@@ -592,17 +592,20 @@ def _model_identity(filename: str, kind: str) -> tuple[str, str, int | None]:
 
 def _model_file_info(path: Path) -> dict:
     """Parse one model file's bytes into cacheable inventory facts."""
-    data = path.read_bytes()
+    return _battle_file_info(path.name.casefold(), path.read_bytes())
+
+
+def _battle_file_info(filename: str, data: bytes) -> dict:
     image = _standalone_texture_info(data)
     if image is not None:
         return image
-    if re.fullmatch(r'a0stg\d+\.x', path.name.casefold()):
+    if re.fullmatch(r'a0stg\d+\.x', filename):
         return _stage_info(data)
     sections = parse_dat_sections(data)
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
                 "parsed": False}
-    kind, names = _section_names(path.name, len(sections))
+    kind, names = _section_names(filename, len(sections))
     named = ([{**section, "name": names[section["index"] - 1]}
               for section in sections] if names is not None
              else [{**section, "name": f"Section {section['index']}"}
@@ -614,6 +617,15 @@ def _model_file_info(path: Path) -> dict:
                   if geometry is not None else None)
         textures = _texture_section(kind, sections)
         tims = _texture_layouts(data, textures) if textures is not None else None
+    else:
+        # Unknown containers can still hold complete, independently validated images.
+        tims = []
+        for section in named:
+            start, size = section['offset'], section['size']
+            image = _standalone_texture_info(data[start:start + size])
+            if image is not None:
+                section['name'] = 'Texture'
+                tims.append({**image['tims'][0], 'index': len(tims), 'offset': start})
     return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
             "parsed": True, "kind": kind, "sections": named,
             "counts": counts, "tims": tims if tims is not None else [],
@@ -972,8 +984,7 @@ def _standalone_texture_info(data: bytes) -> dict | None:
 def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) -> dict | None:
     archive = FsArchive(Path(prefix))
     data = archive.extract(archive.find(filename))
-    return (_stage_info(data) if re.fullmatch(r'a0stg\d+\.x', filename)
-            else _standalone_texture_info(data))
+    return _battle_file_info(filename, data)
 
 
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
@@ -1322,10 +1333,12 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
             if tim_index != 0:
                 raise ValueError('Battle stage TIM index is out of range')
             return tim_png_bytes(data, battle_stage.texture_layout(data)['offset'], palette)
-        info = _model_file_info_from_bytes(inner.casefold(), data)
+        info = _battle_file_info(inner.casefold(), data)
         tims = info.get("tims") or []
         if not 0 <= tim_index < len(tims):
             raise ValueError("Battle TIM index is out of range")
+        if 'offset' in tims[tim_index]:
+            return tim_png_bytes(data, tims[tim_index]['offset'], palette)
         kind = info.get("kind")
         sections = parse_dat_sections(data) or []
         section = _texture_section(kind, sections) if kind else None

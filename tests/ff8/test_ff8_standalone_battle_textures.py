@@ -18,6 +18,20 @@ def test_complete_image_required():
     assert assets._standalone_texture_info(image()[:-1]) is None
 
 
+def test_unknown_container_exposes_only_complete_texture_sections(monkeypatch):
+    texture = image()
+    data = struct.pack('<4I', 2, 16, 16 + len(texture), 20 + len(texture)) + texture + b'data'
+    info = assets._battle_file_info('b0wave.dat', data)
+    assert info['kind'] == 'unmapped'
+    assert [section['name'] for section in info['sections']] == ['Texture', 'Section 2']
+    assert len(info['tims']) == 1 and info['tims'][0]['offset'] == 16
+    monkeypatch.setattr(assets, 'ensure_character_models', lambda: None)
+    monkeypatch.setattr(assets, '_model_bytes', lambda *args: (data, None))
+    assert assets.texture_png_bytes('battle/b0wave.dat#0').startswith(b'\x89PNG')
+    with pytest.raises(ValueError, match='index'):
+        assets.texture_png_bytes('battle/b0wave.dat#1')
+
+
 def test_texture_preview_and_index_validation(monkeypatch):
     monkeypatch.setattr(assets, 'ensure_character_models', lambda: None)
     monkeypatch.setattr(assets, '_model_bytes', lambda *args: (image(), None))
