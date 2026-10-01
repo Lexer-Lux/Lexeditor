@@ -2,6 +2,27 @@
 from test_shared_ui_feedback import page, framework
 
 
+def test_record_images_stay_inside_the_card_at_different_aspect_ratios(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      const cards=[[128,256],[256,128]].flatMap(([w,h])=>[false,true].map(linked=>{
+        const image=U.el('img',{src:'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="cyan"/></svg>`)});
+        return U.recordCard({title:'Texture',image:linked?U.el('a',{href:'#'},image):image,body:U.el('select',{},U.el('option',{},'Palette 1'))});
+      }));
+      document.querySelector('main').append(U.tileGrid(cards,{balanced:true,minWidth:150}));
+    }''')
+    page.wait_for_function('Array.from(document.images).every(image=>image.complete&&image.naturalWidth>0)')
+    for width in (850, 350):
+        page.locator('.lex-tile-grid').evaluate('(grid,width)=>grid.style.width=width+"px"', width)
+        page.wait_for_timeout(80)
+        bounds = page.locator('.lex-record-card').evaluate_all('''cards=>cards.map(card=>{
+          const outer=card.getBoundingClientRect(),image=card.querySelector('img').getBoundingClientRect();
+          return {card:outer.height,image:image.height,fits:image.top>=outer.top&&image.bottom<=outer.bottom+1};
+        })''')
+        assert all(item['fits'] for item in bounds), bounds
+
+
 def test_six_record_cards_balance_and_keep_keyboard_actions(page):
     framework(page)
     page.evaluate('''()=>{
