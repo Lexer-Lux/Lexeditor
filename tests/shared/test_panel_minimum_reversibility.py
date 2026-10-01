@@ -63,3 +63,34 @@ def test_initial_and_reset_sizes_share_the_configured_floor(page,vertical,resiza
         divider.click(button='right')
         assert sizes()[0]==pytest.approx(260,abs=1)
         assert sizes()[1]>=279
+
+
+@pytest.mark.parametrize('vertical',[False,True])
+@pytest.mark.parametrize('resizable',[False,True])
+def test_small_container_scrolls_without_lowering_minima(page,tmp_path,vertical,resizable):
+    framework(page)
+    page.evaluate('''({vertical,resizable})=>{
+      const U=LexeditorUI;
+      document.querySelector('main').style.cssText='flex:none;width:400px;height:400px';
+      document.querySelector('main').append(U.panelLayout([
+        U.detailPanel({title:'First',body:'First panel'}),U.detailPanel({title:'Second',body:'Second panel'})],
+        {orientation:vertical?'vertical':'horizontal',resizable,minSizes:[260,280]}));
+    }''',{'vertical':vertical,'resizable':resizable})
+    page.wait_for_timeout(150)
+    result=page.locator('.lex-panel-layout').evaluate('''(root,vertical)=>({
+      sizes:[...root.querySelectorAll(':scope > .lex-panel-layout-pane')].map(n=>n.getBoundingClientRect()[vertical?'height':'width']),
+      overflow:getComputedStyle(root).overflow,
+      scroll:vertical?root.scrollHeight>root.clientHeight:root.scrollWidth>root.clientWidth
+    })''',vertical)
+    assert result['sizes'][0]>=259 and result['sizes'][1]>=279,result
+    assert result['scroll'] and result['overflow']=='auto',result
+    page.locator('.lex-panel-layout').evaluate('(n,v)=>{if(v)n.scrollTop=n.scrollHeight;else n.scrollLeft=n.scrollWidth}',vertical)
+    assert page.locator('.lex-panel-layout').evaluate('(n,v)=>v?n.scrollTop:n.scrollLeft',vertical)>0
+    if vertical:
+        page.set_viewport_size({'width':700,'height':800})
+        page.wait_for_timeout(100)
+        sizes=page.locator('.lex-panel-layout-pane').evaluate_all('ns=>ns.map(n=>n.getBoundingClientRect().height)')
+        assert sizes[0]>=259 and sizes[1]>=279,sizes
+        if resizable:
+            assert page.get_by_role('separator').is_visible()
+    page.screenshot(path=str(tmp_path/f'small-panel-{vertical}-{resizable}.png'))

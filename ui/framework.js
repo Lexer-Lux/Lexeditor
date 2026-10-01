@@ -8192,10 +8192,11 @@ ${contents.path}`});
     }
     const template = (current, dividers = true) => current.flatMap((value, index) =>
       index < current.length - 1 && dividers
-        ? [`minmax(0, ${value}fr)`, "var(--lex-panel-gap, 14px)"]
-        : [`minmax(0, ${value}fr)`]).join(" ");
+        ? [`minmax(${minSizes[index]}px, ${value}fr)`, "var(--lex-panel-gap, 14px)"]
+        : [`minmax(${minSizes[index]}px, ${value}fr)`]).join(" ");
     const minSizes = Array.from({length: nodes.length}, (_, index) =>
       Math.max(80, Number(options.minSizes?.[index]) || 240));
+    if (!vertical) root.style.setProperty('--lex-panel-stack-min', `${Math.max(0, ...minSizes)}px`);
     let belowMinimum = false, measuredGap = 14;
     // Every side-by-side layout keeps its panes at their minimum widths, from
     // the first draw on, not only the ones that stack when room runs out: a
@@ -8211,6 +8212,9 @@ ${contents.path}`});
       else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(vertical ? css.rowGap : css.columnGap) || 0;
       const available = extent - (parseFloat(vertical ? css.paddingTop : css.paddingLeft) || 0)
         - (parseFloat(vertical ? css.paddingBottom : css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      const least = minSizes.reduce((sum, value) => sum + value, 0);
+      root.classList.toggle('lex-panel-layout-overflow', available <
+        (!vertical && options.stackBelowMinimum ? Math.max(...minSizes) : least));
       if (vertical || !options.stackBelowMinimum) return available;
       belowMinimum = available < minSizes.reduce((sum, value) => sum + value, 0);
       root.classList.toggle('lex-panel-layout-below-minimum', belowMinimum);
@@ -8219,12 +8223,9 @@ ${contents.path}`});
     };
     const fitResponsiveSizes = available => {
       const least=minSizes.reduce((sum,value)=>sum+value,0);
-      // Too narrow for every minimum and not allowed to stack: each pane
-      // gives up the same share of its minimum.
-      if (available && available < least) {
-        const scaled=minSizes.map(value=>value*available/least);
-        return sizes.some((value,index)=>Math.abs(value*available/100-scaled[index])>.5)?scaled:null;
-      }
+      // The grid keeps its declared track minima when they cannot fit. The
+      // container scrolls (or stacks), rather than quietly reducing the floor.
+      if (available && available < least) return null;
       if (!available || !sizes.some((value,index)=>value*available/100<minSizes[index]-.5)) return null;
       const spare=available-minSizes.reduce((sum,value)=>sum+value,0);
       const weights=sizes.map((value,index)=>Math.max(0,value*available/100-minSizes[index]));
@@ -8238,7 +8239,7 @@ ${contents.path}`});
         ? `${Number(options.gap)}px` : "var(--lex-panel-gap, 14px)");
       root.classList.add("lex-panel-layout-static");
       root.append(...nodes);
-      if (nodes.length > 1) {
+      if (nodes.length) {
         const refresh = () => {
           const fitted = fitResponsiveSizes(updateResponsive());
           if (fitted) {
@@ -8303,8 +8304,7 @@ ${contents.path}`});
         : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
       if (!root.isConnected || widths.some(value => value <= 0)) return false;
       const total = widths.reduce((sum,value)=>sum+value,0);
-      const minimumScale = Math.min(1,total/minSizes.reduce((sum,value)=>sum+value,0));
-      const minimums = minSizes.map((value,i)=>Math.max(value*minimumScale,total*minimumFractions[i]));
+      const minimums = minSizes.map((value,i)=>Math.max(value,total*minimumFractions[i]));
       if(edge==="home")delta=-total;
       if(edge==="end")delta=total;
       // When the adjacent pane reaches its minimum, use spare room in the

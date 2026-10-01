@@ -2184,6 +2184,7 @@ body[data-lex-github-open="true"] > :is(#main,#toolbar,footer) {
 .lex-panel-layout.lex-panel-layout-static {
   gap: var(--lex-panel-layout-gap, var(--lex-panel-gap, 14px));
 }
+.lex-panel-layout.lex-panel-layout-overflow { overflow:auto; }
 main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 
 .lex-panel-layout-pane {
@@ -3931,12 +3932,12 @@ body:has(.lex-data-map-table) #main {
 }
 
 @media (max-width: 850px) {
-  .lex-panel-layout {
+  .lex-panel-layout:not(.lex-panel-layout-vertical) {
   gap: 14px;
-  grid-template-columns: var(--lex-panel-layout-narrow-template, 1fr);
+  grid-template-columns: var(--lex-panel-layout-narrow-template, minmax(var(--lex-panel-stack-min,0px),1fr));
 }
 
-  .lex-panel-layout-divider {
+  .lex-panel-layout:not(.lex-panel-layout-vertical) > .lex-panel-layout-divider {
     display: var(--lex-panel-layout-narrow-divider-display, none);
   }
 
@@ -3967,19 +3968,19 @@ body:has(.lex-data-map-table) #main {
 }
 
 @media (max-width: 1000px) {
-  .lex-panel-layout.lex-panel-layout-stack-1000 {
+  .lex-panel-layout.lex-panel-layout-stack-1000:not(.lex-panel-layout-vertical) {
   gap: 14px;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(var(--lex-panel-stack-min,0px),1fr);
 }
 
-  .lex-panel-layout-stack-1000 > .lex-panel-layout-divider {
+  .lex-panel-layout-stack-1000:not(.lex-panel-layout-vertical) > .lex-panel-layout-divider {
     display: none;
   }
 }
 
 /* A container can run out of horizontal room even in a wide app window. */
 .lex-panel-layout.lex-panel-layout-below-minimum {
-  grid-template-columns:minmax(0,1fr);
+  grid-template-columns:minmax(var(--lex-panel-stack-min,0px),1fr);
   grid-template-rows:repeat(var(--lex-panel-count),minmax(0,1fr));
   gap:var(--lex-panel-gap,14px);
 }
