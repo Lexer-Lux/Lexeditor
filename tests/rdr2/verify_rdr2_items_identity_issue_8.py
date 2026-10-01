@@ -1,81 +1,55 @@
+"""Render RDR2 item identity through the shared list/detail components."""
 from pathlib import Path
+import tempfile
+
+from playwright.sync_api import expect, sync_playwright
+from rdr2_browser_check import document
 
 
-ROOT = Path(__file__).resolve().parents[2]
-from rdr2_editor_source import editor_source
-SOURCE = editor_source()
+def main():
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.route("**/*", lambda route: route.abort())
+            page.set_content(document().replace('<head>', '<head><base href="https://lexeditor.test/">', 1))
+            page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
+            listing = page.locator('#main .lex-column-list')
+            expect(listing.locator('[role=columnheader]')).to_have_text(['Name / Item', 'ID', 'Group', 'Category'])
+            rows = listing.locator('.lex-list-row')
+            expect(rows).to_have_count(3)
+            for row in rows.all():
+                expect(row.locator('.lex-column-list-cell')).to_have_count(4)
+                expect(row.locator('input,select,textarea')).to_have_count(0)
+            rows.filter(has_text='CONSUMABLE_BRANDY').click()
+            name = page.get_by_role('textbox', name='Item name', exact=True)
+            expect(name).to_have_value('Brandy')
+            heading = page.locator('.lex-detail-panel-heading').filter(has=name)
+            expect(heading).to_contain_text('CONSUMABLE_BRANDY')
+            name.fill('Edited brandy')
+            name.press('Tab')
+            assert page.evaluate("state.localizationEdits.NAME_BRANDY") == 'Edited brandy'
+            search = page.get_by_role('searchbox', name='Search items', exact=True)
+            search.fill('MOONSHINE')
+            search.press('Tab')
+            expect(rows).to_have_count(1)
+            expect(name).to_have_value('Moonshine')
+            search.fill('')
+            search.press('Tab')
+            expect(rows).to_have_count(3)
+            rows.filter(has_text='CONSUMABLE_BRANDY').click()
+            expect(name).to_have_value('Edited brandy')
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            assert not errors, errors
+            output = Path(tempfile.gettempdir()) / 'lexeditor-dev' / 'rdr2-item-identity.png'
+            output.parent.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(output))
+        finally:
+            browser.close()
+    print('PASS: four identity columns, detail-only editing, name persistence, and search selection')
 
 
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        raise AssertionError(message)
-
-
-require('class:"loot-list list-4col"' in SOURCE,
-        "Items must select the four-column master layout")
-require('el("span",{},"Name / Item"),el("span",{},"ID"),el("span",{},"Group"),el("span",{},"Category")' in SOURCE,
-        "Items must declare the requested master-column order")
-require('class:"item-list-name"' in SOURCE and 'class:"item-list-id"' in SOURCE,
-        "the name and ID must be separate master cells")
-require('class:"item-list-group"' in SOURCE and 'class:"item-list-category"' in SOURCE,
-        "the group and category must be separate master cells")
-require(".loot-list.list-4col" in SOURCE,
-        "the four-column master needs an explicit grid contract")
-# The name/identity field can be assembled through a helper rather than spelling
-# its class literal at one call site. The durable contract is the dedicated
-# one-column field rule plus a full-width identity/control inside it.
-require('.item-detail .detail-field.item-name-field { grid-template-columns:minmax(0,1fr)' in SOURCE
-        and '.item-name-field .detail-control, .item-name-field .item-identity { width:100%; }' in SOURCE,
-        "the identity segment must have its own full-width detail field")
-require('class: "item-meta-line"' in SOURCE,
-        "the identity block must have one aligned metadata row")
-require('class: "item-meta-taxonomy"' in SOURCE,
-        "Group and Category must share the right side of the metadata row")
-require('.item-meta-separator::before { content:"\\00B7"; }' in SOURCE,
-        "the interpunct must use an ASCII CSS escape outside the RDR Lino glyph map")
-require('field("In-game name / item",cells.identity)' not in SOURCE,
-        "the redundant identity label must be removed")
-require('field("Description",cells.description)' in SOURCE,
-        "the description label must use the requested short name")
-require(".item-name-field .localized-name" in SOURCE and "var(--rdr-font-display)" in SOURCE,
-        "the item name input must use the larger RDR2 display treatment")
-require('grid-template-columns:16px minmax(0,1fr)' in SOURCE,
-        "every origin-aware name must reserve the same fixed-width marker slot")
-require('class:"origin-slot"' in SOURCE and 'class:"origin-name-text"' in SOURCE,
-        "origin-aware names must keep the optional marker separate from aligned text")
-require('el("span",{class:"origin-slot","aria-hidden":"true"},originMarker(record))' in SOURCE,
-        "the marker slot must exist even when a record has no origin icon")
-require("grid-template-columns:48px minmax(0,1fr)" not in SOURCE,
-        "the item icon must not remain trapped in a fixed 48-pixel column")
-require(".item-identity { display:flex" in SOURCE and "align-items:flex-start" in SOURCE,
-        "the identity header must keep the square icon aligned with the content top")
-require(".item-identity-main { flex:1 1 0; min-width:0; }" in SOURCE,
-        "the name and metadata must retain the flexible remainder of the header")
-require("--item-icon-size" in SOURCE and "function sizeItemIdentityIcon(identity,main)" in SOURCE,
-        "the icon size must follow the rendered identity-content height")
-require("Math.max(48,Math.min(96,main.getBoundingClientRect().height))" in SOURCE,
-        "the adaptive icon must keep the 48-96 pixel bounds")
-require("aspect-ratio:1" in SOURCE and "max-width:96px" in SOURCE and "max-height:96px" in SOURCE,
-        "the expanding icon must stay square and keep a safe upper bound")
-require("function rdrSearchField({" in SOURCE,
-        "RDR2 search fields must share one magnifier/input component")
-require("itemSearchText" in SOURCE and 'className:"shop-panel-search"' in SOURCE,
-        "Items must search through the shared pager and Shops through rdrSearchField")
-require('class:"record-toolbar"' in SOURCE,
-        "the Items controls must use the shared record toolbar")
-require("item-toolbar-center" not in SOURCE and "item-toolbar-controls" not in SOURCE,
-        "the retired three-zone toolbar rules must not return")
-require('class:"item-toolbar-filters"' in SOURCE,
-        "the three Items dropdown filters must remain one right-aligned group")
-require('class:"item-toolbar-meta toolbar-context-slot"' in SOURCE,
-        "Items metadata and help must not disrupt the three primary alignment zones")
-require("transform:translateY(-1px)" in SOURCE,
-        "the magnifier needs the optical vertical correction shown by the reference image")
-require('class:"item-identity-actions"' in SOURCE,
-        "the item lookup and preview controls must share one vertical action rail")
-require('.item-identity-actions { grid-column:3; grid-row:1 / span 2; display:grid; grid-template-rows:repeat(2,26px)' in SOURCE,
-        "the item action rail must stack two equal controls vertically")
-require('grid-template-columns:18px minmax(0,1fr) 26px' in SOURCE,
-        "the item identity grid must reserve one action column, not two side-by-side buttons")
-
-print("RDR2 Items identity issue 8 source contract passed")
+if __name__ == '__main__':
+    main()

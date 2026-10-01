@@ -71,21 +71,24 @@ def verify_copied_clean_install() -> None:
         copied_tools = copied_root / "tools" / "rpf-cli" / "bin"
         copied_plugin.mkdir(parents=True)
         copied_tools.mkdir(parents=True)
+        (copied_root / "core").mkdir()
 
         # service_session imports runtime_bootstrap, so a "minimum install"
         # without it is not one: the probe died on the import rather than on
         # anything this check is about.
         for relative in ("core/plugin_api.py", "core/service_session.py", "core/game_installation.py",
-                         "core/runtime_bootstrap.py"):
+                         "core/runtime_bootstrap.py", "core/plugin_manifest.py"):
             shutil.copy2(ROOT / relative, copied_root / relative)
         (copied_root / "plugins").mkdir(exist_ok=True)
         shutil.copy2(ROOT / "plugins" / "__init__.py", copied_root / "plugins" / "__init__.py")
-        for relative in ("__init__.py", "extractor.py", "paths.py", "plugin.py"):
+        for relative in ("__init__.py", "extractor.py", "paths.py", "plugin.py", "plugin.json"):
             shutil.copy2(ROOT / "plugins" / "rdr2" / relative, copied_plugin / relative)
         for name in extractor.TOOL_FILES:
             target = copied_tools / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(extractor.TOOL_ROOT / name, target)
+            # The child replaces external tool execution with a deterministic
+            # stub. Only presence and stamps are used in this isolated check.
+            target.write_bytes(b"synthetic extractor tool fixture")
 
         environment = os.environ.copy()
         environment["LOCALAPPDATA"] = str(copied_root / "local-data")
@@ -93,7 +96,7 @@ def verify_copied_clean_install() -> None:
         environment["LEXEDITOR_MOD_ROOT"] = str(copied_root / "fixture-project" / "mod")
         command = [
             sys.executable,
-            str(ROOT / "tools" / "issue16_clean_install_probe.py"),
+            str(Path(__file__).with_name("first_start_probe.py")),
             str(copied_root),
         ]
         result = subprocess.run(
@@ -266,7 +269,9 @@ def main() -> int:
     game_root = Path(os.environ.get("RDR2_GAME_ROOT", DEFAULT_GAME)).resolve()
     required = PLUGIN.installation.required_paths
     assert "update_4.rpf" in required
-    assert all((game_root / relative).exists() for relative in required), game_root
+    missing = [relative for relative in required if not (game_root / relative).exists()]
+    if missing:
+        raise FileNotFoundError(f"Missing RDR2 installed game/project data: {game_root}; {missing}")
     outputs = {entry.output for entry in extractor.ENTRIES}
     expected = {
         "catalog_sp.ymt", "quickselectitems.ymt", "weapons.ymt",

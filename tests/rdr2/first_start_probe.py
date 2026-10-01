@@ -40,7 +40,7 @@ def _raw_fixture(output: str) -> bytes:
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise SystemExit("usage: issue16_clean_install_probe.py COPIED_ROOT")
+        raise SystemExit("usage: first_start_probe.py COPIED_ROOT")
     copied_root = Path(sys.argv[1]).resolve()
     sys.path.insert(0, str(copied_root))
 
