@@ -533,12 +533,14 @@ def load_extended(game_root, project_root):
             target = _target(game_root, project_root, source, relative)
             original = source.read_bytes()
             active = target.read_bytes() if target.exists() else original
-            vanilla, current = model(family, original, original), model(family, active, original)
+            vanilla = model(family, original, original)
+            current = vanilla if active == original else model(family, active, original)
             report.update(sourceSha256=digest(original), activeSha256=digest(active), usingProject=target.exists(), projectPath=str(target))
             if getattr(current,'errors',None): report['memberErrors'] = current.errors
             for key in info['categories']:
                 try:
-                    rows, baseline = current.records(key), vanilla.records(key)
+                    baseline = vanilla.records(key)
+                    rows = deepcopy(baseline) if current is vanilla else current.records(key)
                     if [r['id'] for r in rows] != [r['id'] for r in baseline]:
                         raise ValueError('Project record identities differ from the installed source')
                     result['records'][key], result['vanilla'][key] = rows, baseline
