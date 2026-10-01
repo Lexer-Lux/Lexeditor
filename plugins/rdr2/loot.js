@@ -95,7 +95,7 @@ async function renderLootSounds(){
       if(view.reason!=="select"&&view.reason!=="sync")renderLootSounds();
     },
     splitKey:"rdr2-loot-sounds",defaultSplit:45,
-    select:id=>{state.lootSoundSelected=id;},
+    sync:view=>{state.lootSoundPage=view.page;state.lootSoundSelected=view.selected;},
     search:{value:state.lootSoundQuery||"",label:"Find pickup sound",change:value=>{
       state.lootSoundQuery=value;state.lootSoundPage=0;renderLootSounds();}},
     master:view=>LexeditorUI.columnList({rows:view.rows,key:row=>row.id,

@@ -90,7 +90,9 @@ def save_one_weapon(session_url: str, data: dict) -> bytes:
 
 
 def verify_structure() -> None:
-    allowed = {"__init__.py", "plugin.py", "__pycache__"}
+    # Edition metadata and attribution are required in each plugin folder;
+    # the implementation must still delegate to FF7.
+    allowed = {"__init__.py", "plugin.py", "plugin.json", "credits.md", "__pycache__"}
     extras = sorted(path.name for path in LEGACY_ROOT.iterdir() if path.name not in allowed)
     if extras:
         raise AssertionError(
