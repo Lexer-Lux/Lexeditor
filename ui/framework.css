@@ -4127,7 +4127,8 @@ body:has(.lex-data-map-table) #main {
    stop at 90px, which is a quarter of a small card but under a fifth of a large
    one: on a wide window the label read small beside its own graph. */
 .lex-curve-plot::before { content:attr(data-curve-title); position:absolute; inset:20px; z-index:2; display:grid; place-items:center; color:var(--lex-text); opacity:.13; text-shadow:none; font:800 clamp(24px,22cqw,220px)/1 var(--lex-heading-font); pointer-events:none; }
-.lex-curve-svg { display:block; position:relative; width:100%; height:auto; aspect-ratio:2; overflow:visible; background:transparent; }
+/* Leave graph space below a wrapped variable drawer, including fallback fonts. */
+.lex-curve-svg { display:block; position:relative; width:100%; height:auto; min-height:8em; aspect-ratio:2; overflow:visible; background:transparent; }
 .lex-curve-svg :is(path,line,polyline) { vector-effect:non-scaling-stroke; }
 .lex-curve-grid-lines { fill:none; stroke:var(--lex-curve-grid,color-mix(in srgb,var(--lex-border) 42%,transparent)); stroke-width:1; }
 .lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent)); stroke:none; }
@@ -4174,7 +4175,8 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-variables { position:absolute; z-index:6; left:0; right:0; top:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(0 0 100%); transition:opacity .15s,clip-path .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; clip-path:inset(0); }
 
-.lex-curve-variable { flex:1 1 84px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
+/* Wrap before the mode button can shrink a value and its native spinner. */
+.lex-curve-variable { flex:1 0 6em; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }

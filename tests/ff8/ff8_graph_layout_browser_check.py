@@ -57,6 +57,9 @@ def main():
   # variables in a ~300px drawer used to render ~50px inputs while two-variable
   # cards rendered ~120px ones, and the drawer covered the BARS toggle parked
   # at the plot's bottom-right. The toggle now rides in the drawer itself.
+  # Hosted Windows runners do not have Arial Narrow. Exercise that wider
+  # fallback explicitly so local font availability cannot hide clipping.
+  page.add_style_tag(content=':root{--lex-font:Arial,sans-serif}')
   page.evaluate("""()=>{const mount=document.createElement('div');
     mount.id='narrow-mount';mount.style.cssText='width:320px;height:520px;margin-top:12px';
     document.body.append(mount);
@@ -75,10 +78,9 @@ def main():
   assert narrow.evaluate("e=>e.querySelector('.lex-curve-plot').classList.contains('lex-curve-bar-mode')")
   toggle.click()
   assert toggle.inner_text()=='BARS'
-  # A wrapped strip fills the row it is in and keeps its rows down to two. The
-  # grid this replaced left the last row short of the right edge and, in a
-  # 240px card, needed three rows - 109px of a 143px card, so the strip covered
-  # the graph it belongs to.
+  # A wrapped strip fills its variable rows. A wider fallback font may put
+  # the mode button on a third row rather than squeezing the numeric inputs.
+  # Even then the drawer must leave the graph usable.
   page.evaluate("""()=>{const mount=document.createElement('div');
     mount.id='wrap-mount';mount.style.cssText='width:240px;height:200px;margin-top:12px';
     document.body.append(mount);
@@ -95,10 +97,11 @@ def main():
     return {rows:bands.length,slack:Math.round(box.right-6-Math.max(...last.items.map(item=>item.right))),
       share:Math.round(box.height/e.getBoundingClientRect().height*100),
       widths:[...e.querySelectorAll('.lex-curve-variable input')].map(node=>Math.round(node.getBoundingClientRect().width))}}""")
-  assert strip['rows']<=2,strip
+  assert strip['rows']<=3,strip
   assert strip['slack']<=2,strip
   assert strip['share']<=65,strip
   assert_readable_inputs(wrap)
+  wrap.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-wrapped-graph.png'))
   page.mouse.move(1,1);page.wait_for_timeout(250)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-eight-graphs.png'))
   browser.close();print('Eight graphs: titles, borders, colors, drawer bounds and equation spacing passed.')
