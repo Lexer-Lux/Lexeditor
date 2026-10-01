@@ -7,6 +7,11 @@ Each object stores vertex frames followed by eight counted primitive groups.
 import struct
 import base64
 
+PRIMITIVES = ((3, 12, 0x20, False), (4, 12, 0x28, False),
+              (3, 20, 0x24, True), (4, 24, 0x2c, True),
+              (3, 20, 0x30, False), (4, 24, 0x38, False),
+              (3, 28, 0x34, True), (4, 36, 0x3c, True))
+
 
 def parse(data: bytes) -> list[dict]:
     if 8 <= len(data) <= 16 * 1024 * 1024:
@@ -30,7 +35,7 @@ def _direct_objects(data: bytes) -> list[dict]:
                 obj['offset'] += start
             break
         cursor = start + faces_at
-        for stride in (12, 16, 20, 24, 20, 24, 28, 36):
+        for _, stride, _, _ in PRIMITIVES:
             if cursor + 4 > len(data):
                 raise ValueError('Truncated direct surface face count')
             count, = struct.unpack_from('<I', data, cursor)
@@ -79,10 +84,7 @@ def _parse_table(data: bytes) -> list[dict]:
             raise ValueError('Invalid effect surface vertex frames')
         cursor = start + faces_at
         faces = []
-        for corners, stride, command, textured in ((3, 12, 0x20, False), (4, 16, 0x28, False),
-                                                   (3, 20, 0x24, True), (4, 24, 0x2c, True),
-                                                   (3, 20, 0x30, False), (4, 24, 0x38, False),
-                                                   (3, 28, 0x34, True), (4, 36, 0x3c, True)):
+        for corners, stride, command, textured in PRIMITIVES:
             if cursor + 4 > stop:
                 raise ValueError('Truncated effect surface face count')
             amount, = struct.unpack_from('<I', data, cursor)

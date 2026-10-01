@@ -10,7 +10,7 @@ def surface():
     vertices = b''.join(struct.pack('<4h', *point, 0) for point in
                         ((0, 0, 0), (100, 0, 0), (0, 100, 0), (100, 100, 0)))
     groups = []
-    for corners, stride, command, textured in ((3, 12, 0x20, False), (4, 16, 0x28, False),
+    for corners, stride, command, textured in ((3, 12, 0x20, False), (4, 12, 0x28, False),
                                                (3, 20, 0x24, True), (4, 24, 0x2c, True),
                                                (3, 20, 0x30, False), (4, 24, 0x38, False),
                                                (3, 28, 0x34, True), (4, 36, 0x3c, True)):
@@ -40,6 +40,17 @@ def test_all_primitive_groups_and_vertex_frames():
     assert obj['faces'][3]['uv'] == [(1, 2), (3, 4), (5, 6), (7, 8)]
     assert obj['faces'][6]['clut'] == 123 and obj['faces'][6]['tpage'] == 189
     assert obj['faces'][7]['colors'] == [[128, 64, 32], [10, 20, 30], [11, 20, 30], [12, 20, 30]]
+
+
+def test_flat_quad_has_no_padding_after_its_four_indices():
+    # Four color/command bytes followed immediately by four u16 references.
+    face = bytes.fromhex('80 40 20 28 00 00 02 00 04 00 06 00')
+    obj = struct.pack('<3I', 44, 4, 1) + bytes(32)
+    obj += struct.pack('<2I', 0, 1) + face + bytes(24)
+    data = struct.pack('<3I', 1, 12 + len(obj), 12) + obj
+    decoded, = effect_surface.parse(data)
+    assert decoded['faces'] == [{'indices': [0, 1, 2, 3], 'color': [128, 64, 32],
+                                 'colors': [[128, 64, 32]] * 4}]
 
 
 @pytest.mark.parametrize('offset,value', [(0, 257), (8, 16), (12, 999999), (16, 999999), (20, 0)])
