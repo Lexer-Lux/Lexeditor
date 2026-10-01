@@ -661,6 +661,32 @@ def _model_motion_info(data: bytes, sections: list[dict], part: int = 1) -> list
              'animations': [{'id': index, 'frames': raw[offset]} for index, offset in enumerate(offsets)]}]
 
 
+def _battle_font_tim(data: bytes) -> tuple[bytes, int]:
+    """Read a TDW battle font, bounding palettes by their stored block length.
+
+    Deling's TdwFile/TimFile use the palette block length too: the shipped BFT
+    claims 16 palette rows but stores only eight. Normalize a preview copy.
+    """
+    if not 28 <= len(data) <= MAX_MODEL_BYTES:
+        raise ValueError('Invalid battle font size')
+    widths, offset = struct.unpack_from('<2I', data)
+    if widths != 8 or not 8 <= offset <= len(data) - 20:
+        raise ValueError('Invalid battle font offsets')
+    raw = bytearray(data[offset:])
+    magic, flags, palette_size = struct.unpack_from('<3I', raw)
+    width, = struct.unpack_from('<H', raw, 16)
+    if magic != 16 or flags != 8 or width != 16 or palette_size < 12:
+        raise ValueError('Unsupported battle font image')
+    rows, remainder = divmod(palette_size - 12, 32)
+    if remainder or rows not in (8, 16, 32):
+        raise ValueError('Invalid battle font palettes')
+    struct.pack_into('<H', raw, 18, rows)
+    layout = _tim_layout(raw)
+    if layout['size'] != len(raw):
+        raise ValueError('Battle font image has trailing data')
+    return bytes(raw), offset
+
+
 def _battle_resource_info(filename: str, data: bytes, sections: list[dict]) -> dict | None:
     """Recognize the shared battle and victory containers, including child bounds.
 
@@ -680,6 +706,13 @@ def _battle_resource_info(filename: str, data: bytes, sections: list[dict]) -> d
         named = [{**section, 'name': name} for section, name in zip(
             sections, ('Battle effect textures', 'Battle font', 'Sound data'))]
         tims = [{**image['tims'][0], 'offset': texture['offset']}]
+        try:
+            font_image, _ = _battle_font_tim(font_raw)
+        except ValueError:
+            pass
+        else:
+            tims.append({'index': 1, **_tim_layout(font_image),
+                         'fontOffset': font['offset'], 'fontSize': font['size']})
     elif filename == 'r0win.dat' and len(sections) == 8:
         labels = ('Victory fanfare', 'Victory camera', 'Rinoa', 'Quistis', 'Irvine', 'Edea', 'Selphie', 'Kiros')
         for section, label in zip(sections, labels):
@@ -718,6 +751,18 @@ def _battle_resource_info(filename: str, data: bytes, sections: list[dict]) -> d
 
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
+    if filename == 'a9btlfnt.bft':
+        try:
+            font_image, offset = _battle_font_tim(data)
+        except ValueError:
+            pass
+        else:
+            return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                    'parsed': True, 'kind': 'font', 'counts': None,
+                    'tims': [{'index': 0, **_tim_layout(font_image), 'fontOffset': 0, 'fontSize': len(data)}],
+                    'geometryVerified': False, 'texturesVerified': True,
+                    'sections': [{'index': 1, 'name': 'Character widths', 'offset': 8, 'size': offset - 8},
+                                 {'index': 2, 'name': 'Font image', 'offset': offset, 'size': len(data) - offset}]}
     # Both archive sound containers use a 64-byte header and a bounded payload.
     # SCOT identification: wiki.ffrtt.ru/index.php/FF8/FileFormat_magfiles
     if 64 <= len(data) <= MAX_MODEL_BYTES and (data[:4] == b'AKAO' or data[4:8] == b'SCOT'):
@@ -1278,13 +1323,15 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         row['summonFamily'] = None
     elif kind == 'battle-data':
         if filename == 'b0wave.dat':
-            name, note = 'Shared battle resources', 'Textures, font and sound data used in battle. Preview the effect textures below. Font and sound playback are not decoded.'
+            name, note = 'Shared battle resources', 'Textures, font and sound data used in battle. Preview the images below. Sound playback is not decoded.'
         else:
             name, note = 'Victory sequence', 'Music, camera movements and character poses used after a victory. The poses use the characters\' models. Sequence playback is not shown here.'
+    elif kind == 'font':
+        name, note = 'Battle font', 'Letters and symbols stored in the battle archive. Choose a palette to preview their colors. Character widths and lettering are read-only.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data", "battle-data") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data", "battle-data", "font") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1568,6 +1615,10 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
         tims = info.get("tims") or []
         if not 0 <= tim_index < len(tims):
             raise ValueError("Battle TIM index is out of range")
+        if 'fontOffset' in tims[tim_index]:
+            font = tims[tim_index]
+            raw, _ = _battle_font_tim(data[font['fontOffset']:font['fontOffset'] + font['fontSize']])
+            return tim_png_bytes(raw, palette=palette)
         if 'offset' in tims[tim_index]:
             return tim_png_bytes(data, tims[tim_index]['offset'], palette)
         kind = info.get("kind")

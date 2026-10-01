@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -156,7 +156,7 @@
     if(!model?.file)return null;
     if(model.modelKind==='effect'&&!model.effectMeshes?.some(mesh=>mesh.triangles||mesh.quads))return summonTextureThumb(model);
     if(model.summonFamily!=null&&!model.vertices&&!model.counts?.vertices)return summonTextureThumb(model);
-    if(model.modelKind==='texture')return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
+    if(['texture','font'].includes(model.modelKind))return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
     if(!model.vertices&&!model.counts?.vertices)return null;
     return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }

@@ -3,6 +3,8 @@ import struct
 import pytest
 
 from plugins.ff8 import assets
+from io import BytesIO
+from PIL import Image
 
 
 def container(blocks):
@@ -10,6 +12,29 @@ def container(blocks):
     for block in blocks:
         offsets.append(offsets[-1] + len(block))
     return struct.pack(f'<{len(offsets) + 1}I', len(blocks), *offsets) + b''.join(blocks)
+
+
+def test_battle_font_uses_stored_palettes_without_changing_source(monkeypatch):
+    # The shipped font claims sixteen rows but stores eight complete palettes.
+    colors = [31] * 112 + [992] * 16
+    tim = struct.pack('<3I4H', 16, 8, 268, 0, 224, 16, 16)
+    tim += struct.pack('<128H', *colors)
+    tim += struct.pack('<I4H', 14, 0, 0, 1, 1) + bytes(2)
+    data = struct.pack('<2I', 8, 12) + bytes(4) + tim
+    with pytest.raises(ValueError, match='palette length'):
+        assets._tim_layout(tim)
+    info = assets._battle_file_info('a9btlfnt.bft', data)
+    assert info['kind'] == 'font' and info['tims'][0]['paletteCount'] == 8
+    assert data[12 + 18:12 + 20] == bytes((16, 0))
+    monkeypatch.setattr(assets, 'ensure_character_models', lambda: None)
+    monkeypatch.setattr(assets, '_model_bytes', lambda *args: (data, None))
+    image = Image.open(BytesIO(assets.texture_png_bytes('battle/a9btlfnt.bft#0', 7)))
+    assert image.getpixel((0, 0)) == (0, 255, 0, 255)
+    with pytest.raises(ValueError, match='Palette ID'):
+        assets.texture_png_bytes('battle/a9btlfnt.bft#0', 8)
+    for invalid in (data[:-1], data + b'extra', bytes(8) + data[8:]):
+        with pytest.raises(ValueError):
+            assets._battle_font_tim(invalid)
 
 
 def test_shared_resources_preserve_texture_offset(monkeypatch):
