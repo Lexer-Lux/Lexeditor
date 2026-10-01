@@ -198,6 +198,22 @@ def main():
             if os.environ.get('LEXEDITOR_SOUND_DATA_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_SOUND_DATA_SCREENSHOT'])
+            page.evaluate("state.selected.models='b0wave.dat';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Battle font', exact=True).wait_for(state='visible')
+            palette = page.get_by_role('combobox', name='Shared battle resources texture 1 palette', exact=True)
+            palette.focus()
+            palette.select_option('25')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('b0wave.dat%230')&&i.src.includes('palette=25')&&i.complete&&i.naturalWidth===768)")
+            assert page.locator('.lex-model-stage').count() == 0
+            if os.environ.get('LEXEDITOR_BATTLE_RESOURCES_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_BATTLE_RESOURCES_SCREENSHOT'])
+            page.evaluate("state.selected.models='r0win.dat';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Rinoa: body animation', exact=True).wait_for(state='visible')
+            assert page.locator('.lex-model-stage').count() == 0
+            if os.environ.get('LEXEDITOR_VICTORY_RESOURCES_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_VICTORY_RESOURCES_SCREENSHOT'])
             page.evaluate("state.selected.models='scene.out';navigate('models')")
             assert page.get_by_role('button', name='Open in Encounters', exact=True).is_visible()
             assert page.locator('.lex-model-stage').count() == 0

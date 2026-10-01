@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -232,7 +232,7 @@
         {key:"offset",label:"Offset",render:section=>formatNumber(section.offset)},
         ...(resources?[]:[{key:"size",label:"Size",render:section=>assetFileSize(section.size)}])]});
       sections.push(detailSection({title:resources?"RESOURCES":"SECTIONS",body:[table],
-        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":row.modelKind==='sound-data'?"Parts of this sound file. The sound data is not editable here.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
+        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":row.modelKind==='sound-data'?"Parts of this sound file. The sound data is not editable here.":row.modelKind==='battle-data'?"Shared resources used during battle or after a victory. Individual sections are read-only.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
     }
     const links=[];
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));

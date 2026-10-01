@@ -661,6 +661,61 @@ def _model_motion_info(data: bytes, sections: list[dict], part: int = 1) -> list
              'animations': [{'id': index, 'frames': raw[offset]} for index, offset in enumerate(offsets)]}]
 
 
+def _battle_resource_info(filename: str, data: bytes, sections: list[dict]) -> dict | None:
+    """Recognize the shared battle and victory containers, including child bounds.
+
+    Layouts: FF8ModdingWiki technical-reference/battle/file-format-b0wavedat/
+    and technical-reference/battle/victory-sequence-r0windat/.
+    """
+    named, tims = [], []
+    if filename == 'b0wave.dat' and len(sections) == 3:
+        texture, font, sound = sections
+        image = _standalone_texture_info(data[texture['offset']:texture['offset'] + texture['size']])
+        font_raw = data[font['offset']:font['offset'] + font['size']]
+        if (image is None or len(font_raw) < 8
+                or not 8 == struct.unpack_from('<I', font_raw)[0]
+                or not 8 <= struct.unpack_from('<I', font_raw, 4)[0] < len(font_raw)
+                or sound['size'] < 64 or data[sound['offset']:sound['offset'] + 4] != b'AKAO'):
+            return None
+        named = [{**section, 'name': name} for section, name in zip(
+            sections, ('Battle effect textures', 'Battle font', 'Sound data'))]
+        tims = [{**image['tims'][0], 'offset': texture['offset']}]
+    elif filename == 'r0win.dat' and len(sections) == 8:
+        labels = ('Victory fanfare', 'Victory camera', 'Rinoa', 'Quistis', 'Irvine', 'Edea', 'Selphie', 'Kiros')
+        for section, label in zip(sections, labels):
+            start, size = section['offset'], section['size']
+            raw = data[start:start + size]
+            if label == 'Victory camera':
+                if len(raw) < 8:
+                    return None
+                count, sequence, animation, end = struct.unpack_from('<4H', raw)
+                if count != 2 or not 8 <= sequence < animation < end == len(raw):
+                    return None
+                children = [{'offset': sequence, 'size': animation - sequence},
+                            {'offset': animation, 'size': end - animation}]
+                names = ('Camera sequence', 'Camera animations')
+            else:
+                children = parse_dat_sections(raw)
+                expected = 2 if label in ('Victory fanfare', 'Edea', 'Kiros') else 3
+                if children is None or len(children) != expected:
+                    return None
+                if label == 'Victory fanfare':
+                    if any(child['size'] < 16 or raw[child['offset']:child['offset'] + 4] != b'AKAO' for child in children):
+                        return None
+                    names = ('Fanfare sound bank', 'Fanfare music sequence')
+                else:
+                    names = tuple(f'{label}: {name}' for name in ('body animation', 'animation sequence', 'weapon animation'))
+            first_index = len(named) + 1
+            named.extend({'index': first_index + index, 'offset': start + child['offset'],
+                          'size': child['size'], 'name': name}
+                         for index, (child, name) in enumerate(zip(children, names)))
+    else:
+        return None
+    return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+            'parsed': True, 'kind': 'battle-data', 'sections': named, 'tims': tims,
+            'counts': None, 'geometryVerified': False, 'texturesVerified': bool(tims)}
+
+
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
     # Both archive sound containers use a 64-byte header and a bounded payload.
@@ -730,6 +785,9 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
                 "parsed": False}
+    resources = _battle_resource_info(filename, data, sections)
+    if resources is not None:
+        return resources
     kind, names = _section_names(filename, len(sections))
     named = ([{**section, "name": names[section["index"] - 1]}
               for section in sections] if names is not None
@@ -1210,10 +1268,15 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     elif kind == 'sound-data':
         name, note = f'Battle sound data {filename}', 'This file contains sound data. It has no model preview, and playback of this sound container is not decoded.'
         row['summonFamily'] = None
+    elif kind == 'battle-data':
+        if filename == 'b0wave.dat':
+            name, note = 'Shared battle resources', 'Textures, font and sound data used in battle. Preview the effect textures below. Font and sound playback are not decoded.'
+        else:
+            name, note = 'Victory sequence', 'Music, camera movements and character poses used after a victory. The poses use the characters\' models. Sequence playback is not shown here.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data", "battle-data") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
