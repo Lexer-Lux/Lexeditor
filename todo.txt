@@ -36,8 +36,6 @@ enemies -> actions: uhh only a handful of these -- the spells -- are hoverables?
 	then enemy becomes another subtab. for those enemy-only abilities.
 
 
-maybme this is a global thing, but all the weapons stay if i toggle mod contents only. but none of their items in the list appear in the changed item accent color. also, the property name of a changed property should appear in that changed color too.
-
 Cards
 - FF8 Cards: show each player's deck and its cards in the detail pane; add a deck editor instead of only a Deck ID, researching the executable tables as needed.
     > status 2026-09-27: Cards > Decks exists and a player's deck is a link + finder. Not done: a deck's cards - which rare cards a deck number holds is in FF8_EN.exe and has not been found yet.

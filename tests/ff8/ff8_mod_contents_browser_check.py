@@ -36,7 +36,7 @@ state.base=structuredClone(state.data);
     document.documentElement.style.setProperty('--lex-accent-ink','#ee2277');
     document.querySelector('main').style.cssText='height:600px;display:flex';
     window.render=()=>{const U=LexeditorUI;document.querySelector('main').replaceChildren(U.pagedListDetail({
-      rows:state.data.weapons.rows,key:r=>r.id,slots:true,pageSize:10,selected:0,
+      rows:state.data.weapons.rows,key:r=>r.id,slots:true,pageSize:10,selected:0,fit:false,
       modOnly:modOnlySpec('weapons'),splitKey:'weapon-mod-test',
       master:view=>U.columnList({rows:view.rows,key:r=>r.id,selected:view.selected,select:view.select,
         columns:[{key:'id',label:'ID'},{key:'name',label:'Name'}]}),
@@ -49,7 +49,7 @@ state.base=structuredClone(state.data);
   page.get_by_role('checkbox',name='Mod contents only',exact=True).check()
   assert page.locator('.lex-list-row').count()==1
   page.get_by_role('checkbox',name='Mod contents only',exact=True).uncheck()
-  page.wait_for_function("document.querySelectorAll('.lex-list-row').length===2")
+  assert page.locator('.lex-list-row').count()==2, page.evaluate("({modOnly:state.modOnly,keys:[...document.querySelectorAll('.lex-list-row')].map(n=>n.dataset.key),text:document.querySelector('main').innerText})")
   page.evaluate('state.data.weapons.rows[1].fields[0].value=95;LexeditorUI.refreshReferences()')
   assert modified.count()==2
   import tempfile
