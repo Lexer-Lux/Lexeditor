@@ -2020,7 +2020,9 @@
       const target = input.getBoundingClientRect();
       const icon = pin.getBoundingClientRect();
       if (!owner.width || !target.height || !icon.width) return;
-      if (input.matches('input[type="checkbox"]')) {
+      const checkbox = input.matches('input[type="checkbox"]');
+      const wideBoolean = checkbox && document.documentElement.dataset.lexBooleanStyle !== "arrow";
+      if (checkbox && !wideBoolean) {
         // Keep the whole icon inside the row, above the leader near the box.
         // Rectangles include UI zoom; positioned offsets use unscaled pixels.
         const scale = owner.width / control.offsetWidth || 1;
@@ -2045,8 +2047,9 @@
       // amount leaves the mark at the box's corner and inside the row.
       const overhangX = Math.min(icon.width - tipX, 8);
       const dropY = Math.min(4, target.height * .2);
-      const targetX = target.right + (outward ? inset : -inset - overhangX);
-      const targetY = target.top + (outward ? -inset : inset + dropY);
+      const outside = outward && !wideBoolean;
+      const targetX = target.right + (outside ? inset : -inset - overhangX);
+      const targetY = target.top + (outside ? -inset : inset + dropY);
       const scale = owner.width / control.offsetWidth || 1;
       pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
       pin.style.setProperty("top", `${(targetY - owner.top - tipY) / scale}px`, "important");

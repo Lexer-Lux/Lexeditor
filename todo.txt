@@ -9,8 +9,6 @@
     > status 2026-09-27: it was really 22px; now 15px (type rail 11px, 4px inset). Lower and the rail's letters touch the name. Tell me if 15 is enough.
 - (reopened) Boolean rows: only each tab's default view was checked for misplaced help buttons; subtabs were not swept.
     > status 2026-09-27: FF8 swept (every tab, subtab and panel tab) - all fine. Other games not swept yet.
-- pins in the new and improved bool boxes are...well, way out of place
-    > status 2026-09-27: fixed one cause - a group of bool boxes also had a pin for the whole field, and it sat in the last box's corner and lit up when any box was hovered (Weapons > Renzokuken finishers). It now sits by the label and each box shows only its own pin. If you meant a different misplacement, say which page.
 
 
 ==================================================================== GITHUB
