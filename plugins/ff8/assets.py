@@ -824,7 +824,8 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
             resources = effect_surface.resource_sections(data)
             for resource in resources:
                 if any(resource['offset'] <= obj['offset'] < resource['offset'] + resource['size'] for obj in surfaces):
-                    resource['name'] = f"Resource {resource['index']}: surface geometry"
+                    kind = next(obj['kind'] for obj in surfaces if resource['offset'] <= obj['offset'] < resource['offset'] + resource['size'])
+                    resource['name'] = f"Resource {resource['index']}: {'sprite frames' if kind == 'sprite' else 'surface geometry'}"
             return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
                     'parsed': True, 'kind': 'surface', 'sections': resources, 'tims': [],
                     'effectMeshes': surfaces, 'geometryVerified': True, 'texturesVerified': False,
@@ -1323,7 +1324,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     elif kind == 'surface':
         name, note = f'Effect surface {filename}', 'Animated scenery used by a battle effect. Select an object and frame to inspect its shape. Matching textures are shown when known.'
         if info['sections']:
-            note = 'Preview the decoded surfaces in this effect pack. Other resources are listed but not decoded. Placement and timing within the effect are not shown.'
+            note = 'Preview the surfaces and sprite frames in this effect pack. Some resources are not decoded. Placement and timing within the effect are not shown.'
     elif kind == 'sound-data':
         name, note = f'Battle sound data {filename}', 'This file contains sound data. It has no model preview, and playback of this sound container is not decoded.'
         row['summonFamily'] = None

@@ -76,7 +76,7 @@ def main():
             page.locator('.lex-detail-panel-icon').click()
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             objects = page.get_by_role('combobox', name='Summon mesh object', exact=True)
-            assert objects.locator('option').count() == 6
+            assert objects.locator('option').count() == 10
             with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=5' in response.url) as selected:
                 objects.select_option('5')
             assert len(selected.value.json()['positions']) == 100
@@ -84,6 +84,19 @@ def main():
             if os.environ.get('LEXEDITOR_RESOURCE_MESH_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_RESOURCE_MESH_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag088_b.2p0';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'frame=15' in response.url) as sprite:
+                page.get_by_role('combobox', name='Surface frame', exact=True).select_option('15')
+            assert sprite.value.json()['frameCount'] == 16
+            assert sprite.value.json()['unmappedFaces'] == 0
+            assert len(sprite.value.json()['positions']) == 4
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_SPRITE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_SPRITE_SCREENSHOT'])
             page.evaluate("state.selected.models='mag115_h.16';navigate('models')")
             page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
             page.locator('.lex-detail-panel-icon').click()

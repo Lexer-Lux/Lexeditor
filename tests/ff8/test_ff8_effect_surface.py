@@ -167,3 +167,34 @@ def test_resource_packs_expose_only_complete_mesh_blocks(monkeypatch):
         struct.pack_into('<I', invalid, index * 4, value)
         with pytest.raises(ValueError):
             effect_surface.parse(invalid)
+
+
+def test_sprite_frames_transform_uv_palette_and_bounds(monkeypatch):
+    primitive = struct.pack('<6BH3hH2h', 16, 64, 8, 0x2e, 248, 250,
+                            0xbc54, -8, -4, 1024, 0x14b7, 2048, 4096)
+    # Second frame has two primitives, and uses the frame's draw-mode bit.
+    sequence = bytes.fromhex('24 05 01 17 00 02 00 00')
+    sequence += struct.pack('<4H', 2, 16, 40, 65535)
+    sequence += struct.pack('<I', 1) + primitive
+    sequence += struct.pack('<I', 0x80000002) + primitive * 2
+    header = [0] * 65
+    header[17], header[1] = 260, 260 + len(sequence)
+    raw = struct.pack('<65I', *header) + sequence + bytes(344)
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    obj, = effect_surface.parse(raw)
+    assert obj['frameCount'] == 2 and obj['vertexCount'] == 8
+    assert obj['positions'][0] == pytest.approx((64, -64, 0))
+    assert obj['faces'][0]['uv'] == [(248, 250), (255, 250), (248, 255), (255, 255)]
+    assert obj['faces'][0]['clut'] == 0x3cd4
+    assert obj['faces'][0]['tpage'] == 0xb7
+    scene = effect_surface.scene('mag094_b.2p0', raw, 'vanilla', frame=1)
+    assert len(scene['positions']) == 8 and len(scene['triangles']) == 4
+    assert scene['triangles'][0]['colors'][0] == [0.5] * 3
+    assert assets._battle_file_info('mag094_b.2p0', raw)['sections'][0]['name'] == 'Resource 1 (not decoded)'
+    for offset, value in ((8, 65535), (10, 12), (12, 65534), (14, 0), (34, 0xf000)):
+        invalid = bytearray(sequence)
+        struct.pack_into('<H', invalid, offset, value)
+        with pytest.raises(ValueError):
+            effect_surface._sprite_object(invalid)
+    with pytest.raises(ValueError):
+        effect_surface._sprite_object(sequence[:-1])

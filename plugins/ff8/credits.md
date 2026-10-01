@@ -4,6 +4,8 @@ Lexeditor's Final Fantasy VIII plugin stands on years of community reverse-engin
 
 ## Attributions
 
+- **HobbitDur and the FF8 modding wiki contributors** — effect sprite frame layout and renderer reference, independently checked against the installed Steam English executable. <https://hobbitdur.github.io/FF8ModdingWiki/technical-reference/battle/cure-case-study/>
+
 - **HobbitDur and FF8 Ultimate Editor contributors** — battle-model skeleton, geometry, animation decoding and GLB export, vendored from revision `97772fffe4c8a8df6e483a68804497958c6bc095` (GPL-3.0). Source paths and local adaptations are recorded in `plugins/ff8/vendor/ff8ue/README.md`, with the license alongside the code. <https://github.com/HobbitDur/FF8UltimateEditor/tree/97772fffe4c8a8df6e483a68804497958c6bc095>
 
 - **ff8-speedruns contributors** — ff8-memory address map (GPL-3.0, reference only; nothing copied): Renzokuken state/timing fields and the controller button order, used to confirm the trigger window found in the executable. <https://github.com/ff8-speedruns/ff8-memory>
