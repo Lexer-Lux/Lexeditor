@@ -97,13 +97,44 @@ def _texture_sources(filename: str, dataset: str):
     return slot, files, description
 
 
-def texture_options(filename: str, dataset: str) -> dict:
-    slot, files, description = _texture_sources(filename, dataset)
-    rows = []
+def _texture_records(slot: int, files: dict, description: dict) -> list[dict]:
+    records = []
     for texture in description['textures']:
         if texture['slot'] != slot or slot not in files:
             continue
         effect_textures.resource_bytes(files[slot], texture, texture=True)
+        records.append({**texture, 'resourceId': texture['id'], 'name': f"Texture {texture['id']}"})
+    if 0 not in files:
+        return records
+    seen = set()
+    for event_id, (tick, kind, args) in enumerate(effect_timeline.texture_uploads(bytes(files[0]))):
+        if kind != 'raw':
+            continue
+        index, source_slot, offset = args
+        if source_slot != slot:
+            continue
+        if not 0 <= index < len(description['textures']):
+            raise ValueError('Streamed texture references an unknown rectangle')
+        texture = description['textures'][index]
+        key = (index, offset)
+        if key in seen:
+            continue
+        seen.add(key)
+        length = texture['rect'][2] * texture['rect'][3] * 2
+        if slot not in files or offset < 0 or length <= 0 or offset + length > len(files[slot]):
+            raise ValueError('Streamed texture upload has incomplete pixels')
+        records.append({**texture, 'id': len(description['textures']) + event_id,
+                        'resourceId': index, 'sourceOffset': offset, 'slot': slot,
+                        'previewTick': tick, 'name': f'Texture {index} · Upload {len(seen)}'})
+        if len(records) > 128:
+            raise ValueError('Summon file exceeds texture preview limit')
+    return records
+
+
+def texture_options(filename: str, dataset: str) -> dict:
+    slot, files, description = _texture_sources(filename, dataset)
+    rows = []
+    for texture in _texture_records(slot, files, description):
         depth = texture['depth']
         colors = 1 << depth
         choices = []
@@ -116,8 +147,8 @@ def texture_options(filename: str, dataset: str) -> dict:
                                 'name': f"Palette {palette['id']}" + (f' · Part {bank + 1}' if len(data) > colors * 2 else '')})
                 if len(choices) > 4096:
                     raise ValueError('Summon exceeds preview palette limit')
-        default = f"{texture['id']}:0"
-        rows.append({'id': texture['id'], 'width': texture['rect'][2] * (16 // depth),
+        default = f"{texture['resourceId']}:0"
+        rows.append({'id': texture['id'], 'name': texture['name'], 'width': texture['rect'][2] * (16 // depth),
                      'height': texture['rect'][3], 'depth': depth, 'palettes': choices,
                      'palette': default if any(choice['value'] == default for choice in choices) else (choices[0]['value'] if choices else None)})
     return {'rows': rows}
@@ -125,9 +156,9 @@ def texture_options(filename: str, dataset: str) -> dict:
 
 def texture_png(filename: str, dataset: str, texture_id: int, palette_key: str) -> bytes:
     slot, files, description = _texture_sources(filename, dataset)
-    if not 0 <= texture_id < len(description['textures']):
+    texture = next((row for row in _texture_records(slot, files, description) if row['id'] == texture_id), None)
+    if texture is None:
         raise ValueError('Unknown summon texture')
-    texture = description['textures'][texture_id]
     if texture['slot'] != slot or slot not in files:
         raise ValueError('Summon texture is not stored in this file')
     if not re.fullmatch(r'\d{1,4}:\d{1,4}', palette_key):
@@ -143,7 +174,11 @@ def texture_png(filename: str, dataset: str, texture_id: int, palette_key: str) 
     if bank >= len(palette_data) // (colors * 2):
         raise ValueError('Summon palette part is outside the resource')
     palette_data = palette_data[bank * colors * 2:(bank + 1) * colors * 2]
-    pixels = effect_textures.resource_bytes(files[slot], texture, texture=True)
+    if 'sourceOffset' in texture:
+        start = texture['sourceOffset']
+        pixels = files[slot][start:start + texture['rect'][2] * texture['rect'][3] * 2]
+    else:
+        pixels = effect_textures.resource_bytes(files[slot], texture, texture=True)
     size = texture['rect'][2] * (16 // depth), texture['rect'][3]
     rgba = effect_textures.indexed_rgba(pixels, palette_data, *size, depth)
     output = BytesIO()

@@ -1007,6 +1007,8 @@ def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) ->
 
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                mod_only_files: set[str]) -> dict:
+    from . import effect_mesh
+    summon = effect_mesh.FILENAME.fullmatch(filename)
     override = _battle_override(filename, dataset)
     target = _battle_path(filename, dataset)
     info: dict | None = None
@@ -1019,6 +1021,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         stat = target.stat()
         info = _cached_model_file(str(target), stat.st_size, stat.st_mtime_ns)
     row: dict = {"id": filename, "kind": "model", "file": filename,
+                 "summonFamily": int(summon[1]) if summon else None,
                  "override": override, "modOnly": filename in mod_only_files,
                  "modelChanged": bool(override) and (filename in mod_only_files
                                                      or _model_changed(filename, dataset))}
@@ -1063,6 +1066,9 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                    name=name, sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                    enemyId=None, note=note)
+        if summon and info['sizeBytes']:
+            row.update(modelKind='effect-data', name=f'Summon data {filename}',
+                       note='This file belongs to a summon. Texture previews use upload instructions found in its script. Other contents are not yet decoded.')
         return row
     kind = info["kind"]
     name, note, enemy_id = _model_identity(filename, kind)

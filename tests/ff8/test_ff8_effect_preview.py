@@ -8,7 +8,8 @@ from plugins.ff8.effect_preview import material_state
 from plugins.ff8 import effect_preview
 
 
-def test_texture_preview_uses_selected_palette_and_rejects_invalid_bank(monkeypatch):
+@pytest.mark.parametrize('streamed', [False, True])
+def test_texture_preview_uses_selected_palette_and_rejects_invalid_bank(monkeypatch, streamed):
     texture_data = bytearray(56)
     struct.pack_into('<I', texture_data, 20, 48)
     struct.pack_into('<I', texture_data, 48, 4)
@@ -21,18 +22,30 @@ def test_texture_preview_uses_selected_palette_and_rejects_invalid_bank(monkeypa
     struct.pack_into('<H', palette_data, 52 + 512 + 2, 31 << 10)
     description = {'textures': [{'id': 0, 'slot': 3, 'rect': (0, 0, 1, 1), 'depth': 8}],
                    'cluts': [{'id': 0, 'slot': 1, 'rect': (0, 0, 256, 2)}]}
-    monkeypatch.setattr(effect_preview, '_texture_sources', lambda *args: (3, {3: texture_data, 1: palette_data}, description))
-    options = effect_preview.texture_options('mag200_b.03', 'current')['rows'][0]
+    files = {3: texture_data, 1: palette_data}
+    if streamed:
+        files.update({0: bytes(48), 3: b'xx\x01\x02'})
+        description['textures'][0]['slot'] = None
+        monkeypatch.setattr(effect_preview.effect_timeline, 'texture_uploads', lambda data: ((4, 'raw', (0, 3, 2)), (5, 'raw', (0, 3, 2))))
+    monkeypatch.setattr(effect_preview, '_texture_sources', lambda *args: (3, files, description))
+    rows = effect_preview.texture_options('mag200_b.03', 'current')['rows']
+    assert len(rows) == 1
+    options = rows[0]
+    texture_id = options['id']
     assert options['palette'] == '0:0'
     assert len(options['palettes']) == 2
-    first = Image.open(BytesIO(effect_preview.texture_png('mag200_b.03', 'current', 0, '0:0')))
+    first = Image.open(BytesIO(effect_preview.texture_png('mag200_b.03', 'current', texture_id, '0:0')))
     assert [first.getpixel((x, 0)) for x in range(2)] == [(255, 0, 0, 255), (0, 255, 0, 255)]
-    second = Image.open(BytesIO(effect_preview.texture_png('mag200_b.03', 'current', 0, '0:1')))
+    second = Image.open(BytesIO(effect_preview.texture_png('mag200_b.03', 'current', texture_id, '0:1')))
     assert second.getpixel((0, 0)) == (0, 0, 255, 255)
     with pytest.raises(ValueError, match='outside'):
-        effect_preview.texture_png('mag200_b.03', 'current', 0, '0:2')
+        effect_preview.texture_png('mag200_b.03', 'current', texture_id, '0:2')
     with pytest.raises(ValueError, match='Unknown summon texture'):
-        effect_preview.texture_png('mag200_b.03', 'current', 1, '0:0')
+        effect_preview.texture_png('mag200_b.03', 'current', texture_id + 1, '0:0')
+    if streamed:
+        files[3] = files[3][:-1]
+        with pytest.raises(ValueError, match='incomplete pixels'):
+            effect_preview.texture_options('mag200_b.03', 'current')
 
 
 def test_material_state_uses_first_mesh_appearance():

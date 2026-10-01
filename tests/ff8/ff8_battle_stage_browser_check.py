@@ -49,6 +49,11 @@ def main():
             page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('palette=8%3A0')&&i.complete&&i.naturalWidth===128)")
             palette.select_option('13:0')
             page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('palette=13%3A0')&&i.complete&&i.naturalWidth===128)")
+            page.evaluate("state.selected.models='mag200_b.02';navigate('models')")
+            page.get_by_role('combobox', name='mag200_b.02 texture 40 preview palette', exact=True).wait_for(state='visible')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('file=mag200_b.02')&&i.complete&&i.naturalWidth===256&&i.naturalHeight===256)")
+            assert page.get_by_role('combobox', name='mag200_b.02 texture 40 preview palette', exact=True).input_value() == '21:0'
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.naturalWidth===256")
             if os.environ.get('LEXEDITOR_RESOURCE_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_RESOURCE_SCREENSHOT'])

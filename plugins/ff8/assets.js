@@ -107,11 +107,30 @@
     }),{minWidth:160,balanced:true});
   }
   // Summon textures can take their palette from a different packed file.
+  const pendingSummonTextures=new Map();
+  function summonTextureOptions(row,dataset){
+    const key=JSON.stringify([row.file,dataset]);
+    if(!pendingSummonTextures.has(key))pendingSummonTextures.set(key,
+      fetch(`/api/summon-textures?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(dataset)}`).then(async response=>{
+        const result=await response.json();if(!response.ok)throw Error(result.error||'Could not read summon textures');return result;
+      }).finally(()=>pendingSummonTextures.delete(key)));
+    return pendingSummonTextures.get(key);
+  }
+  function summonTextureThumb(row){
+    const image=el('img',{alt:row.name}),dataset=assetDataset();
+    const missing=()=>image.replaceWith(LexeditorUI.noImage());
+    image.onerror=missing;
+    summonTextureOptions(row,dataset).then(result=>{
+      const texture=result.rows.find(texture=>texture.palette!=null);
+      if(!texture){missing();return;}
+      image.src=`/assets/summon-texture.png?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(dataset)}&texture=${texture.id}&palette=${encodeURIComponent(texture.palette)}`;
+    }).catch(missing);
+    return image;
+  }
   function summonTextureCards(row){
     const host=el('div',{},LexeditorUI.loadingPanel({label:'Loading summon textures'})),dataset=assetDataset();
     const base=`file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(dataset)}`;
-    fetch(`/api/summon-textures?${base}`).then(async response=>{
-      const result=await response.json();if(!response.ok)throw Error(result.error||'Could not read summon textures');
+    summonTextureOptions(row,dataset).then(result=>{
       const cards=result.rows.filter(texture=>texture.palettes.length).map(texture=>{
         const image=el('img',{alt:`${row.name}, texture ${texture.id}`});
         const show=palette=>{image.src=`/assets/summon-texture.png?${base}&texture=${texture.id}&palette=${encodeURIComponent(palette)}`;};
@@ -119,10 +138,10 @@
         control.setAttribute('aria-label',`${row.file} texture ${texture.id} preview palette`);
         image.onerror=()=>image.replaceWith(LexeditorUI.detailNote('Could not load this summon texture.'));
         show(texture.palette);
-        return LexeditorUI.recordCard({title:`Texture ${texture.id}`,image,
+        return LexeditorUI.recordCard({title:texture.name||`Texture ${texture.id}`,image,
           body:detailField({label:'PREVIEW PALETTE',control,help:infoHelp('Changes the colours in this preview. The summon can use different palettes while it plays. This choice does not change the game.')} )});
       });
-      host.replaceChildren(cards.length?LexeditorUI.tileGrid(cards,{minWidth:160,balanced:true}):LexeditorUI.detailNote('No complete palette is available for these textures.'));
+      host.replaceChildren(cards.length?LexeditorUI.tileGrid(cards,{minWidth:160,balanced:true}):result.rows.length?LexeditorUI.detailNote('No complete palette is available for these textures.'):LexeditorUI.detailNote('No texture uploads were found for this file.'));
     }).catch(error=>host.replaceChildren(LexeditorUI.detailNote(error.message)));
     return host;
   }
@@ -135,7 +154,8 @@
   // showed the model). Enemies and Models share it.
   function modelPageThumb(model){
     if(!model?.file)return null;
-    if(model.modelKind==='effect'&&!model.effectMeshes?.some(mesh=>mesh.triangles||mesh.quads))return null;
+    if(model.modelKind==='effect'&&!model.effectMeshes?.some(mesh=>mesh.triangles||mesh.quads))return summonTextureThumb(model);
+    if(model.summonFamily!=null&&!model.vertices&&!model.counts?.vertices)return summonTextureThumb(model);
     if(model.modelKind==='texture')return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
     if(!model.vertices&&!model.counts?.vertices)return null;
     return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
@@ -172,7 +192,7 @@
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
-    if(row.effectResources?.some(resource=>resource.name.startsWith('Texture ')))sections.push(detailSection({title:'TEXTURES',body:summonTextureCards(row)}));
+    if(row.summonFamily!=null)sections.push(detailSection({title:'TEXTURES',body:summonTextureCards(row),help:infoHelp('Shows packed textures and texture uploads found by simulating the summon script. Different uploads can use different parts of a file. Battle-dependent script paths may use other textures.')}));
     if(row.sections?.length||row.effectResources?.length){
       const resources=!!row.effectResources?.length;
       const table=columnList({fill:true,rows:resources?row.effectResources:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:resources?"52px minmax(150px,1fr) 110px":"52px minmax(150px,1fr) 110px 110px",columns:[

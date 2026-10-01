@@ -40,6 +40,9 @@ ALLOWED = {
     '"Enable GF Spellbooks on the Tweaks page.")',
     '"GF Spellbooks needs Monogamy on and Shared Party Magic Inventory off.',
     "error.message)",
+    "'Could not load this summon texture.')",  # Failed image request
+    "'No complete palette is available for these textures.')",  # Missing required palette
+    "'No texture uploads were found for this file.')",  # Empty preview result
     "data.error)",  # FF8_EN.exe missing or an unknown build: draw point magic cannot be read
     "'No initial state for this GF.')",
     "'This enemy has no battle-script section.')",

@@ -1,5 +1,6 @@
 """Bounded, deterministic preview scheduling for GF cinematic resources."""
 import struct
+from functools import lru_cache
 
 from .vendor.ff8ue.magcine.cinesim import CineSimulation
 
@@ -46,3 +47,9 @@ def simulate(data: bytes) -> PreviewSimulation:
     if root < 48 or root >= len(data) or root % 2:
         raise ValueError('Summon root script is outside the file')
     return PreviewSimulation(data, root, max_ticks=3000, target_count=1, seed=0)
+
+
+@lru_cache(maxsize=8)
+def texture_uploads(data: bytes) -> tuple:
+    """Cache only upload events, keyed by the actual script bytes."""
+    return tuple(simulate(data).vram_events)
