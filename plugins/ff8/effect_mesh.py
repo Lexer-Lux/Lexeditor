@@ -18,6 +18,32 @@ PRIMITIVES = {
 }
 
 
+def resources(data: bytes) -> list[dict]:
+    """Locate packed texture/palette entries without guessing image dimensions."""
+    if not 48 <= len(data) <= 16 * 1024 * 1024:
+        raise ValueError('Effect file size is outside the supported bounds')
+    header = struct.unpack_from('<12I', data)
+    if header[0] or header[5] != 48 or header[10] or header[11]:
+        raise ValueError('Not a packed cinematic effect file')
+    texture, palette, music, end = header[5], header[2], header[6], header[7]
+    if not texture <= palette <= music <= end <= len(data):
+        raise ValueError('Effect resource tables are out of order')
+    result = []
+    for name, start, stop in (('Texture', texture, palette), ('Palette', palette, music)):
+        if (stop - start) % 4 or (stop - start) // 4 > 4096:
+            raise ValueError('Effect resource table size is invalid')
+        for index, cursor in enumerate(range(start, stop, 4)):
+            entry, = struct.unpack_from('<I', data, cursor)
+            if not entry:
+                continue
+            offset = start + (entry & 0xFFFFFF)
+            if not end <= offset < len(data):
+                raise ValueError('Effect resource offset is outside its data')
+            result.append({'index': len(result) + 1, 'name': f'{name} {index}',
+                           'offset': offset})
+    return result
+
+
 def objects(data: bytes) -> list[dict]:
     if not 0x30 <= len(data) <= 16 * 1024 * 1024:
         raise ValueError('Effect file size is outside the supported bounds')

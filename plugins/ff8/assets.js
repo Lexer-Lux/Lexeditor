@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh","effect-data":"Summon data",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -151,14 +151,15 @@
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
-    if(row.sections?.length){
-      const table=columnList({fill:true,rows:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:"52px minmax(150px,1fr) 110px 110px",columns:[
+    if(row.sections?.length||row.effectResources?.length){
+      const resources=!!row.effectResources?.length;
+      const table=columnList({fill:true,rows:resources?row.effectResources:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:resources?"52px minmax(150px,1fr) 110px":"52px minmax(150px,1fr) 110px 110px",columns:[
         {key:"index",label:"#",render:section=>String(section.index)},
-        {key:"name",label:"Section"},
+        {key:"name",label:resources?"Resource":"Section"},
         {key:"offset",label:"Offset",render:section=>formatNumber(section.offset)},
-        {key:"size",label:"Size",render:section=>assetFileSize(section.size)}]});
-      sections.push(detailSection({title:"SECTIONS",body:[table],
-        help:infoHelp("The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
+        ...(resources?[]:[{key:"size",label:"Size",render:section=>assetFileSize(section.size)}])]});
+      sections.push(detailSection({title:resources?"RESOURCES":"SECTIONS",body:[table],
+        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
     }
     const links=[];
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));

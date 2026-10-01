@@ -24,6 +24,25 @@ def test_mesh_byte_offsets_become_vertex_indices():
     assert result['faces'] == [{'type': 6, 'indices': [0, 1, 2], 'colors': [[0, 0, 0]] * 3}]
 
 
+def test_packed_resources_keep_global_ids_and_mask_flags():
+    data = bytearray(96)
+    struct.pack_into('<12I', data, 0, 0, 0, 60, 0, 0, 48, 68, 68, 0, 0, 0, 0)
+    struct.pack_into('<3I', data, 48, 0, 0x80000014, 0)
+    struct.pack_into('<2I', data, 60, 0, 20)
+    assert effect_mesh.resources(data) == [
+        {'index': 1, 'name': 'Texture 1', 'offset': 68},
+        {'index': 2, 'name': 'Palette 1', 'offset': 80}]
+    from plugins.ff8.assets import _battle_file_info
+    info = _battle_file_info('mag200_b.03', data)
+    assert info['kind'] == 'effect-data'
+    assert info['counts'] is None
+    assert len(info['effectResources']) == 2
+    struct.pack_into('<I', data, 52, 2)
+    with pytest.raises(ValueError, match='offset'):
+        effect_mesh.resources(data)
+    assert not _battle_file_info('mag200_b.03', data)['parsed']
+
+
 def test_textured_triangle_preserves_uv_palette_and_page():
     data = triangle() + bytes(8)
     struct.pack_into('<2H', data, 72, 8, 1)

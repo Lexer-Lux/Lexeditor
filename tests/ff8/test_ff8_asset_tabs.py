@@ -203,7 +203,12 @@ def test_save_sfx_round_trip_and_revert(tmp_path):
 
 def test_save_models_validates_containers_and_reverts(tmp_path):
     data = dat_bytes([64] * 11)
+    baseline = tmp_path / 'baseline' / 'battle'
+    baseline.mkdir(parents=True)
+    for filename in ('c0m001.dat', 'c0m002.dat'):
+        (baseline / filename).write_bytes(data)
     with patch.object(assets.paths, "PROJECT_ROOT", tmp_path), \
+            patch.object(assets.paths, "BASELINE_ROOT", tmp_path / 'baseline'), \
             patch.object(assets.paths, "DIRECT_ROOT", tmp_path / "direct"):
         assert assets.save_models([{"file": "c0m001.dat",
                                     "datBase64": base64.b64encode(data).decode()}]) == {"saved": 1}

@@ -604,16 +604,21 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
         return _stage_info(data)
     if effect_mesh.FILENAME.fullmatch(filename):
         try:
+            resources = effect_mesh.resources(data)
+        except ValueError:
+            resources = []
+        try:
             meshes = effect_mesh.inventory(data)
         except ValueError:
             meshes = []
-        if meshes:
+        if meshes or resources:
             return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-                    'parsed': True, 'kind': 'effect', 'sections': [], 'tims': [],
+                    'parsed': True, 'kind': 'effect' if meshes else 'effect-data', 'sections': [], 'tims': [],
+                    'effectResources': resources,
                     'effectMeshes': meshes,
-                    'counts': {'objects': len(meshes), **{key: sum(obj[key] for obj in meshes)
-                               for key in ('vertices', 'triangles', 'quads')}},
-                    'geometryVerified': True, 'texturesVerified': False}
+                    'counts': ({'objects': len(meshes), **{key: sum(obj[key] for obj in meshes)
+                               for key in ('vertices', 'triangles', 'quads')}} if meshes else None),
+                    'geometryVerified': bool(meshes), 'texturesVerified': False}
     sections = parse_dat_sections(data)
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
@@ -1067,10 +1072,12 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = f'Battle texture {filename}', 'This file is a texture image, not a 3D model. Select a palette to preview its colors.'
     elif kind == 'effect':
         name, note = f'Summon geometry {filename}', 'Preview individual mesh objects in this summon file. Textures use the first simulated appearance when known. Animation and placement within the summon are not yet shown.'
+    elif kind == 'effect-data':
+        name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. These resources do not yet have individual image previews.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1079,8 +1086,9 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         note = row["note"] + (f" {note}" if note else "")
     counts = info["counts"] or {}
     row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'),
+               effectResources=info.get('effectResources'),
                counts=info["counts"], tims=info["tims"],
-               vertices=counts.get("vertices"), timCount=None if kind == 'effect' else len(info["tims"]),
+               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data') else len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                enemyId=enemy_id, note=note)
     return row
