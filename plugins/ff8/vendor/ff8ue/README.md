@@ -17,3 +17,12 @@ accepts PNG bytes already decoded by Lexeditor, preserving the TIM alpha rules.
 The animation bit reader rejects truncated streams instead of zero-filling them.
 Parsing limits and application transport belong in `plugins/ff8/model_geometry.py`.
 No game files are distributed with this source.
+
+The cinematic decoder and simulator in `magcine/` are from revision
+`57de22415858d625af6fd3d03d21d4d58365bb14` of the same GPL-3.0 project:
+`FF8GameData/magcine/cinescript.py`, `FF8GameData/magcine/cinesim.py`, and
+`FF8GameData/Resources/json/gf_cinematic_opcodes.json`.
+The sole adaptation is resolving the opcode JSON beside the decoder.
+Lexeditor's execution limits live in `plugins/ff8/effect_timeline.py`.
+The simulator documents its approximations in its module docstring; it does
+not reproduce battle-dependent behavior exactly.
