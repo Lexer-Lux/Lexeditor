@@ -11,15 +11,34 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from plugins.rdr.plugin import RdrSession  # noqa: E402
+from plugins.rdr import server  # noqa: E402
+from tools.rdr_test_support import workspace  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
+
+
+@contextmanager
+def provenance_session():
+    # CI has no installed game. Exercise the real server against the same
+    # synthetic editable workspace used by the save/reload browser checks.
+    with tempfile.TemporaryDirectory(prefix="rdr-provenance-data-") as temp, workspace(Path(temp), count=3):
+        service = server.create_server(0)
+        thread = threading.Thread(target=service.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield SimpleNamespace(url=f"http://127.0.0.1:{service.server_port}/")
+        finally:
+            service.shutdown()
+            service.server_close()
+            thread.join(timeout=5)
 
 
 def main() -> int:
@@ -31,7 +50,7 @@ def main() -> int:
     browser = None
     cdp = None
     try:
-        with RdrSession({"LEXEDITOR_RDR_OPEN_URL_DRY_RUN": "1"}) as session:
+        with provenance_session() as session:
             port = free_port()
             browser = subprocess.Popen([
                 str(edge), "--headless=new", "--no-first-run", "--no-default-browser-check",
@@ -54,6 +73,7 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             wait_eval(cdp, "!!document.querySelector('.item-detail')", 30)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 30)
             item = cdp.eval("""(() => {
               const source=[...document.querySelectorAll('.item-detail .lex-source-control')]
                 .find(node=>node.querySelector('input:not([type=checkbox])'));
@@ -62,11 +82,13 @@ def main() -> int:
               const before=input.value;
               input.value=String((Number(before)||0)+1);
               input.dispatchEvent(new Event('input',{bubbles:true}));
-              const reference=source.querySelector('.lex-reference-value');
+              const liveSource=[...document.querySelectorAll('.item-detail .lex-source-control')]
+                .find(node=>node.querySelector('input:not([type=checkbox])'));
+              const reference=liveSource?.querySelector('button.lex-reference-value');
               const changed={before,after:input.value,tag:reference?.querySelector('.lex-reference-tag')?.textContent,
                 text:reference?.textContent.trim(),dirty:dirtyCount(),errors:window.__testErrors};
               reference?.click();
-              return {...changed,restored:input.value,dirtyAfter:dirtyCount()};
+              return {...changed,restored:document.querySelector('.item-detail .lex-source-control input:not([type=checkbox])')?.value,dirtyAfter:dirtyCount()};
             })()""")
             assert not item.get("missing") and item["tag"] == "V" and item["dirty"] > 0, item
             assert item["restored"] == item["before"] and item["dirtyAfter"] == 0, item
