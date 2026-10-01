@@ -39,7 +39,7 @@ class ModelGeometryTests(unittest.TestCase):
             self.assertEqual(assets._model_motion_info(invalid, sections), [])
         self.assertEqual(assets._model_motion_info(data, []), [])
 
-    def test_diablos_parts_are_bounded_and_selected_for_export(self):
+    def test_effect_parts_are_bounded_and_selected_for_export(self):
         original = model_bytes(colored=True)
         spans = assets.parse_dat_sections(original)
         sections = [original[s['offset']:s['offset'] + s['size']] for s in spans[:3]] + [b'']
@@ -47,31 +47,31 @@ class ModelGeometryTests(unittest.TestCase):
         for section in sections:
             offsets.append(offsets[-1] + len(section))
         part = struct.pack('<6I', 4, *offsets) + b''.join(sections)
-        # Make the second part distinguishable in the scene and GLB.
+        # Make the last part distinguishable in the scene and GLB.
         second = bytearray(part)
         struct.pack_into('<h', second, offsets[1] + 14, 1024)
-        raw = part + second
-        self.assertIsNone(assets.parse_dat_sections(raw))
-        for filename in ('mag324_h.02', 'mag324_h.m00'):
+        for filename, count in (('mag324_h.02', 2), ('mag324_h.m00', 2), ('mag326_e.dat', 5)):
+            raw = part * (count - 1) + second
+            self.assertIsNone(assets.parse_dat_sections(raw))
             info = assets._battle_file_info(filename, raw)
-            self.assertEqual(info['counts']['vertices'], 6)
-            self.assertEqual(len(info['modelParts']), 2)
+            self.assertEqual(info['counts']['vertices'], 3 * count)
+            self.assertEqual(len(info['modelParts']), count)
             with patch.object(assets, 'model_dat_bytes', return_value=raw), patch.object(effect_model_textures, 'sources', return_value={}):
                 first = model_geometry.scene(filename, object_id=0)
-                selected = model_geometry.scene(filename, object_id=1)
+                selected = model_geometry.scene(filename, object_id=count - 1)
                 self.assertNotEqual(first['positions'], selected['positions'])
                 with tempfile.TemporaryDirectory(prefix='ff8-parts-') as directory:
                     path = Path(directory) / 'selected.glb'
-                    path.write_bytes(model_geometry.glb(filename, object_id=1))
+                    path.write_bytes(model_geometry.glb(filename, object_id=count - 1))
                     gltf, binary = read_glb(path)
                     positions = read_accessor(gltf, binary, gltf['meshes'][0]['primitives'][0]['attributes']['POSITION'])
                     self.assertEqual(positions, [tuple(selected['positions'][index]) for index in (2, 0, 1)])
                 with self.assertRaisesRegex(ValueError, 'part'):
-                    model_geometry.scene(filename, object_id=2)
-            for invalid in (raw[:-1], raw + b'junk', part + b'bad header'):
+                    model_geometry.scene(filename, object_id=count)
+            for invalid in (raw[:-1], raw + b'junk', part + b'bad header', part * (count - 1), raw + part):
                 self.assertIsNone(assets.effect_model_parts(filename, invalid))
                 with self.assertRaises(ValueError):
-                    model_geometry.decode(filename, invalid)
+                    model_geometry.decode(filename, invalid, object_id=count - 1)
         self.assertIsNone(assets.effect_model_parts('mag123_b.dat', raw))
 
     def test_four_section_effect_model_reuses_battle_geometry(self):

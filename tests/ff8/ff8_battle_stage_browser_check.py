@@ -170,6 +170,27 @@ def main():
             if os.environ.get('LEXEDITOR_DIABLOS_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_DIABLOS_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag326_e.dat';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            part = page.get_by_role('combobox', name='Model part', exact=True)
+            assert part.locator('option').count() == 5
+            if os.environ.get('LEXEDITOR_GILGAMESH_PART_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_GILGAMESH_PART_SCREENSHOT'])
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=4' in response.url) as selected:
+                part.select_option('4')
+            assert len(selected.value.json()['positions']) == 62
+            assert selected.value.json()['unmappedFaces'] == 0
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            with page.expect_download() as download:
+                page.get_by_role('button', name='Export GLB', exact=True).click()
+            assert download.value.suggested_filename.endswith('part-5.glb')
+            assert Path(download.value.path()).read_bytes()[:4] == b'glTF'
+            if os.environ.get('LEXEDITOR_GILGAMESH_LAST_PART_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_GILGAMESH_LAST_PART_SCREENSHOT'])
             page.evaluate("state.selected.models='mag076_b.02';navigate('models')")
             page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Sound header', exact=True).wait_for(state='visible')
             assert page.locator('.lex-model-stage').count() == 0

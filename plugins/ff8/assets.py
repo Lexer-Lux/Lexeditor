@@ -87,7 +87,7 @@ EFFECT_MODEL_FILES = frozenset((
     'mag184_e.dat', 'mag290_h.03', 'mag094_b.2e0', 'mag099_b.4e0',
     'mag115_h.07', 'mag186_b.dat', 'mag190_b.dat', 'mag217_b.dat',
     'mag325_b.dat', 'mag325_h.dat', 'mag326_b.dat', 'mag326_g.dat',
-    'mag324_h.02', 'mag324_h.m00',
+    'mag324_h.02', 'mag324_h.m00', 'mag326_e.dat',
 ))
 EFFECT_MODEL_SECTIONS = ('Skeleton', 'Model geometry', 'Model animation', 'Extra data')
 # Confirmed identities from the summon-creature-models format census.
@@ -97,6 +97,7 @@ EFFECT_MODEL_NAMES = {
     'mag217_b.dat': 'Gilgamesh (alternate animations)', 'mag290_h.03': 'Pandemona',
     'mag325_b.dat': 'Odin (Zantetsuken Reverse)', 'mag326_g.dat': 'Gilgamesh',
     'mag324_h.02': 'Diablos', 'mag324_h.m00': 'Diablos',
+    'mag326_e.dat': 'Gilgamesh (effect parts)',
 }
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
 
@@ -376,13 +377,14 @@ def tim_png_bytes(data: bytes, offset: int = 0, palette: int = 0) -> bytes:
 
 
 def effect_model_parts(filename: str, data: bytes) -> list[dict] | None:
-    """Diablos stores two consecutive, independently bounded model containers."""
-    if filename.casefold() not in ('mag324_h.02', 'mag324_h.m00'):
+    """Known effect files store consecutive, independently bounded models."""
+    count = {'mag324_h.02': 2, 'mag324_h.m00': 2, 'mag326_e.dat': 5}.get(filename.casefold())
+    if count is None:
         return None
     if len(data) > 16 * 1024 * 1024:
         return None
     parts, offset = [], 0
-    for index in range(2):
+    for index in range(count):
         if offset + 24 > len(data) or struct.unpack_from('<I', data, offset)[0] != 4:
             return None
         size = struct.unpack_from('<I', data, offset + 20)[0]
