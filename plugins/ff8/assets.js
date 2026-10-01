@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Locked",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Locked",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -123,8 +123,8 @@
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
       content:()=>LexeditorUI.stack(
-        LexeditorUI.actionRow(infoHelp('Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
-          el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}`,download:`${row.file.replace(/\.[^.]+$/,'')}.glb`}).click()},'Export GLB'),...(extra?[extra]:[])),
+        LexeditorUI.actionRow(infoHelp(row.modelKind==='stage'?'Drag to turn the stage and use the wheel to zoom. Arrow keys turn it, plus and minus zoom, and Home resets. This preview shows static geometry and textures.':'Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
+          ...(row.modelKind==='stage'?[]:[el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}`,download:`${row.file.replace(/\.[^.]+$/,'')}.glb`}).click()},'Export GLB')]),...(extra?[extra]:[])),
         FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name})),
       onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
   }

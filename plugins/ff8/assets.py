@@ -592,6 +592,8 @@ def _model_identity(filename: str, kind: str) -> tuple[str, str, int | None]:
 def _model_file_info(path: Path) -> dict:
     """Parse one model file's bytes into cacheable inventory facts."""
     data = path.read_bytes()
+    if re.fullmatch(r'a0stg\d+\.x', path.name.casefold()):
+        return _stage_info(data)
     sections = parse_dat_sections(data)
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
@@ -668,6 +670,9 @@ def _model_bytes(filename: str, dataset: str) -> tuple[bytes, str | None]:
     override = _battle_override(filename, dataset)
     target = _battle_path(filename, dataset)
     if not target.is_file():
+        if re.fullmatch(r'a0stg\d+\.x', filename):
+            archive = FsArchive(paths.GAME_ROOT / 'Data/lang-en/battle')
+            return archive.extract(archive.find(filename)), override
         raise ValueError(f"{filename} is not available in this dataset")
     return target.read_bytes(), override
 
@@ -932,11 +937,36 @@ def _battle_archive_index() -> list[dict]:
     return rows
 
 
+def _stage_info(data: bytes) -> dict:
+    from . import battle_stage
+    try:
+        geometry = battle_stage.parse(data)
+        atlas = battle_stage.texture_layout(data)
+    except ValueError:
+        return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'parsed': False}
+    return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+            'parsed': True, 'kind': 'stage', 'sections': [],
+            'counts': {'objects': len(geometry['objects']), 'vertices': geometry['vertices'],
+                       'triangles': geometry['triangles'], 'quads': geometry['quads']},
+            'tims': [atlas], 'geometryVerified': True, 'texturesVerified': True}
+
+
+@lru_cache(maxsize=256)
+def _stage_archive_info(prefix: str, filename: str, size: int, mtime_ns: int) -> dict:
+    archive = FsArchive(Path(prefix))
+    return _stage_info(archive.extract(archive.find(filename)))
+
+
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                mod_only_files: set[str]) -> dict:
     override = _battle_override(filename, dataset)
     target = _battle_path(filename, dataset)
     info: dict | None = None
+    if not target.is_file() and re.fullmatch(r'a0stg\d+\.x', filename):
+        prefix = paths.GAME_ROOT / 'Data/lang-en/battle'
+        if prefix.with_suffix('.fs').is_file():
+            stat = prefix.with_suffix('.fs').stat()
+            info = _stage_archive_info(str(prefix), filename, stat.st_size, stat.st_mtime_ns)
     if target.is_file():
         stat = target.stat()
         info = _cached_model_file(str(target), stat.st_size, stat.st_mtime_ns)
@@ -988,6 +1018,8 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         return row
     kind = info["kind"]
     name, note, enemy_id = _model_identity(filename, kind)
+    if kind == 'stage':
+        name, note = f'Battle stage {int(filename[5:-2])}', 'Static battle-stage geometry and textures. Stage scripting and animation are not editable here.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
@@ -1250,6 +1282,11 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
             raise ValueError("Battle texture needs a numeric TIM index") from error
         ensure_character_models()
         data, _override = _model_bytes(inner.casefold(), dataset)
+        if re.fullmatch(r'a0stg\d+\.x', inner.casefold()):
+            from . import battle_stage
+            if tim_index != 0:
+                raise ValueError('Battle stage TIM index is out of range')
+            return tim_png_bytes(data, battle_stage.texture_layout(data)['offset'], palette)
         info = _model_file_info_from_bytes(inner.casefold(), data)
         tims = info.get("tims") or []
         if not 0 <= tim_index < len(tims):

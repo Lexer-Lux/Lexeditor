@@ -117,6 +117,9 @@ def decode(filename: str, data: bytes, *, animations: bool = True):
 
 
 def scene(filename: str, dataset: str = 'current') -> dict:
+    if filename.casefold().startswith('a0stg') and filename.casefold().endswith('.x'):
+        from . import battle_stage
+        return battle_stage.scene(filename, assets.model_dat_bytes(filename, dataset))
     exporter=decode(filename,assets.model_dat_bytes(filename,dataset),animations=False)
     positions,bones=exporter._collect_vertices()
     animations=exporter.ifrit_manager.enemy.animation_data.animations

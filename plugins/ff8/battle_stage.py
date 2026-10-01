@@ -9,6 +9,43 @@ from __future__ import annotations
 import struct
 
 
+def texture_layout(data: bytes) -> dict:
+    from .assets import _tim_layout
+    offset = data.find(b'\x10\x00\x00\x00', 0x500)
+    while offset >= 0:
+        if offset % 4 == 0:
+            try:
+                layout = _tim_layout(data, offset)
+                if layout['depth'] == 8 and offset + layout['size'] == len(data):
+                    return {**layout, 'offset': offset, 'index': 0}
+            except ValueError:
+                pass
+        offset = data.find(b'\x10\x00\x00\x00', offset + 4)
+    raise ValueError('Battle stage has no supported terminal texture atlas')
+
+
+def scene(filename: str, data: bytes) -> dict:
+    geometry, atlas = parse(data), texture_layout(data)
+    positions, triangles, palettes = [], [], []
+    for obj in geometry['objects']:
+        base = len(positions)
+        positions.extend((x, -y, -z) for x, y, z in obj['vertices'])
+        for face in obj['faces']:
+            palette = (face['palette'] >> 6) & 15
+            if palette >= atlas['paletteCount']:
+                raise ValueError('Battle stage face uses an unavailable palette')
+            if palette not in palettes:
+                palettes.append(palette)
+            # FFNx uses 128-pixel texture-page strides in the 8-bit atlas.
+            uv = [((u + (face['texture'] & 15) * 128) / atlas['width'], v / atlas['height'])
+                  for u, v in face['uv']]
+            for corners in (((0, 1, 2),) if len(face['indices']) == 3 else ((0, 1, 2), (1, 3, 2))):
+                triangles.append({'indices': [base + face['indices'][i] for i in corners],
+                                  'uv': [uv[i] for i in corners], 'texture': palettes.index(palette)})
+    return {'file': filename, 'positions': positions, 'triangles': triangles,
+            'textures': [0] * len(palettes), 'texturePalettes': palettes, 'bones': 0, 'animations': 0}
+
+
 def parse(data: bytes) -> dict:
     if not 0x510 <= len(data) <= 16 * 1024 * 1024:
         raise ValueError("Battle stage size is outside the supported bounds")

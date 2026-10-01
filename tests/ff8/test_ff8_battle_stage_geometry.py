@@ -1,7 +1,7 @@
 """Synthetic stage geometry exercises bounds without proprietary fixtures."""
 import struct
 import pytest
-from plugins.ff8.battle_stage import parse
+from plugins.ff8.battle_stage import parse, scene
 
 
 def stage():
@@ -36,3 +36,14 @@ def test_face_vertex_outside_object_is_rejected():
     struct.pack_into('<H',data,len(data)-20,3)
     with pytest.raises(ValueError,match='missing vertex'):
         parse(data)
+
+
+def test_stage_scene_uses_face_palette_and_texture_page():
+    palette=struct.pack('<IHHHH',12+16*512,0,0,256,16)+bytes(16*512)
+    pixels=struct.pack('<IHHHH',12+512*256,0,0,256,256)+bytes(512*256)
+    atlas=struct.pack('<II',16,9)+palette+pixels
+    result=scene('a0stg000.x',stage()+atlas)
+    assert result['positions'][1]==(100,50,0)
+    assert result['texturePalettes']==[15]
+    assert result['textures']==[0]
+    assert result['triangles'][0]['uv'][0]==(.5,0)
