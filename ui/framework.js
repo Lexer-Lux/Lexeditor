@@ -5411,8 +5411,9 @@ ${contents.path}`});
     // button inside one is not: pins, copy buttons and question marks stay
     // usable while the page is read-only.
     const isEditAttempt = target => {
-      if (!target?.closest?.("main") || target.closest?.("button")) return false;
-      return Boolean(target.closest?.(".lex-detail-field"))
+      if (!target?.closest?.("main") || target.closest?.("button") ||
+          target.closest?.(READONLY_EXEMPT)) return false;
+      return Boolean(target.closest?.(".lex-detail-field,.lex-toggle"))
         || Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
     };
     const protectManagedEdit = async event => {
@@ -5421,14 +5422,15 @@ ${contents.path}`});
       if (copyPromptOpen || !isEditAttempt(event.target)) return;
       // A game with no mod has nothing to write into, so the attempt to edit
       // the game's own data is the moment to offer the way out of it.
-      if (current?.noMod) {
+      if (current?.noMod || current?.vanilla || sessionHasNoMod() ||
+          String(options.projectActiveSource?.() || "") === "vanilla") {
         event.preventDefault(); event.stopImmediatePropagation();
         copyPromptOpen = true;
         try {
           const agreed = await confirmAction({
             title: "Create a mod to edit?",
-            message: "This is the game's own data, so Lexeditor shows it read-only: there is "
-              + "no mod to save into yet. Create a mod and this page becomes editable.",
+            message: "This is the game's own data, so Lexeditor shows it read-only. "
+              + "Create a mod to make your own editable version.",
             confirmLabel: "Create a mod"});
           if (!agreed) return;
           await createModProject(options.plugin.id, {pluginName: options.plugin.name});
