@@ -18,12 +18,14 @@
     ["Flags","These battle settings are not understood yet, so this value is read-only."],
     ["Main camera","This may select the main battle camera. Its effect is not confirmed, so this value is read-only."],
     ["Secondary camera","This may select a second battle camera. Its effect is not confirmed, so this value is read-only."]];
+  const encounterHeaderKeys=['stageId','flags','cameraMain','cameraSecondary'];
   function encounterDetail(row,prefs){
-    const formation=LexeditorUI.multiNumberRow(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>({
+    const formation=encounterHeaderKeys.map((key,index)=>detailField({
       label:encounterHeaderFields[index][0],
-      help:encounterHeaderFields[index][1],
+      help:infoHelp(encounterHeaderFields[index][1]),
+      pin:prefs?.pinButton(key,encounterHeaderFields[index][0]),
       control:index===0?encounterSource(numberControl(row[key],0,255,1,value=>{row[key]=value;shell.refresh()},{'aria-label':'Formation stage'}),row,value=>value?.[key],value=>{row[key]=Number(value);shell.refresh()}):LexeditorUI.readonlyField(row[key])
-    })),{columns:4,stacked:true});
+    }));
     const source=(slot,key,control)=>{
       if(!slot.enabled&&key!=='enabled')for(const input of [control,...control.querySelectorAll('input,select,button')])
         if(input.matches('input,select,button'))input.disabled=true;
@@ -38,7 +40,7 @@
         {key:'level',label:'Level rule',grow:2,render:slot=>source(slot,'level',encounterLevelControl(slot))}
       ]});
     return LexeditorUI.stack(
-      detailPanel({heading:false,body:[formation]}),
+      detailPanel({heading:false,body:formation}),
       table
     );
   }

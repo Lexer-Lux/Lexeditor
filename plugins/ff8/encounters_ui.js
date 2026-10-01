@@ -301,7 +301,7 @@
     const rows=filtered("encounters",["name","id","stageId"]);
     return showPaged("encounters",rows,[{key:"id",label:"ID",help:"scene.out record number of this battle formation. Encounter groups and field maps refer to it."},
       {key:"name",label:"Encounter",help:"The enemies switched on in this formation. Select a row to edit its slots."},
-      {key:"stageId",label:"Stage",pinned:false,help:"Battle stage number used when this formation starts."}],
+      ...encounterHeaderKeys.map((key,index)=>({key,label:encounterHeaderFields[index][0],pinned:false,help:encounterHeaderFields[index][1]}))],
       encounterDetail,"74px minmax(180px,1fr)",{defaultSplit:26,minLeft:220,minRight:600,
         // A formation whose eight slots all hold enemy 0 ("Dummy") is an
         // unused slot: none of the game's encounter groups names one. Add

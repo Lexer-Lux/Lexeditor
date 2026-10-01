@@ -38,7 +38,6 @@ Cards
 - cards -> decks: lol, what is this? finish your job, please.
 
 Encounters
-- encounters -> top right panel: so weird and clearly nonstandard. no data type rails, no pins. been causing problems for us constantly. maybe because it' some weird spaghetti code unique thing and not a proper component, i'm assuming?
 - WAIT HOLY SHIT. nah it must be hallucinating. it says that encounter chances aren't actually equal, and they vary by region? there's no way. because the editor doesn't say that at all!
     > status 2026-09-27: partly true. Each group has 8 slots and they repeat formations (group 0: 514 x3, 512 x2, 513 x2, 520 x1), so formations are not equally likely; the group panel shows "3 of 8" beside each slot. Unproven: that the game picks a slot evenly.
   lol what? wait, so they repeat formations, so i can't set all 8 to be different? and why is there an X of 8 text now that makes no sense? They're not in order and i see multiple of the same number. also i should be able to see the probability and edit it. okay, i need to understand this before we redesign.

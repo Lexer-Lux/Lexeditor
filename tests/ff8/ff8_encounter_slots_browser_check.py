@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from plugin_ui import plugin_ui
 from plugins.ff8.encounters import apply_edits
+from plugins.ff8.plugin import FF8Session
 def main():
  raw=bytes([1,2,3,4])+bytes(124)
  header={'id':0,'stageId':9,'flags':2,'cameraMain':3,'cameraSecondary':4}
@@ -36,12 +37,15 @@ const numberControl=(value,min,max,step,change,attrs)=>el('input',{type:'text',i
 const encounterSource=control=>control;
 const enemySearchControl=(id,label,set)=>el('button',{'aria-label':label},'G-Soldier');
 const row={id:0,stageId:1,flags:2,cameraMain:3,cameraSecondary:4,slots:Array.from({length:8},(_,slot)=>({slot,enemyName:slot?'Dummy':'G-Soldier',enemyId:0,enabled:slot===0,visible:true,loaded:true,targetable:true,x:1100,y:0,z:-3300,level:255}))};
-const renderEncounters=()=>document.querySelector('main').replaceChildren(encounterDetail(row));
+const prefs=LexeditorUI.columnPreferences('encounter-fixture',[
+ {key:'stageId',label:'Stage',pinned:false},{key:'flags',label:'Flags',pinned:false},
+ {key:'cameraMain',label:'Main camera',pinned:false},{key:'cameraSecondary',label:'Secondary camera',pinned:false}],()=>{});
+const renderEncounters=()=>document.querySelector('main').replaceChildren(encounterDetail(row,prefs));
 const render=renderEncounters;
 """+functions+"renderEncounters();")
   assert page.locator('.lex-column-list-row').count()==8
-  assert page.locator('.lex-multi-number input:not([readonly])').count()==1
-  assert page.locator('.lex-multi-number .lex-readonly-field').count()==3
+  assert page.locator('.lex-detail-panel input:not([readonly])').count()==1
+  assert page.locator('.lex-detail-panel .lex-readonly-field').count()==3
   page.get_by_label('Slot 1 x',exact=True).fill('1200')
   page.get_by_label('Slot 1 x',exact=True).press('Tab')
   assert page.evaluate('row.slots[0].x')==1200
@@ -55,16 +59,32 @@ const render=renderEncounters;
    page.wait_for_timeout(150)
    assert page.locator('.lex-detail-panel').count()==1
    assert page.locator('.lex-stack > .lex-column-list').count()==1
-   # Four properties share one row; labels above controls keep long names readable.
-   assert page.locator('.lex-detail-parts-stacked').count()==1
-   names=page.locator('.lex-multi-number-label').all_text_contents()
+   # Every property uses the shared detail row, type rail and column pin.
+   assert page.locator('.lex-multi-number').count()==0
+   names=page.locator('.lex-detail-field-label').all_text_contents()
    assert [name.rstrip('?').strip() for name in names]==['Stage','Flags','Main camera','Secondary camera'],names
-   assert page.locator('.lex-multi-number .lex-info-help').count()==4
-   tops=page.locator('.lex-multi-number-item').evaluate_all('(fields)=>fields.map(f=>f.getBoundingClientRect().top)')
-   assert max(tops)-min(tops)<2,tops
+   assert page.locator('.lex-detail-field .lex-info-help').count()==4
+   assert page.locator('.lex-detail-field .lex-column-pin').count()==4
+   assert page.locator('.lex-detail-field').evaluate_all('fields=>fields.every(f=>f.dataset.lexType==="INT")')
+   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-encounter-slots.png'))
+   assert page.locator('.lex-detail-panel input').evaluate_all('inputs=>inputs.every(input=>input.getBoundingClientRect().right<=input.closest(".lex-detail-panel").getBoundingClientRect().right)')
   dimmed=page.locator('.lex-row-disabled').first.locator('.lex-column-list-cell:not([data-column-key="enabled"])').evaluate_all('(cells)=>cells.map(c=>[c.dataset.columnKey,c.children.length&&getComputedStyle(c.firstElementChild).opacity])')
   assert all(float(opacity)==.45 for key,opacity in dimmed),dimmed
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-encounter-slots.png'))
+  with tempfile.TemporaryDirectory(prefix='lexeditor-encounter-properties-') as project, FF8Session({'LEXEDITOR_FF8_PROJECT':project}) as session:
+   page.set_viewport_size({'width':1600,'height':950})
+   page.goto(session.url)
+   page.wait_for_function("typeof state!=='undefined'&&!state.booting",timeout=90000)
+   page.wait_for_function("!document.querySelector('.lex-plugin-loading-screen')",timeout=30000)
+   page.evaluate("state.encountersTab='formations';navigate('encounters')")
+   field=page.locator('.lex-detail-field').filter(has=page.get_by_label('Formation stage',exact=True))
+   field.hover()
+   field.get_by_role('button',name='Pin Stage column',exact=True).click()
+   page.locator('.ff8-record-list .lex-column-list-head-cell[data-column-key="stageId"]').wait_for(timeout=10000)
+   field=page.locator('.lex-detail-field').filter(has=page.get_by_label('Formation stage',exact=True))
+   field.hover()
+   assert field.get_by_role('button',name='Unpin Stage column',exact=True).get_attribute('aria-pressed')=='true'
+   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-encounter-properties.png'))
   browser.close()
  print('Encounter slots: selection, disabled state, numeric edits, level rules and width bounds passed.')
 if __name__=='__main__':main()
