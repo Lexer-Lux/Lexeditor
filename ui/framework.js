@@ -6619,12 +6619,6 @@ ${contents.path}`});
     let githubWorkspace = null;
     let navigationHistory = null;
     let developerMode = false;
-    const toast = message => {
-      const node = element("div", {class: "lex-toast", role: "status"}, message);
-      document.body.append(node);
-      requestAnimationFrame(() => node.classList.add("visible"));
-      setTimeout(() => { node.classList.remove("visible"); setTimeout(() => node.remove(), 180); }, 2200);
-    };
     const installPackagedDefaults = async () => {
       const result = await callWindow("default_views", options.plugin.id);
       let changed = false;
@@ -6673,7 +6667,7 @@ ${contents.path}`});
         }
         const result = await callWindow("save_default_view", options.plugin.id, tab.id, preferences);
         savedDefault = !!result?.saved;
-        if (savedDefault) toast(`${tab.label} is now the shipped default view.`);
+        if (savedDefault) showToast(`${tab.label} is now the shipped default view.`);
       };
       const button = element("button", {
         "data-tab": tab.id,

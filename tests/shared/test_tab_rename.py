@@ -235,6 +235,29 @@ def test_the_shell_undo_takes_a_rename_back_and_redo_puts_it_on_again(page):
     assert page.evaluate('localStorage.getItem("fixture-items.label")') == "Gear"
 
 
+def test_saving_main_tab_view_does_not_shrink_the_editor(page, tmp_path):
+    framework(page)
+    mount_shell(page)
+    page.evaluate('''() => document.querySelector('main').append(
+      LexeditorUI.detailPanel({title:'Record',body:LexeditorUI.detailField({
+        label:'Value',control:LexeditorUI.el('input',{type:'number',value:10})})}))''')
+    before = page.locator('main').bounding_box()
+    page.locator('nav button[data-tab="items"]').hover()
+    page.mouse.down(button='right')
+    page.wait_for_timeout(900)
+    page.mouse.up(button='right')
+    page.wait_for_timeout(200)
+    assert len(page.evaluate('savedCalls')) == 1
+    toast = page.locator('.lex-toast-stack > .lex-toast')
+    assert toast.inner_text() == 'Items is now the shipped default view.'
+    assert page.locator('main').bounding_box() == before
+    assert page.locator('body > .lex-toast').count() == 0
+    page.screenshot(path=str(tmp_path / 'saved-view.png'))
+    toast.click()
+    toast.wait_for(state='detached')
+    assert page.locator('main').bounding_box() == before
+
+
 def test_holding_right_click_on_a_subtab_saves_its_page_view(page):
     """Lexer: holding the right button on a subtab to save its layout did nothing."""
     framework(page)
