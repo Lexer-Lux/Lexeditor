@@ -72,7 +72,6 @@ World
 - draw points: okay, possible that i can't change precisely what the draw amount is, possible. but how is it possible i can't even SEE what it is?
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
     > status 2026-09-27: field name on top as a link and the field's picture with the landing point marked. Not done: the world-map side - this table stores no world point (all 72 entries are where you land inside the field). The world-side trigger is in the world map's own scripts, not found yet.
-- world -> world->field: shouldn't this really just be a panel tab on the field tab? not sure why this is here.
 - FF8 Field-to-World: recover the original requested behaviour and implement it.
     > status 2026-09-27: not recoverable - it is in no saved session, GitHub issue or worklog.
     > Lexer: I genuinely don't know and this is why I'm so fucking pissed at you/Codex for just fucking wiping my entire original todo.txt and replacing it with a horribly shitty new version "figure out what i'm supposed to do" bitch you fucking deleted the todo and replaced it with a message saying to find the thing you deleted holy fucking shit

@@ -6418,6 +6418,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:100%;
   border-top:0;
 }
+.lex-paged-list-detail > .lex-pager-inline { grid-column:1 / -1; grid-row:2; }
 .lex-pager > * { min-height:0; }
 .lex-pager > :is(.lex-pager-left,.lex-pager-controls,.lex-pager-right) { height:100%; flex-wrap:nowrap; }
 .lex-pager .lex-action-row { flex-wrap:nowrap; }

@@ -9448,7 +9448,7 @@ ${contents.path}`});
           change("table-rows-clear", {page: nextPage, pageSize: globalPageSize});
         },
       } : null;
-      const pagerNode = pager({page, pages, total: records.length, pageSize: barrelSize,
+      const pagerNode = pager({inline:options.inlinePager===true,page, pages, total: records.length, pageSize: barrelSize,
         noun: options.noun, change: changePage, search: options.search, filters: bottomTools,
         rowControl});
       root.classList.add("lex-paged-list-detail", "has-pager");
@@ -9475,7 +9475,7 @@ ${contents.path}`});
         const value = `${height}px`;
         if (height && root.style.getPropertyValue("--lex-pager-height") !== value) {
           root.style.setProperty("--lex-pager-height", value);
-          document.documentElement.style.setProperty("--lex-pager-height", value);
+          if(options.inlinePager!==true)document.documentElement.style.setProperty("--lex-pager-height", value);
         }
       };
       requestAnimationFrame(() => requestAnimationFrame(measurePager));

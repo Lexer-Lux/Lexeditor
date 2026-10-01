@@ -239,6 +239,7 @@
     return detailPanel({title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
   }
   const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
+  fieldDetailTabs.push({id:"worldToField",label:"World → Field",help:"Where the player arrives after entering a field from the world map. Select an entry to change its field, position or walkmesh triangle. The panel opens on an arrival for the selected field, when one exists. The table does not store a world-map position. Test changed arrivals in the game."});
   function fieldDetailHelp(id){return infoHelp(fieldDetailTabs.find(tab=>tab.id===id).help)}
   function fieldCameraControl(row,camera,field,axis=null){
     const vector=field.startsWith("axis")?Number(field.slice(4)):null,vanilla=fieldMapRow(state.vanilla,row.key)?.camera?.cameras?.[camera.id];
@@ -374,10 +375,18 @@
     return fieldCameraSection(row);
   }
   function fieldDetail(row,prefs){
-    if(!row._loaded){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
+    if(!row._loaded&&state.fieldDetailTab!=="worldToField"){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
     const tabs=[...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
     const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"camera";
     state.fieldDetailTab=active;
+    if(active==='worldToField'){
+      if(state.fieldArrivalOwner!==row.id){
+        state.fieldArrivalOwner=row.id;
+        const arrival=state.data.wm2field.rows.find(entry=>row.mapId!=null&&Number(entry.fieldId)===Number(row.mapId));
+        state.selected.wm2field=arrival?.id??null;state.filters.wm2field='';state.pages.wm2field=0;
+      }
+      return LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:renderWorldToField()});
+    }
     const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
     // The picture's help sits in its own corner, outside the heading that
     // fades away while the picture is hovered.

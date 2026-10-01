@@ -35,13 +35,14 @@ def main() -> int:
                     page.locator("#main").inner_text()[:200]
                 # Set the tab directly: navigate() is async and can re-render
                 # after this evaluate, which left the list on its default page.
-                page.evaluate("""()=>{state.tab='world';state.worldTab='worldToField';
+                page.evaluate("""()=>{state.tab='fields';state.fieldDetailTab='worldToField';
+                  state.selected.fields=state.data.fields.rows.find(field=>Number(field.mapId)===state.data.wm2field.rows[0].fieldId).id;
                   state.pageSizes.wm2field=80;state.pages.wm2field=0;state.selected.wm2field=0;render()}""")
                 page.wait_for_selector(".world-to-field", timeout=60000)
-                rows = page.locator(".ff8-record-list .lex-list-row").count()
+                rows = page.locator(".ff8-record-list").last.locator('.lex-list-row').count()
                 # The list fits its pane, so the visible count is not the table's
                 # size; the data and the row content are what matter here.
-                assert rows >= 10, rows
+                assert rows > 0, rows
                 assert page.evaluate("()=>state.data.wm2field.count") == 72
                 assert page.evaluate("()=>state.data.wm2field.path").endswith("wm2field.tbl")
                 # The list names the field each position leads to, from the
@@ -49,7 +50,13 @@ def main() -> int:
                 named = page.evaluate("""()=>{const row=state.data.wm2field.rows[0];
                   const field=state.data.fields.rows.find(entry=>Number(entry.mapId)===Number(row.fieldId));
                   return field?field.name:''}""")
-                assert named and named in page.locator(".ff8-record-list .lex-list-row").first.inner_text(), named
+                assert named and named in page.locator(".ff8-record-list").last.locator('.lex-list-row').first.inner_text(), named
+                assert page.evaluate("state.tab==='fields'&&state.fieldDetailTab==='worldToField'")
+                arrival_pager=page.locator('.lex-pager-inline')
+                arrival_pager.get_by_role('button',name='Last page',exact=True).click()
+                page.wait_for_function("state.pages.wm2field>0")
+                assert page.locator('.ff8-record-list').last.locator('.lex-list-row[data-key="71"]').count()==1
+                arrival_pager.get_by_role('button',name='First page',exact=True).click()
                 # The detail is the entry's arrival in the field: the field's
                 # name as a link on top, and its picture with the point drawn
                 # (Lexer, 2026-09-27).
@@ -63,6 +70,10 @@ def main() -> int:
                     "const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;"
                     "for(let i=3;i<d.length;i+=4)if(d[i])return true;return false}")
                 assert marked, "the arrival point is not drawn"
+                page.wait_for_function("!document.querySelector('.lex-plugin-loading-screen')")
+                output=Path(tempfile.gettempdir())/'lexeditor-dev'/'ff8-field-arrivals.png'
+                output.parent.mkdir(exist_ok=True)
+                page.screenshot(path=str(output))
                 bound = page.evaluate("()=>document.querySelector('input[aria-label=\"World to field 0 Z\"]').max")
                 triangles = page.evaluate(
                     "name=>state.data.fields.rows.find(r=>r.name===name).walkmesh.triangles.length", named)
@@ -86,6 +97,8 @@ def main() -> int:
                 assert stored["rows"][1] == before[1], (before[1], stored["rows"][1])
                 vanilla = api(session.url, "/api/wm2field?dataset=vanilla")
                 assert vanilla["rows"][0]["fieldId"] != 160, vanilla["rows"][0]
+                page.evaluate("state.tab='world';state.worldTab='map';render()")
+                assert page.locator('.ff8-world-tabs').get_by_role('tab',name='World → Field',exact=True).count()==0
                 assert not errors, errors
                 print(json.dumps({"entries": stored["count"], "editedX": stored["rows"][0]["x"],
                                   "editedField": stored["rows"][0]["fieldId"],

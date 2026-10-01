@@ -141,6 +141,7 @@
     const normalized=[...columns,...flagColumns].map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
     const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,empty:layout.empty,add:layout.add,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
+      inlinePager:layout.inlinePager===true,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
       change:async value=>{if(view==="enemies"&&!(await enemyAiBeforeLeave()))return;state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},
