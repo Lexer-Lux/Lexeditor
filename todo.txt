@@ -1,7 +1,6 @@
 =================================================================== GLOBAL / ALL GAMES
 
 - Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
-- Resolve how UI zoom should scale the main menu and pagination bars.
 - Audit remaining supported record-creation gaps in Warband, DS3, Factorio, Bannerlord, Project Zomboid, and Terraria localization; finish missing record families and verify save/reload.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
     > status 2026-09-27: detector repaired. Every FF8 tab, subtab and panel tab swept at 1600x900; the one find (Encounters > Rules #000 column) is fixed. Not done: other games, smaller window sizes.

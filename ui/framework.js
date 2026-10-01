@@ -210,18 +210,19 @@
     const slider = element("input", {type:"range", min:50, max:150, step:1, value:100,
       "aria-label":"UI scale", "aria-valuetext":"100%"});
     let pending = null, running = false;
+    const applyBarScale = percent => document.documentElement.style.setProperty("--lex-ui-scale", String(percent / 100));
     const show = percent => { slider.value=percent; value.textContent=`${percent}%`; slider.setAttribute("aria-valuetext",`${percent}%`); };
     const apply = async () => {
       if(running)return;
       running=true;
       try {
-        while(pending!==null){const percent=pending;pending=null;await callWindow("ui_scale",percent);}
+        while(pending!==null){const percent=pending;pending=null;const result=await callWindow("ui_scale",percent);applyBarScale(result?.percent||percent);}
       } catch(error){showToast(`Could not change UI scale: ${error.message||error}`,true);}
       finally{running=false;}
     };
     slider.addEventListener("input",()=>show(Number(slider.value)));
     slider.addEventListener("change",()=>{pending=Number(slider.value);apply();});
-    const initialize=async()=>{try{const result=await callWindow("ui_scale");if(result?.percent&&!running)show(result.percent);}catch(_error){}};
+    const initialize=async()=>{try{const result=await callWindow("ui_scale");if(result?.percent&&!running){show(result.percent);applyBarScale(result.percent);}}catch(_error){}};
     if(window.pywebview?.api)initialize();else window.addEventListener("pywebviewready",initialize,{once:true});
     return element("label",{class:"lex-ui-scale",title:"UI scale. Right-click to reset to 100%.",
       "data-lex-history-control":true,oncontextmenu:event=>{
@@ -5708,8 +5709,8 @@ ${contents.path}`});
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
-        {key:"pagerBarHeightPercent", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is, as a percentage of the screen height. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:3, max:12, step:.5, unit:"%"},
-        {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
+        {key:"pagerBarHeightPercent", scope:"user", title:"Pagination bar height", description:"Height of the bottom table bar as a percentage of screen height at 100% UI scale. UI zoom scales this bar with the editor. All table pages use this height.", type:"number", min:3, max:12, step:.5, unit:"%"},
+        {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Menu bar height as a percentage of screen height at 100% UI scale. UI zoom scales this bar on Home and in every game plugin.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
         {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
         {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},

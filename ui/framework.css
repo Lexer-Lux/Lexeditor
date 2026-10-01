@@ -6406,7 +6406,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
   box-sizing:border-box;
   min-height:0;
-  height:var(--lex-pager-bar-height, 6vh);
+  height:calc(var(--lex-pager-bar-height, 6vh) * var(--lex-ui-scale, 1));
   font-size:min(1rem, calc(var(--lex-pager-bar-height, 6vh) * .45));
 
 }
@@ -7827,11 +7827,11 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   display: grid;
   box-sizing: border-box;
   grid-template-columns: minmax(min-content, 1fr) auto minmax(max-content, 1fr);
-  height: var(--lex-command-row-height);
-  min-height: var(--lex-command-row-height);
+  height: calc(var(--lex-command-row-height) * var(--lex-ui-scale, 1));
+  min-height: calc(var(--lex-command-row-height) * var(--lex-ui-scale, 1));
   /* The row has to honour the height the setting asks for, so its contents
      are bounded by it rather than propping it open from inside. */
-  max-height: var(--lex-command-row-height);
+  max-height: calc(var(--lex-command-row-height) * var(--lex-ui-scale, 1));
   align-items: center;
   gap: 7px;
   min-width: 0;
