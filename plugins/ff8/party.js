@@ -522,6 +522,15 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       change:value=>{state.enemyActionTier=value;renderEnemies()},
       content:tier=>enemyAbilitiesSection(row,tier)});
   }
+  function enemyLootPanel(row){
+    const tabs=[{id:'mug',label:'Mug'},{id:'draw',label:'Draw'},{id:'drops',label:'Drops'},
+      {id:'cards',label:'Cards'},{id:'devour',label:'Devour'}];
+    const active=tabs.some(tab=>tab.id===state.enemyLootTab)?state.enemyLootTab:'mug';
+    return tabbedPanel({tabs,active,label:'Enemy loot types',
+      change:value=>{state.enemyLootTab=value;renderEnemies()},
+      content:kind=>kind==='cards'?enemySimpleTables(row)[0]:kind==='devour'?enemySimpleTables(row)[1]
+        :enemyPairSection(row,kind,kind.toUpperCase(),kind==='draw'?'Magic':'Item')});
+  }
   function enemyDetail(row,prefs){
     const table=enemyTableRow(state.data,row.id),tab=state.enemyDetailTab||'properties';
     const tabs=[{id:'properties',label:'Properties'},{id:'actions',label:'Actions',help:'The AI uses these action slots. Each level tier can use a different ability in the same slot.'},{id:'loot',label:'Loot'},
@@ -537,7 +546,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
         help:infoHelp('The texture pages of this enemy battle model, with the palettes it stores. Showing a page here does not change the game; the Textures tab is where a page is replaced.'),
         body:modelTextureCards(model,{inPlace:true})}));
     }else if(tab==='actions'&&table)body=[enemyActionsPanel(table)];
-    else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
+    else if(tab==='loot'&&table)body=[enemyLootPanel(table)];
     else if(tab==='renzokuken'&&table)body=enemySimpleTables(table).slice(2);
     else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
     else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
