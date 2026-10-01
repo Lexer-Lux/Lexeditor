@@ -9,6 +9,55 @@ import base64
 
 
 def parse(data: bytes) -> list[dict]:
+    if 8 <= len(data) <= 16 * 1024 * 1024:
+        faces_at, vertices = struct.unpack_from('<2I', data)
+        if vertices and faces_at == 8 + vertices * 8:
+            return _direct_objects(data)
+    return _parse_table(data)
+
+
+def _direct_objects(data: bytes) -> list[dict]:
+    """Diablos stores consecutive single-frame objects without an offset table."""
+    start, blocks, spans = 0, [], []
+    tail = []
+    while start < len(data):
+        if len(blocks) >= 256 or start + 8 > len(data):
+            raise ValueError('Invalid direct surface object sequence')
+        faces_at, vertices = struct.unpack_from('<2I', data, start)
+        if not 1 <= vertices <= 65536 or faces_at != 8 + vertices * 8:
+            tail = _parse_table(data[start:])
+            for obj in tail:
+                obj['offset'] += start
+            break
+        cursor = start + faces_at
+        for stride in (12, 16, 20, 24, 20, 24, 28, 36):
+            if cursor + 4 > len(data):
+                raise ValueError('Truncated direct surface face count')
+            count, = struct.unpack_from('<I', data, cursor)
+            cursor += 4 + count * stride
+            if cursor > len(data):
+                raise ValueError('Direct surface faces exceed their file')
+        blocks.append(struct.pack('<3I', faces_at + 4, vertices, 1) + data[start + 8:cursor])
+        spans.append((start, cursor - start))
+        start = cursor
+    header_size = 8 + 4 * len(blocks)
+    offsets, end = [], header_size
+    for block in blocks:
+        offsets.append(end)
+        end += len(block)
+    normalized = struct.pack(f'<{len(blocks) + 2}I', len(blocks), end, *offsets) + b''.join(blocks)
+    objects = _parse_table(normalized)
+    for obj, (offset, size) in zip(objects, spans):
+        obj.update(offset=offset, size=size, vertexOffset=8)
+    objects.extend(tail)
+    if len(objects) > 256 or sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000 or sum(len(obj['faces']) for obj in objects) > 500000:
+        raise ValueError('Composite surface exceeds decoding budget')
+    for index, obj in enumerate(objects):
+        obj['id'] = index
+    return objects
+
+
+def _parse_table(data: bytes) -> list[dict]:
     if not 12 <= len(data) <= 16 * 1024 * 1024:
         raise ValueError('Effect surface size is outside the supported bounds')
     count, end = struct.unpack_from('<2I', data)
@@ -90,7 +139,7 @@ def scene(filename: str, data: bytes, dataset: str, object_id: int | None = None
     obj = objects[selected]
     if not 0 <= frame < obj['frameCount']:
         raise ValueError('Unknown surface frame')
-    start = obj['offset'] + 12 + frame * obj['vertexCount'] * 8
+    start = obj['offset'] + obj.get('vertexOffset', 12) + frame * obj['vertexCount'] * 8
     positions = [(x, -y, -z) for x, y, z in
                  (struct.unpack_from('<3h', data, start + i * 8) for i in range(obj['vertexCount']))]
     images = materials.sources(filename, dataset)

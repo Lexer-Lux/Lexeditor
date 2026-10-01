@@ -81,3 +81,23 @@ def test_inventory_and_scene_select_vertex_frames(monkeypatch):
     for object_id, frame in ((1, 0), (-1, 0), (0, -1), (0, 2)):
         with pytest.raises(ValueError):
             model_geometry.scene('mag094_b.1s0', object_id=object_id, frame=frame)
+
+
+def test_direct_mesh_sequence_and_animated_tail_keep_original_offsets(monkeypatch):
+    original = surface()
+    obj = original[12:]
+    faces_at, vertices, _ = struct.unpack_from('<3I', obj)
+    direct = struct.pack('<2I', 8 + vertices * 8, vertices) + obj[12:12 + vertices * 8] + obj[faces_at:]
+    changed = bytearray(direct)
+    struct.pack_into('<h', changed, 8, 75)
+    data = direct + changed + original
+    objects = effect_surface.parse(data)
+    assert [o['offset'] for o in objects] == [0, len(direct), 2 * len(direct) + 12]
+    assert [o['frameCount'] for o in objects] == [1, 1, 2]
+    monkeypatch.setattr(assets, 'model_dat_bytes', lambda *args: data)
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    assert model_geometry.scene('mag324_h.s00', object_id=1)['positions'][0] == (75, 0, 0)
+    assert model_geometry.scene('mag324_h.s00', object_id=2, frame=1)['positions'][0] == (0, 0, 0)
+    for invalid in (direct[:-1], direct + b'garbage', direct + original[:-1]):
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
