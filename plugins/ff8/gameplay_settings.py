@@ -89,13 +89,11 @@ DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
 DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
 DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
 # These are the Tweaks shown by the current editor. They remain off by default.
-# Formulae Rework is not in this set because its requested behavior is not
-# complete; it must not be saved through a stale client.
 ACCEPTED_TWEAKS = frozenset({
     "flyingEvaEnabled", "autoSortInventory", "autoSortMagic",
     "enhancedAbilityMenu", "singleGf", "universalItem", "scannedTargetScan",
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
-    "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
+    "streamlinedDraw", "formulaeRework", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "worldMapFullscreen", "gfAcquisitionRework", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
     "interactionIndicators",

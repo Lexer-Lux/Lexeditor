@@ -15,20 +15,24 @@ ICONS = ROOT / "plugins" / "ff8" / "game_icons.py"
 
 
 def main() -> int:
-    editor = EDITOR.read_text(encoding="utf-8")
+    editor = EDITOR.with_suffix('.css').read_text(encoding="utf-8")
+    framework = (ROOT / 'ui/framework.css').read_text(encoding='utf-8')
     icons = ICONS.read_text(encoding="utf-8")
     required = [
-        ".lex-shell-header nav button{position:relative;display:inline-flex;align-items:center;justify-content:center",
-        '.lex-shell-header nav button.active::before{content:none!important}',
-        '.lex-shell-header nav button.active .lex-tab-label::before{position:absolute',
-        'right:calc(100% + 3px);width:32px;height:22px',
-        'background:url("/assets/icons/0.png") center/contain no-repeat',
-        '.lex-shell-header nav .lex-tab-label{position:relative;display:inline-block}',
+        '--lex-tab-marker-content:""',
+        '--lex-tab-marker-image:url("/assets/icons/0.png")',
+        '--lex-tab-marker-width:32px;--lex-tab-marker-height:22px',
         '0: "Menu pointer"',
     ]
     for contract in required:
         if contract not in editor + icons:
             raise AssertionError(f"Missing native pointer/font contract: {contract}")
+    marker = framework.split('.lex-shell-header nav button.active::before {', 1)[1].split('}', 1)[0]
+    for contract in ('position: absolute', 'top: 50%', 'transform: translateY(-50%)',
+                     'var(--lex-tab-marker-image, none)', 'var(--lex-tab-marker-width, 24px)',
+                     'var(--lex-tab-marker-height, 16px)', 'pointer-events: none'):
+        if contract not in marker:
+            raise AssertionError(f'Missing shared marker geometry: {contract}')
     forbidden = [
         '.lex-shell-header nav button.active::before{content:"►"',
         '.lex-shell-header nav button.active::before{content:"►";margin-right:7px;font-family:"Arial",sans-serif;font-size:11px;vertical-align:2px}',

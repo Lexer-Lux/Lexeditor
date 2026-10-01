@@ -128,7 +128,7 @@ def main() -> int:
     require('const compatibility=field.formula==="gf_compat"' in editor
             and 'control=compatibility?gfCompatibilityControl(field):fieldControl(field)' in editor,
             "GF provenance must choose the signed Compatibility control or the existing typed control")
-    require("return sourceControl(control,()=>read(field.value),read(vanillaField?.value),references" in editor
+    require("return sourceControl(options.control||control,()=>read(field.value),read(vanillaField?.value),references" in editor
             and "format=compatibility?gfCompatibilityFormat:" in editor,
             "GF fields must preserve player-facing current, vanilla, and reference values")
     require('gfs:()=>renderKernel("gfs","GFs")' not in editor,

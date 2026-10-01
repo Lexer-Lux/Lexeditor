@@ -18,7 +18,7 @@ VISIBLE = frozenset({
     "flyingEvaEnabled", "autoSortInventory", "autoSortMagic",
     "enhancedAbilityMenu", "singleGf", "universalItem", "scannedTargetScan",
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
-    "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
+    "streamlinedDraw", "formulaeRework", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars",
     "flatStatAbilities", "maxSpellEnabled", "gfHpBars", "noMagicConsumption", "dropsAfterMug",
@@ -77,7 +77,10 @@ def main() -> None:
         loaded = gameplay_settings.load(project)
         for key in VISIBLE:
             assert loaded[key] is True, key
-        assert loaded["formulaeRework"] is False
+        # Disabling a supported tweak must preserve vanilla behavior too.
+        configured["formulaeRework"] = False
+        gameplay_settings.settings_path(project).write_text(json.dumps(configured), encoding="utf-8")
+        assert gameplay_settings.load(project)["formulaeRework"] is False
 
     editor = plugin_ui('ff8')
     rendered = editor[editor.index('const view=el("section",{class:"settings-view"}'):
@@ -88,8 +91,7 @@ def main() -> None:
                   "BETTER TARGETING", "COMMAND MENU REWORK"):
         assert f'row("{title}"' in rendered, title
     assert 'row("ENHANCED SCAN"' in rendered
-    # The unfinished tweak is visible with a blocker, while the persisted
-    # setting above remains fail-closed until the implementation is accepted.
+    # Availability diagnostics remain attached to the visible tweak control.
     assert 'formulaeRework,{blocker:settings.formulaeReworkBlocker}' in rendered
 
     print("FF8 visible Tweak persistence regression check passed")

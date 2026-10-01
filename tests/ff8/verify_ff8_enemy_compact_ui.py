@@ -150,6 +150,7 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             print('PASS Scan is editable in Battle Text, including empty/unavailable script cases')
             page.evaluate("fixtureState.enemyDetailTab='loot';rerender()")
             for kind in ['draw','mug','drops']:
+                page.get_by_role('tab',name=kind.title(),exact=True).click()
                 table=page.locator(f'.enemy-{kind}-table')
                 # One row per tier and slot, so an item name has the row's width.
                 assert table.locator('.enemy-tier-row').count()==12
@@ -160,11 +161,14 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
                         control.fill(str(30+slot))
                         assert page.evaluate('([k,t,s])=>fixtureState.data.enemyTables.rows[0].tables[k][t][s].quantity',[kind,tier,slot])==30+slot
             page.evaluate('rerender()')
+            page.get_by_role('tab',name='Draw',exact=True).click()
             assert page.get_by_label('DRAW low choice 1 quantity',exact=True).input_value()=='30'
             print('PASS all 36 quantities edit their stored slots and survive rendering')
+            page.get_by_role('tab',name='Cards',exact=True).click()
             page.get_by_label('Clear card slot 1',exact=True).click()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.cards[0].cardId')==255
             assert page.get_by_label('Clear card slot 1',exact=True).is_disabled()
+            page.get_by_role('tab',name='Mug',exact=True).click()
             for width in [720,1000,1600]:
                 page.set_viewport_size({'width':width,'height':1000})
                 page.wait_for_timeout(150)
@@ -198,9 +202,13 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             page.evaluate("fixtureState.activeSource='mine'")
             page.evaluate('setup',dataset)
             page.evaluate("fixtureState.enemyDetailTab='loot';rerender()")
+            page.get_by_role('tab',name='Mug',exact=True).click()
             page.get_by_label('MUG high choice 3 quantity',exact=True).fill('77')
+            page.get_by_role('tab',name='Draw',exact=True).click()
             page.get_by_label('DRAW medium choice 2 quantity',exact=True).fill('8')
+            page.get_by_role('tab',name='Drops',exact=True).click()
             page.get_by_label('DROPS low choice 4 quantity',exact=True).fill('99')
+            page.get_by_role('tab',name='Cards',exact=True).click()
             page.get_by_label('Clear card slot 1',exact=True).click()
             page.evaluate("fixtureState.enemyDetailTab='defense';rerender()")
             page.locator('[data-defence="Fire"] input[type=checkbox]').check()
