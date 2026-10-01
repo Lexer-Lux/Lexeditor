@@ -5,7 +5,8 @@ window.FF8ModelViewer = function ({file,dataset,label,onReady,onError,initialVie
   stage.append(canvas);
   const gl=canvas.getContext('webgl',{alpha:true,antialias:true,preserveDrawingBuffer:true});
   if(!gl){stage.lexMessage.textContent='A 3D graphics context is unavailable.';onError?.(new Error(stage.lexMessage.textContent));return stage;}
-  let yaw=initialView.yaw??0,pitch=initialView.pitch??0,zoom=.9,drag=null,disposed=false,attached=false,program=null;
+  const isStage=/^a0stg\d+\.x$/i.test(file),homeYaw=initialView.yaw??(isStage ? .6 : 0),homePitch=initialView.pitch??(isStage ? -.6 : 0);
+  let yaw=homeYaw,pitch=homePitch,zoom=.9,drag=null,disposed=false,attached=false,program=null;
   const buffers=[],textures=[],meshes=[],abort=new AbortController();
   const resize=new ResizeObserver(()=>draw());
   const lifetime=new MutationObserver(()=>{if(stage.isConnected)attached=true;else if(attached)dispose();});
@@ -37,7 +38,7 @@ window.FF8ModelViewer = function ({file,dataset,label,onReady,onError,initialVie
   canvas.addEventListener('pointermove',event=>{if(!drag)return;yaw+=(event.clientX-drag[0])*.012;pitch=Math.max(-1.5,Math.min(1.5,pitch+(event.clientY-drag[1])*.012));drag=[event.clientX,event.clientY];draw();});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(type,()=>{drag=null;canvas.classList.remove('dragging');});
   canvas.addEventListener('wheel',event=>{event.preventDefault();zoom=Math.max(.2,Math.min(4,zoom*Math.exp(-event.deltaY*.001)));draw();},{passive:false});
-  canvas.addEventListener('keydown',event=>{let used=true;switch(event.key){case'ArrowLeft':yaw-=.1;break;case'ArrowRight':yaw+=.1;break;case'ArrowUp':pitch-=.1;break;case'ArrowDown':pitch+=.1;break;case'+':case'=':zoom*=1.1;break;case'-':zoom/=1.1;break;case'Home':yaw=pitch=0;zoom=.9;break;default:used=false;}
+  canvas.addEventListener('keydown',event=>{let used=true;switch(event.key){case'ArrowLeft':yaw-=.1;break;case'ArrowRight':yaw+=.1;break;case'ArrowUp':pitch-=.1;break;case'ArrowDown':pitch+=.1;break;case'+':case'=':zoom*=1.1;break;case'-':zoom/=1.1;break;case'Home':yaw=homeYaw;pitch=homePitch;zoom=.9;break;default:used=false;}
     if(used){event.preventDefault();event.stopPropagation();pitch=Math.max(-1.5,Math.min(1.5,pitch));zoom=Math.max(.2,Math.min(4,zoom));draw();}});
   (async()=>{try{
     const response=await fetch(`/api/model-scene?file=${encodeURIComponent(file)}&dataset=${encodeURIComponent(dataset)}`,{signal:abort.signal});
@@ -92,7 +93,7 @@ window.FF8ModelViewer = function ({file,dataset,label,onReady,onError,initialVie
     try{
       return await new Promise((resolve,reject)=>{
         timer=setTimeout(()=>reject(new Error('Model preview timed out')),15000);
-        stage=FF8ModelViewer({...options,initialView:{yaw:.55,pitch:.15},onReady:canvas=>resolve(portrait(canvas)),onError:reject});
+        stage=FF8ModelViewer({...options,initialView:/^a0stg\d+\.x$/i.test(options.file)?{}:{yaw:.55,pitch:.15},onReady:canvas=>resolve(portrait(canvas)),onError:reject});
         stage.style.cssText='position:fixed;left:-10000px;top:0;width:192px;height:192px;min-height:0;visibility:hidden;pointer-events:none';
         stage.setAttribute('aria-hidden','true');
         document.body.append(stage);
