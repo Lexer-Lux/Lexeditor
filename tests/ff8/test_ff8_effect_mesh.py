@@ -21,7 +21,7 @@ def triangle():
 def test_mesh_byte_offsets_become_vertex_indices():
     result = effect_mesh.mesh(triangle())
     assert result['vertices'][1] == (100, -20, 0)
-    assert result['faces'] == [{'type': 6, 'indices': [0, 1, 2]}]
+    assert result['faces'] == [{'type': 6, 'indices': [0, 1, 2], 'colors': [[0, 0, 0]] * 3}]
 
 
 def test_textured_triangle_preserves_uv_palette_and_page():

@@ -24,8 +24,8 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
     gl.useProgram(program);gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
     gl.uniform4f(gl.getUniformLocation(program,'view'),yaw,pitch,zoom,canvas.width/canvas.height);
     for(const mesh of meshes){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);
-      for(const [name,size,offset] of [['position',3,0],['uv',2,12],['normal',3,20]]){
-        const attribute=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,size,gl.FLOAT,false,32,offset);}
+      for(const [name,size,offset] of [['position',3,0],['uv',2,12],['normal',3,20],['vertexColor',3,32]]){
+        const attribute=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,size,gl.FLOAT,false,44,offset);}
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,mesh.texture);gl.uniform1i(gl.getUniformLocation(program,'image'),0);
       gl.drawArrays(gl.TRIANGLES,0,mesh.count);}
     stage.dataset.rendered='true';stage.dataset.rotation=`${yaw},${pitch}`;stage.dataset.zoom=String(zoom);
@@ -43,10 +43,10 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
   (async()=>{try{
     const response=await fetch(`/api/model-scene?file=${encodeURIComponent(file)}&dataset=${encodeURIComponent(dataset)}${objectId==null?'':`&object=${encodeURIComponent(objectId)}`}`,{signal:abort.signal});
     const scene=await response.json();if(!response.ok)throw Error(scene.error||'Could not decode this model');if(disposed)return;
-    const vertex=shader(gl.VERTEX_SHADER,`attribute vec3 position;attribute vec2 uv;attribute vec3 normal;uniform vec4 view;varying vec2 tex;varying float light;
+    const vertex=shader(gl.VERTEX_SHADER,`attribute vec3 position;attribute vec2 uv;attribute vec3 normal;attribute vec3 vertexColor;uniform vec4 view;varying vec2 tex;varying float light;varying vec3 tint;
       vec3 rotate(vec3 p){float cy=cos(view.x),sy=sin(view.x),cx=cos(view.y),sx=sin(view.y);vec3 q=vec3(cy*p.x+sy*p.z,p.y,-sy*p.x+cy*p.z);return vec3(q.x,cx*q.y-sx*q.z,sx*q.y+cx*q.z);}
-      void main(){vec3 p=rotate(position);gl_Position=vec4(p.x*view.z/view.w,p.y*view.z,p.z*.25,1.);tex=uv;light=.45+.55*abs(dot(rotate(normal),normalize(vec3(.3,.5,1.))));}`);
-    const fragment=shader(gl.FRAGMENT_SHADER,`precision mediump float;varying vec2 tex;varying float light;uniform sampler2D image;void main(){vec4 color=texture2D(image,tex);if(color.a<.5)discard;gl_FragColor=vec4(color.rgb*light,color.a);}`);
+      void main(){vec3 p=rotate(position);gl_Position=vec4(p.x*view.z/view.w,p.y*view.z,p.z*.25,1.);tex=uv;tint=vertexColor;light=.45+.55*abs(dot(rotate(normal),normalize(vec3(.3,.5,1.))));}`);
+    const fragment=shader(gl.FRAGMENT_SHADER,`precision mediump float;varying vec2 tex;varying float light;varying vec3 tint;uniform sampler2D image;void main(){vec4 color=texture2D(image,tex);if(color.a<.5)discard;gl_FragColor=vec4(color.rgb*light*tint,color.a);}`);
     program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);gl.deleteShader(vertex);gl.deleteShader(fragment);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
     const minimum=[Infinity,Infinity,Infinity],maximum=[-Infinity,-Infinity,-Infinity];
@@ -56,11 +56,11 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
       const points=face.indices.map(index=>scene.positions[index].map((value,axis)=>(value-center[axis])/radius));
       const a=points[1].map((value,index)=>value-points[0][index]),b=points[2].map((value,index)=>value-points[0][index]);
       const n=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],length=Math.hypot(...n)||1;
-      points.forEach((point,index)=>values.push(...point,...face.uv[index],...n.map(value=>value/length)));}
+      points.forEach((point,index)=>values.push(...point,...face.uv[index],...n.map(value=>value/length),...(face.colors?.[index]||[1,1,1])));}
     const loads=[];
     for(const [index,values] of groups){const buffer=gl.createBuffer();buffers.push(buffer);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(values),gl.STATIC_DRAW);
       const rgb=-index-2,color=index<-1?[(rgb&255),(rgb>>8)&255,(rgb>>16)&255,255]:null;
-      const tex=texture(color);meshes.push({buffer,texture:tex,count:values.length/8});if(index<0)continue;
+      const tex=texture(color);meshes.push({buffer,texture:tex,count:values.length/11});if(index<0)continue;
       loads.push(new Promise(resolve=>{const image=new Image();image.onload=()=>{if(!disposed){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);draw();}resolve();};image.onerror=resolve;
         image.src=scene.textureImages?.[index]||`/assets/texture.png?id=${encodeURIComponent(`battle/${file}#${scene.textures[index]}`)}&palette=${scene.texturePalettes?.[index]??0}&dataset=${encodeURIComponent(dataset)}`;}));}
     stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();onReady?.(canvas);}

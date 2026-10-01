@@ -72,6 +72,9 @@ def mesh(data: bytes) -> dict:
                 if any(ref % 8 or ref // 8 >= count for ref in refs):
                     raise ValueError('Effect face references a missing vertex')
                 face = {'type': kind, 'indices': [ref // 8 for ref in refs]}
+                gouraud = kind in (2, 7, 9, 12, 17, 19)
+                face['colors'] = [list(data[start + (i * 4 if gouraud else 0):start + (i * 4 if gouraud else 0) + 3])
+                                  for i in range(len(fields))]
                 textured = {8: (4, 16, 18), 9: (12, 24, 26), 18: (4, 20, 22), 19: (16, 32, 34)}.get(kind)
                 if textured:
                     uv_at, clut_at, page_at = textured
@@ -117,7 +120,8 @@ def scene(filename: str, data: bytes, object_id: int | None = None) -> dict:
     for face in decoded['faces']:
         for corners in (((0, 1, 2),) if len(face['indices']) == 3 else ((0, 1, 2), (1, 3, 2))):
             triangle = {'indices': [face['indices'][i] for i in corners],
-                        'uv': [[0, 0]] * 3, 'texture': -1}
+                        'uv': [[0, 0]] * 3, 'texture': -0xFFFFFF - 2,
+                        'colors': [[value / (128 if 'uv' in face else 255) for value in face['colors'][i]] for i in corners]}
             if 'uv' in face:
                 triangle['uv'] = [[value / 256 for value in face['uv'][i]] for i in corners]
                 triangle['sourceTexture'] = {'tpage': face['tpage'], 'clut': face['clut']}
