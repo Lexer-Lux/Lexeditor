@@ -215,6 +215,14 @@
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
+    if(row.motion?.length){
+      const multiple=row.motion.length>1;
+      const rows=row.motion.flatMap(part=>part.animations.map(animation=>({...animation,part:part.part})));
+      sections.push(detailSection({title:'ANIMATIONS',body:[LexeditorUI.controlGroup(row.motion.map(part=>({label:multiple?`PART ${part.part} BONES`:'BONES',control:readonlyField(formatNumber(part.bones))})),{columns:4,stacked:true}),columnList({rows,key:item=>`${item.part}-${item.id}`,localSort:false,template:multiple?'1fr 1fr 1fr':'1fr 1fr',columns:[
+        ...(multiple?[{key:'part',label:'Part'}]:[]),{key:'id',label:'Animation'},
+        {key:'frames',label:'Frames'}]})],
+        help:infoHelp('Frame counts describe the stored poses. Playback timing depends on the game. These animations are read-only.')}));
+    }
     if(row.summonFamily!=null)sections.push(detailSection({title:'TEXTURES',body:summonTextureCards(row),help:infoHelp('Shows packed textures and texture uploads found by simulating the summon script. Different uploads can use different parts of a file. Battle-dependent script paths may use other textures.')}));
     if(row.sections?.length||row.effectResources?.length){
       const resources=!!row.effectResources?.length;

@@ -639,6 +639,26 @@ def _model_file_info(path: Path) -> dict:
     return _battle_file_info(path.name.casefold(), path.read_bytes())
 
 
+def _model_motion_info(data: bytes, sections: list[dict], part: int = 1) -> list[dict]:
+    """Read bounded skeleton and animation headers without expanding poses."""
+    spans = {section['name']: section for section in sections}
+    if 'Skeleton' not in spans or 'Model animation' not in spans:
+        return []
+    skeleton, animation = spans['Skeleton'], spans['Model animation']
+    bones = data[skeleton['offset']:skeleton['offset'] + skeleton['size']]
+    raw = data[animation['offset']:animation['offset'] + animation['size']]
+    if len(bones) < 16 or not bones[0] or len(bones) < 16 + bones[0] * 48 or len(raw) < 4:
+        return []
+    count, = struct.unpack_from('<I', raw)
+    if count > 256 or 4 + count * 4 > len(raw):
+        return []
+    offsets = struct.unpack_from(f'<{count}I', raw, 4)
+    if any(not 4 + count * 4 <= offset < len(raw) for offset in offsets):
+        return []
+    return [{'part': part, 'bones': bones[0],
+             'animations': [{'id': index, 'frames': raw[offset]} for index, offset in enumerate(offsets)]}]
+
+
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
     image = _texture_pack_info(data)
@@ -666,15 +686,18 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
     parts = effect_model_parts(filename, data)
     if parts:
         named = []
+        motion = []
         for part in parts:
             raw = data[part['offset']:part['offset'] + part['size']]
+            motion.extend(_model_motion_info(raw, [{**section, 'name': name}
+                for section, name in zip(parse_dat_sections(raw), EFFECT_MODEL_SECTIONS)], part['id'] + 1))
             for section, name in zip(parse_dat_sections(raw), EFFECT_MODEL_SECTIONS):
                 named.append({**section, 'index': len(named) + 1,
                               'offset': part['offset'] + section['offset'],
                               'name': f"Part {part['id'] + 1}: {name}"})
         return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
                 'parsed': True, 'kind': 'effect-model', 'sections': named,
-                'modelParts': parts, 'tims': [], 'texturesVerified': False,
+                'modelParts': parts, 'motion': motion, 'tims': [], 'texturesVerified': False,
                 'geometryVerified': True,
                 'counts': {key: sum(part[key] for part in parts)
                            for key in ('objects', 'vertices', 'triangles', 'quads')}}
@@ -716,7 +739,7 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
                 section['name'] = 'Texture'
                 tims.append({**image['tims'][0], 'index': len(tims), 'offset': start})
     return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-            "parsed": True, "kind": kind, "sections": named,
+            "parsed": True, "kind": kind, "sections": named, 'motion': _model_motion_info(data, named),
             "counts": counts, "tims": tims if tims is not None else [],
             "geometryVerified": counts is not None,
             "texturesVerified": tims is not None}
@@ -1183,7 +1206,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         note = row["note"] + (f" {note}" if note else "")
     counts = info["counts"] or {}
     row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'), modelParts=info.get('modelParts'),
-               effectResources=info.get('effectResources'),
+               effectResources=info.get('effectResources'), motion=info.get('motion'),
                counts=info["counts"], tims=info["tims"],
                vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model', 'surface') else len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],

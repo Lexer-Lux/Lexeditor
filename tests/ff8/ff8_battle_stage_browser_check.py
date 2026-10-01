@@ -123,6 +123,13 @@ def main():
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             assert not failed_textures, failed_textures
             page.evaluate("state.selected.models='mag184_e.dat';navigate('models')")
+            animations = page.locator('[data-lex-layout-section="ANIMATIONS"]')
+            animations.wait_for(state='visible')
+            assert animations.get_by_text('86', exact=True).is_visible()
+            assert animations.locator('input').evaluate_all("inputs=>inputs.some(input=>input.value==='69')")
+            if os.environ.get('LEXEDITOR_ANIMATION_DETAILS_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_ANIMATION_DETAILS_SCREENSHOT'])
             effect = page.request.get(session.url + 'api/model-scene?file=mag184_e.dat&dataset=vanilla').json()
             assert len(effect['textureImages']) == 2
             assert effect['unmappedFaces'] == 0

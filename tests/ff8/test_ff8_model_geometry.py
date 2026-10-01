@@ -25,6 +25,20 @@ def model_bytes(colored=False):
 
 
 class ModelGeometryTests(unittest.TestCase):
+    def test_motion_inventory_preserves_counts_without_decoding_poses(self):
+        bones = bytes([2]) + bytes(15 + 2 * 48)
+        animation = struct.pack('<3I', 2, 12, 13) + bytes([7, 19])
+        data = bones + animation
+        sections = [{'name': 'Skeleton', 'offset': 0, 'size': len(bones)},
+                    {'name': 'Model animation', 'offset': len(bones), 'size': len(animation)}]
+        self.assertEqual(assets._model_motion_info(data, sections, part=2),
+                         [{'part': 2, 'bones': 2, 'animations': [{'id': 0, 'frames': 7}, {'id': 1, 'frames': 19}]}])
+        for offset, value in ((len(bones), 257), (len(bones) + 4, 4), (len(bones) + 8, len(animation))):
+            invalid = bytearray(data)
+            struct.pack_into('<I', invalid, offset, value)
+            self.assertEqual(assets._model_motion_info(invalid, sections), [])
+        self.assertEqual(assets._model_motion_info(data, []), [])
+
     def test_diablos_parts_are_bounded_and_selected_for_export(self):
         original = model_bytes(colored=True)
         spans = assets.parse_dat_sections(original)
