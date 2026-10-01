@@ -71,7 +71,14 @@ def mesh(data: bytes) -> dict:
                 refs = [struct.unpack_from('<H', data, start + field)[0] for field in fields]
                 if any(ref % 8 or ref // 8 >= count for ref in refs):
                     raise ValueError('Effect face references a missing vertex')
-                faces.append({'type': kind, 'indices': [ref // 8 for ref in refs]})
+                face = {'type': kind, 'indices': [ref // 8 for ref in refs]}
+                textured = {8: (4, 16, 18), 9: (12, 24, 26), 18: (4, 20, 22), 19: (16, 32, 34)}.get(kind)
+                if textured:
+                    uv_at, clut_at, page_at = textured
+                    face['uv'] = [list(struct.unpack_from('<2B', data, start + uv_at + i * 2)) for i in range(len(fields))]
+                    face['clut'], = struct.unpack_from('<H', data, start + clut_at)
+                    face['tpage'], = struct.unpack_from('<H', data, start + page_at)
+                faces.append(face)
             cursor += total * stride
     return {'vertices': vertices, 'faces': faces}
 
@@ -109,8 +116,12 @@ def scene(filename: str, data: bytes, object_id: int | None = None) -> dict:
     triangles = []
     for face in decoded['faces']:
         for corners in (((0, 1, 2),) if len(face['indices']) == 3 else ((0, 1, 2), (1, 3, 2))):
-            triangles.append({'indices': [face['indices'][i] for i in corners],
-                              'uv': [[0, 0]] * 3, 'texture': -1})
+            triangle = {'indices': [face['indices'][i] for i in corners],
+                        'uv': [[0, 0]] * 3, 'texture': -1}
+            if 'uv' in face:
+                triangle['uv'] = [[value / 256 for value in face['uv'][i]] for i in corners]
+                triangle['sourceTexture'] = {'tpage': face['tpage'], 'clut': face['clut']}
+            triangles.append(triangle)
     return {'file': filename, 'objectId': chosen['id'],
             'positions': [(x, -y, -z) for x, y, z in decoded['vertices']],
             'triangles': triangles, 'textures': [], 'bones': 0, 'animations': 0}

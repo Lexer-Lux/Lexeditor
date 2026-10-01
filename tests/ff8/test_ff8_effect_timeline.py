@@ -36,3 +36,21 @@ def test_invalid_root_is_rejected():
 def test_shared_page_load_replaces_previous_upload_source():
     result = simulate(script(0xC006, 0x2029, 704, 256, 64, 256, 0))
     assert result.vram_events == [(0, 'rawrect', ((704, 256, 64, 256), 'ma8def_p.0'))]
+
+
+def test_summon_file_slot_base_applies_to_streamed_loads():
+    result = simulate(script(0xB2, 10, 0x8E06, 0x8029, 33, 0))
+    assert result.vram_events == [(0, 'raw', (33, 17, 0))]
+
+
+def test_shared_pages_ignore_summon_file_slot_base():
+    result = simulate(script(0xB2, 10, 0xC006, 0x8029, 33, 0))
+    assert result.vram_events == [(0, 'raw', (33, 'ma8def_p.0', 0))]
+
+
+@pytest.mark.parametrize('opcode,handler', [(0x3C, 2), (0x56, 9)])
+def test_scaled_and_clipped_mesh_selection_is_recorded(opcode, handler):
+    words = (opcode, 8, 0) if opcode == 0x3C else (opcode, 8, 1, 0)
+    result = simulate(script(*words))
+    assert result.bones[0].prop('mesh', 0) == 8
+    assert result.bones[0].prop('draw', 0) == handler

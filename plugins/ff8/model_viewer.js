@@ -62,7 +62,7 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
       const rgb=-index-2,color=index<-1?[(rgb&255),(rgb>>8)&255,(rgb>>16)&255,255]:null;
       const tex=texture(color);meshes.push({buffer,texture:tex,count:values.length/8});if(index<0)continue;
       loads.push(new Promise(resolve=>{const image=new Image();image.onload=()=>{if(!disposed){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);draw();}resolve();};image.onerror=resolve;
-        image.src=`/assets/texture.png?id=${encodeURIComponent(`battle/${file}#${scene.textures[index]}`)}&palette=${scene.texturePalettes?.[index]??0}&dataset=${encodeURIComponent(dataset)}`;}));}
+        image.src=scene.textureImages?.[index]||`/assets/texture.png?id=${encodeURIComponent(`battle/${file}#${scene.textures[index]}`)}&palette=${scene.texturePalettes?.[index]??0}&dataset=${encodeURIComponent(dataset)}`;}));}
     stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();onReady?.(canvas);}
   }catch(error){if(!disposed){stage.lexMessage.replaceChildren(ui.detailNote(error.message));stage.lexMessage.hidden=false;stage.dataset.error=error.message;onError?.(error);}}})();
   return stage;

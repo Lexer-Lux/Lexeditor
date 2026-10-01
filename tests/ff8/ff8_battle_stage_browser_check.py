@@ -44,6 +44,8 @@ def main():
             with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=8' in response.url) as selected:
                 page.get_by_role('combobox', name='Summon mesh object', exact=True).select_option('8')
             assert selected.value.json()['objectId'] == 8
+            assert selected.value.json()['textureImages']
+            assert selected.value.json()['previewTick'] == 255
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             assert not failed_textures, failed_textures
             assert not errors, errors

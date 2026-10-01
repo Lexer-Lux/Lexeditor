@@ -21,12 +21,22 @@ class PreviewSimulation(CineSimulation):
 
     def _record_props(self, bone, instruction):
         super()._record_props(bone, instruction)
-        if instruction.code == 6 and instruction.op & 0x8000:
+        if instruction.code in (0x3C, 0x56):
+            bone.props.append((self.tick, 'mesh', instruction.words[0] & 65535))
+            bone.props.append((self.tick, 'draw', 2 if instruction.code == 0x3C else 9))
+        if instruction.code == 0xB2:
+            self._file_slot_base = instruction.words[0] & 255
+        elif instruction.code == 6:
             slot = (instruction.op >> 9) & 63
-            if slot & 32:
+            if instruction.op & 0x8000 and slot & 32:
                 # Shared page loads replace the last-upload source even though
                 # they do not replace a summon-specific file slot.
                 self._last_load = f'ma8def_p.{slot & 31}'
+            else:
+                slot += getattr(self, '_file_slot_base', 0)
+                if not 0 <= slot < 64:
+                    raise ValueError('Summon file slot is outside the supported range')
+                self._last_load = slot
 
 
 def simulate(data: bytes) -> PreviewSimulation:

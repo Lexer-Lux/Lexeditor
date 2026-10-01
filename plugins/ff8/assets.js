@@ -131,7 +131,7 @@
           const show=id=>{host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id}));};
           const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
           control.setAttribute('aria-label','Summon mesh object');show(meshes[0].id);
-          return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp('Each object is shown separately, without textures or animation. Objects with vertices but no faces are morph targets and have no standalone surface.')}),host);
+          return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp('Each object is shown separately, with textures from its first simulated appearance when known. Animation and placement within the summon are not shown. Morph targets have vertices but no standalone surface.')}),host);
         },onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
     }
     return {label:`${row.name} model`,

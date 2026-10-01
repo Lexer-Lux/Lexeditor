@@ -24,6 +24,17 @@ def test_mesh_byte_offsets_become_vertex_indices():
     assert result['faces'] == [{'type': 6, 'indices': [0, 1, 2]}]
 
 
+def test_textured_triangle_preserves_uv_palette_and_page():
+    data = triangle() + bytes(8)
+    struct.pack_into('<2H', data, 72, 8, 1)
+    data[80:86] = bytes((0, 1, 10, 11, 20, 21))
+    struct.pack_into('<5H', data, 86, 0, 8, 16, 14356, 150)
+    struct.pack_into('<2H', data, 96, 0, 65535)
+    face = effect_mesh.mesh(data)['faces'][0]
+    assert face['uv'] == [[0, 1], [10, 11], [20, 21]]
+    assert (face['clut'], face['tpage']) == (14356, 150)
+
+
 @pytest.mark.parametrize('reference', [1, 24, 65535])
 def test_mesh_rejects_invalid_vertex_reference(reference):
     data = triangle()
