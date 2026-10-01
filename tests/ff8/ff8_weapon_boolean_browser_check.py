@@ -15,7 +15,7 @@ def main():
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
   p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-  p.evaluate("""()=>{const U=LexeditorUI, prefs=U.columnPreferences('weapon-bool-test',[{key:'melee',label:'Melee weapon',defaultVisible:false}],()=>{});
+  p.evaluate("""()=>{document.documentElement.dataset.lexBooleanStyle='arrow';const U=LexeditorUI, prefs=U.columnPreferences('weapon-bool-test',[{key:'melee',label:'Melee weapon',defaultVisible:false}],()=>{});
    for(const bool of [false,true]){
     const input=U.el('input',bool?{type:'checkbox'}:{type:'number',value:20});
     document.querySelector('#fields').append(U.detailField({className:'weapon-data-field',label:bool?'Melee weapon':'Attack power',control:U.provenanceControl({control:input,current:bool?false:20,vanilla:bool?false:20,references:[],apply(){},internal:true}),pin:bool?prefs.pinButton('melee','Melee weapon'):null}));

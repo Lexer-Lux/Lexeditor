@@ -122,7 +122,7 @@ def main():
         page.wait_for_selector(".lex-map-magnifier-dialog", timeout=10000)
         assert stored(page) == before, ("a click on the panel's map moved the record",
                                         before, stored(page))
-        note = page.locator(".lex-map-magnifier-note").inner_text()
+        note = page.locator(".lex-map-magnifier-dialog .lex-searcher-prompt").inner_text()
         assert "place Draw Point 129" in note, note
         assert page.locator(".lex-map-magnifier-dialog .lex-image-map-stage").count() == 1
         properties = page.locator('.lex-map-magnifier-dialog .lex-detail-panel')
