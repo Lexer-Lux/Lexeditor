@@ -11,7 +11,7 @@
 
   async function api(path,options){const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data;}
   function signature(value){return JSON.stringify(value)}
-  const editableDatasets=["battleItems","ammoEffects","cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","names","wm2field","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields","sfx","models","textures","drawPointData"];
+  const editableDatasets=["enemyAbilities","battleItems","ammoEffects","cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","names","wm2field","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields","sfx","models","textures","drawPointData"];
   const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
   function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(signature(value)!==signature(saved[id]))changes[id]=value;return changes}
   // "Mod contents only" keeps the rows this project has actually changed.
@@ -102,9 +102,9 @@
   }
   function setStatus(text){state.status=text}
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}
-  function filtered(view,fields,source=state.data[view].rows){const query=state.filters[view].trim().toLocaleLowerCase();let rows=source.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,key)).localeCompare(String(rowSortValue(b,key)),undefined,{numeric:true,sensitivity:"base"}))}
+  function filtered(view,fields,source=state.data[view].rows){const query=state.filters[view].trim().toLocaleLowerCase();let rows=source.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,view==="gfAbilities"&&key==="id"?"abilityId":key)).localeCompare(String(rowSortValue(b,view==="gfAbilities"&&key==="id"?"abilityId":key)),undefined,{numeric:true,sensitivity:"base"}))}
   function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render()}
-  function listColumns(view,columns,template,prefs,forceTemplate=false){return ({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,row.abilityType?{type:"ability",value:row.abilityId,label:row.name}:{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
+  function listColumns(view,columns,template,prefs,forceTemplate=false,keyFor=row=>row.id){return ({rows,selected,select})=>columnList({rows,key:keyFor,columns:columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,row.abilityType?{type:"ability",value:row.abilityId,label:row.name}:{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
   // Why a table's add button is off. FF8 keeps every one of these in a
   // fixed place the game reads by number, so a new record has nowhere to go;
   // each reason says where the limit is.
@@ -140,12 +140,12 @@
     });
     const normalized=[...columns,...flagColumns].map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
-    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,empty:layout.empty,add:layout.add,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
+    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:layout.key|| (row=>row.id),slots:true,empty:layout.empty,add:layout.add,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
       inlinePager:layout.inlinePager===true,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
       change:async value=>{if(view==="enemies"&&!(await enemyAiBeforeLeave()))return;state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},
-      master:listColumns(view,normalized,template,prefs,layout.fixedTemplate===true),detail:row=>detail(row,prefs)});
+      master:listColumns(view,normalized,template,prefs,layout.fixedTemplate===true,layout.key),detail:row=>detail(row,prefs)});
     if(mount)$("#main").replaceChildren(root);
     return root;
   }

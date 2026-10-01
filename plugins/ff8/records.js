@@ -138,7 +138,7 @@
     const body=[LexeditorUI.tabbedPanel({label:"Magic details",active,
       tabs:[{id:"attack",label:"Attack data",help:"What this spell does when it is cast: animation, power, targeting, element and status."},
         {id:"junction",label:"Junction",help:"What this spell gives the character it is junctioned to: stat bonuses, elemental and status attack and defence."}],
-      change:id=>{state.magicDetailTab=id;renderKernel("magic","Magic")},
+      change:id=>{state.magicDetailTab=id;renderAbilities()},
       content:sections[active]()})];
     const detail=sharedDetail({...row,titleContent:magicLabel(row)},prefs,body,"magic-detail");
     return detail;
@@ -171,24 +171,42 @@
     return LexeditorUI.inlineLabel(abilityIcon(row),name);
   }
   function recordHoverLabel(view,row,content,edit){return hoverable({class:"ff8-record-hover-label",content,targetType:view,targetId:row.id,targetLabel:row.name,edit,activate:()=>{state.selected[view]=row.id;navigate(view)}})}
-  // FF8 keeps its ability definitions in one kernel section per category,
-  // each record carrying its AP-to-learn cost. They are ordinary kernel
-  // sections, so each category renders through the shared kernel view.
+  // Keep the original per-category rows for saves and source comparisons;
+  // use their global ability ID when presenting them in one master list.
   const abilityCategories=[["abilityJunction","Junction"],["abilityCommand","Command"],["abilityStat","Stat Boost"],["abilityCharacter","Character"],["abilityParty","Party"],["abilityGf","GF"],["abilityMenu","Menu"]];
-  state.abilityTab=state.abilityTab||abilityCategories[0][0];
+  state.abilityTab=state.abilityTab||"gfAbilities";
+  for(const view of ["gfAbilities","enemyAbilities"]){
+    state.selected[view]=null;state.pages[view]=0;state.pageSizes[view]=15;
+    state.filters[view]="";state.sorts[view]=[view==="gfAbilities"?"abilityId":"name",1];
+  }
+  function renderGfAbilities(){
+    const view="gfAbilities",source=abilityCategories.flatMap(([key])=>state.data[key]?.rows||[]);
+    const dataset=row=>abilityCategories.find(([key])=>state.data[key]?.rows.includes(row))?.[0];
+    const fields=[...new Map(source.flatMap(row=>row.fields).map(field=>[field.field,field])).values()];
+    const columns=[{key:"id",label:"ID",sortValue:row=>row.abilityId,render:row=>recordId(row.abilityId)},
+      {key:"name",label:"GF Ability",render:row=>recordHoverLabel(dataset(row),row,abilityLabel(row),node=>renameAbilityName(row,node))},
+      {key:"abilityType",label:"Type",pinned:false},
+      ...fields.map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,
+        render:row=>{const value=row.fields.find(value=>value.field===field.field);return value?displayFieldValue(value):""}}))];
+    showPaged(view,filtered(view,["name","abilityId","abilityType"],source),columns,(row,prefs)=>sharedDetail(
+      {...row,id:row.abilityId,titleContent:abilityLabel(row,node=>renameAbilityName(row,node))},prefs,
+      [detailSection({title:"ABILITY",body:detailField({label:"Type",control:readonlyField(row.abilityType),pin:prefs.pinButton("abilityType","Type")})}),
+       fieldGroups(row.fields,dataset(row),row.id,false,prefs)]),undefined,
+      {key:row=>row.abilityId,noun:"GF abilities",addReason:addReasonFor("abilityJunction")});
+  }
   function renderAbilities(){
-    const active=abilityCategories.some(([key])=>key===state.abilityTab)
-      ? state.abilityTab : abilityCategories[0][0];
-    const label=abilityCategories.find(([key])=>key===active)[1];
-    renderKernel(active,`${label} abilities`);
+    const tabs=[["gfAbilities","GF Abilities"],["magic","Magic"],["enemyAbilities","Enemy"]];
+    const active=tabs.some(([key])=>key===state.abilityTab)?state.abilityTab:"gfAbilities";
+    if(active==="gfAbilities")renderGfAbilities();
+    else renderKernel(active,active==="magic"?"Magic":"Enemy abilities");
     // The category bar belongs in the toolbar, as Starting Data does it;
     // putting it inside #main breaks the list/detail grid.
     const toolbar=$("#toolbar");
     toolbar.hidden=false;
     toolbar.replaceChildren(subtabBar({
-      tabs:abilityCategories.map(([id,name])=>({id,label:name})),
+      tabs:tabs.map(([id,name])=>({id,label:name})),
       active,
-      label:"Ability category",
+      label:"Abilities",
       change:value=>{state.abilityTab=value;renderAbilities()},
     }));
   }

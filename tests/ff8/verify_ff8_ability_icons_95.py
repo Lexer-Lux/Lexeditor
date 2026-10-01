@@ -35,10 +35,11 @@ def main():
                 wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
                 results = []
                 for view, icon in zip(("abilityJunction", "abilityCommand", "abilityStat", "abilityCharacter", "abilityParty", "abilityGf", "abilityMenu"), range(216, 223)):
-                    cdp.eval(f"state.abilityTab={json.dumps(view)};navigate('abilities')")
+                    cdp.eval(f"state.selected[{json.dumps(view)}]=0;navigate({json.dumps(view)})")
                     wait_eval(cdp, "[...document.querySelectorAll('.ff8-ability-icon img')].length>1&&[...document.querySelectorAll('.ff8-ability-icon img')].every(i=>i.complete&&i.naturalWidth>0)", 15)
                     rows = cdp.eval("[...document.querySelectorAll('.ff8-ability-icon img')].map(i=>({src:i.getAttribute('src'),width:i.getBoundingClientRect().width}))")
-                    assert all(r["src"] == f"/assets/icons/{icon}.png" and r["width"] > 0 for r in rows), rows
+                    assert any(r["src"] == f"/assets/icons/{icon}.png" and r["width"] > 0 for r in rows), rows
+                    assert all(r["width"] > 0 for r in rows), rows
                     results.append({"view": view, "icons": len(rows)})
                 screenshot(cdp, "github-95-abilities.png")
                 cdp.eval("navigate('gfs')")

@@ -30,10 +30,6 @@
 
 ==================================================================== FF8 - PAGES
 
-enemies -> actions: uhh only a handful of these -- the spells -- are hoverables? but surely there must be data for these abilites? are they like, special enemy-only abilities? if so, then what to do:
-	The current Abilities tab is made into a subtab in the new abilities tab. since there are no sub-subtabs, just put all those abilites in one subtab, we don't really need these current subtabs here anyway, just have the ability type as a property. Call this the GF Abilities subtab.
-	Magic then becomes another subtbab in the new abilities tab.
-	then enemy becomes another subtab. for those enemy-only abilities.
 
 
 Cards

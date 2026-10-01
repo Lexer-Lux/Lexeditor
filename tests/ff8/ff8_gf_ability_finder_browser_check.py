@@ -47,7 +47,8 @@ def main() -> int:
                 link.click()
                 page.wait_for_function("()=>state.tab==='abilities'", timeout=20000)
                 opened = page.evaluate("view=>[state.abilityTab,String(state.selected[view])]", first[0])
-                assert opened == first, (opened, first)
+                assert opened == ["gfAbilities",first[1]], (opened, first)
+                assert page.evaluate("view=>state.selected.gfAbilities===state.data[view].rows.find(r=>String(r.id)===String(state.selected[view])).abilityId", first[0])
                 page.evaluate("()=>navigate('gfs')")
                 table.wait_for(timeout=20000)
                 before = page.evaluate(SLOT_VALUES)
@@ -55,8 +56,8 @@ def main() -> int:
                 # Pick an ability from another category with the finder.
                 finders.first.click()
                 page.wait_for_function("()=>state.tab==='abilities'", timeout=20000)
-                page.locator(".lex-subtab-button[data-subtab='abilityMenu']").click()
-                candidate = page.locator(".ff8-record-list .lex-column-list-row").nth(2)
+                page.evaluate("state.filters.gfAbilities=state.data.abilityMenu.rows[5].name;state.pages.gfAbilities=0;renderAbilities()")
+                candidate = page.locator(".ff8-record-list .lex-column-list-row").first
                 candidate.wait_for(timeout=20000)
                 picked = candidate.locator(".lex-column-list-cell[data-column-key='name']").inner_text().strip()
                 box = candidate.bounding_box()
