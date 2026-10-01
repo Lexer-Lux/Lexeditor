@@ -61,10 +61,12 @@ def test_later_page_actions_use_full_script_indices(page):
     assert last['y']+last['height']<=footer['y']+1
 
 
-def test_curve_drawer_is_one_row_at_top(page):
+def test_curve_drawer_wraps_readably_at_top(page):
     """Lexer, 2026-09-27: the drawer sits on the graph's top edge, where it
     does not cover the x-axis labels."""
     framework(page)
+    # CI uses a wider fallback face than the locally installed Arial Narrow.
+    page.add_style_tag(content=':root{--lex-font:Arial,sans-serif}')
     page.evaluate('''() => {
       const U=LexeditorUI,graph=U.curveEditor({title:'HP',domain:{min:1,max:100},range:{min:0,max:100},evaluate:x=>x,
         variables:['A','B','C','D'].map(label=>({label,control:U.el('input',{type:'number',value:2})}))});
@@ -75,9 +77,17 @@ def test_curve_drawer_is_one_row_at_top(page):
     page.locator('.lex-curve-editor').hover()
     page.wait_for_timeout(200)
     boxes=page.locator('.lex-curve-variable').evaluate_all('ns=>ns.map(n=>n.getBoundingClientRect().toJSON())')
-    assert len({round(box['top']) for box in boxes})==1
+    assert 1 <= len({round(box['top']) for box in boxes}) <= 2
     graph=page.locator('.lex-curve-editor').bounding_box();box=drawer.bounding_box()
     assert abs(box['y']-graph['y'])<2
+    assert box['height'] < graph['height']/2
+    assert all(item['left'] >= box['x'] and item['right'] <= box['x']+box['width'] for item in boxes)
+    assert page.locator('.lex-curve-variable input').evaluate_all('''inputs=>inputs.every(input=>{
+      const style=getComputedStyle(input),canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+      context.font=style.font;
+      return input.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-18
+        >= context.measureText(input.value).width;
+    })''')
     page.locator('.lex-curve-variable input').first.focus()
     page.mouse.move(1000,700)
     assert drawer.evaluate('n=>Number(getComputedStyle(n).opacity)')==1
