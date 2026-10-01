@@ -7,6 +7,35 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 from test_shared_ui_feedback import page, framework
+from test_tab_rename import mount_shell
+
+
+def test_large_map_reuses_finder_bar_below_menu(page,tmp_path):
+    framework(page)
+    mount_shell(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      U.beginSearcher({type:'fixture',prompt:'Choose a record',target(){},origin(){}});
+    }''')
+    finder=page.locator('.lex-searcher-cancel').evaluate('n=>({background:getComputedStyle(n).backgroundColor,width:n.offsetWidth,height:n.offsetHeight})')
+    page.evaluate('''()=>{
+      LexeditorUI.finishSearcher();
+      document.querySelector('main').append(LexeditorUI.el('button',{id:'open-map',onclick:()=>LexeditorUI.mapMagnifier({label:'World cells',magnify:()=>({ratio:4/3,cells:[{id:1,column:1,row:1,selected:true}]})})},'Open map'));
+    }''')
+    page.get_by_role('button',name='Open map',exact=True).click()
+    page.wait_for_timeout(100)
+    assert page.locator('.lex-map-magnifier-dialog > .lex-searcher-bar').count()==1
+    close=page.get_by_role('button',name='Close large map',exact=True)
+    assert close.evaluate('n=>({background:getComputedStyle(n).backgroundColor,width:n.offsetWidth,height:n.offsetHeight})')==finder
+    dialog=page.locator('.lex-map-magnifier-dialog').bounding_box()
+    menu=page.locator('.lex-shell-command-row').bounding_box()
+    assert dialog['y']==pytest.approx(menu['y']+menu['height'],abs=1)
+    assert dialog['width']==pytest.approx(page.viewport_size['width'],abs=1)
+    assert dialog['y']+dialog['height']==pytest.approx(page.viewport_size['height'],abs=1)
+    page.screenshot(path=str(tmp_path/'map-finder-layout.png'))
+    page.get_by_role('button',name='Return to the map record',exact=True).click()
+    assert page.locator('.lex-map-magnifier-dialog').count()==0
+    assert page.locator('#open-map').evaluate('n=>document.activeElement===n')
 
 
 def test_magnifier_properties_and_placement_share_state(page):

@@ -365,7 +365,7 @@ body.lex-save-busy .lex-save-icon.saving {
   background:var(--lex-panel,#171717);
 }
 
-.lex-shell-header .lex-searcher-bar > .lex-searcher-context {
+.lex-searcher-bar > .lex-searcher-context {
 
   display:grid;
   width:34px;
@@ -4530,9 +4530,10 @@ body:has(.lex-data-map-table) #main {
   color:#fff; filter:drop-shadow(0 1px 2px #000c) drop-shadow(0 0 1px #000); background:transparent; }
 .lex-image-map-click-magnify > .lex-image-map-magnify > svg { width:min(64px,40%); height:min(64px,40%); }
 .lex-image-map-click-magnify:is(:hover,:focus-within) > .lex-image-map-magnify { opacity:1; background:color-mix(in srgb,var(--lex-panel) 45%,transparent); color:#fff; }
-.lex-map-magnifier-dialog { width:min(1600px,96vw); height:96vh; max-height:96vh; display:flex; flex-direction:column; }
-.lex-map-magnifier-header { display:flex; align-items:center; gap:12px; flex:0 0 auto; }
-.lex-map-magnifier-note { flex:1; min-width:0; margin:0; color:var(--lex-text); }
+.lex-map-magnifier-backdrop { padding:0; background:var(--lex-bg); }
+.lex-map-magnifier-dialog { width:100%; height:100%; max-width:none; max-height:none; margin:0; padding:0; border:0; border-radius:0; display:flex; flex-direction:column; }
+.lex-map-magnifier-dialog > .lex-searcher-bar { position:relative; inset:auto; height:auto; flex:0 0 auto; }
+.lex-map-magnifier-dialog > .lex-searcher-bar .lex-searcher-prompt { white-space:normal; }
 .lex-map-magnifier-body { display:grid; flex:1 1 auto; min-height:0; }
 .lex-map-magnifier-map,.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; }
 .lex-map-magnifier-details { overflow:auto; }

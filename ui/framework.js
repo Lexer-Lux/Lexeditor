@@ -1789,16 +1789,17 @@
   const mapMagnifier = (options = {}) => {
     const opener=document.activeElement;
     const backdrop=element("div",{class:"lex-dialog-backdrop lex-map-magnifier-backdrop","data-lex-history-control":true});
-    const note=element("div",{class:"lex-map-magnifier-note",role:"status"});
+    const {bar,context,prompt:note,cancel:done}=selectionBar({prompt:options.label||"Map",
+      contextLabel:"Return to the map record",closeLabel:"Close large map"});
     const body=element("div",{class:"lex-map-magnifier-body"});
     const mapHost=element("div",{class:"lex-map-magnifier-map"});
     const detailsHost=element("div",{class:"lex-map-magnifier-details"});
-    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();if(opener?.isConnected)opener.focus();};
+    const close=()=>{document.removeEventListener("keydown",onKey,true);window.removeEventListener("resize",fit);observer?.disconnect();backdrop.remove();if(opener?.isConnected)opener.focus();};
     const onKey=event=>{if(event.key==="Escape"){event.preventDefault();event.stopImmediatePropagation();close();}};
     const draw=()=>{
       const spec=options.magnify()||{},place=spec.place;
       // The placing hint only where a click places something.
-      note.textContent=spec.note||(place?"Point at the map to read the value, then click to place the point.":"");
+      note.textContent=spec.note||(place?"Point at the map to read the value, then click to place the point.":options.label||"Map");
       mapHost.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
         place:place?point=>{place(point);draw();}:undefined}));
       if(options.details)detailsHost.replaceChildren(options.details({refresh:draw}));
@@ -1806,11 +1807,19 @@
     body.append(options.details?panelLayout([mapHost,detailsHost],"",{
       defaultSizes:[3,1],minSizes:options.minSizes||[480,280],stackBelowMinimum:true,
     }):mapHost);
-    const done=closeButton({onclick:close,"aria-label":"Close large map"});
+    done.onclick=close;
+    context.onclick=close;
+    context.replaceChildren(element("span",{class:"lex-ui-symbol","aria-hidden":"true"},"↩"));
     backdrop.append(element("section",{class:"lex-dialog lex-map-magnifier-dialog",role:"dialog","aria-modal":"true",
       "aria-label":`${options.label||"Map"}, full size`},
-      element("header",{class:"lex-map-magnifier-header"},note,done),body));
+      bar,body));
+    const menu=document.querySelector(".lex-shell-command-row");
+    const fit=()=>backdrop.style.top=`${menu?.getBoundingClientRect().bottom||0}px`;
+    const observer=menu?new ResizeObserver(fit):null;
+    observer?.observe(menu);
+    window.addEventListener("resize",fit);
     document.body.append(backdrop);
+    fit();
     document.addEventListener("keydown",onKey,true);
     draw();
     done.focus();
@@ -8677,14 +8686,20 @@ ${contents.path}`});
     if (navigateOrigin) searcher.origin?.();
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: false}}));
   };
+  const selectionBar = (options = {}) => {
+    const context=element("button",{type:"button",class:"lex-searcher-context",title:options.contextLabel||"Show the source record",
+      "aria-label":options.contextLabel||null},searchIcon());
+    const prompt=element("strong",{class:"lex-searcher-prompt"},options.prompt||"Select a record");
+    const cancel=element("button",{type:"button",class:"lex-searcher-cancel",title:options.closeLabel||"Cancel selection",
+      "aria-label":options.closeLabel||"Cancel selection"},"×");
+    const bar=element("div",{class:"lex-searcher-bar",role:"status","aria-live":"polite"},context,prompt,cancel);
+    return {context,prompt,cancel,bar};
+  };
   const beginSearcher = options => {
     finishSearcher(false);
     const header = document.querySelector(".lex-shell-header");
     if (!header?.querySelector(".lex-nav-frame")) throw new Error("The shared Searcher needs the Lexeditor shell");
-    const context = element("button", {type: "button", class: "lex-searcher-context", title: "Show the source record"}, searchIcon());
-    const prompt = element("strong", {class: "lex-searcher-prompt"}, options.prompt || "Select a record");
-    const cancel = element("button", {type: "button", class: "lex-searcher-cancel", title: "Cancel selection", "aria-label": "Cancel selection"}, "×");
-    const bar = element("div", {class: "lex-searcher-bar", role: "status", "aria-live": "polite"}, context, prompt, cancel);
+    const {context,prompt,cancel,bar}=selectionBar(options);
     const searcher = {
       type: String(options.type || "record"), accept: options.accept, origin: options.origin,
       target: options.target, bar, header, atTarget: true,
