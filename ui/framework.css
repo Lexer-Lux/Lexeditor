@@ -6791,7 +6791,8 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-hoverable > .lex-stack { width:100%; }
 
 .lex-value-modified > :is(input,select,textarea,output), .lex-value-modified > .lex-unit-field > :is(input,select,output), .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable,
-.lex-column-list-cell.lex-value-modified > .lex-column-cell-content {
+.lex-column-list-cell.lex-value-modified > .lex-column-cell-content,
+.lex-list-row.lex-record-modified > .lex-column-list-cell > .lex-column-cell-content {
   color:var(--lex-accent-ink);
 }
 .lex-detail-field:has(> .lex-detail-field-control .lex-value-modified) > .lex-detail-field-label > .lex-detail-field-label-text,

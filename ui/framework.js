@@ -1473,6 +1473,7 @@
   // is the single update path for all plugins and all control types.
   const refreshReferences = (container = document) => {
     container.querySelectorAll?.(".lex-source-control").forEach(node => node.refreshReference?.());
+    container.querySelectorAll?.("[data-lex-record-provenance]").forEach(node => node.refreshRecordProvenance?.());
     alignReferenceRails(container);
   };
   // The first pass measures the rail against whatever face is loaded at the
@@ -9228,6 +9229,13 @@ ${contents.path}`});
         node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
           const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
           row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+          if(modOnly){
+            const record=rows.find(record=>String(keyOf(record))===row.dataset.key);
+            row.dataset.lexRecordProvenance='';
+            row.refreshRecordProvenance=()=>row.classList.toggle('lex-record-modified',
+              record!==undefined&&modOnly.available!==false&&Boolean(modOnly.changed(record)));
+            row.refreshRecordProvenance();
+          }
         });
         node.setAttribute('aria-multiselectable','true');
         fitBarrelTableColumns(node);

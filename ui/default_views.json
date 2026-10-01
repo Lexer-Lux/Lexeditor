@@ -6,12 +6,20 @@
       "lexeditor:list-detail:ff8-enemies": "66",
       "lexeditor:rows:ff8-enemies": "48"
     },
+    "gfs": {
+      "lexeditor:panel-layout:ff8-gfs": "[13.910962601678625,44.29760200766901,41.79143539065236]"
+    },
+    "items": {
+      "ff8-items.help.4bf58eb5.text": "Someone at Square loved Quistis so much that each item in the game has a flag you can set to make it usable only on her and nobody else. ~Lex"
+    },
     "refine": {
       "lexeditor:columns:ff8-refine": "[\"enabled\",\"id\",\"groupName\",\"name\"]"
     },
     "weapons": {
-      "lexeditor:list-detail:ff8-weapons": "42.00000000000001",
-      "lexeditor:rows:ff8-weapons": "33"
+      "ff8-weapons.field.Melee weapon.label": "Melee?"
+    },
+    "world": {
+      "ff8-world.help.a6997259.text": ""
     }
   }
 }

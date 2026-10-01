@@ -1,0 +1,121 @@
+=================================================================== GLOBAL / ALL GAMES
+
+- Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
+- Resolve how UI zoom should scale the main menu and pagination bars.
+- Audit remaining supported record-creation gaps in Warband, DS3, Factorio, Bannerlord, Project Zomboid, and Terraria localization; finish missing record families and verify save/reload.
+- Enforce usable panel minimum sizes from initial layout; fix Enemy Loot overlap and panels that become impossible to shrink after expanding.
+    > status 2026-09-27: done - minimums hold from the first draw; Enemy Loot is one row per tier+slot; AI steps wrap in narrow panes; a click lost after editing a loot quantity (scroll jump) is fixed. Open: the drag rule still stops a pane where its names start to clip.
+    > Lexer: ???? literally all i said was that if it has a minimum size it should be the minimum size. it shouldn't have to wait for you to actually expand it then go surprise! you can't make it smaller because of minimum size. and confuse and frustrate the user because for some reason they can't shrink a panel that was clearly that small, which feels arbitrary and surreal and very wrong and probably violates every UX rule in the book. okay, if it can't be smaller than that then it shouldn't be that small to begin with!!!
+      what you're doing: enforcing the minimum wage by not actually requiring people to get paid minimum wage and telling everybody minimum wage doesn't exist and then waiting for people who make less than minimum wage to get a raise and then ambushing their employer going surprise! you can never give them a pay cut now because that's illegal, their wages get a "ratchet" effect now, unless they were raised beyond minimum wage, in which case their wages CAN be reduced but not to the point of being below minimum wage and if they are currently below minimum wage then you simply cannot reduce them at all
+      the simpler, easier, common sense approach that is easier for everyone and i have genuinely no clue why you didn't do this to begin with: minimum wage is minimum wage. nobody's wage can be below that. that's literally it that's all there is to it
+      and i have genuinely no clue why your response to this was "oh i see the problem, to solve it let's make it so you can now demote people to below minimum wage except you have to sign a form first" like what????????????????
+- Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
+    > status 2026-09-27: detector repaired. Every FF8 tab, subtab and panel tab swept at 1600x900; the one find (Encounters > Rules #000 column) is fixed. Not done: other games, smaller window sizes.
+    > Lexer: okayy, umm. i do everything % based in my own code so it can work on every screen size. is that not normal? like idk why all text doesn't just auto size to fit whatever, too. is there some reason everyone doesn't do that? can we not do that? That way it would work at any resolution, we don't have to test it at all resolutions? what is SOP for other devs for checking for these issues, do they check at every posssible resolution or just certain ones or something else entirely? also yet, it shoudn't even be a game-specific thing but a more general script that just checks the wholeass app automatically, not needing to be scripted for every new thing we make or change. or is that not doable?
+- (reopened) Reduce the heading-to-property-label offset further: cut from 26px to 18px on 2026-09-26, not confirmed enough.
+    > status 2026-09-27: it was really 22px; now 15px (type rail 11px, 4px inset). Lower and the rail's letters touch the name. Tell me if 15 is enough.
+- (reopened) Boolean rows: only each tab's default view was checked for misplaced help buttons; subtabs were not swept.
+    > status 2026-09-27: FF8 swept (every tab, subtab and panel tab) - all fine. Other games not swept yet.
+- pins in the new and improved bool boxes are...well, way out of place
+    > status 2026-09-27: fixed one cause - a group of bool boxes also had a pin for the whole field, and it sat in the last box's corner and lit up when any box was hovered (Weapons > Renzokuken finishers). It now sits by the label and each box shows only its own pin. If you meant a different misplacement, say which page.
+- in dev mode i need to be able to click and drag a property to move it around so i can change the order or even put it in a different header and so on
+
+
+==================================================================== GITHUB
+
+- Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
+- https://github.com/Lexer-Lux/Lexeditor/issues/406
+  wait didn't i tell you to delete all of these unnecessary redundant "Plugin" issues that just held all the other boilerplate issues and stop making them? so why is this still here?
+
+
+==================================================================== FF8 - PAGES
+
+enemies -> actions: uhh only a handful of these -- the spells -- are hoverables? but surely there must be data for these abilites? are they like, special enemy-only abilities? if so, then what to do:
+	The current Abilities tab is made into a subtab in the new abilities tab. since there are no sub-subtabs, just put all those abilites in one subtab, we don't really need these current subtabs here anyway, just have the ability type as a property. Call this the GF Abilities subtab.
+	Magic then becomes another subtbab in the new abilities tab.
+	then enemy becomes another subtab. for those enemy-only abilities.
+
+
+maybme this is a global thing, but all the weapons stay if i toggle mod contents only. but none of their items in the list appear in the changed item accent color. also, the property name of a changed property should appear in that changed color too.
+
+Cards
+- FF8 Cards: show each player's deck and its cards in the detail pane; add a deck editor instead of only a Deck ID, researching the executable tables as needed.
+    > status 2026-09-27: Cards > Decks exists and a player's deck is a link + finder. Not done: a deck's cards - which rare cards a deck number holds is in FF8_EN.exe and has not been found yet.
+- cards -> decks: lol, what is this? finish your job, please.
+
+Encounters
+- encounters -> top right panel: so weird and clearly nonstandard. no data type rails, no pins. been causing problems for us constantly. maybe because it' some weird spaghetti code unique thing and not a proper component, i'm assuming?
+- WAIT HOLY SHIT. nah it must be hallucinating. it says that encounter chances aren't actually equal, and they vary by region? there's no way. because the editor doesn't say that at all!
+    > status 2026-09-27: partly true. Each group has 8 slots and they repeat formations (group 0: 514 x3, 512 x2, 513 x2, 520 x1), so formations are not equally likely; the group panel shows "3 of 8" beside each slot. Unproven: that the game picks a slot evenly.
+  lol what? wait, so they repeat formations, so i can't set all 8 to be different? and why is there an X of 8 text now that makes no sense? They're not in order and i see multiple of the same number. also i should be able to see the probability and edit it. okay, i need to understand this before we redesign.
+
+Field
+
+GF
+- gfs -> Center panel -> attack: uhhh how is the entire left 1/3rd reserved for the property names????? i even told you to get rid of all the overrides and make it globally always the same % that i indicated. so how the fuck is this possible.
+    > status 2026-09-27: a label-fitter override widens the lane up to 50% for the longest name (252px here). The literal global 7.5% in this 463px panel is 35px and the names became unreadable. Need your call: a different % for narrow panels, a px minimum, or 7.5% of the window instead of the panel?
+
+Models
+- models: 90% of things here have no preview, say "locked", and have basically nothing in their details panel. what gives?
+
+SFX / Text
+
+Weapons
+- weapons -> Right panel -> data: on the left side should be the character's portrait. name below it, hoverable. portrait itself is a card -- thing finder. on the right of this div is all the properties and stuff.
+
+World
+- i asked for a button on the world->regions->left panel to swap between that brown map and the more detailed 3d map thing dollet has.
+    > status 2026-09-27: World > Map has a Terrain button that draws the real terrain with its textures from above; it is a flat picture you cannot orbit.
+    > Lexer: i don't know why you have to condense these questions into like 8 words, they're all no inscrutable. yes, the new improved mapmode is cool but without being able to move the camera or zoom in it's not too useful, i should be able to zooom in and move around and it should look almost exactly like in game.
+- ff8 -> world -> cells: this little map preview thing says "Point at the map to read the value, then click to place the point.", even on things where there's clearly nothing to move. also the x,y text in it is diferent than on the map subtab map for some reason? and it uses %???? instead of just the x, y? also again, it should have the same magnifying glass thing  that appears on hover as the thumbnail preview -- nice and big, flex it -- clicking it ANYWHERE should enter the bigger version, and the bigger version/screen should be like, the thing finder screen but with some overrides
+    > status 2026-09-27: done - the placing hint only shows where a click places something; the readout is (x, y) in world cells like the Map tab; hover shows a big magnifier over the picture and a click anywhere opens the large map. Cells, Draw Points and Field Returns now use this one component. Not done: making the large map look like the thing finder screen - which overrides do you want there?
+- ground types: some weirdness? i'm seeing this here and maybe other places but you're not necessarily using the standard ID column, it has the special ID look and formatting but it's called "ground" for some reason not ID? anyways, instead of a description it should have a name. and i should be able to edit it.
+- FUCK YOU. I ASKED TO BE ABLE TO FUCKING EDIT THE AMOUNT AND SPELL ON THE FUCKING DRAW POINTS AND YOU JUST FUCKING WIPED IT INSTEAD OF DOING IT FUCK YOU. oh. you really need a better way to leave me messages on these long task strings. okay, can you not ilke, just do some hext editing shit that makes it so we can set values in the editor to read and change the draw points? kind of like how you added the custom shots per turn property to irvine's guns?
+    > status 2026-09-27: World > Draw Points > each point has WHAT IT GIVES: magic (link + finder), refill, high yield, saved as a Hext patch in your mod (the exe is never touched). The game stores no per-point amount, only the high-yield bit. Left: try one edited point in game.
+- draw points: okay, possible that i can't change precisely what the draw amount is, possible. but how is it possible i can't even SEE what it is?
+- WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
+    > status 2026-09-27: field name on top as a link and the field's picture with the landing point marked. Not done: the world-map side - this table stores no world point (all 72 entries are where you land inside the field). The world-side trigger is in the world map's own scripts, not found yet.
+- world -> world->field: shouldn't this really just be a panel tab on the field tab? not sure why this is here.
+- FF8 Field-to-World: recover the original requested behaviour and implement it.
+    > status 2026-09-27: not recoverable - it is in no saved session, GitHub issue or worklog.
+    > Lexer: I genuinely don't know and this is why I'm so fucking pissed at you/Codex for just fucking wiping my entire original todo.txt and replacing it with a horribly shitty new version "figure out what i'm supposed to do" bitch you fucking deleted the todo and replaced it with a message saying to find the thing you deleted holy fucking shit
+
+
+==================================================================== FF8 - DATA, MODS, NATIVE, IN-GAME
+
+- Finish FF8 mod composition for formats without a proven merger; test installing, combining, ordering, and removing real mods.
+- Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
+- FF8: rebuild the native driver so R3 opens Enhanced Scan and Shot fires on R2 (source is in; Timed Hits already on Square).
+    > Lexer: yes go ahead  (to downloading the 63 MB CI build + an FFNx source checkout to package it)
+- Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
+- Deliver and verify the implemented proportional FF8 vehicle throttle in-game, including partial trigger pressure, braking, coasting, and digital controls.
+- when i use the shot command in ff8 the crosshair thinsg over my target are so transparent i can barely see them. make them fully opaque. this should be part of the better targeting tweak.
+- FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
+- Flat stats (you asked "Flat stat????"):
+    > Claude: in your mod's data Squall's VIT, SPR, SPD and LUCK are 0 at every level, and several characters' growth curves are flat or near-flat (vanilla Squall VIT is 26,5,5,41). Your Design.txt says levels should barely matter, so I took it as deliberate and changed nothing. If you didn't set those, they need restoring - say so.
+- ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
+
+
+==================================================================== OTHER GAMES
+
+- (reopened) Warband: created records (e.g. troops from the template copy) still get no created-in-mod pen; the server has no "created" flag yet.
+    > status 2026-09-27: creating a troop, item or sound now records it and the lists show the pen automatically. Records made before today can't be told apart from shipped ones.
+    > Lexer: What? How...huh? The pen component should just be something automatic. You should not have to manually do it so I'm kind of confused by this. Doubly confused b/c I never created any new records in Warband!!!
+- ff7 still takes forever to start up. and my computer is really going hard. i'm assuming this is first-time setup? if so, the message should say that so the user knows why it's taking so long.
+  but strangely enough: i've already gone through this. not long ago i did this, it took forever, my computer fan ran up a storm, aND then it started not taking a long time. oh wait. maybe that was the other ff7...?
+
+
+==================================================================== CI / INTEGRATION
+
+- Resolve outstanding CI failures, including RDR2 source/browser checks and RDR provenance fixtures; check the latest FF7 and shared-suite results.
+    > status 2026-09-27: FF8 checks that need the installed game now skip on CI instead of failing (most of FF8's red). Not yet pushed or re-run.
+- Complete integration verification on local master, including native FF8 package validation and remaining CI checks.
+
+
+==================================================================== ANSWERS (finished items; the replies you may still want)
+
+- SFX ID / Text Source header pushed right: a table's first sortable column keeps room on its left for the sort hand, so the hand never hangs off the table's edge. That room was on the left only, so a centred header centred in a lopsided box and sat right of the middle. Centred headers now get the same room on the right. That reserved room is also the extra empty space you saw on the left of the column.
+- Cards > Players rules/trade: only MenuChan (a test opponent) has fixed rules. Every real opponent's script passes Rules and Trade as game variables (Zell: 292 and 293) that the game fills in when the match starts, so there are no fixed rule boxes to tick; the page shows the variable number. Location is the subtitle, Location/Map file and "also uses deck" are gone, and each deck lists the opponents that use it.
+- Plus button / empty slots: a table that knows its empty slots gets a live + that opens the next empty one, plus HIDE EMPTY. In FF8 only Encounters > Formations has empty slots (176 of 1,024); every other table's data has none (Weapons 'None' and Junction 'None' are entries the game itself uses).
+- Region (cell) details: one cell panel on Map and Cells lists sky colours, draw points, field->world, ground types and encounters. World->field can't be listed: that table has no world position.
+- Ground types: the terrain code each world polygon stores; with the cell's region it picks the encounter rule. The game has only numbers; the descriptions are Deling's notes. There is no single texture per ground type (one type uses many).

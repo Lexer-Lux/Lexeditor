@@ -26,6 +26,36 @@ state.base=structuredClone(state.data);
   assert page.locator('.lex-value-modified').count()==1
   page.evaluate('value=100;control.refreshReference()')
   assert page.locator('.lex-value-modified').count()==0
+  page.evaluate("""()=>{
+    state.pages={weapons:0};state.modOnly=false;
+    state.data.weapons={rows:[{id:0,name:'Revolver',fields:[{field:'hit_rate',value:100}]},
+      {id:1,name:'Valiant',fields:[{field:'hit_rate',value:90}]}]};
+    state.vanilla.weapons=structuredClone(state.data.weapons);
+    state.data.weapons.rows[0].fields[0].value=110;
+    state.base.weapons=structuredClone(state.data.weapons.rows);
+    document.documentElement.style.setProperty('--lex-accent-ink','#ee2277');
+    document.querySelector('main').style.cssText='height:600px;display:flex';
+    window.render=()=>{const U=LexeditorUI;document.querySelector('main').replaceChildren(U.pagedListDetail({
+      rows:state.data.weapons.rows,key:r=>r.id,slots:true,pageSize:10,selected:0,
+      modOnly:modOnlySpec('weapons'),splitKey:'weapon-mod-test',
+      master:view=>U.columnList({rows:view.rows,key:r=>r.id,selected:view.selected,select:view.select,
+        columns:[{key:'id',label:'ID'},{key:'name',label:'Name'}]}),
+      detail:row=>U.detailPanel({title:row.name,body:'Weapon properties'})}))};render();
+  }""")
+  modified=page.locator('.lex-list-row.lex-record-modified')
+  assert modified.count()==1
+  assert modified.get_attribute('data-key')=='0'
+  assert modified.locator('.lex-column-cell-content').last.evaluate('n=>getComputedStyle(n).color')=='rgb(238, 34, 119)'
+  page.get_by_role('checkbox',name='Mod contents only',exact=True).check()
+  assert page.locator('.lex-list-row').count()==1
+  page.get_by_role('checkbox',name='Mod contents only',exact=True).uncheck()
+  page.wait_for_function("document.querySelectorAll('.lex-list-row').length===2")
+  page.evaluate('state.data.weapons.rows[1].fields[0].value=95;LexeditorUI.refreshReferences()')
+  assert modified.count()==2
+  import tempfile
+  page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-weapon-mod-highlights.png'))
+  page.evaluate('state.data.weapons.rows[0].fields[0].value=100;LexeditorUI.refreshReferences()')
+  assert modified.count()==1 and modified.get_attribute('data-key')=='1'
   page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content="""
 const {el,detailSection,infoHelp,unitField}=LexeditorUI;
