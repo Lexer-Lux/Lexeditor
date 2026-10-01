@@ -821,8 +821,12 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
         except ValueError:
             surfaces = []
         if surfaces:
+            resources = effect_surface.resource_sections(data)
+            for resource in resources:
+                if any(resource['offset'] <= obj['offset'] < resource['offset'] + resource['size'] for obj in surfaces):
+                    resource['name'] = f"Resource {resource['index']}: surface geometry"
             return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-                    'parsed': True, 'kind': 'surface', 'sections': [], 'tims': [],
+                    'parsed': True, 'kind': 'surface', 'sections': resources, 'tims': [],
                     'effectMeshes': surfaces, 'geometryVerified': True, 'texturesVerified': False,
                     'counts': {'objects': len(surfaces), **{key: sum(obj[key] for obj in surfaces)
                                for key in ('vertices', 'triangles', 'quads')}}}
@@ -1318,6 +1322,8 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = EFFECT_MODEL_NAMES.get(filename, f'Effect model {filename}'), 'A model used by a battle effect, shown in its first pose. Matching textures come from other files in the effect. Unmatched surfaces stay plain.'
     elif kind == 'surface':
         name, note = f'Effect surface {filename}', 'Animated scenery used by a battle effect. Select an object and frame to inspect its shape. Matching textures are shown when known.'
+        if info['sections']:
+            note = 'Preview the decoded surfaces in this effect pack. Other resources are listed but not decoded. Placement and timing within the effect are not shown.'
     elif kind == 'sound-data':
         name, note = f'Battle sound data {filename}', 'This file contains sound data. It has no model preview, and playback of this sound container is not decoded.'
         row['summonFamily'] = None

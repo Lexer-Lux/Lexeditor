@@ -144,3 +144,26 @@ def test_direct_mesh_sequence_and_animated_tail_keep_original_offsets(monkeypatc
     for invalid in (direct[:-1], direct + b'garbage', direct + original[:-1]):
         with pytest.raises(ValueError):
             effect_surface.parse(invalid)
+
+
+def test_resource_packs_expose_only_complete_mesh_blocks(monkeypatch):
+    obj = surface()[12:]
+    faces_at, vertices, _ = struct.unpack_from('<3I', obj)
+    mesh = struct.pack('<2I', 8 + vertices * 8, vertices) + obj[12:12 + vertices * 8] + obj[faces_at:]
+    header = [0] * 65
+    header[17], header[33], header[34] = 260, 264, 264 + len(mesh)
+    header[1] = header[34] + len(mesh) + 4
+    raw = struct.pack('<65I', *header) + bytes(4) + mesh + mesh + b'junk' + bytes(344)
+    decoded = effect_surface.parse(raw)
+    assert len(decoded) == 1 and decoded[0]['offset'] == 264
+    info = assets._battle_file_info('mag098_b.4p0', raw)
+    names = {section['index']: section['name'] for section in info['sections']}
+    assert names[33] == 'Resource 33: surface geometry'
+    assert names[34] == 'Resource 34 (not decoded)'
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    assert effect_surface.scene('mag098_b.4p0', raw, 'vanilla')['positions'][1] == (100, 0, 0)
+    for index, value in ((0, 1), (17, 256), (33, 260), (33, len(raw)), (1, header[1] - 4)):
+        invalid = bytearray(raw)
+        struct.pack_into('<I', invalid, index * 4, value)
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)

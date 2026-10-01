@@ -14,6 +14,8 @@ PRIMITIVES = ((3, 12, 0x20, False), (4, 12, 0x28, False),
 
 
 def parse(data: bytes) -> list[dict]:
+    if 260 <= len(data) <= 16 * 1024 * 1024 and data[:4] == bytes(4):
+        return _resource_objects(data)
     if 8 <= len(data) <= 16 * 1024 * 1024:
         faces_at, vertices = struct.unpack_from('<2I', data)
         if vertices and faces_at == 8 + vertices * 8:
@@ -23,6 +25,50 @@ def parse(data: bytes) -> list[dict]:
                     return _composite_objects(data, faces_at)
             return _direct_objects(data)
     return _parse_table(data)
+
+
+def resource_sections(data: bytes) -> list[dict]:
+    """Bound the four 16-slot resource banks used by the .p0 effect packs."""
+    if not 260 <= len(data) <= 16 * 1024 * 1024 or data[:4] != bytes(4):
+        return []
+    offsets = struct.unpack_from('<64I', data, 4)
+    present = [offset for offset in offsets if offset]
+    if (not present or min(present) != 260 or len(set(present)) != len(present)
+            or any(offset % 4 or not 260 <= offset < len(data) for offset in present)):
+        raise ValueError('Invalid effect resource offsets')
+    bounds = sorted(present) + [len(data)]
+    sizes = {start: end - start for start, end in zip(bounds, bounds[1:])}
+    controls = [offset for offset in offsets[:16] if offset]
+    if not controls or any(sizes[offset] != 344 for offset in controls):
+        raise ValueError('Invalid effect control records')
+    return [{'index': slot, 'offset': offset, 'size': sizes[offset],
+             'name': f'Resource {slot} (not decoded)'}
+            for slot, offset in enumerate(offsets, 1) if offset]
+
+
+def _resource_objects(data: bytes) -> list[dict]:
+    objects = []
+    for section in resource_sections(data):
+        if not 33 <= section['index'] <= 48:
+            continue
+        start, size = section['offset'], section['size']
+        raw = data[start:start + size]
+        try:
+            group = _direct_objects(raw)
+        except ValueError:
+            continue
+        # A resource can contain additional data beyond a recognized mesh.
+        # Only complete direct-object resources are accepted here.
+        if sum(obj['size'] for obj in group) != size:
+            continue
+        for obj in group:
+            obj.update(id=len(objects), offset=start + obj['offset'], resource=section['index'])
+            objects.append(obj)
+        if len(objects) > 256 or sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000 or sum(len(obj['faces']) for obj in objects) > 500000:
+            raise ValueError('Effect resource pack exceeds decoding budget')
+    if not objects:
+        raise ValueError('Effect resource pack has no decoded surfaces')
+    return objects
 
 
 def _track_table_end(data: bytes, start: int) -> int:
