@@ -66,13 +66,16 @@ def match_material(region: dict, page: int, clut: int, uv: list[tuple]) -> tuple
     return palette_start // colors, [(u / region['width'], v / region['height']) for u, v in points]
 
 
-def resolve(exporter, images: dict[str, bytes]) -> None:
+def resolve(exporter, images: dict[str, bytes], preferred_source: str | None = None) -> None:
+    if preferred_source is not None and preferred_source not in images:
+        raise ValueError('Unknown effect texture source')
     regions = [(name, tim_region(data)) for name, data in images.items()]
     geometry = exporter.ifrit_manager.enemy.geometry_data
     colored = [face for face in exporter._collect_triangulated_faces() if face[2] < 0]
     faces, textures, materials = [], [], {}
     base = 0
     missing = 0
+    choices = set()
     for obj in geometry.object_data:
         for primitive in obj.triangles + obj.quads:
             if primitive.is_hidden():
@@ -85,6 +88,11 @@ def resolve(exporter, images: dict[str, bytes]) -> None:
             matches = [(name, match_material(region, primitive.tex_id_2, primitive.tex_id_1, uv))
                        for name, region in regions]
             matches = [(name, match) for name, match in matches if match is not None]
+            if len(matches) > 1:
+                choices.update(name for name, _ in matches)
+                preferred = [match for match in matches if match[0] == preferred_source]
+                if preferred:
+                    matches = preferred
             texture = -0xD7C3B4 - 2
             normalized = [(0, 0)] * len(corners)
             if len(matches) == 1:
@@ -108,3 +116,4 @@ def resolve(exporter, images: dict[str, bytes]) -> None:
     exporter._resolved_faces = faces + colored
     exporter.ifrit_manager.texture_data = textures
     exporter.unmapped_effect_faces = missing
+    exporter.effect_texture_choices = sorted(choices)

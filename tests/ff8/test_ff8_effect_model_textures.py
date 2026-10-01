@@ -55,3 +55,25 @@ def test_invalid_tim_coordinates_are_rejected():
     struct.pack_into('<H', data, 12, 900)
     with pytest.raises(ValueError, match='video memory'):
         materials.tim_region(data)
+
+
+def test_explicit_source_resolves_only_matching_ambiguity(tmp_path):
+    red = tim()
+    green = bytearray(red)
+    struct.pack_into('<H', green, 22, 31 << 5)
+    images = {'red.dat': red, 'green.dat': bytes(green)}
+    exporter = model_geometry.decode('d0c000.dat', model_bytes())
+    exporter.ifrit_manager.enemy.geometry_data.object_data[0].triangles[0].tex_id_2 = 128
+    materials.resolve(exporter, images, 'green.dat')
+    assert exporter.unmapped_effect_faces == 0
+    assert exporter.effect_texture_choices == ['green.dat', 'red.dat']
+    from plugins.ff8 import assets
+    expected = assets.tim_png_bytes(bytes(green))
+    assert exporter.ifrit_manager.texture_data[0].texture_image == expected
+    target = tmp_path / 'chosen.glb'
+    exporter.export(str(target))
+    gltf, binary = read_glb(target)
+    span = gltf['bufferViews'][gltf['images'][0]['bufferView']]
+    assert binary[span['byteOffset']:span['byteOffset'] + span['byteLength']] == expected
+    with pytest.raises(ValueError, match='Unknown effect texture source'):
+        materials.resolve(exporter, images, '../other.dat')

@@ -181,12 +181,13 @@ class Handler(PluginRequestHandler):
                         int(query.get('texture', ['-1'])[0]), query.get('palette', [''])[0]), 'image/png')
             elif path == "/api/model-scene":
                 self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0],
-                    int(query['object'][0]) if 'object' in query else None))
+                    int(query['object'][0]) if 'object' in query else None,
+                    query.get('textureSource', [None])[0]))
             elif path == "/assets/model.glb":
                 filename=query.get("file",[""])[0]
                 object_id = int(query['object'][0]) if 'object' in query else None
                 self.binary_response(model_geometry.glb(filename,query.get("dataset",["current"])[0],
-                    object_id), "model/gltf-binary",
+                    object_id, query.get('textureSource', [None])[0]), "model/gltf-binary",
                     Path(filename).stem + (f'-part-{object_id + 1}' if object_id is not None else '') + '.glb')
             elif path.startswith("/assets/models/"):
                 filename = path.rsplit("/", 1)[-1]

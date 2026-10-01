@@ -86,6 +86,18 @@ def main():
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             part = page.get_by_role('combobox', name='Model part', exact=True)
             assert part.input_value() == '0'
+            texture = page.get_by_role('combobox', name='Model preview texture', exact=True)
+            for source in ('mag324_h.01', 'mag324_h.t00'):
+                with page.expect_response(lambda response: '/api/model-scene?' in response.url and f'textureSource={source}' in response.url) as textured:
+                    texture.select_option(source)
+                material = textured.value.json()
+                assert material['unmappedFaces'] == 0
+                assert len(material['textureImages']) == 4
+                page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+                assert texture.input_value() == source
+            if os.environ.get('LEXEDITOR_DIABLOS_TEXTURE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_DIABLOS_TEXTURE_SCREENSHOT'])
             with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=1' in response.url) as selected:
                 part.select_option('1')
             assert len(selected.value.json()['positions']) == 242

@@ -128,7 +128,7 @@ def decode(filename: str, data: bytes, *, animations: bool = True, object_id: in
     return exporter
 
 
-def scene(filename: str, dataset: str = 'current', object_id: int | None = None) -> dict:
+def scene(filename: str, dataset: str = 'current', object_id: int | None = None, texture_source: str | None = None) -> dict:
     from . import effect_mesh
     if effect_mesh.FILENAME.fullmatch(filename):
         from . import effect_preview
@@ -139,7 +139,7 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
     exporter=decode(filename,assets.model_dat_bytes(filename,dataset),animations=False,object_id=object_id)
     if filename.casefold() in assets.EFFECT_MODEL_FILES:
         from . import effect_model_textures
-        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))
+        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset), texture_source)
     positions,bones=exporter._collect_vertices()
     animations=exporter.ifrit_manager.enemy.animation_data.animations
     frame=next((animation.frames[0] for animation in animations if animation.frames),None)
@@ -157,14 +157,15 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
         'textures':[texture.index for texture in exporter.ifrit_manager.texture_data],
         'bones':len(exporter.ifrit_manager.enemy.bone_data.bones),
         **({'textureImages':['data:image/png;base64,' + base64.b64encode(texture.texture_image).decode('ascii') for texture in exporter.ifrit_manager.texture_data],
-            'unmappedFaces': exporter.unmapped_effect_faces} if hasattr(exporter, '_resolved_faces') else {})}
+            'unmappedFaces': exporter.unmapped_effect_faces,
+            'textureChoices': exporter.effect_texture_choices} if hasattr(exporter, '_resolved_faces') else {})}
 
 
-def glb(filename: str, dataset: str = 'current', object_id: int | None = None) -> bytes:
+def glb(filename: str, dataset: str = 'current', object_id: int | None = None, texture_source: str | None = None) -> bytes:
     exporter=decode(filename,assets.model_dat_bytes(filename,dataset),object_id=object_id)
     if filename.casefold() in assets.EFFECT_MODEL_FILES:
         from . import effect_model_textures
-        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))
+        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset), texture_source)
     with tempfile.TemporaryDirectory(prefix='ff8-model-export-') as directory:
         target=Path(directory)/'model.glb'
         exporter.export(str(target))

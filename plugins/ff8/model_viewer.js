@@ -1,5 +1,5 @@
 /* Battle geometry uses the shared model stage; this module only draws the mesh. */
-window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onError,initialView={}}) {
+window.FF8ModelViewer = function ({file,dataset,label,objectId=null,textureSource=null,onReady,onError,initialView={}}) {
   const ui=LexeditorUI,stage=ui.modelStage(),canvas=ui.el('canvas',{tabindex:0,style:'position:absolute;inset:0','aria-label':`${label}: drag or use arrow keys to rotate; wheel or plus and minus to zoom`});
   stage.lexMessage.replaceChildren(ui.loadingPanel({label:'Loading model'}));
   stage.append(canvas);
@@ -41,7 +41,7 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
   canvas.addEventListener('keydown',event=>{let used=true;switch(event.key){case'ArrowLeft':yaw-=.1;break;case'ArrowRight':yaw+=.1;break;case'ArrowUp':pitch-=.1;break;case'ArrowDown':pitch+=.1;break;case'+':case'=':zoom*=1.1;break;case'-':zoom/=1.1;break;case'Home':yaw=homeYaw;pitch=homePitch;zoom=.9;break;default:used=false;}
     if(used){event.preventDefault();event.stopPropagation();pitch=Math.max(-1.5,Math.min(1.5,pitch));zoom=Math.max(.2,Math.min(4,zoom));draw();}});
   (async()=>{try{
-    const response=await fetch(`/api/model-scene?file=${encodeURIComponent(file)}&dataset=${encodeURIComponent(dataset)}${objectId==null?'':`&object=${encodeURIComponent(objectId)}`}`,{signal:abort.signal});
+    const response=await fetch(`/api/model-scene?file=${encodeURIComponent(file)}&dataset=${encodeURIComponent(dataset)}${objectId==null?'':`&object=${encodeURIComponent(objectId)}`}${textureSource==null?'':`&textureSource=${encodeURIComponent(textureSource)}`}`,{signal:abort.signal});
     const scene=await response.json();if(!response.ok)throw Error(scene.error||'Could not decode this model');if(disposed)return;
     const vertex=shader(gl.VERTEX_SHADER,`attribute vec3 position;attribute vec2 uv;attribute vec3 normal;attribute vec3 vertexColor;uniform vec4 view;varying vec2 tex;varying float light;varying vec3 tint;
       vec3 rotate(vec3 p){float cy=cos(view.x),sy=sin(view.x),cx=cos(view.y),sx=sin(view.y);vec3 q=vec3(cy*p.x+sy*p.z,p.y,-sy*p.x+cy*p.z);return vec3(q.x,cx*q.y-sx*q.z,sx*q.y+cx*q.z);}
@@ -63,7 +63,7 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,onReady,onEr
       const tex=texture(color);meshes.push({buffer,texture:tex,count:values.length/11});if(index<0)continue;
       loads.push(new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{if(!disposed){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);draw();}resolve();};image.onerror=()=>reject(new Error(`Could not load texture ${index+1} for ${file}.`));
         image.src=scene.textureImages?.[index]||`/assets/texture.png?id=${encodeURIComponent(`battle/${file}#${scene.textures[index]}`)}&palette=${scene.texturePalettes?.[index]??0}&dataset=${encodeURIComponent(dataset)}`;}));}
-    stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();onReady?.(canvas);}
+    stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();onReady?.(canvas,scene);}
   }catch(error){if(!disposed){stage.lexMessage.replaceChildren(ui.detailNote(error.message));stage.lexMessage.hidden=false;stage.dataset.error=error.message;onError?.(error);}}})();
   return stage;
 };
