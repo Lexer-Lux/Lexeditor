@@ -2,7 +2,7 @@ import struct
 
 import pytest
 
-from plugins.ff8.effect_textures import TextureMemory, read_descriptor, resource_bytes
+from plugins.ff8.effect_textures import TextureMemory, read_descriptor, resource_bytes, indexed_rgba
 
 
 def descriptor():
@@ -65,6 +65,14 @@ def test_direct_color_texture_page():
     memory = TextureMemory({'textures': [], 'cluts': []}, {})
     memory.write((0, 0, 1, 1), struct.pack('<H', 31 << 10))
     assert memory.page_rgba(2 << 7, 0)[:4] == bytes((0, 0, 255, 255))
+
+
+@pytest.mark.parametrize('depth,pixels,width', [(4, b'\x21', 2), (8, b'\x01\x02', 2)])
+def test_standalone_resource_palette_selection(depth, pixels, width):
+    palette = struct.pack(f'<{1 << depth}H', 0, 31, 31 << 5, *([0] * ((1 << depth) - 3)))
+    assert indexed_rgba(pixels, palette, width, 1, depth) == bytes((255, 0, 0, 255, 0, 255, 0, 255))
+    with pytest.raises(ValueError, match='incomplete'):
+        indexed_rgba(pixels, palette[:-2], width, 1, depth)
 
 
 def test_replay_overwrites_and_rewinds_raw_uploads():

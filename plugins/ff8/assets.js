@@ -106,6 +106,27 @@
         body:paletteSelect?detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}):null});
     }),{minWidth:160,balanced:true});
   }
+  // Summon textures can take their palette from a different packed file.
+  function summonTextureCards(row){
+    const host=el('div',{},LexeditorUI.loadingPanel({label:'Loading summon textures'})),dataset=assetDataset();
+    const base=`file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(dataset)}`;
+    fetch(`/api/summon-textures?${base}`).then(async response=>{
+      const result=await response.json();if(!response.ok)throw Error(result.error||'Could not read summon textures');
+      const cards=result.rows.filter(texture=>texture.palettes.length).map(texture=>{
+        const image=el('img',{alt:`${row.name}, texture ${texture.id}`});
+        const show=palette=>{image.src=`/assets/summon-texture.png?${base}&texture=${texture.id}&palette=${encodeURIComponent(palette)}`;};
+        const control=selectControl(texture.palette,texture.palettes,show);
+        control.setAttribute('aria-label',`${row.file} texture ${texture.id} preview palette`);
+        image.onerror=()=>image.replaceWith(LexeditorUI.detailNote('Could not load this summon texture.'));
+        show(texture.palette);
+        return LexeditorUI.recordCard({title:`Texture ${texture.id}`,image,
+          body:detailField({label:'PREVIEW PALETTE',control,help:infoHelp('Changes the colours in this preview. The summon can use different palettes while it plays. This choice does not change the game.')} )});
+      });
+      host.replaceChildren(cards.length?LexeditorUI.tileGrid(cards,{minWidth:160,balanced:true}):LexeditorUI.detailNote('No complete palette is available for these textures.'));
+    }).catch(error=>host.replaceChildren(LexeditorUI.detailNote(error.message)));
+    return host;
+  }
+
   // The first texture page of a battle model, as the record's own picture.
   // A creature whose model the game ships shows the creature; only a record
   // with no page left falls back to the shared placeholder.
@@ -151,6 +172,7 @@
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
+    if(row.effectResources?.some(resource=>resource.name.startsWith('Texture ')))sections.push(detailSection({title:'TEXTURES',body:summonTextureCards(row)}));
     if(row.sections?.length||row.effectResources?.length){
       const resources=!!row.effectResources?.length;
       const table=columnList({fill:true,rows:resources?row.effectResources:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:resources?"52px minmax(150px,1fr) 110px":"52px minmax(150px,1fr) 110px 110px",columns:[

@@ -1073,7 +1073,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     elif kind == 'effect':
         name, note = f'Summon geometry {filename}', 'Preview individual mesh objects in this summon file. Textures use the first simulated appearance when known. Animation and placement within the summon are not yet shown.'
     elif kind == 'effect-data':
-        name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. These resources do not yet have individual image previews.'
+        name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. Choose a preview palette to inspect each supported texture.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")

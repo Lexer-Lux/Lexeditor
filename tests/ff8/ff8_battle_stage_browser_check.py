@@ -17,7 +17,7 @@ def main():
             errors, failed_textures = [], []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.on('response', lambda response: failed_textures.append(response.url)
-                    if '/assets/texture.png?' in response.url and response.status >= 400 else None)
+                    if any(path in response.url for path in ('/assets/texture.png?', '/assets/summon-texture.png?')) and response.status >= 400 else None)
             page.goto(session.url)
             page.wait_for_function("typeof state!=='undefined'&&!state.booting", timeout=90000)
             page.wait_for_function("!document.querySelector('.lex-plugin-loading-screen')", timeout=30000)
@@ -42,6 +42,13 @@ def main():
             page.locator('[data-lex-layout-section="RESOURCES"]').wait_for(state='visible')
             assert page.locator('.ff8-model-sections').get_by_text('Texture 13', exact=True).is_visible()
             assert page.locator('.lex-model-stage').count() == 0
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('/assets/summon-texture.png?')&&i.naturalWidth===128&&i.naturalHeight===256)")
+            palette = page.get_by_role('combobox', name='mag200_b.03 texture 13 preview palette', exact=True)
+            assert palette.input_value() == '13:0'
+            palette.select_option('8:0')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('palette=8%3A0')&&i.complete&&i.naturalWidth===128)")
+            palette.select_option('13:0')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('palette=13%3A0')&&i.complete&&i.naturalWidth===128)")
             if os.environ.get('LEXEDITOR_RESOURCE_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_RESOURCE_SCREENSHOT'])

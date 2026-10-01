@@ -171,6 +171,14 @@ class Handler(PluginRequestHandler):
                         query.get("id", [""])[0],
                         int(query.get("palette", ["0"])[0]),
                         query.get("dataset", ["current"])[0]), "image/png")
+            elif path in ("/api/summon-textures", "/assets/summon-texture.png"):
+                from . import effect_preview
+                filename, dataset = query.get('file', [''])[0], query.get('dataset', ['current'])[0]
+                if path == '/api/summon-textures':
+                    self.json_response(effect_preview.texture_options(filename, dataset))
+                else:
+                    self.binary_response(effect_preview.texture_png(filename, dataset,
+                        int(query.get('texture', ['-1'])[0]), query.get('palette', [''])[0]), 'image/png')
             elif path == "/api/model-scene":
                 self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0],
                     int(query['object'][0]) if 'object' in query else None))

@@ -87,6 +87,70 @@ def material_state(simulation, object_id: int, description: dict):
     return tick, page, clut
 
 
+def _texture_sources(filename: str, dataset: str):
+    match = effect_mesh.FILENAME.fullmatch(filename)
+    if match is None:
+        raise ValueError('Unsupported summon filename')
+    family, slot = int(match[1]), int(filename.rpartition('.')[2])
+    files = _files(family, dataset)
+    description = effect_textures.descriptor((paths.GAME_ROOT / 'FF8_EN.exe').read_bytes(), family)
+    return slot, files, description
+
+
+def texture_options(filename: str, dataset: str) -> dict:
+    slot, files, description = _texture_sources(filename, dataset)
+    rows = []
+    for texture in description['textures']:
+        if texture['slot'] != slot or slot not in files:
+            continue
+        effect_textures.resource_bytes(files[slot], texture, texture=True)
+        depth = texture['depth']
+        colors = 1 << depth
+        choices = []
+        for palette in description['cluts']:
+            if palette['slot'] is None or palette['slot'] not in files or palette['rect'][2] % colors:
+                continue
+            data = effect_textures.resource_bytes(files[palette['slot']], palette, texture=False)
+            for bank in range(len(data) // (colors * 2)):
+                choices.append({'value': f"{palette['id']}:{bank}",
+                                'name': f"Palette {palette['id']}" + (f' · Part {bank + 1}' if len(data) > colors * 2 else '')})
+                if len(choices) > 4096:
+                    raise ValueError('Summon exceeds preview palette limit')
+        default = f"{texture['id']}:0"
+        rows.append({'id': texture['id'], 'width': texture['rect'][2] * (16 // depth),
+                     'height': texture['rect'][3], 'depth': depth, 'palettes': choices,
+                     'palette': default if any(choice['value'] == default for choice in choices) else (choices[0]['value'] if choices else None)})
+    return {'rows': rows}
+
+
+def texture_png(filename: str, dataset: str, texture_id: int, palette_key: str) -> bytes:
+    slot, files, description = _texture_sources(filename, dataset)
+    if not 0 <= texture_id < len(description['textures']):
+        raise ValueError('Unknown summon texture')
+    texture = description['textures'][texture_id]
+    if texture['slot'] != slot or slot not in files:
+        raise ValueError('Summon texture is not stored in this file')
+    if not re.fullmatch(r'\d{1,4}:\d{1,4}', palette_key):
+        raise ValueError('Invalid summon palette selection')
+    palette_id, bank = map(int, palette_key.split(':'))
+    if not 0 <= palette_id < len(description['cluts']):
+        raise ValueError('Unknown summon palette')
+    palette = description['cluts'][palette_id]
+    depth, colors = texture['depth'], 1 << texture['depth']
+    if palette['slot'] is None or palette['slot'] not in files or palette['rect'][2] % colors:
+        raise ValueError('Summon palette is unavailable for this image depth')
+    palette_data = effect_textures.resource_bytes(files[palette['slot']], palette, texture=False)
+    if bank >= len(palette_data) // (colors * 2):
+        raise ValueError('Summon palette part is outside the resource')
+    palette_data = palette_data[bank * colors * 2:(bank + 1) * colors * 2]
+    pixels = effect_textures.resource_bytes(files[slot], texture, texture=True)
+    size = texture['rect'][2] * (16 // depth), texture['rect'][3]
+    rgba = effect_textures.indexed_rgba(pixels, palette_data, *size, depth)
+    output = BytesIO()
+    Image.frombytes('RGBA', size, rgba).save(output, format='PNG')
+    return output.getvalue()
+
+
 def scene(filename: str, dataset: str, object_id: int | None = None) -> dict:
     match = effect_mesh.FILENAME.fullmatch(filename)
     if match is None:

@@ -76,6 +76,26 @@ def resource_bytes(data: bytes, row: dict, *, texture: bool) -> bytes:
     return data[start:end]
 
 
+def indexed_rgba(pixels: bytes, palette: bytes, width: int, height: int, depth: int) -> bytes:
+    """Decode one exact indexed resource with an explicitly selected palette."""
+    if depth not in (4, 8) or not 0 < width <= 4096 or not 0 < height <= 512:
+        raise ValueError('Unsupported summon image dimensions or depth')
+    if width * height * depth != len(pixels) * 8 or len(palette) != (1 << depth) * 2:
+        raise ValueError('Summon image or palette has incomplete pixels')
+    colors = []
+    for packed, in struct.iter_unpack('<H', palette):
+        channels = [((packed >> shift) & 31) for shift in (0, 5, 10)]
+        colors.append(bytes([(value << 3) | (value >> 2) for value in channels] + [255 if packed else 0]))
+    rgba = bytearray()
+    for packed in pixels:
+        if depth == 4:
+            rgba.extend(colors[packed & 15])
+            rgba.extend(colors[packed >> 4])
+        else:
+            rgba.extend(colors[packed])
+    return bytes(rgba)
+
+
 class TextureMemory:
     """One bounded PSX VRAM snapshot, replayed in script order up to a tick."""
 
