@@ -2525,11 +2525,16 @@
       // The type rail stays fixed; help belongs beside the property name.
       const rail = element("span", {class: "lex-toggle-rail"},
         element("span", {class: "lex-toggle-type"}, "BOOL"));
+      const name = labelNode(toggle);
+      // Renaming a name inside a label must not activate its checkbox.
+      name.addEventListener("click", event => {
+        if (sharedSettingsSnapshot?.developerMode) event.preventDefault();
+      });
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
       }, rail, toggle.decorateControl ? toggle.decorateControl(input) : input,
-      toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label,
+      toggle.icon || null, element("span", {class: "lex-toggle-name"}, name,
         toggle.help ? infoHelp(toggle.help) : null));
       // A switch that is also a table column carries its pin in its corner,
       // the same place every other pinnable property keeps one.

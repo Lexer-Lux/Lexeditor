@@ -36,6 +36,39 @@ def label_of(page, tab):
         f'nav button[data-tab="{tab}"] .lex-tab-label-text').evaluate("n=>n.textContent.trim()")
 
 
+def test_boolean_names_rename_without_changing_the_value(page, tmp_path):
+    framework(page)
+    mount_shell(page)
+    page.evaluate('''() => {
+      window.toggleChanges=[];
+      window.drawToggle=()=>document.querySelector('main').replaceChildren(
+        LexeditorUI.toggleRow({toggles:[{label:'Enabled',checked:true,
+          change:value=>toggleChanges.push(value)}]}));
+      drawToggle();
+    }''')
+    name = page.locator('.lex-toggle-name .lex-detail-field-label-text')
+    name.dblclick()
+    editor = page.get_by_role('textbox', name='Rename Enabled', exact=True)
+    editor.fill('Active')
+    page.screenshot(path=str(tmp_path / 'boolean-rename.png'))
+    editor.press('Enter')
+    assert name.text_content() == 'Active'
+    assert page.evaluate('toggleChanges') == []
+    assert page.evaluate('savedCalls') == [
+        ['fixture', 'items', {'fixture-items.field.Enabled.label': 'Active'}]]
+    page.evaluate('drawToggle()')
+    assert name.text_content() == 'Active'
+    name.dblclick()
+    editor.fill('Discard me')
+    editor.press('Escape')
+    assert name.text_content() == 'Active'
+    assert page.locator('.lex-toggle input[type=checkbox]').is_checked()
+    page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:false}}))")
+    name.click()
+    assert not page.locator('.lex-toggle input[type=checkbox]').is_checked()
+    assert page.evaluate('toggleChanges') == [False]
+
+
 def rename(page, tab, typed, key="Enter"):
     page.locator(f'nav button[data-tab="{tab}"] .lex-tab-label-text').dblclick()
     field = page.locator(f'nav button[data-tab="{tab}"] .lex-label-rename')
