@@ -605,7 +605,7 @@
       cancelClose();
       closeTimer = setTimeout(() => {
         if (activeHelpPopup?.id === popupId &&
-            !marker.matches(":hover,:focus-visible") &&
+            !marker.matches(":hover,:focus-within") &&
             !activeHelpPopup.matches(":hover,:focus-within")) closeHelpPopup();
       }, 150);
     };

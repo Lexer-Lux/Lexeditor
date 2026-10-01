@@ -12,6 +12,8 @@ def main():
     source = plugin_ui('ff8')
     world = re.search(r'const tabsData=(\[.*?\]),wrap=', source).group(1)
     field = re.search(r'const fieldDetailTabs=(\[.*?\]);', source).group(1)
+    additions = re.findall(r'fieldDetailTabs.push\((\{.*?\})\);', source)
+    field = field[:-1] + ''.join(',' + entry for entry in additions) + ']'
     # Every subtab carries its own help, so the number of markers is the number
     # of tabs - counted from the arrays rather than pinned, because the tabs
     # move between screens (the encounter rules and groups now live on the
@@ -27,6 +29,7 @@ def main():
         page.add_script_tag(content=(ROOT / 'ui/framework.js').read_text(encoding='utf-8'))
         page.evaluate("""groups => {
             window.changes = 0;
+            document.body.append(LexeditorUI.el('button', {id:'neutral-focus',style:'position:fixed;bottom:0;left:0;z-index:10000'},'Neutral focus'));
             for (const tabs of groups) document.querySelector('main').append(
                 LexeditorUI.subtabBar({tabs, active: tabs[0].id, change: () => window.changes++}));
         }""", page.evaluate('[' + field + ',' + world + ']'))
@@ -35,9 +38,13 @@ def main():
         assert page.locator('button button').count() == 0
         for i in range(markers.count()):
             marker = markers.nth(i)
+            page.locator('#neutral-focus').click()
             marker.focus()
             expected = marker.get_attribute('aria-label')
             assert len(expected) > 70
+            # A pointer-leave timer must not close help owned by keyboard focus.
+            marker.dispatch_event('pointerleave')
+            page.wait_for_timeout(200)
             assert page.get_by_role('tooltip').inner_text() == expected
             marker.press('Enter')
             marker.click()
@@ -46,7 +53,7 @@ def main():
         page.get_by_role('tab').nth(1).click(position={'x': 10, 'y': 10})
         assert page.evaluate('window.changes') == 1
         browser.close()
-    print('All 19 Field/World subtabs have usable help; keyboard and click help do not switch tabs.')
+    print(f'All {tabs} Field/World subtabs have usable help; keyboard and click help do not switch tabs.')
 
 if __name__ == '__main__':
     main()
