@@ -863,3 +863,37 @@ def test_the_marker_follows_the_swinging_attacker_before_the_hit_is_held():
     _swing_starts(emu, 5000, 1)
     assert _marker_owner(emu) == 1
     assert _colour(_paint(emu, 5100)) == RED
+
+
+def _trigger_call(emu, entry: str):
+    """00504EDB / 00504EEB inside opcode 0xAB: start Squall's trigger task."""
+    for _site, target in t.TRIGGER_CALLS:
+        emu.mem_write(target, b"\xF4")      # reaching the game's routine halts
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<II", STOP, 0x01D98214))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.emu_start(t.ENTRIES[entry], 0, count=100)
+    return emu.reg_read(x86.UC_X86_REG_EIP) - 1
+
+
+def test_a_normal_attack_skips_squalls_own_trigger():
+    """Lexer: harmonize his with the rest. They should all work on the same system."""
+    emu = _machine()
+    emu.mem_write(t.HIT_COUNTER, struct.pack("<HH", 2, 3))
+    _swing_starts(emu, 5000, 0)            # a normal attack: the swing hook ran
+    assert _trigger_call(emu, "trigger_task") == STOP, "the trigger task is not started"
+    assert _trigger_call(emu, "trigger_bar") == STOP
+    assert struct.unpack("<HH", emu.mem_read(t.HIT_COUNTER, 4)) == (0, 0)
+
+
+def test_a_limit_break_keeps_the_trigger():
+    emu = _machine()                       # no swing through 0050BB9E
+    assert _trigger_call(emu, "trigger_task") == t.TRIGGER_CALLS[0][1]
+    assert _trigger_call(emu, "trigger_bar") == t.TRIGGER_CALLS[1][1]
+
+
+def test_squalls_normal_path_hit_is_held_like_anyones():
+    emu = _machine(window=1000)
+    _swing_starts(emu, 5000, 0)
+    _gunblade(emu, landing=False)          # counters 0 and 0: the normal path deals the hit
+    assert struct.unpack("<III", emu.mem_read(t.THR_HIT, 12)) == (255, 29, 1)
