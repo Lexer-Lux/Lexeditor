@@ -240,7 +240,7 @@ def main() -> int:
         print(f":: {len(files['scripts'])} verifier/browser scripts", flush=True)
         for tool, code, report in run_scripts(files["scripts"], args.jobs):
             status = "FAIL" if code else ("SKIP" if report.startswith("SKIPPED") else "ok  ")
-            print(f"{status} {tool.name}: {report[:160]}")
+            print(f"{status} {tool.name}: {report if code else report[:160]}")
             if code:
                 failures.append(tool.name)
     print()

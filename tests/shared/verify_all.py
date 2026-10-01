@@ -296,6 +296,7 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
     if preflight_reason:
         return tool, 0, time.time() - started, f"SKIPPED ({preflight_reason}): {preflight_detail}"
     timeout = timeout_for(tool, timeout)
+    attempt = 1
     code, tail, context = _once(tool, timeout, output)
     reason = _unrunnable(context)
     if code and reason:
@@ -314,6 +315,15 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
         if not second:
             return tool, 0, time.time() - started, f"FLAKY (passed on retry): {tail}"
         code, tail = second, second_tail
+        attempt = 2
+    if code:
+        log = (output or DEV_CACHE / "verify-results") / f"{tool.stem}.attempt-{attempt}.log"
+        if log.is_file():
+            # CI otherwise retains only "FAILED (errors=1)" and loses the
+            # traceback when its temporary runner disappears.
+            with log.open("rb") as stream:
+                stream.seek(max(0, log.stat().st_size - 16000))
+                tail = stream.read().decode("utf-8", errors="replace").strip()
     return tool, code, time.time() - started, tail
 
 

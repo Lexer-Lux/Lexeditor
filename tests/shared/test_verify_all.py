@@ -11,6 +11,26 @@ from tests.shared import verify_all
 
 
 class RunnerTests(unittest.TestCase):
+    def test_failure_report_includes_bounded_diagnostics_from_final_attempt(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            script = root / 'verify_report.py'
+            script.write_text(
+                "from pathlib import Path\n"
+                "marker = Path(__file__).with_suffix('.marker')\n"
+                "attempt = 2 if marker.exists() else 1\n"
+                "marker.touch()\n"
+                "print('x' * 20000)\n"
+                "print(f'diagnostic from attempt {attempt}')\n"
+                "print('FAILED (errors=1)')\n"
+                "raise SystemExit(1)\n", encoding='utf-8')
+            with patch.object(verify_all.time, 'sleep'):
+                _, code, _, report = verify_all.run(script, output=root)
+            self.assertEqual(code, 1)
+            self.assertIn('diagnostic from attempt 2', report)
+            self.assertNotIn('diagnostic from attempt 1', report)
+            self.assertLessEqual(len(report), 16000)
+
     def test_noisy_check_cannot_fill_the_drive(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name); script = root / 'verify_noisy.py'
