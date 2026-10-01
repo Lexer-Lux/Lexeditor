@@ -637,7 +637,7 @@ def _model_file_info(path: Path) -> dict:
 
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
-    image = _standalone_texture_info(data)
+    image = _texture_pack_info(data)
     if image is not None:
         return image
     if re.fullmatch(r'a0stg\d+\.x', filename):
@@ -1045,15 +1045,27 @@ def _stage_info(data: bytes) -> dict:
 
 
 def _standalone_texture_info(data: bytes) -> dict | None:
-    try:
-        layout = _tim_layout(data)
-    except ValueError:
+    info = _texture_pack_info(data)
+    return info if info and len(info['tims']) == 1 else None
+
+
+def _texture_pack_info(data: bytes) -> dict | None:
+    """Accept only a bounded sequence of complete TIMs, with no trailing bytes."""
+    if not data or len(data) > MAX_MODEL_BYTES:
         return None
-    if layout['size'] != len(data):
+    tims, offset = [], 0
+    try:
+        while offset < len(data):
+            if len(tims) >= 128:
+                return None
+            layout = _tim_layout(data, offset)
+            tims.append({'index': len(tims), 'offset': offset, **layout})
+            offset += layout['size']
+    except ValueError:
         return None
     return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
             'parsed': True, 'kind': 'texture', 'sections': [], 'counts': None,
-            'tims': [{'index': 0, **layout}], 'geometryVerified': False,
+            'tims': tims, 'geometryVerified': False,
             'texturesVerified': True}
 
 
@@ -1134,7 +1146,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     if kind == 'stage':
         name, note = f'Battle stage {int(filename[5:-2])}', 'Static battle-stage geometry and textures. Stage scripting and animation are not editable here.'
     elif kind == 'texture':
-        name, note = f'Battle texture {filename}', 'This file is a texture image, not a 3D model. Select a palette to preview its colors.'
+        name, note = f'Battle texture {filename}', 'Texture images used in battle. Select a palette to preview their colors.'
     elif kind == 'effect':
         name, note = f'Summon geometry {filename}', 'Preview individual mesh objects in this summon file. Textures use the first simulated appearance when known. Animation and placement within the summon are not yet shown.'
     elif kind == 'effect-data':
@@ -1212,7 +1224,7 @@ def save_models(edits: list[dict]) -> dict:
             raise ValueError(f"{edit.get('file')} is not a battle model filename")
         exists = (_battle_path(filename, 'current').is_file()
                   or any(entry['file'] == filename for entry in _battle_archive_index()))
-        original_texture = (_standalone_texture_info(_model_bytes(filename, 'current')[0])
+        original_texture = (_texture_pack_info(_model_bytes(filename, 'current')[0])
                             if exists else None)
         if not MODEL_FILENAME.fullmatch(filename) and original_texture is None:
             raise ValueError('Only supported models and standalone textures can be replaced')
@@ -1231,7 +1243,7 @@ def save_models(edits: list[dict]) -> dict:
         if not data or len(data) > MAX_MODEL_BYTES:
             raise ValueError(
                 f"{filename} must be 1 byte to {MAX_MODEL_BYTES} bytes")
-        if original_texture is not None and _standalone_texture_info(data) is None:
+        if original_texture is not None and _texture_pack_info(data) is None:
             raise ValueError(f'{filename} needs a complete supported TIM image')
         if original_texture is None and filename.endswith(".dat") and parse_dat_sections(data) is None:
             raise ValueError(f"{filename} is not a battle-model container")
@@ -1414,10 +1426,11 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
             raise ValueError("Battle texture needs a numeric TIM index") from error
         ensure_character_models()
         data, _override = _model_bytes(inner.casefold(), dataset)
-        if _standalone_texture_info(data) is not None:
-            if tim_index != 0:
-                raise ValueError('Standalone texture TIM index is out of range')
-            return tim_png_bytes(data, 0, palette)
+        texture_pack = _texture_pack_info(data)
+        if texture_pack is not None:
+            if not 0 <= tim_index < len(texture_pack['tims']):
+                raise ValueError('Texture TIM index is out of range')
+            return tim_png_bytes(data, texture_pack['tims'][tim_index]['offset'], palette)
         if re.fullmatch(r'a0stg\d+\.x', inner.casefold()):
             from . import battle_stage
             if tim_index != 0:

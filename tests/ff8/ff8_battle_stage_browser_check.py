@@ -38,6 +38,13 @@ def main():
             page.get_by_role('combobox', name='Battle texture mag163_a.dat texture 1 palette', exact=True).select_option('1')
             page.wait_for_function("Array.from(document.querySelectorAll('img')).some(i=>i.src.includes('palette=1')&&i.naturalWidth>0)")
             assert page.locator('.lex-model-stage').count() == 0
+            page.evaluate("state.selected.models='mag337_h.t06';navigate('models')")
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('mag337_h.t06%231')&&i.naturalWidth===128&&i.naturalHeight===64)")
+            page.get_by_role('combobox', name='Battle texture mag337_h.t06 texture 1 palette', exact=True).select_option('1')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('mag337_h.t06%230')&&i.src.includes('palette=1')&&i.complete&&i.naturalWidth===128)")
+            if os.environ.get('LEXEDITOR_TEXTURE_PACK_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_TEXTURE_PACK_SCREENSHOT'])
             page.evaluate("state.selected.models='mag200_b.03';navigate('models')")
             page.locator('[data-lex-layout-section="RESOURCES"]').wait_for(state='visible')
             assert page.locator('.ff8-model-sections').get_by_text('Texture 13', exact=True).is_visible()
