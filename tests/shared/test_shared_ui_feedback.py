@@ -309,6 +309,46 @@ def test_save_preview_and_native_tooltips(page):
     assert card.evaluate("n=>getComputedStyle(n).backgroundColor") != 'rgba(0, 0, 0, 0)'
 
 
+def test_hover_tooltips_are_opt_in_and_do_not_cover_save_preview(page, tmp_path):
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from core.settings_manager import SettingsStore
+    store = SettingsStore(path=tmp_path / 'settings.json')
+    assert store.snapshot()['showHoverTooltips'] is False
+    store.save('daily', show_hover_tooltips=True)
+    store = SettingsStore(path=tmp_path / 'settings.json')
+    assert store.snapshot()['showHoverTooltips'] is True
+    assert store.save('weekly')['showHoverTooltips'] is True
+    assert store.save('daily', show_hover_tooltips=False)['showHoverTooltips'] is False
+    framework(page)
+    from test_tab_rename import mount_shell
+    mount_shell(page, developer=False)
+    page.evaluate('''() => {
+      const U=LexeditorUI;
+      document.querySelector('main').replaceChildren(
+        U.el('button',{id:'example',title:'Example tooltip'},'Example'),
+        U.settingsSaveControl({dirtyCount:()=>1,pendingChanges:()=>[
+          {label:'Price',before:10,after:20}]}));
+    }''')
+    page.locator('#example').hover()
+    page.wait_for_timeout(550)
+    assert page.locator('.lex-hover-tip').count() == 0
+    page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{showHoverTooltips:true}}))")
+    page.mouse.move(0,0)
+    page.locator('#example').hover()
+    page.wait_for_timeout(550)
+    assert page.locator('.lex-hover-tip').inner_text() == 'Example tooltip'
+    page.locator('.lex-settings-save-control').hover()
+    page.wait_for_timeout(550)
+    assert page.locator('.lex-hover-tip').count() == 0
+    assert page.locator('.lex-save-preview').is_visible()
+    page.screenshot(path=str(tmp_path / 'save-preview.png'))
+    page.locator('#example').hover()
+    page.wait_for_timeout(550)
+    page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{showHoverTooltips:false}}))")
+    assert page.locator('.lex-hover-tip').count() == 0
+
+
 def test_save_preview_does_not_cover_bottom_save_button(page):
     framework(page)
     page.evaluate('''() => {

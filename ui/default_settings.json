@@ -3,6 +3,7 @@
   "booleanBoxStyle": true,
   "globalMessageRarity": 3.0,
   "hoverableAltClick": false,
+  "showHoverTooltips": false,
   "loadingTransitionMinimumSeconds": 2.5,
   "mainMenuHeightPercent": 5.0,
   "pageWrapAround": true,

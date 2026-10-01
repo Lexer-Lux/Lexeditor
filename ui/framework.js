@@ -536,16 +536,13 @@
       else record.addedNodes.forEach(strip);
     }));
     observer.observe(root, {childList:true, subtree:true, attributes:true, attributeFilter:['title']});
-    // The browser's own hover boxes are gone, so the shell draws the stored
-    // text itself. Nothing drew it before: every button's explanation - why an
-    // add button is unavailable, why save is off - existed and was never shown
-    // ("just hovering it should give you the text. you shouldn't have to
-    // click it"). A question mark keeps its own popup.
+    // Generic hover text is opt-in. Help bubbles and save previews own their
+    // popups independently, so this layer must never obscure them.
     let tip = null, tipTimer = 0, tipOwner = null;
     const hideTip = () => { clearTimeout(tipTimer); tip?.remove(); tip = null; tipOwner = null; };
     const showTip = owner => {
       const text = owner.dataset.lexTitle;
-      if (!text || !owner.isConnected) return;
+      if (!text || !owner.isConnected || sharedSettingsSnapshot?.showHoverTooltips !== true) return;
       tip = element("div", {class: "lex-hover-tip", role: "tooltip"}, text);
       document.body.append(tip);
       const box = owner.getBoundingClientRect(), size = tip.getBoundingClientRect(), pad = 8;
@@ -557,7 +554,8 @@
       const owner = event.target.closest?.("[data-lex-title]");
       if (owner === tipOwner) return;
       hideTip();
-      if (!owner || owner.closest(".lex-info-help") || !root.contains(owner)) return;
+      if (sharedSettingsSnapshot?.showHoverTooltips !== true || !owner ||
+          owner.closest(".lex-info-help,.lex-save-icon") || !root.contains(owner)) return;
       tipOwner = owner;
       tipTimer = setTimeout(() => showTip(owner), 450);
     };
@@ -565,6 +563,7 @@
     document.addEventListener("pointerdown", hideTip, true);
     document.addEventListener("keydown", hideTip, true);
     window.addEventListener("scroll", hideTip, true);
+    window.addEventListener("lexeditor-settings-changed", hideTip);
     return () => {
       observer.disconnect();
       hideTip();
@@ -572,6 +571,7 @@
       document.removeEventListener("pointerdown", hideTip, true);
       document.removeEventListener("keydown", hideTip, true);
       window.removeEventListener("scroll", hideTip, true);
+      window.removeEventListener("lexeditor-settings-changed", hideTip);
     };
   };
 
@@ -5687,6 +5687,7 @@ ${contents.path}`});
       const definitions = [
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
+        {key:"showHoverTooltips", scope:"user", title:"Show hover tooltips", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
         {key:"booleanBoxStyle", scope:"user", title:"Wide boolean boxes", description:"An on/off property is one wide box that fills its row, ticked when on. Off draws a small checkbox at the end of an arrow from the property name.", type:"checkbox"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},

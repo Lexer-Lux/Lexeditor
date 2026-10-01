@@ -630,6 +630,7 @@ class HostApi:
             payload.get("panelTabTarget"),
             payload.get("pagerBarHeightPercent"),
             None if "booleanBoxStyle" not in payload else bool(payload["booleanBoxStyle"]),
+            show_hover_tooltips=None if "showHoverTooltips" not in payload else bool(payload["showHoverTooltips"]),
         )
         return self.lexeditor_settings()
 
