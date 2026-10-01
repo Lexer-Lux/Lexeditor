@@ -47,7 +47,7 @@ def test_github_owns_search_pager_detail_and_workflow(page):
     search.fill('505')
     page.wait_for_timeout(150)
     assert root.locator('.lex-github-issue-row').count()==1
-    assert root.locator('.lex-page-summary').inner_text()=='1-1/1'
+    assert root.locator('.lex-page-summary').inner_text()=='1/1'
     output=Path('C:/Users/Lexer/AppData/Local/Temp/lex-github-layout.png')
     page.screenshot(path=str(output))
     root.locator('.lex-github-workflow-actions').get_by_role('button',name='Needs Testing').click()

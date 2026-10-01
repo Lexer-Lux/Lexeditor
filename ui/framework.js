@@ -8779,7 +8779,9 @@ ${contents.path}`});
     const right = element("div", {class: "lex-pager-right"},
       rowControl,
       ...filters.filter(control=>!createControls.includes(control)),
-      element("span", {class: "lex-page-summary", text: `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
+      element("span", {class: "lex-page-summary", text: first === last
+        ? `${formatNumber(first)}/${formatNumber(total)}`
+        : `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
     return element("div", {
       class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,
       "aria-label": "Search and pagination",
