@@ -1,0 +1,258 @@
+{
+  "source": "https://github.com/vawser/Smithbox",
+  "revision": "057b417887cc7d0ddc8001602be3f5339f42c74f",
+  "license": "MIT",
+  "scope": "DS1 item and enemy parameter metadata only; no GPL dependencies or executable code.",
+  "unavailableEnums": [
+    "WEP_CORRECT_TYPE"
+  ],
+  "transformations": [
+    "UTF-8 BOM removed; XML declarations normalized to UTF-8."
+  ],
+  "files": {
+    "annotations/EQUIP_PARAM_ACCESSORY_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/EQUIP_PARAM_ACCESSORY_ST.json",
+      "sha256": "ac6d0c3c8717a34aaa2b8d855d8a6d3d3b8798836fd7945b43271d0782ba137c"
+    },
+    "annotations/EQUIP_PARAM_GOODS_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/EQUIP_PARAM_GOODS_ST.json",
+      "sha256": "aa38875a263ea96f633535e1c5a834f3beb3cf21440b407184cca00605f5282c"
+    },
+    "annotations/EQUIP_PARAM_PROTECTOR_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/EQUIP_PARAM_PROTECTOR_ST.json",
+      "sha256": "519efcfab676dae7dff0c3d6966201cab6907d9c2960dfbcddb16d128c8b14b3"
+    },
+    "annotations/EQUIP_PARAM_WEAPON_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/EQUIP_PARAM_WEAPON_ST.json",
+      "sha256": "d1f37868dc1333aa7dd2c28b71e8fc65317aefdcf5aee35ede0ba5dadbb37295"
+    },
+    "annotations/MAGIC_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/MAGIC_PARAM_ST.json",
+      "sha256": "bf381d0d8ea0791ed44fe121c1b99b5db400c30cbbca2f8b5ebd8d087956326e"
+    },
+    "annotations/NPC_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/NPC_PARAM_ST.json",
+      "sha256": "eb832fce0a9a87bad22f88e8745a197136adc5173e5902b34dc6fb9e9ef49146"
+    },
+    "defs/EquipParamAccessory.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/EquipParamAccessory.xml",
+      "sha256": "69df8ca44d3ffe109b52372a4deecf07e5adb193c95e4167d464293b3a8740c6"
+    },
+    "defs/EquipParamGoods.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/EquipParamGoods.xml",
+      "sha256": "0c0712976d1f843289989de35c78d61f6fc546aca9fa033036c1621df4b7e17d"
+    },
+    "defs/EquipParamProtector.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/EquipParamProtector.xml",
+      "sha256": "06738d5cd87fbce7c468c3d395f755d1b25a1be5aae849382d848a84ddcec84d"
+    },
+    "defs/EquipParamWeapon.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/EquipParamWeapon.xml",
+      "sha256": "09295e59ca880563f4cb72c4f59ac6a1b1e48655158e55cac28728585f57f586"
+    },
+    "defs/Magic.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/MagicParam.xml",
+      "sha256": "91a77aa292bc5619740303f8e25ddc97d38ac8fbdf5d1bf5cd29eb268e98f884"
+    },
+    "defs/NpcParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/NpcParam.xml",
+      "sha256": "945e0c93b55ae311ce5bf2abf89a7243c846d36474ec34426463d63f4d709ba5"
+    },
+    "enums/ACCESSORY_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ACCESSORY_CATEGORY.json",
+      "sha256": "67b4f75a43ef6b09ae134a69b6162119d0e7eb898361dc0039e4a6b9f573f7bb"
+    },
+    "enums/ATKPARAM_SPATTR_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATKPARAM_SPATTR_TYPE.json",
+      "sha256": "f36d7d8cfdba2fea5565437ec475d37aa47ffe32b9a70ce6d57d6ff8018c1079"
+    },
+    "enums/ATK_PARAM_PARTSDMGTYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATK_PARAM_PARTSDMGTYPE.json",
+      "sha256": "0613d56d593c3c52cbdd0e142b3e316ad19744d4f7f7a5a65f209fae3a42c321"
+    },
+    "enums/BEHAVIOR_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/BEHAVIOR_CATEGORY.json",
+      "sha256": "3e8d0d1cc94646095a79a33e2a18cd6109d237254c98aeff5c3267770a727cac"
+    },
+    "enums/BEHAVIOR_REF_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/BEHAVIOR_REF_TYPE.json",
+      "sha256": "44c821583b7d46939cefe06a9f9c6abcaf23582bb1afb316c015b119f4619676"
+    },
+    "enums/DURABILITY_DIVERGENCE_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/DURABILITY_DIVERGENCE_CATEGORY.json",
+      "sha256": "533636242b466007faddfa5674af625774b80d196294b4295d54387a0e3c126f"
+    },
+    "enums/EQUIP_MODEL_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/EQUIP_MODEL_CATEGORY.json",
+      "sha256": "fca28e9fdb495daca45da5b74d75f5db709113289be56e86bd1cd6e082d08a0e"
+    },
+    "enums/EQUIP_MODEL_GENDER.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/EQUIP_MODEL_GENDER.json",
+      "sha256": "59136b7dc9bb1ff8f8cdc6bdbbcd0a7146380b2771395eb8741fe61d8f10b7cc"
+    },
+    "enums/GOODS_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/GOODS_CATEGORY.json",
+      "sha256": "5aabf9a548cfd1b413c8a7e75b34a883097c2ea07bcb02445ae485658257566c"
+    },
+    "enums/GOODS_OPEN_MENU.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/GOODS_OPEN_MENU.json",
+      "sha256": "b7d76660ce7d4fcb759135f4734d6c34196fa404adaf8caaf3568b29ee7fe689"
+    },
+    "enums/GOODS_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/GOODS_TYPE.json",
+      "sha256": "1a46fea29a971abf5d217765172a98d66c9347a64e46c68bf7c20581da2160c0"
+    },
+    "enums/GOODS_USE_ANIM.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/GOODS_USE_ANIM.json",
+      "sha256": "6687c21ba8f6cedc8fd4fdd42edbeea1e5685d9f73bb0d6b6bd55300d1b096e2"
+    },
+    "enums/GUARD_DAMAGE_LEVEL.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/GUARD_DAMAGE_LEVEL.json",
+      "sha256": "938f82670662ee94e7b69922582260558d0f286819796565b27c04def6ca0d4f"
+    },
+    "enums/MAGIC_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/MAGIC_CATEGORY.json",
+      "sha256": "bafa767f82bb23df2dab80d16e2ed539107ff91ef4087d2601ad51d05e94b84b"
+    },
+    "enums/NPC_BURN_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_BURN_TYPE.json",
+      "sha256": "ac1bb29982568375aa520ea1cbaa7891618a2a6671d8830b265103d2ee445e6c"
+    },
+    "enums/NPC_DRAW_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_DRAW_TYPE.json",
+      "sha256": "f5134148dee88d23f9bfb4dd0080c8bf0bd734624cf51b6a6513c3bb6d317eb8"
+    },
+    "enums/NPC_HITSTOP_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_HITSTOP_TYPE.json",
+      "sha256": "d2318c3b4e35302b9ff970223bce115c81c3a97d9e29dcfc6cd648152396adfa"
+    },
+    "enums/NPC_ITEMDROP_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_ITEMDROP_TYPE.json",
+      "sha256": "86092488f796ea1a8531187143d0762e5c723f4b86af0933dca31eff7a78731c"
+    },
+    "enums/NPC_MOVE_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_MOVE_TYPE.json",
+      "sha256": "ac6d9db2cfd13b46e540c01fd597ba2b386ab53c35eb011895dda05bd19d2f5f"
+    },
+    "enums/NPC_SFX_SIZE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_SFX_SIZE.json",
+      "sha256": "950bb11b22aa1efd2fffea149812b20d253ff4f991c385237061fb242a3405f7"
+    },
+    "enums/NPC_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_TYPE.json",
+      "sha256": "4b65299de64fd1272233068a1b50f2449d00326d21d2c2d90bc7917a21bafbfc"
+    },
+    "enums/PROTECTOR_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/PROTECTOR_CATEGORY.json",
+      "sha256": "f583075c6b579a9aa79f177b65068597fa2436a51123b1cf2431ef40a9668319"
+    },
+    "enums/REPLACE_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/REPLACE_CATEGORY.json",
+      "sha256": "b8d909aee75b8e23a2a952e4b76dc20cdd55568f3cc7e42c9f78d65e566c1410"
+    },
+    "enums/SP_EFFECT_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFFECT_TYPE.json",
+      "sha256": "bd2b5320c0661f945f443fe5c44c3ac04ec576eae2d6d03494e4fc4166a89d5c"
+    },
+    "enums/SP_EFFECT_USELIMIT_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFFECT_USELIMIT_CATEGORY.json",
+      "sha256": "8b826715ced61454efaf739c7a5f5e6b2d5e20cd6da4deb841d77c401b006c8e"
+    },
+    "enums/TAE_MOTION_BASE_CATEGORIES.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TAE_MOTION_BASE_CATEGORIES.json",
+      "sha256": "4d80ec6050b67581c6270ed747c6cac75fdcbf94c7b867e8af4bd5993d37042e"
+    },
+    "enums/TAE_MOTION_GUARD_CATEGORIES.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TAE_MOTION_GUARD_CATEGORIES.json",
+      "sha256": "32dc4134a80a3f6c69aa5b40741072bfe5ddfe160b16c59e60f8358a9276bb64"
+    },
+    "enums/TAE_MOTION_HOLD_CATEGORIES.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TAE_MOTION_HOLD_CATEGORIES.json",
+      "sha256": "1d7253021338504a9440c9a5f5e2258e930d9285af2843bff9eb1fed18ae4ea3"
+    },
+    "enums/TAE_MOTION_MAGIC_CATEGORIES.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TAE_MOTION_MAGIC_CATEGORIES.json",
+      "sha256": "ca4a20308e0fb46ce69e810a6473fddd1ffcceb91cccfa8da8d2171babd97c81"
+    },
+    "enums/TAE_MOTION_OVERRIDE_CATEGORIES.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TAE_MOTION_OVERRIDE_CATEGORIES.json",
+      "sha256": "2b7e8a9fd3c75ca25e637c49cc881554a52633fce25285f229aa1adcd564ea0a"
+    },
+    "enums/TEAM_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/TEAM_TYPE.json",
+      "sha256": "3027dac7acfe952ab35e2c2281b5961f7e9d5a78e1a9cc448331f210d7cb2ad3"
+    },
+    "enums/VOW_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/VOW_TYPE.json",
+      "sha256": "49d586eeda566a055647fc6d64cb28dc1cd31f4a3d37c97333061f3828e269b5"
+    },
+    "enums/WEAPON_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/WEAPON_CATEGORY.json",
+      "sha256": "978297bd2579e68c0630a5c68992964ccff21749dd96200ae5642e580849d333"
+    },
+    "enums/WEP_BASE_CHANGE_CATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/WEP_BASE_CHANGE_CATEGORY.json",
+      "sha256": "4e32f6885a3c12eddd2f98c1a53ab0364a3c387575655147cf1899428dd438aa"
+    },
+    "enums/WEP_MATERIAL_ATK.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/WEP_MATERIAL_ATK.json",
+      "sha256": "3c54ee69400985100fb09b9b63385bcc8e6726c96f6e2080bf2162cdc726c72e"
+    },
+    "enums/WEP_MATERIAL_DEF.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/WEP_MATERIAL_DEF.json",
+      "sha256": "03f56c9979a35113b7b30e7ff63f3a037c8df017fbb946146e25d340e3aae7bd"
+    },
+    "enums/WEP_MATERIAL_DEF_SFX.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/WEP_MATERIAL_DEF_SFX.json",
+      "sha256": "898e79dad46084fff4223407a736e26fa9266a786d52c169af9186ffcab4046a"
+    },
+    "meta/EquipParamAccessory.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/EquipParamAccessory.xml",
+      "sha256": "cdb25bae8d9670c0110655d2c0749d11b98a417c99a015aa26a5d54df4cd3a01"
+    },
+    "meta/EquipParamGoods.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/EquipParamGoods.xml",
+      "sha256": "46b57693f75e76e1572f7aa1e7610a2c8ac49f969e774fd19bdfd48467d01e7a"
+    },
+    "meta/EquipParamProtector.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/EquipParamProtector.xml",
+      "sha256": "b3cbd9dbe7b9588caa5669dfeec8075fb219d230f5a4fa2df645a10edfac820f"
+    },
+    "meta/EquipParamWeapon.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/EquipParamWeapon.xml",
+      "sha256": "69086b8cf2b7b53581e916fd791e690ed961b88cf92dff62a0af726f4790f791"
+    },
+    "meta/Magic.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/MagicParam.xml",
+      "sha256": "5ee96ca12983d057e1e46a89a7e6f7fc50e6a4aa24ca1d7eb1cdb3ea28506299"
+    },
+    "meta/NpcParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/NpcParam.xml",
+      "sha256": "cd74618ad0c522a4f7e438d9d67ebc37bdaaf2252e3bf37359eaaa14b121911b"
+    },
+    "row_names/EquipParamAccessory.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/EquipParamAccessory.json",
+      "sha256": "ab78c1c31ad7e512b1c25e7826b83c9aef915a9dc0ec804c5a2c00b3cdcdb48a"
+    },
+    "row_names/EquipParamGoods.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/EquipParamGoods.json",
+      "sha256": "71755f448e8d903188e4b9807c21b4c5e5b44921beb34bc5eb4a6d2104952d11"
+    },
+    "row_names/EquipParamProtector.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/EquipParamProtector.json",
+      "sha256": "152b089c9f17b7e23b8a4e3fac1e123543e8c2100650d66c09e774e4b8e007c7"
+    },
+    "row_names/EquipParamWeapon.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/EquipParamWeapon.json",
+      "sha256": "d9c88e21035dba1122865f08354bfc0df704084f9d02f5c68b194454f6e06204"
+    },
+    "row_names/Magic.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/Magic.json",
+      "sha256": "e7e4bced0fe48d6cc7e699326d3589789f96938c9423a24e98bb75976f09d7f6"
+    },
+    "row_names/NpcParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/NpcParam.json",
+      "sha256": "9123730fefaaeb93050b16ffea15d51a14b3e7ed354e5e5c983bd922b00fa985"
+    }
+  }
+}

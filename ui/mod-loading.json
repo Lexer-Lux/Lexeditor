@@ -86,6 +86,11 @@
       "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",
       "overriding": "Fahrenheit indexes enabled mods in loadorder order and later replacements supersede earlier same-path files. Lexeditor owns only its lexeditor-ffx-x2 mod folder and exact loadorder line; it preserves other mods and refuses to overwrite its deployment if those files changed externally."
     },
+    "ds1": {
+      "loader": "Dark Souls Remastered reads param/GameParam/GameParam.parambnd.dcx as a loose file next to the executable, not from a packed archive, so the game needs no mod loader to see a replacement. Apply installs the mod project's saved copy there directly; no separate loader is installed or required.",
+      "structure": "A marked project contains param/GameParam/GameParam.parambnd.dcx after Save. The first Apply preserves one backup of the installed original beside it before replacing it; Disable restores those exact preserved bytes.",
+      "overriding": "One complete parameter archive is installed at a time; applying a different project replaces what is currently installed. Apply and Disable refuse to continue if the installed file or the preserved original changed outside Lexeditor."
+    },
     "ds3": {
       "loader": "Lexeditor does not claim a managed Dark Souls III loader yet. It exports a project-local Data0.bdt for manual offline use with a compatible external loader; Lexeditor neither installs nor configures that loader.",
       "structure": "One selected Lexeditor project contains a marker file and, after Save, one encrypted Data0.bdt. The installed <Dark Souls III>/Game/Data0.bdt is always treated as read-only source data.",

@@ -1,0 +1,25 @@
+{
+  "id": "ds1",
+  "name": "Dark Souls Remastered",
+  "accent": "#a4824c",
+  "processNames": ["DarkSoulsRemastered.exe"],
+  "canLaunch": false,
+  "projects": {
+    "rootEnv": "LEXEDITOR_DS1_PROJECT",
+    "requiredPaths": [".lexeditor-ds1-project"],
+    "contentTypes": [["Game parameters", [".dcx"]]],
+    "templateRoot": "project-template"
+  },
+  "installation": {
+    "rootEnv": "LEXEDITOR_DS1_ROOT",
+    "requiredPaths": ["DarkSoulsRemastered.exe", "param", "map"],
+    "executable": "DarkSoulsRemastered.exe",
+    "steamAppId": "570940",
+    "installDirNames": ["DARK SOULS REMASTERED"],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED",
+      "C:\\Program Files\\Steam\\steamapps\\common\\DARK SOULS REMASTERED"
+    ],
+    "launchPath": "DarkSoulsRemastered.exe"
+  }
+}

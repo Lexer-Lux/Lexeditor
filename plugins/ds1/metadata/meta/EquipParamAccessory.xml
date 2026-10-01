@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <refId Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <sfxVariationId />
+    <weight />
+    <behaviorId Refs="BehaviorParam_PC" />
+    <basicPrice />
+    <sellValue />
+    <sortId />
+    <qwcId Obsolete="" />
+    <equipModelId />
+    <iconId />
+    <shopLv />
+    <trophySGradeId />
+    <trophySeqId />
+    <equipModelCategory Enum="EQUIP_MODEL_CATEGORY" />
+    <equipModelGender Enum="EQUIP_MODEL_GENDER" />
+    <accessoryCategory Enum="ACCESSORY_CATEGORY" />
+    <refCategory Enum="BEHAVIOR_REF_TYPE" />
+    <spEffectCategory Enum="BEHAVIOR_CATEGORY" />
+    <pad Padding="" />
+    <vagrantItemLotId Refs="ItemLotParam" />
+    <vagrantBonusEneDropItemLotId Refs="ItemLotParam" />
+    <vagrantItemEneDropItemLotId Refs="ItemLotParam" />
+    <isDeposit IsBool="" />
+    <isEquipOutBrake IsBool="" />
+    <disableMultiDropShare IsBool="" />
+    <pad1 Padding="" />
+  </Field>
+</PARAMMETA>
