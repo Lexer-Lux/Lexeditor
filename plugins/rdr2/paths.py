@@ -38,8 +38,9 @@ EXTRACT_ROOT = Path(
 
 
 def check() -> list[str]:
+    # A mod project is optional: the host can open the installed game's
+    # prepared Vanilla data before the reader chooses to create a mod.
     required = (
-        (PROJECT_ROOT, "RDR2 project"),
         (PLUGIN_ROOT / "server.py", "RDR2 plugin service"),
         (PLUGIN_ROOT / "editor.html", "RDR2 plugin interface"),
         (PLUGIN_ROOT / "core.js", "RDR2 plugin interface modules"),

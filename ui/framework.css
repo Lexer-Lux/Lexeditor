@@ -7378,6 +7378,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 }
 
 .lex-detail-panel-title {
+  font-family:var(--lex-heading-font,var(--lex-font));
    display:flex;align-items:center;gap:6px;min-width:0;margin:0;font-size:var(--lex-detail-title-size,clamp(21px,2.5vw,32px));line-height:1.1;
  overflow-wrap:normal;
  word-break:normal;
@@ -7873,6 +7874,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   overflow-x: var(--lex-nav-overflow-x, auto);
 }
 .lex-shell-header nav button {
+  font-family:var(--lex-heading-font,var(--lex-font));
 
   user-select: none;
   -webkit-user-select: none;
@@ -8069,6 +8071,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  height: var(--lex-window-button-height, 30px);
 }
 .lex-save-icon {
+  font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;
 
   position:relative;
   display:inline-grid;

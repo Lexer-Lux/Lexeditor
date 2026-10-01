@@ -1,43 +1,46 @@
-from pathlib import Path
+"""Exercise the RDR2 shop picker through the shared table component."""
+from playwright.sync_api import expect, sync_playwright
+from rdr2_browser_check import document
 
 
-ROOT = Path(__file__).resolve().parents[2]
-from rdr2_editor_source import editor_source
-SOURCE = editor_source()
+def main():
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.route('**/*', lambda route: route.abort())
+            page.set_content(document().replace('<head>', '<head><base href="https://lexeditor.test/">', 1))
+            page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
+            page.evaluate("""async()=>{
+              __responses['/api/shops']={shops:[{type:'ST_GENERAL',items:[]},{type:'ST_GUNSMITH',items:[]}]};
+              __responses['/api/shop-buyers']={available:true,shops:['ST_GENERAL','ST_GUNSMITH'],vanillaBuyers:{}};
+              state.tab='shops';await renderShops();
+            }""")
+            picker = page.locator('.lex-column-list').filter(has=page.get_by_role('columnheader', name='2 Shops'))
+            rows = picker.locator('.lex-list-row')
+            expect(rows).to_have_count(2)
+            expect(rows.first).to_contain_text('0 listings')
+            page.evaluate("""()=>{
+              state.filters.shopBuyQ='RUM';state.filters.shopSellQ='RUM';
+              state.filters.shopSellCategory='old';state.filters.shopSellSubcategory='old';
+              state.filters['shop-buys-page']=8;state.filters['shop-sells-page']=9;
+            }""")
+            picker.locator('[data-key="ST_GUNSMITH"]').click()
+            expect(picker.locator('[data-key="ST_GUNSMITH"]')).to_have_attribute('aria-selected', 'true')
+            assert page.evaluate("""()=>({
+              selected:state.filters.shopType,category:state.filters.shopSellCategory,
+              subcategory:state.filters.shopSellSubcategory,
+              buyPage:state.filters['shop-buys-page'],sellPage:state.filters['shop-sells-page']
+            })""") == {'selected':'ST_GUNSMITH','category':'','subcategory':'','buyPage':0,'sellPage':0}
+            expect(picker.locator('[data-key="ST_GENERAL"]')).to_have_attribute('aria-selected', 'false')
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            assert not errors, errors
+        finally:
+            browser.close()
+    print('PASS: shared shop picker count, listings, selection, and category/page resets')
 
 
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        raise AssertionError(message)
-
-
-require(".shop-picker-total { color:color-mix(" in SOURCE,
-        "the shop total must derive from the active theme accent")
-require("var(--accent2)" in SOURCE and "var(--bg)" in SOURCE,
-        "the dynamic total color must mix the active accent with the theme background")
-require(".shop-picker-row { display:block; padding:7px 10px;" in SOURCE,
-        "shop rows must use the requested modestly tighter vertical padding")
-require("text-align:center" in SOURCE,
-        "the shop picker must center its two row lines")
-require(".shop-picker-row .shop-name { display:block; font:400 16px/1.05 var(--rdr-font-display);" in SOURCE,
-        "shop names must use the regular display face instead of synthetic heavy text")
-require("font-weight:800" not in SOURCE[SOURCE.index(".shop-picker-row .shop-name"):SOURCE.index(".shop-requirement-grid")],
-        "the shop picker must not restore synthetic heavy weight")
-require("font:400 10.5px/1.15 var(--rdr-font-body)" in SOURCE,
-        "shop summaries must be slightly larger and use the regular body face")
-require("`${explicit}+ buys · ${row.shop?.items.length||0} sells`" in SOURCE,
-        "shop summaries must use X+ buys wording")
-require("explicit buys" not in SOURCE,
-        "the old explicit-buys wording must not return")
-require(".shop-catalogue-tabs { display:grid; grid-template-columns:repeat(var(--shop-tab-count),minmax(0,1fr));" in SOURCE,
-        "both SELLS catalogue levels must share the full-width equal-column grid")
-require(".shop-catalogue-tabs button { width:100%; min-width:0;" in SOURCE and "text-align:center" in SOURCE,
-        "catalogue tabs must fill their equal grid cells and center their labels")
-require("style:`--shop-tab-count:${topCount}`" in SOURCE and
-        "style:`--shop-tab-count:${secondCount}`" in SOURCE,
-        "each catalogue level must set its own dynamic equal-column count")
-catalogue_css = SOURCE[SOURCE.index(".shop-catalogue-tabs {"):SOURCE.index(".shop-item-conditions {")]
-require("display:flex" not in catalogue_css and "overflow-x:auto" not in catalogue_css,
-        "the old left-packed scrolling catalogue-tab layout must not return")
-
-print("RDR2 shop picker issue 15 source contract passed")
+if __name__ == '__main__':
+    main()

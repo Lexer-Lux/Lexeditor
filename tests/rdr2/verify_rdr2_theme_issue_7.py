@@ -1,56 +1,53 @@
-import re
+"""Verify RDR2's registered theme on the rendered shared components."""
 from pathlib import Path
+import tempfile
+from playwright.sync_api import expect, sync_playwright
+from rdr2_browser_check import document
 
 
-ROOT = Path(__file__).resolve().parents[2]
-FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-from rdr2_editor_source import editor_source
-RDR2 = editor_source()
+def main():
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.route('**/*', lambda route: route.abort())
+            page.set_content(document().replace('<head>', '<head><base href="https://lexeditor.test/">', 1))
+            page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
+            expect(page.get_by_role('textbox', name='Item name', exact=True)).to_be_visible()
+            styles = page.evaluate("""()=>{
+              const css=n=>getComputedStyle(n);
+              const save=document.querySelector('#global-save');
+              const heading=document.querySelector('.lex-detail-panel-title');
+              const input=document.querySelector('.lex-inline-label input');
+              return {
+                body:css(document.body).fontFamily,
+                heading:css(heading).fontFamily,
+                tabs:[...document.querySelectorAll('nav button[data-tab]')].map(n=>css(n).fontFamily),
+                save:css(save).fontFamily,saveClass:save.classList.contains('lex-save-icon'),
+                saveDisabled:save.disabled,
+                inputLine:parseFloat(css(input).lineHeight)/parseFloat(css(input).fontSize),
+                metrics:[...document.fonts].filter(f=>f.family==='Lex RDR Lino').map(f=>({
+                  size:f.sizeAdjust,ascent:f.ascentOverride,descent:f.descentOverride,gap:f.lineGapOverride
+                }))
+              };
+            }""")
+            assert 'Lex RDR Lino' in styles['body'], styles
+            assert 'Lex Redemption' in styles['heading'], styles
+            assert styles['tabs'] and all('Lex Redemption' in font for font in styles['tabs']), styles
+            assert styles['saveClass'] and 'Segoe UI Emoji' in styles['save'], styles
+            assert styles['saveDisabled'], styles
+            assert styles['inputLine'] >= 1.3, styles
+            assert styles['metrics'] == [{'size':'95%','ascent':'90%','descent':'10%','gap':'20%'}], styles
+            assert not errors, errors
+            output = Path(tempfile.gettempdir()) / 'lexeditor-dev' / 'rdr2-theme.png'
+            output.parent.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(output))
+        finally:
+            browser.close()
+    print('PASS: shared RDR2 body, heading, tab and save-icon fonts; input line height and font metrics')
 
 
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        raise AssertionError(message)
-
-
-require('id: "global-save", class: "save lex-save-icon' in FRAMEWORK_JS,
-        "Save must use its own color-emoji class")
-require('class: "save lex-ui-symbol"' not in FRAMEWORK_JS,
-        "Save must not use the monochrome utility-symbol class")
-require(".lex-save-icon" in FRAMEWORK_CSS and '"Segoe UI Emoji"' in FRAMEWORK_CSS,
-        "the shared save class must prefer the Windows color-emoji font")
-require("nav button" in RDR2 and "font-family:var(--rdr-font-display)" in RDR2,
-        "every RDR2 main tab must use the Chinese Rocks display face")
-require('class:"item-list-name"' in RDR2,
-        "the visible item name must have a display-font class")
-require('class:"item-list-id"' in RDR2,
-        "the internal item ID must have a technical monospace class")
-require(".item-list-name" in RDR2 and "var(--rdr-font-display)" in RDR2,
-        "item list names must use the display face")
-require(".item-list-id" in RDR2 and "Consolas" in RDR2,
-        "item IDs must remain clearly monospace")
-require("#global-save:disabled { color:#77736c; background:#34312c; border-color:#49453e; opacity:.48; filter:grayscale(1)" not in RDR2,
-        "the RDR2 disabled state must not strip the save icon color")
-def css_number(property_name: str) -> float:
-    match = re.search(rf"{re.escape(property_name)}\s*:\s*([0-9.]+)%?", RDR2)
-    require(match is not None, f"RDR Lino needs {property_name}")
-    return float(match.group(1))
-
-
-size_adjust = css_number("size-adjust")
-ascent = css_number("ascent-override")
-descent = css_number("descent-override")
-line_gap = css_number("line-gap-override")
-control_line_height = css_number("line-height")
-require(92 <= size_adjust < 100,
-        "RDR Lino must be optically reduced without shrinking every CSS box")
-require(ascent > 80 and descent < 20 and abs(ascent + descent - 100) < 0.01,
-        "RDR Lino must move its baseline down through balanced font metrics")
-require(line_gap >= 15,
-        "RDR Lino must retain a stable corrected line box")
-require('input:not([type="checkbox"]):not([type="radio"]), select, textarea' in RDR2
-        and control_line_height >= 1.3,
-        "RDR2 text controls must leave visible vertical breathing room")
-
-print("RDR2 theme issue 7 source contract passed")
+if __name__ == '__main__':
+    main()
