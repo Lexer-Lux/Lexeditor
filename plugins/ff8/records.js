@@ -39,12 +39,33 @@
   function weaponColumns(){const base=[{key:"id",label:"ID",width:"58px"},{key:"name",label:"Weapon"},{key:"upgradePrice",label:"Price",numeric:true,sortValue:row=>row.upgradePrice,render:row=>gilValue(row.upgradePrice)}],sample=state.data.weapons.rows[0];return base.concat((sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>displayFieldValue(row.fields.find(value=>value.field===field.field))})))}
   function renderWeapons(){const rows=filtered("weapons",["name","id"]);showPaged("weapons",rows,weaponColumns(),weaponDetail,"70px minmax(220px,2fr) 120px")}
   function weaponDataField(label,control,help="",prefs=null,key=""){return detailField({className:"weapon-data-field",label,help:help?infoHelp(help):null,control,pin:prefs?.pinButton(key,label)})}
+  function weaponCharacterCard(row,field){
+    const entries=field.lookup?.entries||[],character=entries.find(entry=>Number(entry.value)===Number(field.value));
+    const name=character?.name||`Character ${field.value}`;
+    const origin=()=>{state.selected.weapons=row.id;navigate('weapons')};
+    const apply=value=>{field.value=Number(value);renderWeapons();shell.refresh()};
+    const finder=el('button',{type:'button','aria-label':`Choose character for ${row.name}`,
+      disabled:field.readonly||state.activeSource!=='mine',onclick:()=>beginSearcher({
+        type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
+        target:()=>navigate('characters'),accept:value=>{
+          if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
+        }})},LexeditorUI.selectionIcon());
+    const card=LexeditorUI.recordCard({image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
+    const figure=LexeditorUI.figureGrid([{media:card,caption:recordHoverLabel('characters',{id:Number(field.value),name},name)}]);
+    return sourceControl(figure,()=>field.value,rowOf(state.vanilla,'weapons',row.id)?.fields?.find(entry=>entry.field===field.field)?.value,
+      referenceValues('weapons',row.id,value=>value?.fields?.find(entry=>entry.field===field.field)?.value),apply,
+      value=>entries.find(entry=>Number(entry.value)===Number(value))?.name||`Character ${value}`,{internal:true});
+  }
   function weaponDetail(row,prefs){
     const vanilla=rowOf(state.vanilla,"weapons",row.id);
     const price=sourceControl(unitField(numberControl(row.upgradePrice,0,2550,10,value=>row.upgradePrice=value),"G",{unitClass:"ff8-gil-unit"}),()=>row.upgradePrice,vanilla.upgradePrice,referenceValues("weapons",row.id,value=>value?.upgradePrice),value=>row.upgradePrice=value,value=>`${formatNumber(value)} G`,{internal:true});
-    const dataFields=row.fields.map(field=>weaponDataField(field.label,fieldSourceControl(field,"weapons",row.id,{internal:true}),field.help,prefs,`field:${field.field}`));
+    const character=row.fields.find(field=>field.field==='character_id');
+    const dataFields=row.fields.filter(field=>field!==character).map(field=>weaponDataField(field.label,fieldSourceControl(field,"weapons",row.id,{internal:true}),field.help,prefs,`field:${field.field}`));
+    const data=character?el('div',{class:'lex-detail-panel-beside'},
+      weaponDataField('',weaponCharacterCard(row,character),'',prefs,'field:character_id'),
+      el('div',{},...dataFields)):dataFields;
     const ingredients=row.ingredients.map(ingredient=>{const vanillaIngredient=vanilla.ingredients[ingredient.slot],refs=referenceValues("weapons",row.id,value=>value?.ingredients?.[ingredient.slot]),setItem=value=>{const itemId=Number(value);ingredient.itemId=itemId;ingredient.quantity=itemId===0?0:Math.max(1,Number(ingredient.quantity)||1);renderWeapons();shell.refresh()},origin=()=>{state.selected.weapons=row.id;navigate("weapons")},item=sourceControl(itemSearchControl(ingredient.itemId,`Select the Item for ${row.name}.`,setItem,origin),()=>ingredient.itemId,vanillaIngredient.itemId,refs.map(entry=>({...entry,value:entry.value?.itemId})),setItem,value=>state.data.weapons.items.find(item=>item.id===value)?.name||`Item ${value}`,{internal:true}),quantity=ingredient.itemId===0?null:sourceControl(numberControl(ingredient.quantity,1,255,1,value=>ingredient.quantity=value,{"aria-label":`Quantity for ingredient ${ingredient.slot+1}`}),()=>ingredient.quantity,vanillaIngredient.quantity,refs.map(entry=>({...entry,value:entry.value?.quantity})),value=>ingredient.quantity=value,undefined,{internal:true});return detailField({className:"weapon-ingredient-row",label:`ITEM ${ingredient.slot+1}`,control:LexeditorUI.controlGroup([item,quantity].filter(Boolean))})});
-    return sharedDetail(row,prefs,[detailSection({title:"DATA",body:dataFields}),detailSection({title:"COST",body:[detailField({label:"",control:price,pin:prefs?.pinButton("upgradePrice","Price")}),...ingredients]})],"")
+    return sharedDetail(row,prefs,[detailSection({title:"DATA",body:data}),detailSection({title:"COST",body:[detailField({label:"",control:price,pin:prefs?.pinButton("upgradePrice","Price")}),...ingredients]})],"")
   }
 
   function magicIcons(row){
@@ -393,6 +414,7 @@
       label:view==="gfs"?"Guardian Forces":"Characters",change:select,
       tabs:ordered.map(row=>({id:row.id,attrs:{id:`${view}-tab-${row.id}`,"aria-controls":detailId,title:row.name},
         label:el("img",{src:`/assets/portraits/${view}/${row.id}.png`,alt:row.name})}))});
+    ordered.forEach(row=>decorateSearchCandidate(tabs.querySelector(`[id="${view}-tab-${row.id}"]`),{type:view,value:row.id,label:row.name}));
     const name=el("strong",{class:"lex-detail-panel-title"},active?.name||"");
     let genderControl=null;
     if(view==="characters"&&active){

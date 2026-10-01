@@ -59,7 +59,6 @@ Models
 SFX / Text
 
 Weapons
-- weapons -> Right panel -> data: on the left side should be the character's portrait. name below it, hoverable. portrait itself is a card -- thing finder. on the right of this div is all the properties and stuff.
 
 World
 - i asked for a button on the world->regions->left panel to swap between that brown map and the more detailed 3d map thing dollet has.

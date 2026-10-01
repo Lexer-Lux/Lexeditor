@@ -7332,8 +7332,12 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 }
 .lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-title { display: none; }
 .lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-content { min-width: 0; }
+.lex-detail-panel-beside:has(> .lex-detail-field .lex-record-card) {
+  grid-template-columns: minmax(8em,1fr) minmax(0,4fr);
+}
 @media (max-width: 900px) {
-  .lex-detail-panel-beside { grid-template-columns: minmax(0, 1fr); }
+  .lex-detail-panel-beside,
+  .lex-detail-panel-beside:has(> .lex-detail-field .lex-record-card) { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* A tab bar with no margin of its own, against what it labels. */

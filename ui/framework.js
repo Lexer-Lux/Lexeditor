@@ -8544,7 +8544,7 @@ ${contents.path}`});
       const scale = bounds.height / nav.offsetHeight || 1;
       let bottom = bounds.bottom;
       const tabs = [...document.querySelectorAll("#toolbar .lex-subtab-bar,#main .lex-subtab-bar")]
-        .filter(node => !node.closest(".lex-detail-panel,.lex-tabbed-panel") && node.getClientRects().length)
+        .filter(node => !node.closest(".lex-detail-panel,.lex-tabbed-panel") && !node.querySelector('.lex-search-candidate') && node.getClientRects().length)
         .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
       const covered = new Set();
       for (const node of tabs) {
