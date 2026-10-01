@@ -91,7 +91,7 @@ def test_full_ff7_surface_uses_human_controls(self):
     # Items: bitmask/formula/status bytes are semantic controls.
     self.navigate("items")
     self.assertEqual(self.page.get_by_role("group", name="Targeting for Record0", exact=True).locator('input[type="checkbox"]').count(), 8)
-    self.assertEqual(self.page.get_by_label("Damage / healing formula for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(self.page.get_by_label("DMG/Heal Formula for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(self.page.get_by_label("Status change mode for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(self.page.get_by_label("Target flags for Record0", exact=True).count(), 0)
 
@@ -137,7 +137,7 @@ def test_full_ff7_surface_uses_human_controls(self):
     self.assertEqual(self.page.get_by_role("group", name="Status immunities for Enemy0", exact=True).locator('input[type="checkbox"]').count(),32)
 
     self.navigate("enemyAttacks")
-    self.assertEqual(self.page.get_by_label("Damage / healing formula for Action0", exact=True).evaluate("e=>e.tagName"),"SELECT")
+    self.assertEqual(self.page.get_by_label("DMG/Heal Formula for Action0", exact=True).evaluate("e=>e.tagName"),"SELECT")
     specials=self.page.get_by_role("group", name="Special attack properties for Action0", exact=True)
     self.assertGreaterEqual(specials.locator('input[type="checkbox"]').count(),10)
 
@@ -270,6 +270,7 @@ def test_finished_high_value_detail_views(self):
 
 def test_dense_custom_views_fit_narrow_detail_pane(self):
     self.install(); self.open()
+    self.page.add_style_tag(content=':root{--lex-font:Arial,sans-serif}')
     self.page.set_viewport_size({"width":900,"height":620})
     for group in ("characters","playerAttacks","encounters","shops"):
         with self.subTest(group=group):
@@ -280,12 +281,18 @@ def test_dense_custom_views_fit_narrow_detail_pane(self):
               const clipped=[...detail.querySelectorAll('input,select,textarea,button')].filter(visible).filter(node=>{const r=node.getBoundingClientRect();return r.left<dr.left-2||r.right>dr.right+2}).length;
               const tableOverflow=[...detail.querySelectorAll('.ff7-concept-table')].filter(table=>table.scrollWidth>table.clientWidth+1).length;
               const subtabOverflow=[...document.querySelectorAll('.lex-subtab-button .lex-tab-label-text')].filter(label=>label.scrollWidth>label.clientWidth+1).length;
-              return {clipped,tableOverflow,subtabOverflow,documentWidth:document.documentElement.scrollWidth};
+              const tables=[...detail.querySelectorAll('.ff7-concept-table')].filter(t=>t.scrollWidth>t.clientWidth+1).map(t=>({name:t.getAttribute('aria-label'),width:t.clientWidth,scroll:t.scrollWidth,template:getComputedStyle(t).gridTemplateColumns}));
+              return {clipped,tableOverflow,subtabOverflow,documentWidth:document.documentElement.scrollWidth,tables};
             }""")
             self.assertEqual(metrics["clipped"],0,(group,metrics))
             self.assertEqual(metrics["tableOverflow"],0,(group,metrics))
             self.assertEqual(metrics["subtabOverflow"],0,(group,metrics))
             self.assertLessEqual(metrics["documentWidth"],902,(group,metrics))
+            if group == 'characters':
+                output=Path(__import__('tempfile').gettempdir())/'lexeditor-dev'/'ff7-narrow-character.png'
+                output.parent.mkdir(exist_ok=True)
+                self.page.get_by_label('Character Limit attacks and gauge divisors',exact=True).scroll_into_view_if_needed()
+                self.page.screenshot(path=str(output))
     self.originals_unchanged()
 
 

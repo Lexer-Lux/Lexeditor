@@ -16,7 +16,11 @@
     // fixed 44px/36px identity track shears them. Floor those tracks at the
     // ink: 44px where short ids fit, wider where padding needs it.
     const tracks=template.match(/minmax\((?:[^()]*|\([^()]*\))*\)|[^\s]+/g)||[template];
-    const floored=tracks.map((track,index)=>columns[index]?.numberedId&&/^\d+px$/.test(track)?`minmax(${track},max-content)`:track).join(" ");
+    // Flexible value lanes use the shared heading/content sizing. Fixed pixel
+    // minima otherwise overflow a narrow detail pane even when the controls
+    // fit; keep the intrinsic floor only for numbered identities.
+    const floored=tracks.map((track,index)=>columns[index]?.numberedId&&/^\d+px$/.test(track)
+      ?`minmax(${track},max-content)`:track.replace(/^minmax\(\d+px,\s*([\d.]+fr)\)$/,'minmax(0,$1)')).join(" ");
     return columnList({rows,key:entry=>entry.key,class:"ff7-concept-table",editable:true,template:floored,columns,"aria-label":label});
   }
   function conceptPanel(row,body){return detailPanel({className:"ff7-detail",title:displayRowName(row),identity:recordId(row.id),meta:null,body})}
