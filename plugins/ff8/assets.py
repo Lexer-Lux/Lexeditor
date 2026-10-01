@@ -788,6 +788,14 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
     resources = _battle_resource_info(filename, data, sections)
     if resources is not None:
         return resources
+    if filename.startswith('mag') and sections and all(
+            section['size'] >= 64 and data[section['offset']:section['offset'] + 4] == b'AKAO'
+            for section in sections):
+        return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                'parsed': True, 'kind': 'sound-data', 'counts': None, 'tims': [],
+                'geometryVerified': False, 'texturesVerified': False,
+                'sections': [{**section, 'name': f"Sound block {section['index']}"}
+                             for section in sections]}
     kind, names = _section_names(filename, len(sections))
     named = ([{**section, "name": names[section["index"] - 1]}
               for section in sections] if names is not None

@@ -46,6 +46,18 @@ def test_victory_nested_sections_are_bounded():
         assert assets._battle_file_info('r0win.dat', invalid)['kind'] == 'unmapped'
 
 
+def test_sound_pack_requires_every_block_to_have_a_sound_header():
+    blocks = [b'AKAO' + bytes(60), b'AKAO' + bytes(76)]
+    data = container(blocks)
+    info = assets._battle_file_info('mag078_b.9m0', data)
+    assert info['kind'] == 'sound-data'
+    assert [section['name'] for section in info['sections']] == ['Sound block 1', 'Sound block 2']
+    assert [section['size'] for section in info['sections']] == [64, 80]
+    assert not info['tims'] and info['counts'] is None
+    for invalid in (container([blocks[0], bytes(80)]), container([blocks[0], b'AKAO']), data[:-1], data + b'extra'):
+        assert assets._battle_file_info('mag078_b.9m0', invalid).get('kind') != 'sound-data'
+
+
 @pytest.mark.parametrize('signature,offset', [(b'AKAO', 0), (b'SCOT', 4)])
 def test_sound_container_needs_a_complete_payload(signature, offset, monkeypatch, tmp_path):
     data = bytearray(80)
