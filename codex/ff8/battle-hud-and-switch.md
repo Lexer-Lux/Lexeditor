@@ -62,6 +62,28 @@ prove final screen placement in a running game.
 
 ## Test boundary
 
+### Shot UI entry points
+
+The supported `FF8_EN.exe` (SHA-256
+`064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`)
+registers Shot's UI through `004B9AD0` at `004AD89E`. The four pushes are
+`004AAFD0`, `004ADBF0`, `004AD8D0`, and slot `6`. The update entry is
+`004AD8D0`; the menu drawing entry is `004ADBF0`.
+
+`004ADBF0` calls the shared target-menu routine `004AAC70`, emits a bar
+through `004B0D20`, and calls `004AD6D0` with the byte at `01D2A220`.
+`004AD6D0` uses `004A7210` and `004A77B0`, rather than the icon entry
+`004B75B0` patched by Better Targeting. These call sites were checked by
+disassembling the supported executable on 2026-10-01.
+
+The other registered entry, `004AAFD0`, draws icon 15 through `004B75B0` at
+`004AB0DC`. That is the existing Better Targeting hook: its wrapper changes
+the selected target's label to icon 0 and marks that call for FFNx. These
+entry points establish UI ownership; they do not establish the primitive
+responsible for Shot's crosshair opacity.
+
+### Verification limits
+
 Native execution tests exercise these instructions with resource I/O stubbed.
 `verify_ff8_native_compiled.py` executes production C++ with instrumented
 native I/O; `verify_ff8_gf_bar_settings.py` checks independent per-mod settings.
