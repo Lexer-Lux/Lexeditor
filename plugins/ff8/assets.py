@@ -87,6 +87,7 @@ EFFECT_MODEL_FILES = frozenset((
     'mag184_e.dat', 'mag290_h.03', 'mag094_b.2e0', 'mag099_b.4e0',
     'mag115_h.07', 'mag186_b.dat', 'mag190_b.dat', 'mag217_b.dat',
     'mag325_b.dat', 'mag325_h.dat', 'mag326_b.dat', 'mag326_g.dat',
+    'mag324_h.02', 'mag324_h.m00',
 ))
 EFFECT_MODEL_SECTIONS = ('Skeleton', 'Model geometry', 'Model animation', 'Extra data')
 # Confirmed identities from the summon-creature-models format census.
@@ -95,6 +96,7 @@ EFFECT_MODEL_NAMES = {
     'mag186_b.dat': 'Odin', 'mag190_b.dat': 'Doomtrain',
     'mag217_b.dat': 'Gilgamesh (alternate animations)', 'mag290_h.03': 'Pandemona',
     'mag325_b.dat': 'Odin (Zantetsuken Reverse)', 'mag326_g.dat': 'Gilgamesh',
+    'mag324_h.02': 'Diablos', 'mag324_h.m00': 'Diablos',
 }
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
 
@@ -369,6 +371,29 @@ def tim_png_bytes(data: bytes, offset: int = 0, palette: int = 0) -> bytes:
     return output.getvalue()
 
 
+def effect_model_parts(filename: str, data: bytes) -> list[dict] | None:
+    """Diablos stores two consecutive, independently bounded model containers."""
+    if filename.casefold() not in ('mag324_h.02', 'mag324_h.m00'):
+        return None
+    if len(data) > 16 * 1024 * 1024:
+        return None
+    parts, offset = [], 0
+    for index in range(2):
+        if offset + 24 > len(data) or struct.unpack_from('<I', data, offset)[0] != 4:
+            return None
+        size = struct.unpack_from('<I', data, offset + 20)[0]
+        if size < 24 or offset + size > len(data):
+            return None
+        raw = data[offset:offset + size]
+        sections = parse_dat_sections(raw)
+        counts = _geometry_counts(raw, sections[1]) if sections else None
+        if counts is None:
+            return None
+        parts.append({'id': index, 'offset': offset, 'size': size, **counts})
+        offset += size
+    return parts if offset == len(data) else None
+
+
 def parse_dat_sections(data: bytes) -> list[dict] | None:
     """Split a battle model file into its section extents.
 
@@ -634,6 +659,21 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
                     'counts': ({'objects': len(meshes), **{key: sum(obj[key] for obj in meshes)
                                for key in ('vertices', 'triangles', 'quads')}} if meshes else None),
                     'geometryVerified': bool(meshes), 'texturesVerified': False}
+    parts = effect_model_parts(filename, data)
+    if parts:
+        named = []
+        for part in parts:
+            raw = data[part['offset']:part['offset'] + part['size']]
+            for section, name in zip(parse_dat_sections(raw), EFFECT_MODEL_SECTIONS):
+                named.append({**section, 'index': len(named) + 1,
+                              'offset': part['offset'] + section['offset'],
+                              'name': f"Part {part['id'] + 1}: {name}"})
+        return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                'parsed': True, 'kind': 'effect-model', 'sections': named,
+                'modelParts': parts, 'tims': [], 'texturesVerified': False,
+                'geometryVerified': True,
+                'counts': {key: sum(part[key] for part in parts)
+                           for key in ('objects', 'vertices', 'triangles', 'quads')}}
     sections = parse_dat_sections(data)
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
@@ -1112,7 +1152,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     if filename in mod_only_files:
         note = row["note"] + (f" {note}" if note else "")
     counts = info["counts"] or {}
-    row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'),
+    row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'), modelParts=info.get('modelParts'),
                effectResources=info.get('effectResources'),
                counts=info["counts"], tims=info["tims"],
                vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model') else len(info["tims"]),

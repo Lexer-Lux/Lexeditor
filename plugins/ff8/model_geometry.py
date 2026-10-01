@@ -45,9 +45,18 @@ class ModelExporter(GltfExporter):
         return mapping
 
 
-def decode(filename: str, data: bytes, *, animations: bool = True):
+def decode(filename: str, data: bytes, *, animations: bool = True, object_id: int | None = None):
     if len(data) > 16*1024*1024:
         raise ValueError('Model exceeds the 16 MB decoding limit')
+    parts = assets.effect_model_parts(filename, data)
+    if parts:
+        selected = 0 if object_id is None else object_id
+        if not 0 <= selected < len(parts):
+            raise ValueError('Unknown model part')
+        part = parts[selected]
+        data = data[part['offset']:part['offset'] + part['size']]
+    elif object_id is not None:
+        raise ValueError('This model has no selectable parts')
     sections = assets.parse_dat_sections(data)
     if sections is None:
         raise ValueError('This file is not a supported battle model')
@@ -127,7 +136,7 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
     if filename.casefold().startswith('a0stg') and filename.casefold().endswith('.x'):
         from . import battle_stage
         return battle_stage.scene(filename, assets.model_dat_bytes(filename, dataset))
-    exporter=decode(filename,assets.model_dat_bytes(filename,dataset),animations=False)
+    exporter=decode(filename,assets.model_dat_bytes(filename,dataset),animations=False,object_id=object_id)
     if filename.casefold() in assets.EFFECT_MODEL_FILES:
         from . import effect_model_textures
         effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))
@@ -151,8 +160,8 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
             'unmappedFaces': exporter.unmapped_effect_faces} if hasattr(exporter, '_resolved_faces') else {})}
 
 
-def glb(filename: str, dataset: str = 'current') -> bytes:
-    exporter=decode(filename,assets.model_dat_bytes(filename,dataset))
+def glb(filename: str, dataset: str = 'current', object_id: int | None = None) -> bytes:
+    exporter=decode(filename,assets.model_dat_bytes(filename,dataset),object_id=object_id)
     if filename.casefold() in assets.EFFECT_MODEL_FILES:
         from . import effect_model_textures
         effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))

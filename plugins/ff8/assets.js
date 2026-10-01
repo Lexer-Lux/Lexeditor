@@ -178,10 +178,21 @@
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
-      content:()=>LexeditorUI.stack(
+      content:()=>{
+        let selectedPart=row.modelParts?.[0]?.id;
+        const host=el('div',{style:'display:contents'});
+        const show=id=>{selectedPart=id;host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id}));};
+        const controls=[];
+        if(row.modelParts?.length){
+          const control=selectControl(selectedPart,row.modelParts.map(part=>({value:part.id,name:`Part ${part.id+1} · ${part.vertices} vertices`})),show);
+          control.setAttribute('aria-label','Model part');
+          controls.push(detailField({label:'PART',control,help:infoHelp('Each part has its own pose. Export GLB saves the selected part. Surfaces stay plain when several textures match.')}));
+        }
+        show(selectedPart);
+        return LexeditorUI.stack(...controls,
         LexeditorUI.actionRow(infoHelp(row.modelKind==='stage'?'Drag to turn the stage and use the wheel to zoom. Arrow keys turn it, plus and minus zoom, and Home resets. This preview shows static geometry and textures.':row.modelKind==='effect-model'?'Drag or use arrow keys to turn the model. The wheel, plus and minus zoom, and Home resets the view. Export GLB includes matching textures, its skeleton and animations. Unmatched surfaces stay plain.':'Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
-          ...(row.modelKind==='stage'?[]:[el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}`,download:`${row.file.replace(/\.[^.]+$/,'')}.glb`}).click()},'Export GLB')]),...(extra?[extra]:[])),
-        FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name})),
+          ...(row.modelKind==='stage'?[]:[el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}${selectedPart==null?'':`&object=${selectedPart}`}`,download:`${row.file.replace(/\.[^.]+$/,'')}${selectedPart==null?'':`-part-${Number(selectedPart)+1}`}.glb`}).click()},'Export GLB')]),...(extra?[extra]:[])),host);
+      },
       onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
   }
   function modelDetail(row,prefs){

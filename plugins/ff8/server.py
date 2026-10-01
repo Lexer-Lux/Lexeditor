@@ -184,8 +184,10 @@ class Handler(PluginRequestHandler):
                     int(query['object'][0]) if 'object' in query else None))
             elif path == "/assets/model.glb":
                 filename=query.get("file",[""])[0]
-                self.binary_response(model_geometry.glb(filename,query.get("dataset",["current"])[0]),
-                    "model/gltf-binary",Path(filename).stem+'.glb')
+                object_id = int(query['object'][0]) if 'object' in query else None
+                self.binary_response(model_geometry.glb(filename,query.get("dataset",["current"])[0],
+                    object_id), "model/gltf-binary",
+                    Path(filename).stem + (f'-part-{object_id + 1}' if object_id is not None else '') + '.glb')
             elif path.startswith("/assets/models/"):
                 filename = path.rsplit("/", 1)[-1]
                 dataset = query.get("dataset", ["current"])[0]

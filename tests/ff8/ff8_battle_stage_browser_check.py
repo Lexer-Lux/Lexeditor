@@ -80,6 +80,23 @@ def main():
             if os.environ.get('LEXEDITOR_EFFECT_MODEL_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_EFFECT_MODEL_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag324_h.02';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            part = page.get_by_role('combobox', name='Model part', exact=True)
+            assert part.input_value() == '0'
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=1' in response.url) as selected:
+                part.select_option('1')
+            assert len(selected.value.json()['positions']) == 242
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            with page.expect_download() as download:
+                page.get_by_role('button', name='Export GLB', exact=True).click()
+            assert download.value.suggested_filename.endswith('part-2.glb')
+            assert Path(download.value.path()).read_bytes()[:4] == b'glTF'
+            if os.environ.get('LEXEDITOR_DIABLOS_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_DIABLOS_SCREENSHOT'])
             assert not errors, errors
             browser.close()
     print('Stage preview loads its palette textures; rotation and Home restore the overview.')
