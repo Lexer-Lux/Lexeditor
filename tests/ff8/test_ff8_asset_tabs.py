@@ -247,7 +247,10 @@ def test_retail_monster_model_decodes(installed_game):
     assert gim["counts"]["vertices"] > 0 and len(gim["tims"]) == 3
     assert rows["c0m127.dat"]["modelKind"] == "nomodel"
     assert rows["d0c000.dat"]["modelKind"] == "body"
-    assert rows["a0stg001.x"]["modelKind"] == "locked"
+    assert rows["a0stg001.x"]["modelKind"] == "stage"
+    assert rows["a0stg001.x"]["vertices"] > 0
+    assert rows["mag046_b.1t0"]["modelKind"] == "texture"
+    assert rows["mag046_b.1t0"]["timCount"] == 1
 
 
 def test_retail_texture_inventory_links_models(installed_game):

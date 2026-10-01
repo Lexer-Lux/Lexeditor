@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Locked",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -114,11 +114,13 @@
   // showed the model). Enemies and Models share it.
   function modelPageThumb(model){
     if(!model?.file)return null;
+    if(model.modelKind==='texture')return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
+    if(!model.vertices&&!model.counts?.vertices)return null;
     return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }
   // Both Enemies and Models open the same geometry viewer from their header.
   function modelPreviewSpec(row,extra=null,options={}){
-    if(!row?.file)return null;
+    if(!row?.file||(!row.vertices&&!row.counts?.vertices))return null;
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
@@ -149,13 +151,13 @@
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));
     if(row.editor==="encounters")links.push(el("button",{type:"button",onclick:()=>navigate("encounters")},"Open in Encounters"));
     if(links.length)sections.push(detailSection({title:"LINKS",body:[detailField({label:"",control:LexeditorUI.actionRow(...links)})]}));
-    const upload=el("input",{type:"file",accept:".dat,.x,application/octet-stream",hidden:true});
+    const upload=el("input",{type:"file",accept:row.modelKind==='texture'?undefined:".dat,.x,application/octet-stream",hidden:true});
     upload.onchange=()=>assetStageUpload(row,"datBase64",upload,null,file=>{
       const ext=file.name.split(".").pop()?.toLowerCase();
-      if(!["dat","x"].includes(ext)){showAlert({title:"Unsupported model",message:`${file.name} is not a .dat or .x battle file.`});return null}
+      if(row.modelKind!=='texture'&&!["dat","x"].includes(ext)){showAlert({title:"Unsupported model",message:`${file.name} is not a .dat or .x battle file.`});return null}
       return {datRevert:false};
     });
-    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine",onclick:()=>upload.click()},"Replace"),
+    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||(row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))),onclick:()=>upload.click()},"Replace"),
       revert=el("button",{type:"button",disabled:state.activeSource!=="mine"||!row.override,onclick:()=>{row.datBase64="";row.datRevert=true;shell.refresh();render()}},"Revert"),
       exportLink=row.sha256?el("a",{href:`/assets/models/${row.file}?dataset=${encodeURIComponent(assetDataset())}`,download:row.file},"Export"):null,
       pending=assetPendingNote(row,"datBase64","Replacement"),

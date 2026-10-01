@@ -32,6 +32,11 @@ def main():
             canvas.press('Home')
             assert stage.get_attribute('data-rotation') == '0.6,-0.6'
             assert page.get_by_role('button', name='Export GLB', exact=True).count() == 0
+            page.evaluate("state.selected.models='mag163_a.dat';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.naturalWidth>0", timeout=30000)
+            page.get_by_role('combobox', name='Battle texture mag163_a.dat texture 1 palette', exact=True).select_option('1')
+            page.wait_for_function("Array.from(document.querySelectorAll('img')).some(i=>i.src.includes('palette=1')&&i.naturalWidth>0)")
+            assert page.locator('.lex-model-stage').count() == 0
             assert not failed_textures, failed_textures
             assert not errors, errors
             browser.close()

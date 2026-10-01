@@ -79,6 +79,7 @@ REDUCED_WEAPON_SECTIONS = (
     "Textures",
 )
 MODEL_FILENAME = re.compile(r"[a-z0-9][a-z0-9_.-]*\.(dat|x)", re.IGNORECASE)
+BATTLE_FILENAME = re.compile(r"[a-z0-9][a-z0-9_-]*\.[a-z0-9]{1,3}", re.IGNORECASE)
 CHARACTER_MODEL = re.compile(r"d[0-9a-f][cw][0-9]{3}\.dat")
 BODY_FILENAME = re.compile(r"d([0-9a-f])c(\d{3})\.dat", re.IGNORECASE)
 WEAPON_FILENAME = re.compile(r"d([0-9a-f])w(\d{3})\.dat", re.IGNORECASE)
@@ -592,6 +593,9 @@ def _model_identity(filename: str, kind: str) -> tuple[str, str, int | None]:
 def _model_file_info(path: Path) -> dict:
     """Parse one model file's bytes into cacheable inventory facts."""
     data = path.read_bytes()
+    image = _standalone_texture_info(data)
+    if image is not None:
+        return image
     if re.fullmatch(r'a0stg\d+\.x', path.name.casefold()):
         return _stage_info(data)
     sections = parse_dat_sections(data)
@@ -670,7 +674,7 @@ def _model_bytes(filename: str, dataset: str) -> tuple[bytes, str | None]:
     override = _battle_override(filename, dataset)
     target = _battle_path(filename, dataset)
     if not target.is_file():
-        if re.fullmatch(r'a0stg\d+\.x', filename):
+        if BATTLE_FILENAME.fullmatch(filename):
             archive = FsArchive(paths.GAME_ROOT / 'Data/lang-en/battle')
             return archive.extract(archive.find(filename)), override
         raise ValueError(f"{filename} is not available in this dataset")
@@ -951,10 +955,25 @@ def _stage_info(data: bytes) -> dict:
             'tims': [atlas], 'geometryVerified': True, 'texturesVerified': True}
 
 
-@lru_cache(maxsize=256)
-def _stage_archive_info(prefix: str, filename: str, size: int, mtime_ns: int) -> dict:
+def _standalone_texture_info(data: bytes) -> dict | None:
+    try:
+        layout = _tim_layout(data)
+    except ValueError:
+        return None
+    if layout['size'] != len(data):
+        return None
+    return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+            'parsed': True, 'kind': 'texture', 'sections': [], 'counts': None,
+            'tims': [{'index': 0, **layout}], 'geometryVerified': False,
+            'texturesVerified': True}
+
+
+@lru_cache(maxsize=1024)
+def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) -> dict | None:
     archive = FsArchive(Path(prefix))
-    return _stage_info(archive.extract(archive.find(filename)))
+    data = archive.extract(archive.find(filename))
+    return (_stage_info(data) if re.fullmatch(r'a0stg\d+\.x', filename)
+            else _standalone_texture_info(data))
 
 
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
@@ -962,11 +981,11 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     override = _battle_override(filename, dataset)
     target = _battle_path(filename, dataset)
     info: dict | None = None
-    if not target.is_file() and re.fullmatch(r'a0stg\d+\.x', filename):
+    if not target.is_file():
         prefix = paths.GAME_ROOT / 'Data/lang-en/battle'
         if prefix.with_suffix('.fs').is_file():
             stat = prefix.with_suffix('.fs').stat()
-            info = _stage_archive_info(str(prefix), filename, stat.st_size, stat.st_mtime_ns)
+            info = _archive_asset_info(str(prefix), filename, stat.st_size, stat.st_mtime_ns)
     if target.is_file():
         stat = target.stat()
         info = _cached_model_file(str(target), stat.st_size, stat.st_mtime_ns)
@@ -1020,10 +1039,12 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     name, note, enemy_id = _model_identity(filename, kind)
     if kind == 'stage':
         name, note = f'Battle stage {int(filename[5:-2])}', 'Static battle-stage geometry and textures. Stage scripting and animation are not editable here.'
+    elif kind == 'texture':
+        name, note = f'Battle texture {filename}', 'This file is a texture image, not a 3D model. Select a palette to preview its colors.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind != "nomodel" and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1075,7 +1096,7 @@ def model_rows(dataset: str = "current") -> dict:
 
 
 def model_dat_bytes(filename: str, dataset: str = "current") -> bytes:
-    if not MODEL_FILENAME.fullmatch(filename) or "/" in filename or "\\" in filename:
+    if not BATTLE_FILENAME.fullmatch(filename) or "/" in filename or "\\" in filename:
         raise ValueError("Model export needs a battle archive filename")
     ensure_character_models()
     data, _override = _model_bytes(filename.casefold(), dataset)
@@ -1086,8 +1107,14 @@ def save_models(edits: list[dict]) -> dict:
     saved = 0
     for edit in edits:
         filename = str(edit.get("file", "")).casefold()
-        if not MODEL_FILENAME.fullmatch(filename):
+        if not BATTLE_FILENAME.fullmatch(filename):
             raise ValueError(f"{edit.get('file')} is not a battle model filename")
+        exists = (_battle_path(filename, 'current').is_file()
+                  or any(entry['file'] == filename for entry in _battle_archive_index()))
+        original_texture = (_standalone_texture_info(_model_bytes(filename, 'current')[0])
+                            if exists else None)
+        if not MODEL_FILENAME.fullmatch(filename) and original_texture is None:
+            raise ValueError('Only supported models and standalone textures can be replaced')
         destination = paths.DIRECT_ROOT / "battle" / filename
         if edit.get("revert") is True:
             destination.unlink(missing_ok=True)
@@ -1103,7 +1130,9 @@ def save_models(edits: list[dict]) -> dict:
         if not data or len(data) > MAX_MODEL_BYTES:
             raise ValueError(
                 f"{filename} must be 1 byte to {MAX_MODEL_BYTES} bytes")
-        if filename.endswith(".dat") and parse_dat_sections(data) is None:
+        if original_texture is not None and _standalone_texture_info(data) is None:
+            raise ValueError(f'{filename} needs a complete supported TIM image')
+        if original_texture is None and filename.endswith(".dat") and parse_dat_sections(data) is None:
             raise ValueError(f"{filename} is not a battle-model container")
         destination.parent.mkdir(parents=True, exist_ok=True)
         handle, temporary = tempfile.mkstemp(
@@ -1209,11 +1238,13 @@ def texture_rows(dataset: str = "current") -> dict:
                 "height": tim["height"],
                 "depth": tim["depth"],
                 "paletteCount": tim["paletteCount"],
-                "ffnxBase": f"battle/{row['file']}",
-                "modFiles": claims.get(asset_id, []),
+                "ffnxBase": None if row['modelKind'] == 'texture' else f"battle/{row['file']}",
+                "modFiles": [] if row['modelKind'] == 'texture' else claims.get(asset_id, []),
                 "mapped": True,
                 "editor": "models",
-                "note": ("Replace the whole model file on the Models tab; "
+                "note": ('Replace this image on the Models tab. Its external FFNx texture name is not yet mapped.'
+                         if row['modelKind'] == 'texture' else
+                         "Replace the whole model file on the Models tab; "
                          "in-place texture swaps inside a model are not supported."),
             })
     for asset_id, entries in sorted(claims.items()):
@@ -1274,7 +1305,7 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
         return world_textures.png_bytes(texture_id_number, palette, dataset)
     if value.startswith("battle/"):
         inner, _, index_text = value.partition("/")[2].rpartition("#")
-        if not MODEL_FILENAME.fullmatch(inner):
+        if not BATTLE_FILENAME.fullmatch(inner):
             raise ValueError("Battle texture needs a model file and TIM index")
         try:
             tim_index = int(index_text)
@@ -1282,6 +1313,10 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
             raise ValueError("Battle texture needs a numeric TIM index") from error
         ensure_character_models()
         data, _override = _model_bytes(inner.casefold(), dataset)
+        if _standalone_texture_info(data) is not None:
+            if tim_index != 0:
+                raise ValueError('Standalone texture TIM index is out of range')
+            return tim_png_bytes(data, 0, palette)
         if re.fullmatch(r'a0stg\d+\.x', inner.casefold()):
             from . import battle_stage
             if tim_index != 0:
