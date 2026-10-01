@@ -515,6 +515,13 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,help:infoHelp("This enemy uses this line during battle. Its number matches a Show Text instruction in the AI view."),body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))});
     }));
   }
+  function enemyActionsPanel(row){
+    const tiers=[{id:'low',label:'Low'},{id:'medium',label:'Medium'},{id:'high',label:'High'}];
+    const active=tiers.some(tier=>tier.id===state.enemyActionTier)?state.enemyActionTier:'low';
+    return tabbedPanel({tabs:tiers,active,label:'Enemy action tiers',
+      change:value=>{state.enemyActionTier=value;renderEnemies()},
+      content:tier=>enemyAbilitiesSection(row,tier)});
+  }
   function enemyDetail(row,prefs){
     const table=enemyTableRow(state.data,row.id),tab=state.enemyDetailTab||'properties';
     const tabs=[{id:'properties',label:'Properties'},{id:'actions',label:'Actions',help:'The AI uses these action slots. Each level tier can use a different ability in the same slot.'},{id:'loot',label:'Loot'},
@@ -529,7 +536,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       if(model?.tims?.length)body.push(detailSection({title:'TEXTURES',
         help:infoHelp('The texture pages of this enemy battle model, with the palettes it stores. Showing a page here does not change the game; the Textures tab is where a page is replaced.'),
         body:modelTextureCards(model,{inPlace:true})}));
-    }else if(tab==='actions'&&table)body=['low','medium','high'].map(tier=>enemyAbilitiesSection(table,tier));
+    }else if(tab==='actions'&&table)body=[enemyActionsPanel(table)];
     else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
     else if(tab==='renzokuken'&&table)body=enemySimpleTables(table).slice(2);
     else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
