@@ -1,0 +1,53 @@
+import struct
+
+import pytest
+
+from plugins.ff8 import effect_mesh
+
+
+def triangle():
+    data = bytearray(0x30 + 24 + 4 + 12 + 4)
+    struct.pack_into('<I', data, 0, 3)
+    struct.pack_into('<I', data, 8, 72)
+    struct.pack_into('<2I', data, 20, 48, 3)
+    for index, vertex in enumerate(((0, 0, 0), (100, -20, 0), (0, 0, 100))):
+        struct.pack_into('<3h', data, 48 + index * 8, *vertex)
+    struct.pack_into('<2H', data, 72, 6, 1)
+    struct.pack_into('<3H', data, 80, 0, 8, 16)
+    struct.pack_into('<2H', data, 88, 0, 0xFFFF)
+    return data
+
+
+def test_mesh_byte_offsets_become_vertex_indices():
+    result = effect_mesh.mesh(triangle())
+    assert result['vertices'][1] == (100, -20, 0)
+    assert result['faces'] == [{'type': 6, 'indices': [0, 1, 2]}]
+
+
+@pytest.mark.parametrize('reference', [1, 24, 65535])
+def test_mesh_rejects_invalid_vertex_reference(reference):
+    data = triangle()
+    struct.pack_into('<H', data, 80, reference)
+    with pytest.raises(ValueError, match='missing vertex'):
+        effect_mesh.mesh(data)
+
+
+def test_mesh_requires_terminated_primitive_list():
+    with pytest.raises(ValueError, match='terminator'):
+        effect_mesh.mesh(triangle()[:-4])
+
+
+def test_sparse_object_table_retains_resource_ids():
+    data = bytearray(64) + triangle()
+    struct.pack_into('<I', data, 12, 48)
+    struct.pack_into('<I', data, 20, 48)
+    struct.pack_into('<4I', data, 48, 3, 0, 16, 0)
+    assert effect_mesh.objects(data) == [{'id': 1, 'offset': 64, 'size': 92}]
+    struct.pack_into('<I', data, 56, 4)
+    with pytest.raises(ValueError, match='offset'):
+        effect_mesh.objects(data)
+
+
+def test_raw_texture_page_is_not_a_packed_effect():
+    with pytest.raises(ValueError, match='Not a packed'):
+        effect_mesh.objects(bytes(32768))
