@@ -8513,6 +8513,10 @@ ${contents.path}`});
     const searcher = activeSearcher;
     activeSearcher = null;
     searcher.targetObserver?.disconnect();
+    searcher.layoutObserver?.disconnect();
+    cancelAnimationFrame(searcher.layoutFrame);
+    window.removeEventListener("resize", searcher.scheduleLayout);
+    for (const [node, inert] of searcher.tabLocks || []) node.inert = inert;
     lockSearcherTarget(searcher);
     lockSearcherSource(searcher, false);
     searcher.header?.classList.remove("lex-searcher-active");
@@ -8534,7 +8538,49 @@ ${contents.path}`});
       holdMs: Math.max(150, Math.min(2000, Number(options.holdMs || sharedSettingsSnapshot?.selectionHoldMs || 650))),
     };
     activeSearcher = searcher;
-    searcher.targetObserver = new MutationObserver(() => lockSearcherTarget(searcher));
+    searcher.tabLocks = new Map();
+    const fitBar = () => {
+      if (activeSearcher !== searcher) return;
+      const nav = header.querySelector(".lex-nav-frame");
+      const bounds = nav.getBoundingClientRect();
+      const scale = bounds.height / nav.offsetHeight || 1;
+      let bottom = bounds.bottom;
+      const tabs = [...document.querySelectorAll("#toolbar .lex-subtab-bar,#main .lex-subtab-bar")]
+        .filter(node => !node.closest(".lex-detail-panel,.lex-tabbed-panel") && node.getClientRects().length)
+        .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      const covered = new Set();
+      for (const node of tabs) {
+        const box = node.getBoundingClientRect();
+        // Only page navigation directly below the header, never panel tabs.
+        if (box.height && box.top >= bounds.bottom - 1 && box.top <= bottom + 32 * scale &&
+            box.width >= bounds.width * .8) {
+          bottom = Math.max(bottom, box.bottom);
+          covered.add(node);
+          if (!searcher.tabLocks.has(node)) {
+            searcher.tabLocks.set(node, node.inert);
+            searcher.layoutObserver.observe(node);
+          }
+          node.inert = true;
+        }
+      }
+      for (const [node, inert] of searcher.tabLocks) if (!covered.has(node)) {
+        node.inert = inert;
+        searcher.tabLocks.delete(node);
+        searcher.layoutObserver.unobserve(node);
+      }
+      bar.style.setProperty("--lex-searcher-height", `${(bottom - bounds.top) / scale}px`);
+    };
+    searcher.scheduleLayout = () => {
+      cancelAnimationFrame(searcher.layoutFrame);
+      searcher.layoutFrame = requestAnimationFrame(fitBar);
+    };
+    searcher.layoutObserver = new ResizeObserver(searcher.scheduleLayout);
+    searcher.layoutObserver.observe(header);
+    window.addEventListener("resize", searcher.scheduleLayout);
+    searcher.targetObserver = new MutationObserver(() => {
+      lockSearcherTarget(searcher);
+      searcher.scheduleLayout();
+    });
     searcher.targetObserver.observe(document.body, {childList:true, subtree:true});
     context.onclick = () => {
       if (searcher.atTarget) {
@@ -8565,6 +8611,7 @@ ${contents.path}`});
     header.append(bar);
     searcher.target?.();
     lockSearcherTarget(searcher);
+    fitBar();
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: true, type: searcher.type}}));
     return searcher;
   };

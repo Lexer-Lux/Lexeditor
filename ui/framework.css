@@ -336,10 +336,13 @@ body.lex-save-busy .lex-save-icon.saving {
   filter:grayscale(1);
   pointer-events:none;
 }
-.lex-searcher-active .lex-nav-frame { display:none; }
+.lex-searcher-active .lex-nav-frame { visibility:hidden; }
 
 .lex-searcher-bar {
-  position:relative;
+  position:absolute;
+  inset:0 0 auto;
+  height:var(--lex-searcher-height,100%);
+  box-sizing:border-box;
   z-index:20;
   grid-column:1;
   grid-row:2;
@@ -351,7 +354,7 @@ body.lex-save-busy .lex-save-icon.saving {
   gap:8px;
   padding:5px 10px;
   color:var(--lex-text);
-  background:color-mix(in srgb,var(--lex-panel,#171717) 92%,transparent);
+  background:var(--lex-panel,#171717);
 }
 
 .lex-shell-header .lex-searcher-bar > .lex-searcher-context {

@@ -8,6 +8,45 @@ from test_shared_ui_feedback import framework, page
 from test_tab_rename import mount_shell
 
 
+def test_finder_covers_page_subtabs_and_tracks_navigation(page, tmp_path):
+    framework(page)
+    mount_shell(page, developer=False)
+    page.evaluate('''() => {
+      const U=LexeditorUI;
+      window.showTarget=()=>document.querySelector('main').replaceChildren(U.stack(
+        U.subtabBar({tabs:[{id:'all',label:'All'},{id:'rare',label:'Rare'}],active:'all'}),
+        U.el('p',{},'Candidates')));
+      U.beginSearcher({type:'items',prompt:'Choose the item',target:showTarget,
+        origin:()=>document.querySelector('main').replaceChildren(U.el('p',{},'Source'))});
+    }''')
+    def covered():
+        return page.evaluate('''() => {
+          const bar=document.querySelector('.lex-searcher-bar').getBoundingClientRect();
+          const tabs=document.querySelector('main .lex-subtab-bar').getBoundingClientRect();
+          return Math.abs(bar.bottom-tabs.bottom)<2;
+        }''')
+    page.wait_for_timeout(150)
+    assert covered()
+    assert page.locator('main .lex-subtab-bar').evaluate('e=>e.inert')
+    page.evaluate('document.body.style.zoom=1.25')
+    page.set_viewport_size({'width': 1000, 'height': 700})
+    page.wait_for_timeout(150)
+    assert covered()
+    page.screenshot(path=str(tmp_path / 'finder-subtabs.png'))
+    page.locator('.lex-searcher-context').click()
+    page.wait_for_timeout(150)
+    assert page.evaluate('''() => {
+      const a=document.querySelector('.lex-searcher-bar').getBoundingClientRect();
+      const b=document.querySelector('.lex-nav-frame').getBoundingClientRect();
+      return Math.abs(a.bottom-b.bottom)<2;
+    }''')
+    page.locator('.lex-searcher-context').click()
+    page.wait_for_timeout(150)
+    assert covered()
+    page.evaluate('LexeditorUI.finishSearcher(false)')
+    assert not page.locator('main .lex-subtab-bar').evaluate('e=>e.inert')
+
+
 def test_searcher_keeps_menu_visible_and_source_locked(page):
     framework(page)
     mount_shell(page, developer=False)
