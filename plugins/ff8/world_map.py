@@ -525,6 +525,8 @@ def parse_rail(data: bytes) -> dict:
 
 
 def rows(dataset: str = "current") -> dict:
+    from . import world_names
+    ground_names = world_names.load(dataset)
     parsed = parse(source_path(dataset).read_bytes())
     rail = parse_rail(rail_source_path(dataset).read_bytes())
     texture_data = world_textures.rows(dataset)
@@ -539,6 +541,8 @@ def rows(dataset: str = "current") -> dict:
         *geometry_data["segments"],
         *rail["tracks"],
         *texture_data["textures"],
+        *({"kind": "groundName", "id": index, "name": ground_names.get(str(index), "")}
+          for index in range(256)),
     ]
     return {**parsed, **rail, "textures": texture_data["textures"],
             "segments": geometry_data["segments"], "rows": flattened,
@@ -678,6 +682,12 @@ def _atomic_write(destination: Path, raw: bytes | bytearray) -> None:
 
 
 def save(edits: list[dict]) -> dict:
+    from . import world_names
+    name_edits = [edit for edit in edits if edit.get("kind") == "groundName"]
+    names = world_names.prepare(name_edits) if name_edits else None
+    if name_edits and len(name_edits) == len(edits):
+        destination = world_names.write(names)
+        return {"saved": len(name_edits), "file": str(destination), "files": [str(destination)]}
     source = source_path("current")
     raw = bytearray(source.read_bytes())
     parsed = parse(raw)
@@ -699,7 +709,7 @@ def save(edits: list[dict]) -> dict:
     geometry_edits = [edit for edit in edits if str(edit.get("kind", "")) == "worldSegment"]
     wmset_edits = [edit for edit in edits if str(edit.get("kind", "")) not in (
         "drawPoint", "fieldReturn", "skyColor", "railTrack", "worldTexture",
-        "worldSegment")]
+        "worldSegment", "groundName")]
     for edit in wmset_edits:
         kind = str(edit.get("kind", ""))
         index = _bounded(edit.get("id"), 0, 100000, "Record ID")
@@ -759,5 +769,8 @@ def save(edits: list[dict]) -> dict:
         _atomic_write(geometry_destination, geometry_raw)
         destinations.append(str(geometry_destination))
         changed += len(geometry_edits)
+    if name_edits:
+        destinations.append(str(world_names.write(names)))
+        changed += len(name_edits)
     return {"saved": changed, "file": destinations[0] if destinations else "",
             "files": destinations}

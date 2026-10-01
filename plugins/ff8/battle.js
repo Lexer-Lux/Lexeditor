@@ -357,7 +357,8 @@
     24:"Grass to mountain, Balamb",25:"Some Esthar borders, ground to mountain (?)",27:"Railroads",
     28:"Roads, FH and some towns",29:"Inaccessible places",31:"Lakes",32:"Water at coasts",
     33:"Water near coasts",34:"Water"};
-  function worldGroundLabel(id){const name=worldGroundTypeNames[Number(id)];return name?`${id} · ${name}`:String(id)}
+  function worldGroundName(id){return state.data.world.rows.find(row=>row.kind==="groundName"&&row.id===Number(id))?.name||worldGroundTypeNames[Number(id)]||""}
+  function worldGroundLabel(id){const name=worldGroundName(id);return name?`${id} · ${name}`:String(id)}
   function worldGroundLink(id){
     return hoverable({content:worldGroundLabel(id),targetType:"groundTypes",targetId:id,targetLabel:`ground type ${id}`,
       activate:()=>{state.worldTab="groundTypes";state.selected.world=Number(id);state.worldMapPoint=null;state.worldMapSky=null;
@@ -366,13 +367,17 @@
   function worldGroundTypeRows(){
     const rows=new Map(),world=state.data.world.rows;
     for(const segment of world)if(segment.kind==="worldSegment"&&segment.id<768)for(const ground of segment.groundTypes||[]){
-      if(!rows.has(ground))rows.set(ground,{kind:"groundType",id:ground,name:worldGroundTypeNames[ground]||"",cells:[],rules:[]});
+      if(!rows.has(ground))rows.set(ground,{kind:"groundType",id:ground,name:worldGroundName(ground),cells:[],rules:[]});
       rows.get(ground).cells.push(segment.id);
     }
     for(const rule of world)if(rule.kind==="helper"&&rows.has(rule.groundId))rows.get(rule.groundId).rules.push(rule);
     return [...rows.values()];
   }
   function worldGroundTypeDetail(row,prefs){
+    const storedName=state.data.world.rows.find(entry=>entry.kind==="groundName"&&entry.id===row.id);
+    const nameControl=el("input",{type:"text",value:row.name,maxlength:120,"aria-label":"Ground name",
+      oninput:event=>{if(storedName){storedName.name=event.target.value;row.name=event.target.value;shell.refresh()}},
+      onchange:()=>rerenderWorldMap()});
     const cells=row.cells.map(id=>{const cell=worldRow(state.data,"region",id);return {id,column:cell?.x??id%32,row:cell?.y??Math.floor(id/32),label:`Cell ${id}`,selected:true}});
     const rules=row.rules.length?columnList({rows:row.rules,key:rule=>rule.id,fill:true,localSort:false,
         class:"ff8-encounter-usage-table ff8-record-list","aria-label":`Encounter rules for ground ${row.id}`,
@@ -381,13 +386,14 @@
             targetType:"encounterGroups",targetId:rule.encounterGroup,targetLabel:`encounter group ${rule.encounterGroup}`,
             activate:()=>showEncounterSubtab("groups","encounterGroups",rule.encounterGroup)})}]})
       :LexeditorUI.notice({message:"No encounter rule uses this ground type, so no random battle starts on it."});
-    return sharedDetail({...row,name:`GROUND ${row.id}`},prefs,[
+    return sharedDetail({...row,name:row.name||`Ground ${row.id}`},prefs,[
+      detailField({label:"Name",property:"name",control:nameControl}),
       LexeditorUI.tileGrid([detailSection({className:"world-region-position",title:"WHERE IT IS",
           body:[worldLocationMap({label:`Cells with ground ${row.id}`,cells,select:id=>{state.worldTab="regions";state.selected.world=id;state.pages.world=null;state.filters.world="";rerenderWorldMap()}})]}),
         detailSection({title:"GROUND TYPE",body:[detailField({label:"CELLS",help:infoHelp("World-map cells with at least one polygon of this ground type."),control:readonlyField(row.cells.length)}),
           detailField({label:"RULES",help:infoHelp("Encounter rules that start battles on this ground type."),control:readonlyField(row.rules.length)})]})],{columns:2,minWidth:300}),
       detailSection({title:"ENCOUNTERS",help:infoHelp("The rules that start battles on this ground type, one per region, and the battle group each one starts."),body:[rules]})],
-      "world-map-detail world-ground-type",row.name||"Not described in Deling's notes");
+      "world-map-detail world-ground-type");
   }
   // One world-map cell, one panel: the Map page and the Cells page show the
   // same record, so they draw the same panel (Lexer, 2026-09-27). The word
@@ -631,7 +637,7 @@
       {noun:"world to field entries",inlinePager:state.tab==='fields'},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the right mouse button to pan, and click the middle button to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field Returns",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"drawPoints",label:"Draw Points",help:"Where each world draw point is, and what it gives: its magic, whether it refills and whether it gives a high yield. Click the map to move a point. What it gives is changed through a Hext patch in the mod; the executable is never written."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the right mouse button to pan, and click the middle button to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Ground types used by the world map, their locations, and their encounter rules. Names are project labels and do not change terrain behavior. Default names come from Deling's notes."},{id:"fieldReturns",label:"Field Returns",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"drawPoints",label:"Draw Points",help:"Where each world draw point is, and what it gives: its magic, whether it refills and whether it gives a high yield. Click the map to move a point. What it gives is changed through a Hext patch in the mod; the executable is never written."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField"){state.worldTab='map';state.fieldDetailTab='worldToField';state.tab='fields';return render()}
     if(state.worldTab==="groundTypes"){
@@ -639,8 +645,8 @@
       const visible=worldGroundTypeRows().filter(row=>!query||`${row.id} ${row.name}`.toLocaleLowerCase().includes(query))
         .sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
       delete state.columnPrefs.world;
-      return wrap(showPaged("world",visible,[{key:"id",label:"GROUND"},
-        {key:"name",label:"DESCRIPTION",help:"Where this code appears in the game, from Deling's notes. The game stores only the number.",render:row=>row.name||"—"},
+      return wrap(showPaged("world",visible,[{key:"id",label:"ID"},
+        {key:"name",label:"NAME",help:"A name for this ground type in your project. It does not change terrain behavior. Clear it to restore the default name.",render:row=>row.name||"—"},
         {key:"cellCount",label:"CELLS",sortValue:row=>row.cells.length,render:row=>row.cells.length},
         {key:"ruleCount",label:"RULES",help:"Encounter rules that start battles on this ground type.",sortValue:row=>row.rules.length,render:row=>row.rules.length}],
         worldDetail,"90px minmax(180px,2fr) minmax(70px,.5fr) minmax(70px,.5fr)",{noun:"ground types",defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:true},false));

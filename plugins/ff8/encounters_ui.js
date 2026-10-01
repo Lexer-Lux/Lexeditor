@@ -164,7 +164,7 @@
     return {table:LexeditorUI.matrixTable({rows,key:row=>row.id,columns,template,
       rowAxis:{key:"regionId",label:"REGION",numberedId:true,render:row=>row.regionId,
         help:"Region code of the world-map cell the player is standing in. Region codes are set on the World tab."},
-      columnAxis:{label:"TERRAIN",help:`Terrain code of the ground the player is standing on. The region and terrain together choose an encounter group. ${grounds.filter(ground=>worldGroundTypeNames[ground]).map(ground=>`${ground}: ${worldGroundTypeNames[ground]}.`).join(" ")} World > Ground Types shows where each one is.`},
+      columnAxis:{label:"TERRAIN",help:"The ground the player stands on. The region and ground type together choose an encounter group. World > Ground Types shows their names and locations."},
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
   }
