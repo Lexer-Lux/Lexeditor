@@ -1,22 +1,7 @@
-"""Editable native encumbrance fields, expressed in player-facing units."""
-from . import stamina_patch as native
+"""Shared-control descriptions for variable load bands and effect overrides."""
+from . import load_bands as bands
 
-DEFAULTS = {key: value for key, value in native.DEFAULT_RULES.items() if key != "baseRecovery"}
-NAMES = ("Ultralight", "Light", "Medium", "Heavy", "Overloaded")
-HELP = (
-    "Edit each movement class's load range and stamina recovery. Enable Encumbrance rules in Tweaks, then save and Apply. "
-    "Ultralight requires the game's special movement effect and shares the Light limit. "
-    "These controls do not edit animation timing, invincibility frames or other load-dependent formulas."
-)
-RECOVERY_HELP = (
-    "Multiplies base recovery plus active effect bonuses. 100% keeps the full amount. "
-    "Armour penalties and other recovery conditions still apply."
-)
-LIMIT_HELP = (
-    "The highest equipment load percentage in this class, including the boundary. "
-    "Limits must increase from Light through Heavy. "
-    "Changing limits also adjusts the game's within-class movement interpolation."
-)
+HELP = bands.HELP
 
 
 def number(key, label, value, minimum, maximum, help_text="", editable=True, group="Rules"):
@@ -25,31 +10,69 @@ def number(key, label, value, minimum, maximum, help_text="", editable=True, gro
             "editable": editable, "group": group, "step": 0.01}
 
 
-def row(tier, config, *, read_only=False):
-    if type(tier) is not int or not 0 <= tier < len(NAMES):
-        raise ValueError("Unknown encumbrance class")
-    lower = (0, 0, config["lightLimit"], config["mediumLimit"], config["heavyLimit"])[tier]
-    upper = (config["lightLimit"], config["lightLimit"], config["mediumLimit"],
-             config["heavyLimit"], "No upper limit")[tier]
-    limit_key = ("lightLimit", "lightLimit", "mediumLimit", "heavyLimit", None)[tier]
-    rate_key = native.RECOVERY_KEYS[tier]
-    active = config["encumbranceEnabled"]
-    fields = [
-        number("lower", "Load above (%)" if tier > 1 else "Minimum load (%)",
-               lower, 0, 1000, "Derived from the previous class's upper limit." if tier > 1
-               else "This class starts at zero equipment load.", editable=False),
-        number(limit_key or "upper", "Load up to (%)", upper, 0.01, 1000, LIMIT_HELP,
-               editable=tier in (1, 2, 3)),
-        number(rate_key, "Stamina recovery (%)", config[rate_key], 0, 1000, RECOVERY_HELP),
-    ]
-    # Timing and invincibility do not live in this table. Do not invent editable numbers.
-    fields.append({"key": "movement", "label": "Native movement class", "value": NAMES[tier],
-                   "description": "The game supplies this class's animations. Their timing is not edited here.",
-                   "editable": False, "type": "text", "dtype": "", "minimum": None, "maximum": None,
-                   "enum": {}, "group": "Rules"})
+def finish(fields, config, read_only):
     for field in fields:
-        field["disabled"] = read_only or not active
+        field["disabled"] = read_only or not config["encumbranceEnabled"]
         if not field["editable"]:
             field["protectedReason"] = field["description"]
-    return {"table": "NativeRules", "id": 10 + tier, "name": NAMES[tier], "fields": fields,
-            "help": HELP}
+    return fields
+
+
+def row(identity, config, *, read_only=False):
+    rows = bands.validate_bands(config["bands"])
+    index = bands.locate(rows, identity)
+    value = rows[index]
+    lower = 0.0 if index == 0 else rows[index - 1]["upper"]
+    upper = value["upper"]
+    fields = [
+        {"key": "name", "label": "Name", "value": value["name"], "type": "text",
+         "dtype": "text", "editable": True, "description": "",
+         "enum": {}, "minimum": None, "maximum": None, "maxLength": bands.MAX_NAME, "group": "Band"},
+        number("lower", "Load above (%)" if index else "Minimum load (%)", lower, 0, 1000,
+               "Derived from the preceding band's upper limit." if index else
+               "The first band begins at zero equipment load.", editable=False, group="Band"),
+        number("upper", "Load up to (%)", "No upper limit" if upper is None else upper,
+               round(lower + .01, 2),
+               round(rows[index + 1]["upper"] - .01, 2)
+               if index + 1 < len(rows) and rows[index + 1]["upper"] is not None else bands.MAX_BOUND,
+               bands.UPPER_HELP, editable=upper is not None, group="Band"),
+        {"key": "movement", "label": "Movement profile", "value": value["movement"],
+         "description": bands.MOVEMENT_HELP, "editable": True, "type": "enum", "dtype": "u32",
+         "minimum": 1, "maximum": 4, "enum": {str(k): v for k, v in bands.MOVEMENTS.items()},
+         "group": "Behaviour"},
+        number("recovery", "Stamina recovery (%)", value["recovery"], 0, 1000,
+               bands.RECOVERY_HELP, group="Behaviour"),
+    ]
+    split_min = round(lower + .01, 2)
+    split_max = bands.MAX_BOUND if upper is None else round(upper - .01, 2)
+    neighbours = [
+        {"id": 1000 + rows[i]["id"], "name": rows[i]["name"],
+         "lower": 0.0 if i == 0 else rows[i - 1]["upper"], "upper": rows[i]["upper"],
+         "movement": bands.MOVEMENTS[rows[i]["movement"]], "recovery": rows[i]["recovery"]}
+        for i in (index - 1, index + 1) if 0 <= i < len(rows)
+    ]
+    return {"table": "NativeRules", "id": 1000 + identity, "name": value["name"],
+            "fields": finish(fields, config, read_only), "help": HELP,
+            "band": {"index": index, "lower": lower, "upper": upper,
+                     "movement": bands.MOVEMENTS[value["movement"]], "recovery": value["recovery"],
+                     "splitMinimum": split_min, "splitMaximum": split_max,
+                     "canAdd": len(rows) < bands.MAX_BANDS and split_min <= split_max,
+                     "canDelete": len(rows) > 1, "neighbours": neighbours}}
+
+
+def overrides(config, *, read_only=False):
+    fields = [
+        {"key": "specialEnabled", "label": "Allow special-light override",
+         "value": config["specialLight"]["enabled"], "description": bands.SPECIAL_HELP,
+         "editable": True, "type": "bool", "dtype": "bool", "minimum": 0, "maximum": 1,
+         "enum": {}, "group": "Special light"},
+        number("specialRecovery", "Special-light recovery (%)", config["specialLight"]["recovery"],
+               0, 1000, "Replaces the band's recovery while the special-light override is active.",
+               group="Special light"),
+        number("forcedRecovery", "Forced-overburdened recovery (%)", config["forcedRecovery"],
+               0, 1000, bands.FORCED_HELP, group="Forced condition"),
+    ]
+    finish(fields, config, read_only)
+    fields[1]["disabled"] = fields[1]["disabled"] or not config["specialLight"]["enabled"]
+    return {"id": 200, "table": "NativeRules", "name": "Effect-driven overrides", "fields": fields,
+            "help": "These native conditions take priority over numeric bands. They do not create another load range."}

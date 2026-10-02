@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],effectTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monster:null,allAttacks:false,attackLinks:null,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
+  bandForm:null,bandBusy:false,monster:null,allAttacks:false,attackLinks:null,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
@@ -18,7 +18,7 @@ const shell=LexeditorUI.mountShell({
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. Each record can be shared by several items or abilities. Unknown and legacy properties stay protected. Equipment, Spells and Items show direct references. All effects includes unlinked records. Save changes the mod project."},
-    {id:"encumbrance",label:"Encumbrance",help:"Edit load limits and recovery percentages for each movement class. Enable Encumbrance rules in Tweaks before editing. Animation timing and invincibility frames are not part of these rules."},
+    {id:"encumbrance",label:"Encumbrance",help:"Add, delete and edit load bands, their movement profiles and recovery percentages. Enable Encumbrance rules in Tweaks before editing. Special-light and forced-overburdened conditions are separate overrides."},
     {id:"misc",label:"Misc.",help:"Base stamina regeneration is used by Stamina rebalance. Enable it in Tweaks before editing, then save and Apply."},
     {id:"tweaks",label:"Tweaks"}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -39,7 +39,7 @@ async function loadItems(){
   if(request!==recordsRequest||state.sub!==sub)return;
   if(monster!==state.monster)return;
   if(monster)state.attackLinks=result;
-  state.rows=result.rows;state.dirty=result.dirtyCount;
+  state.rows=result.rows;state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
   if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
   await loadDetail();
 }
@@ -53,10 +53,11 @@ async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
 async function navigate(tab,sub=state.sub,selection=null){
-  const token=++navigation;await edits;state.tab=tab;
+  const token=++navigation;await edits;if(token!==navigation)return;state.bandForm=null;state.tab=tab;
   const previousMonster=state.monster;
   state.monster=null;
-  if(["encumbrance","misc","tweaks"].includes(tab))sub=tab;
+  if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
+  else if(["misc","tweaks"].includes(tab))sub=tab;
   else if(tab==="enemies")sub="monsters";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
@@ -100,7 +101,7 @@ async function save(){
   catch(error){notify(error);throw error;}
 }
 async function discard(){
-  await edits;
+  await edits;state.bandForm=null;
   try{await api("/api/discard",{});await refreshState();await loadItems();render();}catch(error){notify(error);}
 }
 function commit(row,field,value,control){
@@ -113,7 +114,7 @@ function commit(row,field,value,control){
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
-      if(row.table==="NativeRules"){render();}
+      if(row.table==="NativeRules"){await loadItems();render();}
       else if(["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
       else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
     }catch(error){
@@ -121,7 +122,7 @@ function commit(row,field,value,control){
       const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`);
       const original=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!original.value;else control.value=String(original.value);}
-    }finally{state.pending--;shell.refresh();}
+    }finally{state.pending--;if(row.table==="NativeRules")render();else shell.refresh();}
   }).catch(notify);
 }
 function controlFor(row,field){
@@ -133,6 +134,12 @@ function controlFor(row,field){
   // control that looks editable but shows a blocked cursor.
   if(field.type==="bool")return el("input",{...attrs,type:"checkbox",checked:!!field.value,
     onchange:event=>commit(row,field,event.target.checked?1:0,event.target)});
+  if(field.type==="text")return el("input",{...attrs,type:"text",value:field.value,
+    maxlength:field.maxLength||48,required:true,onchange:event=>{
+      const input=event.target;
+      if(!input.value.trim()||!input.checkValidity()){input.reportValidity();return;}
+      commit(row,field,input.value,input);
+    }});
   if(field.type==="enum"){
     const choices=Object.entries(field.enum);
     if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
@@ -162,6 +169,7 @@ function detail(){
   const title=state.monster?(state.row?.impact?.variants.length>1?"Shared attack damage":state.row?.impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Resistances":"Properties";
   if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
   if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  if(state.bandForm&&state.bandForm.id===state.row.id)return renderBandForm();
   const groups=new Map();
   for(const field of state.row.fields){
     const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
@@ -198,39 +206,133 @@ function detail(){
         help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")}))]);
   }
   return detailPanel({title,help,paginate:{inline:true},
-    actions:state.tab==="enemies"&&!state.monster?[el("button",{type:"button",onclick:()=>openAttacks({id:state.row.id,name:state.row.name})},"Attacks")]:[],
+    actions:state.row.band?bandActions():state.tab==="enemies"&&!state.monster?[el("button",{type:"button",onclick:()=>openAttacks({id:state.row.id,name:state.row.name})},"Attacks")]:[],
     body:[...groups].map(([title,body])=>detailSection({title,body}))});
 }
+
+function bandActions(){
+  const disabled=state.readOnly||!state.nativeRules?.encumbranceEnabled||state.bandBusy||state.pending>0;
+  return [
+    el("button",{type:"button",disabled:disabled||!state.row.band.canAdd,onclick:()=>beginBandForm("add")},"Add band"),
+    el("button",{type:"button",disabled:disabled||!state.row.band.canDelete,onclick:()=>beginBandForm("delete")},"Delete band")
+  ];
+}
+function beginBandForm(action){
+  if(state.readOnly||!state.nativeRules?.encumbranceEnabled||state.bandBusy||state.pending||!state.row?.band)return;
+  const band=state.row.band;
+  if(action==="add"&&!band.canAdd||action==="delete"&&!band.canDelete)return;
+  const split=band.upper===null?band.lower+25:(band.lower+band.upper)/2;
+  state.bandForm={action,id:state.row.id,revision:state.nativeRules.bandRevision,
+    at:Math.min(band.splitMaximum,Math.max(band.splitMinimum,Math.round(split*100)/100)),neighbour:"",keep:""};
+  render();
+}
+function bandRange(lower,upper){
+  return (lower===0?"0":">"+lower)+"% to "+(upper===null?"no upper limit":upper+"%");
+}
+function renderBandForm(){
+  const form=state.bandForm,row=state.row,band=row.band;
+  const body=[detailField({label:"Selected band",control:readonlyField(row.name)}),
+    detailField({label:"Current range",control:readonlyField(bandRange(band.lower,band.upper))})];
+  const controls=[];
+  if(form.action==="add"){
+    const input=el("input",{type:"number","aria-label":"Split at (%)","data-band-input":"at",
+      min:band.splitMinimum,max:band.splitMaximum,step:.01,value:form.at,disabled:state.bandBusy,
+      oninput:event=>{form.at=event.target.value;}});
+    controls.push(input);
+    body.push(detailField({label:"Split at (%)",control:input,
+      help:infoHelp("The lower band includes the split point. The new upper band copies its name, movement and recovery. This initially preserves gameplay.")}));
+  }else{
+    const neighbour=el("select",{"aria-label":"Merge into","data-band-input":"neighbour",disabled:state.bandBusy,
+      onchange:event=>{form.neighbour=event.target.value;render();}},
+      el("option",{value:""},"Choose a neighbouring band"),
+      ...band.neighbours.map(n=>el("option",{value:n.id},n.name+" ("+bandRange(n.lower,n.upper)+")")));
+    neighbour.value=String(form.neighbour);
+    const keep=el("select",{"aria-label":"Properties to keep","data-band-input":"keep",disabled:state.bandBusy,
+      onchange:event=>{form.keep=event.target.value;render();}},
+      el("option",{value:""},"Choose which properties survive"),
+      el("option",{value:"selected"},"Selected band's properties"),
+      el("option",{value:"neighbour"},"Neighbour's properties"));
+    keep.value=form.keep;
+    body.push(detailField({label:"Merge into",control:neighbour}),
+      detailField({label:"Properties to keep",control:keep,
+        help:infoHelp("The neighbouring identity survives. The chosen band's name, movement and recovery are kept across the combined range.")}));
+    const other=band.neighbours.find(n=>String(n.id)===form.neighbour);
+    if(other&&form.keep){
+      const winner=form.keep==="selected"?{...band,name:row.name}:other;
+      const upper=band.upper===null||other.upper===null?null:Math.max(band.upper,other.upper);
+      body.push(detailField({label:"Merged range",control:readonlyField(bandRange(Math.min(band.lower,other.lower),upper))}),
+        detailField({label:"Resulting name",control:readonlyField(winner.name)}),
+        detailField({label:"Resulting movement",control:readonlyField(winner.movement)}),
+        detailField({label:"Resulting recovery (%)",control:readonlyField(winner.recovery)}));
+    }
+  }
+  return detailPanel({title:form.action==="add"?"Add band":"Delete band",paginate:{inline:true},
+    actions:[
+      el("button",{type:"button",disabled:state.bandBusy||(form.action==="delete"&&(!form.neighbour||!form.keep)),
+        onclick:()=>{
+          if(controls.some(input=>!input.value.trim()||!input.checkValidity())){
+            controls.forEach(input=>input.reportValidity());return;
+          }
+          submitBandForm(form);
+        }},form.action==="add"?"Create band":"Merge and delete"),
+      el("button",{type:"button",disabled:state.bandBusy,onclick:()=>{state.bandForm=null;render();}},"Cancel")],
+    body:[detailSection({title:"Load range",body})]});
+}
+function submitBandForm(form){
+  if(state.bandBusy||state.readOnly||state.bandForm!==form)return;
+  const body={id:form.id,revision:form.revision,...(form.action==="add"?
+    {at:Number(form.at)}:{neighbour:Number(form.neighbour),keep:form.keep})};
+  state.bandBusy=true;state.pending++;render();
+  edits=edits.then(async()=>{
+    try{
+      const result=await api("/api/bands/"+form.action,body);
+      state.nativeRules=result.nativeRules;state.dirty=result.dirtyCount;
+      state.bandForm=null;state.selected=key(result.row);state.query="";
+      await loadItems();
+      const index=orderedRows().findIndex(row=>key(row)===state.selected);
+      state.page=Math.max(0,Math.floor(index/state.pageSize));
+    }catch(error){
+      state.bandForm=null;await refreshState();await loadItems();notify(error);
+    }finally{
+      state.pending--;state.bandBusy=false;render();
+    }
+  }).catch(notify);
+}
+
 function orderedRows(){
   const query=state.query.toLowerCase();
-  return state.rows.filter(row=>(row.id+" "+row.name).toLowerCase().includes(query)).sort((a,b)=>{
+  const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  if(state.tab==="encumbrance")return filtered;
+  return filtered.sort((a,b)=>{
     const left=a[state.sort.key],right=b[state.sort.key];
     return state.sort.dir*(typeof left==="number"?left-right:String(left).localeCompare(String(right),undefined,{numeric:true}));
   });
 }
 function renderItems(){
   const enemies=state.tab==="enemies",effects=state.tab==="effects",encumbrance=state.tab==="encumbrance",attacks=!!state.monster,
-    noun=attacks?"attacks":enemies?"monsters":effects?"effects":encumbrance?"classes":"items",label=enemies?"Enemies":effects?"Effects":encumbrance?"Encumbrance":"Items";
+    noun=attacks?"attacks":enemies?"monsters":effects?"effects":encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):"items",label=enemies?"Enemies":effects?"Effects":encumbrance?"Encumbrance":"Items";
   const rows=orderedRows();
   const view=pagedListDetail({className:"ds1-records",rows,key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     sync:next=>{
       state.page=next.page;state.pageSize=next.pageSize;
-      if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}
+      if(state.selected!==next.selected){state.bandForm=null;state.selected=next.selected;void loadDetail().then(render).catch(notify);}
     },
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;render();},
     master:({rows:listed,selected,select})=>columnList({rows:listed,key,selected,sortState:state.sort,
       sort:column=>{state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
-      select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
-      columns:[{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start",...(encumbrance?{render:row=>row.id-10}:{})},{key:"name",label:"Name",sortable:true,grow:1}]}),
+      select:async row=>{await edits;state.bandForm=null;select(row);state.selected=key(row);await loadDetail();render();},
+      columns:encumbrance?[{key:"name",label:"Name",grow:1},
+        ...(state.sub==="encumbrance"?[{key:"range",label:"Load",grow:1}]:[])]:
+        [{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]}),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote(attacks&&!state.rows.length?
       "No attack link was resolved. Choose All attack records to inspect records without a confirmed link to this monster.":"Change the search to find a record.")]})});
   const links=state.attackLinks;
   const attackHelp=attacks?`Matches behavior variation ${links?.variation} across ${links?.behaviorCount} behavior records. `+
     `${links?.unresolved.length} references remain unresolved or lead to effects. Direct and projectile links are traced; animation use is unverified. `+
     "All attack records includes bosses, NPCs and records with unresolved ownership; Not linked means no supported link to this monster.":"";
-  return el("div",{class:"ds1-items"},subtabBar({tabs:encumbrance?[]:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
+  return el("div",{class:"ds1-items"},subtabBar({tabs:encumbrance?[{id:"encumbrance",label:"Load bands"},{id:"encumbrance-overrides",label:"Effect overrides"}]:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
     attacks?actionRow(el("button",{type:"button",onclick:()=>navigate("enemies")},"Back to monsters"),
       el("span",{},state.monster.name),infoHelp(attackHelp)):null,
     attacks?subtabBar({tabs:[{id:"linked",label:"Referenced attacks"},{id:"all",label:"All attack records"}],order:"given",

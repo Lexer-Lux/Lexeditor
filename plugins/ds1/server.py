@@ -20,7 +20,7 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
                   os.environ.get('LEXEDITOR_MOD_READ_ONLY') == '1' or os.environ.get('LEXEDITOR_NO_MOD') == '1'
                   or not os.environ.get('LEXEDITOR_DS1_PROJECT'))
 RULES = StaminaRebalance(STORE.game_root, STORE.project, STORE.read_only)
-NATIVE_TABS = {"encumbrance", "misc", "tweaks"}
+NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "misc", "tweaks"}
 
 
 class Handler(PluginRequestHandler):
@@ -47,6 +47,7 @@ class Handler(PluginRequestHandler):
                         row = RULES.read_row(row_id) if table == 'NativeRules' else STORE.get().read_row(table, row_id)
                         result = {'row': RULES.describe_row(row, STORE.get())}
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                    result['nativeRules'] = RULES.snapshot()
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -81,7 +82,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable'):
+            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete',
+                            '/api/deployment/apply', '/api/deployment/disable'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -100,6 +102,15 @@ class Handler(PluginRequestHandler):
                         row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                         row = RULES.describe_row(row, STORE.get())
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
+                elif path in ('/api/bands/add', '/api/bands/delete'):
+                    action = path.rsplit('/', 1)[-1]
+                    allowed = {'id', 'revision', 'at'} if action == 'add' else {'id', 'revision', 'neighbour', 'keep'}
+                    if set(payload) != allowed:
+                        raise ValueError('Unsupported load-band operation')
+                    row = RULES.band_action(action, payload['id'], revision=payload['revision'],
+                                            at=payload.get('at'), neighbour=payload.get('neighbour'),
+                                            keep=payload.get('keep'))
+                    result = {'row': row}
                 elif path == '/api/save':
                     RULES.validate_save()
                     STORE.validate_save()

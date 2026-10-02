@@ -7,20 +7,25 @@ atomic replacement; a stopped two-file Apply must be retried or restored.
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 import json
 from pathlib import Path
 
 from core.plugin_files import atomic_write
 from . import deployment, stamina_patch as native
 from .effects import TABLE, RECOVERY_KEY
-from . import encumbrance
+from . import encumbrance, load_bands
 from .formats import ItemDocument, MAX_ARCHIVE
 from .store import RELATIVE, MARKER
 
 TWEAK_ID = "stamina-rebalance"
 SETTINGS_FILE = ".lexeditor-ds1-stamina.json"
+LEGACY_DEFAULTS = {"enabled": False, "baseRecovery": 60.0, "shieldRecovery": 5,
+                   "encumbranceEnabled": False,
+                   **{k: v for k, v in native.DEFAULT_RULES.items() if k != "baseRecovery"}}
 DEFAULTS = {"enabled": False, "baseRecovery": 60.0, "shieldRecovery": 5,
-            "encumbranceEnabled": False, **encumbrance.DEFAULTS}
+            "encumbranceEnabled": False, "nextBandId": 5, **load_bands.project_defaults()}
+SETTINGS_LIMIT = 32768
 SHIELD_BASES = (1453000, 1453100, 1453200, 1453400, 1453600, 1453800)
 PASSIVES = ("residentSpEffectId", "residentSpEffectId1", "residentSpEffectId2")
 HELP = (
@@ -40,24 +45,43 @@ def digest(content: bytes | None) -> str | None:
 
 
 def settings(value: dict) -> dict:
-    if type(value) is not dict or set(value) != set(DEFAULTS):
+    if type(value) is not dict:
+        raise ValueError("Unsupported native settings")
+    if set(value) == set(LEGACY_DEFAULTS):
+        legacy = native.validate_rules({key: value[key] for key in native.DEFAULT_RULES})
+        value = {**{k: value[k] for k in ("enabled", "encumbranceEnabled", "shieldRecovery")},
+                 "baseRecovery": legacy["baseRecovery"], "nextBandId": 5,
+                 **load_bands.legacy_bands(legacy)}
+    if set(value) != set(DEFAULTS):
         raise ValueError("Unsupported native settings")
     if type(value["enabled"]) is not bool or type(value["encumbranceEnabled"]) is not bool:
         raise ValueError("Tweaks must be on or off")
     bonus = value["shieldRecovery"]
     if type(bonus) not in (int, float) or not 0 <= bonus <= 100 or int(bonus) != bonus:
         raise ValueError("Shield recovery must be a whole number from 0 to 100")
-    validated = native.validate_rules({key: value[key] for key in native.DEFAULT_RULES})
-    return {**validated, "enabled": value["enabled"],
-            "encumbranceEnabled": value["encumbranceEnabled"], "shieldRecovery": int(bonus)}
+    bands = load_bands.validate_bands(value["bands"])
+    next_id = value["nextBandId"]
+    if (type(next_id) is not int or not max(b["id"] for b in bands) < next_id <= 2**31 - 1024):
+        raise ValueError("Invalid next load-band identity")
+    return {"baseRecovery": native.rate_value(value["baseRecovery"]),
+            "enabled": value["enabled"], "encumbranceEnabled": value["encumbranceEnabled"],
+            "shieldRecovery": int(bonus), "nextBandId": next_id, "bands": bands,
+            "specialLight": load_bands.special(value["specialLight"]),
+            "forcedRecovery": load_bands.percent(value["forcedRecovery"])}
 
 
 def effective_rules(config: dict) -> dict:
+    config = settings(config)
     result = dict(native.DEFAULT_RULES)
     if config["enabled"]:
         result["baseRecovery"] = config["baseRecovery"]
     if config["encumbranceEnabled"]:
-        result.update({key: config[key] for key in encumbrance.DEFAULTS})
+        projected = load_bands.native_projection({**config, "baseRecovery": result["baseRecovery"]})
+        default = load_bands.native_projection({
+            **load_bands.project_defaults(), "baseRecovery": result["baseRecovery"]})
+        # The ordinary defaults require no executable extension.
+        if projected != default:
+            return projected
     return native.validate_rules(result)
 
 
@@ -109,7 +133,7 @@ class StaminaRebalance:
         self.project = Path(project) if project else None
         self.read_only = bool(read_only or self.project is None)
         self.saved, self.saved_hash = self._read()
-        self.value = dict(self.saved)
+        self.value = deepcopy(self.saved)
         self.live = {"available": False, "rate": None, "backupOk": False,
                      "problem": "", "checked": False}
 
@@ -125,14 +149,18 @@ class StaminaRebalance:
 
     def _read(self) -> tuple[dict, str | None]:
         if self.project is None:
-            return dict(DEFAULTS), None
-        raw = native.read_file(self._settings_path(), 4096, optional=True)
+            return deepcopy(DEFAULTS), None
+        raw = native.read_file(self._settings_path(), SETTINGS_LIMIT, optional=True)
         if raw is None:
-            return dict(DEFAULTS), None
+            return deepcopy(DEFAULTS), None
         content = json.loads(raw)
-        if type(content) is not dict or set(content) != {"schema", TWEAK_ID} or type(content["schema"]) is not int or content["schema"] != 1:
+        if type(content) is not dict or set(content) != {"schema", TWEAK_ID} or type(content["schema"]) is not int or content["schema"] not in (1, 2):
             raise ValueError("Unsupported stamina settings file; it was left unchanged")
-        return settings(content[TWEAK_ID]), digest(raw)
+        values = content[TWEAK_ID]
+        expected = LEGACY_DEFAULTS if content["schema"] == 1 else DEFAULTS
+        if type(values) is not dict or set(values) != set(expected):
+            raise ValueError("Stamina settings do not match their schema version")
+        return settings(values), digest(raw)
 
     def editable(self) -> None:
         if self.read_only:
@@ -158,14 +186,14 @@ class StaminaRebalance:
     def save(self) -> dict:
         self.validate_save()
         if self.dirty_count:
-            raw = (json.dumps({"schema": 1, TWEAK_ID: self.value}, indent=2) + "\n").encode()
+            raw = (json.dumps({"schema": 2, TWEAK_ID: self.value}, indent=2) + "\n").encode()
             atomic_write(self._settings_path(), raw)
-            self.saved, self.saved_hash = dict(self.value), digest(raw)
+            self.saved, self.saved_hash = deepcopy(self.value), digest(raw)
         return self.snapshot()
 
     def discard(self) -> dict:
         self.saved, self.saved_hash = self._read()
-        self.value = dict(self.saved)
+        self.value = deepcopy(self.saved)
         return self.snapshot()
 
     def snapshot(self, refresh=False) -> dict:
@@ -178,7 +206,8 @@ class StaminaRebalance:
             except (ValueError, RuntimeError, OSError) as error:
                 self.live = {"available": False, "rate": None, "backupOk": False,
                              "problem": str(error), "checked": True}
-        return {**self.value, "saved": dict(self.saved), "dirtyCount": self.dirty_count,
+        return {**deepcopy(self.value), "saved": deepcopy(self.saved), "dirtyCount": self.dirty_count,
+                "bandRevision": self.band_revision(), "maxBands": load_bands.MAX_BANDS,
                 "readOnly": self.read_only, "native": dict(self.live), "help": HELP,
                 "applyHelp": APPLY_HELP}
 
@@ -200,8 +229,18 @@ class StaminaRebalance:
 
     def list_rows(self, tab):
         if tab == "encumbrance":
-            return [{"id": 10 + tier, "table": "NativeRules", "name": name}
-                    for tier, name in enumerate(encumbrance.NAMES)]
+            result = []
+            lower = 0
+            for band in self.value["bands"]:
+                upper = band["upper"]
+                label = f"{lower:g}" if lower == 0 else f">{lower:g}"
+                label += "%" if upper is None else f"–{upper:g}%"
+                result.append({"id": 1000 + band["id"], "table": "NativeRules",
+                               "name": band["name"], "range": label})
+                lower = upper
+            return result
+        if tab == "encumbrance-overrides":
+            return [{"id": 200, "table": "NativeRules", "name": "Effect-driven overrides"}]
         if tab in ("misc", "tweaks"):
             return [{"id": 0 if tab == "misc" else 100, "table": "NativeRules",
                      "name": "Stamina" if tab == "misc" else "Tweaks"}]
@@ -211,8 +250,10 @@ class StaminaRebalance:
         if type(row_id) is not int:
             raise ValueError("Invalid native rule identity")
         value = self.value
-        if 10 <= row_id <= 14:
-            return encumbrance.row(row_id - 10, value, read_only=self.read_only)
+        if row_id >= 1001:
+            return encumbrance.row(row_id - 1000, value, read_only=self.read_only)
+        if row_id == 200:
+            return encumbrance.overrides(value, read_only=self.read_only)
         if row_id == 0:
             rate = native.VANILLA_RATE if self.project is None else value["baseRecovery"]
             field = encumbrance.number("baseRecovery", "Base regeneration (stamina/second)",
@@ -237,18 +278,61 @@ class StaminaRebalance:
                 switch("encumbranceEnabled", "Encumbrance rules", encumbrance.HELP)]}
         raise ValueError("Unknown native rule identity")
 
+    def band_revision(self):
+        encoded = json.dumps({k: self.value[k] for k in
+                             ("bands", "nextBandId", "specialLight", "forcedRecovery")},
+                             sort_keys=True, separators=(",", ":")).encode()
+        return digest(encoded)
+
+    def band_action(self, action, row_id, *, revision, at=None, neighbour=None, keep=None):
+        self.editable()
+        if not self.value["encumbranceEnabled"]:
+            raise ValueError("Enable Encumbrance rules before changing bands")
+        if type(revision) is not str or revision != self.band_revision():
+            raise ValueError("Load bands changed. Reload the band list before trying again.")
+        if type(row_id) is not int or row_id < 1001:
+            raise ValueError("Select a load band")
+        if action == "add":
+            bands, identity = load_bands.split(self.value["bands"], row_id - 1000, at,
+                                               new_id=self.value["nextBandId"])
+            updates = {"bands": bands, "nextBandId": self.value["nextBandId"] + 1}
+        elif action == "delete":
+            if type(neighbour) is not int or neighbour < 1001:
+                raise ValueError("Choose a neighbouring load band")
+            bands, identity = load_bands.merge(self.value["bands"], row_id - 1000,
+                                               neighbour - 1000, keep)
+            updates = {"bands": bands}
+        else:
+            raise ValueError("Unknown load-band operation")
+        self.value = settings({**self.value, **updates})
+        return self.read_row(1000 + identity)
+
     def edit_row(self, row_id, key, value):
+        self.editable()
         field = next((f for f in self.read_row(row_id)["fields"]
                       if f["key"] == key and f["editable"]), None)
         if field is None:
             raise ValueError("This native rule is not editable")
         if field.get("disabled") and key not in ("enabled", "encumbranceEnabled"):
             raise ValueError("Enable the related tweak before editing its rules")
-        if key in ("enabled", "encumbranceEnabled"):
-            if type(value) not in (int, bool) or value not in (0, 1):
-                raise ValueError("Expected a checkbox value")
-            value = bool(value)
-        self.edit(key, value)
+        if row_id >= 1001:
+            bands = load_bands.edit(self.value["bands"], row_id - 1000, key, value)
+            self.edit("bands", bands)
+        elif row_id == 200:
+            if key == "specialEnabled":
+                if type(value) not in (int, bool) or value not in (0, 1):
+                    raise ValueError("Expected a checkbox value")
+                self.edit("specialLight", {**self.value["specialLight"], "enabled": bool(value)})
+            elif key == "specialRecovery":
+                self.edit("specialLight", {**self.value["specialLight"], "recovery": value})
+            else:
+                self.edit("forcedRecovery", value)
+        else:
+            if key in ("enabled", "encumbranceEnabled"):
+                if type(value) not in (int, bool) or value not in (0, 1):
+                    raise ValueError("Expected a checkbox value")
+                value = bool(value)
+            self.edit(key, value)
         return self.read_row(row_id)
 
     def _preflight_params(self, source: bytes) -> None:

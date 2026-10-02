@@ -1,7 +1,8 @@
-"""Exact-build, fixed-span stamina and encumbrance patches for Remastered.
+"""Exact-build stamina and encumbrance projections for Remastered.
 
-All defaults preserve the original image exactly. The encumbrance patch keeps
-the original stack frame, nonvolatile registers and unwind metadata intact.
+The legacy fixed-class format remains readable and exactly restorable. Project
+defaults use its no-op path. Variable bands add a bounded table and two leaf
+selectors while preserving the existing nonleaf frames and unwind metadata.
 Only original Lexeditor instructions are encoded here, not game-code dumps.
 """
 from __future__ import annotations
@@ -16,10 +17,11 @@ import stat
 import struct
 
 from core.plugin_files import atomic_write
-from . import deployment
+from . import deployment, load_bands, load_bands_patch
 
 EXECUTABLE = "DarkSoulsRemastered.exe"
 ORIGINAL_SIZE = 50286344
+MAX_NATIVE_SIZE = ORIGINAL_SIZE + load_bands_patch.EXTENSION_SIZE
 ORIGINAL_SHA256 = "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b"
 BASELINE_OFFSET = 0x1A2A240
 BASELINE_RVA = 0x1A2BE40
@@ -52,6 +54,8 @@ def rate_value(value) -> float:
 
 
 def validate_rules(value: dict) -> dict:
+    if type(value) is dict and "bands" in value:
+        return load_bands.validate_native(value)
     if type(value) is not dict or set(value) != set(DEFAULT_RULES):
         raise ValueError("Unsupported native rules")
     result = {"baseRecovery": rate_value(value["baseRecovery"])}
@@ -77,6 +81,8 @@ def transform(original: bytes, rules: dict) -> bytes:
     """Return one deterministic patch projection of a verified pristine image."""
     rules = validate_rules(rules)
     _pristine(original)
+    if "bands" in rules:
+        return load_bands_patch.transform_verified(original, rules)
     result = bytearray(original)
     struct.pack_into("<f", result, BASELINE_OFFSET, rules["baseRecovery"])
     if any(rules[key] != DEFAULT_RULES[key] for key in DEFAULT_RULES if key != "baseRecovery"):
@@ -95,6 +101,14 @@ def transform(original: bytes, rules: dict) -> bytes:
 
 def identify(source: bytes, original: bytes | None = None) -> dict:
     """Recognize only vanilla or our exact reproducible projection, not a signature match."""
+    if len(source) == MAX_NATIVE_SIZE:
+        if original is None:
+            raise ValueError("A verified original is required to identify a modified executable")
+        _pristine(original)
+        rules = load_bands_patch.read_rules(source)
+        if transform(original, rules) != source:
+            raise ValueError("Executable contains changes not owned by the variable-band editor")
+        return rules
     if len(source) != ORIGINAL_SIZE:
         raise ValueError("Unsupported Remastered executable size")
     if hashlib.sha256(source).hexdigest() == ORIGINAL_SHA256:
@@ -205,7 +219,7 @@ def _write_owner(game_root: Path, owner: dict) -> None:
 
 def inspect(game_root: Path) -> tuple[bytes, dict, bool]:
     game_root = checked(game_root)
-    source = read_file(game_root / EXECUTABLE, ORIGINAL_SIZE)
+    source = read_file(game_root / EXECUTABLE, MAX_NATIVE_SIZE)
     backup = read_file(game_root / BACKUP, ORIGINAL_SIZE, optional=True)
     owner = _owner(game_root)
     source_hash = hashlib.sha256(source).hexdigest()
@@ -250,7 +264,7 @@ def install(game_root: Path, rules: dict, *, expected: bytes | None = None) -> N
              "pendingHash": hashlib.sha256(after).hexdigest()}
     _write_owner(game_root, owner)
     atomic_write(live, after)
-    if read_file(live, ORIGINAL_SIZE) != after:
+    if read_file(live, MAX_NATIVE_SIZE) != after:
         raise RuntimeError("Executable verification failed; the original backup was retained")
     owner.update(activeHash=owner["pendingHash"], pendingHash=None)
     _write_owner(game_root, owner)
