@@ -262,9 +262,10 @@ class SlotChecks(unittest.TestCase):
 
 class TransportChecks(unittest.TestCase):
     def test_non_windows_refused_before_loading_api(self):
+        path = Path("DarkSoulsRemastered.exe")
         with mock.patch.object(probe.os, "name", "posix"):
             with self.assertRaisesRegex(probe.ProbeError, "64-bit Python on Windows"):
-                probe.WindowsReader(1234, Path("DarkSoulsRemastered.exe"))
+                probe.WindowsReader(1234, path)
 
     def test_close_is_idempotent(self):
         reader = probe.WindowsReader.__new__(probe.WindowsReader)
