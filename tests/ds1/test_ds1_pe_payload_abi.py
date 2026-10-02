@@ -139,4 +139,6 @@ def test_abi_adapter_rebuild_matches_both_calling_conventions(tmp_path):
         subprocess.run([*args,str(source),"-o",str(obj)],check=True,capture_output=True)
         subprocess.run(["ld","-Ttext=0","-e","entry","-o",str(elf),str(obj)],check=True,capture_output=True)
         subprocess.run(["objcopy","-O","binary","-j",".text",str(elf),str(binary)],check=True)
-        assert binary.read_bytes()==expected
+        # The source spells out PE/COFF's 16-byte section-tail alignment.
+        # Compare all instruction bytes AND the exact nonexecuted NOP padding.
+        assert binary.read_bytes()==expected + b"\x90" * (-len(expected) % 16)

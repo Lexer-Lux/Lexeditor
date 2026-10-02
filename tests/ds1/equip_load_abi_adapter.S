@@ -55,3 +55,6 @@ capture:
     pop r12
     pop rbx
     ret
+# Explicit tail padding keeps ELF and PE/COFF section bytes identical.
+# It is outside the adapter's return and never executed.
+    .fill (16 - ((. - entry) % 16)) % 16, 1, 0x90
