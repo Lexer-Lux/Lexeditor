@@ -56,3 +56,19 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Equip Load Percentage
+
+The Remastered display hook was independently traced from a privately supplied
+executable. Only original authored patch code, small verification signatures
+and build fingerprints are distributed; no executable or copied game table is
+bundled. The earlier PTDE research is not used by this implementation.
+
+Microsoft's primary documentation supplied PE and x64 chained-unwind format
+facts. No Microsoft implementation code is copied:
+- https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
+- https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+
+The tweak reuses Lexeditor's shared controls, atomic file writer and process
+probe. GNU binutils is used only to reproduce and test the authored assembly;
+it is not a player-side requirement or a bundled runtime.
