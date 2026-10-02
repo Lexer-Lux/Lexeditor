@@ -39,6 +39,12 @@ def main():
                     page=browser.new_page(viewport={"width":1440,"height":900})
                     page.on("pageerror",lambda error:errors.append(str(error)))
                     page.set_default_timeout(10000)
+                    page.set_default_navigation_timeout(30000)
+
+                    def ready():
+                        page.wait_for_selector('body[data-ds1-ready="true"]')
+                        page.wait_for_selector('.lex-plugin-loading-screen',state='detached')
+                        page.evaluate('() => document.fonts.ready')
 
                     def open_effect():
                         page.locator('[data-tab="effects"]').click()
@@ -70,7 +76,7 @@ def main():
                             "(expected)=>state.pending===0 && state.row.fields.find(f=>f.key===expected.key)?.value===expected.value",
                             arg={"key":key,"value":int(value) if type(value) is bool else value})
 
-                    page.goto(session.url);page.wait_for_selector('body[data-ds1-ready="true"]')
+                    page.goto(session.url,wait_until="domcontentloaded");ready()
                     open_effect()
                     assert page.locator('[data-subtab]').evaluate_all("nodes=>nodes.map(n=>n.dataset.subtab)") == [
                         "effects-all","effects-equipment","effects-spells","effects-items"]
@@ -118,7 +124,7 @@ def main():
                     saved=ItemDocument((mod/RELATIVE).read_bytes())
                     for key,value in changes.items():assert saved.value(TABLE,6890,key)==value
                     assert (game/RELATIVE).read_bytes()==raw
-                    page.reload();page.wait_for_selector('body[data-ds1-ready="true"]');open_effect()
+                    page.reload(wait_until="domcontentloaded");ready();open_effect()
                     assert float(control(RECOVERY_KEY).input_value().replace(",",""))==4
                     edit(RECOVERY_KEY,7)
                     page.evaluate("discard()")
@@ -149,7 +155,7 @@ def main():
                     session.stop()
                     session=DS1Session({**env,"LEXEDITOR_NO_MOD":"1","LEXEDITOR_MOD_READ_ONLY":"1"})
                     session.start()
-                    page.goto(session.url+"?lexNoMod=1");page.wait_for_selector('body[data-ds1-ready="true"]')
+                    page.goto(session.url+"?lexNoMod=1",wait_until="domcontentloaded");ready()
                     open_effect()
                     assert control(RECOVERY_KEY).is_disabled()
                     assert float(control(RECOVERY_KEY).input_value().replace(",",""))==10

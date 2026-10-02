@@ -127,6 +127,10 @@ def main():
                     vanilla.wait_for_function('document.documentElement.dataset.lexProjectReadonly==="true"')
                     assert vanilla.locator('#global-save').is_disabled()
                     assert 'Vanilla' in vanilla.locator('.lex-project-control').inner_text()
+                    # The ready marker means data loaded, not that the shared
+                    # minimum-duration loading curtain has stopped intercepting clicks.
+                    vanilla.wait_for_selector('.lex-plugin-loading-screen', state='detached')
+                    vanilla.evaluate('() => document.fonts.ready')
                     # The field is disabled now, matching every other plugin's
                     # read-only look. A real mouse click at its position still
                     # reaches the shared shell's document-level edit-attempt
