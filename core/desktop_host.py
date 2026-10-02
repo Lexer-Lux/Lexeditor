@@ -1487,14 +1487,15 @@ class HostApi:
             Path(source), adapter, data_root, selected)
 
     def import_mod_package(self, plugin_id: str, source: str, name: str,
-                           data_root: str = "", selected: list[str] | None = None) -> dict:
+                           data_root: str = "", selected: list[str] | None = None,
+                           details: dict | None = None) -> dict:
         from core.mod_library import ModLibrary
         adapter = self._mod_adapter(plugin_id)
         if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
             raise ValueError("Mod management is not supported for this game yet")
         with self._mod_library_lock:
             target = ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).import_mod(
-                plugin_id, Path(source), adapter, name, data_root, selected)
+                plugin_id, Path(source), adapter, name, data_root, selected, details=details)
         return {"path": str(target), "name": name}
 
     def choose_mod_package(self, plugin_id: str, kind: str = "folder") -> dict:
@@ -1712,7 +1713,8 @@ class HostApi:
         if not isinstance(plugin_id, str) or plugin_id not in self._plugins:
             raise ValueError(f"Unknown plugin: {plugin_id}")
 
-    def create_mod_project(self, plugin_id: str, name: str, parent: str = "") -> dict:
+    def create_mod_project(self, plugin_id: str, name: str, parent: str = "",
+                           details: dict | None = None) -> dict:
         """Clone the plugin's valid starter into the mod library, or `parent`.
 
         Naming a mod is all a reader needs: it lands under this game's own
@@ -1727,7 +1729,14 @@ class HostApi:
         else:
             target_parent = Path(self.mod_library_location()["root"]) / plugin_id
             target_parent.mkdir(parents=True, exist_ok=True)
+        from core import mod_metadata
+        mod_metadata.clean({**(details or {}), "name": name})
         project = self._projects.create(plugin_id, str(target_parent), name)
+        # A new mod is named in its own mod.json, with the author and
+        # description the reader gave, before the editor opens it.
+        mod_metadata.write(Path(project["current"]), {
+            **{key: value for key, value in (details or {}).items() if key in mod_metadata.FIELDS},
+            "name": name})
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, str(target_parent / name))}
 

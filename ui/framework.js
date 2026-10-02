@@ -5141,12 +5141,19 @@
     let parent = "";
     const cancel = element("button", {class: "lex-dialog-action"}, "Cancel");
     const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Create"));
+    // Every mod carries a name, and optionally an author and a description,
+    // in its mod.json (core/mod_metadata.py). Creating one asks for them here.
+    const author = options.details ? element("input", {type: "text", maxlength: "200", value: options.author || "",
+      placeholder: "Author (optional)", "aria-label": "Author"}) : null;
+    const about = options.details ? element("textarea", {maxlength: "4000", rows: "3",
+      placeholder: "Description (optional)", "aria-label": "Description"}, options.about || "") : null;
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close(null);
     create.onclick = () => {
       const value = input.value.trim();
       if (!value) { message.textContent = "Enter a mod name."; input.focus(); return; }
-      close(options.rename ? value : {name: value, parent});
+      close(options.rename ? value : {name: value, parent,
+        details: options.details ? {author: author.value.trim(), description: about.value.trim()} : undefined});
     };
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") create.click();
@@ -5167,7 +5174,8 @@
     backdrop.append(element("section", {class: "lex-dialog lex-project-dialog", role: "dialog", "aria-modal": "true"},
       element("h2", {}, options.rename ? "Rename Mod" : "Create New Mod"),
       element("p", {}, options.rename ? "Change the mod project folder name." : (options.description || "Lexeditor will create a new editable project from this game's working template.")),
-      input, message, element("div", {class: "lex-dialog-actions"}, location, cancel, create)));
+      input, ...(options.details ? [author, about] : []), message,
+      element("div", {class: "lex-dialog-actions"}, location, cancel, create)));
     document.body.append(backdrop); input.focus(); input.select();
     });
   };
@@ -5221,9 +5229,9 @@ ${contents.path}`});
   // read-only data needs it most.
   const createModProject = async (pluginId, options = {}) => {
     const named = await askProjectName(options.pluginName || pluginId,
-      {...options, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
+      {...options, details: true, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
     if (!named) return null;
-    return callWindow("create_mod_project", pluginId, named.name, named.parent || "");
+    return callWindow("create_mod_project", pluginId, named.name, named.parent || "", named.details || {});
   };
 
   const mountProjectControl = (options, host) => {
@@ -5445,6 +5453,7 @@ ${contents.path}`});
           // mods are files on disk; a plugin with its own createProject
           // (Blank's in-browser samples) has no folder to offer one for.
           const named = await askProjectName(options.plugin.name || options.plugin.id, {
+            details: !options.createProject,
             ...(options.projectCreatePrompt || {}),
             chooseLocation: options.createProject ? undefined
               : () => callWindow("choose_mod_project_location", options.plugin.id),
@@ -5452,7 +5461,7 @@ ${contents.path}`});
           if (named) guarded(async () => {
             const result = options.createProject
               ? await options.createProject(named.name)
-              : await callWindow("create_mod_project", options.plugin.id, named.name, named.parent || "");
+              : await callWindow("create_mod_project", options.plugin.id, named.name, named.parent || "", named.details || {});
             if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${named.name}`);
             return result;
           });
