@@ -18,8 +18,8 @@ def field_value(page, label):
 
 
 def main():
-    output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-    if output: output.mkdir(parents=True, exist_ok=True)
+    output = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(tempfile.gettempdir()) / 'lexeditor-dev' / 'ds1-deployment'
+    output.mkdir(parents=True, exist_ok=True)
     raw = make_archive()
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-deploy-ui-') as folder:
         temp = Path(folder)
@@ -47,7 +47,7 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.evaluate('navigate("info")')
                     page.wait_for_function('state.tab==="info" && state.deployment && !state.error')
-                    if output: page.screenshot(path=str(output / 'info-before-apply.png'))
+                    page.screenshot(path=str(output / 'info-before-apply.png'))
 
                     apply_button = page.get_by_role('button', name='Apply', exact=True)
                     restore_button = page.get_by_role('button', name='Restore original', exact=True)
@@ -63,7 +63,7 @@ def main():
                     page.wait_for_function('state.deployment && state.deployment.enabled===true')
                     assert ItemDocument((game / RELATIVE).read_bytes()).value('EquipParamGoods', 100, 'sellValue') == 42
                     assert restore_button.is_enabled()
-                    if output: page.screenshot(path=str(output / 'info-after-apply.png'))
+                    page.screenshot(path=str(output / 'info-after-apply.png'))
 
                     # Keep the service open across Apply, a later edit/save, and
                     # Reapply. The backup is now Vanilla, not the deployed file.
@@ -80,16 +80,17 @@ def main():
 
                     restore_button.click()
                     dialog.wait_for()
-                    assert 'Restore the original installed param archive' in dialog.inner_text()
+                    assert 'Restore the original installed files?' in dialog.inner_text()
+                    assert 'parameter archive' in dialog.inner_text()
+                    assert 'native stamina/encumbrance' in dialog.inner_text()
+                    page.screenshot(path=str(output / 'restore-confirmation.png'))
                     dialog.get_by_role('button', name='Restore original', exact=True).click()
                     page.wait_for_function('state.deployment && state.deployment.enabled===false')
                     assert hashlib.sha256((game / RELATIVE).read_bytes()).hexdigest() == original_hash
-                    if output: page.screenshot(path=str(output / 'info-after-restore.png'))
+                    page.screenshot(path=str(output / 'info-after-restore.png'))
 
-                    # --- Honest labels for states a real crash/external-change/other-project
-                    # install could leave behind: must never claim "restored" or "this
-                    # project" when the facts don't support it. Client state is mutated
-                    # directly and re-rendered through the real render() pipeline.
+                    # Honest labels for interrupted operations, other projects,
+                    # and missing backups must follow the available evidence.
                     page.evaluate('''() => {
                         state.deployment = {...state.deployment, everApplied:true, enabled:false,
                           backupOk:true, changedExternally:false, pendingRecovery:true,
@@ -97,7 +98,7 @@ def main():
                         render();
                     }''')
                     assert field_value(page, 'APPLIED') == 'Unknown — an interrupted operation needs Apply or Restore to finish'
-                    if output: page.screenshot(path=str(output / 'info-pending-recovery.png'))
+                    page.screenshot(path=str(output / 'info-pending-recovery.png'))
 
                     page.evaluate('''() => {
                         state.deployment = {...state.deployment, everApplied:true, enabled:true,
@@ -107,7 +108,7 @@ def main():
                     }''')
                     assert field_value(page, 'APPLIED') == "Yes, a different project's edits"
                     assert field_value(page, 'UP TO DATE') == '-'
-                    if output: page.screenshot(path=str(output / 'info-other-project-active.png'))
+                    page.screenshot(path=str(output / 'info-other-project-active.png'))
 
                     page.evaluate('''() => {
                         state.deployment = {...state.deployment, everApplied:true, enabled:false,
@@ -116,8 +117,7 @@ def main():
                         render();
                     }''')
                     assert field_value(page, 'APPLIED') == 'Unknown — the preserved original is missing or changed'
-                    if output: page.screenshot(path=str(output / 'info-backup-missing.png'))
-
+                    page.screenshot(path=str(output / 'info-backup-missing.png'))
                     assert not errors, errors
                 finally:
                     browser.close()
