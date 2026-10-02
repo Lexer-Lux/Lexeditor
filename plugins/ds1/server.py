@@ -95,8 +95,10 @@ class Handler(PluginRequestHandler):
                     row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/save':
+                    STORE.writable()
                     TWEAKS.validate_save()
-                    result = STORE.save()
+                    # A tweak-only mod must not gain an unrelated param override.
+                    result = STORE.save() if STORE.get().dirty_count else {'saved': True, 'dirtyCount': 0}
                     result['tweaks'] = TWEAKS.save()
                 elif path == '/api/discard':
                     result = STORE.discard()

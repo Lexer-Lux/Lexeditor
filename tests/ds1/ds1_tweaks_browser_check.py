@@ -1,5 +1,6 @@
 """Real shared-component tweak UI and settings API; no retail assets."""
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -26,7 +27,6 @@ def main():
         (game / RELATIVE).write_bytes(raw)
         (mod / RELATIVE).parent.mkdir(parents=True)
         (mod / MARKER).touch()
-        (mod / RELATIVE).write_bytes(raw)
         session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game),
                               "LEXEDITOR_DS1_PROJECT": str(mod),
                               "LEXEDITOR_NO_MOD": "0", "LEXEDITOR_MOD_READ_ONLY": "0"})
@@ -55,11 +55,26 @@ def main():
                     page.wait_for_function("tweakDirty()===0")
                     assert json.loads((mod / SETTING_FILE).read_text())[TWEAK_ID] is True
                     assert not (game / EXECUTABLE).exists(), "Save must not install an executable"
+                    assert not (mod / RELATIVE).exists(), "Tweak-only saves must not create a param override"
                     box.uncheck()
                     page.wait_for_function("state.pending===0 && tweakDirty()===1")
                     page.evaluate("discard()")
                     page.wait_for_function("tweakDirty()===0 && state.tweaks.enabled===true")
                     assert box.is_checked()
+                    assert not (mod / RELATIVE).exists(), "Discard must not create a param override"
+                    # An existing archive must also keep its contents and timestamp.
+                    archive = mod / RELATIVE
+                    archive.write_bytes(raw)
+                    os.utime(archive, (1600000000, 1600000000))
+                    stamp = archive.stat().st_mtime_ns
+                    for enabled in (False, True):
+                        box.set_checked(enabled)
+                        page.wait_for_function("state.pending===0 && tweakDirty()===1")
+                        page.evaluate("save()")
+                        page.wait_for_function("tweakDirty()===0")
+                        assert json.loads((mod / SETTING_FILE).read_text())[TWEAK_ID] is enabled
+                        assert archive.read_bytes() == raw
+                        assert archive.stat().st_mtime_ns == stamp, "Tweak-only save rewrote the param archive"
                     if output:
                         page.screenshot(path=str(output / "tweaks-missing-executable.png"))
                     # Render the supported/applied presentation with explicit simulated
