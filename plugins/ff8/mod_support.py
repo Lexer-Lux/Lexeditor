@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core import script_mods
+
 from . import runtime_layout
 
 # Suffixes that describe a mod instead of belonging to the game. Hext patches
@@ -58,10 +60,13 @@ class Ff8ModAdapter:
         problems: list[str] = []
         packages: list[str] = []
         ignored: list[str] = []
+        # A tweak mod's script and settings belong to the mod, not the game,
+        # and its game files only exist once it has been built.
+        tweak = script_mods.is_script_mod(Path(root))
         for path in files:
             top = path.parts[0].casefold() if path.parts else ""
             suffix = path.suffix.casefold()
-            if path.name.casefold() in IGNORED_NAMES:
+            if path.name.casefold() in IGNORED_NAMES or (tweak and script_mods.owns(path)):
                 ignored.append(path.as_posix())
                 continue
             if top not in runtime_layout.SOURCE_FOLDERS:
@@ -81,7 +86,7 @@ class Ff8ModAdapter:
                 ignored.append(path.as_posix())
                 continue
             packages.append(path.as_posix())
-        if not packages:
+        if not packages and not tweak:
             problems.append(
                 f"This folder has no FF8 game files. An FF8 mod keeps game files "
                 f"under {ROOT_TEXT}.")
@@ -108,6 +113,9 @@ class Ff8ModAdapter:
             rows, key=lambda row: (int(row["order"]), row["name"].casefold()))]
         rows = runtime_layout.configure(
             project, library, order, {row["id"]: row["enabled"] for row in rows})
+        # An enabled tweak mod deploys what its script builds, so build first.
+        from . import tweak_mods
+        tweak_mods.build_enabled(project, library, Path(game_root), baseline)
         composition = runtime_layout.compose(
             project, runtime, rows, baseline, formats.SECTIONS,
             runtime_layout.prelaunch_condition_state(Path(game_root) / "FFNx.toml"),

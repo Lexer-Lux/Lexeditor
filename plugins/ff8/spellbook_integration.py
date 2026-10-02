@@ -129,7 +129,8 @@ def install() -> None:
             install_runtime=install_runtime, runtime_root=runtime_root,
         )
         project = (project_root or paths.PROJECT_ROOT).resolve()
-        active = bool(data.get("gfSpellbooksEnabled", False)) and bool(data.get("singleGf", False)) and not bool(data.get("sharedMagicInventory", False))
+        # Monogamy is a tweak mod, so the saved result says whether it is on.
+        active = bool(result.get("gfSpellbooksEnabled")) and bool(result.get("singleGf")) and not bool(result.get("sharedMagicInventory"))
         _sync_runtime(project, enabled=active)
         return result
 

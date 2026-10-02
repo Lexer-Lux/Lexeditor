@@ -1,4 +1,4 @@
-  function renderDataMap(){const view=LexeditorUI.dataMap({rows:state.datamap.rows,open:row=>{if(row.filename==="FFNx.toml")state.settingsTab="platform";else if(row.filename.includes("FLYING_EVA"))state.settingsTab="gameplay";if(row.target)navigate(row.target)},query:state.filters.datamap,status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,pageSize:100,changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},changePage:page=>{state.pages.datamap=page;renderDataMap()},changeSort:key=>{const [active,direction]=state.sorts.datamap;state.sorts.datamap=[key,active===key?-direction:1];renderDataMap()}});state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);$("#main").replaceChildren(LexeditorUI.stack(spreadsheetBar(),view.content))}
+  function renderDataMap(){const view=LexeditorUI.dataMap({rows:state.datamap.rows,open:row=>{if(row.filename==="FFNx.toml")state.settingsTab="platform";else if(row.filename.includes("(tweak mods)"))state.settingsTab="gameplay";if(row.target)navigate(row.target)},query:state.filters.datamap,status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,pageSize:100,changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},changePage:page=>{state.pages.datamap=page;renderDataMap()},changeSort:key=>{const [active,direction]=state.sorts.datamap;state.sorts.datamap=[key,active===key?-direction:1];renderDataMap()}});state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);$("#main").replaceChildren(LexeditorUI.stack(spreadsheetBar(),view.content))}
   function renderDashboard(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const dashboard=state.dashboard,runtime=dashboard.runtime,baseline=dashboard.baseline,game=dashboard.game;
@@ -52,148 +52,72 @@
     }});
     return input;
   }
-  const settingsPayload=()=>({flyingEvaBonus:state.data.settings.flyingEvaBonus,flyingEvaEnabled:state.data.settings.flyingEvaEnabled,autoSortInventory:state.data.settings.autoSortInventory,autoSortMagic:state.data.settings.autoSortMagic,enhancedAbilityMenu:state.data.settings.enhancedAbilityMenu,singleGf:state.data.settings.singleGf,gfSpellbooksEnabled:state.data.settings.gfSpellbooksEnabled,fixedCommandMenu:state.data.settings.fixedCommandMenu,universalItem:state.data.settings.universalItem,scannedTargetScan:state.data.settings.scannedTargetScan,partySwitch:state.data.settings.partySwitch,drawOncePerEnemy:state.data.settings.drawOncePerEnemy,streamlinedDraw:state.data.settings.streamlinedDraw,formulaeRework:state.data.settings.formulaeRework,trueAtbWait:state.data.settings.trueAtbWait,betterTargeting:state.data.settings.betterTargeting,modernControls:state.data.settings.modernControls,worldMapFullscreen:state.data.settings.worldMapFullscreen,battleResultsHelp:state.data.settings.battleResultsHelp,gfAcquisitionRework:state.data.settings.gfAcquisitionRework,vibrationConsolidation:state.data.settings.vibrationConsolidation,sharedMagicInventory:state.data.settings.sharedMagicInventory,damageLimitRemoval:state.data.settings.damageLimitRemoval,hitFrameLog:state.data.settings.hitFrameLog,splitMusicVolume:state.data.settings.splitMusicVolume,betterCard:state.data.settings.betterCard,fastStart:state.data.settings.fastStart,xpBars:state.data.settings.xpBars,hpBars:state.data.settings.hpBars,betterHpColors:state.data.settings.betterHpColors,gfHpBars:state.data.settings.gfHpBars,inGameTime:state.data.settings.inGameTime,interactionIndicators:state.data.settings.interactionIndicators,noMagicConsumption:state.data.settings.noMagicConsumption,gfHpCasting:state.data.settings.gfHpCasting,gfHpCastingCosts:state.data.settings.gfHpCastingCosts,dropsAfterMug:state.data.settings.dropsAfterMug,dropChance:state.data.settings.dropChance,flatStatAbilities:state.data.settings.flatStatAbilities,maxSpellEnabled:state.data.settings.maxSpellEnabled,maxSpell:state.data.settings.maxSpell,timedHits:state.data.settings.timedHits,timedHitsWindow:state.data.settings.timedHitsWindow,timedHitsSuccessSound:state.data.settings.timedHitsSuccessSound,timedHitsCritSound:state.data.settings.timedHitsCritSound,timedHitsFailureSound:state.data.settings.timedHitsFailureSound,timedHitsContinuous:state.data.settings.timedHitsContinuous,timedHitsIndicator:state.data.settings.timedHitsIndicator});
+  // Each gameplay tweak is a tweak mod in the mod library; this page shows
+  // every one from its own settings schema. Only changed switches and values
+  // are sent, so saving never rewrites a tweak the reader did not touch.
+  const settingsPayload=()=>{
+    const settings=state.data.settings,before=state.base.settings||{},tweaks={};
+    for(const row of settings.tweaks||[]){
+      const old=(before.tweaks||[]).find(item=>item.id===row.id);if(!old)continue;
+      const change={};
+      if(row.enabled!==old.enabled)change.enabled=row.enabled;
+      if(signature(row.values)!==signature(old.values))change.values=row.values;
+      if(Object.keys(change).length)tweaks[row.id]=change;
+    }
+    return {gfSpellbooksEnabled:settings.gfSpellbooksEnabled,sharedMagicInventory:settings.sharedMagicInventory,tweaks};
+  };
+  const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
+  const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
+  function tweakField(row,field){
+    const values=row.values,label=field.label||field.key,set=value=>{values[field.key]=value;shell.refresh()};
+    let control;
+    if(field.type==="bool")control=el("input",{type:"checkbox",checked:values[field.key]===true,"aria-label":label,onchange:event=>set(event.target.checked)});
+    else if(field.type==="enum")control=selectControl(values[field.key],field.choices.map(choice=>({id:choice.value,name:choice.label||String(choice.value)})),value=>set(value));
+    else if(field.type==="sound"&&soundEntries().length)control=selectControl(values[field.key],soundEntries(),value=>set(Number(value)));
+    else{const number=numberControl(values[field.key],field.min,field.max,field.step||(field.type==="number"?0.1:1),value=>set(value),{"aria-label":label});control=field.unit?unitField(number,field.unit):number}
+    return detailField({label,help:field.help?infoHelp(field.help):null,control});
+  }
+  async function trustTweak(row,trusted){
+    try{
+      const result=await api("/api/settings/trust",post({id:row.id,trusted}));
+      // Trust is not a pending edit: it applies at once, to both copies.
+      for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id),fresh=result.tweaks.find(item=>item.id===row.id);if(match&&fresh){match.trust=fresh.trust;match.describe=fresh.describe;match.error=fresh.error}}
+      renderSettings();
+    }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
+  }
   function renderGameplaySettings(){
     if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
-    const settings=state.data.settings;
-    const flying=numberControl(settings.flyingEvaBonus,settings.minimum,settings.maximum,1,value=>settings.flyingEvaBonus=value,{"aria-label":"Flying EVA Bonus"});
-    const flyingEnabled=el("input",{type:"checkbox",checked:settings.flyingEvaEnabled,"aria-label":"Enable Flying EVA Bonus",onchange:event=>{settings.flyingEvaEnabled=event.target.checked;shell.refresh()}});
-    const singleGf=el("input",{type:"checkbox",checked:settings.singleGf,"aria-label":"Monogamy",onchange:event=>{settings.singleGf=event.target.checked;shell.refresh()}});
-    const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
-    const autoSort=el("input",{type:"checkbox",checked:settings.autoSortInventory,"aria-label":"Auto-sort Inventory",onchange:event=>{settings.autoSortInventory=event.target.checked;shell.refresh()}});
-    const autoSortMagic=el("input",{type:"checkbox",checked:settings.autoSortMagic,"aria-label":"Auto-sort Magic Menu",onchange:event=>{settings.autoSortMagic=event.target.checked;shell.refresh()}});
-    const enhancedAbilityMenu=el("input",{type:"checkbox",checked:settings.enhancedAbilityMenu,"aria-label":"Enhanced Ability Menu",onchange:event=>{settings.enhancedAbilityMenu=event.target.checked;shell.refresh()}});
-    const universalItem=el("input",{type:"checkbox",checked:settings.universalItem,"aria-label":"Universal Item",onchange:event=>{settings.universalItem=event.target.checked;shell.refresh()}});
-    const scannedTargetScan=el("input",{type:"checkbox",checked:settings.scannedTargetScan,disabled:!settings.enhancedScanAvailable,"aria-label":"Enhanced Scan",onchange:event=>{settings.scannedTargetScan=event.target.checked;shell.refresh()}});
-    const partySwitch=el("input",{type:"checkbox",checked:settings.partySwitch,disabled:!settings.partySwitchAvailable,"aria-label":"FF10-style Party Switch",onchange:event=>{settings.partySwitch=event.target.checked;shell.refresh()}});
-    const drawOnce=el("input",{type:"checkbox",checked:settings.drawOncePerEnemy,"aria-label":"Draw Once per Enemy",onchange:event=>{settings.drawOncePerEnemy=event.target.checked;shell.refresh()}});
-    const streamlinedDraw=el("input",{type:"checkbox",checked:settings.streamlinedDraw,"aria-label":"Streamlined Draw",onchange:event=>{settings.streamlinedDraw=event.target.checked;shell.refresh()}});
-    const fixedCommandMenu=el("input",{type:"checkbox",checked:settings.fixedCommandMenu,disabled:!settings.singleGf,"aria-label":"Command Menu Rework",onchange:event=>{settings.fixedCommandMenu=event.target.checked;shell.refresh()}});
-    const trueAtbWait=el("input",{type:"checkbox",checked:settings.trueAtbWait,"aria-label":"True ATB Wait",onchange:event=>{settings.trueAtbWait=event.target.checked;shell.refresh()}});
-    const modernControls=el("input",{type:"checkbox",checked:settings.modernControls,disabled:!settings.modernControlsAvailable,"aria-label":"Modern Controls",onchange:event=>{settings.modernControls=event.target.checked;shell.refresh()}});
-    // How fast the right stick turns the battle camera, as a multiple of the
-    // shipped rate. It belongs to this tweak, so it sits in this row rather
-    // than becoming a tweak of its own that does nothing on its own.
-    const cameraSpeed=numberControl(settings.cameraSpeed,settings.cameraSpeedMinimum,settings.cameraSpeedMaximum,0.1,value=>{settings.cameraSpeed=value},{"aria-label":"Battle camera speed"});
-    const modernControlsControl=LexeditorUI.actionRow(modernControls,unitField(cameraSpeed,"×"));
-    const worldMapFullscreen=el("input",{type:"checkbox",checked:settings.worldMapFullscreen,disabled:!settings.modernControls||!settings.worldMapFullscreenAvailable,"aria-label":"Full-screen World Map",onchange:event=>{settings.worldMapFullscreen=event.target.checked;shell.refresh()}});
-    const battleResultsHelp=el("input",{type:"checkbox",checked:settings.battleResultsHelp,disabled:!settings.battleResultsHelpAvailable,"aria-label":"Battle Results Item Help",onchange:event=>{settings.battleResultsHelp=event.target.checked;shell.refresh()}});
-    const gfAcquisitionRework=el("input",{type:"checkbox",checked:settings.gfAcquisitionRework,disabled:!settings.gfAcquisitionReworkAvailable,"aria-label":"GF Acquisition Rework",onchange:event=>{settings.gfAcquisitionRework=event.target.checked;shell.refresh()}});
-    const vibrationConsolidation=el("input",{type:"checkbox",checked:settings.vibrationConsolidation,"aria-label":"Vibration Rationalization",onchange:event=>{settings.vibrationConsolidation=event.target.checked;shell.refresh()}});
-    const betterTargeting=el("input",{type:"checkbox",checked:settings.betterTargeting,"aria-label":"Better Targeting",onchange:event=>{settings.betterTargeting=event.target.checked;shell.refresh()}});
-    const damageLimitRemoval=el("input",{type:"checkbox",checked:settings.damageLimitRemoval,"aria-label":"Remove Damage Limit",onchange:event=>{settings.damageLimitRemoval=event.target.checked;shell.refresh()}});
-    const hitFrameLog=el("input",{type:"checkbox",checked:settings.hitFrameLog,"aria-label":"Hit-frame Log",onchange:event=>{settings.hitFrameLog=event.target.checked;shell.refresh()}});
-    const splitMusicVolume=el("input",{type:"checkbox",checked:settings.splitMusicVolume,"aria-label":"SFX and Music Sliders",onchange:event=>{settings.splitMusicVolume=event.target.checked;shell.refresh()}});
-    const betterCard=el("input",{type:"checkbox",checked:settings.betterCard,"aria-label":"Better Card",onchange:event=>{settings.betterCard=event.target.checked;shell.refresh()}});
-    const fastStart=el("input",{type:"checkbox",checked:settings.fastStart,"aria-label":"Fast Start",onchange:event=>{settings.fastStart=event.target.checked;shell.refresh()}});
-    const xpBars=el("input",{type:"checkbox",checked:settings.xpBars,"aria-label":"XP Bars",onchange:event=>{settings.xpBars=event.target.checked;shell.refresh()}});
-    const hpBars=el("input",{type:"checkbox",checked:settings.hpBars,"aria-label":"HP Bars",onchange:event=>{settings.hpBars=event.target.checked;shell.refresh()}});
-    const betterHpColors=el("input",{type:"checkbox",checked:settings.betterHpColors,"aria-label":"Better HP Colors",onchange:event=>{settings.betterHpColors=event.target.checked;shell.refresh()}});
-    const gfHpBars=el("input",{type:"checkbox",checked:settings.gfHpBars,disabled:!settings.singleGf,"aria-label":'GF "MP" Bars',onchange:event=>{settings.gfHpBars=event.target.checked;shell.refresh()}});
-    const inGameTime=el("input",{type:"checkbox",checked:settings.inGameTime,"aria-label":"In-game Time",onchange:event=>{settings.inGameTime=event.target.checked;shell.refresh()}});
-    const interactionIndicators=el("input",{type:"checkbox",checked:settings.interactionIndicators,"aria-label":"Interaction Indicators",onchange:event=>{settings.interactionIndicators=event.target.checked;shell.refresh()}});
-    const noMagicConsumption=el("input",{type:"checkbox",checked:settings.noMagicConsumption,"aria-label":"No Magic Consumption",onchange:event=>{settings.noMagicConsumption=event.target.checked;shell.refresh()}});
-    const gfHpCasting=el("input",{type:"checkbox",checked:settings.gfHpCasting,disabled:!settings.singleGf||!settings.noMagicConsumption,"aria-label":"GF HP Casting",onchange:event=>{settings.gfHpCasting=event.target.checked;shell.refresh()}});
-    const dropsAfterMug=el("input",{type:"checkbox",checked:settings.dropsAfterMug,"aria-label":"Drops After Mug",onchange:event=>{settings.dropsAfterMug=event.target.checked;shell.refresh()}});
-    const dropChance=el("input",{type:"checkbox",checked:settings.dropChance,"aria-label":"Drop Chance Rework",onchange:event=>{settings.dropChance=event.target.checked;shell.refresh()}});
-    const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
-    const flatStatAbilities=el("input",{type:"checkbox",checked:settings.flatStatAbilities,"aria-label":"Flat +Stat Abilities",onchange:event=>{settings.flatStatAbilities=event.target.checked;shell.refresh()}});
-    // The Formulae page lives under Tweaks now, so its owning toggle lives
-    // here with the other tweaks. It stays unavailable until every row in the
-    // central Formulae Rework contract has a real runtime patch, and the
-    // Formulae subtab unlocks only while this tweak is enabled.
-    const formulaeRework=el("input",{type:"checkbox",checked:settings.formulaeRework,disabled:state.activeSource!=="mine"||!settings.formulaeReworkAvailable,"aria-label":"Formulae Rework",onchange:event=>{settings.formulaeRework=event.target.checked;shell.refresh();renderSettings()}});
-    const maxSpellEnabled=el("input",{type:"checkbox",checked:settings.maxSpellEnabled,"aria-label":"Enable Max Spell",onchange:event=>{settings.maxSpellEnabled=event.target.checked;shell.refresh()}});
-    const maxSpellValue=numberControl(settings.maxSpell,settings.maxSpellMinimum,settings.maxSpellMaximum,1,value=>settings.maxSpell=value,{"aria-label":"Maximum spell stock"});
-    const row=(title,description,control,options={})=>{
-      const toggle=control.matches?.('input[type="checkbox"]')?control:control.querySelector?.('input[type="checkbox"]');
-      if(toggle&&toggle!==control)toggle.remove();
-      // A tweak that cannot be switched on yet says so where it stands. The
-      // blocker used to be the help text instead of the description, so the row
-      // showed a dead checkbox and the reader never learned what the tweak
-      // would do. Both belong on the page: what it does in the help bubble,
-      // why it is unavailable in the body, with the switch itself.
-      // "Not available yet" is for a feature that is not finished, not for a
-      // switch that is waiting on another switch: a row disabled by its own
-      // dependency says which one it needs in its help, and wears no badge.
-      const blocker=options.blocker||"";
-      const unavailable=Boolean(blocker);
-      // The shared inline label is the component for a name with something
-      // beside it: it already spaces the two, so the plugin styles nothing.
-      const titleNode=unavailable?LexeditorUI.inlineLabel(el("span",{},title),
-        LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",title:blocker})):title;
-      const body=control===toggle?[]:[detailField({label:"",control})];
-      if(unavailable)body.unshift(LexeditorUI.detailNote(blocker));
-      return detailPanel({title:titleNode,help:description,actions:toggle,body});
+    const settings=state.data.settings,toggles=new Map();
+    const panel=(title,help,toggle,body,blocker="")=>{
+      // A tweak that cannot be switched on yet says so where it stands: what
+      // it does in the help bubble, why it is unavailable in the body.
+      const titleNode=blocker?LexeditorUI.inlineLabel(el("span",{},title),LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",title:blocker})):title;
+      return detailPanel({title:titleNode,help,actions:toggle,body:[...(blocker?[LexeditorUI.detailNote(blocker)]:[]),...body]});
     };
-    // The number is a percentage of effective EVA, so it carries its unit. A
-    // bare number here reads as flat points and the row label alone does not
-    // say which.
-    const flyingControl=LexeditorUI.actionRow(flyingEnabled,unitField(flying,"% EVA"));
-    const maxSpellControl=LexeditorUI.actionRow(maxSpellEnabled,maxSpellValue);
-    // Timed Hits: one switch, then the input window, the block strength and
-    // the three sounds. Sounds are chosen from the game's own sound list (the
-    // SFX tab).
-    const timedLimits=settings.timedHitsLimits||{};
-    const timedNumber=(key,label,unit)=>{const limit=timedLimits[key]||{};return detailField({label,control:unitField(numberControl(settings[key],limit.minimum,limit.maximum,1,value=>settings[key]=value,{"aria-label":label}),unit)})};
-    const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
-    const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
-    const timedSound=(key,label)=>{const entries=soundEntries(),limit=timedLimits[key]||{};return detailField({label,control:entries.length?selectControl(settings[key],entries,value=>settings[key]=Number(value)):numberControl(settings[key],limit.minimum,limit.maximum,1,value=>settings[key]=value,{"aria-label":label})})};
-    const timedHitsEnabled=el("input",{type:"checkbox",checked:settings.timedHits,"aria-label":"Timed Hits",onchange:event=>{settings.timedHits=event.target.checked;shell.refresh()}});
-    const timedHitsControl=el("div",{class:"timed-hits-settings"},timedHitsEnabled,
-      timedNumber("timedHitsWindow","Input window","ms"),
-      timedSound("timedHitsSuccessSound","Hit sound"),
-      timedSound("timedHitsCritSound","Crit sound"),
-      timedSound("timedHitsFailureSound","Miss sound"),
-      detailField({label:"Time indicator",help:infoHelp("Colours the triangle over your character, and moves it to whoever is attacking or being attacked. White: nothing to time. Red: a press now fails. Yellow: a press now hits, or takes a normal hit from an enemy. Green: a press now crits, or dodges. Yellow and green start from a character's second use of an attack, once its timing is known."),control:el("input",{type:"checkbox",checked:settings.timedHitsIndicator!==false,"aria-label":"Time indicator",onchange:event=>{settings.timedHitsIndicator=event.target.checked;shell.refresh()}})}),
-      detailField({label:"Continuous grading",help:infoHelp("Your timing sets the damage inside each result. An attack deals nothing at the start of its hit window, normal damage where the crit window starts and crit damage at the moment of the hit. A block works the same way in reverse. This lowers the damage you deal, because only a perfect press reaches full crit damage."),control:el("input",{type:"checkbox",checked:!!settings.timedHitsContinuous,"aria-label":"Continuous grading",onchange:event=>{settings.timedHitsContinuous=event.target.checked;shell.refresh()}})}));
-    const view=el("section",{class:"settings-view"},
-      row("AUTO-SORT INVENTORY","Sorts the inventory before the Item screen opens, then runs the normal Item-screen initialization.",autoSort),
-      row("AUTO-SORT MAGIC MENU","Uses the Attack, Restore, Indirect order for every character when the Magic menu opens.",autoSortMagic),
-      row("BETTER CARD","Removes enemies that cannot become cards from Card targeting and disables Card when no valid target exists.",betterCard),
-      row("BETTER TARGETING","Removes the red Target labels.",betterTargeting),
-      row("COMMAND MENU REWORK","Gives each character the fixed four-slot command layout. Requires Monogamy.",fixedCommandMenu),
-      row("DRAW ONCE PER ENEMY","After any party member successfully Draws from an enemy instance, that enemy cannot be Drawn from again during that battle.",drawOnce),
-      row("DROP CHANCE REWORK",dropChanceDescription(),dropChance),
-      row("DROPS AFTER MUG","A successfully Mugged enemy still rolls its normal death drops. Mugging the same enemy twice remains prohibited; its item-slot distribution follows the current Drop Chance setting.",dropsAfterMug),
-      row("ENHANCED ABILITY MENU","Shows unfinished GF abilities first, orders each group by name, and dims completed abilities.",enhancedAbilityMenu),
-      row("ENHANCED SCAN","Clicking the right stick (R3) opens Scan target selection without requiring or consuming Scan Magic and without spending the active character's turn.",scannedTargetScan),
-      row("FAST START","Skips the Square Enix logo movie and the opening credits, then uses the game's normal transition into the main menu.",fastStart),
-      row("FF10-STYLE PARTY SWITCH","Look Left opens the reserve-party selector during an active turn. Confirming a replacement spends that turn.",partySwitch),
-      row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities),
-      row("FORMULAE REWORK","Uses Lexer's reworked battle formulae and opens the Formulae subtab, which previews each formula against a weapon you choose.",formulaeRework,{blocker:settings.formulaeReworkBlocker}),
-      row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl),
-      row("FULL-SCREEN WORLD MAP","R1 opens the full-screen map from the world map; L1 opens the Journal. The base is the game's own world-map textures, always visible. Location names appear once discovered or Journal-revealed, and selecting a location sets a waypoint only. Requires Modern Controls.",worldMapFullscreen,{blocker:settings.worldMapFullscreenBlocker}),
-      row("BATTLE RESULTS ITEM HELP","The battle reward screen shows Item, Quantity and Help columns so every received item's help text is visible at once, using current item text including mod edits.",battleResultsHelp,{blocker:settings.battleResultsHelpBlocker}),
-      row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting),
-      row("GF ACQUISITION REWORK","Awards drawable GFs automatically on winning their vanilla boss fight instead of through Draw, with missed GFs recovered at their Disc 4 boss. Ordinary spell Draw is unaffected, and disabling keeps acquired GFs.",gfAcquisitionRework,{blocker:settings.gfAcquisitionReworkBlocker}),
-      row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars),
-      row("HP BARS","Shows thin red HP bars below the active party's HP numbers in the main menu and in battle. The lost part is black.",hpBars),
-      row("BETTER HP COLORS","Smoothly blends living HP numbers from white at full HP through yellow at 50% and orange at 25% toward red near zero. KO keeps FF8's vanilla display. Applies in battle and the verified shared character menu panels where FF8 already recolours HP.",betterHpColors),
-      row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime),
-      row("INTERACTION INDICATORS","Shows a fixed HUD cue when the field interaction selector has a target. Card-capable Talk scripts add a distinct CARD cue. It never presses a button or starts the interaction for you.",interactionIndicators),
-      row("TIMED HITS","Press Square just before a hit lands. On your attacks, the attack's hit chance sets how much of the input window hits: 75% gives the last 75% of it. The crit chance sets the part of that nearest the hit that crits. Earlier, or no press, misses. On an enemy's attack it is reversed: the enemy misses if you press in the last part of the window, sized by its miss chance. Just before that part the enemy hits normally, and earlier it crits. The crit sound plays for a crit or a dodge, as soon as you press. The first time a character uses an attack, the sound plays when the hit lands instead. With no press, the miss sound plays on a late press or one input window after the hit. Every character uses this timing, Squall included.",timedHitsControl),
-      row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl),
-      row("MODERN CONTROLS",el("div",{},el("p",{},"Modern bindings for battle and the world map. The number is the camera turn rate as a multiple of the shipped speed, from 0.2 to 4."),el("ul",{class:"tweak-bindings"},el("li",{},"Right stick: turns the battle camera while it is idle, and rotates the world map camera. Up tilts the view up. The camera stops level with what it looks at."),el("li",{},"RT / R2 / left mouse button: fire. The gunblade trigger, and Irvine's shots."),el("li",{},"LT / L2 / right mouse button: hold to flee."),el("li",{},"B / Circle / Backspace: end Irvine's Shot early."),el("li",{},"RT and LT on the world map: accelerate and reverse vehicles."))),modernControlsControl,{blocker:settings.modernControlsBlocker}),
-      row("MONOGAMY","Allows one GF on each character. Warning: when gameplay starts, any character who already has several GFs junctioned will have all of those GFs unequipped.",singleGf),
-      row("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
-      row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption),
-      row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval),
-      row("SFX AND MUSIC SLIDERS","In the game's Config menu, Sound becomes SFX and a new Music slider appears under it. SFX works as before and is kept in each save. Music is one setting for the whole game, kept in lexeditor-music-volume.dat in the game folder, and applies straight away. It does not affect music from FFNx's external music option.",splitMusicVolume),
-      row("HIT-FRAME LOG","Diagnostic for Timed Hits and Timed Blocks. While on, every battle animation step is written to lexeditor-hitframe.log in the game folder, so the moment each attack connects can be found. Turn it on, play one or two battles with several different attackers and enemies, then send the log. It slows nothing you would notice but the file grows each battle; turn it off afterwards.",hitFrameLog),
-      row("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic),
-      row("STREAMLINED DRAW","Skips the spell list when only one spell is available and submits the native Stock action directly.",streamlinedDraw),
-      row("TRUE ATB WAIT","Works only when the game is set to ATB Wait mode. Stops all party and enemy ATB filling while any party member is ready to act. Active mode keeps its normal behavior.",trueAtbWait),
-      row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem),
-      row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation),
-      row("XP BARS","Shows thin yellow XP bars below character and GF level rows, including the active and reserve party in the main menu, and on the post-battle report.",xpBars));
-    const settingsView=LexeditorUI.settingsColumns([...view.children],tweakTabProps());
+    const rows=[...(settings.tweaks||[])].sort((a,b)=>(a.schema?.title||a.name).localeCompare(b.schema?.title||b.name));
+    const panels=rows.map(row=>{
+      const schema=row.schema||{fields:[]},blocker=schema.blocker||"";
+      const toggle=el("input",{type:"checkbox",checked:row.enabled,disabled:Boolean(blocker)&&!row.enabled,"aria-label":row.name,onchange:event=>{row.enabled=event.target.checked;shell.refresh()}});
+      toggles.set(row.id,toggle);
+      const body=[];
+      if(row.error)body.push(LexeditorUI.detailNote(row.error));
+      if(row.trust!=="trusted")body.push(LexeditorUI.detailNote(row.trust==="changed"
+        ?"This tweak's script changed since you trusted it, so it will not build until you trust it again."
+        :"This tweak runs its own script when it builds. Trust it only if you know where it came from."),
+        LexeditorUI.actionRow(el("button",{type:"button",onclick:()=>trustTweak(row,true)},"Trust this tweak")));
+      body.push(...schema.fields.filter(field=>!field.hidden).map(field=>tweakField(row,field)));
+      return panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker);
+    });
+    const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
+    const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
+    panels.push(
+      panel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks,[]),
+      panel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic,[]));
+    if(!rows.length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
+    const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
     $("#main").replaceChildren(settingsView);
-    bindSettingDependencies(settingsView,[{
-      key:"singleGf->fixedCommandMenu",
-      dependency:singleGf,
-      dependent:fixedCommandMenu,
-    },{key:"singleGf->gfHpBars",dependency:singleGf,dependent:gfHpBars},{key:"singleGf->gfHpCasting",dependency:singleGf,dependent:gfHpCasting},{key:"noMagicConsumption->gfHpCasting",dependency:noMagicConsumption,dependent:gfHpCasting}]);
+    bindSettingDependencies(settingsView,rows.flatMap(row=>(row.schema?.requires||[]).filter(need=>toggles.has(need))
+      .map(need=>({key:`${need}->${row.id}`,dependency:toggles.get(need),dependent:toggles.get(row.id)}))));
   }
 
   async function loadReshade(){
@@ -214,20 +138,6 @@
   function renderPlatformSettings(){
     $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
   }
-  function dropChanceDescription(){
-    // Weights out of 256, from drop_chance.py.
-    const vanilla={normal:[178,51,15,12],rare:[128,114,14,0]},rework={normal:[137,68,34,17],rare:[94,70,53,39]};
-    const percent=value=>`${(value/256*100).toFixed(1)}%`;
-    const change=(before,after)=>LexeditorUI.badge(`${percent(before)} → ${percent(after)}`,{tone:before===0?"warning":""});
-    return el("div",{},
-      el("p",{},el("strong",{},"Fixes a vanilla bug: "),"with the Rare Item ability, the fourth loot slot - usually the rarest item an enemy has - can never drop or be Mugged. The rework makes it reachable again and evens out the odds of the rarer slots, with and without Rare Item."),
-      columnList({class:"drop-chance-table","aria-label":"Drop Chance slot probabilities, vanilla to rework",
-        rows:[0,1,2,3].map(index=>({key:index,slot:index+1,normal:index,rare:index})),
-        key:entry=>entry.key, localSort:false, template:'48px minmax(0,1fr) minmax(0,1fr)',
-        columns:[{key:"slot",label:"Slot"},
-          {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
-          {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
-  }
   const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
   // The subtab stays visible and openable even while its owning switch cannot
   // be turned on - the same treatment GFs -> Spellbook uses. A tab that goes
@@ -245,21 +155,23 @@
   function formulaInput(label,key,min,max,step=1){return detailField({label,control:numberControl(state.formula[key],min,max,step,value=>{state.formula[key]=value})})}
   function renderFormulae(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
-    const f=state.formula,weapons=state.data.weapons?.rows||[],settings=state.data.settings;
+    const f=state.formula,weapons=state.data.weapons?.rows||[],formulaeMod=tweakMod("formulae-rework"),rework=tweakOn("formulae-rework");
+    const formulaRows=formulaeMod?.describe?.formulas||[];
+    const formulaeBlocker=formulaeMod?(formulaeMod.describe?.blocker||formulaeMod.schema?.blocker||""):"Install the Formulae Rework tweak mod to preview its formulae.";
     if(!weapons.some(row=>Number(row.id)===Number(f.weaponId)))f.weaponId=weapons[0]?.id??0;
     const weapon=weapons.find(row=>Number(row.id)===Number(f.weaponId)),weaponField=name=>weapon?.fields?.find(field=>field.field===name),fieldValue=name=>Number(weaponField(name)?.value??0);
     // The owning toggle lives in the Tweaks Gameplay list; this subtab unlocks
     // only while it is enabled, so no second toggle lives here.
     const preset=()=>detailField({label:"Weapon preset",control:selectControl(f.weaponId,weapons.map(row=>({id:row.id,name:row.name})),value=>{f.weaponId=value;renderFormulae()})});
     const formulaTerm=(name,label,help)=>{const field=weaponField(name);return field?detailField({label,help:infoHelp(help),control:fieldSourceControl(field,"weapons",weapon.id)}):null};
-    const boost=()=>state.data.settings.flyingEvaEnabled?state.data.settings.flyingEvaBonus:0;
+    const boost=()=>tweakOn("flying-eva")?Number(tweakValues("flying-eva").bonus??0):0;
     const reworkedMelee=()=>{const raw=Math.trunc(Number(f.strength)*fieldValue("str_bonus")*fieldValue("attack_power")*5/100);return Math.max(0,Math.trunc(raw*(100-Math.min(75,Number(f.vitality)))/100))};
-    const calculate=()=>{const strength=Math.min(255,Math.max(0,Math.trunc(Number(f.strength)+fieldValue("str_bonus")))),inner=Math.trunc((265-Number(f.vitality))*(strength+Math.trunc(strength*strength/16))/256),middle=Math.max(0,Math.trunc(fieldValue("attack_power")*inner/16)),low=Math.max(0,Math.trunc(middle*240/256)),average=Math.max(0,middle),high=Math.max(0,Math.trunc(middle*272/256)),flyingPenalty=f.flying&&Boolean(fieldValue("melee"))&&!f.float?boost():0,luckTerm=settings.formulaeRework?Number(f.luck):Math.floor(Number(f.luck)/2),effective=Math.max(0,Math.min(100,fieldValue("hit_rate")+luckTerm-Number(f.eva)-Number(f.targetLuck)-flyingPenalty)),chance=Math.max(0,Math.min(100,(Math.floor(255*effective/100)+1)/256*100));if(settings.formulaeRework){const fixed=reworkedMelee();return{low:fixed,average:fixed,high:fixed,flyingPenalty,chance}}return{low,average,high,flyingPenalty,chance}};
+    const calculate=()=>{const strength=Math.min(255,Math.max(0,Math.trunc(Number(f.strength)+fieldValue("str_bonus")))),inner=Math.trunc((265-Number(f.vitality))*(strength+Math.trunc(strength*strength/16))/256),middle=Math.max(0,Math.trunc(fieldValue("attack_power")*inner/16)),low=Math.max(0,Math.trunc(middle*240/256)),average=Math.max(0,middle),high=Math.max(0,Math.trunc(middle*272/256)),flyingPenalty=f.flying&&Boolean(fieldValue("melee"))&&!f.float?boost():0,luckTerm=rework?Number(f.luck):Math.floor(Number(f.luck)/2),effective=Math.max(0,Math.min(100,fieldValue("hit_rate")+luckTerm-Number(f.eva)-Number(f.targetLuck)-flyingPenalty)),chance=Math.max(0,Math.min(100,(Math.floor(255*effective/100)+1)/256*100));if(rework){const fixed=reworkedMelee();return{low:fixed,average:fixed,high:fixed,flyingPenalty,chance}}return{low,average,high,flyingPenalty,chance}};
     const checkbox=(label,key)=>detailField({label,control:el("input",{type:"checkbox",checked:f[key],onchange:event=>{f[key]=event.target.checked;updateOutputs()}})});
     const damageOutput=LexeditorUI.detailNote(""),accuracyOutput=LexeditorUI.detailNote("");
     const section=(title,body)=>detailSection({title,body});
     const damage=section("PHYSICAL DAMAGE",[
-      preset(),section("FORMULA",settings.formulaeRework?[
+      preset(),section("FORMULA",rework?[
         LexeditorUI.mathFormula("DAMAGE = floor(STR * STR BONUS * POWER * 5 / 100) * (100 - min(75, VIT)) / 100"),
         LexeditorUI.mathFormula("ENEMIES: STR BONUS = 1 and POWER = the ability's attack power")]:[
         LexeditorUI.mathFormula("STR = min(255, attacker STR + weapon STR bonus)"),
@@ -269,8 +181,8 @@
         formulaTerm("attack_power","Weapon attack power","The selected weapon's stored attack power."),
         formulaTerm("str_bonus","Weapon STR bonus","The selected weapon's stored Strength bonus.")]),
       section("PREVIEW INPUTS",[formulaInput("Attacker STR","strength",0,255),formulaInput("Target VIT","vitality",0,255)]),damageOutput]);
-    const flyingTerm=sourceControl(unitField(numberControl(boost(),0,100,1,value=>state.data.settings.flyingEvaBonus=value),"%"),()=>state.data.settings.flyingEvaBonus,DEFAULT_FLYING_EVA_BONUS,[],value=>state.data.settings.flyingEvaBonus=Number(value),value=>`${formatNumber(value)}%`);
-    const accuracyLuck=settings.formulaeRework?"attacker LUCK":"floor(attacker LUCK / 2)";
+    const flyingTerm=sourceControl(unitField(numberControl(boost(),0,100,1,value=>tweakValues("flying-eva").bonus=value),"%"),()=>tweakValues("flying-eva").bonus,DEFAULT_FLYING_EVA_BONUS,[],value=>tweakValues("flying-eva").bonus=Number(value),value=>`${formatNumber(value)}%`);
+    const accuracyLuck=rework?"attacker LUCK":"floor(attacker LUCK / 2)";
     const accuracy=detailSection({title:"PHYSICAL ACCURACY",
       help:infoHelp("A hit rate of 255 does not always hit here. It goes through this formula like any other value."),body:[
       preset(),
@@ -286,7 +198,6 @@
     // The backend owns the complete requested inventory and each row's runtime
     // status. A formula cannot disappear from this page merely because its native
     // implementation is unfinished.
-    const formulaRows=settings.formulaeReworkFormulas||[];
     const reworkCard=formula=>detailSection({title:`${String(formula.name||formula.id).toUpperCase()} · ${formula.status==="implemented"?"IMPLEMENTED":"INCOMPLETE"}`,
       attrs:{"data-formula-id":formula.id},body:[
         section("REWORKED",LexeditorUI.mathFormula(formula.replacement||"Not specified")),
@@ -295,11 +206,10 @@
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
     const master=detailSection({title:"FORMULAE REWORK",
-      help:infoHelp(`${implementedCount} of the ${formulaRows.length} requested formulae have a game patch.`),body:[
+      help:infoHelp(`${implementedCount} of the ${formulaRows.length} requested formulae have a game patch. ${rework?"Formulae Rework is enabled. The previews use the reworked formulas.":"Formulae Rework is disabled. The previews use the vanilla formulas."}`),body:[
       // The blocker comes from the module that owns the switch, so this page
       // cannot disagree with the row that cannot turn it on.
-      LexeditorUI.detailNote(settings.formulaeReworkBlocker
-        || "Formulae Rework is on: every listed formula has a guarded game patch, so what the previews below show is what the game runs.")]})
+      formulaeBlocker?LexeditorUI.detailNote(formulaeBlocker):null].filter(Boolean)})
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
     // The stacked damage, accuracy and per-formula cards run taller than the
