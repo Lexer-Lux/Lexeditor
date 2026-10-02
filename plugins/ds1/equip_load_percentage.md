@@ -28,7 +28,7 @@ Do not remove the original backup while this patch is enabled.
 | Original size | 50,286,344 bytes |
 | Original SHA-256 | `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b` |
 | Patched size | 51,675,648 bytes |
-| Patched SHA-256 | `a5a68e2ab5439390fff74073a9f3a027d47dfded2e9200c70d36c182bb5c43f9` |
+| Patched SHA-256 | `a1cf3ba8dc98419f67682bbd9f5af4f8c564bf512ba47a7f1fa94670b1d43290` |
 | Preferred image base | `0x140000000` |
 | Native hook RVA / file offset | `0x6b3e58` / `0x6b3258` |
 | Added code RVA / file offset | `0x319e000` / `0x2ff5800` |
@@ -52,8 +52,9 @@ These associations are static evidence, not a report of runtime observation.
 The island keeps R8/R9, the already formatted current/max strings, unchanged.
 It computes `100 * current / maximum` as a double, choosing the same nonnegative
 preview overrides. Negative zero in an override is normalized to zero.
-Invalid selected values or a nonpositive maximum fall back to the original
-format without dividing.
+Invalid selected values, a nonpositive maximum, or a subnormal maximum fall
+back to the original format without dividing. Subnormal denominators could
+otherwise become zero when the caller enables denormals-are-zero (DAZ).
 
 The extra variadic double goes at `[rsp+0x20]`. RDX becomes the authored
 UTF-16 format `%s/%s (%.1f%%)`. A direct jump resumes at RVA `0x6b3e5f`, before
@@ -120,6 +121,20 @@ bytes for known cases and 200 deterministic random float32 input pairs, checking
 the result, arguments, nonvolatile registers, stack pointer and immutable
 snapshot. This does not execute the game's formatter or Windows loader. That
 harness is explicitly skipped on other platforms.
+
+A second harness, `test_ds1_pe_payload_abi.py`, executes the same production
+island on x64 Windows and Linux without requiring an assembler. Its test-only
+ABI adapter has reproducible assembly for both platforms. It runs 2,060 bit
+patterns in each of five MXCSR modes (10,300 cases), including DAZ/FTZ, directed
+rounding, NaNs, infinity, negative zero and subnormal values. It verifies the
+original string arguments, outgoing stack slot, unchanged snapshot and stack
+pointer, and MXCSR control bits. Code pages become read/execute before use;
+Windows instruction-cache flushing is checked. This is a synthetic native-code
+test, not game startup or rendering acceptance.
+
+```sh
+python -m pytest -q tests/ds1/test_ds1_pe_payload_abi.py
+```
 
 `ds1_tweaks_browser_check.py` uses the real shared controls and synthetic
 parameter archive to test the settings API, save/discard behavior, unsupported

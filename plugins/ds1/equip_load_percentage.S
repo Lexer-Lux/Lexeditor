@@ -33,8 +33,9 @@ maximum_ready:
     js vanilla
     cmp r10d, 0x7f800000
     jae vanilla
-    test r11d, r11d
-    jle vanilla
+    /* Subnormal maxima can become zero when the game enables DAZ. */
+    cmp r11d, 0x00800000
+    jb vanilla
     cmp r11d, 0x7f800000
     jae vanilla
     movd xmm0, r10d
