@@ -1,4 +1,14 @@
-"""Structured FF8 gameplay settings and the verified FFNx Hext patch."""
+"""FF8 gameplay tweaks: library tweak mods plus the project's own runtime data.
+
+Every gameplay tweak is a tweak mod in the mod library (plugins/ff8/
+tweak_mods.py builds them). What stays here is what is not a tweak:
+
+- the project's data features that the editor itself authors: Shared Party
+  Magic Inventory (direct/lexeditor/gameplay.toml) and GF Spellbooks;
+- the Lexeditor FFNx derivative those features and several tweaks run on,
+  and the FFNx.toml keys enabled tweaks ask for;
+- the one transaction that applies all of that, then composes the runtime.
+"""
 
 from __future__ import annotations
 
@@ -8,115 +18,46 @@ from pathlib import Path
 import re
 import time
 
+from core import script_mods
+
 from . import paths, formats
 from . import ffnx_manager
 from . import runtime_layout
-from . import inventory_auto_sort
-from . import world_map_fullscreen_issue_90
-from . import battle_results_issue_466
-from . import gf_acquisition_rework
-from . import menu_qol_issue_61
-from . import single_gf
-from . import battle_shortcuts
-from . import party_switch_issue_62
-from . import battle_issue_54
-from . import better_card
-from . import fixed_command_menu
-from . import true_atb_wait_issue_63
-from . import flying_eva
-from . import gf_hp_casting
-from . import character_growth
-from . import luck_accuracy
-from . import modern_controls_issue_65
-from . import vibration_consolidation_issue_66
-from . import better_targeting_issue_64
-from . import damage_limit
-from . import hit_frame_log
-from . import music_volume_issue_498
-from . import magic_damage_rework
-from . import melee_damage_rework
-from . import mug_chance_rework
-from . import status_chance_rework
-from . import no_magic_consumption as no_magic_consumption_patch
-from . import fast_start
-from . import streamlined_draw
-from . import healing_rework
-from . import formulae_rework as formulae_rework_contract
-from . import flat_stat_abilities
-from . import max_spell
-from . import timed_hits
-from . import mug_drops
-from . import drop_chance
+from . import tweak_mods
 from .ffnx_issue_51 import runtime_config as shared_magic_runtime_config
 
 
-DEFAULT_FLYING_EVA_BONUS = 25
-DEFAULT_FLYING_EVA_ENABLED = False
-DEFAULT_AUTO_SORT_INVENTORY = inventory_auto_sort.DEFAULT_AUTO_SORT_INVENTORY
-DEFAULT_AUTO_SORT_MAGIC = menu_qol_issue_61.DEFAULT_AUTO_SORT_MAGIC
-DEFAULT_ENHANCED_ABILITY_MENU = menu_qol_issue_61.DEFAULT_ENHANCED_ABILITY_MENU
-DEFAULT_SINGLE_GF = single_gf.DEFAULT_SINGLE_GF
-DEFAULT_UNIVERSAL_ITEM = battle_shortcuts.DEFAULT_UNIVERSAL_ITEM
-DEFAULT_SCANNED_TARGET_SCAN = battle_shortcuts.DEFAULT_SCANNED_TARGET_SCAN
-DEFAULT_PARTY_SWITCH = party_switch_issue_62.DEFAULT_PARTY_SWITCH
-DEFAULT_DRAW_ONCE_PER_ENEMY = battle_issue_54.DEFAULT_DRAW_ONCE_PER_ENEMY
-DEFAULT_BETTER_CARD = better_card.DEFAULT_BETTER_CARD
-DEFAULT_FIXED_COMMAND_MENU = False
-DEFAULT_TRUE_ATB_WAIT = true_atb_wait_issue_63.DEFAULT_TRUE_ATB_WAIT
-DEFAULT_FORMULAE_REWORK = False
-DEFAULT_MODERN_CONTROLS = modern_controls_issue_65.DEFAULT_MODERN_CONTROLS
-DEFAULT_WORLD_MAP_FULLSCREEN = world_map_fullscreen_issue_90.DEFAULT_WORLD_MAP_FULLSCREEN
-DEFAULT_BATTLE_RESULTS_HELP = battle_results_issue_466.DEFAULT_BATTLE_RESULTS_HELP
-DEFAULT_GF_ACQUISITION_REWORK = gf_acquisition_rework.DEFAULT_GF_ACQUISITION_REWORK
-DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
-MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
-MAXIMUM_CAMERA_SPEED = modern_controls_issue_65.MAXIMUM_CAMERA_SPEED
-DEFAULT_VIBRATION_CONSOLIDATION = vibration_consolidation_issue_66.DEFAULT_VIBRATION_CONSOLIDATION
-DEFAULT_BETTER_TARGETING = better_targeting_issue_64.DEFAULT_BETTER_TARGETING
-DEFAULT_DAMAGE_LIMIT_REMOVAL = damage_limit.DEFAULT_DAMAGE_LIMIT_REMOVAL
-DEFAULT_HIT_FRAME_LOG = hit_frame_log.DEFAULT_HIT_FRAME_LOG
-DEFAULT_SPLIT_MUSIC_VOLUME = music_volume_issue_498.DEFAULT_SPLIT_MUSIC_VOLUME
-DEFAULT_FAST_START = fast_start.DEFAULT_FAST_START
-DEFAULT_STREAMLINED_DRAW = streamlined_draw.DEFAULT_STREAMLINED_DRAW
 DEFAULT_SHARED_MAGIC_INVENTORY = False
-DEFAULT_XP_BARS = False
-DEFAULT_HP_BARS = False
-DEFAULT_BETTER_HP_COLORS = False
-DEFAULT_GF_HP_BARS = False
-DEFAULT_INGAME_TIME = menu_qol_issue_61.DEFAULT_INGAME_TIME
-DEFAULT_INTERACTION_INDICATORS = False
-DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
-DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
-DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
-# These are the Tweaks shown by the current editor. They remain off by default.
-ACCEPTED_TWEAKS = frozenset({
-    "flyingEvaEnabled", "autoSortInventory", "autoSortMagic",
-    "enhancedAbilityMenu", "singleGf", "universalItem", "scannedTargetScan",
-    "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
-    "streamlinedDraw", "formulaeRework", "betterCard", "fixedCommandMenu", "trueAtbWait",
-    "modernControls", "worldMapFullscreen", "gfAcquisitionRework", "vibrationConsolidation", "betterTargeting",
-    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
-    "interactionIndicators",
-    "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
-    "dropChance", "gfHpCasting", "battleResultsHelp", "hitFrameLog", "splitMusicVolume",
-    "timedHits",
-})
-MIN_FLYING_EVA_BONUS = 0
-MAX_FLYING_EVA_BONUS = 100
-SUPPORTED_EXE_SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
+DEFAULT_MAX_SPELL = 100
+DEFAULT_CAMERA_SPEED = 1.0
+SUPPORTED_EXE_SHA256 = tweak_mods.SUPPORTED_EXE_SHA256
+# The single combined patch every gameplay tweak used to share. Saving
+# removes it, because each tweak mod now ships its own patch.
 PATCH_NAME = "Lexeditor.FLYING_EVA.txt"
 FFNX_HEXT_SUFFIX = Path("ff8") / "en_nv"
+# Driver switches Lexeditor owns in FFNx.toml. A tweak mod turns one on; every
+# switch no enabled mod asks for is written off, so disabling a mod disables
+# its driver feature.
+FFNX_DEFAULTS = {
+    "enable_ff8_xp_bars": False,
+    "enable_ff8_hp_bars": False,
+    "enable_ff8_better_hp_colors": False,
+    "enable_ff8_gf_hp_bars": False,
+    "enable_ff8_ingame_time": False,
+    "enable_ff8_interaction_indicators": False,
+    "enable_ff8_better_targeting": False,
+    "enable_ff8_fast_start": False,
+    "enable_ff8_modern_controls": False,
+    "enable_ff8_party_switch": False,
+    # No Magic Consumption is a Hext patch; the driver's copy stays off so only
+    # one of them ever hooks the debit.
+    "enable_ff8_no_magic_consumption": False,
+    "ff8_modern_controls_camera_speed": DEFAULT_CAMERA_SPEED,
+}
+FFNX_KEY = re.compile(r"^(?:enable_ff8|ff8)_[a-z0-9_]+$")
 _last_activation_ns = 0
+_last_patches: list[Path] = []
 
-# FF8_EN.exe 2013 Steam EN, SHA-256 above.
-ALWAYS_HIT_BRANCH = 0x00492E66
-HIT_FORMULA_HOOK = 0x00492EF5
-CODE_CAVE = 0x0279EF00
-CODE_CAVE_LENGTH = len(flying_eva.build_payload(0))
-SINGLE_GF_CAVE = 0x0279EF60
-
-# Flying EVA shares this reserved block with Monogamy; its payload must fit.
-assert CODE_CAVE_LENGTH <= SINGLE_GF_CAVE - CODE_CAVE
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -124,20 +65,6 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def _bounded_bonus(value) -> int:
-    if isinstance(value, bool):
-        raise ValueError("Flying EVA Bonus must be a whole number from 0 to 100")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError("Flying EVA Bonus must be a whole number from 0 to 100") from error
-    if str(value).strip() not in {str(result), f"{result}.0"}:
-        raise ValueError("Flying EVA Bonus must be a whole number from 0 to 100")
-    if not MIN_FLYING_EVA_BONUS <= result <= MAX_FLYING_EVA_BONUS:
-        raise ValueError("Flying EVA Bonus must be from 0 to 100")
-    return result
 
 
 def _boolean(value, label: str) -> bool:
@@ -151,39 +78,8 @@ def settings_path(project_root: Path | None = None) -> Path:
 
 
 def patch_path(project_root: Path | None = None) -> Path:
-    # FFNx treats hext_patching_path as a base directory. It always appends the
-    # game and detected executable edition before it scans files. The supported
-    # Steam executable is FFNx's English Nvidia build, so it scans ff8/en_nv.
+    """Where the retired combined patch lived, so saving can remove it."""
     return (project_root or paths.PROJECT_ROOT) / "hext" / FFNX_HEXT_SUFFIX / PATCH_NAME
-
-
-def runtime_patch_path(runtime_root: Path | None = None) -> Path:
-    """Return the logical pre-composition path for the generated patch."""
-    return (runtime_root or paths.RUNTIME_ROOT) / "hext" / FFNX_HEXT_SUFFIX / PATCH_NAME
-
-
-def materialized_runtime_patch_path(runtime_root: Path | None = None) -> Path:
-    """Resolve this editable mod's ordered filename from composition.json."""
-    active = Path(runtime_root or paths.RUNTIME_ROOT).resolve()
-    logical = runtime_patch_path(active).relative_to(active).as_posix()
-    manifest = runtime_layout.read(active)
-    selected_ids = {
-        str(row.get("id")) for row in manifest.get("mods", [])
-        if row.get("selected") is True
-    }
-    matches = []
-    for row in manifest.get("files", []):
-        if str(row.get("sourcePath") or row.get("path")).casefold() != logical.casefold():
-            continue
-        if selected_ids and str(row.get("winner")) not in selected_ids:
-            continue
-        candidate = (active / str(row.get("path", ""))).resolve()
-        if candidate == active or active not in candidate.parents:
-            raise RuntimeError("The composed gameplay patch path escapes the FF8 runtime")
-        matches.append(candidate)
-    if len(matches) > 1:
-        raise RuntimeError("The FF8 composition contains more than one editable gameplay patch")
-    return matches[0] if matches else runtime_patch_path(active).resolve()
 
 
 def legacy_patch_path(project_root: Path | None = None) -> Path:
@@ -192,7 +88,7 @@ def legacy_patch_path(project_root: Path | None = None) -> Path:
 
 
 def obsolete_english_patch_path(project_root: Path | None = None) -> Path:
-    """Return the wrong non-Nvidia path used by the previous contract."""
+    """Return the wrong non-Nvidia path used by an older contract."""
     return (project_root or paths.PROJECT_ROOT) / "hext" / "ff8" / "en" / PATCH_NAME
 
 
@@ -204,10 +100,16 @@ def _runtime_root(value: Path | None = None,
         project = Path(project_root).resolve()
         if project != paths.PROJECT_ROOT.resolve():
             # Explicit temporary/test projects must never compose into the
-            # player's real active runtime. The private child is not copied,
-            # because composition reads only direct/ and hext/.
+            # player's real active runtime.
             return project / ".lexeditor-runtime"
     return paths.RUNTIME_ROOT.resolve()
+
+
+def _mods_root(project: Path) -> Path:
+    # A temporary project brings its own library when it has one, so a test
+    # never builds or enables the reader's real mods.
+    private = project / ".lexeditor-mods"
+    return private if private.is_dir() else paths.MODS_ROOT
 
 
 def _shared_magic_payload(project: Path, game: Path,
@@ -223,9 +125,7 @@ def _shared_magic_payload(project: Path, game: Path,
         configured = False
         config_error = str(error)
     # A verified package makes the request selectable. Launch then installs
-    # and verifies that package before FF8 starts. Requiring an installed
-    # runtime here creates a circular gate: the runtime is installed only
-    # after the user can select and save the request.
+    # and verifies that package before FF8 starts.
     package_available = bool(runtime.get("sharedMagicInventoryPackageAvailable"))
     installed = bool(runtime.get("sharedMagicInventoryRuntime"))
     return {
@@ -259,604 +159,44 @@ def _validate_shared_magic_launch(project: Path, game: Path,
     return enabled
 
 
+def _stored(project: Path) -> dict:
+    try:
+        data = json.loads(settings_path(project).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _tweak_payload(project: Path, game: Path) -> list[dict]:
+    """Every tweak mod as the Tweaks page shows it; trusted ones may describe more."""
+    rows = []
+    for row in tweak_mods.tweak_rows(project, _mods_root(project)):
+        entry = {key: row.get(key) for key in (
+            "id", "name", "order", "enabled", "trust", "error", "schema", "values", "path")}
+        entry["describe"] = {}
+        if row.get("trust") == "trusted" and not row.get("error"):
+            try:
+                context = tweak_mods.BuildContext(game, paths.BASELINE_ROOT, {})
+                entry["describe"] = script_mods.describe(Path(row["path"]), context)
+            except Exception as error:  # A broken describe() must not hide the page.
+                entry["error"] = f"describe(): {error}"
+        rows.append(entry)
+    return rows
+
+
 def load(project_root: Path | None = None, game_root: Path | None = None,
          runtime_root: Path | None = None) -> dict:
-    target = settings_path(project_root)
     project = (project_root or paths.PROJECT_ROOT).resolve()
     game = (game_root or paths.GAME_ROOT).resolve()
-    data = {}
-    if target.is_file():
-        try:
-            data = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            data = {}
-    try:
-        bonus = _bounded_bonus(data.get("flyingEvaBonus", DEFAULT_FLYING_EVA_BONUS))
-    except ValueError:
-        bonus = DEFAULT_FLYING_EVA_BONUS
-    # A stored numeric bonus is configuration, not consent to activate the
-    # gameplay patch. Old projects which predate the explicit toggle remain off.
-    flying_enabled = data.get("flyingEvaEnabled", DEFAULT_FLYING_EVA_ENABLED)
-    if not isinstance(flying_enabled, bool):
-        flying_enabled = DEFAULT_FLYING_EVA_ENABLED
-    auto_sort = data.get("autoSortInventory", DEFAULT_AUTO_SORT_INVENTORY)
-    if not isinstance(auto_sort, bool):
-        auto_sort = DEFAULT_AUTO_SORT_INVENTORY
-    auto_sort_magic = data.get("autoSortMagic", DEFAULT_AUTO_SORT_MAGIC)
-    if not isinstance(auto_sort_magic, bool):
-        auto_sort_magic = DEFAULT_AUTO_SORT_MAGIC
-    enhanced_ability_menu = data.get(
-        "enhancedAbilityMenu", DEFAULT_ENHANCED_ABILITY_MENU,
-    )
-    if not isinstance(enhanced_ability_menu, bool):
-        enhanced_ability_menu = DEFAULT_ENHANCED_ABILITY_MENU
-    single_gf = data.get("singleGf", DEFAULT_SINGLE_GF)
-    if not isinstance(single_gf, bool):
-        single_gf = DEFAULT_SINGLE_GF
-    universal_item = data.get("universalItem", DEFAULT_UNIVERSAL_ITEM)
-    if not isinstance(universal_item, bool):
-        universal_item = DEFAULT_UNIVERSAL_ITEM
-    scanned_target_scan = data.get("scannedTargetScan", DEFAULT_SCANNED_TARGET_SCAN)
-    if not isinstance(scanned_target_scan, bool):
-        scanned_target_scan = DEFAULT_SCANNED_TARGET_SCAN
-    if not battle_shortcuts.ENHANCED_SCAN_AVAILABLE:
-        scanned_target_scan = False
-    party_switch = data.get("partySwitch", DEFAULT_PARTY_SWITCH)
-    if not isinstance(party_switch, bool):
-        party_switch = DEFAULT_PARTY_SWITCH
-    if not party_switch_issue_62.PARTY_SWITCH_AVAILABLE:
-        party_switch = False
-    draw_once = data.get("drawOncePerEnemy", DEFAULT_DRAW_ONCE_PER_ENEMY)
-    if not isinstance(draw_once, bool):
-        draw_once = DEFAULT_DRAW_ONCE_PER_ENEMY
-    streamlined_draw_enabled = data.get(
-        "streamlinedDraw", DEFAULT_STREAMLINED_DRAW,
-    )
-    if not isinstance(streamlined_draw_enabled, bool):
-        streamlined_draw_enabled = DEFAULT_STREAMLINED_DRAW
-    formulae_rework = data.get("formulaeRework")
-    if not isinstance(formulae_rework, bool):
-        # The two short-lived legacy switches (spellHealingRework,
-        # fullLuckAccuracy) each changed one formula. The rework now changes
-        # seven, so an old mod that had one of them on stays off rather than
-        # silently taking every formula change; the reader turns it on.
-        formulae_rework = DEFAULT_FORMULAE_REWORK
-    better_card_enabled = data.get("betterCard", DEFAULT_BETTER_CARD)
-    if not isinstance(better_card_enabled, bool):
-        better_card_enabled = DEFAULT_BETTER_CARD
-    fixed_command_menu_enabled = data.get(
-        "fixedCommandMenu", data.get("irvineShoot", DEFAULT_FIXED_COMMAND_MENU),
-    )
-    if not isinstance(fixed_command_menu_enabled, bool):
-        fixed_command_menu_enabled = DEFAULT_FIXED_COMMAND_MENU
-    if not single_gf:
-        fixed_command_menu_enabled = False
-    true_atb_wait = data.get("trueAtbWait", DEFAULT_TRUE_ATB_WAIT)
-    if not isinstance(true_atb_wait, bool):
-        true_atb_wait = DEFAULT_TRUE_ATB_WAIT
-    modern_controls = data.get("modernControls", DEFAULT_MODERN_CONTROLS)
-    if not isinstance(modern_controls, bool):
-        modern_controls = DEFAULT_MODERN_CONTROLS
-    if not modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE:
-        modern_controls = False
-    world_map_fullscreen = data.get(
-        "worldMapFullscreen", DEFAULT_WORLD_MAP_FULLSCREEN)
-    if not isinstance(world_map_fullscreen, bool):
-        world_map_fullscreen = DEFAULT_WORLD_MAP_FULLSCREEN
-    if not modern_controls:
-        world_map_fullscreen = False
-    if not world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE:
-        world_map_fullscreen = False
-    battle_results_help = data.get(
-        "battleResultsHelp", DEFAULT_BATTLE_RESULTS_HELP)
-    if not isinstance(battle_results_help, bool):
-        battle_results_help = DEFAULT_BATTLE_RESULTS_HELP
-    if not battle_results_issue_466.BATTLE_RESULTS_HELP_AVAILABLE:
-        battle_results_help = False
-    gf_acquisition_rework_enabled = data.get(
-        "gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK)
-    if not isinstance(gf_acquisition_rework_enabled, bool):
-        gf_acquisition_rework_enabled = DEFAULT_GF_ACQUISITION_REWORK
-    if not gf_acquisition_rework.GF_ACQUISITION_AVAILABLE:
-        gf_acquisition_rework_enabled = False
-    camera_speed = data.get("cameraSpeed", DEFAULT_CAMERA_SPEED)
-    try:
-        camera_speed = float(camera_speed)
-    except (TypeError, ValueError):
-        camera_speed = DEFAULT_CAMERA_SPEED
-    if not camera_speed > 0:
-        camera_speed = DEFAULT_CAMERA_SPEED
-    camera_speed = round(
-        min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed)), 2)
-    vibration_consolidation = data.get(
-        "vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION,
-    )
-    if not isinstance(vibration_consolidation, bool):
-        vibration_consolidation = DEFAULT_VIBRATION_CONSOLIDATION
-    better_targeting = data.get("betterTargeting", DEFAULT_BETTER_TARGETING)
-    if not isinstance(better_targeting, bool):
-        better_targeting = DEFAULT_BETTER_TARGETING
-    damage_limit_removal = data.get(
-        "damageLimitRemoval", DEFAULT_DAMAGE_LIMIT_REMOVAL,
-    )
-    if not isinstance(damage_limit_removal, bool):
-        damage_limit_removal = DEFAULT_DAMAGE_LIMIT_REMOVAL
-    hit_frame_log_enabled = data.get("hitFrameLog", DEFAULT_HIT_FRAME_LOG)
-    if not isinstance(hit_frame_log_enabled, bool):
-        hit_frame_log_enabled = DEFAULT_HIT_FRAME_LOG
-    split_music_volume = data.get("splitMusicVolume", DEFAULT_SPLIT_MUSIC_VOLUME)
-    if not isinstance(split_music_volume, bool):
-        split_music_volume = DEFAULT_SPLIT_MUSIC_VOLUME
-    fast_start_enabled = data.get("fastStart", DEFAULT_FAST_START)
-    if not isinstance(fast_start_enabled, bool):
-        fast_start_enabled = DEFAULT_FAST_START
-    xp_bars = data.get("xpBars", DEFAULT_XP_BARS)
-    if not isinstance(xp_bars, bool):
-        xp_bars = DEFAULT_XP_BARS
-    hp_bars = data.get("hpBars", DEFAULT_HP_BARS)
-    if not isinstance(hp_bars, bool):
-        hp_bars = DEFAULT_HP_BARS
-    better_hp_colors = data.get("betterHpColors", DEFAULT_BETTER_HP_COLORS)
-    if not isinstance(better_hp_colors, bool):
-        better_hp_colors = DEFAULT_BETTER_HP_COLORS
-    gf_hp_bars = data.get("gfHpBars", DEFAULT_GF_HP_BARS)
-    if not isinstance(gf_hp_bars, bool):
-        gf_hp_bars = DEFAULT_GF_HP_BARS
-    in_game_time = data.get("inGameTime", DEFAULT_INGAME_TIME)
-    if not isinstance(in_game_time, bool):
-        in_game_time = DEFAULT_INGAME_TIME
-    interaction_indicators = data.get(
-        "interactionIndicators", DEFAULT_INTERACTION_INDICATORS,
-    )
-    if not isinstance(interaction_indicators, bool):
-        interaction_indicators = DEFAULT_INTERACTION_INDICATORS
-    no_magic_consumption = data.get("noMagicConsumption") is True
-    gf_casting = data.get("gfHpCasting") is True
-    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
-    drops_after_mug = data.get("dropsAfterMug") is True
-    drop_chance_enabled = data.get("dropChance") is True
-    flat_stat_abilities_enabled = data.get(
-        "flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES,
-    )
-    if not isinstance(flat_stat_abilities_enabled, bool):
-        flat_stat_abilities_enabled = DEFAULT_FLAT_STAT_ABILITIES
-    max_spell_enabled = data.get("maxSpellEnabled", DEFAULT_MAX_SPELL_ENABLED)
-    if not isinstance(max_spell_enabled, bool):
-        max_spell_enabled = DEFAULT_MAX_SPELL_ENABLED
-    try:
-        max_spell_value = max_spell.bounded_limit(
-            data.get("maxSpell", DEFAULT_MAX_SPELL),
-        )
-    except ValueError:
-        max_spell_value = DEFAULT_MAX_SPELL
-    timed_hits_enabled = data.get("timedHits", timed_hits.DEFAULT_TIMED_HITS)
-    if not isinstance(timed_hits_enabled, bool):
-        timed_hits_enabled = timed_hits.DEFAULT_TIMED_HITS
-    timed_hits_options = timed_hits.options(data, strict=False)
-    # A formula description is not an implementation. Keep the owning toggle
-    # off until every row in the central Formulae Rework contract has a real
-    # guarded runtime component.
-    if not formulae_rework_contract.available():
-        formulae_rework = False
-    shared_magic = _shared_magic_payload(project, game, runtime_root)
+    tweaks = _tweak_payload(project, game)
+    enabled = {row["id"] for row in tweaks if row["enabled"]}
     return {
-        "flyingEvaBonus": bonus,
-        "flyingEvaEnabled": flying_enabled,
-        "autoSortInventory": auto_sort,
-        "autoSortMagic": auto_sort_magic,
-        "enhancedAbilityMenu": enhanced_ability_menu,
-        "singleGf": single_gf,
-        "gfSpellbooksEnabled": data.get("gfSpellbooksEnabled", False) is True,
-        "universalItem": universal_item,
-        "scannedTargetScan": scanned_target_scan,
-        "enhancedScanAvailable": battle_shortcuts.ENHANCED_SCAN_AVAILABLE,
-        "partySwitch": party_switch,
-        "partySwitchAvailable": party_switch_issue_62.PARTY_SWITCH_AVAILABLE,
-        "drawOncePerEnemy": draw_once,
-        "streamlinedDraw": streamlined_draw_enabled,
-        "formulaeRework": formulae_rework,
-        "formulaeReworkAvailable": formulae_rework_contract.available(),
-        "formulaeReworkBlocker": formulae_rework_contract.blocker(),
-        "formulaeReworkFormulas": formulae_rework_contract.rows(),
-        "betterCard": better_card_enabled,
-        "fixedCommandMenu": fixed_command_menu_enabled,
-        "trueAtbWait": true_atb_wait,
-        "modernControls": modern_controls,
-        "cameraSpeed": camera_speed,
-        "cameraSpeedMinimum": MINIMUM_CAMERA_SPEED,
-        "cameraSpeedMaximum": MAXIMUM_CAMERA_SPEED,
-        "modernControlsAvailable": modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE,
-        "modernControlsBlocker": modern_controls_issue_65.MODERN_CONTROLS_BLOCKER,
-        "worldMapFullscreen": world_map_fullscreen,
-        "worldMapFullscreenAvailable": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE,
-        "worldMapFullscreenBlocker": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_BLOCKER,
-        "battleResultsHelp": battle_results_help,
-        "battleResultsHelpAvailable": battle_results_issue_466.BATTLE_RESULTS_HELP_AVAILABLE,
-        "battleResultsHelpBlocker": battle_results_issue_466.BATTLE_RESULTS_HELP_BLOCKER,
-        "gfAcquisitionRework": gf_acquisition_rework_enabled,
-        "gfAcquisitionReworkAvailable": gf_acquisition_rework.GF_ACQUISITION_AVAILABLE,
-        "gfAcquisitionReworkBlocker": gf_acquisition_rework.GF_ACQUISITION_BLOCKER,
-        "vibrationConsolidation": vibration_consolidation,
-        "betterTargeting": better_targeting,
-        "damageLimitRemoval": damage_limit_removal,
-        "hitFrameLog": hit_frame_log_enabled,
-        "splitMusicVolume": split_music_volume,
-        "fastStart": fast_start_enabled,
-        "xpBars": xp_bars,
-        "hpBars": hp_bars,
-        "betterHpColors": better_hp_colors,
-        "gfHpBars": gf_hp_bars,
-        "inGameTime": in_game_time,
-        "interactionIndicators": interaction_indicators,
-        "noMagicConsumption": no_magic_consumption,
-        "gfHpCasting": gf_casting,
-        "gfHpCastingCosts": gf_costs,
-        "dropsAfterMug": drops_after_mug,
-        "dropChance": drop_chance_enabled,
-        "dropChanceWeights": drop_chance.metadata(),
-        "flatStatAbilities": flat_stat_abilities_enabled,
-        "maxSpellEnabled": max_spell_enabled,
-        "maxSpell": max_spell_value,
-        "maxSpellMinimum": max_spell.MIN_MAX_SPELL,
-        "maxSpellMaximum": max_spell.MAX_MAX_SPELL,
-        "timedHits": timed_hits_enabled,
-        **{key: timed_hits_options[argument]
-           for key, (argument, *_rest) in timed_hits.SETTING_KEYS.items()},
-        "timedHitsLimits": timed_hits.limits(),
-        **shared_magic,
+        "tweaks": tweaks,
+        "gfSpellbooksEnabled": _stored(project).get("gfSpellbooksEnabled", False) is True,
+        # Features outside the library ask whether these tweak mods are on.
+        "singleGf": "monogamy" in enabled,
+        **_shared_magic_payload(project, game, runtime_root),
     }
-
-
-def flying_bonus_applies(*, target_flying: bool, attacker_melee: bool,
-                         attacker_float: bool) -> bool:
-    """Mirror the three runtime branches for tests and UI explanations."""
-    return bool(target_flying and attacker_melee and not attacker_float)
-
-
-def effective_hit_value(hit_rate: int, bonus: int, *, target_flying: bool,
-                        attacker_melee: bool, attacker_float: bool) -> int:
-    """Show the new accuracy input; 255 has no special exemption."""
-    penalty = bonus if flying_bonus_applies(
-        target_flying=target_flying,
-        attacker_melee=attacker_melee,
-        attacker_float=attacker_float,
-    ) else 0
-    # The clamp mirrors the shipped assembly, which does `cmp eax,0x64 / jle /
-    # mov eax,0x64` before subtracting the bonus, and only on the penalised
-    # branch. This model must agree with the bytes that actually run.
-    return min(100, int(hit_rate)) - int(penalty) if penalty else int(hit_rate)
-
-
-def _verify_executable(game_root: Path) -> Path:
-    executable = game_root / "FF8_EN.exe"
-    if not executable.is_file():
-        raise RuntimeError(f"FF8_EN.exe is missing from {game_root}")
-    actual = _sha256(executable)
-    if actual != SUPPORTED_EXE_SHA256:
-        raise RuntimeError(
-            "The installed FF8_EN.exe build is not yet supported by the Flying EVA patch "
-            f"(SHA-256 {actual}). No executable patch was generated."
-        )
-    with executable.open("rb") as stream:
-        stream.seek(ALWAYS_HIT_BRANCH - 0x400000)
-        branch = stream.read(1)
-        stream.seek(HIT_FORMULA_HOOK - 0x400000)
-        displaced = stream.read(6)
-        stream.seek(inventory_auto_sort.ITEM_OPEN_SORT_HOOK - 0x400000)
-        item_open = stream.read(5)
-        stream.seek(menu_qol_issue_61.MAGIC_OPEN_HOOK - 0x400000)
-        magic_open = stream.read(len(menu_qol_issue_61.MAGIC_OPEN_HOOK_ORIGINAL))
-        stream.seek(single_gf.ADD_GATE_HOOK - 0x400000)
-        single_gf_gate = stream.read(single_gf.ADD_GATE_HOOK_LENGTH)
-        verified_hooks = []
-        for address, original in (
-            (inventory_auto_sort.BATTLE_CACHE_HOOK, inventory_auto_sort.BATTLE_CACHE_ORIGINAL),
-            (character_growth.HOOK, character_growth.ORIGINAL),
-            (character_growth.ZERO_HOOK, character_growth.ZERO_ORIGINAL),
-            (battle_issue_54.BATTLE_ENTER_HOOK, battle_issue_54.BATTLE_ENTER_ORIGINAL),
-            (battle_issue_54.BATTLE_EXIT_HOOK, battle_issue_54.BATTLE_EXIT_ORIGINAL),
-            (battle_issue_54.DRAW_RESULT_HOOK, battle_issue_54.DRAW_RESULT_ORIGINAL),
-            (battle_issue_54.DRAW_SELECT_HOOK, battle_issue_54.DRAW_SELECT_ORIGINAL),
-            (battle_issue_54.DRAW_TARGET_MASK_HOOK, battle_issue_54.DRAW_TARGET_MASK_ORIGINAL),
-            (battle_issue_54.DRAW_RENDER_HOOK, battle_issue_54.DRAW_RENDER_ORIGINAL),
-            (true_atb_wait_issue_63.ATB_WAIT_HOOK, true_atb_wait_issue_63.ATB_WAIT_HOOK_ORIGINAL),
-            (luck_accuracy.LUCK_HALVE, luck_accuracy.LUCK_HALVE_ORIGINAL),
-            (modern_controls_issue_65.CAMERA_YAW_HOOK, modern_controls_issue_65.CAMERA_YAW_HOOK_ORIGINAL),
-            (modern_controls_issue_65.REJECTED_NORMAL_INPUT_FIELD, modern_controls_issue_65.REJECTED_NORMAL_INPUT_ORIGINAL),
-            (modern_controls_issue_65.REJECTED_SPECIAL_MODE_READ, modern_controls_issue_65.REJECTED_SPECIAL_MODE_ORIGINAL),
-            (vibration_consolidation_issue_66.FIELD_HOOK, vibration_consolidation_issue_66.FIELD_HOOK_ORIGINAL),
-            (vibration_consolidation_issue_66.BATTLE_HOOK, vibration_consolidation_issue_66.BATTLE_HOOK_ORIGINAL),
-            (vibration_consolidation_issue_66.BATTLE_BRANCH, vibration_consolidation_issue_66.BATTLE_BRANCH_ORIGINAL),
-            (better_targeting_issue_64.TARGET_ICON_HOOK, better_targeting_issue_64.TARGET_ICON_HOOK_ORIGINAL),
-            (damage_limit.DAMAGE_LIMIT_FLAG_OPCODE, damage_limit.DAMAGE_LIMIT_FLAG_ORIGINAL),
-            *timed_hits.verified_hooks(),
-            (hit_frame_log.HOOK, hit_frame_log.HOOK_ORIGINAL),
-            (hit_frame_log.DAMAGE_HOOK, hit_frame_log.DAMAGE_ORIGINAL),
-            (hit_frame_log.TASK_HOOK, hit_frame_log.TASK_ORIGINAL),
-            (hit_frame_log.SCRIPT_HOOK, hit_frame_log.SCRIPT_ORIGINAL),
-            (hit_frame_log.SEQUENCE_HOOK, hit_frame_log.SEQUENCE_ORIGINAL),
-            *music_volume_issue_498.verified_hooks(),
-            *magic_damage_rework.verified_hooks(),
-            *melee_damage_rework.verified_hooks(),
-            *mug_chance_rework.verified_hooks(),
-            *status_chance_rework.verified_hooks(),
-            *no_magic_consumption_patch.verified_hooks(),
-            *gf_acquisition_rework.verified_hooks(),
-            (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
-            (menu_qol_issue_61.ABILITY_LIST_RETURN_HOOK, menu_qol_issue_61.ABILITY_LIST_RETURN_ORIGINAL),
-            (menu_qol_issue_61.ABILITY_STATE_READ, menu_qol_issue_61.ABILITY_STATE_READ_ORIGINAL),
-            (menu_qol_issue_61.ABILITY_ROW_BOUNDS_BRANCH, menu_qol_issue_61.ABILITY_ROW_BOUNDS_ORIGINAL),
-            (menu_qol_issue_61.ABILITY_PALETTE_HOOK, menu_qol_issue_61.ABILITY_PALETTE_HOOK_ORIGINAL),
-            (menu_qol_issue_61.ABILITY_TEXT_RENDER_CALL, menu_qol_issue_61.ABILITY_TEXT_RENDER_CALL_ORIGINAL),
-        ):
-            stream.seek(address - 0x400000)
-            verified_hooks.append((stream.read(len(original)), original))
-        flat_stat_abilities.verify_executable(stream)
-        max_spell.verify_executable(stream)
-        mug_drops.verify_executable(stream)
-        drop_chance.verify_executable(stream)
-    if branch != b"\x75" or displaced != bytes.fromhex("8A 8D D2 7B D2 01"):
-        raise RuntimeError("The installed FF8 hit-check bytes do not match the verified build")
-    if item_open != inventory_auto_sort.ITEM_OPEN_SORT_ORIGINAL:
-        raise RuntimeError("The installed FF8 Item-menu bytes do not match the verified build")
-    if magic_open != menu_qol_issue_61.MAGIC_OPEN_HOOK_ORIGINAL:
-        raise RuntimeError("The installed FF8 Magic-menu bytes do not match the verified build")
-    if single_gf_gate != single_gf.ADD_GATE_ORIGINAL:
-        raise RuntimeError("The installed FF8 GF-junction add gate does not match the verified build")
-    if any(actual != expected for actual, expected in verified_hooks):
-        raise RuntimeError("The installed FF8 gameplay hook bytes do not match the verified build")
-    return executable
-
-
-def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
-               single_gf_enabled: bool = DEFAULT_SINGLE_GF,
-               universal_item: bool = DEFAULT_UNIVERSAL_ITEM,
-               draw_once_per_enemy: bool = DEFAULT_DRAW_ONCE_PER_ENEMY,
-               better_card_enabled: bool = DEFAULT_BETTER_CARD,
-               scanned_target_scan: bool = DEFAULT_SCANNED_TARGET_SCAN,
-               party_switch: bool = DEFAULT_PARTY_SWITCH,
-               fixed_command_menu_enabled: bool = DEFAULT_FIXED_COMMAND_MENU,
-               auto_sort_magic: bool = DEFAULT_AUTO_SORT_MAGIC,
-               true_atb_wait: bool = DEFAULT_TRUE_ATB_WAIT,
-               formulae_rework: bool = DEFAULT_FORMULAE_REWORK,
-               modern_controls: bool = DEFAULT_MODERN_CONTROLS,
-               vibration_consolidation: bool = DEFAULT_VIBRATION_CONSOLIDATION,
-               better_targeting: bool = DEFAULT_BETTER_TARGETING,
-               damage_limit_removal: bool = DEFAULT_DAMAGE_LIMIT_REMOVAL,
-               fast_start_enabled: bool = DEFAULT_FAST_START,
-               enhanced_ability_menu: bool = DEFAULT_ENHANCED_ABILITY_MENU,
-               streamlined_draw_enabled: bool = DEFAULT_STREAMLINED_DRAW,
-               flat_stat_abilities_enabled: bool = DEFAULT_FLAT_STAT_ABILITIES,
-               max_spell_enabled: bool = DEFAULT_MAX_SPELL_ENABLED,
-               max_spell_value: int = DEFAULT_MAX_SPELL,
-               timed_hits_enabled: bool = False,
-               timed_hits_options: dict | None = None,
-               flying_eva_enabled: bool = True,
-               drops_after_mug: bool = False,
-               drop_chance_enabled: bool = False,
-               drop_chance_plan=None,
-               world_map_fullscreen: bool = DEFAULT_WORLD_MAP_FULLSCREEN,
-               gf_acquisition_rework_enabled: bool = DEFAULT_GF_ACQUISITION_REWORK,
-               battle_results_help: bool = DEFAULT_BATTLE_RESULTS_HELP,
-               no_magic_consumption: bool = False) -> str:
-    bonus = _bounded_bonus(bonus)
-    no_magic_consumption = _boolean(no_magic_consumption, "No Magic Consumption")
-    flying_eva_enabled = _boolean(flying_eva_enabled, "Flying EVA Bonus")
-    auto_sort = _boolean(auto_sort, "Auto-sort Inventory")
-    auto_sort_magic = _boolean(auto_sort_magic, "Auto-sort Magic Menu")
-    enhanced_ability_menu = _boolean(
-        enhanced_ability_menu, "Enhanced Ability Menu",
-    )
-    single_gf_enabled = _boolean(single_gf_enabled, "Monogamy")
-    universal_item = _boolean(universal_item, "Universal Item")
-    scanned_target_scan = _boolean(scanned_target_scan, "Enhanced Scan")
-    party_switch = _boolean(party_switch, "FF10-style Party Switch")
-    draw_once_per_enemy = _boolean(draw_once_per_enemy, "Draw Once per Enemy")
-    better_card_enabled = _boolean(better_card_enabled, "Better Card")
-    fixed_command_menu_enabled = _boolean(
-        fixed_command_menu_enabled, "Command Menu Rework",
-    )
-    true_atb_wait = _boolean(true_atb_wait, "True ATB Wait")
-    formulae_rework = _boolean(formulae_rework, "Formulae Rework")
-    modern_controls = _boolean(modern_controls, "Modern Controls")
-    world_map_fullscreen = _boolean(world_map_fullscreen, "Full-screen World Map")
-    battle_results_help = _boolean(battle_results_help, "Battle Results Item Help")
-    gf_acquisition_rework_enabled = _boolean(
-        gf_acquisition_rework_enabled, "GF Acquisition Rework")
-    vibration_consolidation = _boolean(
-        vibration_consolidation, "Vibration Rationalization",
-    )
-    better_targeting = _boolean(better_targeting, "Better Targeting")
-    damage_limit_removal = _boolean(
-        damage_limit_removal, "Damage Limit Removal",
-    )
-    fast_start_enabled = _boolean(fast_start_enabled, "Fast Start")
-    streamlined_draw_enabled = _boolean(
-        streamlined_draw_enabled, "Streamlined Draw",
-    )
-    flat_stat_abilities_enabled = _boolean(
-        flat_stat_abilities_enabled, "Flat +Stat Abilities",
-    )
-    max_spell_enabled = _boolean(max_spell_enabled, "Max Spell")
-    max_spell_value = max_spell.bounded_limit(max_spell_value)
-    timed_hits_enabled = _boolean(timed_hits_enabled, "Timed Hits")
-    timed_hits_options = dict(timed_hits_options or {})
-    drops_after_mug = _boolean(drops_after_mug, "Drops After Mug")
-    drop_chance_enabled = _boolean(drop_chance_enabled, "Drop Chance")
-    header = [
-        "# Generated by Lexeditor for FF8 2013 Steam EN.",
-        "# Intrinsic flying targets gain the configured effective EVA.",
-        "# Ranged attacks and Float-enabled melee attackers ignore the bonus.",
-        "# A vanilla hit rate of 255 does not bypass this added EVA.",
-    ]
-    lines = list(header)
-    lines.extend(character_growth.build_hext().rstrip().splitlines())
-    if flying_eva_enabled and bonus:
-        payload = flying_eva.build_payload(bonus)
-        lines.extend([
-            f"# Flying EVA Bonus: {bonus} percentage points",
-            f"{CODE_CAVE:X}:{len(payload):X}",
-            f"{ALWAYS_HIT_BRANCH:X} = EB",
-            f"{HIT_FORMULA_HOOK:X} = E9 06 C0 30 02 90",
-            f"{CODE_CAVE:X} = {payload.hex(' ').upper()}",
-            "# Physical Attack and the gunblade get the same penalty.",
-            f"{flying_eva.PHYSICAL_CAVE:X}:{len(flying_eva.PHYSICAL_TEMPLATE):X}",
-            *(f"{site:X} = {replacement}" for site, (replacement, _) in flying_eva.PHYSICAL_HOOKS.items()),
-            f"{flying_eva.PHYSICAL_CAVE:X} = {flying_eva.build_physical_payload(bonus).hex(' ').upper()}",
-        ])
-    else:
-        lines.append("# Flying EVA Bonus is disabled.")
-    inventory_patch = inventory_auto_sort.build_hext(auto_sort)
-    if inventory_patch:
-        lines.extend(inventory_patch.rstrip().splitlines())
-    else:
-        lines.append("# Automatic inventory sorting is disabled.")
-    magic_sort_patch = menu_qol_issue_61.build_auto_sort_magic_hext(auto_sort_magic)
-    if magic_sort_patch:
-        lines.extend(magic_sort_patch.rstrip().splitlines())
-    else:
-        lines.append("# Automatic Magic-menu sorting is disabled.")
-    ability_patch = menu_qol_issue_61.build_enhanced_ability_menu_hext(
-        enhanced_ability_menu,
-    )
-    if ability_patch:
-        lines.extend(ability_patch.rstrip().splitlines())
-    else:
-        lines.append("# Enhanced Ability Menu is disabled; GF ability order and palettes are unchanged.")
-    single_gf_patch = single_gf.build_hext(single_gf_enabled, SINGLE_GF_CAVE)
-    if single_gf_patch:
-        lines.extend(single_gf_patch.rstrip().splitlines())
-    else:
-        lines.append("# Monogamy is disabled; vanilla junction additions are unchanged.")
-    item_patch = battle_shortcuts.build_hext(
-        universal_item=universal_item,
-        scanned_target_scan=scanned_target_scan,
-        party_switch=party_switch,
-    )
-    if item_patch:
-        lines.extend(item_patch.rstrip().splitlines())
-    else:
-        lines.append("# Universal Item is disabled; Look Right keeps vanilla behavior.")
-    if not scanned_target_scan:
-        lines.append("# Enhanced Scan is disabled; camera and battle input remain vanilla.")
-    if not party_switch:
-        lines.append("# FF10-style Party Switch is disabled; Look Left keeps vanilla behavior.")
-    # Summon's gate is not a taste: a GF slot that does nothing and never says
-    # why reads as a broken game, so it rides along with every build.
-    draw_patch = battle_issue_54.build_command_eligibility_patch(
-        draw_once=draw_once_per_enemy, better_card=better_card_enabled,
-        streamlined_draw=streamlined_draw_enabled,
-        summon_gate=battle_issue_54.DEFAULT_SUMMON_GATE,
-    )
-    if draw_patch:
-        lines.extend(draw_patch.rstrip().splitlines())
-    else:
-        lines.append("# Draw Once per Enemy and Better Card are disabled; command eligibility is vanilla.")
-    active_stock_limit = max_spell_value if max_spell_enabled else max_spell.DEFAULT_MAX_SPELL
-    streamlined_draw_patch = streamlined_draw.build_hext(
-        streamlined_draw_enabled, active_stock_limit,
-    )
-    if streamlined_draw_patch:
-        lines.extend(streamlined_draw_patch.rstrip().splitlines())
-    else:
-        lines.append("# Streamlined Draw is disabled; spell and Stock/Cast selection remain vanilla.")
-    healing_patch = healing_rework.build_hext(formulae_rework)
-    if healing_patch:
-        lines.extend(healing_patch.rstrip().splitlines())
-    else:
-        lines.append("# Formulae Rework is disabled; curative-magic arithmetic remains vanilla.")
-    lines.extend(magic_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
-    lines.extend(melee_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
-    lines.extend(mug_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
-    lines.extend(status_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
-    lines.extend(no_magic_consumption_patch.build_hext(no_magic_consumption).rstrip().splitlines())
-    fixed_commands = fixed_command_menu.build_patch(
-        enabled=fixed_command_menu_enabled,
-        single_gf_enabled=single_gf_enabled,
-    )
-    if fixed_commands:
-        lines.extend(fixed_commands.rstrip().splitlines())
-    else:
-        lines.append("# Fixed Command Menu is disabled; command slots remain vanilla.")
-    atb_patch = true_atb_wait_issue_63.build_hext(true_atb_wait)
-    if atb_patch:
-        lines.extend(atb_patch.rstrip().splitlines())
-    else:
-        lines.append("# True ATB Wait is disabled; the native ATB gate is unchanged.")
-    luck_patch = luck_accuracy.build_hext(formulae_rework)
-    if luck_patch:
-        lines.extend(luck_patch.rstrip().splitlines())
-    else:
-        lines.append("# Formulae Rework is disabled; the attacker still contributes LUCK / 2.")
-    controls_patch = modern_controls_issue_65.build_hext(modern_controls)
-    if controls_patch:
-        lines.extend(controls_patch.rstrip().splitlines())
-    else:
-        lines.append("# Modern Controls is disabled; world-map camera input is unchanged.")
-    world_map_patch = world_map_fullscreen_issue_90.build_hext(
-        world_map_fullscreen, modern_controls)
-    if world_map_patch:
-        lines.extend(world_map_patch.rstrip().splitlines())
-    else:
-        lines.append("# Full-screen World Map is disabled; world-map Back behavior is unchanged.")
-    battle_results_patch = battle_results_issue_466.build_hext(
-        battle_results_help)
-    if battle_results_patch:
-        lines.extend(battle_results_patch.rstrip().splitlines())
-    else:
-        lines.append("# Battle Results Item Help is disabled; the reward screen keeps its HELP box.")
-    gf_acquisition_patch = gf_acquisition_rework.build_hext(
-        gf_acquisition_rework_enabled)
-    if gf_acquisition_patch:
-        lines.extend(gf_acquisition_patch.rstrip().splitlines())
-    else:
-        lines.append("# GF Acquisition Rework is disabled; drawable GFs keep their vanilla Draw source.")
-    vibration_patch = vibration_consolidation_issue_66.build_hext(
-        vibration_consolidation,
-    )
-    if vibration_patch:
-        lines.extend(vibration_patch.rstrip().splitlines())
-    else:
-        lines.append("# Vibration Rationalization is disabled; FFNx pause screens are unchanged.")
-    targeting_patch = better_targeting_issue_64.build_hext(better_targeting)
-    if targeting_patch:
-        lines.extend(targeting_patch.rstrip().splitlines())
-    else:
-        lines.append("# Better Targeting is disabled; native target indicators are unchanged.")
-    limit_patch = damage_limit.build_hext(damage_limit_removal)
-    if limit_patch:
-        lines.extend(limit_patch.rstrip().splitlines())
-    else:
-        lines.append("# Damage Limit Removal is disabled; the native 9,999 cap is unchanged.")
-    fast_start_patch = fast_start.build_hext(fast_start_enabled)
-    if fast_start_patch:
-        lines.extend(fast_start_patch.rstrip().splitlines())
-    else:
-        lines.append("# Fast Start is disabled; the native opening credits remain unchanged.")
-    flat_stat_patch = flat_stat_abilities.build_hext(flat_stat_abilities_enabled)
-    if flat_stat_patch:
-        lines.extend(flat_stat_patch.rstrip().splitlines())
-    else:
-        lines.append("# Flat +Stat Abilities is disabled; percentage stat abilities remain vanilla.")
-    mug_drop_patch = mug_drops.build_hext(drops_after_mug)
-    if mug_drop_patch:
-        lines.extend(mug_drop_patch.rstrip().splitlines())
-    drop_chance_patch = drop_chance.build_hext(drop_chance_enabled, drop_chance_plan)
-    if drop_chance_patch:
-        lines.extend(drop_chance_patch.rstrip().splitlines())
-    else:
-        lines.append("# Drop Chance is disabled; regular drops and Mug use vanilla slot weights.")
-    max_spell_patch = max_spell.build_hext(max_spell_enabled, max_spell_value)
-    if max_spell_patch:
-        lines.extend(max_spell_patch.rstrip().splitlines())
-    else:
-        lines.append("# Max Spell is disabled; the native stock cap and junction scaling remain 100.")
-    timed_hits_patch = timed_hits.build_hext(timed_hits_enabled, **timed_hits_options)
-    if timed_hits_patch:
-        lines.extend(timed_hits_patch.rstrip().splitlines())
-    else:
-        lines.append("# Timed Hits is disabled; only Squall's gunblade trigger is timed.")
-    return "\n".join(lines + [""])
 
 
 def _atomic_text(target: Path, text: str) -> None:
@@ -866,55 +206,21 @@ def _atomic_text(target: Path, text: str) -> None:
     temporary.replace(target)
 
 
-def _atomic_bytes(target: Path, content: bytes) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(target.suffix + ".tmp")
-    temporary.write_bytes(content)
-    temporary.replace(target)
-
-
-def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
-                             better_targeting: bool, better_hp_colors: bool = False,
-                             fast_start: bool = False,
-                             modern_controls: bool = False, party_switch: bool = False,
-                             gf_hp_bars: bool = False,
-                             in_game_time: bool = False,
-                             interaction_indicators: bool = False,
-                             no_magic_consumption: bool = False,
-                             camera_speed: float = DEFAULT_CAMERA_SPEED) -> None:
-    """Set derivative options without changing unrelated FFNx settings."""
+def _set_ffnx_keys(config: Path, values: dict) -> None:
+    """Set Lexeditor's driver keys without changing unrelated FFNx settings."""
     text = config.read_text(encoding="utf-8", errors="strict")
-    for key, enabled in (
-        ("enable_ff8_xp_bars", xp_bars),
-        ("enable_ff8_hp_bars", hp_bars),
-        ("enable_ff8_better_hp_colors", better_hp_colors),
-        ("enable_ff8_gf_hp_bars", gf_hp_bars),
-        ("enable_ff8_ingame_time", in_game_time),
-        ("enable_ff8_interaction_indicators", interaction_indicators),
-        ("enable_ff8_better_targeting", better_targeting),
-        ("enable_ff8_fast_start", fast_start),
-        ("enable_ff8_modern_controls", modern_controls),
-        ("enable_ff8_party_switch", party_switch),
-        ("enable_ff8_no_magic_consumption", no_magic_consumption),
-    ):
-        pattern = re.compile(
-            rf"(?m)^\s*{re.escape(key)}\s*=\s*(?:true|false)\s*$"
-        )
-        replacement = f"{key} = {'true' if enabled else 'false'}"
-        if pattern.search(text):
-            text = pattern.sub(replacement, text, count=1)
+    for key, value in values.items():
+        if not FFNX_KEY.match(key):
+            raise ValueError(f"A tweak asked for an FFNx key Lexeditor does not manage: {key}")
+        if isinstance(value, bool):
+            rendered, pattern = ("true" if value else "false"), r"(?:true|false)"
+        elif isinstance(value, (int, float)):
+            rendered, pattern = f"{value:g}", r"[-+0-9.eE]+"
         else:
-            text = text.rstrip() + f"\n\n{replacement}\n"
-    # The camera turn rate is a number rather than a switch, so it needs its own
-    # pass; the runtime clamps whatever it reads to a usable range.
-    rate = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, float(camera_speed)))
-    speed_pattern = re.compile(
-        r"(?m)^\s*ff8_modern_controls_camera_speed\s*=\s*[-+0-9.eE]+\s*$")
-    speed_line = f"ff8_modern_controls_camera_speed = {rate:g}"
-    if speed_pattern.search(text):
-        text = speed_pattern.sub(speed_line, text, count=1)
-    else:
-        text = text.rstrip() + f"\n\n{speed_line}\n"
+            raise ValueError(f"FFNx key {key} needs a switch or a number")
+        line = f"{key} = {rendered}"
+        existing = re.compile(rf"(?m)^\s*{re.escape(key)}\s*=\s*{pattern}\s*$")
+        text = existing.sub(line, text, count=1) if existing.search(text) else text.rstrip() + f"\n\n{line}\n"
     _atomic_text(config, text)
 
 
@@ -937,9 +243,7 @@ def _restore_files(snapshots: list[tuple[Path, bool, bytes]]) -> None:
         if path.is_file():
             try:
                 if path.read_bytes() == content:
-                    path.with_suffix(
-                        path.suffix + ".lexeditor.rollback.tmp"
-                    ).unlink(missing_ok=True)
+                    path.with_suffix(path.suffix + ".lexeditor.rollback.tmp").unlink(missing_ok=True)
                     continue
             except OSError:
                 pass
@@ -950,64 +254,33 @@ def _restore_files(snapshots: list[tuple[Path, bool, bytes]]) -> None:
 
 
 def initialize_project(project_root: Path) -> None:
-    """Reset copied gameplay Tweaks for one newly created mod."""
+    """A new mod starts with no project-owned gameplay features switched on."""
     project = project_root.resolve()
-    settings_data = {
-        "autoSortInventory": False,
-        "autoSortMagic": False,
-        "enhancedAbilityMenu": False,
-        "flyingEvaBonus": DEFAULT_FLYING_EVA_BONUS,
-        "flyingEvaEnabled": False,
-        "singleGf": False,
-        "universalItem": False,
-        "scannedTargetScan": False,
-        "partySwitch": False,
-        "drawOncePerEnemy": False,
-        "streamlinedDraw": False,
-        "formulaeRework": False,
-        "betterCard": False,
-        "fixedCommandMenu": False,
-        "trueAtbWait": False,
-        "modernControls": False,
-        "worldMapFullscreen": False,
-        "battleResultsHelp": False,
-        "gfAcquisitionRework": False,
-        "vibrationConsolidation": False,
-        "betterTargeting": False,
-        "damageLimitRemoval": False,
-        "hitFrameLog": False,
-        "splitMusicVolume": False,
-        "fastStart": False,
-        "xpBars": False,
-        "hpBars": False,
-        "betterHpColors": False,
-        "gfHpBars": False,
-        "inGameTime": False,
-        "interactionIndicators": False,
-        "noMagicConsumption": False,
-        "dropsAfterMug": False,
-        "dropChance": False,
-        "flatStatAbilities": False,
-        "maxSpellEnabled": False,
-        "maxSpell": DEFAULT_MAX_SPELL,
-        "timedHits": False,
-        **{key: default for key, (_a, default, *_r) in timed_hits.SETTING_KEYS.items()},
-        "cameraSpeed": DEFAULT_CAMERA_SPEED,
-    }
-    _atomic_text(settings_path(project), json.dumps(
-        settings_data, indent=2, sort_keys=True,
-    ) + "\n")
+    _atomic_text(settings_path(project), json.dumps({"gfSpellbooksEnabled": False}, indent=2) + "\n")
     shared_magic_runtime_config.write(
         project, shared_magic_inventory=DEFAULT_SHARED_MAGIC_INVENTORY,
         magic_stock_limit=DEFAULT_MAX_SPELL,
     )
-    _atomic_text(patch_path(project), build_hext(
-        DEFAULT_FLYING_EVA_BONUS,
-        flying_eva_enabled=False,
-    ))
-    for old_patch in (legacy_patch_path(project), obsolete_english_patch_path(project)):
-        if old_patch.is_file():
-            old_patch.unlink()
+    for old_patch in (patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project)):
+        old_patch.unlink(missing_ok=True)
+
+
+def _tweak_changes(data: dict, rows: dict[str, dict]) -> tuple[dict, dict]:
+    """Validate requested enable switches and values before anything is written."""
+    requested = data.get("tweaks", {})
+    if not isinstance(requested, dict):
+        raise ValueError("tweaks must map tweak ids to their changes")
+    enabled, values = {}, {}
+    for mod_id, change in requested.items():
+        if mod_id not in rows:
+            raise ValueError(f"There is no tweak mod {mod_id}")
+        if not isinstance(change, dict) or set(change) - {"enabled", "values"}:
+            raise ValueError(f"{mod_id}: send enabled and values only")
+        if "enabled" in change:
+            enabled[mod_id] = _boolean(change["enabled"], rows[mod_id]["name"])
+        if "values" in change:
+            values[mod_id] = change["values"]
+    return enabled, values
 
 
 def save(data: dict, game_root: Path | None = None,
@@ -1015,353 +288,83 @@ def save(data: dict, game_root: Path | None = None,
          runtime_root: Path | None = None) -> dict:
     game = (game_root or paths.GAME_ROOT).resolve()
     project = (project_root or paths.PROJECT_ROOT).resolve()
-    bonus = _bounded_bonus(data.get("flyingEvaBonus"))
-    flying_enabled = _boolean(
-        data.get("flyingEvaEnabled", DEFAULT_FLYING_EVA_ENABLED),
-        "Flying EVA Bonus",
-    )
-    auto_sort = _boolean(
-        data.get("autoSortInventory", DEFAULT_AUTO_SORT_INVENTORY),
-        "Auto-sort Inventory",
-    )
-    auto_sort_magic = _boolean(
-        data.get("autoSortMagic", DEFAULT_AUTO_SORT_MAGIC),
-        "Auto-sort Magic Menu",
-    )
-    enhanced_ability_menu = _boolean(
-        data.get("enhancedAbilityMenu", DEFAULT_ENHANCED_ABILITY_MENU),
-        "Enhanced Ability Menu",
-    )
-
-    single_gf = _boolean(data.get("singleGf", DEFAULT_SINGLE_GF), "Monogamy")
-    spellbooks_enabled = _boolean(data.get("gfSpellbooksEnabled", False), "GF Spellbooks")
-    universal_item = _boolean(
-        data.get("universalItem", DEFAULT_UNIVERSAL_ITEM), "Universal Item",
-    )
-    scanned_target_scan = _boolean(
-        data.get("scannedTargetScan", DEFAULT_SCANNED_TARGET_SCAN),
-        "Enhanced Scan",
-    )
-    party_switch = _boolean(
-        data.get("partySwitch", DEFAULT_PARTY_SWITCH),
-        "FF10-style Party Switch",
-    )
-    draw_once = _boolean(
-        data.get("drawOncePerEnemy", DEFAULT_DRAW_ONCE_PER_ENEMY),
-        "Draw Once per Enemy",
-    )
-    streamlined_draw_enabled = _boolean(
-        data.get("streamlinedDraw", DEFAULT_STREAMLINED_DRAW),
-        "Streamlined Draw",
-    )
-    formulae_rework = _boolean(
-        data.get("formulaeRework", DEFAULT_FORMULAE_REWORK),
-        "Formulae Rework",
-    )
-    better_card_enabled = _boolean(
-        data.get("betterCard", DEFAULT_BETTER_CARD), "Better Card",
-    )
-    fixed_command_menu_enabled = _boolean(
-        data.get("fixedCommandMenu", DEFAULT_FIXED_COMMAND_MENU),
-        "Command Menu Rework",
-    )
-    true_atb_wait = _boolean(
-        data.get("trueAtbWait", DEFAULT_TRUE_ATB_WAIT), "True ATB Wait",
-    )
-    modern_controls = _boolean(
-        data.get("modernControls", DEFAULT_MODERN_CONTROLS), "Modern Controls",
-    )
-    world_map_fullscreen = _boolean(
-        data.get("worldMapFullscreen", DEFAULT_WORLD_MAP_FULLSCREEN),
-        "Full-screen World Map",
-    )
-    gf_acquisition_rework_enabled = _boolean(
-        data.get("gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK),
-        "GF Acquisition Rework",
-    )
-    battle_results_help = _boolean(
-        data.get("battleResultsHelp", DEFAULT_BATTLE_RESULTS_HELP),
-        "Battle Results Item Help",
-    )
-    # The camera turn rate travels with the switch that uses it. A value the
-    # page never sent, or one outside the usable range, becomes the shipped
-    # rate rather than refusing the whole apply.
-    try:
-        camera_speed = float(data.get("cameraSpeed", DEFAULT_CAMERA_SPEED))
-    except (TypeError, ValueError):
-        camera_speed = DEFAULT_CAMERA_SPEED
-    if not camera_speed > 0:
-        camera_speed = DEFAULT_CAMERA_SPEED
-    camera_speed = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed))
-    vibration_consolidation = _boolean(
-        data.get("vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION),
-        "Vibration Rationalization",
-    )
-    better_targeting = _boolean(
-        data.get("betterTargeting", DEFAULT_BETTER_TARGETING), "Better Targeting",
-    )
-    damage_limit_removal = _boolean(
-        data.get("damageLimitRemoval", DEFAULT_DAMAGE_LIMIT_REMOVAL),
-        "Damage Limit Removal",
-    )
-    hit_frame_log_enabled = _boolean(
-        data.get("hitFrameLog", DEFAULT_HIT_FRAME_LOG), "Hit-frame Log",
-    )
-    split_music_volume = _boolean(
-        data.get("splitMusicVolume", DEFAULT_SPLIT_MUSIC_VOLUME), "SFX and Music Sliders",
-    )
-    fast_start_enabled = _boolean(
-        data.get("fastStart", DEFAULT_FAST_START), "Fast Start",
-    )
-    xp_bars = _boolean(data.get("xpBars", DEFAULT_XP_BARS), "XP Bars")
-    hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
-    better_hp_colors = _boolean(
-        data.get("betterHpColors", DEFAULT_BETTER_HP_COLORS), "Better HP Colors",
-    )
-    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), 'GF "MP" Bars')
-    in_game_time = _boolean(data.get("inGameTime", DEFAULT_INGAME_TIME), "In-game Time")
-    interaction_indicators = _boolean(
-        data.get("interactionIndicators", DEFAULT_INTERACTION_INDICATORS),
-        "Interaction Indicators",
-    )
-    no_magic_consumption = _boolean(data.get("noMagicConsumption", False), "No Magic Consumption")
-    drops_after_mug = _boolean(data.get("dropsAfterMug", False), "Drops After Mug")
-    drop_chance_enabled = _boolean(data.get("dropChance", False), "Drop Chance")
-    flat_stat_abilities_enabled = _boolean(
-        data.get("flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES),
-        "Flat +Stat Abilities",
-    )
-    max_spell_enabled = _boolean(
-        data.get("maxSpellEnabled", DEFAULT_MAX_SPELL_ENABLED), "Max Spell",
-    )
-    max_spell_value = max_spell.bounded_limit(
-        data.get("maxSpell", DEFAULT_MAX_SPELL),
-    )
-    timed_hits_enabled = _boolean(
-        data.get("timedHits", timed_hits.DEFAULT_TIMED_HITS), "Timed Hits",
-    )
-    timed_hits_options = timed_hits.options(data, strict=True)
-    shared_magic_inventory = _boolean(
-        data.get("sharedMagicInventory", DEFAULT_SHARED_MAGIC_INVENTORY),
-        "Shared Party Magic Inventory",
-    )
-    # Do not let an old page or direct API call arm incomplete hidden features.
-    # Visible Tweaks must keep the value the user selected.
-    if formulae_rework and not formulae_rework_contract.available():
-        missing = ", ".join(formulae_rework_contract.incomplete_ids())
-        raise ValueError(f"Formulae Rework is not available; incomplete: {missing}")
-    if party_switch and not party_switch_issue_62.PARTY_SWITCH_AVAILABLE:
-        raise ValueError(party_switch_issue_62.PARTY_SWITCH_BLOCKER)
-    if modern_controls and not modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE:
-        raise ValueError(modern_controls_issue_65.MODERN_CONTROLS_BLOCKER)
-    for world_map_requirement in world_map_fullscreen_issue_90.requirement_errors(
-        enabled=world_map_fullscreen, modern_controls=modern_controls,
-    ):
-        raise ValueError(world_map_requirement)
-    for battle_results_requirement in battle_results_issue_466.requirement_errors(
-        enabled=battle_results_help,
-    ):
-        raise ValueError(battle_results_requirement)
-    for gf_acquisition_requirement in gf_acquisition_rework.requirement_errors(
-        enabled=gf_acquisition_rework_enabled,
-    ):
-        raise ValueError(gf_acquisition_requirement)
+    mods_root = _mods_root(project)
+    if not isinstance(data, dict):
+        raise ValueError("Settings must be an object")
+    spellbooks = _boolean(data.get("gfSpellbooksEnabled", _stored(project).get("gfSpellbooksEnabled", False)),
+                          "GF Spellbooks")
+    current_shared = _shared_magic_payload(project, game, runtime_root)["sharedMagicInventory"]
+    shared_magic = _boolean(data.get("sharedMagicInventory", current_shared), "Shared Party Magic Inventory")
+    catalog = runtime_layout.catalog(project, mods_root)
+    tweak_rows = {row["id"]: row for row in tweak_mods.tweak_rows(project, mods_root)}
+    enabled_changes, value_changes = _tweak_changes(data, tweak_rows)
     active_root = _runtime_root(runtime_root, project)
     direct_root = active_root / "direct"
-    shared_magic_status = ffnx_manager.status(
-        game, ffnx_manager.STATE_PATH, direct_root=direct_root,
-    )
-    # Keep the selected mod's requested value even when the runtime is not yet
-    # installed. Activation installs and verifies the runtime before launch.
-    # Save must never turn an enabled feature off behind the user's back.
-    if gf_hp_bars and not single_gf:
-        raise ValueError('GF "MP" Bars requires Monogamy')
-    if fixed_command_menu_enabled and not single_gf:
-        raise ValueError("Fixed Command Menu requires Monogamy")
-    gf_casting = _boolean(data.get("gfHpCasting", False), "GF HP Casting")
-    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
-    if gf_casting and not (single_gf and no_magic_consumption):
-        raise ValueError("GF HP Casting requires Monogamy and No Magic Consumption")
-    executable = _verify_executable(game)
-    if gf_casting:
-        with executable.open("rb") as stream:
-            gf_hp_casting.verify_executable(stream)
-    drop_chance_plan = (
-        drop_chance.discover_path(executable) if drop_chance_enabled else None
-    )
-    hext = build_hext(
-        bonus, auto_sort, single_gf, universal_item, draw_once,
-        better_card_enabled,
-        scanned_target_scan=scanned_target_scan,
-        party_switch=party_switch,
-        fixed_command_menu_enabled=fixed_command_menu_enabled,
-        auto_sort_magic=auto_sort_magic,
-        enhanced_ability_menu=enhanced_ability_menu,
-        true_atb_wait=true_atb_wait,
-        formulae_rework=formulae_rework,
-        modern_controls=modern_controls,
-        world_map_fullscreen=world_map_fullscreen,
-        battle_results_help=battle_results_help,
-        no_magic_consumption=no_magic_consumption,
-        gf_acquisition_rework_enabled=gf_acquisition_rework_enabled,
-        vibration_consolidation=vibration_consolidation,
-        better_targeting=better_targeting,
-        damage_limit_removal=damage_limit_removal,
-        fast_start_enabled=fast_start_enabled,
-        streamlined_draw_enabled=streamlined_draw_enabled,
-        flat_stat_abilities_enabled=flat_stat_abilities_enabled,
-        max_spell_enabled=max_spell_enabled,
-        max_spell_value=max_spell_value,
-        timed_hits_enabled=timed_hits_enabled,
-        timed_hits_options=timed_hits_options,
-        flying_eva_enabled=flying_enabled,
-        drops_after_mug=drops_after_mug,
-        drop_chance_enabled=drop_chance_enabled,
-        drop_chance_plan=drop_chance_plan,
-    )
-    hext += gf_hp_casting.build_hext(gf_casting, gf_costs)
-    hext += hit_frame_log.build_hext(hit_frame_log_enabled)
-    hext += music_volume_issue_498.build_hext(split_music_volume)
-    settings_data = {
-        "autoSortInventory": auto_sort,
-        "autoSortMagic": auto_sort_magic,
-        "enhancedAbilityMenu": enhanced_ability_menu,
-        "flyingEvaBonus": bonus,
-        "flyingEvaEnabled": flying_enabled,
-        "singleGf": single_gf,
-        "gfSpellbooksEnabled": spellbooks_enabled,
-        "universalItem": universal_item,
-        "scannedTargetScan": scanned_target_scan,
-        "partySwitch": party_switch,
-        "drawOncePerEnemy": draw_once,
-        "streamlinedDraw": streamlined_draw_enabled,
-        "formulaeRework": formulae_rework,
-        "betterCard": better_card_enabled,
-        "fixedCommandMenu": fixed_command_menu_enabled,
-        "trueAtbWait": true_atb_wait,
-        "modernControls": modern_controls,
-        "worldMapFullscreen": world_map_fullscreen,
-        "gfAcquisitionRework": gf_acquisition_rework_enabled,
-        "battleResultsHelp": battle_results_help,
-        # Stored with the switch it belongs to. Written only to FFNx.toml, it
-        # read back as the default and the next save overwrote the reader's.
-        "cameraSpeed": round(camera_speed, 2),
-        "vibrationConsolidation": vibration_consolidation,
-        "betterTargeting": better_targeting,
-        "damageLimitRemoval": damage_limit_removal,
-        "hitFrameLog": hit_frame_log_enabled,
-        "splitMusicVolume": split_music_volume,
-        "fastStart": fast_start_enabled,
-        "xpBars": xp_bars,
-        "hpBars": hp_bars,
-        "betterHpColors": better_hp_colors,
-        "gfHpBars": gf_hp_bars,
-        "inGameTime": in_game_time,
-        "interactionIndicators": interaction_indicators,
-        "noMagicConsumption": no_magic_consumption,
-        "gfHpCasting": gf_casting,
-        "gfHpCastingCosts": gf_costs,
-        "dropsAfterMug": drops_after_mug,
-        "dropChance": drop_chance_enabled,
-        "flatStatAbilities": flat_stat_abilities_enabled,
-        "maxSpellEnabled": max_spell_enabled,
-        "maxSpell": max_spell_value,
-        "timedHits": timed_hits_enabled,
-        **{key: timed_hits_options[argument]
-           for key, (argument, *_rest) in timed_hits.SETTING_KEYS.items()},
-    }
-    settings_text = json.dumps(settings_data, indent=2, sort_keys=True) + "\n"
-    runtime_text = shared_magic_runtime_config.build(
-        shared_magic_inventory=shared_magic_inventory,
-        magic_stock_limit=(max_spell_value if max_spell_enabled else 100),
-    )
-    install_needed = bool(
-        install_runtime
-        and
-        (shared_magic_inventory or xp_bars or hp_bars or interaction_indicators or better_hp_colors or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
-         or modern_controls or party_switch)
-        and not shared_magic_status.get("sharedMagicInventoryRuntime")
-    )
+
     changed_files = [
-        patch_path(project),
-        legacy_patch_path(project),
-        obsolete_english_patch_path(project),
-        settings_path(project),
-        shared_magic_runtime_config.path(project),
+        patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project),
+        settings_path(project), shared_magic_runtime_config.path(project),
+        *(Path(row["path"]) / "mod.json" for row in catalog if not row["selected"]),
+        *(Path(tweak_rows[mod_id]["path"]) / script_mods.VALUES_FILE for mod_id in value_changes),
     ]
-    flat_kernel_target = project / "direct" / "kernel.bin"
-    flat_kernel_bytes = None
-    if flat_stat_abilities_enabled or flat_kernel_target.is_file():
-        flat_kernel_target, flat_kernel_bytes, _flat_text_changes = (
-            flat_stat_abilities.transformed_kernel(
-                project, paths.BASELINE_ROOT, flat_stat_abilities_enabled,
-            )
-        )
-        changed_files.append(flat_kernel_target)
     if install_runtime:
         changed_files.append(game / "FFNx.toml")
-    if install_needed:
-        changed_files[:0] = [
-            game / ffnx_manager.runtime_package.DRIVER_NAME,
-            ffnx_manager.STATE_PATH,
-        ]
     snapshots = _snapshot_files(changed_files)
-    runtime_link_snapshots = (
-        ffnx_manager._snapshot_runtime_links(game)
-        if install_runtime else None
-    )
+    runtime_link_snapshots = ffnx_manager._snapshot_runtime_links(game) if install_runtime else None
     try:
-        _atomic_text(patch_path(project), hext)
-        for old_patch in (legacy_patch_path(project), obsolete_english_patch_path(project)):
-            if old_patch.is_file():
-                old_patch.unlink()
-        _atomic_text(settings_path(project), settings_text)
-        _atomic_text(shared_magic_runtime_config.path(project), runtime_text)
-        if flat_kernel_bytes is not None:
-            _atomic_bytes(flat_kernel_target, flat_kernel_bytes)
+        for mod_id, changes in value_changes.items():
+            script_mods.save_values(Path(tweak_rows[mod_id]["path"]), changes)
+        if enabled_changes:
+            order = [row["id"] for row in catalog]
+            runtime_layout.configure(project, mods_root, order, {
+                row["id"]: enabled_changes.get(row["id"], row["enabled"]) for row in catalog})
+        built = tweak_mods.build_enabled(project, mods_root, game, paths.BASELINE_ROOT)
+        for old_patch in (patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project)):
+            old_patch.unlink(missing_ok=True)
+        # Every other switch that used to live here is a tweak mod now.
+        _atomic_text(settings_path(project), json.dumps(
+            {"gfSpellbooksEnabled": spellbooks}, indent=2, sort_keys=True) + "\n")
+        enabled_now = {row["id"]: row for row in tweak_mods.tweak_rows(project, mods_root) if row["enabled"]}
+        stock_limit = (enabled_now["max-spell"]["values"]["limit"]
+                       if "max-spell" in enabled_now else DEFAULT_MAX_SPELL)
+        _atomic_text(shared_magic_runtime_config.path(project), shared_magic_runtime_config.build(
+            shared_magic_inventory=shared_magic, magic_stock_limit=stock_limit))
         runtime_layout.compose(
-            project, active_root, runtime_layout.catalog(project, paths.MODS_ROOT),
+            project, active_root, runtime_layout.catalog(project, mods_root),
             paths.BASELINE_ROOT, formats.SECTIONS,
             runtime_layout.prelaunch_condition_state(game / "FFNx.toml"),
         )
-        if install_needed:
-            ffnx_manager.install_derivative(
-                game, state_path=ffnx_manager.STATE_PATH, direct_root=direct_root,
-                game_running=ffnx_manager._game_running,
-            )
-            if not ffnx_manager.status(
-                game, ffnx_manager.STATE_PATH, direct_root=direct_root,
-            ).get("sharedMagicInventoryRuntime"):
-                raise RuntimeError(
-                    "The Lexeditor FFNx derivative did not verify after installation. "
-                    "No enabled runtime configuration was written."
-                )
-        elif install_runtime:
-            config = game / "FFNx.toml"
-            if not config.is_file():
-                raise RuntimeError("FFNx.toml is missing. FFNx cannot use the active runtime.")
-            ffnx_manager._set_project_paths(config, direct_root)
-            ffnx_manager._verify_project_path(config, direct_root)
         if install_runtime:
-            _set_ffnx_runtime_tweaks(
-                game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars,
-                better_hp_colors=better_hp_colors, gf_hp_bars=gf_hp_bars,
-                in_game_time=in_game_time, better_targeting=better_targeting,
-                fast_start=fast_start_enabled,
-                interaction_indicators=interaction_indicators,
-                modern_controls=modern_controls, party_switch=party_switch,
-                # No Magic Consumption is a Hext patch now; the driver's
-                # copy stays off so only one of them ever hooks the debit.
-                no_magic_consumption=False,
-                camera_speed=camera_speed,
-            )
+            status = ffnx_manager.status(game, ffnx_manager.STATE_PATH, direct_root=direct_root)
+            if (built["driver"] or shared_magic) and not status.get("sharedMagicInventoryRuntime"):
+                ffnx_manager.install_derivative(
+                    game, state_path=ffnx_manager.STATE_PATH, direct_root=direct_root,
+                    game_running=ffnx_manager._game_running,
+                )
+                if not ffnx_manager.status(
+                    game, ffnx_manager.STATE_PATH, direct_root=direct_root,
+                ).get("sharedMagicInventoryRuntime"):
+                    raise RuntimeError(
+                        "The Lexeditor FFNx derivative did not verify after installation. "
+                        "No enabled runtime configuration was written."
+                    )
+            else:
+                config = game / "FFNx.toml"
+                if not config.is_file():
+                    raise RuntimeError("FFNx.toml is missing. FFNx cannot use the active runtime.")
+                ffnx_manager._set_project_paths(config, direct_root)
+                ffnx_manager._verify_project_path(config, direct_root)
+            _set_ffnx_keys(game / "FFNx.toml", {**FFNX_DEFAULTS, **built["ffnx"]})
     except Exception:
         _restore_files(snapshots)
         if runtime_link_snapshots is not None:
             ffnx_manager._restore_runtime_links(game, runtime_link_snapshots)
         try:
+            # Rebuild from the restored switches and values so the runtime
+            # matches them again, not the half-applied request.
+            tweak_mods.build_enabled(project, mods_root, game, paths.BASELINE_ROOT)
             runtime_layout.compose(
-                project, active_root, runtime_layout.catalog(project, paths.MODS_ROOT),
+                project, active_root, runtime_layout.catalog(project, mods_root),
                 paths.BASELINE_ROOT, formats.SECTIONS,
                 runtime_layout.prelaunch_condition_state(game / "FFNx.toml"),
             )
@@ -1374,19 +377,28 @@ def save(data: dict, game_root: Path | None = None,
 def ensure(game_root: Path | None = None, project_root: Path | None = None,
            *, install_runtime: bool = False,
            runtime_root: Path | None = None) -> dict:
-    current = load(project_root, game_root, runtime_root)
-    return save(
-        current, game_root, project_root, install_runtime=install_runtime,
-        runtime_root=runtime_root,
-    )
+    """Rebuild and recompose with the current switches and values."""
+    return save({}, game_root, project_root, install_runtime=install_runtime,
+                runtime_root=runtime_root)
+
+
+def trust(mod_id: str, trusted: bool, project_root: Path | None = None,
+          game_root: Path | None = None) -> dict:
+    """Let a tweak mod run its script, or stop it; the reader decides."""
+    project = (project_root or paths.PROJECT_ROOT).resolve()
+    rows = {row["id"]: row for row in tweak_mods.tweak_rows(project, _mods_root(project))}
+    if mod_id not in rows:
+        raise ValueError(f"There is no tweak mod {mod_id}")
+    script_mods.set_trusted(Path(rows[mod_id]["path"]), _boolean(trusted, "Trusted"))
+    return payload(project, game_root=game_root)
 
 
 def keep_previous_log(game: Path) -> Path | None:
     """Copy the last session's FFNx.log aside before the game starts again.
 
     FFNx rewrites FFNx.log on every start, so the session in which something
-    went wrong (a crash, music at the wrong speed) was gone the moment the
-    game was relaunched. One previous copy is kept and replaced each launch.
+    went wrong was gone the moment the game was relaunched. One previous copy
+    is kept and replaced each launch.
     """
     log = game / "FFNx.log"
     previous = game / "FFNx.previous.log"
@@ -1399,44 +411,56 @@ def keep_previous_log(game: Path) -> Path | None:
     return None
 
 
+def materialized_tweak_patches(runtime_root: Path, tweak_ids: set[str]) -> list[Path]:
+    """The composed Hext files that came from enabled tweak mods."""
+    active = Path(runtime_root).resolve()
+    patches = []
+    for row in runtime_layout.read(active).get("files", []):
+        path = str(row.get("path", ""))
+        if str(row.get("winner")) not in tweak_ids or not path.replace("\\", "/").startswith("hext/"):
+            continue
+        candidate = (active / path).resolve()
+        if candidate == active or active not in candidate.parents:
+            raise RuntimeError("A composed tweak patch path escapes the FF8 runtime")
+        patches.append(candidate)
+    return sorted(patches)
+
+
 def activate(game_root: Path | None = None,
              project_root: Path | None = None,
              runtime_root: Path | None = None) -> dict:
-    """Write and verify the exact patch that FFNx will read before launch."""
-    global _last_activation_ns
+    """Build, compose and verify exactly the patches FFNx will read before launch."""
+    global _last_activation_ns, _last_patches
     game = (game_root or paths.GAME_ROOT).resolve()
     project = (project_root or paths.PROJECT_ROOT).resolve()
     active_root = _runtime_root(runtime_root, project)
     keep_previous_log(game)
-    result = ensure(
-        game, project, install_runtime=True, runtime_root=active_root,
-    )
+    result = ensure(game, project, install_runtime=True, runtime_root=active_root)
     _validate_shared_magic_launch(project, game, active_root)
-    target = materialized_runtime_patch_path(active_root)
     config = game / "FFNx.toml"
     if not config.is_file():
-        raise RuntimeError("FFNx.toml is missing. FFNx cannot load the gameplay patch.")
+        raise RuntimeError("FFNx.toml is missing. FFNx cannot load the gameplay patches.")
     text = config.read_text(encoding="utf-8", errors="strict")
     match = re.search(r'(?m)^\s*hext_patching_path\s*=\s*"([^"]+)"\s*$', text)
     configured_root = (active_root / "hext").resolve()
     if not match or Path(match.group(1)).resolve() != configured_root:
         actual = match.group(1) if match else "not configured"
-        raise RuntimeError(
-            f"FFNx uses {actual} as its Hext base, not {configured_root}."
-        )
+        raise RuntimeError(f"FFNx uses {actual} as its Hext base, not {configured_root}.")
     effective_root = configured_root / FFNX_HEXT_SUFFIX
-    if target.parent != effective_root:
-        raise RuntimeError(
-            f"The gameplay patch is in {target.parent}, but FFNx scans {effective_root}."
-        )
-    if not target.is_file() or target.stat().st_size == 0:
-        raise RuntimeError(f"The generated gameplay patch is missing: {target}")
+    enabled = {row["id"] for row in result["tweaks"] if row["enabled"]}
+    patches = materialized_tweak_patches(active_root, enabled)
+    for patch in patches:
+        if patch.parent != effective_root:
+            raise RuntimeError(f"The tweak patch {patch.name} is in {patch.parent}, but FFNx scans {effective_root}.")
+        if patch.stat().st_size == 0:
+            raise RuntimeError(f"The tweak patch is empty: {patch}")
+    _last_patches = patches
     _last_activation_ns = time.time_ns()
     return {
         **result,
         "ready": True,
-        "patchSha256": _sha256(target),
-        "patchBytes": target.stat().st_size,
+        "patches": [{"path": str(patch), "sha256": _sha256(patch), "bytes": patch.stat().st_size}
+                    for patch in patches],
         "activatedAtNs": _last_activation_ns,
         "hextBase": str(configured_root),
         "hextRoot": str(effective_root),
@@ -1449,8 +473,7 @@ def _log_has_loaded_patch(text: str, target: Path) -> bool:
     for line in text.splitlines():
         if marker.casefold() not in line.casefold():
             continue
-        normalized = line.replace("/", "\\").casefold()
-        if expected in normalized:
+        if expected in line.replace("/", "\\").casefold():
             return True
     return False
 
@@ -1460,7 +483,7 @@ def runtime_status(game_root: Path | None = None,
                    runtime_root: Path | None = None,
                    game_running=ffnx_manager._game_running,
                    game_started=ffnx_manager._game_started) -> dict:
-    """Report whether FFNx loaded the patch from the latest launch barrier."""
+    """Report whether FFNx loaded every tweak patch from the latest launch."""
     game = (game_root or paths.GAME_ROOT).resolve()
     log = game / "FFNx.log"
     # The launcher can stay open for as long as the player likes; FFNx only
@@ -1471,15 +494,12 @@ def runtime_status(game_root: Path | None = None,
                 "message": "FFNx.log is not ready."}
     text = log.read_text(encoding="utf-8", errors="replace")
     log_is_current = bool(_last_activation_ns) and log.stat().st_mtime_ns >= _last_activation_ns - 1_000_000_000
-    target = materialized_runtime_patch_path(_runtime_root(runtime_root, project_root))
-    loaded = log_is_current and _log_has_loaded_patch(text, target)
+    missing = [patch for patch in _last_patches if not _log_has_loaded_patch(text, patch)]
+    loaded = log_is_current and not missing
     hext_was_reached = log_is_current and "applied hext patch:" in text.casefold()
     running = bool(game_running())
-    # FFNx writes its log before it scans Hext files. A fresh file that ends at
-    # metadata initialization is not a failed patch scan. Another Hext file can
-    # also appear before this patch. Keep waiting while the game process is
-    # alive, and report a failure only after the process stops or the caller's
-    # complete startup timeout expires.
+    # FFNx writes its log before it scans Hext files. Keep waiting while the
+    # game process is alive, and report a failure only after it stops.
     log_ready = loaded or (log_is_current and not running)
     last_line = next((line.strip() for line in reversed(text.splitlines()) if line.strip()), "")
     return {
@@ -1489,10 +509,11 @@ def runtime_status(game_root: Path | None = None,
         "gameRunning": running,
         "gameStarted": started,
         "log": str(log),
+        "missing": [patch.name for patch in missing],
         "message": (
-            "FFNx loaded the Lexeditor gameplay patch."
+            ("FFNx loaded every gameplay tweak patch." if _last_patches else "No gameplay tweak is enabled.")
             if loaded else
-            "FFNx stopped after it applied other Hext files, but it did not apply the Lexeditor gameplay patch."
+            f"FFNx stopped after it applied other Hext files, but it did not apply {', '.join(p.name for p in missing)}."
             if hext_was_reached and not running else
             f"The game stopped before FFNx reached Hext. Its last log entry was: {last_line or 'none'}."
             if log_is_current and not running else
@@ -1509,15 +530,4 @@ def payload(project_root: Path | None = None, saved: int = 0,
     project = (project_root or paths.PROJECT_ROOT).resolve()
     active_root = _runtime_root(runtime_root, project)
     current = load(project, game_root, active_root)
-    bonus = current["flyingEvaBonus"]
-    return {
-        **current,
-        "minimum": MIN_FLYING_EVA_BONUS,
-        "maximum": MAX_FLYING_EVA_BONUS,
-        "unit": "percentage points",
-        "patch": str(patch_path(project)),
-        "runtimePatch": str(materialized_runtime_patch_path(active_root)),
-        "runtimeRoot": str(active_root),
-        "enabled": current["flyingEvaEnabled"],
-        "saved": saved,
-    }
+    return {**current, "runtimeRoot": str(active_root), "modsRoot": str(_mods_root(project)), "saved": saved}
