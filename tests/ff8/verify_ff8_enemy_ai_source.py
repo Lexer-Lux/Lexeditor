@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
+sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from plugins.ff8 import enemy_ai, paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402

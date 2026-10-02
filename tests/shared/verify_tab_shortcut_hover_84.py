@@ -11,7 +11,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-RDR2_ROOT = Path(r"C:\RDR2Mod")
+RDR2_ROOT = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(RDR2_ROOT / "tools" / "reverse-engineering"))
 

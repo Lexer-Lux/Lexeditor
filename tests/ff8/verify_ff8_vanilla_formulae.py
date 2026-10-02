@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 EXPECTED_SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
+sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from plugins.ff8 import formulae_rework  # noqa: E402

@@ -2,7 +2,7 @@
 
 Ninety-nine verifiers open with
 
-    sys.path.insert(0, str(Path(r"C:\\RDR2Mod\\tools\\reverse-engineering")))
+    sys.path.insert(0, str(Path(r"D:\\Documents\\Mods\\rdr2\\RDR2-Overhaul\\tools\\reverse-engineering")))
     from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json
 
 That path exists on one machine, which is why none of those checks could run on

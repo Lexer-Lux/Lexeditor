@@ -9,7 +9,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-RDR2_ROOT = Path(r"C:\RDR2Mod")
+RDR2_ROOT = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul")
 sys.path.insert(0, str(ROOT))
 
 from plugins.ff8.plugin import FF8Session  # noqa: E402

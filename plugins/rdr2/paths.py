@@ -17,8 +17,15 @@ PRIVATE_DATA_ROOT = (
     Path(os.environ.get("LOCALAPPDATA", LEXEDITOR_ROOT / "out"))
     / "Lexeditor" / "game-data" / "rdr2"
 )
+def default_project_root() -> Path:
+    """The RDR2 overhaul, kept as one mod in the mod library until it is split
+    into separate tweak and data mods."""
+    from core.mod_library import default_user_library_root
+    return default_user_library_root() / "rdr2" / "RDR2-Overhaul"
+
+
 PROJECT_ROOT = Path(
-    os.environ.get("LEXEDITOR_RDR2_PROJECT", r"C:\RDR2Mod")
+    os.environ.get("LEXEDITOR_RDR2_PROJECT") or default_project_root()
 ).expanduser().resolve()
 EDITABLE_MOD_ROOT = Path(
     os.environ.get("LEXEDITOR_MOD_ROOT", PROJECT_ROOT / "MyOverhaul")

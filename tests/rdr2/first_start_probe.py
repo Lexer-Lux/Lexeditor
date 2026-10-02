@@ -124,7 +124,7 @@ def main() -> int:
     assert set(manifest["outputs"]) == set(by_output), manifest["outputs"].keys()
     serialized_manifest = json.dumps(manifest).casefold()
     assert "snapshot" not in serialized_manifest
-    assert r"c:\rdr2mod".casefold() not in serialized_manifest
+    assert r"D:\Documents\Mods\rdr2\RDR2-Overhaul".casefold() not in serialized_manifest
     assert all(
         extractor._valid_output(entry, cache / entry.output)
         for entry in extractor.ENTRIES

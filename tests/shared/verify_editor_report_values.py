@@ -41,5 +41,5 @@ try:validate('CA_POOR','MADE_UP',{'CA_POOR','CA_AVERAGE'})
 except ValueError:pass
 else:raise AssertionError('unknown enum')
 from plugins.rdr2.data_map import build_data_map
-rows=build_data_map(Path(r'C:\RDR2Mod\DATA_MAP.md'))['rows'];assert len(rows)>100
+rows=build_data_map(Path(r'D:\Documents\Mods\rdr2\RDR2-Overhaul\DATA_MAP.md'))['rows'];assert len(rows)>100
 print('Original file resolution, typed Mobs values and full RDR2 Data Map parsing passed:',len(rows),'rows')

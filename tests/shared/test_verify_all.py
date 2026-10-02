@@ -156,7 +156,7 @@ class RunnerTests(unittest.TestCase):
         once.assert_called_once()
 
     def test_skip_detected_on_retry_is_still_skip(self):
-        missing = "RuntimeError: Missing RDR2 project: C:\\RDR2Mod"
+        missing = "RuntimeError: Missing RDR2 project: D:\\Documents\\Mods\\rdr2\\RDR2-Overhaul"
         with patch.object(verify_all, "_once",
                           side_effect=[(1, "transient", "transient"), (1, missing, missing)]), \
              patch.object(verify_all.time, "sleep"):

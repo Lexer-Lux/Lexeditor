@@ -1,7 +1,7 @@
 """Summarize wanted-system trace runs from GameplayTweaks.log (#149).
 
 Reads the subsystem "wanted" lines the trace module emits (see
-C:/RDR2Mod/GameplayTweaks/modules/wanted_system.cpp) and prints one row per
+D:/Documents/Mods/rdr2/RDR2-Overhaul/GameplayTweaks/modules/wanted_system.cpp) and prints one row per
 observed state signature: first/last elapsed_ms, duration, and the
 parole-relevant columns (wanted_level, seconds_since_seen, radius,
 origin_distance, visual_dark_red). F8 VISUAL_MARK lines delimit the visible

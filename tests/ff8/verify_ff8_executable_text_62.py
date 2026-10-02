@@ -19,7 +19,7 @@ FFNX_EXE_DATA = DEV_CACHE / "ffnx-upstream/src/exe_data.cpp"
 FF8UE_EXE = DEV_CACHE / "ff8ue-upstream/FF8GameData/ExeSection/exefile.py"
 FF8UE_SCHEMA = DEV_CACHE / "ff8ue-upstream/FF8GameData/Resources/json/exe.json"
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
+sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from plugins.ff8 import executable_text  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402

@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECT = Path(r"C:\RDR2Mod")
+PROJECT = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul")
 EDITOR = ROOT / "plugins" / "rdr2" / "editor.html"
 SERVER = ROOT / "plugins" / "rdr2" / "server.py"
 DATA_MAP = ROOT / "plugins" / "rdr2" / "data_map.py"
