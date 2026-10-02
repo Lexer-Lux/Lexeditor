@@ -1,37 +1,80 @@
-# Effects editor and stamina recovery scope
-
-Related work: #758. Dark Souls Remastered only; Prepare to Die Edition is not supported.
+# Effects, Misc. and Encumbrance
 
 ## Editor access
 
-Select a mod project, open **Effects > Equipment**, and select **Grass Crest Shield (6890)**. The **Recovery adjustment (stamina/second)** property is a signed additive modifier, not a percentage or the player's final recovery rate. The editor reads the selected archive; opening it applies no balance preset.
+**Effects** exposes documented properties on every existing special-effect
+record. All effects includes unlinked/custom records; Equipment, Spells and
+Items filter actual references in the selected archive. Unknown, legacy and
+padding fields remain protected.
 
-An item's **Linked effects** section follows the item's current references. Use that link for a modified shield instead of assuming it still uses 6890. Every item or ability that shares an effect uses the same edited record. The usage help counts direct references in supported parameter tables, not every possible script or animation call.
+For Grass Crest Shield, use **Effects > Equipment > Grass Crest Shield (6890) >
+Recovery adjustment (stamina/second)** or follow the item's **Linked effects**
+button. Modified item references are followed rather than inferred from names.
+A shared effect changes every item or ability that uses it.
 
-The tab now edits all documented properties on existing special-effect records: duration, trigger intervals, HP and stamina changes, damage and defence modifiers, status buildup and resistances, targeting flags, immunities, stacking rules, and linked effects. Known options use named selectors, flags use checkboxes, and numbers use the published bounds. Existing unidentified values remain intact. Padding, legacy fields and insufficiently documented properties are protected.
+**Misc.** contains base regeneration, in stamina per second. **Encumbrance**
+contains five movement classes, their load ranges and recovery percentages.
+Light, Medium and Heavy have editable upper limits; the adjacent lower limits
+are derived. Ultralight shares Light's limit and requires the game's special
+movement condition. The list displays the native class IDs, 0 through 4.
 
-**All effects** includes unlinked records. **Equipment**, **Spells**, and **Items** filter actual references in the current archive, not guesses from reference names. Custom IDs without a reference label use their stored row name or an ID fallback.
+## Independent tweaks and preservation
 
-Save writes the isolated mod project. Apply and Restore original retain the existing explicit deployment behavior. Vanilla stays read-only. The shared Data Map distinguishes structured effect editing from unmapped data and native game rules.
+Enable **Stamina rebalance** in **Tweaks** to apply the configured Misc. baseline
+and the shield bonus. Its proposed settings are 60 base and +5 shield, and it
+starts disabled. Enable **Encumbrance rules** independently to use the class
+settings. Original limits are 25%/50%/100%, with recovery multipliers of
+100%/100%/100%/80%/70%. No preset is applied by opening the editor.
 
-## Binary layout and provenance
+Save writes the isolated project. Apply, with the game closed, installs the saved
+archive and enabled native settings. The shield override is projected at Apply
+time, never written over the project's authored effect value. Disabling a tweak
+and applying restores its native defaults and removes its override, leaving the
+other toggle intact. Restore original restores owned installed files without
+changing project settings.
 
-`SpEffectParam.param` contains `SP_EFFECT_PARAM_ST` records with 368-byte rows and header version 1. The recovery modifier is a signed 32-bit field at byte 184 (`0xB8`). This change reuses the existing BND3/DCX/PARAM reader, field codecs, in-place edits, and project lifecycle. It does not add another archive codec or executable hook.
+Existing shield variants are resolved through their actual passive references.
+Missing or ambiguous custom references are refused. Other items sharing the
+resolved effect change too. The existing single-project archive deployment is
+retained; this PR does not claim multi-mod merging.
 
-The full effect metadata is selectively vendored from **Vawser and Smithbox contributors**, revision `cbd477a8fd6d436b3e011c8548e1de8fd8876918`, under MIT. Exact upstream paths, original hashes, transformation notes, and semantic integrity hashes are in `metadata/EFFECT_SOURCE.json`. The existing MIT notice is retained in `credits.md`. The other parameter metadata retains the pins in `metadata/SOURCE.json`. No Smithbox executable, dependencies, fonts, or proprietary game data are included.
+## Sources
 
-Earlier recovery-field research used Smithbox revision `057b417887cc7d0ddc8001602be3f5339f42c74f`, `Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/SpEffect.xml`, blob `30411975bed40f56ea53247a93807c9cc099cfe1`. Paramdex's `DS1R/Names/SpEffectParam.txt`, blob `77e53462c28ea28e1abb140eea29d177da8bff74`, supplied reference identities. Metal-Crow and Dark-Souls-1-Overhaul contributors' `SpEffectEditor-Remaster.CT`, revision `2a3d8cbe2acee663bef03c7be4f968dbb68f951f`, independently corroborated the four-byte `+B8` recovery field. These sources are credited in `credits.md`; no Cheat Engine or injection code is copied.
+The full effect definitions, annotations, names and enums are selectively
+vendored from Smithbox revision
+`cbd477a8fd6d436b3e011c8548e1de8fd8876918` under MIT. Exact source paths, Git
+hashes, transformations and independent semantic digests are recorded in
+`metadata/EFFECT_SOURCE.json`. Other existing metadata retains `SOURCE.json`.
+The original notices remain in `credits.md`.
 
-## What remains separate
+The initial recovery-cell investigation also consulted Smithbox revision
+`057b417887cc7d0ddc8001602be3f5339f42c74f`,
+`Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/SpEffect.xml`, blob
+`30411975bed40f56ea53247a93807c9cc099cfe1`, and Paramdex
+`DS1R/Names/SpEffectParam.txt`, blob
+`77e53462c28ea28e1abb140eea29d177da8bff74`.
 
-This editor does **not** expose a verified native absolute base-regeneration constant or an equip-load threshold/formula. Armour penalty reference groups 6200-6233 are not presented as percentage encumbrance tiers. Reference rows 40-44 describe player resonance effects; their names alone do not prove activation and stacking behavior or make them a verified global baseline control.
+Independent offset cross-check:
+[Dark-Souls-1-Overhaul](https://github.com/metal-crow/Dark-Souls-1-Overhaul),
+revision `2a3d8cbe2acee663bef03c7be4f968dbb68f951f`,
+`SpEffectEditor-Remaster.CT`, a four-byte recovery modifier at `+B8`.
+No Cheat Engine or upstream executable code is copied.
 
-Finishing that part of #758 still requires tracing the identified Remastered build's actual recovery calculation and modifiers, then implementing the proved data setting or version-guarded Hext patch through the existing tweak mechanism. No guessed offsets, hardcoded baseline of 45, or substitute resonance-row baseline are included.
+## Native evidence and limits
 
-This PR is effect-record editing, not the complete independently toggleable stamina rebalance. It must not close #758 on that basis.
+`codex/ds1/stamina-recovery.md` records the privately inspected executable's
+fingerprint, baseline getter, class selector, class recovery factors and
+within-class fraction. It also credits Microsoft's PE and x64 unwind references.
+`encumbrance.S` is original replacement assembly, not a game disassembly dump.
 
-## Verification boundary
+Tests execute selected functions from the identified private image in an isolated
+harness. The executable is not redistributed. Synthetic Apply/Restore and native
+function tests do not establish Windows game startup, real animation behavior,
+every effect's activation/stacking, or multiplayer safety. Initial candidates
+must be tested offline.
 
-Generated fixtures test every editable effect property, changes restricted to its intended bytes or bits, exact no-op/reversion, linked references, unknown values, invalid input/layout rejection, save/reopen/discard, Vanilla protection, and synthetic Apply/Restore. A separate metadata test compares the consumed definitions, names and options with digests computed from the pinned upstream snapshot.
-
-The headless browser check exercises the actual shared editor controls, small-window paging/scrolling, named effect links beyond the first list page, the Data Map, save/reopen/discard, and read-only Vanilla. Synthetic archives and rendered controls do not demonstrate retail in-game timing, effect activation, stacking, or native baseline compatibility. Those remain separate installed-game acceptance checks.
+Animation timing, invincibility windows and other load-dependent formulas are
+not represented by invented editable fields. Player resonance effects 40-44
+remain effects, not substitutes for the engine baseline. Other independently
+owned executable patches, including the separate equip-load display PR, are
+refused rather than overwritten. Keep #758 open until installed-game acceptance.

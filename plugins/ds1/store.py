@@ -76,7 +76,7 @@ class ItemStore:
         self.writable()
         return self.get().edit(table, row_id, field, value)
 
-    def save(self):
+    def validate_save(self):
         self.writable()
         document = self.get()
         # Apply can legitimately replace the live file while this editor stays
@@ -85,6 +85,10 @@ class ItemStore:
             raise ValueError('The source changed outside Lexeditor. Reopen it before saving.')
         if digest(self.output) != self.output_hash:
             raise ValueError('The mod archive changed outside Lexeditor. Reopen it before saving.')
+        return document
+
+    def save(self):
+        document = self.validate_save()
         payload = document.export()
         ItemDocument(payload)
         atomic_write(self.output, payload)

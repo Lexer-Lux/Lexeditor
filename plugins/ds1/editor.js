@@ -17,7 +17,10 @@ const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."},
-    {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. Each record can be shared by several items or abilities. Unknown and legacy properties stay protected. Equipment, Spells and Items show direct references. All effects includes unlinked records. Save changes the mod project."}],
+    {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. Each record can be shared by several items or abilities. Unknown and legacy properties stay protected. Equipment, Spells and Items show direct references. All effects includes unlinked records. Save changes the mod project."},
+    {id:"encumbrance",label:"Encumbrance",help:"Edit load limits and recovery percentages for each movement class. Enable Encumbrance rules in Tweaks before editing. Animation timing and invincibility frames are not part of these rules."},
+    {id:"misc",label:"Misc.",help:"Base stamina regeneration is used by Stamina rebalance. Enable it in Tweaks before editing, then save and Apply."},
+    {id:"tweaks",label:"Tweaks"}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   help:()=>navigate(state.tab==="datamap"?"effects":"datamap"),helpActive:()=>state.tab==="datamap",
@@ -26,7 +29,7 @@ const shell=LexeditorUI.mountShell({
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.effectTabs=result.effectTabs||[];
-  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;
+  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules;
 }
 async function loadItems(){
   const request=++recordsRequest;
@@ -53,12 +56,13 @@ async function navigate(tab,sub=state.sub,selection=null){
   const token=++navigation;await edits;state.tab=tab;
   const previousMonster=state.monster;
   state.monster=null;
-  if(tab==="enemies")sub="monsters";
+  if(["encumbrance","misc","tweaks"].includes(tab))sub=tab;
+  else if(tab==="enemies")sub="monsters";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
   if(sub!==state.sub||previousMonster||selection!==null){state.sub=sub;state.selected=selection??(tab==="enemies"&&previousMonster?`NpcParam:${previousMonster.id}`:null);state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies"||tab==="effects")await loadItems();else if(tab==="info")await loadDeployment();
+    if(["items","enemies","effects","encumbrance","misc","tweaks"].includes(tab))await loadItems();else if(tab==="info")await loadDeployment();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");
     if(token!==navigation)return;
     if(selection!==null){
@@ -80,8 +84,8 @@ async function deploymentAction(action){
   if(state.deployBusy)return;
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
   const confirmations={
-    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor keeps one backup of the original param archive the first time you apply, then replaces the installed copy with this project's saved edits.",confirmLabel:"Apply"},
-    disable:{title:"Restore the original installed param archive?",message:"Lexeditor copies its preserved original bytes back over the installed file. The mod project itself is unchanged.",confirmLabel:"Restore original"}
+    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive and enabled native rules, preserving each original once. Close the game first. Test native changes offline.",confirmLabel:"Apply"},
+    disable:{title:"Restore the original installed files?",message:"Lexeditor restores the original parameter archive and its owned native stamina/encumbrance changes. The mod project is unchanged.",confirmLabel:"Restore original"}
   };
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
   if(!ok)return;
@@ -105,11 +109,12 @@ function commit(row,field,value,control){
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
-      state.dirty=result.dirtyCount;
+      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
-      if(["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
+      if(row.table==="NativeRules"){render();}
+      else if(["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
       else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
     }catch(error){
       notify(error);
@@ -121,7 +126,7 @@ function commit(row,field,value,control){
 }
 function controlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
-  const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly};
+  const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly||field.disabled};
   // The shared shell still catches an edit attempt here and offers Create a
   // mod; disabling the control too matches the greyed-out, cursor:default
   // read-only look every other plugin's own fields already use instead of a
@@ -136,7 +141,7 @@ function controlFor(row,field){
     control.value=String(field.value);return control;
   }
   return el("input",{...attrs,type:"number",value:field.value,min:field.minimum,max:field.maximum,
-    step:/^(f|angle)/.test(field.dtype)?"any":1,onchange:event=>{
+    step:field.step??(/^(f|angle)/.test(field.dtype)?"any":1),onchange:event=>{
       const input=event.target;if(!input.value.trim()||!input.checkValidity()){input.reportValidity();return;}
       commit(row,field,Number(input.value),input);
     }});
@@ -179,7 +184,7 @@ function detail(){
         (usage.length?"Examples: "+usage.slice(0,3).map(source=>source.name).join(", ")+".":"No direct reference was found."))})]);
   }
   const impact=state.row.impact;
-  let help;
+  let help=state.row.help;
   if(impact){
     const route=state.rows.find(row=>key(row)===state.selected)?.route||"Not linked";
     const examples=impact.variants.slice(0,3).map(n=>`${n.name} #${n.id}`).join(", ");
@@ -204,8 +209,8 @@ function orderedRows(){
   });
 }
 function renderItems(){
-  const enemies=state.tab==="enemies",effects=state.tab==="effects",attacks=!!state.monster,
-    noun=attacks?"attacks":enemies?"monsters":effects?"effects":"items",label=enemies?"Enemies":effects?"Effects":"Items";
+  const enemies=state.tab==="enemies",effects=state.tab==="effects",encumbrance=state.tab==="encumbrance",attacks=!!state.monster,
+    noun=attacks?"attacks":enemies?"monsters":effects?"effects":encumbrance?"classes":"items",label=enemies?"Enemies":effects?"Effects":encumbrance?"Encumbrance":"Items";
   const rows=orderedRows();
   const view=pagedListDetail({className:"ds1-records",rows,key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
@@ -218,18 +223,30 @@ function renderItems(){
     master:({rows:listed,selected,select})=>columnList({rows:listed,key,selected,sortState:state.sort,
       sort:column=>{state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
-      columns:[{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]}),
+      columns:[{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start",...(encumbrance?{render:row=>row.id-10}:{})},{key:"name",label:"Name",sortable:true,grow:1}]}),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote(attacks&&!state.rows.length?
       "No attack link was resolved. Choose All attack records to inspect records without a confirmed link to this monster.":"Change the search to find a record.")]})});
   const links=state.attackLinks;
   const attackHelp=attacks?`Matches behavior variation ${links?.variation} across ${links?.behaviorCount} behavior records. `+
     `${links?.unresolved.length} references remain unresolved or lead to effects. Direct and projectile links are traced; animation use is unverified. `+
     "All attack records includes bosses, NPCs and records with unresolved ownership; Not linked means no supported link to this monster.":"";
-  return el("div",{class:"ds1-items"},subtabBar({tabs:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
+  return el("div",{class:"ds1-items"},subtabBar({tabs:encumbrance?[]:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
     attacks?actionRow(el("button",{type:"button",onclick:()=>navigate("enemies")},"Back to monsters"),
       el("span",{},state.monster.name),infoHelp(attackHelp)):null,
     attacks?subtabBar({tabs:[{id:"linked",label:"Referenced attacks"},{id:"all",label:"All attack records"}],order:"given",
       active:state.allAttacks?"all":"linked",label:"Attack scope",change:id=>openAttacks(state.monster,id==="all")}):null,view);
+}
+function renderTweaks(){
+  if(!state.row)return detail();
+  const groups=new Map();
+  for(const field of state.row.fields){
+    if(!groups.has(field.group))groups.set(field.group,[]);
+    groups.get(field.group).push(detailField({label:field.label,control:controlFor(state.row,field),
+      help:field.description?infoHelp(field.description):null}));
+  }
+  groups.get("Stamina rebalance")?.push(actionRow(el("button",{type:"button",onclick:()=>navigate("misc")},"Base regeneration")));
+  groups.get("Encumbrance rules")?.push(actionRow(el("button",{type:"button",onclick:()=>navigate("encumbrance")},"Edit encumbrance")));
+  return LexeditorUI.settingsColumns([...groups].map(([title,body])=>detailSection({title,body})));
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";
@@ -252,7 +269,8 @@ function renderInfo(){
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
       detailField({label:"SUPPORT",control:readonlyField("Items, monster resistances, enemy attacks and effects"),help:infoHelp("Edit documented item properties, reviewed monster resistances, enemy attack damage and special-effect properties. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")}),
-      detailField({label:"BASE RECOVERY",control:readonlyField("Not yet mapped"),help:infoHelp("Recovery adjustment in Effects is an additive modifier, including the Grass Crest Shield bonus. It does not edit the engine's absolute base recovery rate or equip-load thresholds. Player resonance effects are not a verified substitute for a global baseline setting.")})]}),
+      detailField({label:"BASE RECOVERY",control:el("button",{type:"button",onclick:()=>navigate("misc")},"Edit in Misc."),
+        help:infoHelp("Misc. edits the native baseline used by Stamina rebalance. Equipment and buff adjustments stay in Effects. Encumbrance edits load limits and recovery percentages.")})]}),
     detailSection({title:"INSTALLED GAME",body:[
       detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
       detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
@@ -264,10 +282,15 @@ function renderInfo(){
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
         el("button",{type:"button",disabled:state.deployBusy||!deploy.everApplied||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
+    detailSection({title:"NATIVE RULES",help:state.deployment?.rebalance?.applyHelp,body:[
+      detailField({label:"SUPPORTED EXECUTABLE",control:readonlyField(state.deployment?.rebalance?.native?.available?"Yes":"Unavailable"),
+        help:infoHelp(state.deployment?.rebalance?.native?.problem||"The executable matches the supported build or this editor's verified output. This is not an in-game acceptance result.")}),
+      detailField({label:"INSTALLED BASE RECOVERY",control:readonlyField(state.deployment?.rebalance?.native?.rate??"Unknown")})
+    ]}),
     modLoaderSection({loader:deploy.note||"Dark Souls Remastered reads this file as a loose file; no mod loader is installed.",
       output:"Apply replaces the installed param/GameParam/GameParam.parambnd.dcx with the mod project's saved copy, after preserving the original once.",
       order:"One complete parameter archive. Separate projects are not merged; applying a different project replaces what is currently installed.",
-      safety:"Apply and Disable touch only param/GameParam/GameParam.parambnd.dcx and refuse to continue if that file changed outside Lexeditor.",
+      safety:"Enabled native rules also change the supported executable. Apply and Restore refuse externally modified files and retain one original of each.",
       removal:"Restore original copies the preserved original bytes back over the installed file."})]});
 }
 function renderDataMap(){
@@ -277,12 +300,12 @@ function renderDataMap(){
     changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render();},
     changePage:value=>{state.mapPage=value;render();},
     changeSort:key=>{state.mapSort=[key,state.mapSort[0]===key?-state.mapSort[1]:1];render();},
-    open:row=>navigate(row.target==="enemies"?"enemies":row.target.startsWith("effects-")?"effects":"items",row.target)});
+    open:row=>navigate(["encumbrance","misc"].includes(row.target)?row.target:row.target==="enemies"?"enemies":row.target.startsWith("effects-")?"effects":"items",row.target)});
   state.mapPage=view.page;
   return view.content;
 }
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="datamap"?renderDataMap():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="datamap"?renderDataMap():state.tab==="tweaks"?renderTweaks():state.tab==="misc"?detail():renderItems());
   shell.refresh();
 }
 async function boot(){

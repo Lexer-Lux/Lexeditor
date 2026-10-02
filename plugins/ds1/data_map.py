@@ -2,7 +2,7 @@
 from .formats import SUBTABS, EFFECT_TABLE
 
 
-def build(document, source):
+def build(document, source, native_rules=None):
     rows = []
     for filename in document.members:
         table = filename.removesuffix(".param")
@@ -30,9 +30,12 @@ def build(document, source):
                      "status": "not-integrated", "coverage": "unavailable",
                      "sourceAvailable": False, "openable": False,
                      "notes": "Open a complete Remastered parameter archive to edit effects."})
-    rows.append({"id": "native-rules", "filename": "DarkSoulsRemastered.exe",
-                 "controls": "Native rules, including base stamina recovery",
-                 "status": "not-integrated", "coverage": "unavailable",
-                 "sourceAvailable": False, "openable": False,
-                 "notes": "The effects editor does not change native code or equip-load thresholds."})
+    available = bool(native_rules and native_rules["native"]["available"])
+    for key, label in (("misc", "Base stamina regeneration"), ("encumbrance", "Load limits and per-class stamina recovery")):
+        rows.append({"id": "native-" + key, "filename": "DarkSoulsRemastered.exe",
+                     "controls": label, "status": "partial", "coverage": "structured",
+                     "sourceAvailable": available, "openable": True,
+                     "targets": [{"id": key, "label": "Misc." if key == "misc" else "Encumbrance"}],
+                     "notes": "Enable the corresponding tweak, save, and Apply with the game closed. "
+                              "Only the fingerprinted build is supported. Animation timing, other native rules and in-game acceptance remain unverified."})
     return {"rows": rows}
