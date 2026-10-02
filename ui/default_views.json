@@ -1,4 +1,9 @@
 {
+  "ds1": {
+    "items": {
+      "ds1-items.help.339fa854.text": ""
+    }
+  },
   "ff8": {
     "enemies": {
       "lexeditor:barrels:ff8-enemies": "3",

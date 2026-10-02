@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <hit0_Radius />
+    <hit1_Radius />
+    <hit2_Radius />
+    <hit3_Radius />
+    <knockbackDist />
+    <hitStopTime />
+    <spEffectId0 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId3 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId4 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <hit0_DmyPoly1 />
+    <hit1_DmyPoly1 />
+    <hit2_DmyPoly1 />
+    <hit3_DmyPoly1 />
+    <hit0_DmyPoly2 />
+    <hit1_DmyPoly2 />
+    <hit2_DmyPoly2 />
+    <hit3_DmyPoly2 />
+    <blowingCorrection />
+    <atkPhysCorrection />
+    <atkMagCorrection />
+    <atkFireCorrection />
+    <atkThunCorrection />
+    <atkStamCorrection />
+    <guardAtkRateCorrection />
+    <guardBreakCorrection />
+    <atkThrowEscapeCorrection />
+    <atkSuperArmorCorrection />
+    <atkPhys />
+    <atkMag />
+    <atkFire />
+    <atkThun />
+    <atkStam />
+    <guardAtkRate />
+    <guardBreakRate />
+    <atkSuperArmor />
+    <atkThrowEscape />
+    <atkObj />
+    <guardStaminaCutRate />
+    <guardRate />
+    <throwTypeId />
+    <hit0_hitType Enum="ATK_PARAM_HIT_TYPE" />
+    <hit1_hitType Enum="ATK_PARAM_HIT_TYPE" />
+    <hit2_hitType Enum="ATK_PARAM_HIT_TYPE" />
+    <hit3_hitType Enum="ATK_PARAM_HIT_TYPE" />
+    <hti0_Priority />
+    <hti1_Priority />
+    <hti2_Priority />
+    <hti3_Priority />
+    <dmgLevel Enum="ATKPARAM_REP_DMGTYPE" />
+    <mapHitType Enum="ATK_PARAM_MAP_HIT" />
+    <guardCutCancelRate />
+    <atkAttribute Enum="ATKPARAM_ATKATTR_TYPE" />
+    <spAttribute Enum="ATKPARAM_SPATTR_TYPE" />
+    <atkType Enum="BEHAVIOR_ATK_TYPE" />
+    <atkMaterial Enum="WEP_MATERIAL_ATK" />
+    <atkSize Enum="BEHAVIOR_ATK_SIZE" />
+    <defMaterial Enum="WEP_MATERIAL_ATK" />
+    <defSfxMaterial Enum="WEP_MATERIAL_DEF_SFX" />
+    <hitSourceType Enum="ATK_PARAM_HIT_SOURCE" />
+    <throwFlag Enum="ATK_PATAM_THROWFLAG_TYPE" />
+    <disableGuard IsBool="" />
+    <disableStaminaAttack IsBool="" />
+    <disableHitSpEffect IsBool="" />
+    <IgnoreNotifyMissSwingForAI IsBool="" />
+    <repeatHitSfx IsBool="" />
+    <isArrowAtk IsBool="" />
+    <isGhostAtk IsBool="" />
+    <isDisableNoDamage IsBool="" />
+    <pad Padding="" />
+  </Field>
+</PARAMMETA>

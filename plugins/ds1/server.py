@@ -1,4 +1,4 @@
-"""Loopback item editor; installed data is never a write destination."""
+"""Loopback parameter editor; only explicit deployment writes installed data."""
 from http.server import ThreadingHTTPServer
 import json
 import os
@@ -25,11 +25,14 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row'):
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks'):
             try:
                 with LOCK:
                     if path == '/api/state':
                         result = STORE.state()
+                    elif path == '/api/attacks':
+                        result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
+                        result['dirtyCount'] = STORE.get().dirty_count
                     elif path == '/api/table':
                         result = {'rows': STORE.get().list_rows(query.get('tab', [''])[0]), 'dirtyCount': STORE.get().dirty_count}
                     else:
@@ -50,7 +53,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["items", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
+                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):

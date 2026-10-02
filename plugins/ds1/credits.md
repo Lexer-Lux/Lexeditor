@@ -7,7 +7,7 @@ and executable name. Reviewed official source at commit
 Repository: https://github.com/vawser/Smithbox
 
 This plugin uses Lexeditor's existing installation discovery, shared shell,
-and fixed-field PARAM reader. DS1 item definitions, English annotations,
+and fixed-field PARAM reader. DS1 item, NPC, attack, behavior and projectile definitions, English annotations,
 row names and enums are selectively vendored from Smithbox under MIT.
 Exact source paths and upstream hashes are in `metadata/SOURCE.json`.
 No Smithbox executable implementation, dependencies, binaries, or GPL code

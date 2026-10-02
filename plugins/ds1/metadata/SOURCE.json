@@ -7,7 +7,7 @@
     "WEP_CORRECT_TYPE"
   ],
   "transformations": [
-    "UTF-8 BOM removed; XML declarations normalized to UTF-8."
+    "UTF-8/UTF-16 BOMs removed; XML declarations normalized to UTF-8."
   ],
   "files": {
     "annotations/EQUIP_PARAM_ACCESSORY_ST.json": {
@@ -253,6 +253,58 @@
     "row_names/NpcParam.json": {
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/NpcParam.json",
       "sha256": "9123730fefaaeb93050b16ffea15d51a14b3e7ed354e5e5c983bd922b00fa985"
+    },
+    "defs/AtkParam_Npc.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/AtkParam.xml",
+      "sha256": "a72a9bed8bad372aca03d0502b155fd73be9f001a9338231416b2be459f45f48"
+    },
+    "meta/AtkParam_Npc.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/AtkParam.xml",
+      "sha256": "d63d52aa29817068bcf6db085f46f94a5e84bd546630389b7c82b1f7b084c12a"
+    },
+    "annotations/ATK_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/ATK_PARAM_ST.json",
+      "sha256": "65877c9b2def31259b2152636caaf4f47f35a8988ac8d95fca49d532e9240306"
+    },
+    "row_names/AtkParam_Npc.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/AtkParam_Npc.json",
+      "sha256": "dc3ff562e90a49002ededec9b26f3649407e706abbc69eca6fd55a627cd89b3b"
+    },
+    "defs/BehaviorParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/BehaviorParam.xml",
+      "sha256": "d04fe6fbadfbf4924860a5b41556d9c6db20d824a88b92724a0c7afca4afdcd9"
+    },
+    "meta/BehaviorParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/BehaviorParam.xml",
+      "sha256": "a74a02f5af039a0f23b4bbc7e0f1fb0daf6119a7a2cbf75866ed16e1289fb90c"
+    },
+    "annotations/BEHAVIOR_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/BEHAVIOR_PARAM_ST.json",
+      "sha256": "97895141ee1d2ea654114f664337ae8fd83fd1c548226cb3266e0df412fb9882"
+    },
+    "row_names/BehaviorParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/BehaviorParam.json",
+      "sha256": "1de0623181ab9c2cdeb8cfd302fafc2bce4b070f534c281ae227c72523a34248"
+    },
+    "annotations/BULLET_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/BULLET_PARAM_ST.json",
+      "sha256": "b5dd7a4551d59d4232b0b4d9ee9a13cf6b0a6de62ed04dfde56ccf3cd89d3631"
+    },
+    "row_names/Bullet.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/Bullet.json",
+      "sha256": "18da446b10c430ac77e0392ba4883b9d37926fb74a15c08a98fd8edd1b4466b6"
+    },
+    "defs/Bullet.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/BulletParam.xml",
+      "sha256": "34f521974a839d820fe0fe6835f2012b8bdd718a40687d669dde5d5ec64c7b0d"
+    },
+    "meta/Bullet.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/BulletParam.xml",
+      "sha256": "c03823e9dd41b31a1083046c9733a4dec9412f78bae7d19b3113de0d4fa298f8"
+    },
+    "enums/ATKPARAM_ATKATTR_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATKPARAM_ATKATTR_TYPE.json",
+      "sha256": "5558365cfdf67e4d540558de570b2e3dfc02a11a51fa8cf2278df55aa51a71f6"
     }
   }
 }

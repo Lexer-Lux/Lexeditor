@@ -1706,15 +1706,35 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, selected)}
 
-    def create_mod_project(self, plugin_id: str, name: str) -> dict:
-        """Clone the plugin's valid starter into a new selected folder."""
-        current = Path(self._projects.snapshot(plugin_id)["current"])
-        selected = self._choose_folder(str(current.parent))
-        if not selected:
-            return {**self._projects.snapshot(plugin_id), "cancelled": True}
-        project = self._projects.create(plugin_id, selected, name)
+    def create_mod_project(self, plugin_id: str, name: str, parent: str = "") -> dict:
+        """Clone the plugin's valid starter into the mod library, or `parent`.
+
+        Naming a mod is all a reader needs: it lands under this game's own
+        folder in the mod library shown in Settings, created the first time
+        a game uses it. Choosing a different location is `parent`, the
+        explicit alternate `choose_mod_project_location` picks out; it is
+        never implied by the default call.
+        """
+        if parent:
+            target_parent = Path(parent)
+        else:
+            target_parent = Path(self.mod_library_location()["root"]) / plugin_id
+            target_parent.mkdir(parents=True, exist_ok=True)
+        project = self._projects.create(plugin_id, str(target_parent), name)
         return {**self._restart_for_project(plugin_id, project),
-                "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
+                "contents": self._projects.contents(plugin_id, str(target_parent / name))}
+
+    def choose_mod_project_location(self, plugin_id: str) -> dict:
+        """Let the reader pick a different parent folder for a new mod.
+
+        This is the explicit alternate to create_mod_project's default: the
+        reader opens this only by choice, never as a forced step in naming
+        a mod.
+        """
+        default_parent = Path(self.mod_library_location()["root"]) / plugin_id
+        anchor = default_parent if default_parent.is_dir() else default_parent.parent
+        selected = self._choose_folder(str(anchor))
+        return {"parent": selected, "cancelled": not bool(selected)}
 
     def _reshade_root(self, plugin_id: str) -> Path | None:
         """Where this game's ReShade loader belongs, as the game declares it.

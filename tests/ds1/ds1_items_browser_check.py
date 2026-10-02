@@ -127,7 +127,14 @@ def main():
                     vanilla.wait_for_function('document.documentElement.dataset.lexProjectReadonly==="true"')
                     assert vanilla.locator('#global-save').is_disabled()
                     assert 'Vanilla' in vanilla.locator('.lex-project-control').inner_text()
-                    vanilla.locator('input[data-field-key]:visible').first.click()
+                    # The field is disabled now, matching every other plugin's
+                    # read-only look. A real mouse click at its position still
+                    # reaches the shared shell's document-level edit-attempt
+                    # gate, so click by position rather than through
+                    # Playwright's own actionability check, which refuses to
+                    # drive a disabled element at all.
+                    field_box = vanilla.locator('input[data-field-key]:visible').first.bounding_box()
+                    vanilla.mouse.click(field_box['x'] + field_box['width'] / 2, field_box['y'] + field_box['height'] / 2)
                     dialog = vanilla.locator('.lex-dialog')
                     dialog.wait_for()
                     assert 'Create a mod' in dialog.inner_text()

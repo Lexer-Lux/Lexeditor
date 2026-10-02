@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <atkId_Bullet Refs="AtkParam_Pc,AtkParam_Npc" DeepCopyTarget="Attack" />
+    <sfxId_Bullet ParticleAlias="" />
+    <sfxId_Hit ParticleAlias="" />
+    <sfxId_Flick ParticleAlias="" />
+    <life />
+    <dist />
+    <shootInterval />
+    <gravityInRange />
+    <gravityOutRange />
+    <hormingStopRange />
+    <initVellocity />
+    <accelInRange />
+    <accelOutRange />
+    <maxVellocity />
+    <minVellocity />
+    <accelTime />
+    <homingBeginDist />
+    <hitRadius />
+    <hitRadiusMax />
+    <spreadTime />
+    <expDelay />
+    <hormingOffsetRange />
+    <dmgHitRecordLifeTime />
+    <externalForce />
+    <spEffectIDForShooter Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <autoSearchNPCThinkID Refs="NpcThinkParam" />
+    <HitBulletID Refs="Bullet" DeepCopyTarget="Bullet" />
+    <spEffectId0 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId3 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectId4 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <numShoot />
+    <homingAngle />
+    <shootAngle />
+    <shootAngleInterval />
+    <shootAngleXInterval />
+    <damageDamp />
+    <spelDamageDamp />
+    <fireDamageDamp />
+    <thunderDamageDamp />
+    <staminaDamp />
+    <knockbackDamp />
+    <shootAngleXZ />
+    <lockShootLimitAng />
+    <isPenetrate IsBool="" />
+    <prevVelocityDirRate />
+    <atkAttribute Enum="ATKPARAM_ATKATTR_TYPE" />
+    <spAttribute Enum="ATKPARAM_SPATTR_TYPE" />
+    <Material_AttackType Enum="BEHAVIOR_ATK_TYPE" />
+    <Material_AttackMaterial Enum="WEP_MATERIAL_ATK" />
+    <Material_Size Enum="BEHAVIOR_ATK_SIZE" />
+    <launchConditionType Enum="BULLET_LAUNCH_CONDITION_TYPE" />
+    <FollowType Enum="BULLET_FOLLOW_TYPE" />
+    <EmittePosType Enum="BULLET_EMITTE_POS_TYPE" />
+    <isAttackSFX IsBool="" />
+    <isEndlessHit IsBool="" />
+    <isPenetrateMap IsBool="" />
+    <isHitBothTeam IsBool="" />
+    <isUseSharedHitList IsBool="" />
+    <isUseMultiDmyPolyIfPlace IsBool="" />
+    <attachEffectType Enum="BULLET_ATTACH_EFFECT_TYPE" />
+    <isHitForceMagic IsBool="" />
+    <isIgnoreSfxIfHitWater IsBool="" />
+    <isIgnoreMoveStateIfHitWater IsBool="" />
+    <isHitDarkForceMagic IsBool="" />
+    <pad Padding="" />
+  </Field>
+</PARAMMETA>

@@ -1,4 +1,4 @@
-"""Fixed-size DS1 item edits. Preserve all archive bytes outside edited cells.
+"""Fixed-size DS1 item/resistance/attack edits; preserve other bytes.
 
 BND3/DCX facts: Apache-2.0 SoulsTemplates (see credits.md). PARAM cell codecs
 are reused from Lexeditor's DS3 integration; no SoulsFormats code is used.
@@ -14,11 +14,15 @@ import xml.etree.ElementTree as ET
 import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
+from .monsters import RESISTANCES, classified_monster
+from .attacks import ATTACK_FIELDS, AttackReferences
 
 FormatError = DS3FormatError
 METADATA = Path(__file__).with_name('metadata')
 TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
-          'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2)}
+          'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2),
+          'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1),
+          'BehaviorParam': (32, 2), 'Bullet': (160, 2)}
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -29,6 +33,7 @@ SUBTABS = (
     ('weapons', 'Weapons', 'EquipParamWeapon'), ('ammo', 'Ammo', 'EquipParamWeapon'),
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
 )
+ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
 
 
 def inflate(source):
@@ -96,7 +101,7 @@ def _enum(name):
             for row in raw['Options']}
 
 
-@lru_cache(maxsize=5)
+@lru_cache(maxsize=9)
 def schema(table):
     if table not in TABLES:
         raise FormatError('Unsupported item table')
@@ -131,13 +136,24 @@ def schema(table):
             field_offset = bit_start
         attrs, annotation = metadata.get(key, {}), annotations.get(key, {})
         label = annotation.get('Name') or key
+        description, group = annotation.get('Description', ''), 'Properties'
+        if table == 'NpcParam' and key in RESISTANCES:
+            label, group, description = RESISTANCES[key]
+        if table == 'AtkParam_Npc' and key in ATTACK_FIELDS:
+            label, group, description = ATTACK_FIELDS[key]
         enum_name = attrs.get('Enum') or node.findtext('Enum')
         if 'IsBool' in attrs or enum_name == 'EQUIP_BOOL': enum_name = None
         choices = _enum(enum_name) if enum_name else {}
+        if table == 'AtkParam_Npc' and key == 'atkAttribute':
+            choices = {**choices, '0': 'Standard'}
         padding = dtype == 'dummy8' or 'Padding' in attrs or key.lower().startswith('pad')
         protected = padding or count != 1 or 'Obsolete' in attrs or not annotation or (enum_name and not choices) or bool(re.search(r'unknown|unused|dummy|reserved|^unk', label, re.I))
+        if table == 'NpcParam' and key not in RESISTANCES:
+            protected = True
+        if table in ('BehaviorParam', 'Bullet') or (table == 'AtkParam_Npc' and key not in ATTACK_FIELDS):
+            protected = True
         field = FieldSpec(key, dtype, field_offset, count, bit_used if bits else None, bits,
-                          label, annotation.get('Description', ''), 'Properties',
+                          label, description, group,
                           'IsBool' in attrs or bits == 1, enum_name, attrs.get('Refs'), padding)
         low, high = field.minimum, field.maximum
         if low is None:
@@ -204,11 +220,13 @@ class ItemDocument:
         return read_field(self._row(table, row_id)[2], field, '<')
 
     def list_rows(self, tab):
-        match = next((entry for entry in SUBTABS if entry[0] == tab), None)
-        if match is None: raise FormatError('Unknown Items subtab')
+        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS if entry[0] == tab), None)
+        if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
         result = []
         for row in self.params[table].rows:
+            if table == 'NpcParam' and not self.is_monster(row.row_id):
+                continue
             if table == 'EquipParamGoods':
                 category = self.value(table, row.row_id, 'goodsType')
                 if tab != ('keys' if category == 1 else 'upgrades' if category == 2 else 'consumables'):
@@ -226,22 +244,45 @@ class ItemDocument:
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + (self.schemas[table]['names'].get(row.row_id) or row.name or str(row.row_id)), 'table': table})
         return result
 
+    def is_monster(self, row_id):
+        return classified_monster(row_id, self.schemas['NpcParam']['names'].get(row_id),
+                                  self.value('NpcParam', row_id, 'npcType'))
+
+    def attack_references(self):
+        if not hasattr(self, '_attack_references'):
+            self._attack_references = AttackReferences(self)
+        return self._attack_references
+
     def read_row(self, table, row_id):
+        if table == 'NpcParam' and not self.is_monster(row_id):
+            raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
         fields = []
         for item in self.schemas[table]['fields']:
             field = item['spec']
+            if table == 'NpcParam' and field.key not in RESISTANCES:
+                continue
+            if table == 'AtkParam_Npc' and field.key not in ATTACK_FIELDS:
+                continue
             if field.padding or field.array_length != 1: continue
             value = read_field(data, field, '<')
             finite = not isinstance(value, float) or math.isfinite(value)
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
+                           'group': field.group if table in ('NpcParam', 'AtkParam_Npc') else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if item['enum'] else 'number',
                            'minimum': item['min'], 'maximum': item['max'], 'enum': item['enum'],
                            'editable': item['editable'] and finite})
-        return {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or f'Item {row_id}', 'fields': fields}
+        if table == 'NpcParam':
+            order = {key: index for index, key in enumerate(RESISTANCES)}
+            fields.sort(key=lambda field: order[field['key']])
+        result = {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or f'Item {row_id}', 'fields': fields}
+        if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
+        return result
 
     def edit(self, table, row_id, key, value):
+        if table == 'NpcParam' and not self.is_monster(row_id):
+            raise FormatError('This record is not a reviewed standard monster')
         row, start, data = self._row(table, row_id)
         item = next((f for f in self.schemas[table]['fields'] if f['spec'].key == key), None)
         if item is None or not item['editable']:

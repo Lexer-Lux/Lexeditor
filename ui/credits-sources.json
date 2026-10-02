@@ -844,7 +844,7 @@
       "contributions": [
         {
           "name": "Vawser and Smithbox contributors",
-          "role": "Dark Souls Remastered detection reference and MIT-licensed DS1 item definitions, annotations, row names and enums. No upstream executable code or dependencies are copied.",
+          "role": "Dark Souls Remastered detection reference and MIT-licensed DS1 item, NPC, attack, behavior and projectile definitions, annotations, row names and enums. No upstream executable code or dependencies are copied.",
           "url": "https://github.com/vawser/Smithbox"
         },
         {

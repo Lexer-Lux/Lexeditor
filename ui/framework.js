@@ -1496,17 +1496,44 @@
   document.fonts?.addEventListener?.("loadingdone", () => alignReferenceRails(document));
   document.fonts?.ready?.then(() => alignReferenceRails(document));
 
+  // A section heading is renamed the same way a property name is: a
+  // developer double-clicks it, types, and the wording ships for everyone
+  // who sees that title. The key is the shipped title text itself, so every
+  // tab's own copy of the same heading (DS1's "Combat" on Items, Monsters
+  // and Attacks) reads one chosen wording, the same rule a field label
+  // follows.
+  const sectionTitleKey = title =>
+    `${shellPluginId()}-${activePageTab()}.section.${title}.label`;
   // Shared Detail internals. A game supplies its theme and field controls;
   // this component owns the repeated section and field structure.
-  const detailSection = (options = {}) => element(options.collapsible ? "details" : "section", {
-    ...(options.attrs || {}),
-    class: ["lex-detail-section", options.className || ""].filter(Boolean).join(" "),
-    "data-lex-layout-section": options.layoutKey || (typeof options.title === "string" ? options.title : ""),
-    "aria-label": options.ariaLabel || (typeof options.title === "string" ? options.title : null),
-    ...(options.collapsible && options.open ? {open: true} : {}),
-  }, options.title ? element(options.collapsible ? "summary" : "h3", {class: "lex-detail-section-title"},
-    options.title, options.help || null) : null,
-  element("div", {class: "lex-detail-section-content"}, options.body || []));
+  const detailSection = (options = {}) => {
+    const shippedTitle = typeof options.title === "string" ? options.title : "";
+    // A collapsible section's own summary already owns its click (open or
+    // close); renaming it in place there would fight the native toggle, so
+    // only a plain section heading gets the double-click editor.
+    const titleText = shippedTitle && !options.collapsible
+      ? (() => {
+          const node = element("span", {class: "lex-detail-section-title-text"},
+            savedLabel(sectionTitleKey(shippedTitle), shippedTitle));
+          node.addEventListener("dblclick", event => {
+            if (!sharedSettingsSnapshot?.developerMode) return;
+            event.preventDefault();
+            event.stopPropagation();
+            renameInPlace(sectionTitleKey(shippedTitle), activePageTab(), shippedTitle, node);
+          });
+          return node;
+        })()
+      : options.title;
+    return element(options.collapsible ? "details" : "section", {
+      ...(options.attrs || {}),
+      class: ["lex-detail-section", options.className || ""].filter(Boolean).join(" "),
+      "data-lex-layout-section": options.layoutKey || shippedTitle,
+      "aria-label": options.ariaLabel || shippedTitle || null,
+      ...(options.collapsible && options.open ? {open: true} : {}),
+    }, options.title ? element(options.collapsible ? "summary" : "h3", {class: "lex-detail-section-title"},
+      titleText, options.help || null) : null,
+    element("div", {class: "lex-detail-section-content"}, options.body || []));
+  };
 
   // What a section says when it holds nothing. A section with no rows used to
   // invent one - a property named for the storage state rather than for
@@ -2669,7 +2696,7 @@
       || name(a).localeCompare(name(b), undefined, {numeric: true, sensitivity: "base"}));
     return subtabBarElement({...options, tabs});
   };
-  const subtabBarElement = (options = {}) => (options.tabs || []).length < 2
+  const subtabBarElement = (options = {}) => (options.tabs || []).length < (options.showSingle ? 1 : 2)
     ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
     : element("div", {
     class: ["lex-subtab-bar", options.flush === true ? "lex-subtab-bar-flush" : "",
@@ -5092,23 +5119,36 @@
     const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
     const input = element("input", {type: "text", maxlength: "80", value: suggested, placeholder: `${pluginName} mod name`, "aria-label": options.rename ? "Mod name" : "New mod name"});
     const message = element("div", {class: "lex-dialog-status", "aria-live": "polite"});
+    let parent = "";
     const cancel = element("button", {class: "lex-dialog-action"}, "Cancel");
-    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Choose Location…"));
+    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Create"));
     const close = value => { backdrop.remove(); resolve(value); };
-    cancel.onclick = () => close("");
+    cancel.onclick = () => close(null);
     create.onclick = () => {
       const value = input.value.trim();
       if (!value) { message.textContent = "Enter a mod name."; input.focus(); return; }
-      close(value);
+      close(options.rename ? value : {name: value, parent});
     };
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") create.click();
-      if (event.key === "Escape") close("");
+      if (event.key === "Escape") close(null);
     });
+    // Creating only asks for a name: the mod lands in this game's own
+    // folder in the mod library shown in Settings. Choosing a different
+    // location is a separate, explicit action, so naming a mod never
+    // requires picking through a folder tree first.
+    const location = !options.rename && typeof options.chooseLocation === "function"
+      ? element("button", {type: "button", class: "lex-dialog-link", onclick: async () => {
+          const chosen = await options.chooseLocation();
+          if (chosen?.cancelled || !chosen?.parent) return;
+          parent = chosen.parent;
+          message.textContent = `Will be created in: ${parent}`;
+        }}, "Choose a different location…")
+      : null;
     backdrop.append(element("section", {class: "lex-dialog lex-project-dialog", role: "dialog", "aria-modal": "true"},
       element("h2", {}, options.rename ? "Rename Mod" : "Create New Mod"),
       element("p", {}, options.rename ? "Change the mod project folder name." : (options.description || "Lexeditor will create a new editable project from this game's working template.")),
-      input, message, element("div", {class: "lex-dialog-actions"}, cancel, create)));
+      input, message, element("div", {class: "lex-dialog-actions"}, location, cancel, create)));
     document.body.append(backdrop); input.focus(); input.select();
     });
   };
@@ -5161,9 +5201,10 @@ ${contents.path}`});
   // game's own page both need it, and a page that is showing the game's own
   // read-only data needs it most.
   const createModProject = async (pluginId, options = {}) => {
-    const name = await askProjectName(options.pluginName || pluginId, options);
-    if (!name) return null;
-    return callWindow("create_mod_project", pluginId, name);
+    const named = await askProjectName(options.pluginName || pluginId,
+      {...options, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
+    if (!named) return null;
+    return callWindow("create_mod_project", pluginId, named.name, named.parent || "");
   };
 
   const mountProjectControl = (options, host) => {
@@ -5381,12 +5422,19 @@ ${contents.path}`});
         // does not have one, Blank included.
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
-          const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
-          if (projectName) guarded(async () => {
+          // Choosing a different location only makes sense for a game whose
+          // mods are files on disk; a plugin with its own createProject
+          // (Blank's in-browser samples) has no folder to offer one for.
+          const named = await askProjectName(options.plugin.name || options.plugin.id, {
+            ...(options.projectCreatePrompt || {}),
+            chooseLocation: options.createProject ? undefined
+              : () => callWindow("choose_mod_project_location", options.plugin.id),
+          });
+          if (named) guarded(async () => {
             const result = options.createProject
-              ? await options.createProject(projectName)
-              : await callWindow("create_mod_project", options.plugin.id, projectName);
-            if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${projectName}`);
+              ? await options.createProject(named.name)
+              : await callWindow("create_mod_project", options.plugin.id, named.name, named.parent || "");
+            if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${named.name}`);
             return result;
           });
         },
@@ -5441,6 +5489,17 @@ ${contents.path}`});
     const isEditAttempt = target => {
       if (!target?.closest?.("main") || target.closest?.("button") ||
           target.closest?.(READONLY_EXEMPT)) return false;
+      // A developer's double-click on a property name, a section heading or
+      // a help bubble rewords Lexeditor's own shipped text, not the record's
+      // data, so it is never gated behind having a mod open. The in-place
+      // editor it opens is covered by READONLY_EXEMPT above. Developer Mode
+      // is Lexer's own authenticated identity (lexeditor_settings), so
+      // nobody else ever sees this exemption; the record's own input,
+      // select or textarea is untouched by it and still asks to create a
+      // mod.
+      if (sharedSettingsSnapshot?.developerMode &&
+          target.closest?.(".lex-detail-field-label-text,.lex-detail-section-title,.lex-info-help"))
+        return false;
       return Boolean(target.closest?.(".lex-detail-field,.lex-toggle"))
         || Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
     };
@@ -5472,9 +5531,9 @@ ${contents.path}`});
         const agreed = await confirmAction({title:"Make an editable copy?",
           message:"This mod updates automatically, so direct edits would be lost. Make a copy with a new name to create your own version. You have my blessing.", confirmLabel:"Make a copy"});
         if (!agreed) return;
-        const copyName = await askProjectName(options.plugin.name, {value:`${current.name} Copy`,
+        const copyNamed = await askProjectName(options.plugin.name, {value:`${current.name} Copy`,
           createLabel:"Create copy", description:"Choose a name for your independent editable copy. It will be stored in the mod library."});
-        if (copyName) await guarded(() => callWindow("copy_library_mod", options.plugin.id, current.path, copyName));
+        if (copyNamed) await guarded(() => callWindow("copy_library_mod", options.plugin.id, current.path, copyNamed.name));
       } finally { copyPromptOpen = false; }
     };
     document.addEventListener("pointerdown", protectManagedEdit, true);
@@ -5659,12 +5718,12 @@ ${contents.path}`});
             const agreed = await confirmAction({title:"Create an editable copy?",
               message:"Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel:"Make a copy"});
             if (!agreed) return;
-            const name = await askProjectName("mod", {value:`${row.name} Copy`,
+            const named = await askProjectName("mod", {value:`${row.name} Copy`,
               createLabel:"Create copy", description:"Choose a name for your independent editable copy. It will be stored in the mod library."});
-            if (!name) return;
+            if (!named) return;
             copy.disabled = true;
             try {
-              const result = await callWindow("copy_library_mod", pluginId, row.path, name);
+              const result = await callWindow("copy_library_mod", pluginId, row.path, named.name);
               if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
             } catch (error) { failure(error); copy.disabled = false; }
           }}, "Make editable copy…");
@@ -9056,10 +9115,14 @@ ${contents.path}`});
   };
 
   // Editing chrome that stays live in a read-only project: none of it changes
-  // record data.
+  // record data. The in-place rename input and the help-bubble editor only
+  // ever exist while Developer Mode is on (their own dblclick handlers check
+  // it before creating them), so exempting them here never opens an edit a
+  // reader without that identity could reach.
   const READONLY_EXEMPT = [".lex-pager", ".lex-searcher", ".lex-search", ".lex-dialog",
     ".lex-dialog-backdrop", ".lex-modal", ".lex-global-settings", ".lex-project-control",
     ".lex-shortcut-panel", ".lex-github-workspace", ".lex-toast-stack", ".lex-data-map",
+    ".lex-label-rename", ".lex-help-edit",
     "header", "nav"].join(",");
   const readonlyProject = () =>
     document.documentElement.getAttribute("data-lex-project-readonly") === "true";

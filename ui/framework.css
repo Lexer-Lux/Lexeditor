@@ -3587,6 +3587,28 @@ body:has(.lex-data-map-table) #main {
   min-height: 20px;
   color: var(--lex-highlight);
 }
+
+/* The explicit alternate to a dialog's default action - choosing a
+   different mod location instead of the game's own library folder - reads
+   as a link, not a third button competing with Cancel and the primary
+   action. */
+.lex-dialog-link {
+  margin-right: auto;
+  padding: 0;
+  color: var(--lex-highlight);
+  border: 0;
+  background: transparent;
+  font: 700 13px/1 var(--lex-font);
+  text-decoration: underline;
+  cursor: pointer;
+  align-self: center;
+}
+.lex-dialog-link:hover, .lex-dialog-link:focus-visible {
+  color: var(--lex-accent-text);
+  background: var(--lex-accent);
+  outline: 2px solid var(--lex-highlight);
+  outline-offset: 2px;
+}
 .lex-project-menu > .lex-dialog-status { text-align:center; }
 
 .lex-global-settings {
@@ -7294,6 +7316,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  padding: var(--lex-detail-heading-padding, 4px); gap: var(--lex-panel-body-gap, 10px);
 }
 .lex-detail-panel-body > .lex-detail-section { flex: var(--lex-section-flex, 0 0 auto); }
+/* Paginated detail bodies contain dealt columns, not a vertical stack of
+   sections. Keep those columns stretched across the available pane width. */
+.lex-detail-panel-body.lex-tweak-card-grid { flex-direction:row; }
 /* Natural stacks retain their rows' height; the panel scrolls their contents. */
 .lex-detail-panel-body > .lex-stack-natural { flex:0 0 auto; }
 .lex-tabbed-panel-content {

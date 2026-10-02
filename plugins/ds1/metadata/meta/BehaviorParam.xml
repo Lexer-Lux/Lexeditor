@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self Row0Dummy="" />
+  <Field>
+    <variationId VRef="BehaviorVariation" />
+    <behaviorJudgeId />
+    <ezStateBehaviorType_old />
+    <refType Enum="BEHAVIOR_REF_TYPE" />
+    <pad0 Padding="" />
+    <refId Refs="AtkParam_Pc(refType=0),AtkParam_Npc(refType=0),Bullet(refType=1),SpEffectParam(refType=2)" DeepCopyTarget="Behavior" />
+    <sfxVariationId />
+    <stamina />
+    <mp />
+    <category Enum="BEHAVIOR_CATEGORY" />
+    <heroPoint />
+    <pad1 Padding="" />
+  </Field>
+</PARAMMETA>
