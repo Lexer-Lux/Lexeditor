@@ -7,9 +7,9 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import deployment
+from . import deployment, sprint_deployment
 from .formats import FormatError
-from .store import ItemStore
+from .sprint_editor import SprintItemStore as ItemStore
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -41,6 +41,10 @@ class Handler(PluginRequestHandler):
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
+        if path == '/api/sprint':
+            with LOCK:
+                self.send_json({'sprint': sprint_deployment.status(STORE.game_root)})
+            return
         if path == '/api/deployment':
             try:
                 with LOCK:
@@ -53,7 +57,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
+                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "out-of-combat-sprint"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -71,7 +75,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable'):
+            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable',
+                            '/api/sprint/apply', '/api/sprint/restore'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -90,6 +95,13 @@ class Handler(PluginRequestHandler):
                     result = STORE.save()
                 elif path == '/api/discard':
                     result = STORE.discard()
+                elif path.startswith('/api/sprint/'):
+                    STORE.writable()
+                    if STORE.get().dirty_count:
+                        raise ValueError('Save or discard changes before applying or restoring sprint.')
+                    STORE.sprint.prepare_save()
+                    result = sprint_deployment.apply(
+                        STORE.game_root, STORE.sprint.saved_enabled if path.endswith('/apply') else False)
                 elif path == '/api/deployment/apply':
                     result = deployment.apply(STORE.game_root, STORE.project)
                 else:
