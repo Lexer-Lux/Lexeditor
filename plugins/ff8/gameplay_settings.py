@@ -304,7 +304,7 @@ def save(data: dict, game_root: Path | None = None,
     changed_files = [
         patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project),
         settings_path(project), shared_magic_runtime_config.path(project),
-        *(Path(row["path"]) / "mod.json" for row in catalog if not row["selected"]),
+        *(runtime_layout._metadata_path(Path(row["path"])) for row in catalog if not row["selected"]),
         *(Path(tweak_rows[mod_id]["path"]) / script_mods.VALUES_FILE for mod_id in value_changes),
     ]
     if install_runtime:
@@ -337,6 +337,17 @@ def save(data: dict, game_root: Path | None = None,
         if install_runtime:
             status = ffnx_manager.status(game, ffnx_manager.STATE_PATH, direct_root=direct_root)
             if (built["driver"] or shared_magic) and not status.get("sharedMagicInventoryRuntime"):
+                # A later configuration failure must undo the driver install
+                # too, not only the selected settings and FFNx.toml.
+                package = ffnx_manager.runtime_package.verify()
+                snapshots.extend(_snapshot_files([
+                    game / ffnx_manager.runtime_package.DRIVER_NAME,
+                    game / package["steamApiName"],
+                    game / "steam_appid.txt",
+                    ffnx_manager.STATE_PATH,
+                    *(game / package["shaderDirName"] / shader.name
+                      for shader in Path(package["packagedShaderRoot"]).glob("*") if shader.is_file()),
+                ]))
                 ffnx_manager.install_derivative(
                     game, state_path=ffnx_manager.STATE_PATH, direct_root=direct_root,
                     game_running=ffnx_manager._game_running,

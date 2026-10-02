@@ -297,14 +297,87 @@ def describe(root: Path, context: Any) -> dict:
     return result
 
 
-def _safe_output(relative: str, allowed_roots: tuple[str, ...]) -> PurePosixPath:
-    path = PurePosixPath(str(relative).replace("\\", "/"))
+def _safe_output(relative: str, allowed_roots: tuple[str, ...] | None) -> PurePosixPath:
+    if not isinstance(relative, str):
+        raise ScriptModError("A generated file path must be a string")
+    path = PurePosixPath(relative.replace("\\", "/"))
     if (path.is_absolute() or not path.parts or any(part in ("", ".", "..") or ":" in part for part in path.parts)
-            or owns(path) or path.name == "mod.json"):
+            or owns(path.as_posix().casefold()) or path.name.casefold() == "mod.json"):
         raise ScriptModError(f"A tweak may not write {relative}")
-    if not any(path.parts[0].casefold() == root.casefold() for root in allowed_roots):
+    if allowed_roots is not None and not any(path.parts[0].casefold() == root.casefold() for root in allowed_roots):
         raise ScriptModError(f"{relative} is outside {', '.join(allowed_roots)}")
     return path
+
+
+def _contained_target(root: Path, path: PurePosixPath) -> Path:
+    target = root / Path(*path.parts)
+    try:
+        target.resolve().relative_to(root.resolve())
+    except (ValueError, OSError, RuntimeError) as error:
+        raise ScriptModError(f"{path} resolves outside the mod or cannot be resolved") from error
+    if target.exists() and not target.is_file():
+        raise ScriptModError(f"{path} is not a regular file")
+    return target
+
+
+def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[str, str]:
+    """Validate all recorded ownership before any generated file is changed."""
+    manifest = _contained_target(root, PurePosixPath(MANIFEST_FILE))
+    data = _read_json(manifest)
+    if data is None and not manifest.exists():
+        return {}
+    if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("files"), dict):
+        raise ScriptModError("The generated-file manifest is invalid")
+    previous = {}
+    seen = set()
+    for relative, digest in data["files"].items():
+        path = _safe_output(relative, allowed_roots)
+        key = path.as_posix()
+        if key.casefold() in seen:
+            raise ScriptModError(f"{relative} is recorded twice in the generated-file manifest")
+        seen.add(key.casefold())
+        if (not isinstance(digest, str) or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)):
+            raise ScriptModError(f"{relative} has an invalid generated-file hash")
+        target = _contained_target(root, path)
+        if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+            raise ScriptModError(f"{relative} changed since it was generated; preserve or restore your edits before rebuilding")
+        previous[key] = digest
+    return previous
+
+
+def _snapshot(root: Path, keys) -> dict[str, bytes | None]:
+    result = {}
+    for key in keys:
+        target = _contained_target(root, PurePosixPath(key))
+        result[key] = target.read_bytes() if target.is_file() else None
+    return result
+
+
+def snapshot_generated(root: Path, *, allowed_roots: tuple[str, ...]) -> dict[str, bytes | None]:
+    """Keep an operation-local copy of validated generated files and ownership."""
+    previous = _generated_files(Path(root), allowed_roots)
+    return _snapshot(Path(root), [*previous, MANIFEST_FILE])
+
+
+def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
+                      new_files=(), allowed_roots: tuple[str, ...]) -> None:
+    """Undo one build using its in-memory snapshot, reporting every failure."""
+    restored = {key: None for key in new_files if key not in snapshot}
+    restored.update(snapshot)
+    errors = []
+    for key, contents in restored.items():
+        try:
+            path = PurePosixPath(key) if key == MANIFEST_FILE else _safe_output(key, allowed_roots)
+            target = _contained_target(Path(root), path)
+            if contents is None:
+                target.unlink(missing_ok=True)
+            elif not target.is_file() or target.read_bytes() != contents:
+                atomic_write(target, contents)
+        except Exception as error:
+            errors.append(f"{key}: {error}")
+    if errors:
+        raise ScriptModError("Generated-file rollback failed: " + "; ".join(errors))
 
 
 def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
@@ -323,7 +396,7 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     if not isinstance(outputs, dict):
         raise ScriptModError("build() must return {path: contents}")
     manifest_path = root / MANIFEST_FILE
-    previous = (_read_json(manifest_path) or {}).get("files", {})
+    previous = _generated_files(root, allowed_roots)
     planned: dict[str, bytes] = {}
     for relative, contents in outputs.items():
         path = _safe_output(relative, allowed_roots)
@@ -334,24 +407,32 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
         key = path.as_posix()
         if key.casefold() in {item.casefold() for item in planned}:
             raise ScriptModError(f"{relative} is returned twice")
-        target = root / Path(*path.parts)
+        target = _contained_target(root, path)
         if target.exists() and key not in previous:
             raise ScriptModError(f"{relative} already exists and was not generated by this mod")
         planned[key] = bytes(contents)
+    snapshot = _snapshot(root, [*set(previous).union(planned), MANIFEST_FILE])
     written, removed = [], []
-    for key, contents in planned.items():
-        target = root / Path(*PurePosixPath(key).parts)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.is_file() or target.read_bytes() != contents:
-            atomic_write(target, contents)
-            written.append(key)
-    for key in sorted(set(previous) - set(planned)):
-        target = root / Path(*PurePosixPath(key).parts)
-        if target.is_file():
-            target.unlink()
-            removed.append(key)
-    manifest = {"version": 1, "files": {key: hashlib.sha256(data).hexdigest() for key, data in planned.items()}}
-    atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
+    try:
+        for key, contents in planned.items():
+            target = root / Path(*PurePosixPath(key).parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.is_file() or target.read_bytes() != contents:
+                atomic_write(target, contents)
+                written.append(key)
+        for key in sorted(set(previous) - set(planned)):
+            target = root / Path(*PurePosixPath(key).parts)
+            if target.is_file():
+                target.unlink()
+                removed.append(key)
+        manifest = {"version": 1, "files": {key: hashlib.sha256(data).hexdigest() for key, data in planned.items()}}
+        atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
+    except Exception as error:
+        try:
+            restore_generated(root, snapshot, allowed_roots=allowed_roots)
+        except ScriptModError as rollback_error:
+            raise ScriptModError(f"Build failed: {error}; {rollback_error}") from error
+        raise
     return {"files": sorted(planned), "written": written, "removed": removed}
 
 
@@ -359,7 +440,7 @@ def clear(root: Path) -> list[str]:
     """Remove everything an earlier build generated, as when the mod is off."""
     root = Path(root)
     manifest_path = root / MANIFEST_FILE
-    previous = (_read_json(manifest_path) or {}).get("files", {})
+    previous = _generated_files(root, None)
     removed = []
     for key in sorted(previous):
         target = root / Path(*PurePosixPath(key).parts)

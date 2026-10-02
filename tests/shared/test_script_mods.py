@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import tempfile
@@ -147,6 +148,138 @@ class ScriptModTests(unittest.TestCase):
         self.build()
         self.assertEqual(script_mods.clear(self.mod), ["hext/ff8/en_nv/patch.txt"])
         self.assertFalse((self.mod / script_mods.MANIFEST_FILE).exists())
+
+    def test_manifest_paths_are_validated_before_any_files_change(self):
+        script_mods.set_trusted(self.mod, True)
+        self.build()
+        patch = self.mod / "hext/ff8/en_nv/patch.txt"
+        original = patch.read_bytes()
+        outside = self.mod.parent / "outside.txt"
+        outside.write_bytes(b"keep")
+        manifest = self.mod / script_mods.MANIFEST_FILE
+        for bad in ("../outside.txt", str(outside.resolve()), "MOD.JSON", "script/tweak.py"):
+            manifest.write_text(json.dumps({"version": 1, "files": {
+                "hext/ff8/en_nv/patch.txt": hashlib.sha256(original).hexdigest(),
+                bad: hashlib.sha256(b"keep").hexdigest(),
+            }}), encoding="utf-8")
+            script_mods.save_values(self.mod, {"amount": 60})
+            for operation in (self.build, lambda: script_mods.clear(self.mod)):
+                with self.assertRaises(script_mods.ScriptModError, msg=bad):
+                    operation()
+                self.assertEqual(patch.read_bytes(), original)
+                self.assertEqual(outside.read_bytes(), b"keep")
+                self.assertFalse((self.mod / "direct/extra.bin").exists())
+
+    def test_malformed_manifest_is_refused_before_writing(self):
+        script_mods.set_trusted(self.mod, True)
+        manifest = self.mod / script_mods.MANIFEST_FILE
+        for malformed in (None, [], {}, {"version": 2, "files": {}},
+                          {"version": 1, "files": []},
+                          {"version": 1, "files": {"hext/a.txt": "not a hash"}}):
+            manifest.write_text(json.dumps(malformed), encoding="utf-8")
+            for operation in (self.build, lambda: script_mods.clear(self.mod)):
+                with self.assertRaises(script_mods.ScriptModError):
+                    operation()
+            self.assertFalse((self.mod / "hext").exists())
+            self.assertEqual(json.loads(manifest.read_text()), malformed)
+
+    def test_changed_generated_files_are_preserved_on_rebuild_removal_and_clear(self):
+        script_mods.set_trusted(self.mod, True)
+        script_mods.save_values(self.mod, {"amount": 60})
+        self.build()
+        extra = self.mod / "direct/extra.bin"
+        extra.write_bytes(b"my changes")
+        patch = self.mod / "hext/ff8/en_nv/patch.txt"
+        original = patch.read_bytes()
+        manifest = self.mod / script_mods.MANIFEST_FILE
+        original_manifest = manifest.read_bytes()
+        for amount in (70, 5):
+            script_mods.save_values(self.mod, {"amount": amount})
+            with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
+                self.build()
+            self.assertEqual(extra.read_bytes(), b"my changes")
+            self.assertEqual(patch.read_bytes(), original)
+        with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
+            script_mods.clear(self.mod)
+        self.assertEqual(extra.read_bytes(), b"my changes")
+        self.assertEqual(patch.read_bytes(), original)
+        self.assertEqual(manifest.read_bytes(), original_manifest)
+
+    def test_generated_paths_cannot_follow_a_directory_link_outside_the_mod(self):
+        outside = self.dir / "outside"
+        outside.mkdir()
+        try:
+            (self.mod / "hext").symlink_to(outside, target_is_directory=True)
+        except OSError:
+            self.skipTest("Directory symlinks are unavailable for this account")
+        script_mods.set_trusted(self.mod, True)
+        with self.assertRaisesRegex(script_mods.ScriptModError, "outside"):
+            self.build()
+        target = outside / "keep.txt"
+        target.write_bytes(b"keep")
+        (self.mod / script_mods.MANIFEST_FILE).write_text(json.dumps({"version": 1,
+            "files": {"hext/keep.txt": hashlib.sha256(b"keep").hexdigest()}}), encoding="utf-8")
+        with self.assertRaisesRegex(script_mods.ScriptModError, "outside"):
+            script_mods.clear(self.mod)
+        self.assertEqual(target.read_bytes(), b"keep")
+
+    def test_partial_write_failure_restores_files_and_manifest(self):
+        script_mods.set_trusted(self.mod, True)
+        self.build()
+        patch = self.mod / "hext/ff8/en_nv/patch.txt"
+        manifest = self.mod / script_mods.MANIFEST_FILE
+        old_patch, old_manifest = patch.read_bytes(), manifest.read_bytes()
+        script_mods.save_values(self.mod, {"amount": 60})
+        write = script_mods.atomic_write
+
+        def fail_manifest(path, data):
+            if path == manifest:
+                raise OSError("simulated manifest failure")
+            write(path, data)
+
+        with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
+            with self.assertRaisesRegex(OSError, "simulated manifest failure"):
+                self.build()
+        self.assertEqual(patch.read_bytes(), old_patch)
+        self.assertEqual(manifest.read_bytes(), old_manifest)
+        self.assertFalse((self.mod / "direct/extra.bin").exists())
+
+    def test_partial_removal_failure_restores_removed_files(self):
+        script_mods.set_trusted(self.mod, True)
+        script_mods.save_values(self.mod, {"amount": 60})
+        self.build()
+        extra = self.mod / "direct/extra.bin"
+        script_mods.save_values(self.mod, {"amount": 5})
+        write = script_mods.atomic_write
+
+        def fail_manifest(path, data):
+            if path.name == script_mods.MANIFEST_FILE:
+                raise OSError("simulated manifest failure")
+            write(path, data)
+
+        with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.build()
+        self.assertEqual(extra.read_bytes(), bytes([60]))
+        self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(), "00 = 3C")
+
+    def test_failed_rollback_is_reported_with_original_failure(self):
+        script_mods.set_trusted(self.mod, True)
+        self.build()
+        script_mods.save_values(self.mod, {"amount": 60})
+        write = script_mods.atomic_write
+        count = 0
+
+        def fail_after_first_write(path, data):
+            nonlocal count
+            count += 1
+            if count > 1:
+                raise OSError("disk unavailable")
+            write(path, data)
+
+        with mock.patch.object(script_mods, "atomic_write", side_effect=fail_after_first_write):
+            with self.assertRaisesRegex(script_mods.ScriptModError, "Build failed: disk unavailable; .*rollback failed"):
+                self.build()
 
 
 if __name__ == "__main__":

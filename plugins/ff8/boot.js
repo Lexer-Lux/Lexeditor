@@ -206,11 +206,10 @@
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
     const master=detailSection({title:"FORMULAE REWORK",
-      help:infoHelp(`${implementedCount} of the ${formulaRows.length} requested formulae have a game patch.`),body:[
+      help:infoHelp(`${implementedCount} of the ${formulaRows.length} requested formulae have a game patch. ${rework?"Formulae Rework is enabled. The previews use the reworked formulas.":"Formulae Rework is disabled. The previews use the vanilla formulas."}`),body:[
       // The blocker comes from the module that owns the switch, so this page
       // cannot disagree with the row that cannot turn it on.
-      LexeditorUI.detailNote(formulaeBlocker
-        || "Formulae Rework is on: every listed formula has a guarded game patch, so what the previews below show is what the game runs.")]})
+      formulaeBlocker?LexeditorUI.detailNote(formulaeBlocker):null].filter(Boolean)})
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
     // The stacked damage, accuracy and per-formula cards run taller than the
