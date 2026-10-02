@@ -110,6 +110,16 @@ def main():
                     fill(page, "baseRecovery", 80)
                     page.evaluate("discard()")
                     page.wait_for_function("state.dirty===0 && state.row.fields[0].value===70")
+                    # A crash can leave a native backup before the first parameter Apply.
+                    # Restoration must stay reachable in that native-only state.
+                    page.evaluate("navigate('info')")
+                    page.evaluate("""()=>{
+                        state.deployment.everApplied=false;
+                        state.deployment.changedExternally=false;
+                        state.deployment.rebalance.native.backupOk=true;
+                        render();
+                    }""")
+                    assert page.get_by_role("button", name="Restore original", exact=True).is_enabled()
                     session.stop()
                     session = DS1Session({**env, "LEXEDITOR_NO_MOD": "1", "LEXEDITOR_MOD_READ_ONLY": "1"})
                     session.start()
