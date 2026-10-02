@@ -34,6 +34,29 @@ Dark Souls Remastered needs no unpacking because it ships unpacked already.
 No UXM code, binaries, or dependencies are used; this is a factual reference
 only, consulted to confirm a design decision before implementing it.
 
+## DSR Mod Engine profile backend (mod_loader.py)
+
+The profile exporter targets AltimorTASDK's Dark Souls Remastered branch of
+soulsmods/ModEngine2, pinned at
+`76690e95d5022ba6f8d1bc24faea1f1bfde2ec6d`:
+https://github.com/AltimorTASDK/ModEngine2/tree/76690e95d5022ba6f8d1bc24faea1f1bfde2ec6d
+
+The reviewed `LICENSE-MIT` permits reuse with its required notice. Material
+references are `launcher/launcher.cpp`,
+`installer/dist/config_darksoulsremastered.toml`, and
+`src/modengine/ext/mod_loader/archive_file_overrides.cpp`. They establish the
+DSR target, configuration shape and first-matching-root precedence. The exporter
+reverses its low-to-high source order and places its merged overlay first.
+No Mod Engine implementation code, executable, DLL or dependencies are copied,
+bundled or invoked in this draft. The native runtime still requires packaging,
+license/notices review for its dependencies and installed-game verification.
+
+`composition.py` is a separate baseline-aware merger using the existing DS1
+reader and serializer; Mod Engine itself does not merge edits within one
+archive. The upstream launcher also needs its explicit-path and adjacent-game
+path assumptions corrected for DSR before delivery. See `MOD_LOADER.md` for the
+exact support contract and unfinished runtime/UI/real-mod acceptance gates.
+
 MIT License
 
 Copyright (c) 2025 Vawser
