@@ -31,14 +31,41 @@ mod root. The profile exporter therefore places its composed overlay first and
 then emits source mods in reverse priority order. Mod Engine redirects whole
 files; `composition.py` handles the separate archive-composition problem.
 
-### Required launcher correction
+### Launcher source correction
 
-At the pinned revision, `launcher/launcher.cpp` converts the explicit `-p` game
-executable into `.parent_path().parent_path()`. That assumption fits a game with a
-`Game` subdirectory but not DSR's executable at the installation root. The
-launcher-adjacent autodetection path has the same assumption. A bundled build must
-correct and test both paths, including spaces and Unicode, before they are used.
-No launcher patch or tested native build is supplied in this draft backend.
+The pinned launcher's explicit `-p` and adjacent-game discovery paths both
+assume `.parent_path().parent_path()`. DSR has no `Game` subdirectory.
+`tools/prepare_ds1_modengine.py` now prepares a hash-guarded source correction:
+both paths derive the application root from the target's relative executable
+layout. Missing manual targets are rejected before indexing the target table.
+The correction also initializes `STARTUPINFOW.cb` and returns a failure code
+when process creation fails, instead of incorrectly returning success.
+
+Developer-only preparation, against a checkout of the pinned upstream revision:
+
+```text
+python tools/prepare_ds1_modengine.py <checkout>/launcher/launcher.cpp <new-output>
+```
+
+The input launcher must match Git blob
+`6e79759da92f0a12a7bcefb5a469e85c3414298a`; CRLF checkout conversion is accepted,
+other drift is refused. The tool leaves its input unchanged and emits replacement
+`launcher.cpp`, `lexeditor_launcher_paths.h`, the original MIT notice and an output
+hash manifest. The runtime builder must put the two source files in the upstream
+`launcher/` directory. This tool does not download, compile, install or launch a
+runtime and is not an extra setup step intended for players.
+
+An unmodified MIT-licensed launcher fixture is retained under `tests/ds1/fixtures`
+with provenance and the original notice in `modengine/LICENSE-MIT`. Ten focused
+tests cover the source guard, both patched call sites, process-error propagation
+at source level, preparation preservation and a compiled C++ path helper. The
+helper exercises ten cases including DSR versus Game-subdirectory targets,
+spaces, Unicode and invalid relative layouts.
+
+The helper's native compilation is NOT a build of the complete Windows launcher.
+Detours injection, CLI path conversion, dependent DLL search, long paths and
+actual game launch still need complete-runtime Windows verification. No compiled
+runtime is supplied or enabled by this change.
 
 ## Composition contract
 
