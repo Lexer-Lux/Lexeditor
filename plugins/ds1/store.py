@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
 MARKER = '.lexeditor-ds1-project'
@@ -63,6 +63,10 @@ class ItemStore:
         document = self.get()
         return {'source': str(self.source), 'output': str(self.output or ''),
                 'readOnly': self.read_only, 'dirtyCount': document.dirty_count,
+                'effectsAvailable': EFFECT_TABLE in document.params,
+                'effectTabs': [{'id': key, 'label': label, 'table': table,
+                                'count': len(document.list_rows(key)) if EFFECT_TABLE in document.params else 0}
+                               for key, label, table in EFFECT_SUBTABS],
                 'enemyTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in ENEMY_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
@@ -72,7 +76,7 @@ class ItemStore:
         self.writable()
         return self.get().edit(table, row_id, field, value)
 
-    def save(self):
+    def validate_save(self):
         self.writable()
         document = self.get()
         # Apply can legitimately replace the live file while this editor stays
@@ -81,6 +85,10 @@ class ItemStore:
             raise ValueError('The source changed outside Lexeditor. Reopen it before saving.')
         if digest(self.output) != self.output_hash:
             raise ValueError('The mod archive changed outside Lexeditor. Reopen it before saving.')
+        return document
+
+    def save(self):
+        document = self.validate_save()
         payload = document.export()
         ItemDocument(payload)
         atomic_write(self.output, payload)

@@ -1,4 +1,4 @@
-"""Fixed-size DS1 item/resistance/attack edits; preserve other bytes.
+"""Fixed-size DS1 item/resistance/attack/effect edits; preserve other bytes.
 
 BND3/DCX facts: Apache-2.0 SoulsTemplates (see credits.md). PARAM cell codecs
 are reused from Lexeditor's DS3 integration; no SoulsFormats code is used.
@@ -16,13 +16,15 @@ import zlib
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
 from .monsters import RESISTANCES, classified_monster
 from .attacks import ATTACK_FIELDS, AttackReferences
+from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys
 
 FormatError = DS3FormatError
 METADATA = Path(__file__).with_name('metadata')
 TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2),
           'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1),
-          'BehaviorParam': (32, 2), 'Bullet': (160, 2)}
+          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 1)}
+OPTIONAL_TABLES = frozenset({'SpEffectParam'})
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -101,7 +103,7 @@ def _enum(name):
             for row in raw['Options']}
 
 
-@lru_cache(maxsize=9)
+@lru_cache(maxsize=None)
 def schema(table):
     if table not in TABLES:
         raise FormatError('Unsupported item table')
@@ -141,13 +143,25 @@ def schema(table):
             label, group, description = RESISTANCES[key]
         if table == 'AtkParam_Npc' and key in ATTACK_FIELDS:
             label, group, description = ATTACK_FIELDS[key]
+        if table == EFFECT_TABLE:
+            label, group, description = presentation(key, label, description)
         enum_name = attrs.get('Enum') or node.findtext('Enum')
-        if 'IsBool' in attrs or enum_name == 'EQUIP_BOOL': enum_name = None
+        if 'IsBool' in attrs or enum_name in ('EQUIP_BOOL', 'SP_EFFECT_BOOL'): enum_name = None
         choices = _enum(enum_name) if enum_name else {}
         if table == 'AtkParam_Npc' and key == 'atkAttribute':
             choices = {**choices, '0': 'Standard'}
         padding = dtype == 'dummy8' or 'Padding' in attrs or key.lower().startswith('pad')
         protected = padding or count != 1 or 'Obsolete' in attrs or not annotation or (enum_name and not choices) or bool(re.search(r'unknown|unused|dummy|reserved|^unk', label, re.I))
+        reason = ''
+        if table == EFFECT_TABLE:
+            if key in EFFECT_PROTECTED:
+                protected, reason = True, EFFECT_PROTECTED[key]
+            elif 'Obsolete' in attrs:
+                protected, reason = True, 'This is a legacy field with no supported use.'
+            elif enum_name and not choices:
+                reason = 'The choices for this property are not documented.'
+            if protected:
+                group = 'Protected properties'
         if table == 'NpcParam' and key not in RESISTANCES:
             protected = True
         if table in ('BehaviorParam', 'Bullet') or (table == 'AtkParam_Npc' and key not in ATTACK_FIELDS):
@@ -168,7 +182,7 @@ def schema(table):
                     else: high = min(high, value)
         if low > high:
             protected = True
-        fields.append({'spec': field, 'min': low, 'max': high, 'enum': choices, 'editable': not protected})
+        fields.append({'spec': field, 'min': low, 'max': high, 'enum': choices, 'editable': not protected, 'protectedReason': reason})
         if bits: bit_used += bits
     if offset != TABLES[table][0]:
         raise FormatError(f'{table} definition size {offset} does not match the audited row size')
@@ -182,10 +196,14 @@ class ItemDocument:
         self.plain = bytearray(self.original_plain)
         self.members = members(self.plain)
         self.params = {}
+        self._rows_by_id = {}
+        self._effects = None
         self.schemas = {table: schema(table) for table in TABLES}
         self.dirty = set()
         for table, (row_size, version) in TABLES.items():
             member = self.members.get(table + '.param')
+            if member is None and table in OPTIONAL_TABLES:
+                continue
             if member is None:
                 raise FormatError(f'Missing item table {table}')
             payload = self.plain[member.offset:member.offset + member.size]
@@ -203,6 +221,7 @@ class ItemDocument:
             if any(b - a != row_size for a, b in zip(offsets, offsets[1:])) or offsets[0] < directory_end or offsets[-1] + row_size > param.strings_offset:
                 raise FormatError(f'{table} row boundaries do not match metadata')
             self.params[table] = param
+            self._rows_by_id[table] = {row.row_id: row for row in param.rows}
 
     @property
     def dirty_count(self):
@@ -211,7 +230,11 @@ class ItemDocument:
     def _row(self, table, row_id):
         if table not in TABLES or type(row_id) is not int:
             raise FormatError('Invalid item identity')
-        row = self.params[table].row(row_id)
+        if table not in self.params:
+            raise FormatError(f'{table}.param is missing. Open a complete Remastered parameter archive.')
+        row = self._rows_by_id[table].get(row_id)
+        if row is None:
+            raise FormatError(f'Expected one row ID {row_id}; found 0')
         start = self.members[table + '.param'].offset + row.data_offset
         return row, start, bytes(self.plain[start:start + TABLES[table][0]])
 
@@ -219,7 +242,21 @@ class ItemDocument:
         field = next(f['spec'] for f in self.schemas[table]['fields'] if f['spec'].key == key)
         return read_field(self._row(table, row_id)[2], field, '<')
 
+    def row_name(self, table, row_id):
+        row = self._rows_by_id.get(table, {}).get(row_id)
+        fallback = f'Effect {row_id}' if table == EFFECT_TABLE else f'Item {row_id}'
+        return self.schemas[table]['names'].get(row_id) or (row.name if row else None) or fallback
+
+    def effect_references(self):
+        if self._effects is None:
+            self._effects = EffectReferences(self)
+        return self._effects
+
     def list_rows(self, tab):
+        if tab in {entry[0] for entry in EFFECT_SUBTABS}:
+            if EFFECT_TABLE not in self.params:
+                raise FormatError('SpEffectParam.param is missing. Open a complete Remastered parameter archive.')
+            return self.effect_references().rows(tab)
         match = next((entry for entry in SUBTABS + ENEMY_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
@@ -258,6 +295,7 @@ class ItemDocument:
             raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
         fields = []
+        effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if table == 'NpcParam' and field.key not in RESISTANCES:
@@ -267,16 +305,21 @@ class ItemDocument:
             if field.padding or field.array_length != 1: continue
             value = read_field(data, field, '<')
             finite = not isinstance(value, float) or math.isfinite(value)
+            options = self.effect_references().choices if field.key in effect_keys else item['enum']
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
-                           'group': field.group if table in ('NpcParam', 'AtkParam_Npc') else '',
+                           'group': field.group if table in ('NpcParam', 'AtkParam_Npc', EFFECT_TABLE) else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
-                           'type': 'bool' if field.is_bool else 'enum' if item['enum'] else 'number',
-                           'minimum': item['min'], 'maximum': item['max'], 'enum': item['enum'],
+                           'type': 'bool' if field.is_bool else 'enum' if options else 'number',
+                           'minimum': item['min'], 'maximum': item['max'], 'enum': options, 'protectedReason': item.get('protectedReason', ''),
                            'editable': item['editable'] and finite})
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
         result = {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or f'Item {row_id}', 'fields': fields}
+        if table == EFFECT_TABLE:
+            fields.sort(key=lambda field: EFFECT_GROUPS.index(field['group']))
+            result['effectUsage'] = self.effect_references().incoming.get(row_id, [])
+        result['effectLinks'] = self.effect_references().outgoing.get((table, row_id), [])
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
@@ -288,7 +331,8 @@ class ItemDocument:
         if item is None or not item['editable']:
             raise FormatError('This field is protected')
         field = item['spec']
-        if type(value) not in (int, float, bool) or not math.isfinite(value):
+        if (type(value) not in (int, float, bool) or (type(value) is bool and not field.is_bool)
+                or (isinstance(value, float) and not math.isfinite(value))):
             raise FormatError('Enter a finite number')
         if field.dtype not in ('f32', 'f64', 'angle32') and int(value) != value:
             raise FormatError('Enter a whole number')
@@ -297,7 +341,11 @@ class ItemDocument:
             raise FormatError(f"{field.label} must be between {item['min']} and {item['max']}")
         if item['enum'] and str(int(value)) not in item['enum']:
             raise FormatError('Choose a listed value')
+        if EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id)):
+            if str(int(value)) not in self.effect_references().choices:
+                raise FormatError('Choose an existing effect or None')
         replacement = write_field(data, field, value, '<')
+        self._effects = None
         self.plain[start:start + len(data)] = replacement
         original = self.original_plain[start:start + len(data)]
         dirty_key = (table, row_id, key)

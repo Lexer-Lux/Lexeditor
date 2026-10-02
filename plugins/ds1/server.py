@@ -7,9 +7,10 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import deployment
+from . import deployment, data_map
 from .formats import FormatError
 from .store import ItemStore
+from .stamina_rebalance import StaminaRebalance
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -18,6 +19,8 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
                   None if os.environ.get('LEXEDITOR_NO_MOD') == '1' else os.environ.get('LEXEDITOR_DS1_PROJECT'),
                   os.environ.get('LEXEDITOR_MOD_READ_ONLY') == '1' or os.environ.get('LEXEDITOR_NO_MOD') == '1'
                   or not os.environ.get('LEXEDITOR_DS1_PROJECT'))
+RULES = StaminaRebalance(STORE.game_root, STORE.project, STORE.read_only)
+NATIVE_TABS = {"encumbrance", "misc", "tweaks"}
 
 
 class Handler(PluginRequestHandler):
@@ -25,18 +28,25 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks'):
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map'):
             try:
                 with LOCK:
                     if path == '/api/state':
                         result = STORE.state()
+                        result['nativeRules'] = RULES.snapshot()
+                    elif path == '/api/data-map':
+                        result = data_map.build(STORE.get(), STORE.source, RULES.snapshot(refresh=True))
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
                         result['dirtyCount'] = STORE.get().dirty_count
                     elif path == '/api/table':
-                        result = {'rows': STORE.get().list_rows(query.get('tab', [''])[0]), 'dirtyCount': STORE.get().dirty_count}
+                        tab = query.get('tab', [''])[0]
+                        result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
                     else:
-                        result = {'row': STORE.get().read_row(query.get('table', [''])[0], int(query.get('id', [''])[0])), 'dirtyCount': STORE.get().dirty_count}
+                        table, row_id = query.get('table', [''])[0], int(query.get('id', [''])[0])
+                        row = RULES.read_row(row_id) if table == 'NativeRules' else STORE.get().read_row(table, row_id)
+                        result = {'row': RULES.describe_row(row, STORE.get())}
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -44,7 +54,7 @@ class Handler(PluginRequestHandler):
         if path == '/api/deployment':
             try:
                 with LOCK:
-                    self.send_json(deployment.status(STORE.game_root, STORE.project))
+                    self.send_json(RULES.deployment_status())
             except (RuntimeError, ValueError, OSError, KeyError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
@@ -53,7 +63,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
+                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "effects", "encumbrance", "native-stamina", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -64,9 +74,9 @@ class Handler(PluginRequestHandler):
             elif path == '/shared/distribution-notices.json':
                 self.send_json([])
             else:
-                self.send_json({"error": "Not found"}, 404)
+                self.send_json({'error': 'Not found'}, 404)
         else:
-            self.send_json({"error": "Not found"}, 404)
+            self.send_json({'error': 'Not found'}, 404)
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -84,16 +94,26 @@ class Handler(PluginRequestHandler):
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
                 if path == '/api/edit':
-                    row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
+                    if payload.get('table') == 'NativeRules':
+                        row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
+                    else:
+                        row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
+                        row = RULES.describe_row(row, STORE.get())
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/save':
+                    RULES.validate_save()
+                    STORE.validate_save()
                     result = STORE.save()
+                    RULES.save()
                 elif path == '/api/discard':
                     result = STORE.discard()
+                    RULES.discard()
                 elif path == '/api/deployment/apply':
-                    result = deployment.apply(STORE.game_root, STORE.project)
+                    result = RULES.apply(STORE)
                 else:
-                    result = deployment.disable(STORE.game_root)
+                    result = RULES.restore()
+                result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                result['nativeRules'] = RULES.snapshot()
                 self.send_json(result)
         except PermissionError as error:
             self.send_json({'error': str(error)}, 403)

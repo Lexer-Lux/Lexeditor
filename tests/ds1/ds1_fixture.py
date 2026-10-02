@@ -1,13 +1,15 @@
 """Synthetic DS1-shaped archives; no proprietary game bytes."""
 import struct
 import zlib
-from plugins.ds1.formats import TABLES, schema
+from plugins.ds1.formats import TABLES, OPTIONAL_TABLES, schema
 from plugins.ds3.formats import write_field
 
 
 def make_archive():
     entries = []
     for table, (size, version) in TABLES.items():
+        if table in OPTIONAL_TABLES:
+            continue
         definition = schema(table)
         ids = [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102]
         rows_start = 48 + len(ids) * 12
