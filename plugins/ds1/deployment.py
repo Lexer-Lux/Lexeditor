@@ -86,12 +86,13 @@ def _is_reparse_point(path: Path) -> bool:
     # confirmed against a real junction in this environment. Checking the raw
     # attribute catches symlinks, junctions and mount points alike.
     try:
-        attributes = os.lstat(path).st_file_attributes
+        metadata = os.lstat(path)
+        attributes = getattr(metadata, "st_file_attributes", 0)
     except FileNotFoundError:
         return False
     except OSError as error:
         raise RuntimeError(f"Could not check {path} for a symlink or junction: {error}") from error
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return stat.S_ISLNK(metadata.st_mode) or bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 def _assert_no_reparse_points(path: Path, boundary: Path) -> None:

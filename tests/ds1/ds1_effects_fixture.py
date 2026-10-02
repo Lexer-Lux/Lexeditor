@@ -1,4 +1,4 @@
-"""Generated stamina-effect fixtures, not retail game data."""
+"""Generated effect fixtures, not retail game data."""
 import struct
 import zlib
 
@@ -14,7 +14,7 @@ def wrap(plain, header):
     return bytes(result) + compressed
 
 
-def make_stamina_archive(*, effect_size=368, version=1):
+def make_effects_archive(*, effect_size=368, version=1):
     """Append an independently specified effect table to the existing fixture."""
     source = make_archive()
     document = ItemDocument(source)
@@ -24,9 +24,13 @@ def make_stamina_archive(*, effect_size=368, version=1):
         ("EquipParamProtector", 100, "residentSpEffectId", 6200),
         ("EquipParamAccessory", 100, "refId", 6890),
         ("EquipParamAccessory", 100, "refCategory", 2),
-        # This coincidentally matching projectile ID is NOT an effect reference.
+        # A coincidentally matching projectile ID is not an effect reference.
         ("EquipParamAccessory", 101, "refId", 6890),
         ("EquipParamAccessory", 101, "refCategory", 1),
+        ("Magic", 100, "refCategory", 2),
+        ("Magic", 100, "refId", 2013),
+        ("EquipParamGoods", 100, "refCategory", 2),
+        ("EquipParamGoods", 100, "refId", 3040),
     ]
     for table, row_id, key, value in references:
         _, start, row = document._row(table, row_id)
@@ -37,7 +41,7 @@ def make_stamina_archive(*, effect_size=368, version=1):
         (name, bytes(document.plain[member.offset:member.offset + member.size]))
         for name, member in document.members.items()
     ]
-    ids = [40, 41, 42, 43, 44, 2013, 3040, 6200, 6201, 6890, 6920, 99001]
+    ids = [40, 41, 42, 43, 44, *range(1000, 1050), 2013, 3040, 6200, 6201, 6890, 6920, 99001]
     start = 48 + 12 * len(ids)
     effect = bytearray(start + effect_size * len(ids))
     struct.pack_into("<IHhhH", effect, 0, len(effect), start, 0, version, len(ids))
@@ -46,8 +50,15 @@ def make_stamina_archive(*, effect_size=368, version=1):
     for index, row_id in enumerate(ids):
         offset = start + index * effect_size
         struct.pack_into("<iII", effect, 48 + index * 12, row_id, offset, 0)
-        # Nonzero opaque bytes detect accidental row reconstruction.
-        row = bytearray([0xA5] * effect_size)
+        row = bytearray(effect_size)
+        row[-11:] = bytes([0xA5] * 11)
+        struct.pack_into("<i", row, 0, -1)  # No icon.
+        struct.pack_into("<f", row, 4, -1)  # No HP activation condition.
+        struct.pack_into("<f", row, 8, -1)  # Permanent duration.
+        struct.pack_into("<f", row, 16, 1)  # HP multiplier.
+        struct.pack_into("<f", row, 24, 1)  # Stamina multiplier.
+        for field_offset in (0x124, 0x128, 0x12C):
+            struct.pack_into("<i", row, field_offset, -1)
         value = 10 if row_id == 6890 else -2 if row_id in (6200, 6201) else 0
         struct.pack_into("<i", row, 0xB8, value)
         effect[offset:offset + effect_size] = row

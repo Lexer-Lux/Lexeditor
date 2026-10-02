@@ -3,8 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import SUBTABS, ENEMY_SUBTABS, MAX_ARCHIVE
-from .stamina import StaminaDocument as ItemDocument, STAMINA_SUBTABS
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
 MARKER = '.lexeditor-ds1-project'
@@ -64,10 +63,10 @@ class ItemStore:
         document = self.get()
         return {'source': str(self.source), 'output': str(self.output or ''),
                 'readOnly': self.read_only, 'dirtyCount': document.dirty_count,
-                'staminaAvailable': document.stamina_available,
-                'staminaTabs': [{'id': key, 'label': label, 'table': table,
-                                 'count': len(document.list_rows(key)) if document.stamina_available else 0}
-                                for key, label, table in STAMINA_SUBTABS],
+                'effectsAvailable': EFFECT_TABLE in document.params,
+                'effectTabs': [{'id': key, 'label': label, 'table': table,
+                                'count': len(document.list_rows(key)) if EFFECT_TABLE in document.params else 0}
+                               for key, label, table in EFFECT_SUBTABS],
                 'enemyTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in ENEMY_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}

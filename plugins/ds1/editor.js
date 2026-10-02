@@ -1,9 +1,9 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
   actionRow,confirmAction,modLoaderSection}=LexeditorUI;
-const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],staminaTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
+const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],effectTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monster:null,allAttacks:false,attackLinks:null};
+  monster:null,allAttacks:false,attackLinks:null,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
@@ -17,14 +17,15 @@ const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."},
-    {id:"stamina",label:"Stamina",help:"Edit recovery adjustments from equipment and special effects. Armour penalties belong to individual pieces, not equip-load tiers. Player-effect modifiers are not the engine's base recovery constant, which is not yet mapped. Save changes the mod project; Apply installs its saved archive."}],
+    {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. Each record can be shared by several items or abilities. Unknown and legacy properties stay protected. Equipment, Spells and Items show direct references. All effects includes unlinked records. Save changes the mod project."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
+  help:()=>navigate(state.tab==="datamap"?"effects":"datamap"),helpActive:()=>state.tab==="datamap",
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
 });
 async function refreshState(){
   const result=await api("/api/state");
-  state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.staminaTabs=result.staminaTabs||[];
+  state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.effectTabs=result.effectTabs||[];
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;
 }
 async function loadItems(){
@@ -54,16 +55,22 @@ async function navigate(tab,sub=state.sub,selection=null){
   state.monster=null;
   if(tab==="enemies")sub="monsters";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
-  else if(tab==="stamina"&&!state.staminaTabs.some(entry=>entry.id===sub))sub="stamina-equipment";
+  else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
   if(sub!==state.sub||previousMonster||selection!==null){state.sub=sub;state.selected=selection??(tab==="enemies"&&previousMonster?`NpcParam:${previousMonster.id}`:null);state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies"||tab==="stamina")await loadItems();else if(tab==="info")await loadDeployment();
-    if(token!==navigation)return;state.error="";render();
+    if(tab==="items"||tab==="enemies"||tab==="effects")await loadItems();else if(tab==="info")await loadDeployment();
+    else if(tab==="datamap")state.dataMap=await api("/api/data-map");
+    if(token!==navigation)return;
+    if(selection!==null){
+      const index=orderedRows().findIndex(row=>key(row)===selection);
+      if(index>=0)state.page=Math.floor(index/state.pageSize);
+    }
+    state.error="";render();
   }
   catch(error){if(token===navigation){state.error=error.message;render();}}
 }
-function openStaminaEffect(effect){
-  return navigate("stamina","stamina-all",`SpEffectParam:${effect.id}`);
+function openEffect(effect){
+  return navigate("effects","effects-all",`SpEffectParam:${effect.id}`);
 }
 async function openAttacks(monster,all=false){
   await edits;state.monster=monster;state.allAttacks=all;state.selected=null;state.query="";state.page=0;
@@ -103,7 +110,7 @@ function commit(row,field,value,control){
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
       if(["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
-      else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory"].includes(field.key))render();
+      else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
     }catch(error){
       notify(error);
       const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`);
@@ -147,30 +154,32 @@ function groupFor(field){
   return "Properties";
 }
 function detail(){
-  const title=state.monster?(state.row?.impact?.variants.length>1?"Shared attack damage":state.row?.impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Resistances":state.tab==="stamina"?"Recovery":"Properties";
+  const title=state.monster?(state.row?.impact?.variants.length>1?"Shared attack damage":state.row?.impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Resistances":"Properties";
   if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
   if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
   const groups=new Map();
   for(const field of state.row.fields){
     const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
-    if(!field.editable)help="This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
+    if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
     groups.get(group).push(detailField({label:field.label,property:field.key,control:controlFor(state.row,field),
       help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum}));
   }
-  if(state.row.staminaEffects?.length){
-    groups.set("Linked recovery effects",state.row.staminaEffects.map(effect=>detailField({
-      label:`Effect ${effect.id}`,control:el("button",{type:"button",onclick:()=>openStaminaEffect(effect)},`${effect.name}: ${effect.value}`),
-      help:infoHelp("Open the recovery adjustment for this equipped effect. All items sharing the same effect use the same value. The link comes from this item's actual passive-effect reference, not its name.")})));
+  if(state.row.effectLinks?.length){
+    groups.set("Linked effects",state.row.effectLinks.map(effect=>detailField({
+      label:state.row.fields.find(field=>field.key===effect.field)?.label||effect.field,
+      control:effect.resolved?el("button",{type:"button",onclick:()=>openEffect(effect)},effect.name):readonlyField(effect.name),
+      help:infoHelp("Open this item's or ability's referenced effect. Changing a shared effect changes every use of it.")})));
   }
-  if(state.row.staminaContext){
-    groups.set("Usage",[detailField({label:"Equipment references",control:readonlyField(state.row.staminaSourceCount),
-      help:infoHelp(state.row.staminaContext+" These are direct equipment references only; scripts and other effect sources are not fully traced. "+
-        (state.row.staminaSourceNames.length?"Examples: "+state.row.staminaSourceNames.join(", "):"No direct equipment reference found."))})]);
+  if(state.row.effectUsage){
+    const usage=state.row.effectUsage;
+    groups.set("Usage",[detailField({label:"Direct references",control:readonlyField(usage.length),
+      help:infoHelp("Counts references in the supported parameter tables. Scripts and animations can add more uses. "+
+        (usage.length?"Examples: "+usage.slice(0,3).map(source=>source.name).join(", ")+".":"No direct reference was found."))})]);
   }
   const impact=state.row.impact;
-  let help=state.row.staminaContext;
+  let help;
   if(impact){
     const route=state.rows.find(row=>key(row)===state.selected)?.route||"Not linked";
     const examples=impact.variants.slice(0,3).map(n=>`${n.name} #${n.id}`).join(", ");
@@ -187,14 +196,17 @@ function detail(){
     actions:state.tab==="enemies"&&!state.monster?[el("button",{type:"button",onclick:()=>openAttacks({id:state.row.id,name:state.row.name})},"Attacks")]:[],
     body:[...groups].map(([title,body])=>detailSection({title,body}))});
 }
-function renderItems(){
-  const enemies=state.tab==="enemies",stamina=state.tab==="stamina",attacks=!!state.monster,
-    noun=attacks?"attacks":enemies?"monsters":stamina?"effects":"items",label=enemies?"Enemies":stamina?"Stamina":"Items";
+function orderedRows(){
   const query=state.query.toLowerCase();
-  const rows=state.rows.filter(row=>(row.id+" "+row.name).toLowerCase().includes(query)).sort((a,b)=>{
+  return state.rows.filter(row=>(row.id+" "+row.name).toLowerCase().includes(query)).sort((a,b)=>{
     const left=a[state.sort.key],right=b[state.sort.key];
     return state.sort.dir*(typeof left==="number"?left-right:String(left).localeCompare(String(right),undefined,{numeric:true}));
   });
+}
+function renderItems(){
+  const enemies=state.tab==="enemies",effects=state.tab==="effects",attacks=!!state.monster,
+    noun=attacks?"attacks":enemies?"monsters":effects?"effects":"items",label=enemies?"Enemies":effects?"Effects":"Items";
+  const rows=orderedRows();
   const view=pagedListDetail({className:"ds1-records",rows,key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
@@ -213,7 +225,7 @@ function renderItems(){
   const attackHelp=attacks?`Matches behavior variation ${links?.variation} across ${links?.behaviorCount} behavior records. `+
     `${links?.unresolved.length} references remain unresolved or lead to effects. Direct and projectile links are traced; animation use is unverified. `+
     "All attack records includes bosses, NPCs and records with unresolved ownership; Not linked means no supported link to this monster.":"";
-  return el("div",{class:"ds1-items"},subtabBar({tabs:enemies?state.enemyTabs:stamina?state.staminaTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
+  return el("div",{class:"ds1-items"},subtabBar({tabs:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
     attacks?actionRow(el("button",{type:"button",onclick:()=>navigate("enemies")},"Back to monsters"),
       el("span",{},state.monster.name),infoHelp(attackHelp)):null,
     attacks?subtabBar({tabs:[{id:"linked",label:"Referenced attacks"},{id:"all",label:"All attack records"}],order:"given",
@@ -239,8 +251,8 @@ function renderInfo(){
   const upToDate=deploy.enabled&&deploy.thisProjectActive?(deploy.stale?"No, reapply after the latest save":"Yes"):"-";
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
-      detailField({label:"SUPPORT",control:readonlyField("Items, monster resistances, enemy attacks and stamina effects"),help:infoHelp("Edit documented item properties, reviewed monster resistances, enemy attack damage and special-effect recovery adjustments. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")}),
-      detailField({label:"BASE RECOVERY",control:readonlyField("Not yet mapped"),help:infoHelp("The Stamina tab edits additive special-effect adjustments, including Grass Crest Shield and armour-piece penalties. It does not edit the engine's absolute base recovery rate or equip-load thresholds. Player resonance effects are not a verified substitute for a global baseline setting.")})]}),
+      detailField({label:"SUPPORT",control:readonlyField("Items, monster resistances, enemy attacks and effects"),help:infoHelp("Edit documented item properties, reviewed monster resistances, enemy attack damage and special-effect properties. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")}),
+      detailField({label:"BASE RECOVERY",control:readonlyField("Not yet mapped"),help:infoHelp("Recovery adjustment in Effects is an additive modifier, including the Grass Crest Shield bonus. It does not edit the engine's absolute base recovery rate or equip-load thresholds. Player resonance effects are not a verified substitute for a global baseline setting.")})]}),
     detailSection({title:"INSTALLED GAME",body:[
       detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
       detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
@@ -258,8 +270,19 @@ function renderInfo(){
       safety:"Apply and Disable touch only param/GameParam/GameParam.parambnd.dcx and refuse to continue if that file changed outside Lexeditor.",
       removal:"Restore original copies the preserved original bytes back over the installed file."})]});
 }
+function renderDataMap(){
+  const view=LexeditorUI.dataMap({rows:state.dataMap?.rows||[],query:state.mapQuery,status:state.mapStatus,
+    page:state.mapPage,sort:state.mapSort,
+    changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render();},
+    changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render();},
+    changePage:value=>{state.mapPage=value;render();},
+    changeSort:key=>{state.mapSort=[key,state.mapSort[0]===key?-state.mapSort[1]:1];render();},
+    open:row=>navigate(row.target==="enemies"?"enemies":row.target.startsWith("effects-")?"effects":"items",row.target)});
+  state.mapPage=view.page;
+  return view.content;
+}
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="datamap"?renderDataMap():renderItems());
   shell.refresh();
 }
 async function boot(){
