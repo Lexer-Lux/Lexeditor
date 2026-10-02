@@ -125,6 +125,10 @@ def main():
                     vanilla.goto(session.url + '?lexNoMod=1')
                     vanilla.wait_for_selector('body[data-ds1-ready="true"]')
                     vanilla.wait_for_function('document.documentElement.dataset.lexProjectReadonly==="true"')
+                    # Data readiness precedes the shared loading transition.
+                    # Coordinate clicks bypass Playwright's overlay checks.
+                    vanilla.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")')
+                    vanilla.wait_for_selector('.lex-plugin-loading-screen', state='detached')
                     assert vanilla.locator('#global-save').is_disabled()
                     assert 'Vanilla' in vanilla.locator('.lex-project-control').inner_text()
                     # The field is disabled now, matching every other plugin's
@@ -133,6 +137,9 @@ def main():
                     # gate, so click by position rather than through
                     # Playwright's own actionability check, which refuses to
                     # drive a disabled element at all.
+                    # A press made while the loading screen still covers the
+                    # page lands on that screen, not on the field.
+                    vanilla.wait_for_selector('.lex-plugin-loading-screen', state='detached')
                     field_box = vanilla.locator('input[data-field-key]:visible').first.bounding_box()
                     vanilla.mouse.click(field_box['x'] + field_box['width'] / 2, field_box['y'] + field_box['height'] / 2)
                     dialog = vanilla.locator('.lex-dialog')

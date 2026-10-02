@@ -220,3 +220,9 @@
     detailField({className:"item-parameter-field",label:"Param 2",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param2Type)?.description||""),control:sourceControl(menuParameterControl(row,"param2"),()=>row.param2,vanilla.param2,refs(value=>value?.param2),value=>row.param2=Number(value))})]})}
 
   function gilValue(value){return unitField(numberValue(value),"G",{unitClass:"ff8-gil-unit"})}
+
+  // Gameplay tweaks are tweak mods in the mod library. Every screen that
+  // depends on one asks through these, never through a settings key.
+  const tweakMod=id=>(state.data?.settings?.tweaks||[]).find(row=>row.id===id);
+  const tweakOn=id=>Boolean(tweakMod(id)?.enabled);
+  const tweakValues=id=>tweakMod(id)?.values||{};

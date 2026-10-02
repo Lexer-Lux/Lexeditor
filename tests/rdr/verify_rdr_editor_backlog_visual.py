@@ -5,7 +5,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tests.shared.verify_panel_layout_visual_46 import browser_session,close_browser,screenshot,wait_eval,Rdr2Session
 from plugins.rdr.plugin import RdrSession
-SOURCE_INI=Path(r'C:\RDR2Mod\GameplayTweaks\GameplayTweaks.ini')
+SOURCE_INI=Path(r'D:\Documents\Mods\rdr2\RDR2-Overhaul\GameplayTweaks\GameplayTweaks.ini')
 if not SOURCE_INI.is_file():
  raise FileNotFoundError(f'Missing RDR2 project fixture: {SOURCE_INI}')
 BOUNDS="""(()=>{const list=document.querySelector('.effect-column-list,.behavior-column-list,.rdr-record-list');const rows=[...list.querySelectorAll('.effect-column-row,.behavior-column-row,.rdr-record-entry')];const rect=list.getBoundingClientRect();return {rows:rows.length,over:rows.filter(r=>r.getBoundingClientRect().bottom>rect.bottom+1).length,cut:rows.filter(r=>[...r.querySelectorAll('.lex-column-cell-content')].some(x=>x.getBoundingClientRect().bottom>r.getBoundingClientRect().bottom+1||x.scrollHeight>x.clientHeight+1)).length,detailOverflow:[...document.querySelectorAll('.effect-detail')].some(x=>x.scrollWidth>x.clientWidth+1),height:rect.height,scroll:list.scrollHeight>list.clientHeight+1}})()"""

@@ -7,7 +7,7 @@ Do not hand-write the compile line: the command previously documented here
 omitted `user32.lib xinput.lib` and fails at link with six unresolved externals
 (`GetAsyncKeyState`, `GetCursorPos`, `XInputGetState`, ...). The working line is:
 
-`cl /nologo /O2 /EHsc /MT /LD main.cpp script.cpp /I C:\RDR2Mod\_downloads\RDR2_SDK\SDK\inc /link C:\RDR2Mod\_downloads\RDR2_SDK\SDK\lib\ScriptHookRDR2.lib user32.lib xinput.lib /OUT:Name.asi`
+`cl /nologo /O2 /EHsc /MT /LD main.cpp script.cpp /I D:\Documents\Mods\rdr2\RDR2-Overhaul\_downloads\RDR2_SDK\SDK\inc /link D:\Documents\Mods\rdr2\RDR2-Overhaul\_downloads\RDR2_SDK\SDK\lib\ScriptHookRDR2.lib user32.lib xinput.lib /OUT:Name.asi`
 
 `GameplayTweaks/script.cpp` owns shared native wrappers, configuration/runtime
 state, and `ScriptMain`. Topic implementations live under

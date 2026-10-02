@@ -6,6 +6,7 @@ from __future__ import annotations
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import hashlib
 import importlib.util
+import json
 import shutil
 import struct
 import subprocess
@@ -278,55 +279,60 @@ def main() -> int:
         verify_applied_tree(fixture)
         mutation_checks(source, fixture)
 
+    verify_settings_integration()
+    print("FF8 FFNx XP/HP bars: executable, source, integration, and mutations verified")
+    return 0
+
+
+def verify_settings_integration() -> None:
     from plugins.ff8 import gameplay_settings
 
     with tempfile.TemporaryDirectory() as temporary:
         project = Path(temporary)
-        gameplay_settings.settings_path(project).write_text(
-            '{"flyingEvaBonus": 25, "xpBars": true, "hpBars": true}',
-            encoding="utf-8",
-        )
+        # Discover independent library mods instead of retired project flags.
+        for mod_id, name in (("xp-bars", "XP Bars"), ("hp-bars", "HP Bars")):
+            mod = project / ".lexeditor-mods" / name
+            (mod / "script").mkdir(parents=True)
+            (mod / "mod.json").write_text(json.dumps({"id": mod_id, "name": name,
+                "enabled": True, "script": {"version": 1}}), encoding="utf-8")
+            (mod / "settings.schema.json").write_text(json.dumps({"title": name.upper(),
+                "help": f"Fixture for {name}", "fields": []}), encoding="utf-8")
+            (mod / "script" / "tweak.py").write_text("def build(settings, context):\n    return {}\n", encoding="utf-8")
         loaded = gameplay_settings.load(project, game_root=project / "missing-game")
-        require(loaded["xpBars"] is True and loaded["hpBars"] is True,
+        bars = {row["id"]: row for row in loaded["tweaks"]}
+        require(set(bars) == {"xp-bars", "hp-bars"} and all(row["enabled"] for row in bars.values()),
                 "per-mod XP/HP settings did not load")
+        require(all(row["schema"]["title"] == row["name"].upper() for row in bars.values()),
+                "per-mod schema titles did not reach the generic UI payload")
         config = project / "FFNx.toml"
         config.write_text("enable_devtools = false\n", encoding="utf-8")
-        gameplay_settings._set_ffnx_runtime_tweaks(
-            config, xp_bars=True, hp_bars=False, better_targeting=False,
-        )
+        gameplay_settings._set_ffnx_keys(config, {
+            **gameplay_settings.FFNX_DEFAULTS, "enable_ff8_xp_bars": True})
         configured = config.read_text(encoding="utf-8")
         require(configured.count("enable_ff8_xp_bars = true") == 1,
                 "XP bar activation was not written exactly once")
         require(configured.count("enable_ff8_hp_bars = false") == 1,
                 "HP bar activation was not written exactly once")
-        gameplay_settings._set_ffnx_runtime_tweaks(
-            config, xp_bars=False, hp_bars=True, better_targeting=False,
-        )
+        gameplay_settings._set_ffnx_keys(config, {
+            **gameplay_settings.FFNX_DEFAULTS, "enable_ff8_hp_bars": True})
         configured = config.read_text(encoding="utf-8")
         require(configured.count("enable_ff8_xp_bars = false") == 1,
                 "XP bar activation was not replaced")
         require(configured.count("enable_ff8_hp_bars = true") == 1,
                 "HP bar activation was not replaced")
 
-    gameplay_source = (ROOT / "plugins/ff8/gameplay_settings.py").read_text(encoding="utf-8")
     # The page and the modules it loads beside it.
     editor = "\n".join(path.read_text(encoding="utf-8") for path in
                        [ROOT / "plugins/ff8/editor.html", *sorted((ROOT / "plugins/ff8").glob("*.js"))])
-    for key, label in (("xpBars", "XP BARS"), ("hpBars", "HP BARS")):
-        require(f'"{key}": False' in gameplay_source,
-                f"new mods do not default {key} off")
-        require(f'{key}:state.data.settings.{key}' in editor,
-                f"{key} is absent from the save payload")
-        require(f'checked:settings.{key}' in editor,
-                f"{key} does not have a checkbox")
-        require(label in editor, f"{label} is absent from Tweaks")
-    require("below character and GF level rows, including the active and reserve party in the main menu" in editor,
-            "XP Bars description does not state every rendered surface")
-    require("below the active party's HP numbers in the main menu and in battle" in editor,
-            "HP Bars description does not state its battle placement")
+    for key in ("enable_ff8_xp_bars", "enable_ff8_hp_bars"):
+        require(gameplay_settings.FFNX_DEFAULTS[key] is False,
+                f"disabled mods do not restore {key} to off")
+    require("tweaks[row.id]=change" in editor and "post(settingsPayload())" in editor,
+            "tweak changes are absent from the save path")
+    require("checked:row.enabled" in editor, "the generic tweak checkbox is missing")
+    require("schema.title||row.name.toUpperCase()" in editor and "schema.help" in editor,
+            "the generic tweak UI does not use the mod's title and help")
 
-    print("FF8 FFNx XP/HP bars: executable, source, integration, and mutations verified")
-    return 0
 
 
 if __name__ == "__main__":

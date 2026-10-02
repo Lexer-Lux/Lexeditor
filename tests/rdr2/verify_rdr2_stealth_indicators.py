@@ -76,7 +76,7 @@ int main(){
 }
 '''
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'));a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'));a=p.parse_args()
     source=(a.runtime_root/'GameplayTweaks/modules/stealth_indicators.cpp').read_text('utf-8')
     changes={
         'hud':'HUD::IS_HUD_HIDDEN()', 'cinematic':'CAM::IS_CINEMATIC_CAM_RENDERING()',

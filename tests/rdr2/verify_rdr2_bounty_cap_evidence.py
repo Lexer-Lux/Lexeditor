@@ -31,7 +31,7 @@ def verify(source,natives):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--runtime',type=Path,default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args()
     source=(args.runtime/'_downloads/RDR2-Decompiled-Scripts/script_rel/short_update.c').read_text(encoding='utf-8')
     natives=json.loads((args.runtime/'_downloads/natives.json').read_text(encoding='utf-8'))

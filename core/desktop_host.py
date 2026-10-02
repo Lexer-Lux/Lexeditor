@@ -1706,6 +1706,12 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, selected)}
 
+    def _library_plugin(self, plugin_id: str) -> None:
+        # The id becomes a folder under the mod library, so only a registered
+        # plugin's id may name one; "../x" must never reach mkdir.
+        if not isinstance(plugin_id, str) or plugin_id not in self._plugins:
+            raise ValueError(f"Unknown plugin: {plugin_id}")
+
     def create_mod_project(self, plugin_id: str, name: str, parent: str = "") -> dict:
         """Clone the plugin's valid starter into the mod library, or `parent`.
 
@@ -1715,6 +1721,7 @@ class HostApi:
         explicit alternate `choose_mod_project_location` picks out; it is
         never implied by the default call.
         """
+        self._library_plugin(plugin_id)
         if parent:
             target_parent = Path(parent)
         else:
@@ -1731,6 +1738,7 @@ class HostApi:
         reader opens this only by choice, never as a forced step in naming
         a mod.
         """
+        self._library_plugin(plugin_id)
         default_parent = Path(self.mod_library_location()["root"]) / plugin_id
         anchor = default_parent if default_parent.is_dir() else default_parent.parent
         selected = self._choose_folder(str(anchor))

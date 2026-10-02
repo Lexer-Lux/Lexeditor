@@ -231,7 +231,8 @@ _EXTERNAL_DATA_MARKERS = (
     "\\appdata\\local\\lexeditor\\game-data\\",
     "/appdata/local/lexeditor/game-data/",
     "c:\\rdrmod",
-    "c:\\rdr2mod",
+    "\\documents\\mods\\rdr2\\rdr2-overhaul",
+    "/documents/mods/rdr2/rdr2-overhaul",
 )
 # Some reverse-engineering verifiers are intentionally run against local source
 # snapshots/build trees under the dev cache (%TEMP%/lexeditor-dev). Hosted CI does not manufacture those

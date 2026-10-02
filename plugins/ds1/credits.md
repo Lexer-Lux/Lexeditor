@@ -56,3 +56,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Executable tweak loader
+
+Lexeditor combines DS1 tweak mods' native patches onto the vanilla
+executable (`exe_patches.py`). Microsoft's PE/COFF and x64 exception-handling
+documentation supplied the format facts; no implementation code is copied:
+- https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+- https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
+
+Each tweak's own credits travel with its mod.

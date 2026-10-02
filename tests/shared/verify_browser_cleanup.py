@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import browser_guard  # noqa: E402
 
-HARNESS = Path(r"C:\RDR2Mod\tools\reverse-engineering\render_crime_editors_55_62.py")
+HARNESS = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering\render_crime_editors_55_62.py")
 
 
 def edge_count() -> int:

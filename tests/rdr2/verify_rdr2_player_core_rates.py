@@ -47,7 +47,7 @@ int main(){
 }
 """
 def main():
- parser=argparse.ArgumentParser();parser.add_argument("--runtime-root",type=Path,default=Path("C:/RDR2Mod"));args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument("--runtime-root",type=Path,default=Path("D:/Documents/Mods/rdr2/RDR2-Overhaul"));args=parser.parse_args()
  code=(args.runtime_root/"GameplayTweaks/modules/player_core_rates.cpp").read_text("utf-8")
  source=(args.runtime_root/"_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/short_update.ysc.c").read_text("utf-8")
  for token in ('"playerSkillsDatastore"', '"rpgLines"', 'TEXT_LABEL_APPEND_INT(&unk, j, 64);', 'TEXT_LABEL_APPEND_INT(&unk, i, 64);', 'Global_1954819.f_5.f_2[i /*36*/].f_12[j] =', 'Global_1954819.f_5.f_2[i /*36*/].f_32[j] =', 'return "PMPLAYER_CORE_DRAIN_RATE";', 'return "PMPLAYER_CORE_TIME";'):

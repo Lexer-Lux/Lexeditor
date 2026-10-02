@@ -56,7 +56,7 @@ int main(){
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args()
     source=(args.runtime_root/'GameplayTweaks/modules/horse_exhaustion_recovery.cpp').read_text('utf-8')
     for forbidden in ('SET_HORSE_CORE','SET_PED_STAMINA','SET_PED_MAX_MOVE_BLEND_RATIO','SET_CONTROL_NORMAL','CLEAR_PED_TASKS'):

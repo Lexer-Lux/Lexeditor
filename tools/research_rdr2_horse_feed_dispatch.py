@@ -33,7 +33,7 @@ def resolve(text):
     return {'source_sha256':hashlib.sha256(text.encode()).hexdigest(),'functions':{name:{k:f[name][k] for k in ('position','line')} for name in sorted(referenced)},'eligible_items':names('func_724'),'preferred_order':names('func_789'),'no_bond_items':names('func_959'),'special_5_base_points':names('func_960'),'feeding_events':{n:tiers[n] for n in (13,14,15,16)},'item_aware_hook':'func_739 before its two func_454 calls; preserve native rank/event-cap/motivation/accounting and replace the one selected magnitude, never add a second award','fixed20_is_not_feed_bond':True}
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path('C:/RDR2Mod/_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/player_horse.ysc.c'));p.add_argument('--output',type=Path);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul/_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/player_horse.ysc.c'));p.add_argument('--output',type=Path);a=p.parse_args()
     text=a.source.read_text(encoding='utf-8-sig');result=resolve(text)
     for before,after in [('num2 = func_758(iParam1)','num2 = 20'),('func_454(num, 16)','func_454(num, 15)'),('ATTRIBUTE::SET_ATTRIBUTE_POINTS(pedParam0, 7, iParam1)','ATTRIBUTE::SET_ATTRIBUTE_POINTS(pedParam0, 0, iParam1)')]:
         candidate=text.replace(before,after);assert candidate!=text

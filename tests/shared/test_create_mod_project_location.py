@@ -25,6 +25,7 @@ class CreateModProjectLocationTests(unittest.TestCase):
         )
         plugin = SimpleNamespace(name="Test Plugin", projects=spec)
         host = HostApi.__new__(HostApi)
+        host._plugins = {"test": plugin}
         host._projects = ProjectManager({"test": plugin}, path=root / "projects.json")
         host._restart_for_project = lambda plugin_id, project: {**project, "url": "http://fixture", "identity": "test"}
         host.mod_library_location = lambda: {"root": str(library_root), "move": None}
@@ -91,6 +92,20 @@ class CreateModProjectLocationTests(unittest.TestCase):
             result = host.choose_mod_project_location("test")
             self.assertEqual(seen, [str(library_root)])
             self.assertEqual(result, {"parent": str(root / "chosen"), "cancelled": False})
+
+    def test_an_unregistered_plugin_id_never_creates_a_library_folder(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            library_root = root / "library"
+            host = self.host(root, library_root)
+            host._choose_folder = lambda directory="": self.fail("picker opened")
+            for plugin_id in ("../escape", "missing", None):
+                with self.assertRaises(ValueError):
+                    host.create_mod_project(plugin_id, "My Mod")
+                with self.assertRaises(ValueError):
+                    host.choose_mod_project_location(plugin_id)
+            self.assertFalse(library_root.exists())
+            self.assertFalse((root / "escape").exists())
 
     def test_choosing_a_location_never_creates_or_writes_anything_itself(self):
         with tempfile.TemporaryDirectory() as name:
