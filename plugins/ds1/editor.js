@@ -280,7 +280,7 @@ function renderInfo(){
       needsAttentionNote(deploy),
       actionRow(
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
-        el("button",{type:"button",disabled:state.deployBusy||!deploy.everApplied||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
+        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.rebalance?.native?.backupOk)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
     detailSection({title:"NATIVE RULES",help:state.deployment?.rebalance?.applyHelp,body:[
       detailField({label:"SUPPORTED EXECUTABLE",control:readonlyField(state.deployment?.rebalance?.native?.available?"Yes":"Unavailable"),
