@@ -68,15 +68,6 @@
   };
   const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
   const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
-  function tweakField(row,field){
-    const values=row.values,label=field.label||field.key,set=value=>{values[field.key]=value;shell.refresh()};
-    let control;
-    if(field.type==="bool")control=el("input",{type:"checkbox",checked:values[field.key]===true,"aria-label":label,onchange:event=>set(event.target.checked)});
-    else if(field.type==="enum")control=selectControl(values[field.key],field.choices.map(choice=>({id:choice.value,name:choice.label||String(choice.value)})),value=>set(value));
-    else if(field.type==="sound"&&soundEntries().length)control=selectControl(values[field.key],soundEntries(),value=>set(Number(value)));
-    else{const number=numberControl(values[field.key],field.min,field.max,field.step||(field.type==="number"?0.1:1),value=>set(value),{"aria-label":label});control=field.unit?unitField(number,field.unit):number}
-    return detailField({label,help:field.help?infoHelp(field.help):null,control});
-  }
   async function trustTweak(row,trusted){
     try{
       const result=await api("/api/settings/trust",post({id:row.id,trusted}));
@@ -87,37 +78,18 @@
   }
   function renderGameplaySettings(){
     if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
-    const settings=state.data.settings,toggles=new Map();
-    const panel=(title,help,toggle,body,blocker="")=>{
-      // A tweak that cannot be switched on yet says so where it stands: what
-      // it does in the help bubble, why it is unavailable in the body.
-      const titleNode=blocker?LexeditorUI.inlineLabel(el("span",{},title),LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",title:blocker})):title;
-      return detailPanel({title:titleNode,help,actions:toggle,body:[...(blocker?[LexeditorUI.detailNote(blocker)]:[]),...body]});
-    };
-    const rows=[...(settings.tweaks||[])].sort((a,b)=>(a.schema?.title||a.name).localeCompare(b.schema?.title||b.name));
-    const panels=rows.map(row=>{
-      const schema=row.schema||{fields:[]},blocker=schema.blocker||"";
-      const toggle=el("input",{type:"checkbox",checked:row.enabled,disabled:Boolean(blocker)&&!row.enabled,"aria-label":row.name,onchange:event=>{row.enabled=event.target.checked;shell.refresh()}});
-      toggles.set(row.id,toggle);
-      const body=[];
-      if(row.error)body.push(LexeditorUI.detailNote(row.error));
-      if(row.trust!=="trusted")body.push(LexeditorUI.detailNote(row.trust==="changed"
-        ?"This tweak's script changed since you trusted it, so it will not build until you trust it again."
-        :"This tweak runs its own script when it builds. Trust it only if you know where it came from."),
-        LexeditorUI.actionRow(el("button",{type:"button",onclick:()=>trustTweak(row,true)},"Trust this tweak")));
-      body.push(...schema.fields.filter(field=>!field.hidden).map(field=>tweakField(row,field)));
-      return panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker);
-    });
+    const settings=state.data.settings;
+    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:()=>shell.refresh(),trust:trustTweak,
+      sounds:soundEntries,number:numberControl,select:selectControl});
     const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
     const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
     panels.push(
-      panel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks,[]),
-      panel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic,[]));
-    if(!rows.length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
+      LexeditorUI.tweakPanel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
+      LexeditorUI.tweakPanel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic));
+    if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
     const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
     $("#main").replaceChildren(settingsView);
-    bindSettingDependencies(settingsView,rows.flatMap(row=>(row.schema?.requires||[]).filter(need=>toggles.has(need))
-      .map(need=>({key:`${need}->${row.id}`,dependency:toggles.get(need),dependent:toggles.get(row.id)}))));
+    bind(settingsView);
   }
 
   async function loadReshade(){
