@@ -1498,10 +1498,9 @@
 
   // A section heading is renamed the same way a property name is: a
   // developer double-clicks it, types, and the wording ships for everyone
-  // who sees that title. The key is the shipped title text itself, so every
-  // tab's own copy of the same heading (DS1's "Combat" on Items, Monsters
-  // and Attacks) reads one chosen wording, the same rule a field label
-  // follows.
+  // who sees that title. Like a field label, the key is the page tab plus the
+  // shipped title, so every copy of a heading within one tab (a section dealt
+  // across paginated columns repeats it) reads one chosen wording.
   const sectionTitleKey = title =>
     `${shellPluginId()}-${activePageTab()}.section.${title}.label`;
   // Shared Detail internals. A game supplies its theme and field controls;
@@ -1513,7 +1512,8 @@
     // only a plain section heading gets the double-click editor.
     const titleText = shippedTitle && !options.collapsible
       ? (() => {
-          const node = element("span", {class: "lex-detail-section-title-text"},
+          const node = element("span", {class: "lex-detail-section-title-text",
+            "data-lex-label-key": sectionTitleKey(shippedTitle)},
             savedLabel(sectionTitleKey(shippedTitle), shippedTitle));
           node.addEventListener("dblclick", event => {
             if (!sharedSettingsSnapshot?.developerMode) return;
@@ -4711,6 +4711,12 @@
       const label = element("span", {class: "lex-hoverable-label"}, node.textContent);
       node.replaceWith(label);
     });
+    // A link may preview its target on hover, so a reader can compare several
+    // linked records without leaving the one they are on.
+    if (options.preview) {
+      button.removeAttribute("title");
+      hoverPreview(button, options.preview, "lex-hover-preview");
+    }
     return button;
   };
 
@@ -4964,18 +4970,23 @@
     } else result.push({label:path || "Value",before,after});
     return result;
   };
-  const saveChangePreview = (button, changes, count) => {
-    let popup, timer;
-    const close=()=>{clearTimeout(timer);popup?.remove();popup=null;button.removeAttribute('aria-describedby')};
+  // One hover card for anything that previews what it points at: the save
+  // button's pending changes, or a linked record. `build` returns the card's
+  // contents, or a promise of them; a card whose anchor was left before the
+  // contents arrived is never shown.
+  const hoverPreview = (anchor, build, className = "") => {
+    let popup, timer, request = 0;
+    const close=()=>{clearTimeout(timer);request++;popup?.remove();popup=null;anchor.removeAttribute('aria-describedby')};
     const leave=()=>{timer=setTimeout(close,180)};
-    const show=()=>{
-      clearTimeout(timer);if(popup||button.disabled)return;
-      const rows=count?.()?changes?.() || []:[];
-      const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
-      popup=element('div',{class:'lex-help-popover lex-save-preview',role:'tooltip',id:`save-preview-${Math.random().toString(36).slice(2)}`},
-        rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.'));
-      document.body.append(popup);button.setAttribute('aria-describedby',popup.id);
-      const r=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
+    const show=async()=>{
+      clearTimeout(timer);if(popup||anchor.disabled)return;
+      const token=++request;
+      let contents;
+      try{contents=await build();}catch(error){contents=element('p',{},error?.message||String(error));}
+      if(token!==request||popup||!anchor.isConnected||!contents)return;
+      popup=element('div',{class:['lex-help-popover',className].filter(Boolean).join(' '),role:'tooltip',id:`hover-preview-${Math.random().toString(36).slice(2)}`},contents);
+      document.body.append(popup);anchor.setAttribute('aria-describedby',popup.id);
+      const r=anchor.getBoundingClientRect(),box=popup.getBoundingClientRect();
       popup.style.left=`${Math.max(8,Math.min(r.left+r.width/2-box.width/2,innerWidth-box.width-8))}px`;
       const below=innerHeight-r.bottom-16,above=r.top-16;
       const useBelow=box.height<=below || below>=above;
@@ -4983,10 +4994,18 @@
       popup.style.top=`${useBelow?r.bottom+8:Math.max(8,r.top-popup.getBoundingClientRect().height-8)}px`;
       popup.addEventListener('mouseenter',()=>clearTimeout(timer));popup.addEventListener('mouseleave',leave);
     };
-    button.addEventListener('mouseenter',show);button.addEventListener('mouseleave',leave);
-    button.addEventListener('focus',show);button.addEventListener('blur',leave);button.addEventListener('click',close);
+    anchor.addEventListener('mouseenter',show);anchor.addEventListener('mouseleave',leave);
+    anchor.addEventListener('focus',show);anchor.addEventListener('blur',leave);anchor.addEventListener('click',close);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
-    new MutationObserver(()=>{if(button.disabled)close()}).observe(button,{attributes:true,attributeFilter:['disabled']});
+    new MutationObserver(()=>{if(anchor.disabled)close()}).observe(anchor,{attributes:true,attributeFilter:['disabled']});
+    return close;
+  };
+  const saveChangePreview = (button, changes, count) => {
+    const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
+    hoverPreview(button,()=>{
+      const rows=count?.()?changes?.() || []:[];
+      return rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.');
+    },'lex-save-preview');
   };
 
   const settingsSaveControl = (options = {}) => {
@@ -6591,6 +6610,10 @@ ${contents.path}`});
       const name = label.lastChild;
       if (name?.nodeType === Node.TEXT_NODE) name.data = text;
     }
+    // A section split across paginated columns draws its heading once per
+    // column; every copy follows the one that was renamed.
+    for (const title of document.querySelectorAll(".lex-detail-section-title-text[data-lex-label-key]"))
+      if (title.dataset.lexLabelKey === key) title.textContent = text;
   };
   const storeLabel = async (key, tabId, value, shipped) => {
     const next = value && value !== shipped ? value : "";

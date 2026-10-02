@@ -133,6 +133,9 @@ def main():
                     # gate, so click by position rather than through
                     # Playwright's own actionability check, which refuses to
                     # drive a disabled element at all.
+                    # A press made while the loading screen still covers the
+                    # page lands on that screen, not on the field.
+                    vanilla.wait_for_selector('.lex-plugin-loading-screen', state='detached')
                     field_box = vanilla.locator('input[data-field-key]:visible').first.bounding_box()
                     vanilla.mouse.click(field_box['x'] + field_box['width'] / 2, field_box['y'] + field_box['height'] / 2)
                     dialog = vanilla.locator('.lex-dialog')

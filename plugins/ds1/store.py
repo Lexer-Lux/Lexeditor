@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, MAX_ARCHIVE
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
 MARKER = '.lexeditor-ds1-project'
@@ -65,6 +65,8 @@ class ItemStore:
                 'readOnly': self.read_only, 'dirtyCount': document.dirty_count,
                 'enemyTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in ENEMY_SUBTABS],
+                'attackTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                               for key, label, table in ATTACK_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS]}
 

@@ -1,2 +1,5 @@
 .ds1-items { display:flex; flex-direction:column; height:100%; min-height:0; }
 .ds1-records { flex:1; min-height:0; }
+.ds1-attack-preview dl { display:grid; grid-template-columns:auto auto; gap:.15em 1em; margin:.4em 0; }
+.ds1-attack-preview dd { margin:0; text-align:end; }
+.ds1-attack-preview p { margin:0; }
