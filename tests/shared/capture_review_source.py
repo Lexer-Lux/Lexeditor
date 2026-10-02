@@ -48,8 +48,11 @@ def main() -> None:
     args = parser.parse_args()
     if not os.environ.get("GITHUB_ACTIONS"):
         raise SystemExit("Source capture is a CI-only review operation")
-    out = Path(os.environ["RUNNER_TEMP"]) / "lexeditor-review"
-    out.mkdir(exist_ok=True)
+    # RUNNER_TEMP and Python's temp directory can be on different Windows drives.
+    # Keep all explicitly selected evidence under one root for upload-artifact.
+    dev = Path(tempfile.gettempdir()) / "lexeditor-dev"
+    out = dev / "review-source"
+    out.mkdir(parents=True, exist_ok=True)
     facts = {"head": capture("HEAD", out / "source-head.zip")}
     if args.compare:
         if len(args.compare) != 40 or any(c not in "0123456789abcdef" for c in args.compare):
@@ -60,7 +63,7 @@ def main() -> None:
     (out / "source-evidence.json").write_text(json.dumps(facts, indent=2), encoding="utf-8")
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
         stream.write(f"source_dir={out}\n")
-        stream.write(f"test_dir={Path(tempfile.gettempdir()) / 'lexeditor-dev'}\n")
+        stream.write(f"test_dir={dev}\n")
     print(json.dumps(facts))
 
 
