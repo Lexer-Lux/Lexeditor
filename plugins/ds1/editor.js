@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monster:null,allAttacks:false,attackLinks:null};
+  monster:null,allAttacks:false,attackLinks:null,tweaks:null,tweakBusy:false};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
@@ -12,18 +12,21 @@ async function api(path,body){
   if(!response.ok||result.error)throw new Error(result.error||response.statusText);
   return result;
 }
+const tweakDirty=()=>state.tweaks?.dirtyCount||0;
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
-    {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."}],
+    {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."},
+    {id:"tweaks",label:"Tweaks"}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
-  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
+  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending+tweakDirty(),save,discard
 });
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.readOnly=result.readOnly;state.dirty=result.dirtyCount;
+  state.tweaks=result.tweaks||null;
 }
 async function loadItems(){
   const request=++recordsRequest;
@@ -46,6 +49,7 @@ async function loadDetail(){
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
+async function loadTweaks(){state.tweaks=await api("/api/tweaks");}
 async function navigate(tab,sub=state.sub){
   const token=++navigation;await edits;state.tab=tab;
   const previousMonster=state.monster;
@@ -54,7 +58,7 @@ async function navigate(tab,sub=state.sub){
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   if(sub!==state.sub||previousMonster){state.sub=sub;state.selected=tab==="enemies"&&previousMonster?`NpcParam:${previousMonster.id}`:null;state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies")await loadItems();else if(tab==="info")await loadDeployment();
+    if(tab==="items"||tab==="enemies")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;state.error="";render();
   }
   catch(error){if(token===navigation){state.error=error.message;render();}}
@@ -79,12 +83,12 @@ async function deploymentAction(action){
 }
 async function save(){
   await edits;
-  try{await api("/api/save",{});await refreshState();shell.refresh();LexeditorUI.showToast("Changes saved to the mod project.");}
+  try{await api("/api/save",{});await refreshState();render();LexeditorUI.showToast("Changes saved to the mod project.");}
   catch(error){notify(error);throw error;}
 }
 async function discard(){
   await edits;
-  try{await api("/api/discard",{});await refreshState();await loadItems();render();}catch(error){notify(error);}
+  try{await api("/api/discard",{});await refreshState();if(state.tab==="tweaks")await loadTweaks();else if(state.tab!=="info")await loadItems();render();}catch(error){notify(error);}
 }
 function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
@@ -239,13 +243,69 @@ function renderInfo(){
       safety:"Apply and Disable touch only param/GameParam/GameParam.parambnd.dcx and refuse to continue if that file changed outside Lexeditor.",
       removal:"Restore original copies the preserved original bytes back over the installed file."})]});
 }
+
+function commitTweak(value){
+  if(state.readOnly||state.tweakBusy)return;
+  state.pending++;shell.refresh();
+  edits=edits.then(async()=>{
+    try{state.tweaks=await api("/api/tweaks/edit",{enabled:value});}
+    catch(error){notify(error);await loadTweaks();}
+    finally{state.pending--;render();}
+  }).catch(notify);
+}
+async function tweakAction(action){
+  if(state.tweakBusy)return;
+  await edits;
+  if(action==="apply"&&tweakDirty()){
+    notify(new Error("Save or discard tweak changes before applying."));return;
+  }
+  const spec=action==="apply"?{
+    title:"Apply this executable tweak?",
+    message:"Close the game first. This experimental patch still needs in-game testing. Test offline. Lexeditor keeps one original executable and rejects unsupported or externally changed files. Parameter edits are applied separately.",
+    confirmLabel:"Apply"
+  }:{
+    title:"Restore the original executable?",
+    message:"This restores vanilla ammunition controls and display. The mod project's saved setting and parameter archive are unchanged. Close the game first.",
+    confirmLabel:"Restore"
+  };
+  if(!await confirmAction({...spec,cancelLabel:"Cancel"}))return;
+  state.tweakBusy=true;render();
+  try{state.tweaks=await api("/api/tweaks/"+action,{});}
+  catch(error){notify(error);await loadTweaks();}
+  finally{state.tweakBusy=false;render();}
+}
+function renderTweaks(){
+  const tweak=state.tweaks;
+  if(!tweak)return LexeditorUI.loadingPanel({label:"Loading tweaks"});
+  const busy=state.tweakBusy||state.pending>0;
+  const checked=el("input",{type:"checkbox","aria-label":tweak.label,checked:tweak.enabled,
+    disabled:state.readOnly||busy,onchange:event=>commitTweak(event.target.checked)});
+  const applied=tweak.applied===null?"Unknown":tweak.applied?"Yes":"No";
+  const note=tweak.problem||(!tweak.windows?"Applying executable tweaks requires Windows.": "");
+  const panel=detailPanel({
+    title:LexeditorUI.inlineLabel(tweak.label,LexeditorUI.badge("EXPERIMENTAL",{tone:"warning"})),
+    help:tweak.help,actions:checked,
+    body:[
+      detailField({label:"APPLIED TO GAME",control:readonlyField(applied),
+        help:infoHelp("The checkbox is the mod's setting. Save keeps it in the project. Apply changes the installed executable.")}),
+      note?LexeditorUI.detailNote(note):null,
+      actionRow(
+        el("button",{type:"button",disabled:busy||state.readOnly||!!tweakDirty()||!tweak.available||!tweak.windows,
+          onclick:()=>tweakAction("apply")},"Apply"),
+        el("button",{type:"button",disabled:busy||!tweak.applied||!tweak.backupOk||!tweak.windows,
+          onclick:()=>tweakAction("restore")},"Restore original"))
+    ].filter(Boolean)
+  });
+  return LexeditorUI.settingsColumns([panel]);
+}
+
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
   shell.refresh();
 }
 async function boot(){
   try{await refreshState();await loadItems();render();}catch(error){state.error=error.message;render();}
   finally{document.body.dataset.ds1Ready=state.error?"error":"true";await LexeditorUI.finishPluginLoading();}
 }
-window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending))event.preventDefault();});
+window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending||tweakDirty()))event.preventDefault();});
 boot();
