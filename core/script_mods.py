@@ -436,6 +436,53 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     return {"files": sorted(planned), "written": written, "removed": removed}
 
 
+def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...],
+                error: type[Exception] = ScriptModError) -> list[dict]:
+    """Build every row (enabled tweak mods, in load order), or none of them.
+
+    Each row carries id, name, path, schema, trust and error, as catalog_row
+    gives them. Everything that can be refused is refused before any mod
+    writes; a failure during the builds puts back every mod already built.
+    The context's `current` names the mod being built.
+    """
+    enabled = {row["id"]: Path(row["path"]) for row in rows}
+    snapshots = {}
+    for row in rows:
+        if row["error"]:
+            raise error(f"{row['name']}: {row['error']}")
+        missing = [need for need in row["schema"]["requires"] if need not in enabled]
+        if missing:
+            raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
+        if row["schema"]["blocker"]:
+            raise error(f"{row['name']}: {row['schema']['blocker']}")
+        conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
+        if conflicts:
+            raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
+        if row["trust"] != "trusted":
+            raise error(f"{row['name']}: its script is {row['trust']}; trust it before building")
+        try:
+            snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
+        except Exception as failure:
+            raise error(f"{row['name']}: {failure}") from failure
+    built = []
+    try:
+        for row in rows:
+            context.current = row["name"]
+            result = build(Path(row["path"]), context, allowed_roots=allowed_roots)
+            built.append({"id": row["id"], "files": result["files"]})
+    except Exception as failure:
+        failures = []
+        for result in reversed(built):
+            try:
+                restore_generated(enabled[result["id"]], snapshots[result["id"]],
+                                  new_files=result["files"], allowed_roots=allowed_roots)
+            except Exception as rollback_error:
+                failures.append(f"{result['id']}: {rollback_error}")
+        suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
+        raise error(f"{context.current}: {failure}{suffix}") from failure
+    return built
+
+
 def clear(root: Path) -> list[str]:
     """Remove everything an earlier build generated, as when the mod is off."""
     root = Path(root)

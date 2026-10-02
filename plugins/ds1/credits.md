@@ -57,40 +57,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Later-Game Ammunition
+## Executable tweak loader
 
-lud-berthe's MIT-licensed Dark Souls Remastered Gyro Aim supplied native
-input/HUD entrypoint research leads. Reviewed `src/Aiming.cpp` at
-`d451f3f6403fa4ee24b9fc0868280893fd2e17df`; no upstream implementation is copied.
-https://github.com/lud-berthe/Dark-Souls-Remastered-Gyro-aim-mod
-
-The call sites, equipment layouts and quantity paths were independently
-checked against a privately supplied executable. The distributed native
-payload is original authored code, with no game executable, menu archive or
-proprietary disassembly included. Detailed provenance is in
-`ammunition_controls.md`.
-
-Microsoft's PE/COFF and x64 exception-handling documentation supplied format
-facts, not copied implementation code:
-https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
-https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
-
-The tweak uses Lexeditor's shared controls, `BundledTweak` registry, atomic
-writer and process check. Clang and the test host's C compiler are development
-only and are not player-side requirements or bundled dependencies.
-
-## Equip Load Percentage
-
-The Remastered display hook was independently traced from a privately supplied
-executable. Only original authored patch code, small verification signatures
-and build fingerprints are distributed; no executable or copied game table is
-bundled. The earlier PTDE research is not used by this implementation.
-
-Microsoft's primary documentation supplied PE and x64 chained-unwind format
-facts. No Microsoft implementation code is copied:
-- https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
+Lexeditor combines DS1 tweak mods' native patches onto the vanilla
+executable (`exe_patches.py`). Microsoft's PE/COFF and x64 exception-handling
+documentation supplied the format facts; no implementation code is copied:
 - https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+- https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
 
-The tweak reuses Lexeditor's shared controls, atomic file writer and process
-probe. GNU binutils is used only to reproduce and test the authored assembly;
-it is not a player-side requirement or a bundled runtime.
+Each tweak's own credits travel with its mod.

@@ -10980,7 +10980,71 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+  // One panel per tweak mod, drawn from its settings schema. Every game's
+  // Tweaks page uses this: the switch, the fields, the trust prompt and the
+  // "not available yet" badge look and behave the same everywhere.
+  const tweakPanel = (title, help, toggle, body = [], blocker = "") => {
+    // A tweak that cannot be switched on yet says so where it stands: what it
+    // does in the help bubble, why it is unavailable in the body.
+    const heading = blocker
+      ? inlineLabel(element("span", {}, title), badge("NOT AVAILABLE YET", {tone: "warning", title: blocker}))
+      : title;
+    return detailPanel({title: heading, help, actions: toggle,
+      body: [...(blocker ? [detailNote(blocker)] : []), ...body]});
+  };
+  const tweakModPanels = (options = {}) => {
+    const changed = () => options.change?.();
+    const number = options.number || ((value, min, max, step, onchange, attrs) => element("input", {
+      ...attrs, type: "number", value, min, max, step,
+      onchange: event => { if (event.target.checkValidity()) onchange(Number(event.target.value)); else event.target.reportValidity(); },
+    }));
+    const select = options.select || ((value, entries, onchange) => {
+      const control = element("select", {onchange: event => onchange(event.target.value)},
+        ...entries.map(entry => element("option", {value: entry.id}, entry.name)));
+      control.value = String(value);
+      return control;
+    });
+    const field = (row, item) => {
+      const values = row.values, label = item.label || item.key;
+      const set = value => { values[item.key] = value; changed(); };
+      let control;
+      if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
+        "aria-label": label, disabled: !!options.readOnly, onchange: event => set(event.target.checked)});
+      else if (item.type === "enum") control = select(values[item.key],
+        item.choices.map(choice => ({id: choice.value, name: choice.label || String(choice.value)})), set);
+      else if (item.type === "sound" && options.sounds?.().length) control = select(values[item.key], options.sounds(), value => set(Number(value)));
+      else {
+        const input = number(values[item.key], item.min, item.max, item.step || (item.type === "number" ? 0.1 : 1), set, {"aria-label": label});
+        control = item.unit ? unitField(input, item.unit) : input;
+      }
+      return detailField({label, help: item.help ? infoHelp(item.help) : null, control});
+    };
+    const toggles = new Map();
+    const rows = [...(options.rows || [])].sort((a, b) =>
+      (a.schema?.title || a.name).localeCompare(b.schema?.title || b.name));
+    const panels = rows.map(row => {
+      const schema = row.schema || {fields: []}, blocker = schema.blocker || "";
+      const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": row.name,
+        disabled: !!options.readOnly || (Boolean(blocker) && !row.enabled),
+        onchange: event => { row.enabled = event.target.checked; changed(); }});
+      toggles.set(row.id, toggle);
+      const body = [];
+      if (row.error) body.push(detailNote(row.error));
+      if (row.trust !== "trusted") body.push(detailNote(row.trust === "changed"
+        ? "This tweak's script changed since you trusted it, so it will not build until you trust it again."
+        : "This tweak runs its own script when it builds. Trust it only if you know where it came from."),
+      actionRow(element("button", {type: "button", onclick: () => options.trust?.(row, true)}, "Trust this tweak")));
+      body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
+      return tweakPanel(schema.title || row.name.toUpperCase(), schema.help, toggle, body, blocker);
+    });
+    // A tweak another one requires greys out the dependent while it is off.
+    const bind = root => bindSettingDependencies(root, rows.flatMap(row =>
+      (row.schema?.requires || []).filter(need => toggles.has(need))
+        .map(need => ({key: `${need}->${row.id}`, dependency: toggles.get(need), dependent: toggles.get(row.id)}))));
+    return {panels, toggles, bind};
+  };
+
+window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.

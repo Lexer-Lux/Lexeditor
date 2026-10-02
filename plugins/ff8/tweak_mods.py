@@ -98,38 +98,5 @@ def build_enabled(project_root: Path, mods_root: Path, game_root: Path, baseline
     rows = [row for row in tweak_rows(project_root, mods_root) if row["enabled"]]
     enabled = {row["id"]: Path(row["path"]) for row in rows}
     context = BuildContext(game_root, baseline_root, enabled)
-    snapshots = {}
-    for row in rows:
-        if row["error"]:
-            raise BuildError(f"{row['name']}: {row['error']}")
-        missing = [need for need in row["schema"]["requires"] if need not in enabled]
-        if missing:
-            raise BuildError(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
-        if row["schema"]["blocker"]:
-            raise BuildError(f"{row['name']}: {row['schema']['blocker']}")
-        conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
-        if conflicts:
-            raise BuildError(f"{row['name']} conflicts with {', '.join(conflicts)}")
-        if row["trust"] != "trusted":
-            raise BuildError(f"{row['name']}: its script is {row['trust']}; trust it before building")
-        try:
-            snapshots[row["id"]] = script_mods.snapshot_generated(Path(row["path"]), allowed_roots=ALLOWED_ROOTS)
-        except Exception as error:
-            raise BuildError(f"{row['name']}: {error}") from error
-    built = []
-    try:
-        for row in rows:
-            context.current = row["name"]
-            result = script_mods.build(Path(row["path"]), context, allowed_roots=ALLOWED_ROOTS)
-            built.append({"id": row["id"], "files": result["files"]})
-    except Exception as error:
-        failures = []
-        for result in reversed(built):
-            try:
-                script_mods.restore_generated(enabled[result["id"]], snapshots[result["id"]],
-                    new_files=result["files"], allowed_roots=ALLOWED_ROOTS)
-            except Exception as rollback_error:
-                failures.append(f"{result['id']}: {rollback_error}")
-        suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
-        raise BuildError(f"{context.current}: {error}{suffix}") from error
+    built = script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=BuildError)
     return {"built": built, "ffnx": context.ffnx_keys, "driver": context.driver}

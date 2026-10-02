@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null};
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -18,7 +18,8 @@ const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
-    {id:"attacks",label:"Attacks",help:"Edit enemy attack damage. One attack record can be shared by several monsters, bosses and NPCs, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."}],
+    {id:"attacks",label:"Attacks",help:"Edit enemy attack damage. One attack record can be shared by several monsters, bosses and NPCs, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
+    {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
@@ -53,6 +54,7 @@ async function loadDetail(){
   if(state.selected!==key(row))return;
   state.row=result.row;state.monsterAttacks=attacks;
 }
+async function loadTweaks(){state.tweaks=await api("/api/tweaks");}
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
@@ -64,7 +66,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();
+    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
@@ -272,8 +274,45 @@ function renderInfo(){
       safety:"Apply and Disable touch only param/GameParam/GameParam.parambnd.dcx and refuse to continue if that file changed outside Lexeditor.",
       removal:"Restore original copies the preserved original bytes back over the installed file."})]});
 }
+// Tweaks are library mods: a switch saves at once, and Apply builds every
+// enabled one into the installed executable together.
+async function tweakRequest(path,body,failure){
+  if(state.tweakBusy)return;
+  state.tweakBusy=true;render();
+  try{state.tweaks=await api(path,body);}
+  catch(error){LexeditorUI.showAlert({title:failure,message:error.message||String(error)});await loadTweaks().catch(()=>{});}
+  finally{state.tweakBusy=false;render();}
+}
+async function tweakAction(action){
+  const spec=action==="apply"?{title:"Apply the enabled tweaks?",
+    message:"Close the game first. Lexeditor builds every enabled tweak into one executable, keeps one copy of the original the first time, and refuses an executable changed outside Lexeditor. These tweaks are experimental; test offline.",confirmLabel:"Apply"}
+    :{title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original"};
+  if(!await confirmAction({...spec,cancelLabel:"Cancel"}))return;
+  await tweakRequest("/api/tweaks/"+action,{},action==="apply"?"Could not apply the tweaks":"Could not restore the executable");
+}
+function renderTweaks(){
+  const status=state.tweaks;
+  if(!status)return LexeditorUI.loadingPanel({label:"Loading tweaks"});
+  const busy=state.tweakBusy;
+  const save=row=>tweakRequest("/api/tweaks/save",{tweaks:{[row.id]:{enabled:row.enabled,values:row.values}}},"Could not save the tweak");
+  const {panels,bind}=LexeditorUI.tweakModPanels({rows:status.tweaks||[],readOnly:busy,
+    change:()=>{const changed=(status.tweaks||[]).find(row=>row.enabled!==row._saved?.enabled||JSON.stringify(row.values)!==JSON.stringify(row._saved?.values));if(changed)save(changed)},
+    trust:row=>tweakRequest("/api/tweaks/trust",{id:row.id,trusted:true},"Could not trust the tweak")});
+  for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
+  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original executable":"Unknown";
+  const installed=detailPanel({title:"INSTALLED GAME",
+    help:"Apply builds every enabled tweak into one executable. The first Apply keeps one copy of the original; Restore original puts it back.",
+    body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      status.problem?LexeditorUI.detailNote(status.problem):null,
+      actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
+        el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
+  if(!(status.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}));
+  const view=LexeditorUI.settingsColumns([installed,...panels]);
+  requestAnimationFrame(()=>bind(view));
+  return view;
+}
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
   shell.refresh();
 }
 async function boot(){
