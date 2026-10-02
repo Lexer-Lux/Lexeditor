@@ -39,7 +39,8 @@ def fill(page, key, value):
 
 
 def select_band(page, name, identity):
-    page.get_by_text(name, exact=True).click()
+    # The movement selector intentionally has the same profile names as the bands.
+    page.get_by_role("table").get_by_text(name, exact=True).click()
     page.wait_for_function("(id)=>state.row.id===id && !state.pending", arg=identity)
 
 
