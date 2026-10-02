@@ -85,10 +85,17 @@ class LoaderTests(unittest.TestCase):
                 tweak_mods.save(bad, self.library)
         self.assertTrue(tweak_mods.tweak_rows(self.library)[0]["enabled"])
 
-    def test_off_tweaks_change_nothing(self):
+    def test_off_tweaks_preserve_game_and_create_only_bounded_lock(self):
+        # Reading the catalogue or saving switches does not install anything.
+        tweak_mods.status(self.game, self.library)
+        self.enable(alpha=False, beta=False)
+        self.assertEqual(self.files(), [exe_patches.EXECUTABLE])
         result = tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
-        self.assertEqual(self.files(), [exe_patches.EXECUTABLE])
+        # Explicit Apply serializes even a no-op. Its persistent one-byte lock
+        # is metadata, not an executable edit, backup or generated tweak.
+        self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE]))
+        self.assertEqual((self.game / tweak_mods.LOCK_FILE).read_bytes(), b"0")
         self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
 
     def test_untrusted_tweak_never_builds(self):
@@ -102,7 +109,11 @@ class LoaderTests(unittest.TestCase):
         self.enable(alpha=True)
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), self.expected("alpha"))
-        self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.BACKUP_FILE, tweak_mods.MANIFEST_FILE]))
+        self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.BACKUP_FILE,
+                                               tweak_mods.MANIFEST_FILE, tweak_mods.LOCK_FILE]))
+        lock = self.game / tweak_mods.LOCK_FILE
+        lock_identity = (lock.stat().st_dev, lock.stat().st_ino)
+        self.assertEqual(lock.read_bytes(), b"0")
         self.enable(beta=True)
         result = tweak_mods.apply(self.game, self.library)
         # Both together, built from the original, never stacked on the last output.
@@ -112,7 +123,11 @@ class LoaderTests(unittest.TestCase):
         result = tweak_mods.restore(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(result["state"], "vanilla")
-        self.assertNotIn(tweak_mods.MANIFEST_FILE, self.files())
+        self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.BACKUP_FILE,
+                                               tweak_mods.LOCK_FILE]))
+        self.assertEqual(lock.read_bytes(), b"0")
+        self.assertEqual((lock.stat().st_dev, lock.stat().st_ino), lock_identity,
+                         "Apply and Restore retain the same lock inode")
         self.assertTrue(all(row["enabled"] for row in tweak_mods.tweak_rows(self.library)), "restore keeps the switches")
 
     def test_turning_every_tweak_off_and_applying_restores(self):

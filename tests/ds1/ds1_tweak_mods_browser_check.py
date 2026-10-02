@@ -31,7 +31,8 @@ def make(library: Path, mod_id: str, name: str, order: int) -> Path:
 
 
 def main():
-    output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    destination = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("LEXEDITOR_CHECK_ARTIFACTS")
+    output = Path(destination) if destination else None
     if output:
         output.mkdir(parents=True, exist_ok=True)
     errors = []
@@ -67,8 +68,13 @@ def main():
                     page.get_by_text('DarkSoulsRemastered.exe is missing').wait_for()
                     assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
                     page.get_by_role('button', name='Trust this tweak').wait_for()
-                    if output:
-                        page.screenshot(path=str(output / 'ds1-tweaks.png'))
+                    # The same schema-driven controls must remain usable in both sizes.
+                    for width, height in ((1440, 900), (1000, 700)):
+                        page.set_viewport_size({"width": width, "height": height})
+                        page.get_by_role('checkbox', name='Equip Load Percentage').wait_for(state='visible')
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                        if output:
+                            page.screenshot(path=str(output / f'ds1-tweaks-{width}x{height}.png'))
                     # A switch saves straight to the library mod.
                     page.get_by_role('checkbox', name='Equip Load Percentage').check()
                     page.wait_for_function('!state.tweakBusy && state.tweaks.tweaks.find(r=>r.id==="equip-load-percentage").enabled')
@@ -87,7 +93,11 @@ def main():
                     browser.close()
         finally:
             session.stop()
-    print(json.dumps({'tweakMods': 2, 'switchSaved': True, 'trusted': True, 'missingExecutableReported': True}))
+    evidence = {'tweakMods': 2, 'switchSaved': True, 'trusted': True,
+                'missingExecutableReported': True, 'viewports': [[1440, 900], [1000, 700]]}
+    if output:
+        (output / "ds1-tweak-controls.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    print(json.dumps(evidence))
 
 
 if __name__ == '__main__':

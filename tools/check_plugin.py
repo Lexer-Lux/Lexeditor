@@ -152,25 +152,45 @@ jobs:
       - run: python -m pip install -r requirements-test.txt
       - run: python -m playwright install chromium
       - run: python tools/check_plugin.py {argument}
+{check_env}"""
+
+
+EVIDENCE_STEP = """\
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: {plugin}-evidence-${{{{ github.sha }}}}
+          path: ${{{{ runner.temp }}}}/lexeditor-dev/{plugin}-evidence
+          if-no-files-found: warn
+          retention-days: 7
 """
 
 
-def workflow_files() -> dict[str, str]:
+def workflow_files(target: str | None = None) -> dict[str, str]:
     """The complete, expected contents of .github/workflows/."""
     from runpy import run_path
-    native_ff8_workflow = run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]
     shared = ["tests/plugin_checks.json", "tools/check_plugin.py", "tests/shared/verify_all.py",
               "requirements-test.txt"]
-    files = {"ff8-stock-build.yml": native_ff8_workflow}
-    for plugin in PLUGINS:
+    if target is not None and target not in PLUGINS:
+        raise ValueError(f"Unknown plugin: {target}")
+    files = {} if target else {
+        "ff8-stock-build.yml": run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]}
+    for plugin in ([target] if target else PLUGINS):
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
+        capture = plugin in CONFIG.get("capture_evidence", [])
+        check_env = ("        env:\n          LEXEDITOR_CHECK_ARTIFACTS: ${{ runner.temp }}/lexeditor-dev/"
+                     + plugin + "-evidence\n") if capture else ""
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
-            title=f"{plugin} checks", filter="paths", argument=plugin, env="",
+            title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env,
             paths="\n".join(f"      - '{path}'" for path in paths))
+        if capture:
+            files[f"{plugin}-checks.yml"] += EVIDENCE_STEP.format(plugin=plugin)
+    if target:
+        return files
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
-        title="global checks", filter="paths-ignore", argument="--global",
+        title="global checks", filter="paths-ignore", argument="--global", check_env="",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))
@@ -185,13 +205,15 @@ def main() -> int:
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--write-workflows", action="store_true",
-                        help="regenerate .github/workflows: one <plugin>-checks.yml per plugin plus global-checks.yml")
+                        help="regenerate all workflows, or only the named plugin workflow")
     args = parser.parse_args()
     if args.write_workflows:
-        expected = workflow_files()
-        for stale in WORKFLOWS.glob("*.yml"):
-            if stale.name not in expected:
-                stale.unlink()
+        expected = workflow_files(args.plugin)
+        WORKFLOWS.mkdir(parents=True, exist_ok=True)
+        if args.plugin is None:
+            for stale in WORKFLOWS.glob("*.yml"):
+                if stale.name not in expected:
+                    stale.unlink()
         for name, text in expected.items():
             (WORKFLOWS / name).write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {len(expected)} workflows")
