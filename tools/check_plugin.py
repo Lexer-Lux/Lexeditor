@@ -152,7 +152,7 @@ jobs:
       - run: python -m pip install -r requirements-test.txt
       - run: python -m playwright install chromium
       - run: python tools/check_plugin.py {argument}
-"""
+{check_env}"""
 
 
 EVIDENCE_STEP = """\
@@ -160,7 +160,7 @@ EVIDENCE_STEP = """\
         if: always()
         with:
           name: {plugin}-evidence-${{{{ github.sha }}}}
-          path: ${{{{ env.LEXEDITOR_CHECK_ARTIFACTS }}}}
+          path: ${{{{ runner.temp }}}}/lexeditor-dev/{plugin}-evidence
           if-no-files-found: warn
           retention-days: 7
 """
@@ -179,10 +179,10 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
         capture = plugin in CONFIG.get("capture_evidence", [])
-        env = ("    env:\n      LEXEDITOR_CHECK_ARTIFACTS: ${{ runner.temp }}/lexeditor-dev/"
-               + plugin + "-evidence\n") if capture else ""
+        check_env = ("        env:\n          LEXEDITOR_CHECK_ARTIFACTS: ${{ runner.temp }}/lexeditor-dev/"
+                     + plugin + "-evidence\n") if capture else ""
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
-            title=f"{plugin} checks", filter="paths", argument=plugin, env=env,
+            title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env,
             paths="\n".join(f"      - '{path}'" for path in paths))
         if capture:
             files[f"{plugin}-checks.yml"] += EVIDENCE_STEP.format(plugin=plugin)
@@ -190,7 +190,7 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
         return files
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
-        title="global checks", filter="paths-ignore", argument="--global",
+        title="global checks", filter="paths-ignore", argument="--global", check_env="",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))

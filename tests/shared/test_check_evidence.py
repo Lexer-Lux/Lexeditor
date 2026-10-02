@@ -17,6 +17,10 @@ def test_targeted_workflow_keeps_evidence_opt_in(monkeypatch):
     assert "actions/upload-artifact@v4" in text
     assert "retention-days: 7" in text
     assert "if: always()" in text
+    # runner.temp exists in step context, not in a job-level env expression.
+    assert "    env:\n      LEXEDITOR_CHECK_ARTIFACTS:" not in text
+    assert "        env:\n          LEXEDITOR_CHECK_ARTIFACTS:" in text
+    assert "path: ${{ runner.temp }}/lexeditor-dev/ds1-evidence" in text
     plain = check_plugin.workflow_files("other")["other-checks.yml"]
     assert "upload-artifact" not in plain
     assert "LEXEDITOR_CHECK_ARTIFACTS" not in plain
