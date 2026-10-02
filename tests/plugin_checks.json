@@ -7,5 +7,8 @@
       {"platform": "win32", "run": ["cmake", "--build", "{devcache}/ff7r-native-runtime", "--config", "Release", "--parallel"]},
       {"platform": "win32", "run": ["ctest", "--test-dir", "{devcache}/ff7r-native-runtime", "-C", "Release", "--output-on-failure"]}
     ]
+  },
+  "ci_evidence": {
+    "ds1": {"push_branch": "codex/ds1-stamina-editor", "compare": "f81b575b3edd6797529e68fca654831889b688d1"}
   }
 }

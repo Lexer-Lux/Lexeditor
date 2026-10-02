@@ -127,7 +127,7 @@ WORKFLOW = """\
 name: {title}
 on:
   push:
-    branches: [master]
+    branches: {branches}
     {filter}:
 {paths}
   pull_request:
@@ -151,8 +151,8 @@ jobs:
           node-version: '22'
       - run: python -m pip install -r requirements-test.txt
       - run: python -m playwright install chromium
-      - run: python tools/check_plugin.py {argument}
-"""
+{capture}      - run: python tools/check_plugin.py {argument}
+{upload}"""
 
 
 def workflow_files() -> dict[str, str]:
@@ -165,12 +165,33 @@ def workflow_files() -> dict[str, str]:
     for plugin in PLUGINS:
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
+        review = CONFIG.get("ci_evidence", {}).get(plugin, {})
+        branches = "[master]"
+        if review.get("push_branch"):
+            branches = json.dumps(["master", review["push_branch"]])
+        capture = upload = ""
+        if review:
+            compare = " --compare " + review["compare"] if review.get("compare") else ""
+            capture = ("      - name: Capture exact review sources\n"
+                       "        id: evidence\n"
+                       f"        run: python tests/shared/capture_review_source.py{compare}\n")
+            upload = ("      - uses: actions/upload-artifact@v4\n"
+                      "        if: always()\n"
+                      "        with:\n"
+                      "          name: " + plugin + "-review-${{ github.sha }}\n"
+                      "          retention-days: 7\n"
+                      "          path: |\n"
+                      "            ${{ steps.evidence.outputs.source_dir }}\n"
+                      "            ${{ steps.evidence.outputs.test_dir }}/check-results\n"
+                      "            ${{ steps.evidence.outputs.test_dir }}/" + plugin + "*/*.png\n")
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
+            branches=branches, capture=capture, upload=upload,
             title=f"{plugin} checks", filter="paths", argument=plugin, env="",
             paths="\n".join(f"      - '{path}'" for path in paths))
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
         title="global checks", filter="paths-ignore", argument="--global",
+        branches="[master]", capture="", upload="",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))
