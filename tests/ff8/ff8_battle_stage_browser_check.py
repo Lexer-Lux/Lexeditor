@@ -70,6 +70,48 @@ def main():
                 page.get_by_role('combobox', name='Summon mesh object', exact=True).select_option('2')
             assert len(surface.value.json()['positions']) == 107
             assert page.get_by_role('combobox', name='Surface frame', exact=True).count() == 0
+            page.evaluate("state.selected.models='mag098_b.4p0';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Resource 34: surface geometry', exact=True).wait_for(state='visible')
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            objects = page.get_by_role('combobox', name='Summon mesh object', exact=True)
+            assert objects.locator('option').count() == 10
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=5' in response.url) as selected:
+                objects.select_option('5')
+            assert len(selected.value.json()['positions']) == 100
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_RESOURCE_MESH_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_RESOURCE_MESH_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag088_b.2p0';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'frame=15' in response.url) as sprite:
+                page.get_by_role('combobox', name='Surface frame', exact=True).select_option('15')
+            assert sprite.value.json()['frameCount'] == 16
+            assert sprite.value.json()['unmappedFaces'] == 0
+            assert len(sprite.value.json()['positions']) == 4
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_SPRITE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_SPRITE_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag115_h.16';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            objects = page.get_by_role('combobox', name='Summon mesh object', exact=True)
+            assert objects.locator('option').count() == 8
+            objects.select_option('2')
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'frame=5' in response.url) as surface:
+                page.get_by_role('combobox', name='Surface frame', exact=True).select_option('5')
+            assert surface.value.json()['frameCount'] == 6
+            assert surface.value.json()['unmappedFaces'] == 0
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_QUEZACOTL_SURFACE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_QUEZACOTL_SURFACE_SCREENSHOT'])
             page.evaluate("state.selected.models='mag324_h.s00';navigate('models')")
             page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
             page.locator('.lex-detail-panel-icon').click()
@@ -170,6 +212,27 @@ def main():
             if os.environ.get('LEXEDITOR_DIABLOS_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_DIABLOS_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag326_e.dat';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            part = page.get_by_role('combobox', name='Model part', exact=True)
+            assert part.locator('option').count() == 5
+            if os.environ.get('LEXEDITOR_GILGAMESH_PART_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_GILGAMESH_PART_SCREENSHOT'])
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=4' in response.url) as selected:
+                part.select_option('4')
+            assert len(selected.value.json()['positions']) == 62
+            assert selected.value.json()['unmappedFaces'] == 0
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            with page.expect_download() as download:
+                page.get_by_role('button', name='Export GLB', exact=True).click()
+            assert download.value.suggested_filename.endswith('part-5.glb')
+            assert Path(download.value.path()).read_bytes()[:4] == b'glTF'
+            if os.environ.get('LEXEDITOR_GILGAMESH_LAST_PART_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_GILGAMESH_LAST_PART_SCREENSHOT'])
             page.evaluate("state.selected.models='mag076_b.02';navigate('models')")
             page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Sound header', exact=True).wait_for(state='visible')
             assert page.locator('.lex-model-stage').count() == 0
@@ -177,6 +240,32 @@ def main():
             if os.environ.get('LEXEDITOR_SOUND_DATA_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_SOUND_DATA_SCREENSHOT'])
+            page.evaluate("state.selected.models='a9btlfnt.bft';navigate('models')")
+            page.get_by_role('combobox', name='Battle font texture 1 palette', exact=True).select_option('7')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('a9btlfnt.bft%230')&&i.src.includes('palette=7')&&i.complete&&i.naturalWidth===256&&i.naturalHeight===132)")
+            assert page.locator('.lex-model-stage').count() == 0
+            assert page.get_by_role('button', name='Replace', exact=True).is_disabled()
+            if os.environ.get('LEXEDITOR_BATTLE_FONT_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_BATTLE_FONT_SCREENSHOT'])
+            page.evaluate("state.selected.models='b0wave.dat';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Battle font', exact=True).wait_for(state='visible')
+            palette = page.get_by_role('combobox', name='Shared battle resources texture 1 palette', exact=True)
+            palette.focus()
+            palette.select_option('25')
+            page.get_by_role('combobox', name='Shared battle resources texture 2 palette', exact=True).select_option('7')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('b0wave.dat%231')&&i.src.includes('palette=7')&&i.complete&&i.naturalWidth===256)")
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('b0wave.dat%230')&&i.src.includes('palette=25')&&i.complete&&i.naturalWidth===768)")
+            assert page.locator('.lex-model-stage').count() == 0
+            if os.environ.get('LEXEDITOR_BATTLE_RESOURCES_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_BATTLE_RESOURCES_SCREENSHOT'])
+            page.evaluate("state.selected.models='r0win.dat';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Rinoa: body animation', exact=True).wait_for(state='visible')
+            assert page.locator('.lex-model-stage').count() == 0
+            if os.environ.get('LEXEDITOR_VICTORY_RESOURCES_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_VICTORY_RESOURCES_SCREENSHOT'])
             page.evaluate("state.selected.models='scene.out';navigate('models')")
             assert page.get_by_role('button', name='Open in Encounters', exact=True).is_visible()
             assert page.locator('.lex-model-stage').count() == 0

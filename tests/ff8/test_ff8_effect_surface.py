@@ -42,6 +42,38 @@ def test_all_primitive_groups_and_vertex_frames():
     assert obj['faces'][7]['colors'] == [[128, 64, 32], [10, 20, 30], [11, 20, 30], [12, 20, 30]]
 
 
+def test_composite_tables_keep_absolute_frame_offsets(monkeypatch):
+    # Three independent field types exercise the 16-, 12- and 20-byte records.
+    tracks = struct.pack('<3I', 1, 6, 12)
+    tracks += struct.pack('<5I', 0, (1 << 6) | (1 << 9) | (1 << 13), 20, 40, 56)
+    for words in (4, 3, 5):
+        tracks += struct.pack(f'<{words + 1}I', 6, *([0] * (words - 1)), 0xffffffff)
+    prefix = struct.pack('<2I', 16, 1) + bytes(8)
+    first = surface()
+    second = bytearray(surface())
+    # Second object's second vertex frame starts at its local offset 56.
+    struct.pack_into('<h', second, 56, 777)
+    raw = prefix + first + tracks + second + tracks
+    objects = effect_surface.parse(raw)
+    assert [obj['id'] for obj in objects] == [0, 1]
+    assert objects[1]['offset'] == len(prefix + first + tracks) + 12
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    scene = effect_surface.scene('mag115_h.16', raw, 'vanilla', object_id=1, frame=1)
+    assert scene['positions'][0][0] == 777
+    assert assets._battle_file_info('mag115_h.16', raw)['kind'] == 'surface'
+    track_start = len(prefix + first)
+    for offset, value in ((track_start, 257), (track_start + 8, 16),
+                          (track_start + 16, 1 << 31), (track_start + 20, 24),
+                          (track_start + 32, 7), (track_start + 48, 7)):
+        invalid = bytearray(raw)
+        struct.pack_into('<I', invalid, offset, value)
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
+    for invalid in (raw[:-1], raw + b'junk'):
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
+
+
 def test_flat_quad_has_no_padding_after_its_four_indices():
     # Four color/command bytes followed immediately by four u16 references.
     face = bytes.fromhex('80 40 20 28 00 00 02 00 04 00 06 00')
@@ -112,3 +144,57 @@ def test_direct_mesh_sequence_and_animated_tail_keep_original_offsets(monkeypatc
     for invalid in (direct[:-1], direct + b'garbage', direct + original[:-1]):
         with pytest.raises(ValueError):
             effect_surface.parse(invalid)
+
+
+def test_resource_packs_expose_only_complete_mesh_blocks(monkeypatch):
+    obj = surface()[12:]
+    faces_at, vertices, _ = struct.unpack_from('<3I', obj)
+    mesh = struct.pack('<2I', 8 + vertices * 8, vertices) + obj[12:12 + vertices * 8] + obj[faces_at:]
+    header = [0] * 65
+    header[17], header[33], header[34] = 260, 264, 264 + len(mesh)
+    header[1] = header[34] + len(mesh) + 4
+    raw = struct.pack('<65I', *header) + bytes(4) + mesh + mesh + b'junk' + bytes(344)
+    decoded = effect_surface.parse(raw)
+    assert len(decoded) == 1 and decoded[0]['offset'] == 264
+    info = assets._battle_file_info('mag098_b.4p0', raw)
+    names = {section['index']: section['name'] for section in info['sections']}
+    assert names[33] == 'Resource 33: surface geometry'
+    assert names[34] == 'Resource 34 (not decoded)'
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    assert effect_surface.scene('mag098_b.4p0', raw, 'vanilla')['positions'][1] == (100, 0, 0)
+    for index, value in ((0, 1), (17, 256), (33, 260), (33, len(raw)), (1, header[1] - 4)):
+        invalid = bytearray(raw)
+        struct.pack_into('<I', invalid, index * 4, value)
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
+
+
+def test_sprite_frames_transform_uv_palette_and_bounds(monkeypatch):
+    primitive = struct.pack('<6BH3hH2h', 16, 64, 8, 0x2e, 248, 250,
+                            0xbc54, -8, -4, 1024, 0x14b7, 2048, 4096)
+    # Second frame has two primitives, and uses the frame's draw-mode bit.
+    sequence = bytes.fromhex('24 05 01 17 00 02 00 00')
+    sequence += struct.pack('<4H', 2, 16, 40, 65535)
+    sequence += struct.pack('<I', 1) + primitive
+    sequence += struct.pack('<I', 0x80000002) + primitive * 2
+    header = [0] * 65
+    header[17], header[1] = 260, 260 + len(sequence)
+    raw = struct.pack('<65I', *header) + sequence + bytes(344)
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    obj, = effect_surface.parse(raw)
+    assert obj['frameCount'] == 2 and obj['vertexCount'] == 8
+    assert obj['positions'][0] == pytest.approx((64, -64, 0))
+    assert obj['faces'][0]['uv'] == [(248, 250), (255, 250), (248, 255), (255, 255)]
+    assert obj['faces'][0]['clut'] == 0x3cd4
+    assert obj['faces'][0]['tpage'] == 0xb7
+    scene = effect_surface.scene('mag094_b.2p0', raw, 'vanilla', frame=1)
+    assert len(scene['positions']) == 8 and len(scene['triangles']) == 4
+    assert scene['triangles'][0]['colors'][0] == [0.5] * 3
+    assert assets._battle_file_info('mag094_b.2p0', raw)['sections'][0]['name'] == 'Resource 1 (not decoded)'
+    for offset, value in ((8, 65535), (10, 12), (12, 65534), (14, 0), (34, 0xf000)):
+        invalid = bytearray(sequence)
+        struct.pack_into('<H', invalid, offset, value)
+        with pytest.raises(ValueError):
+            effect_surface._sprite_object(invalid)
+    with pytest.raises(ValueError):
+        effect_surface._sprite_object(sequence[:-1])

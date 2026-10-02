@@ -87,7 +87,7 @@ EFFECT_MODEL_FILES = frozenset((
     'mag184_e.dat', 'mag290_h.03', 'mag094_b.2e0', 'mag099_b.4e0',
     'mag115_h.07', 'mag186_b.dat', 'mag190_b.dat', 'mag217_b.dat',
     'mag325_b.dat', 'mag325_h.dat', 'mag326_b.dat', 'mag326_g.dat',
-    'mag324_h.02', 'mag324_h.m00',
+    'mag324_h.02', 'mag324_h.m00', 'mag326_e.dat',
 ))
 EFFECT_MODEL_SECTIONS = ('Skeleton', 'Model geometry', 'Model animation', 'Extra data')
 # Confirmed identities from the summon-creature-models format census.
@@ -97,6 +97,7 @@ EFFECT_MODEL_NAMES = {
     'mag217_b.dat': 'Gilgamesh (alternate animations)', 'mag290_h.03': 'Pandemona',
     'mag325_b.dat': 'Odin (Zantetsuken Reverse)', 'mag326_g.dat': 'Gilgamesh',
     'mag324_h.02': 'Diablos', 'mag324_h.m00': 'Diablos',
+    'mag326_e.dat': 'Gilgamesh (effect parts)',
 }
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
 
@@ -376,13 +377,14 @@ def tim_png_bytes(data: bytes, offset: int = 0, palette: int = 0) -> bytes:
 
 
 def effect_model_parts(filename: str, data: bytes) -> list[dict] | None:
-    """Diablos stores two consecutive, independently bounded model containers."""
-    if filename.casefold() not in ('mag324_h.02', 'mag324_h.m00'):
+    """Known effect files store consecutive, independently bounded models."""
+    count = {'mag324_h.02': 2, 'mag324_h.m00': 2, 'mag326_e.dat': 5}.get(filename.casefold())
+    if count is None:
         return None
     if len(data) > 16 * 1024 * 1024:
         return None
     parts, offset = [], 0
-    for index in range(2):
+    for index in range(count):
         if offset + 24 > len(data) or struct.unpack_from('<I', data, offset)[0] != 4:
             return None
         size = struct.unpack_from('<I', data, offset + 20)[0]
@@ -659,8 +661,108 @@ def _model_motion_info(data: bytes, sections: list[dict], part: int = 1) -> list
              'animations': [{'id': index, 'frames': raw[offset]} for index, offset in enumerate(offsets)]}]
 
 
+def _battle_font_tim(data: bytes) -> tuple[bytes, int]:
+    """Read a TDW battle font, bounding palettes by their stored block length.
+
+    Deling's TdwFile/TimFile use the palette block length too: the shipped BFT
+    claims 16 palette rows but stores only eight. Normalize a preview copy.
+    """
+    if not 28 <= len(data) <= MAX_MODEL_BYTES:
+        raise ValueError('Invalid battle font size')
+    widths, offset = struct.unpack_from('<2I', data)
+    if widths != 8 or not 8 <= offset <= len(data) - 20:
+        raise ValueError('Invalid battle font offsets')
+    raw = bytearray(data[offset:])
+    magic, flags, palette_size = struct.unpack_from('<3I', raw)
+    width, = struct.unpack_from('<H', raw, 16)
+    if magic != 16 or flags != 8 or width != 16 or palette_size < 12:
+        raise ValueError('Unsupported battle font image')
+    rows, remainder = divmod(palette_size - 12, 32)
+    if remainder or rows not in (8, 16, 32):
+        raise ValueError('Invalid battle font palettes')
+    struct.pack_into('<H', raw, 18, rows)
+    layout = _tim_layout(raw)
+    if layout['size'] != len(raw):
+        raise ValueError('Battle font image has trailing data')
+    return bytes(raw), offset
+
+
+def _battle_resource_info(filename: str, data: bytes, sections: list[dict]) -> dict | None:
+    """Recognize the shared battle and victory containers, including child bounds.
+
+    Layouts: FF8ModdingWiki technical-reference/battle/file-format-b0wavedat/
+    and technical-reference/battle/victory-sequence-r0windat/.
+    """
+    named, tims = [], []
+    if filename == 'b0wave.dat' and len(sections) == 3:
+        texture, font, sound = sections
+        image = _standalone_texture_info(data[texture['offset']:texture['offset'] + texture['size']])
+        font_raw = data[font['offset']:font['offset'] + font['size']]
+        if (image is None or len(font_raw) < 8
+                or not 8 == struct.unpack_from('<I', font_raw)[0]
+                or not 8 <= struct.unpack_from('<I', font_raw, 4)[0] < len(font_raw)
+                or sound['size'] < 64 or data[sound['offset']:sound['offset'] + 4] != b'AKAO'):
+            return None
+        named = [{**section, 'name': name} for section, name in zip(
+            sections, ('Battle effect textures', 'Battle font', 'Sound data'))]
+        tims = [{**image['tims'][0], 'offset': texture['offset']}]
+        try:
+            font_image, _ = _battle_font_tim(font_raw)
+        except ValueError:
+            pass
+        else:
+            tims.append({'index': 1, **_tim_layout(font_image),
+                         'fontOffset': font['offset'], 'fontSize': font['size']})
+    elif filename == 'r0win.dat' and len(sections) == 8:
+        labels = ('Victory fanfare', 'Victory camera', 'Rinoa', 'Quistis', 'Irvine', 'Edea', 'Selphie', 'Kiros')
+        for section, label in zip(sections, labels):
+            start, size = section['offset'], section['size']
+            raw = data[start:start + size]
+            if label == 'Victory camera':
+                if len(raw) < 8:
+                    return None
+                count, sequence, animation, end = struct.unpack_from('<4H', raw)
+                if count != 2 or not 8 <= sequence < animation < end == len(raw):
+                    return None
+                children = [{'offset': sequence, 'size': animation - sequence},
+                            {'offset': animation, 'size': end - animation}]
+                names = ('Camera sequence', 'Camera animations')
+            else:
+                children = parse_dat_sections(raw)
+                expected = 2 if label in ('Victory fanfare', 'Edea', 'Kiros') else 3
+                if children is None or len(children) != expected:
+                    return None
+                if label == 'Victory fanfare':
+                    if any(child['size'] < 16 or raw[child['offset']:child['offset'] + 4] != b'AKAO' for child in children):
+                        return None
+                    names = ('Fanfare sound bank', 'Fanfare music sequence')
+                else:
+                    names = tuple(f'{label}: {name}' for name in ('body animation', 'animation sequence', 'weapon animation'))
+            first_index = len(named) + 1
+            named.extend({'index': first_index + index, 'offset': start + child['offset'],
+                          'size': child['size'], 'name': name}
+                         for index, (child, name) in enumerate(zip(children, names)))
+    else:
+        return None
+    return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+            'parsed': True, 'kind': 'battle-data', 'sections': named, 'tims': tims,
+            'counts': None, 'geometryVerified': False, 'texturesVerified': bool(tims)}
+
+
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
+    if filename == 'a9btlfnt.bft':
+        try:
+            font_image, offset = _battle_font_tim(data)
+        except ValueError:
+            pass
+        else:
+            return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                    'parsed': True, 'kind': 'font', 'counts': None,
+                    'tims': [{'index': 0, **_tim_layout(font_image), 'fontOffset': 0, 'fontSize': len(data)}],
+                    'geometryVerified': False, 'texturesVerified': True,
+                    'sections': [{'index': 1, 'name': 'Character widths', 'offset': 8, 'size': offset - 8},
+                                 {'index': 2, 'name': 'Font image', 'offset': offset, 'size': len(data) - offset}]}
     # Both archive sound containers use a 64-byte header and a bounded payload.
     # SCOT identification: wiki.ffrtt.ru/index.php/FF8/FileFormat_magfiles
     if 64 <= len(data) <= MAX_MODEL_BYTES and (data[:4] == b'AKAO' or data[4:8] == b'SCOT'):
@@ -719,8 +821,13 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
         except ValueError:
             surfaces = []
         if surfaces:
+            resources = effect_surface.resource_sections(data)
+            for resource in resources:
+                if any(resource['offset'] <= obj['offset'] < resource['offset'] + resource['size'] for obj in surfaces):
+                    kind = next(obj['kind'] for obj in surfaces if resource['offset'] <= obj['offset'] < resource['offset'] + resource['size'])
+                    resource['name'] = f"Resource {resource['index']}: {'sprite frames' if kind == 'sprite' else 'surface geometry'}"
             return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-                    'parsed': True, 'kind': 'surface', 'sections': [], 'tims': [],
+                    'parsed': True, 'kind': 'surface', 'sections': resources, 'tims': [],
                     'effectMeshes': surfaces, 'geometryVerified': True, 'texturesVerified': False,
                     'counts': {'objects': len(surfaces), **{key: sum(obj[key] for obj in surfaces)
                                for key in ('vertices', 'triangles', 'quads')}}}
@@ -728,6 +835,17 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
                 "parsed": False}
+    resources = _battle_resource_info(filename, data, sections)
+    if resources is not None:
+        return resources
+    if filename.startswith('mag') and sections and all(
+            section['size'] >= 64 and data[section['offset']:section['offset'] + 4] == b'AKAO'
+            for section in sections):
+        return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                'parsed': True, 'kind': 'sound-data', 'counts': None, 'tims': [],
+                'geometryVerified': False, 'texturesVerified': False,
+                'sections': [{**section, 'name': f"Sound block {section['index']}"}
+                             for section in sections]}
     kind, names = _section_names(filename, len(sections))
     named = ([{**section, "name": names[section["index"] - 1]}
               for section in sections] if names is not None
@@ -1205,13 +1323,22 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = EFFECT_MODEL_NAMES.get(filename, f'Effect model {filename}'), 'A model used by a battle effect, shown in its first pose. Matching textures come from other files in the effect. Unmatched surfaces stay plain.'
     elif kind == 'surface':
         name, note = f'Effect surface {filename}', 'Animated scenery used by a battle effect. Select an object and frame to inspect its shape. Matching textures are shown when known.'
+        if info['sections']:
+            note = 'Preview the surfaces and sprite frames in this effect pack. Some resources are not decoded. Placement and timing within the effect are not shown.'
     elif kind == 'sound-data':
         name, note = f'Battle sound data {filename}', 'This file contains sound data. It has no model preview, and playback of this sound container is not decoded.'
         row['summonFamily'] = None
+    elif kind == 'battle-data':
+        if filename == 'b0wave.dat':
+            name, note = 'Shared battle resources', 'Textures, font and sound data used in battle. Preview the images below. Sound playback is not decoded.'
+        else:
+            name, note = 'Victory sequence', 'Music, camera movements and character poses used after a victory. The poses use the characters\' models. Sequence playback is not shown here.'
+    elif kind == 'font':
+        name, note = 'Battle font', 'Letters and symbols stored in the battle archive. Choose a palette to preview their colors. Character widths and lettering are read-only.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data", "battle-data", "font") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1495,6 +1622,10 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
         tims = info.get("tims") or []
         if not 0 <= tim_index < len(tims):
             raise ValueError("Battle TIM index is out of range")
+        if 'fontOffset' in tims[tim_index]:
+            font = tims[tim_index]
+            raw, _ = _battle_font_tim(data[font['fontOffset']:font['fontOffset'] + font['fontSize']])
+            return tim_png_bytes(raw, palette=palette)
         if 'offset' in tims[tim_index]:
             return tim_png_bytes(data, tims[tim_index]['offset'], palette)
         kind = info.get("kind")

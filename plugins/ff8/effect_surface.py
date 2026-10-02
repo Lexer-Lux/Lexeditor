@@ -6,6 +6,7 @@ Each object stores vertex frames followed by eight counted primitive groups.
 """
 import struct
 import base64
+import math
 
 PRIMITIVES = ((3, 12, 0x20, False), (4, 12, 0x28, False),
               (3, 20, 0x24, True), (4, 24, 0x2c, True),
@@ -14,11 +15,198 @@ PRIMITIVES = ((3, 12, 0x20, False), (4, 12, 0x28, False),
 
 
 def parse(data: bytes) -> list[dict]:
+    if 260 <= len(data) <= 16 * 1024 * 1024 and data[:4] == bytes(4):
+        return _resource_objects(data)
     if 8 <= len(data) <= 16 * 1024 * 1024:
         faces_at, vertices = struct.unpack_from('<2I', data)
         if vertices and faces_at == 8 + vertices * 8:
+            if faces_at + 12 <= len(data):
+                count, end, first = struct.unpack_from('<3I', data, faces_at)
+                if 1 <= count <= 256 and first == 8 + count * 4 and first < end <= len(data) - faces_at:
+                    return _composite_objects(data, faces_at)
             return _direct_objects(data)
     return _parse_table(data)
+
+
+def resource_sections(data: bytes) -> list[dict]:
+    """Bound the four 16-slot resource banks used by the .p0 effect packs."""
+    if not 260 <= len(data) <= 16 * 1024 * 1024 or data[:4] != bytes(4):
+        return []
+    offsets = struct.unpack_from('<64I', data, 4)
+    present = [offset for offset in offsets if offset]
+    if (not present or min(present) != 260 or len(set(present)) != len(present)
+            or any(offset % 4 or not 260 <= offset < len(data) for offset in present)):
+        raise ValueError('Invalid effect resource offsets')
+    bounds = sorted(present) + [len(data)]
+    sizes = {start: end - start for start, end in zip(bounds, bounds[1:])}
+    controls = [offset for offset in offsets[:16] if offset]
+    if not controls or any(sizes[offset] != 344 for offset in controls):
+        raise ValueError('Invalid effect control records')
+    return [{'index': slot, 'offset': offset, 'size': sizes[offset],
+             'name': f'Resource {slot} (not decoded)'}
+            for slot, offset in enumerate(offsets, 1) if offset]
+
+
+def _resource_objects(data: bytes) -> list[dict]:
+    objects = []
+    sections = resource_sections(data)
+    for section in sections:
+        if not 33 <= section['index'] <= 48:
+            continue
+        start, size = section['offset'], section['size']
+        raw = data[start:start + size]
+        try:
+            group = _direct_objects(raw)
+        except ValueError:
+            continue
+        # A resource can contain additional data beyond a recognized mesh.
+        # Only complete direct-object resources are accepted here.
+        if sum(obj['size'] for obj in group) != size:
+            continue
+        for obj in group:
+            obj.update(id=len(objects), offset=start + obj['offset'], resource=section['index'])
+            objects.append(obj)
+        if len(objects) > 256 or sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000 or sum(len(obj['faces']) for obj in objects) > 500000:
+            raise ValueError('Effect resource pack exceeds decoding budget')
+    for section in sections:
+        if not 17 <= section['index'] <= 32:
+            continue
+        start, size = section['offset'], section['size']
+        try:
+            obj = _sprite_object(data[start:start + size])
+        except ValueError:
+            continue
+        obj.update(id=len(objects), offset=start, resource=section['index'])
+        objects.append(obj)
+    if sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000:
+        raise ValueError('Effect resource pack exceeds decoding budget')
+    if not objects:
+        raise ValueError('Effect resource pack has no decoded surfaces')
+    return objects
+
+
+def _sprite_object(data: bytes) -> dict:
+    """EffectSpriteSequence: FF8_EN 0x571c80/0x571dc0 and wiki CureCaseStudy.
+
+    Use default header CLUT parameters and neutral caller tint/transform.
+    Resource trailers remain uninterpreted and outside the decoded extent.
+    """
+    if len(data) < 16 or data[:3] != bytes.fromhex('24 05 01'):
+        raise ValueError('Invalid sprite sequence header')
+    count, = struct.unpack_from('<H', data, 8)
+    first = (12 + 2 * count + 3) & ~3
+    if not 1 <= count <= 4096 or first > len(data):
+        raise ValueError('Invalid sprite frame count')
+    offsets = list(struct.unpack_from(f'<{count}H', data, 10))
+    if (offsets[0] != first or data[10 + 2 * count:12 + 2 * count] != b'\xff\xff'
+            or any(a >= b for a, b in zip(offsets, offsets[1:]))):
+        raise ValueError('Invalid sprite frame offsets')
+    params = struct.unpack_from('<4b', data, 4)
+    frames, budget, end = [], 0, first
+    for index, start in enumerate(offsets):
+        stop = offsets[index + 1] if index + 1 < count else len(data)
+        if start + 4 > stop or stop > len(data):
+            raise ValueError('Truncated sprite frame')
+        amount = struct.unpack_from('<I', data, start)[0] & 0x7fffffff
+        budget += amount * 4
+        end = start + 4 + amount * 20
+        if budget > 500000 or end > stop or (index + 1 < count and end != stop):
+            raise ValueError('Invalid sprite primitive extent')
+        positions, faces = [], []
+        for cursor in range(start + 4, end, 20):
+            width, intensity, height, command, u, v, clut, x, y, angle, flags, sx, sy = struct.unpack_from('<6BH3hH2h', data, cursor)
+            if command & 0xfc != 0x2c or flags >> 12 > 3:
+                raise ValueError('Unsupported sprite primitive')
+            # Centre = offset*16 + half-size*8. Rotate/scale half-extents.
+            if not flags & 0xc00:
+                angle, sx, sy = 0, 4096, 4096
+            radians = angle * math.tau / 4096
+            cosine, sine = math.cos(radians), math.sin(radians)
+            base = len(positions)
+            for dx, dy in ((-width*8, -height*8), (width*8, -height*8),
+                           (-width*8, height*8), (width*8, height*8)):
+                dx, dy = dx * sx / 4096, dy * sy / 4096
+                positions.append((x*16 + width*8 + cosine*dx - sine*dy,
+                                  y*16 + height*8 + sine*dx + cosine*dy, 0))
+            right, bottom = min(u + width, 255), min(v + height, 255)
+            faces.append({'indices': list(range(base, base + 4)),
+                          'colors': [[intensity] * 3] * 4,
+                          'uv': [(u, v), (right, v), (u, bottom), (right, bottom)],
+                          'clut': (clut + params[flags >> 12] * 64) & 0x7fff,
+                          'tpage': flags & 0x1ff})
+        frames.append({'positions': positions, 'faces': faces})
+    return {'offset': 0, 'size': end, 'frameCount': count, 'kind': 'sprite',
+            'vertexCount': max(len(frame['positions']) for frame in frames),
+            'positions': frames[0]['positions'], 'faces': frames[0]['faces'],
+            'spriteFrames': frames}
+
+
+def _track_table_end(data: bytes, start: int) -> int:
+    """Bound the keyframe tracks between Quezacotl's surface tables.
+
+    Field meanings are not interpreted. Mask bits select streams of timestamped
+    records; bit 9 uses 12 bytes, bit 13 uses 20, and other known bits use 16.
+    Each stream ends with a single 0xffffffff word at a record boundary.
+    """
+    if start + 8 > len(data):
+        raise ValueError('Truncated surface track table')
+    count, duration = struct.unpack_from('<2I', data, start)
+    if not 1 <= count <= 256 or not 1 <= duration <= 4096 or start + 8 + count * 4 > len(data):
+        raise ValueError('Invalid surface track table')
+    offsets = struct.unpack_from(f'<{count}I', data, start + 8)
+    if offsets[0] != 8 + count * 4 or any(a >= b for a, b in zip(offsets, offsets[1:])):
+        raise ValueError('Invalid surface track offsets')
+    cursor = start + offsets[0]
+    for offset in offsets:
+        if start + offset != cursor or cursor + 8 > len(data):
+            raise ValueError('Surface tracks are not contiguous')
+        base = cursor
+        mask, = struct.unpack_from('<I', data, base + 4)
+        if not mask or mask & ~0x3fff:
+            raise ValueError('Unsupported surface track fields')
+        bits = [bit for bit in range(14) if mask & (1 << bit)]
+        header = 8 + len(bits) * 4
+        if base + header > len(data):
+            raise ValueError('Truncated surface track fields')
+        fields = struct.unpack_from(f'<{len(bits)}I', data, base + 8)
+        cursor = base + header
+        for bit, field in zip(bits, fields):
+            if base + field != cursor:
+                raise ValueError('Invalid surface track field offset')
+            stride = {9: 12, 13: 20}.get(bit, 16)
+            previous = -1
+            while True:
+                if cursor + 4 > len(data):
+                    raise ValueError('Truncated surface keyframe')
+                timestamp, = struct.unpack_from('<I', data, cursor)
+                if timestamp == 0xffffffff:
+                    cursor += 4
+                    break
+                if not previous < timestamp <= duration or cursor + stride > len(data):
+                    raise ValueError('Invalid surface keyframe timestamp')
+                previous = timestamp
+                cursor += stride
+    return cursor
+
+
+def _composite_objects(data: bytes, start: int) -> list[dict]:
+    """A vertex block followed by alternating surface and keyframe tables."""
+    objects = []
+    while start < len(data):
+        if start + 8 > len(data):
+            raise ValueError('Truncated composite surface table')
+        size, = struct.unpack_from('<I', data, start + 4)
+        if not 12 <= size <= len(data) - start:
+            raise ValueError('Invalid composite surface size')
+        group = _parse_table(data[start:start + size])
+        for obj in group:
+            obj['offset'] += start
+            obj['id'] = len(objects)
+            objects.append(obj)
+        if len(objects) > 256 or sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000 or sum(len(obj['faces']) for obj in objects) > 500000:
+            raise ValueError('Composite surface exceeds decoding budget')
+        start = _track_table_end(data, start + size)
+    return objects
 
 
 def _direct_objects(data: bytes) -> list[dict]:
@@ -126,7 +314,7 @@ def _parse_table(data: bytes) -> list[dict]:
 
 def inventory(data: bytes) -> list[dict]:
     return [{key: obj[key] for key in ('id', 'offset', 'size', 'frameCount')} |
-            {'vertices': obj['vertexCount'],
+            {'kind': obj.get('kind', 'mesh'), 'vertices': obj['vertexCount'],
              'triangles': sum(len(face['indices']) == 3 for face in obj['faces']),
              'quads': sum(len(face['indices']) == 4 for face in obj['faces'])}
             for obj in parse(data)]
@@ -141,14 +329,20 @@ def scene(filename: str, data: bytes, dataset: str, object_id: int | None = None
     obj = objects[selected]
     if not 0 <= frame < obj['frameCount']:
         raise ValueError('Unknown surface frame')
-    start = obj['offset'] + obj.get('vertexOffset', 12) + frame * obj['vertexCount'] * 8
-    positions = [(x, -y, -z) for x, y, z in
-                 (struct.unpack_from('<3h', data, start + i * 8) for i in range(obj['vertexCount']))]
+    if 'spriteFrames' in obj:
+        selected_frame = obj['spriteFrames'][frame]
+        positions = [(x, -y, -z) for x, y, z in selected_frame['positions']]
+        faces = selected_frame['faces']
+    else:
+        start = obj['offset'] + obj.get('vertexOffset', 12) + frame * obj['vertexCount'] * 8
+        positions = [(x, -y, -z) for x, y, z in
+                     (struct.unpack_from('<3h', data, start + i * 8) for i in range(obj['vertexCount']))]
+        faces = obj['faces']
     images = materials.sources(filename, dataset)
     regions = {name: materials.tim_region(image) for name, image in images.items()}
     textures, keys, triangles = [], {}, []
     missing = 0
-    for face in obj['faces']:
+    for face in faces:
         texture, uv = -0xffffff - 2, [(0, 0)] * len(face['indices'])
         if 'uv' in face:
             matches = [(name, materials.match_material(region, face['tpage'], face['clut'], face['uv']))

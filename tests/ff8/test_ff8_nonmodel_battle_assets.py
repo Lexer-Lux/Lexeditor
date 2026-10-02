@@ -3,6 +3,84 @@ import struct
 import pytest
 
 from plugins.ff8 import assets
+from io import BytesIO
+from PIL import Image
+
+
+def container(blocks):
+    offsets = [8 + 4 * len(blocks)]
+    for block in blocks:
+        offsets.append(offsets[-1] + len(block))
+    return struct.pack(f'<{len(offsets) + 1}I', len(blocks), *offsets) + b''.join(blocks)
+
+
+def test_battle_font_uses_stored_palettes_without_changing_source(monkeypatch):
+    # The shipped font claims sixteen rows but stores eight complete palettes.
+    colors = [31] * 112 + [992] * 16
+    tim = struct.pack('<3I4H', 16, 8, 268, 0, 224, 16, 16)
+    tim += struct.pack('<128H', *colors)
+    tim += struct.pack('<I4H', 14, 0, 0, 1, 1) + bytes(2)
+    data = struct.pack('<2I', 8, 12) + bytes(4) + tim
+    with pytest.raises(ValueError, match='palette length'):
+        assets._tim_layout(tim)
+    info = assets._battle_file_info('a9btlfnt.bft', data)
+    assert info['kind'] == 'font' and info['tims'][0]['paletteCount'] == 8
+    assert data[12 + 18:12 + 20] == bytes((16, 0))
+    monkeypatch.setattr(assets, 'ensure_character_models', lambda: None)
+    monkeypatch.setattr(assets, '_model_bytes', lambda *args: (data, None))
+    image = Image.open(BytesIO(assets.texture_png_bytes('battle/a9btlfnt.bft#0', 7)))
+    assert image.getpixel((0, 0)) == (0, 255, 0, 255)
+    with pytest.raises(ValueError, match='Palette ID'):
+        assets.texture_png_bytes('battle/a9btlfnt.bft#0', 8)
+    for invalid in (data[:-1], data + b'extra', bytes(8) + data[8:]):
+        with pytest.raises(ValueError):
+            assets._battle_font_tim(invalid)
+
+
+def test_shared_resources_preserve_texture_offset(monkeypatch):
+    # Complete 16-bit TIM, so the PNG check needs no palette fixture.
+    texture = struct.pack('<III4H2H', 16, 2, 16, 0, 0, 2, 1, 31, 992)
+    font = struct.pack('<II', 8, 12) + bytes(4) + texture
+    data = container([texture, font, b'AKAO' + bytes(60)])
+    info = assets._battle_file_info('b0wave.dat', data)
+    assert info['kind'] == 'battle-data'
+    assert [section['name'] for section in info['sections']] == ['Battle effect textures', 'Battle font', 'Sound data']
+    assert info['tims'][0]['offset'] == 20
+    monkeypatch.setattr(assets, 'ensure_character_models', lambda: None)
+    monkeypatch.setattr(assets, '_model_bytes', lambda *args: (data, None))
+    assert assets.texture_png_bytes('battle/b0wave.dat#0') == assets.tim_png_bytes(texture)
+    invalid = bytearray(data)
+    struct.pack_into('<I', invalid, 20 + len(texture) + 4, len(font))
+    assert assets._battle_file_info('b0wave.dat', invalid)['kind'] == 'unmapped'
+
+
+def test_victory_nested_sections_are_bounded():
+    fanfare = container([b'AKAO' + bytes(12), b'AKAO' + bytes(12)])
+    camera = struct.pack('<4H', 2, 8, 12, 16) + bytes(8)
+    blocks = [fanfare, camera] + [container([bytes(4)] * count) for count in (3, 3, 3, 2, 3, 2)]
+    data = container(blocks)
+    info = assets._battle_file_info('r0win.dat', data)
+    assert info['kind'] == 'battle-data'
+    assert info['counts'] is None and not info['tims']
+    assert [section['index'] for section in info['sections']] == list(range(1, 21))
+    assert info['sections'][4]['name'] == 'Rinoa: body animation'
+    assert info['sections'][-1]['name'] == 'Kiros: animation sequence'
+    for offset in (info['sections'][4]['offset'] - 12, 40 + len(fanfare) + 6):
+        invalid = bytearray(data)
+        struct.pack_into('<H', invalid, offset, 65535)
+        assert assets._battle_file_info('r0win.dat', invalid)['kind'] == 'unmapped'
+
+
+def test_sound_pack_requires_every_block_to_have_a_sound_header():
+    blocks = [b'AKAO' + bytes(60), b'AKAO' + bytes(76)]
+    data = container(blocks)
+    info = assets._battle_file_info('mag078_b.9m0', data)
+    assert info['kind'] == 'sound-data'
+    assert [section['name'] for section in info['sections']] == ['Sound block 1', 'Sound block 2']
+    assert [section['size'] for section in info['sections']] == [64, 80]
+    assert not info['tims'] and info['counts'] is None
+    for invalid in (container([blocks[0], bytes(80)]), container([blocks[0], b'AKAO']), data[:-1], data + b'extra'):
+        assert assets._battle_file_info('mag078_b.9m0', invalid).get('kind') != 'sound-data'
 
 
 @pytest.mark.parametrize('signature,offset', [(b'AKAO', 0), (b'SCOT', 4)])

@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -156,7 +156,7 @@
     if(!model?.file)return null;
     if(model.modelKind==='effect'&&!model.effectMeshes?.some(mesh=>mesh.triangles||mesh.quads))return summonTextureThumb(model);
     if(model.summonFamily!=null&&!model.vertices&&!model.counts?.vertices)return summonTextureThumb(model);
-    if(model.modelKind==='texture')return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
+    if(['texture','font'].includes(model.modelKind))return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
     if(!model.vertices&&!model.counts?.vertices)return null;
     return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }
@@ -171,10 +171,10 @@
           const host=el('div',{style:'display:contents'});
           const frames=el('div',{style:'display:contents'});
           let selected=meshes[0].id;
-          const draw=frame=>{host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}}));};
+          const draw=frame=>{const sprite=meshes.find(mesh=>String(mesh.id)===String(selected))?.kind==='sprite';host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:sprite?{yaw:0,pitch:0}:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}}));};
           const show=id=>{selected=id;frames.replaceChildren();const mesh=meshes.find(mesh=>String(mesh.id)===String(id));
             if(mesh.frameCount>1){const control=selectControl(0,Array.from({length:mesh.frameCount},(_,i)=>({value:i,name:`Frame ${i+1}`})),draw);control.setAttribute('aria-label','Surface frame');frames.append(detailField({label:'FRAME',control}));}draw(0);};
-          const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
+          const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:mesh.kind==='sprite'?`Sprite ${mesh.id} · ${mesh.frameCount} frames`:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
           control.setAttribute('aria-label','Summon mesh object');show(meshes[0].id);
           return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp(row.modelKind==='surface'?'Select an object and frame to inspect its shape. The effect\'s placement and timing are not shown. Surfaces without matching textures stay plain.':'Each object is shown separately, with textures from its first simulated appearance when known. Animation and placement within the summon are not shown. Morph targets have vertices but no standalone surface.')}),frames,host);
         },onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
@@ -232,7 +232,7 @@
         {key:"offset",label:"Offset",render:section=>formatNumber(section.offset)},
         ...(resources?[]:[{key:"size",label:"Size",render:section=>assetFileSize(section.size)}])]});
       sections.push(detailSection({title:resources?"RESOURCES":"SECTIONS",body:[table],
-        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":row.modelKind==='sound-data'?"Parts of this sound file. The sound data is not editable here.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
+        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":row.modelKind==='sound-data'?"Parts of this sound file. The sound data is not editable here.":row.modelKind==='battle-data'?"Shared resources used during battle or after a victory. Individual sections are read-only.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
     }
     const links=[];
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));
