@@ -1,4 +1,4 @@
-"""Rendered native-rule tabs with synthetic data, never an installed game."""
+"""Rendered native-rule editing and band split/merge with synthetic game data."""
 import json
 import os
 from pathlib import Path
@@ -21,12 +21,12 @@ def ready(page):
     page.evaluate("document.fonts.ready")
 
 
-def tab(page, name, key):
+def tab(page, name, target):
     page.get_by_text(name, exact=True).first.click()
     page.wait_for_function("""(tab)=>state.tab===tab && state.sub===tab && state.row &&
         key(state.row)===state.selected && !state.error &&
-        (tab==='encumbrance' ? state.rows.length===5 && state.row.id>=10 && state.row.id<=14 :
-         state.row.id===(tab==='misc'?0:100))""", arg=key)
+        (tab==='encumbrance' ? state.rows.length>=1 && state.row.id>=1001 :
+         state.row.id===(tab==='misc'?0:100))""", arg=target)
 
 
 def fill(page, key, value):
@@ -36,6 +36,11 @@ def fill(page, key, value):
     page.wait_for_function(
         "([key,value])=>state.pending===0 && state.row.fields.find(f=>f.key===key)?.value===value",
         arg=[key, value])
+
+
+def select_band(page, name, identity):
+    page.get_by_text(name, exact=True).click()
+    page.wait_for_function("(id)=>state.row.id===id && !state.pending", arg=identity)
 
 
 def main():
@@ -74,23 +79,38 @@ def main():
                     fill(page, "baseRecovery", 70)
                     page.screenshot(path=str(output / "misc.png"))
                     tab(page, "Encumbrance", "encumbrance")
-                    assert page.evaluate("state.rows.length") == 5
-                    page.get_by_text("Light", exact=True).click()
-                    page.wait_for_function("state.row.id===11")
-                    fill(page, "lightLimit", 30)
-                    fill(page, "lightRecovery", 115)
-                    page.get_by_text("Medium", exact=True).click()
-                    page.wait_for_function("state.row.id===12")
+                    assert page.evaluate("state.rows.length") == 4
+                    fill(page, "upper", 30)
+                    fill(page, "recovery", 115)
+                    page.get_by_role("button", name="Add band", exact=True).click()
+                    page.get_by_label("Split at (%)", exact=True).fill("12.5")
+                    page.get_by_role("button", name="Create band", exact=True).click()
+                    page.wait_for_function("!state.pending && !state.bandBusy && state.rows.length===5 && state.row.id===1005")
+                    fill(page, "name", "Second light band")
+                    fill(page, "recovery", 125)
+                    assert page.locator('[data-field-key="movement"]').input_value() == "1"
+                    page.screenshot(path=str(output / "band-added.png"))
+                    page.get_by_role("button", name="Delete band", exact=True).click()
+                    assert page.get_by_role("button", name="Merge and delete", exact=True).is_disabled()
+                    page.get_by_label("Merge into", exact=True).select_option("1001")
+                    page.get_by_label("Properties to keep", exact=True).select_option("neighbour")
+                    page.set_viewport_size({"width": 1000, "height": 700})
+                    page.screenshot(path=str(output / "merge-preview-small.png"))
+                    assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
+                    page.get_by_role("button", name="Merge and delete", exact=True).click()
+                    page.wait_for_function("!state.pending && !state.bandBusy && state.rows.length===4 && state.row.id===1001")
+                    assert page.evaluate("state.row.fields.find(f=>f.key==='upper').value") == 30
+                    assert page.evaluate("state.row.fields.find(f=>f.key==='recovery').value") == 115
+                    page.set_viewport_size({"width": 1440, "height": 900})
+                    select_band(page, "Medium", 1002)
                     assert page.evaluate("state.row.fields.find(f=>f.key==='lower').value") == 30
-                    fill(page, "mediumLimit", 60)
-                    fill(page, "mediumRecovery", 90)
-                    page.get_by_text("Heavy", exact=True).click()
-                    page.wait_for_function("state.row.id===13")
-                    fill(page, "heavyLimit", 120)
+                    fill(page, "upper", 60)
+                    fill(page, "recovery", 90)
+                    select_band(page, "Heavy", 1003)
+                    fill(page, "upper", 120)
                     page.screenshot(path=str(output / "encumbrance.png"))
                     page.set_viewport_size({"width": 1000, "height": 700})
-                    page.wait_for_timeout(250)
-                    control = page.locator('[data-field-key="heavyRecovery"]:visible')
+                    control = page.locator('[data-field-key="recovery"]:visible')
                     control.scroll_into_view_if_needed()
                     box = control.bounding_box()
                     assert box and box["y"] >= 0 and box["y"] + box["height"] <= 700
@@ -99,19 +119,17 @@ def main():
                     page.locator("#global-save").click()
                     page.wait_for_function("state.dirty===0 && state.pending===0")
                     config = json.loads((mod / SETTINGS_FILE).read_text())["stamina-rebalance"]
-                    assert config["baseRecovery"] == 70 and config["lightLimit"] == 30
-                    assert config["heavyLimit"] == 120 and config["lightRecovery"] == 115
+                    assert config["baseRecovery"] == 70 and config["bands"][0]["upper"] == 30
+                    assert config["bands"][2]["upper"] == 120 and config["bands"][0]["recovery"] == 115
+                    assert config["nextBandId"] == 6
                     assert (game / RELATIVE).read_bytes() == source
                     page.reload(wait_until="domcontentloaded")
                     ready(page)
                     tab(page, "Misc.", "misc")
                     assert float(page.locator('[data-field-key="baseRecovery"]').input_value()) == 70
-                    # Discard through the same application operation, no fixture reinitialization.
                     fill(page, "baseRecovery", 80)
                     page.evaluate("discard()")
                     page.wait_for_function("state.dirty===0 && state.row.fields[0].value===70")
-                    # A crash can leave a native backup before the first parameter Apply.
-                    # Restoration must stay reachable in that native-only state.
                     page.evaluate("navigate('info')")
                     page.evaluate("""()=>{
                         state.deployment.everApplied=false;
@@ -129,7 +147,9 @@ def main():
                     control = page.locator('[data-field-key="baseRecovery"]')
                     assert control.is_disabled() and float(control.input_value()) == 45
                     tab(page, "Encumbrance", "encumbrance")
-                    assert page.locator('[data-field-key="ultralightRecovery"]').is_disabled()
+                    assert page.locator('[data-field-key="recovery"]').is_disabled()
+                    assert page.get_by_role("button", name="Add band", exact=True).is_disabled()
+                    assert page.get_by_role("button", name="Delete band", exact=True).is_disabled()
                     assert not errors, errors
                 except Exception:
                     traceback.print_exc()
