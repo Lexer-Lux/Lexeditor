@@ -56,3 +56,25 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Later-Game Ammunition
+
+lud-berthe's MIT-licensed Dark Souls Remastered Gyro Aim supplied native
+input/HUD entrypoint research leads. Reviewed `src/Aiming.cpp` at
+`d451f3f6403fa4ee24b9fc0868280893fd2e17df`; no upstream implementation is copied.
+https://github.com/lud-berthe/Dark-Souls-Remastered-Gyro-aim-mod
+
+The call sites, equipment layouts and quantity paths were independently
+checked against a privately supplied executable. The distributed native
+payload is original authored code, with no game executable, menu archive or
+proprietary disassembly included. Detailed provenance is in
+`ammunition_controls.md`.
+
+Microsoft's PE/COFF and x64 exception-handling documentation supplied format
+facts, not copied implementation code:
+https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
+
+The tweak uses Lexeditor's shared controls, `BundledTweak` registry, atomic
+writer and process check. Clang and the test host's C compiler are development
+only and are not player-side requirements or bundled dependencies.
