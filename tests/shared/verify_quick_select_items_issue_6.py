@@ -144,8 +144,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
     changed = server.apply_quick_select_edits([
         {"item": one_slot, "slots": [{"id": replacement,
                                          "sortOrder": old_slot["sortOrder"]}]},
-        {"item": unmapped, "slots": [{"id": "PLAYER_PROVISIONS",
-                                        "sortOrder": None}]},
+        {"item": unmapped, "slots": [{"id": "PLAYER_PROVISIONS"}]},
         {"item": remove_key, "slots": []},
     ])
     require(changed == 3, f"expected three changed item mappings, got {changed}")
@@ -180,7 +179,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
     require(digest(mod / "quickselectitems.ymt") == before_invalid,
             "rejected slot changed the file")
 
-    for invalid in (True, False, 1.5, float('nan'), float('inf'), -1, 1_000_001, '1.5'):
+    for invalid in (None, True, False, 1.5, float('nan'), float('inf'), -1, 1_000_001, '1.5'):
         snapshot = server.get_quick_select()
         backup = digest(mod / 'quickselectitems.ymt.bak')
         try:

@@ -652,7 +652,7 @@ async function saveCatalog() {
   });
   const itemEffects = Object.entries(state.itemEffectEdits).map(([item, effs]) => ({ item, effects: effs }));
   const itemTags = Object.entries(state.itemTagEdits).map(([item, tags]) => ({ item, tags }));
-  const quickSelect=Object.entries(state.quickSelectEdits).map(([item,value])=>({item,slots:value.slots}));
+  const quickSelect=Object.entries(state.quickSelectEdits).map(([item,value])=>({item,slots:value.slots.map(row=>row.sortOrder===null?{id:row.id}:row)}));
   const descriptions=Object.entries(state.descriptionKeyEdits).map(([item,key])=>({item,key}));
   try {
     if(Object.keys(state.alcoholEdits).length){
