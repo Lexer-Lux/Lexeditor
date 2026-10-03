@@ -43,10 +43,25 @@ def test_flag_names_and_help_fit_before_adding_columns(page):
             if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
                 page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
             assert page.locator('.lex-toggle-name').evaluate_all('''es=>es.every(e=>{
-              const r=document.createRange();r.selectNode(e.firstChild);
+              // Count text lines, excluding the inline wrapper's own box.
+              const r=document.createRange();r.selectNodeContents(e.firstChild);
               const text=r.getBoundingClientRect(),help=e.querySelector('.lex-info-help').getBoundingClientRect();
               return r.getClientRects().length===1 && Math.abs((text.top+text.bottom-help.top-help.bottom)/2)<5
                 && e.scrollWidth<=e.clientWidth+1;
             })'''), (width, scale)
     if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
         page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
+
+
+def test_text_line_measurement_still_detects_wrapped_flag(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').append(U.toggleRow({toggles:[{label:'Several long words'}]}));
+      const name=document.querySelector('.lex-toggle-name');
+      name.style.cssText='flex:none;width:60px;white-space:normal;font-size:16px';
+    }''')
+    assert page.locator('.lex-toggle-name').evaluate('''e=>{
+      const range=document.createRange();range.selectNodeContents(e.firstChild);
+      return range.getClientRects().length>1;
+    }''')
