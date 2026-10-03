@@ -218,7 +218,11 @@ def main() -> int:
     if files["pytest"]:
         rels = [p.relative_to(ROOT).as_posix() for p in files["pytest"]]
         print(f":: pytest ({len(rels)} files)", flush=True)
-        if subprocess.run([sys.executable, "-m", "pytest", "-q", *rels], cwd=ROOT, env=env).returncode:
+        # Shared checks can hang in a native/browser child before pytest prints
+        # its failure summary. Identify each test, dump a stuck thread's stack,
+        # and report the first failure before starting unrelated later cases.
+        pytest_options = ["-v", "-x", "-o", "faulthandler_timeout=120"] if args.shared else ["-q"]
+        if subprocess.run([sys.executable, "-m", "pytest", *pytest_options, *rels], cwd=ROOT, env=env).returncode:
             failures.append("pytest")
     node = shutil.which("node")
     for test in files["node"]:
