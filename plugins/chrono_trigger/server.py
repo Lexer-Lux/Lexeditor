@@ -159,7 +159,7 @@ class Handler(PluginRequestHandler):
             if route == "/api/messages/save":
                 result = save_messages(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/scenes/save":
-                result = save_scene(STORE, int(body["id"]), str(body["sha256"]), dict(body.get("values") or {}), str(body.get("language", "en")))
+                result = save_scene(STORE, body["id"], str(body["sha256"]), body.get("values", {}), str(body.get("language", "en")))
             elif route == "/api/scene-map/save":
                 result = save_scene_map(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/scene-properties/save":
