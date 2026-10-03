@@ -15,10 +15,11 @@ from plugins.ff7r.tooling import pack_directory, get_file
 from core.mod_library import metadata
 from core.settings_manager import SettingsStore
 from playwright.sync_api import sync_playwright
+from verify_mod_library import repak_fixture
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="lexeditor-library-ui-") as temp:
+    with tempfile.TemporaryDirectory(prefix="lexeditor-library-ui-") as temp, repak_fixture(Path(temp)):
         root = Path(temp)
         content = root / "content/End/Content"
         content.mkdir(parents=True)
