@@ -444,9 +444,12 @@ def verify_rdr2() -> dict:
                 geometry = cdp.eval("""(()=>{const root=document.querySelector('.lex-paged-list-detail.lex-panel-layout'),master=root.querySelector(':scope>.lex-barrelled-master'),divider=root.querySelector(':scope>.lex-panel-layout-divider'),detail=divider?.nextElementSibling,rb=root.getBoundingClientRect(),mb=master?.getBoundingClientRect(),db=detail?.getBoundingClientRect();return{root:{left:rb.left,right:rb.right,top:rb.top,bottom:rb.bottom},master:{left:mb?.left,right:mb?.right,top:mb?.top,bottom:mb?.bottom},detail:{left:db?.left,right:db?.right,top:db?.top,bottom:db?.bottom},divider:!!divider};})()""")
                 assert geometry["divider"], (tab, geometry)
                 assert abs(geometry["master"]["top"] - geometry["detail"]["top"]) < 2, (tab, geometry)
+                assert abs(geometry["master"]["bottom"] - geometry["detail"]["bottom"]) < 2, (tab, geometry)
                 assert geometry["detail"]["left"] > geometry["master"]["right"], (tab, geometry)
                 assert geometry["detail"]["right"] >= geometry["root"]["right"] - 2, (tab, geometry)
                 record_layouts[tab] = geometry
+                if tab == "crafting":
+                    geometry["screenshot"] = str(screenshot(cdp, "github-46-rdr2-crafting-empty-detail.png"))
             cdp.eval("navigate('items')")
             wait_eval(cdp, "state.tab==='items'&&document.querySelector('.lex-paged-list-detail.lex-panel-layout')", 30)
             record_layouts["screenshot"] = str(screenshot(cdp, "github-46-rdr2-side-by-side-record-panels.png"))

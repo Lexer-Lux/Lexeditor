@@ -5409,7 +5409,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
  min-height:0;
 }
 .lex-paged-list-detail:not(.lex-full-table-page) .lex-barrelled-master,
-.lex-paged-list-detail:not(.lex-full-table-page) .lex-detail-panel { align-self:stretch; height:auto; }
+.lex-paged-list-detail:not(.lex-full-table-page) .lex-detail { align-self:stretch; height:auto; }
 
 @keyframes lex-model-preview-open {
   from { opacity:0; transform:translateY(-10px); }
