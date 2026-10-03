@@ -16,7 +16,7 @@ from .field_data import load_exits, load_treasure, save_exits, save_treasure
 from .gameplay_data import (load_weapons, save_weapons, load_armor, save_armor,
                             load_helmets, save_helmets)
 from .palette_data import load_palette, palette_files, save_palette
-from .project import OverlayStore
+from .project import OverlayStore, validate_edits
 from .scene_data import load_scenes, save_scene
 from .scene_map_data import (scene_map_files, load_scene_map, save_scene_map,
                              load_scene_properties, save_scene_properties,
@@ -156,8 +156,8 @@ class Handler(PluginRequestHandler):
             return
         try:
             body = self.read_json()
-            if route.endswith("/save") and "edits" in body and not isinstance(body["edits"], list):
-                raise ValueError("Chrono Trigger edits must be an array")
+            if route.endswith("/save") and "edits" in body:
+                validate_edits(body["edits"])
             if route == "/api/messages/save":
                 result = save_messages(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/scenes/save":

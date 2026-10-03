@@ -2,7 +2,7 @@
 from __future__ import annotations
 from core.numeric_values import integer_value
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 def languages(store: OverlayStore) -> list[str]:
@@ -59,6 +59,7 @@ def load_messages(store: OverlayStore, path: str, source: str = "mine") -> dict:
 
 
 def save_messages(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     path = _message_path(path)
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256:

@@ -7,7 +7,7 @@ documented active-header bytes and preserves the rest of bankc6.bin verbatim.
 from __future__ import annotations
 from core.numeric_values import integer_value
 
-from .project import OverlayStore, digest
+from .project import OverlayStore, digest, validate_edits
 
 
 BANK_PATH = "Game/common/bankc6.bin"
@@ -79,6 +79,7 @@ def _u8(name: str, value) -> int:
 
 
 def save_worlds(store: OverlayStore, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     payload, _ = _payload(store, "mine")
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{BANK_PATH} changed since it was opened; reload before saving")

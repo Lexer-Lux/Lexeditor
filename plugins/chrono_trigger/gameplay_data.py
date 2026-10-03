@@ -33,7 +33,7 @@ import struct
 from core.numeric_values import integer_value
 
 from .field_data import TREASURE_BASES, item_names
-from .project import OverlayStore, digest
+from .project import OverlayStore, digest, validate_edits
 
 
 WEAPON_PATH = "Game/common/WeaponDataTable.dat"
@@ -100,6 +100,7 @@ def _load_stat_table(store: OverlayStore, kind: str, source: str, language: str)
 
 
 def _save_stat_table(store: OverlayStore, kind: str, expected_sha256: str, edits: list[dict], language: str) -> dict:
+    validate_edits(edits)
     spec = _SPECS[kind]
     payload, _ = store.read(spec["path"], "mine")
     if digest(payload) != expected_sha256:

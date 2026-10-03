@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from plugins.chrono_trigger.archive import ResourcesBin
-from plugins.chrono_trigger.project import digest
+from plugins.chrono_trigger.project import OverlayStore, digest
 from plugins.chrono_trigger.plugin import ChronoTriggerSession
 import test_chrono_trigger_replacement as fixtures
 
@@ -78,3 +78,56 @@ def test_batch_route_rejects_non_arrays_and_accepts_real_array(tmp_path, route, 
                 assert snapshot(project) == before
                 assert snapshot(game) == vanilla
     assert session.wait_closed()
+
+
+@pytest.mark.parametrize('route,path', ROUTES)
+def test_direct_codec_rejects_non_arrays_before_writing(tmp_path, route, path):
+    from plugins.chrono_trigger import text_data, palette_data, field_data, world_data, world_navigation
+    from plugins.chrono_trigger import scene_map_data, animation_data, world_map_data, tileset_data, sprite_assembly_data, gameplay_data
+
+    archive, _ = fixtures.FreshChronoTriggerTests().fixture(tmp_path)
+    source = ResourcesBin(archive)
+    resources = [(name, source.extract(name)) for name in source.paths()]
+    for filename, count, width in (('Weapon', 111, 5), ('Armor', 50, 3), ('Helmet', 39, 3)):
+        resources.append(('Game/common/' + filename + 'DataTable.dat', struct.pack('<I', count) + b'\xA5' * (count * width) + b'OPAQUE'))
+    fixtures.build_archive(archive, resources)
+    store = OverlayStore(ResourcesBin(archive), tmp_path / 'codec-mod')
+    original = dict(resources)[path]
+    checksum = digest(original)
+    by_path = {
+        'messages': text_data.save_messages,
+        'scene-map': scene_map_data.save_scene_map,
+        'scene-properties': scene_map_data.save_scene_properties,
+        'palette': palette_data.save_palette,
+        'world-navigation': world_navigation.save_world_navigation,
+        'chip-animations': animation_data.save_chip_animations,
+        'world-map': world_map_data.save_world_tiles,
+        'world-properties': world_map_data.save_world_properties,
+        'world-music': world_map_data.save_world_music,
+        'world-colors': world_map_data.save_world_colors,
+        'tile-assemblies': tileset_data.save_tile_assembly,
+        'sprite-assemblies': sprite_assembly_data.save_sprite_assembly,
+    }
+    if route in by_path:
+        def save(edits):
+            return by_path[route](store, path, checksum, edits)
+    elif route in ('exits', 'treasure'):
+        offset_path = 'Game/common/' + ('MapJumpOffsetTbl.dat' if route == 'exits' else 'TakaraOffsetTbl.dat')
+        offset_sha = digest(dict(resources)[offset_path])
+        writer = field_data.save_exits if route == 'exits' else field_data.save_treasure
+        def save(edits):
+            return writer(store, checksum, offset_sha, edits)
+    else:
+        writer = {'worlds': world_data.save_worlds, 'weapons': gameplay_data.save_weapons,
+                  'armor': gameplay_data.save_armor, 'helmets': gameplay_data.save_helmets}[route]
+        def save(edits):
+            return writer(store, checksum, edits)
+    for existing in (False, True):
+        if existing:
+            assert isinstance(save([]), dict)
+            assert (store.project_root / path).read_bytes() == original
+        for edits in (None, False, True, 0, 1, {}, '', 'token', (), iter([])):
+            before = snapshot(tmp_path)
+            with pytest.raises(ValueError, match='Chrono Trigger edits must be an array'):
+                save(edits)
+            assert snapshot(tmp_path) == before

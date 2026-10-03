@@ -4,7 +4,7 @@ from core.numeric_values import integer_value
 
 import struct
 
-from .project import OverlayStore, digest
+from .project import OverlayStore, digest, validate_edits
 
 
 EXIT_OFFSET_PATH = "Game/common/MapJumpOffsetTbl.dat"
@@ -81,6 +81,7 @@ def _bounded(name: str, value, low: int, high: int) -> int:
 
 
 def save_exits(store: OverlayStore, expected_data_sha: str, expected_offset_sha: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     offset_payload, _ = store.read(EXIT_OFFSET_PATH, "mine")
     data_payload, _ = store.read(EXIT_DATA_PATH, "mine")
     if digest(offset_payload) != expected_offset_sha or digest(data_payload) != expected_data_sha:
@@ -187,6 +188,7 @@ def load_treasure(store: OverlayStore, source: str = "mine", language: str = "en
 
 
 def save_treasure(store: OverlayStore, expected_data_sha: str, expected_offset_sha: str, edits: list[dict], language: str = "en") -> dict:
+    validate_edits(edits)
     offset_payload, _ = store.read(TREASURE_OFFSET_PATH, "mine")
     data_payload, _ = store.read(TREASURE_DATA_PATH, "mine")
     if digest(offset_payload) != expected_offset_sha or digest(data_payload) != expected_data_sha:

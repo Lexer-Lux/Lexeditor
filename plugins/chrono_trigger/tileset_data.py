@@ -14,7 +14,7 @@ from core.numeric_values import integer_value
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 BGSET_RE = re.compile(r"^Game/field/BGSetTable/bgsettable_(\d+)\.dat$", re.IGNORECASE)
@@ -158,6 +158,7 @@ def load_tile_assemblies(store: OverlayStore, source: str = "mine") -> dict:
 def save_tile_assembly(
     store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]
 ) -> dict:
+    validate_edits(edits)
     current = _parse_assembly(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:

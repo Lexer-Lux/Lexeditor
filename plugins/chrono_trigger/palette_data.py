@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 FIELD_PALETTE_RE = re.compile(r"^Game/field/palette_bin/plt(\d+)\.bin$", re.IGNORECASE)
@@ -84,6 +84,7 @@ def _parse_hex(value: str) -> tuple[int, int, int]:
 
 
 def save_palette(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_palette(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:

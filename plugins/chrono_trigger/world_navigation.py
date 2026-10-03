@@ -12,7 +12,7 @@ from core.numeric_values import integer_value
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 EVENT_TABLE_RE = re.compile(r"^Game/world/EventTable/EventTable_(\d+)\.dat$", re.IGNORECASE)
@@ -163,6 +163,7 @@ def _bounded(name: str, value, low: int, high: int) -> int:
 def save_world_navigation(
     store: OverlayStore, path: str, expected_sha256: str, edits: list[dict], language: str = "en"
 ) -> dict:
+    validate_edits(edits)
     current = _parse_file(store, path, "mine", language)
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:

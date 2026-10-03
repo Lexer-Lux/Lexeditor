@@ -11,7 +11,7 @@ from core.numeric_values import integer_value
 
 import re
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 MAP_RE = re.compile(r"^Game/field/MapTable/MapTable_(\d+)\.dat$", re.IGNORECASE)
@@ -138,6 +138,7 @@ def load_scene_map(store: OverlayStore, path: str, source: str = "mine") -> dict
 
 
 def save_scene_map(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_scene_map(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -288,6 +289,7 @@ def _bounded(name: str, value, low: int, high: int) -> int:
 
 
 def save_scene_properties(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_scene_properties(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:

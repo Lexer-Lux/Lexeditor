@@ -15,7 +15,7 @@ from core.numeric_values import integer_value
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 MAP_RE = re.compile(r"^Game/world/Map/Map_(\d+)\.dat$", re.IGNORECASE)
@@ -97,6 +97,7 @@ def load_world_tiles(store: OverlayStore, path: str, source: str = "mine") -> di
 
 
 def save_world_tiles(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_tiles(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -155,6 +156,7 @@ def load_world_properties(store: OverlayStore, path: str, source: str = "mine") 
 
 
 def save_world_properties(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_properties(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -217,6 +219,7 @@ def load_world_music(store: OverlayStore, path: str, source: str = "mine") -> di
 
 
 def save_world_music(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_music(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -283,6 +286,7 @@ def load_world_colors(store: OverlayStore, path: str, source: str = "mine") -> d
 
 
 def save_world_colors(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_colors(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
