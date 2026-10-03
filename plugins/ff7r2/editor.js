@@ -241,6 +241,7 @@
 
   // ---- PlayerParameter project data ----------------------------------------
   let workspace=null, player=null, savedPlayer=null;
+  let numericDrafts=new WeakMap();
   let playerError="", playerBusy=false, activeSource="mine";
   let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
   let recordSort={key:"key",dir:1};
@@ -326,6 +327,7 @@
   }
 
   function installPlayer(value){
+    numericDrafts=new WeakMap();
     player=enrichPlayer(value);
     savedPlayer=clone(player);
     playerError="";
@@ -418,19 +420,27 @@
     return result;
   }
 
-  function dirtyCount(){return changedFields().length}
+  function invalidNumericDrafts(){return (player?.records||[]).flatMap(row=>(row.fields||[]).filter(field=>numericDrafts.has(field)).map(field=>({row,field,text:numericDrafts.get(field)})))}
+  function dirtyCount(){return changedFields().length+(activeSource==="mine"?invalidNumericDrafts().filter(({row,field})=>JSON.stringify(savedField(row,field)?.value)===JSON.stringify(field.value)).length:0)}
   function readonlyPlayer(){return playerBusy||activeSource!=="mine"||workspace?.readOnly===true}
 
   function pendingChanges(){
-    return changedFields().map(change=>({
+    return [...changedFields().filter(change=>!numericDrafts.has(change.field)).map(change=>({
       label:change.row.key+" / "+change.field.name,
       before:change.before,
       after:change.after
-    }));
+    })),...invalidNumericDrafts().map(({row,field,text})=>({label:row.key+" / "+field.name,before:savedField(row,field)?.value,after:text}))];
   }
 
   async function savePlayer(){
     if(readonlyPlayer()||!player)return;
+    for(const input of document.querySelectorAll('main input[type="number"],main input[data-lex-exact-integer],main input[data-lex-validate-number]')){
+      if(input.disabled||input.readOnly||!input.getClientRects().length)continue;
+      const valid=input.lexValidateNumber?input.lexValidateNumber():input.lexValidateInteger?.()??input.checkValidity();
+      if(!valid){requestAnimationFrame(()=>{if(input.isConnected)input.reportValidity()});throw new Error(`Correct ${input.getAttribute("aria-label")||"the numeric value"} before saving.`)}
+    }
+    const draft=invalidNumericDrafts()[0];
+    if(draft)throw new Error(`Correct ${draft.field.name} in ${draft.row.key} before saving.`);
     const changes=changedFields().map(change=>({
       nameIndex:change.row.nameIndex,
       nameNumber:change.row.nameNumber,
@@ -538,26 +548,28 @@
         control:el("input",{type:"checkbox",checked:field.value===true,disabled,"aria-label":field.name,
           onchange:event=>{field.value=event.target.checked;row[field.name]=field.value;render();shell.refresh?.()}})};
     }
-    const attrs={type:"number",value:String(field.value),disabled,"aria-label":field.name,
-      step:field.kind==="float"?"any":"1"};
-    if(Number.isSafeInteger(field.minimum))attrs.min=field.minimum;
-    if(Number.isSafeInteger(field.maximum))attrs.max=field.maximum;
-    const captureNumeric=event=>{
-      const raw=String(event.target.value??"").replaceAll(",","").replace(/\s/g,"");
-      if(raw==="")return false;
-      let next=Number(raw);
-      if(!Number.isFinite(next))return false;
-      if(field.kind!=="float"&&!Number.isInteger(next))return false;
-      if(Number.isSafeInteger(field.minimum)&&next<field.minimum)return false;
-      if(Number.isSafeInteger(field.maximum)&&next>field.maximum)return false;
-      field.value=next;row[field.name]=next;shell.refresh?.();return true;
-    };
-    return {dataType:field.kind==="float"?"FLOAT":"INT",min:attrs.min,max:attrs.max,
+    const value=numericDrafts.get(field)??String(field.value);
+    const floating=field.kind==="float";
+    const min=field.minimum??(floating?-3.4028234663852886e38:undefined);
+    const max=field.maximum??(floating?3.4028234663852886e38:undefined);
+    const commit=value=>{numericDrafts.delete(field);field.value=value;row[field.name]=value;shell.refresh?.()};
+    const remember=(input,valid)=>{if(valid)commit(Number(input.value));else{numericDrafts.set(field,input.value);shell.refresh?.()}};
+    let control;
+    if(!floating){
+      control=LexeditorUI.exactIntegerInput({value,min,max,label:field.name,change:text=>{commit(Number(text));render()}});
+      const input=control.querySelector("input");input.disabled=disabled;
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
+    }else{
+      control=el("input",{type:"number",value,disabled,required:true,min,max,step:"any",
+        "aria-label":field.name,"data-lex-validate-number":"true"});
+      const validate=()=>{control.setCustomValidity("");if(control.value===""||!Number.isFinite(Number(control.value)))control.setCustomValidity("Enter a finite number.");return control.checkValidity()};
+      control.lexValidateNumber=validate;
+      control.oninput=()=>remember(control,validate());
+      control.onchange=()=>{if(validate()){commit(Number(control.value));render()}};
+    }
+    return {dataType:floating?"FLOAT":"INT",min,max,
       help:infoHelp([FIELD_HELP[field.name],field.note].filter(Boolean).join("\n")),
-      control:el("input",{...attrs,
-        oninput:event=>captureNumeric(event),
-        onchange:event=>{if(captureNumeric(event))render();}
-      })};
+      control};
   }
 
   function playerRecordPanel(row){

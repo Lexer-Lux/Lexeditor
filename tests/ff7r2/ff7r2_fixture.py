@@ -75,7 +75,8 @@ def fixture(*, hp_type: int = 7) -> bytes:
             row = (900, 60, 25, 30)
         else:
             row = (800 + index * 25, 40 + index, 20 + index, 18 + index)
-        blob += struct.pack("<qihh" if hp_type == 8 else "<iihh", *row)
+        layout = "<qihh" if hp_type == 8 else "<fihh" if hp_type == 9 else "<iihh"
+        blob += struct.pack(layout, *row)
         mode_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8  # Frozen NameProperty placeholder.
 
