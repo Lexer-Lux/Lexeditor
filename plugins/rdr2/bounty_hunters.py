@@ -7,6 +7,8 @@ shared dispatch.meta and are reported with that scope made explicit.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+import math
+import re
 from pathlib import Path
 
 try:
@@ -336,12 +338,16 @@ def read_bounty_hunters(response_file: Path, dispatch_file: Path) -> dict:
 
 
 def _numeric(value: object, field: str, minimum: float = 0.0, maximum: float | None = None) -> str:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{field} must be numeric")
     text = str(value).strip()
     text_num = text[:-1] if text.lower().endswith("f") else text
     try:
         number = float(text_num)
     except ValueError as exc:
         raise ValueError(f"{field} must be numeric") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be finite")
     if number < minimum or (maximum is not None and number > maximum):
         limit = f" between {minimum:g} and {maximum:g}" if maximum is not None else f" at least {minimum:g}"
         raise ValueError(f"{field} must be{limit}")
@@ -377,6 +383,8 @@ def _cooldown_target(root: ET.Element, edit_id: str) -> ET.Element | None:
     parts = edit_id.split("/")
     if len(parts) != 4 or parts[0] != "cooldown" or parts[3] not in {"Min", "Max"}:
         return None
+    if parts[1] not in (*COOLDOWN_SECTIONS, "DelayInGameHoursAfterMyIncidentTargetUndetected") or not re.fullmatch(r"0|[1-9][0-9]*", parts[2]):
+        return None
     cooldown = _find_named(root.find("BountyResponseCooldowns"), "Item", "BountyHuntersGlobalCooldown")
     group = cooldown.find(parts[1]) if cooldown is not None else None
     if group is None:
@@ -391,11 +399,19 @@ def _cooldown_target(root: ET.Element, edit_id: str) -> ET.Element | None:
 
 
 def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> int:
+    if not isinstance(edits, list):
+        raise ValueError("Bounty-hunter edits must be a list")
+    if not edits:
+        return 0
     response_root, dispatch_root = _parse(response_file), _parse(dispatch_file)
     response_changed = dispatch_changed = 0
     seen = set()
     for edit in edits:
-        edit_id = str(edit.get("id", ""))
+        if not isinstance(edit, dict) or set(edit) != {"id", "value"}:
+            raise ValueError("Bounty-hunter edits require only id and value")
+        edit_id = edit["id"]
+        if not isinstance(edit_id, str):
+            raise ValueError("Bounty-hunter setting id must be text")
         if not edit_id or edit_id in seen:
             raise ValueError(f"duplicate or empty bounty-hunter setting id: {edit_id!r}")
         seen.add(edit_id)

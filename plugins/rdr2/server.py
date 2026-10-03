@@ -5081,6 +5081,12 @@ def get_bounty_hunters(ds="mine"):
 
 
 def apply_bounty_hunter_edits(edits):
+    if not isinstance(edits, list):
+        raise ValueError("Bounty-hunter edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
     return _apply_bounty_hunter_edits(ds_dir("mine") / BOUNTY_HUNTERS_FILE,
                                       ds_dir("mine") / DISPATCH_FILE, edits)
 
@@ -6381,7 +6387,10 @@ class Handler(PluginRequestHandler):
                 elif path == "/api/loot-sounds/save":
                     self._json({"saved": save_loot_sounds(body.get("edits", []))})
                 elif path == "/api/bounty-hunters/save":
-                    self._json({"saved": apply_bounty_hunter_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_bounty_hunter_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/honor-actions/save":
                     try:
                         self._json({"saved": save_honor_actions(body.get("edits", []))})
