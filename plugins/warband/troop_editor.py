@@ -252,32 +252,42 @@ def create_troop(root, expected, record_index, original_id, new_id, name, plural
 
 
 def save_troops(root,expected,edits):
+    from .server import _validate_item_expression
+    if not isinstance(edits,list):raise ValueError('Troop edits must be a list')
+    if not isinstance(expected,str):raise ValueError('Troop source checksum must be text')
     root=Path(root);path=root/'module_troops.py'
     with _LOCK:
         text,encoding,raw=_source(path)
         if hashlib.sha256(raw).hexdigest()!=expected:raise ValueError('Troop source changed; reload before saving')
         records=_records(text);by_index={r['recordIndex']:r for r in records};patches=[];edited=set()
         for edit in edits:
+            if not isinstance(edit,dict) or set(edit) not in ({'recordIndex','originalId','fields'},{'id','fields'}):
+                raise ValueError('Troop edits require indexed identity or legacy id, and fields only')
+            identity=edit.get('originalId',edit.get('id'))
+            if not isinstance(identity,str) or not identity:raise ValueError('Original troop ID must be nonempty text')
+            if not isinstance(edit['fields'],dict):raise ValueError('Troop fields must be an object')
             if 'recordIndex' in edit:
                 record_index=integer_value(edit['recordIndex'], 'Troop record index');row=by_index.get(record_index)
                 if row is None:raise ValueError('Troop record no longer exists')
-                original=str(edit.get('originalId',edit.get('id','')))
+                original=identity
                 if original and row['id']!=original:
                     raise ValueError(f"Troop record {record_index} changed from {original} to {row['id']}; reload before saving")
             else:
-                troop_id=str(edit.get('id',''));matches=[r for r in records if r['id']==troop_id]
+                troop_id=identity;matches=[r for r in records if r['id']==troop_id]
                 if len(matches)!=1:
                     raise ValueError(f"Troop ID {troop_id!r} is missing or ambiguous; reload and use record identity")
                 row=matches[0];record_index=row['recordIndex']
             if record_index in edited:raise ValueError('Send each troop record only once')
             edited.add(record_index)
             for field,val in edit['fields'].items():
+                if not isinstance(field,str) or not isinstance(val,str):raise ValueError('Troop field names and values must be text')
                 if field=='id' or field not in row['fields']:raise ValueError('Unknown or fixed troop field')
-                if field in ('name','plural'):replacement=json.dumps(str(val),ensure_ascii=False)
+                if field in ('name','plural'):replacement=json.dumps(val,ensure_ascii=False)
                 else:
-                    replacement=str(val).strip()
+                    replacement=val.strip()
                     if '\n' in replacement or '\r' in replacement or '#' in replacement:raise ValueError('Use a single source expression')
                     ast.parse(replacement,mode='eval')
+                    _validate_item_expression(replacement)
                 a,b=row['_spans'][FIELDS.index(field)];patches.append((a,b,replacement))
         candidate=text
         for a,b,value in sorted(patches,reverse=True):candidate=candidate[:a]+value+candidate[b:]

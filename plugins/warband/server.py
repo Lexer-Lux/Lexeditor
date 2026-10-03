@@ -447,7 +447,7 @@ def _validate_item_expression(expression: str) -> str:
             number = token.string.replace("_", "").rstrip("jJ")
             if (token.type == tokenize.NUMBER and re.fullmatch(r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", number)
                     and ("." in number or "e" in number.lower()) and not math.isfinite(float(number))):
-                raise ValueError("Item expressions require finite numeric literals")
+                raise ValueError("Source expressions require finite numeric literals")
     except tokenize.TokenError:
         pass  # The existing source/candidate syntax checks handle other errors.
     return expression
@@ -939,7 +939,9 @@ class Handler(PluginRequestHandler):
             if path == "/api/settings/save":
                 self.json_response(save_settings(body.get("edits", []), body.get("sha256")))
             elif path == "/api/troops/save":
-                self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
+                if not isinstance(body, dict) or set(body) != {"edits", "sha256"} or not isinstance(body["sha256"], str):
+                    raise ValueError("Expected troop edits and text sha256 only")
+                self.json_response(save_troops(MODULE_SYSTEM, body["sha256"], body["edits"]))
             elif path == "/api/troops/create":
                 self.json_response(note_created("troops", create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
                                                 body.get("originalId"), body.get("id"), body.get("name"), body.get("plural"))))
