@@ -4201,14 +4201,19 @@
       const cutFrom = new Map(pieces.map(entry => [entry.piece, entry.source]));
       const original = card => { let at = card; while (cutFrom.has(at)) at = cutFrom.get(at); return at; };
       const inOrder = [...pieces].sort((left, right) => cards.indexOf(left.piece) - cards.indexOf(right.piece));
+      const originalSubs = new Map();
       for (const {piece, subSplit} of inOrder) {
         const body = original(piece).querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         if (subSplit && body && rest) {
           const continued = rest.querySelector(':scope > [data-lex-continued="true"]');
-          const fields = subSplit.querySelector(":scope > .settings-fields");
+          // A long sub can span several pieces. Earlier continuations have
+          // already been removed, so later fields must return to the live sub.
+          const targetSub = originalSubs.get(subSplit) || subSplit;
+          const fields = targetSub.querySelector(":scope > .settings-fields");
           const moved = continued?.querySelector(":scope > .settings-fields");
           if (fields && moved) fields.append(...moved.children);
+          if (continued) originalSubs.set(continued, targetSub);
           continued?.remove();
         }
         if (body && rest) body.append(...rest.children);
