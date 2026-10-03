@@ -4414,6 +4414,29 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             prepared[name] = (entry, copy.deepcopy(entry['root']))
         return prepared[name][1]
 
+    def shape(edit, required, optional=()):
+        if not required <= set(edit) or set(edit) - required - set(optional):
+            raise ValueError("Unsupported or missing challenge edit fields")
+
+    def identity(value, label):
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"Challenge {label} must be text")
+        return value
+
+    def offset(value, label):
+        value = integer_value(value, f"Challenge {label}")
+        if value < 0:
+            raise ValueError(f"Challenge {label} must be nonnegative")
+        return value
+
+    def unique_goal(root, name):
+        collections = root.findall('goals')
+        matches = [goal for goal in collections[0].findall('Item')
+                   if len(goal.findall('name')) == 1 and txt(goal, 'name') == name] if len(collections) == 1 else []
+        if len(matches) != 1:
+            raise ValueError("Challenge goal is missing or ambiguous")
+        return matches[0]
+
     vanilla = get_challenges("vanilla")
     allowed_sources = {(s.get("base", ""), s.get("permutation", ""))
                        for s in vanilla["allowedSourcePairs"]}
@@ -4421,9 +4444,23 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
     allowed_conditions = {(row["type"], row["field"]): set(row["values"])
                           for row in vanilla["allowedConditionValues"]}
     for edit in edits:
+        shape(edit, {'name', 'index', 'value'}, {'sources'})
+        identity(edit['name'], 'goal name')
+        offset(edit['index'], 'goal index')
+        finite_number(edit['value'], 'Challenge target')
+        if not isinstance(edit.get('sources', []), list):
+            raise ValueError('Challenge sources must be a list')
         for source in edit.get("sources", []):
-            if source.get("remove"):
+            if not isinstance(source, dict):
+                raise ValueError('Challenge source must be an object')
+            if source.get('remove') is True:
+                shape(source, {'index', 'remove'})
+                offset(source['index'], 'source index')
                 continue
+            shape(source, {'index', 'base', 'permutation'})
+            offset(source['index'], 'source index')
+            if not isinstance(source['base'], str) or not isinstance(source['permutation'], str):
+                raise ValueError('Challenge score source values must be text')
             value = (source.get("base", ""), source.get("permutation", ""))
             if value not in allowed_sources:
                 raise ValueError(f"unknown challenge score source: {value[0]} + {value[1]}")
@@ -4434,28 +4471,44 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             if (reward.get("type"), reward.get("value")) not in allowed_rewards:
                 raise ValueError(f"unknown challenge reward: {reward.get('value')}")
     for edit in condition_edits or []:
+        shape(edit, {'goal', 'index', 'type', 'field', 'value'})
+        for field in ['goal', 'type', 'field', 'value']:
+            identity(edit[field], field)
+        offset(edit['index'], 'condition index')
         key = (edit.get("type", ""), edit.get("field", ""))
         if edit.get("value", "") not in allowed_conditions.get(key, set()):
             raise ValueError(f"unknown challenge condition value: {key[0]}.{key[1]}={edit.get('value')}")
     root = candidate(GOALS_FILE)
-    by_name = {txt(g, "name"): g for g in root.find("goals").findall("Item")}
     changed = 0
+    seen = set()
     for edit in edits:
-        goal = by_name.get(edit.get("name"))
-        if goal is None:
-            continue
+        goal = unique_goal(root, edit['name'])
         desired = list(goal.iter("desiredGoal"))
-        index = int(edit.get("index", -1))
+        index = offset(edit['index'], 'goal index')
+        key = (edit['name'], index)
+        if key in seen:
+            raise ValueError('Duplicate challenge target')
+        seen.add(key)
+        if index >= len(desired):
+            raise ValueError('Unknown challenge goal index')
+        finite_number(desired[index].get('value'), 'Source challenge target')
         if 0 <= index < len(desired):
             desired[index].set("value", str(edit.get("value", "")))
             changed += 1
             parent = next((p for p in goal.iter() if desired[index] in list(p)), None)
             stat_ids = list(parent.iter("statId")) if parent is not None else []
             remove_indices = []
+            seen_sources = set()
             for source_edit in edit.get("sources", []):
-                source_index = int(source_edit.get("index", -1))
+                source_index = offset(source_edit['index'], 'source index')
                 if not (0 <= source_index < len(stat_ids)):
-                    continue
+                    raise ValueError('Unknown challenge source index')
+                if source_index in seen_sources:
+                    raise ValueError('Duplicate challenge source target')
+                seen_sources.add(source_index)
+                stat = stat_ids[source_index]
+                if len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or (txt(stat, 'BaseId'), txt(stat, 'PermutationId')) not in allowed_sources:
+                    raise ValueError('Challenge score source is unsupported or ambiguous')
                 if source_edit.get("remove"):
                     remove_indices.append(source_index)
                     continue
@@ -4479,22 +4532,30 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                     while node in parent_map and parent_map[node].tag != "scoreParams":
                         node = parent_map[node]
                     container = parent_map.get(node)
-                    if container is not None and container.tag == "scoreParams" and len(container) > 1:
-                        container.remove(node)
-                        changed += 1
+                    if container is None or container.tag != 'scoreParams' or node.tag != 'Item' or len(container.findall('Item')) <= 1:
+                        raise ValueError('Cannot remove the final or unmodeled challenge score branch')
+                    container.remove(node)
+                    changed += 1
     condition_changed = 0
+    seen_conditions = set()
     for edit in condition_edits or []:
-        goal = by_name.get(edit.get("goal"))
-        if goal is None:
-            continue
+        goal = unique_goal(root, edit['goal'])
         nodes = [node for node in goal.iter()
                  if node.get("type", "").startswith("CAICondition")]
-        index = int(edit.get("index", -1))
+        index = offset(edit['index'], 'condition index')
         if not (0 <= index < len(nodes)) or nodes[index].get("type") != edit.get("type"):
-            continue
-        field = nodes[index].find(edit.get("field", ""))
-        if field is None:
-            continue
+            raise ValueError('Unknown challenge condition target')
+        key = (edit['goal'], index, edit['field'])
+        if key in seen_conditions:
+            raise ValueError('Duplicate challenge condition target')
+        seen_conditions.add(key)
+        fields = nodes[index].findall(edit['field'])
+        if len(fields) != 1 or len(fields[0]):
+            raise ValueError('Challenge condition field is missing or ambiguous')
+        field = fields[0]
+        current = field.get('value') if 'value' in field.attrib else (field.text or '').strip()
+        if current not in allowed_conditions[(edit['type'], edit['field'])]:
+            raise ValueError('Unsupported source challenge condition value')
         if "value" in field.attrib:
             field.set("value", str(edit.get("value", "")))
         else:

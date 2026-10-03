@@ -1,6 +1,7 @@
 """Challenge families publish together; rejected candidates never leak into cache."""
 import json
 import threading
+import xml.etree.ElementTree as ET
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -11,13 +12,16 @@ from test_rdr2_catalog_numeric_validation import fixture, snapshot
 GOAL = {'name': 'Goal', 'index': 0, 'value': '12', 'sources': []}
 LABEL = {'file': s.CHALLENGES_FILE, 'owner': 'Challenge', 'rank': 0,
          'field': 'description', 'value': 'New label'}
+SOURCE = {'index': 0, 'base': 'SECOND', 'permutation': ''}
+CONDITION = {'goal': 'Goal', 'index': 0, 'type': 'CAIConditionGoalContext',
+             'field': 'ContextHash', 'value': 'CHAL_CTX_SCOPED_KIT'}
 
 
 @pytest.fixture
 def challenges(fixture, monkeypatch):
     root, _ = fixture
     documents = {
-        s.GOALS_FILE: '<Root><!--goals--><goals><Item><name>Goal</name><scoreParams><Item><desiredGoal value="10"/></Item></scoreParams><Opaque>keep</Opaque></Item></goals></Root>',
+        s.GOALS_FILE: '<Root><!--goals--><goals><Item><name>Goal</name><scoreParams><Item><desiredGoal value="10"/><statId><BaseId>BASE</BaseId><PermutationId>PERM</PermutationId></statId></Item></scoreParams><Item type="CAIConditionGoalContext"><ContextHash>CHAL_CTX_ON_MOVING_TRAIN</ContextHash></Item><Opaque>keep</Opaque></Item></goals></Root>',
         s.CHALLENGES_FILE: '<Root><!--challenges--><challenges><Item><name>Challenge</name><uiInfo><description>Old label</description></uiInfo><Opaque>keep</Opaque></Item></challenges></Root>',
     }
     for name, text in documents.items():
@@ -26,7 +30,9 @@ def challenges(fixture, monkeypatch):
         path.write_text(text, encoding='utf-8')
         s.load_file(name)
     monkeypatch.setattr(s, 'get_challenges', lambda ds: {
-        'allowedSourcePairs': [], 'allowedRewards': [], 'allowedConditionValues': []})
+        'allowedSourcePairs': [{'base': 'BASE', 'permutation': 'PERM'}, {'base': 'SECOND', 'permutation': ''}],
+        'allowedRewards': [], 'allowedConditionValues': [{'type': 'CAIConditionGoalContext',
+            'field': 'ContextHash', 'values': ['CHAL_CTX_ON_MOVING_TRAIN', 'CHAL_CTX_SCOPED_KIT']}]})
     return root
 
 
@@ -116,3 +122,90 @@ def test_readonly_and_empty_batch(challenges):
     with pytest.raises(ValueError, match='read-only'):
         s.apply_challenge_edits([GOAL], ui_edits=[LABEL])
     assert snapshot(challenges) == before
+
+
+BAD_GOALS = [{}, dict(GOAL, name='Unknown'), dict(GOAL, name=[]), dict(GOAL, extra=1),
+             dict(GOAL, index=1), dict(GOAL, index=True), dict(GOAL, index=0.5),
+             dict(GOAL, sources=None), dict(GOAL, sources=[None]),
+             dict(GOAL, sources=[dict(SOURCE, index=1)]),
+             dict(GOAL, sources=[dict(SOURCE, index=0.5)]),
+             dict(GOAL, sources=[dict(SOURCE, index=True)]),
+             dict(GOAL, sources=[dict(SOURCE, base=[])]),
+             dict(GOAL, sources=[dict(SOURCE, base='Unknown')]),
+             dict(GOAL, sources=[dict(SOURCE, extra=1)]),
+             dict(GOAL, sources=[SOURCE, SOURCE]),
+             dict(GOAL, sources=[{'index': 0, 'remove': True}]),
+             dict(GOAL, sources=[{'index': 0, 'remove': 'true'}])]
+BAD_GOALS += [dict(GOAL, value=value) for value in [None, True, [], {}, '', float('nan'), float('inf'), 10**400]]
+BAD_CONDITIONS = [dict(CONDITION, **change) for change in [
+    {'index': True}, {'index': 0.5}, {'index': 1}, {'goal': 'Unknown'},
+    {'goal': []}, {'type': 'Unknown'}, {'field': '../Opaque'}, {'value': []}, {'extra': 1}]]
+
+
+@pytest.mark.parametrize('family,bad', [('goal', row) for row in BAD_GOALS] +
+                         [('condition', row) for row in BAD_CONDITIONS])
+@pytest.mark.parametrize('backups', [False, True])
+def test_invalid_targets_preserve_prior_valid_family(challenges, family, bad, backups):
+    if backups:
+        for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+            path = s.data_file_path(name, 'mine')
+            path.with_suffix(path.suffix + '.bak').write_bytes(b'original')
+    before = snapshot(challenges)
+    root = s.load_file(s.GOALS_FILE)['root']
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([bad] if family == 'goal' else [GOAL], ui_edits=[LABEL],
+                               condition_edits=[bad] if family == 'condition' else None)
+    assert snapshot(challenges) == before
+    assert s.load_file(s.GOALS_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+@pytest.mark.parametrize('family', ['goal', 'condition'])
+def test_duplicate_targets_reject(challenges, family):
+    before = snapshot(challenges)
+    with pytest.raises(ValueError, match='Duplicate'):
+        s.apply_challenge_edits([GOAL, GOAL] if family == 'goal' else [GOAL],
+                               condition_edits=[CONDITION, CONDITION] if family == 'condition' else [])
+    assert snapshot(challenges) == before
+
+
+@pytest.mark.parametrize('change', ['duplicate_goal', 'nonfinite_target', 'unknown_source', 'duplicate_source_field', 'unknown_condition', 'duplicate_condition_field'])
+def test_unsupported_source_cannot_be_normalized(challenges, change):
+    root = s.load_file(s.GOALS_FILE)['root']
+    if change == 'duplicate_goal':
+        root.find('goals').append(ET.fromstring(ET.tostring(root.find('goals/Item'))))
+    elif change == 'nonfinite_target':
+        root.find('.//desiredGoal').set('value', 'NaN')
+    elif change == 'unknown_source':
+        root.find('.//BaseId').text = 'Unknown'
+    elif change == 'duplicate_source_field':
+        ET.SubElement(root.find('.//statId'), 'BaseId').text = 'BASE'
+    elif change == 'unknown_condition':
+        root.find('.//ContextHash').text = 'Unknown'
+    else:
+        node = next(node for node in root.iter() if node.get('type') == CONDITION['type'])
+        ET.SubElement(node, 'ContextHash').text = 'CHAL_CTX_ON_MOVING_TRAIN'
+    s.save_file(s.GOALS_FILE)
+    before = snapshot(challenges)
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([dict(GOAL, sources=[SOURCE])], condition_edits=[CONDITION])
+    assert snapshot(challenges) == before
+    assert s.load_file(s.GOALS_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+def test_exact_goal_source_and_condition_save_reload(challenges):
+    value = '9007199254740993.125'
+    assert s.apply_challenge_edits([dict(GOAL, index=0.0, value=value,
+                                         sources=[dict(SOURCE, index='0')])],
+                                  condition_edits=[dict(CONDITION, index='0')]) == 3
+    s._files.clear()
+    root = s.load_file(s.GOALS_FILE)['root']
+    assert root.find('.//desiredGoal').get('value') == value
+    assert root.find('.//BaseId').text == 'SECOND'
+    assert root.find('.//PermutationId').text is None
+    assert root.find('.//ContextHash').text == 'CHAL_CTX_SCOPED_KIT'
+    assert root.find('.//Opaque').text == 'keep'
+    assert b'<!--goals-->' in s.data_file_path(s.GOALS_FILE, 'mine').read_bytes()
