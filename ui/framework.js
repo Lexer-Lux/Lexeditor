@@ -12601,7 +12601,16 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     }
   };
   const schedule=()=>{if(!pending){pending=true;requestAnimationFrame(place);}};
-  new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+  const markerContext='.lex-shell-header nav,.lex-column-list-row';
+  new MutationObserver(records=>{
+    for(const record of records){
+      const target=record.target instanceof Element?record.target:record.target.parentElement;
+      if(target?.closest(markerContext)||(record.type==='attributes'&&target?.querySelector(markerContext))){schedule();return;}
+      for(const node of [...record.addedNodes,...record.removedNodes]){
+        if(node instanceof Element&&(node.matches(markerContext)||node.querySelector(markerContext))){schedule();return;}
+      }
+    }
+  }).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
   new ResizeObserver(schedule).observe(document.documentElement);
   window.addEventListener('resize',schedule);
   document.addEventListener('pointerup',schedule);
