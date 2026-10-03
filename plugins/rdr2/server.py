@@ -4121,6 +4121,29 @@ def delete_loot_table(name, key):
 
 # ---------------- loot matrix ----------------
 
+MATRIX_DAMAGE_QUALITIES = {"Poor", "Good", "Perfect"}
+MATRIX_SKIN_QUALITIES = MATRIX_DAMAGE_QUALITIES | {"Rare", "Legendary"}
+
+
+def _matrix_animal_readonly(animal):
+    fields = {"DamageQuality", "SkinQuality", "SatchelItem", "Quantity"}
+    for row in animal.findall('./Items/Item'):
+        if row.attrib or any(child.tag not in fields or list(child)
+            or set(child.attrib) - ({"value"} if child.tag == "Quantity" else set())
+            for child in row if isinstance(child.tag, str)):
+            return True
+        if any(len(row.findall(field)) > 1 for field in fields):
+            return True
+        if txt(row, "DamageQuality") not in MATRIX_DAMAGE_QUALITIES or txt(row, "SkinQuality") not in MATRIX_SKIN_QUALITIES:
+            return True
+        try:
+            if int(_catalog_quantity(attr_value(row, "Quantity", "1"))) < 1:
+                return True
+        except ValueError:
+            return True
+    return False
+
+
 def get_matrix(ds="mine"):
     root = load_file(MATRIX_FILE, ds)["root"]
     animals = []
@@ -4129,19 +4152,63 @@ def get_matrix(ds="mine"):
         items_el = a.find("Items")
         if items_el is not None:
             for r in items_el.findall("Item"):
+                quantity = attr_value(r, "Quantity", "1")
+                try:
+                    quantity = str(_catalog_quantity(quantity))
+                except ValueError:
+                    pass
                 rows.append({
                     "damage": txt(r, "DamageQuality"),
                     "skin": txt(r, "SkinQuality"),
                     "item": txt(r, "SatchelItem"),
-                    "qty": attr_value(r, "Quantity"),
+                    "qty": quantity,
                 })
-        animals.append({"key": a.get("key", ""), "rows": rows})
+        animals.append({"key": a.get("key", ""), "rows": rows, "readonly": _matrix_animal_readonly(a)})
     return {"animals": animals}
 
 
 def apply_matrix_edits(edits):
     """edits: [{animalKey, rows: [{damage, skin, item, qty}]}]"""
-    root = load_file(MATRIX_FILE)["root"]
+    if not isinstance(edits, list):
+        raise ValueError("Skinning edits must be a list")
+    if not edits:
+        return 0
+    entry = load_file(MATRIX_FILE)
+    root = copy.deepcopy(entry["root"])
+    animals = {animal.get("key"): animal for animal in root.findall('./Entries/Item')}
+    items = set(_catalog_ids())
+    prepared, seen = [], set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"animalKey", "rows"}:
+            raise ValueError("Skinning edits require animalKey and rows only")
+        key = edit["animalKey"]
+        if not isinstance(key, str) or key not in animals:
+            raise ValueError("Unknown skinning animal")
+        if key in seen:
+            raise ValueError("Duplicate skinning animal target")
+        seen.add(key)
+        if _matrix_animal_readonly(animals[key]):
+            raise ValueError("Skinning animal contains unsupported data and is read-only")
+        if not isinstance(edit["rows"], list):
+            raise ValueError("Skinning rows must be a list")
+        rows = []
+        for incoming in edit["rows"]:
+            if not isinstance(incoming, dict) or {"damage", "skin", "item"} - set(incoming) or set(incoming) - {"damage", "skin", "item", "qty"}:
+                raise ValueError("Skinning rows require damage, skin, item and optional qty only")
+            if any(not isinstance(incoming[field], str) for field in ("damage", "skin", "item")):
+                raise ValueError("Skinning identities and quality choices must be text")
+            if incoming["damage"] not in MATRIX_DAMAGE_QUALITIES or incoming["skin"] not in MATRIX_SKIN_QUALITIES:
+                raise ValueError("Skinning quality must be selected from the supported choices")
+            if incoming["item"] not in items:
+                raise ValueError("Unknown skinning catalog item")
+            row = dict(incoming)
+            if "qty" in row:
+                row["qty"] = integer_value(row["qty"], "Skinning quantity")
+                if row["qty"] < 1:
+                    raise ValueError("Skinning quantity must be positive")
+            rows.append(row)
+        prepared.append({"animalKey": key, "rows": rows})
+    edits = prepared
     changed = 0
     for e in edits:
         for a in root.find("Entries").findall("Item"):
@@ -4151,7 +4218,8 @@ def apply_matrix_edits(edits):
             if items_el is None:
                 items_el = ET.SubElement(a, "Items")
             for child in list(items_el):
-                items_el.remove(child)
+                if child.tag == "Item":
+                    items_el.remove(child)
             items_el.text = "\n        "
             rows = e["rows"]
             for i, row in enumerate(rows):
@@ -4178,7 +4246,7 @@ def apply_matrix_edits(edits):
             items_el.tail = "\n    "
             changed += 1
     if changed:
-        save_file(MATRIX_FILE)
+        _commit_xml_roots([(MATRIX_FILE, entry, root)])
     return changed
 
 
@@ -6002,7 +6070,10 @@ class Handler(PluginRequestHandler):
                         except ValueError as e:
                             self._json({"error": str(e)}, 400)
                 elif path == "/api/matrix/save":
-                    self._json({"saved": apply_matrix_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_matrix_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/crime/save":
                     self._json({"saved": apply_crime_edits(body.get("edits", []))})
                 elif path == "/api/dispatch/save":
