@@ -15,7 +15,8 @@ try:
 except ModuleNotFoundError:  # Python 3.10 in Lexeditor's bundled environment.
     import tomli as tomllib
 
-from . import (field_background, field_camera, field_dialogue, field_encounters,
+from . import (encounter_chances, paths, world_map,
+               field_background, field_camera, field_dialogue, field_encounters,
                field_movie, field_scripts, field_walkmesh, fixed_data_merge, init_data,
                iroj_archive, kernel_merge, mngrp_merge, mod_folders, world_data_merge)
 
@@ -1069,6 +1070,77 @@ def _precompose_live_routes(staging: Path, enabled: list[dict],
     return routes
 
 
+def _freeze_encounter_sources(sources, static_sources, live_sources):
+    """Use the same immutable pair for validation, staging and composition."""
+    keys = ('direct/world/dat/wmsetus.obj', encounter_chances.HEXT_RELATIVE)
+    cache = {}
+
+    def frozen(read):
+        if read not in cache:
+            payload = read()
+            cache[read] = lambda payload=payload: payload
+        return cache[read]
+
+    for key in keys:
+        for mapping in (sources, static_sources):
+            if key in mapping:
+                read, layer = mapping[key]
+                mapping[key] = (frozen(read), layer)
+        if key in live_sources:
+            live_sources[key] = [(frozen(read), layer, program)
+                                 for read, layer, program in live_sources[key]]
+
+
+def _validate_encounter_pairs(enabled, resolved_by_mod, static_by_mod,
+                              live_by_mod, baseline_root):
+    world_key = 'direct/world/dat/wmsetus.obj'
+    patch_key = encounter_chances.HEXT_RELATIVE
+    pairs = []
+    for mod in enabled:
+        sources = resolved_by_mod[mod['id']]
+        patch = sources.get(patch_key)
+        patch = patch[0]() if patch is not None else b''
+        worlds = [mapping[world_key][0]()
+                  for mapping in (sources, static_by_mod[mod['id']])
+                  if world_key in mapping]
+        worlds += [read() for read, _, _ in live_by_mod[mod['id']].get(world_key, [])]
+        weighted = [raw for raw in worlds if encounter_chances.has_extension(raw)]
+        if not weighted and not patch:
+            continue
+        if not weighted or not patch:
+            raise ValueError(f"{mod['id']}: encounter weights and their generated Hext must be paired")
+        pairs.append((mod['id'], patch, weighted))
+    if not pairs:
+        return False
+    baseline = (Path(baseline_root)/'world/wmsetus.obj'
+                if baseline_root is not None else None)
+    if baseline is None or not baseline.is_file():
+        raise ValueError('Encounter weight composition requires the original world data')
+    raw = baseline.read_bytes()
+    count = len(world_map.parse(raw)['groups'])
+    group_start = world_map._pointers(raw)[3]
+    expected_offset = len(raw)+len(raw)%2-group_start
+    try:
+        exe = (paths.GAME_ROOT/'FF8_EN.exe').read_bytes()
+    except OSError as error:
+        raise ValueError('Encounter weight composition requires the supported executable') from error
+    expected_patch = encounter_chances.build_hext(exe, expected_offset).encode('utf-8')
+    for mod_id, patch, worlds in pairs:
+        if patch.replace(b'\r\n', b'\n') != expected_patch:
+            raise ValueError(f'{mod_id}: encounter Hext does not match the original world-data layout')
+        for data in worlds:
+            if encounter_chances.extension_offset(data, count, group_start) != expected_offset:
+                raise ValueError(f'{mod_id}: encounter weight storage changes the original world-data layout')
+            merged, _, reason = world_data_merge.merge(raw, [(mod_id, data)], 'wmset', world_key)
+            if merged is None:
+                raise ValueError(f'{mod_id}: encounter weight composition failed: {reason}')
+    if any(live_by_mod[mod['id']].get(world_key) for mod in enabled):
+        # Hext is loaded once; live world-data routes can otherwise select a
+        # plain file while the selector still reads an appended weight table.
+        raise ValueError('Encounter weights cannot yet be combined with live conditional world data')
+    return True
+
+
 def compose(project_root: Path, runtime_root: Path,
             mod_rows: list[dict] | None = None,
             baseline_root: Path | None = None,
@@ -1109,6 +1181,7 @@ def compose(project_root: Path, runtime_root: Path,
                        if mod_root.is_file() else None)
             sources, folder_report, live_sources, static_sources = _resolved_mod_sources(
                 mod, archive, frozen_condition_state)
+            _freeze_encounter_sources(sources, static_sources, live_sources)
             resolved_by_mod[mod["id"]] = sources
             static_by_mod[mod["id"]] = static_sources
             live_by_mod[mod["id"]] = live_sources
@@ -1124,6 +1197,8 @@ def compose(project_root: Path, runtime_root: Path,
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(read_source())
 
+        weighted_encounters = _validate_encounter_pairs(
+            enabled, resolved_by_mod, static_by_mod, live_by_mod, baseline_root)
         # Every live outcome is composed through the same low-to-high merger
         # as the unconditional output.  The inert manifest never redirects to
         # a raw package candidate.
@@ -1192,7 +1267,8 @@ def compose(project_root: Path, runtime_root: Path,
             for world_key, (baseline_name, kind) in WORLD_MERGE_SPECS.items():
                 world_claimants = claims.get(world_key, [])
                 world_baseline = Path(baseline_root) / baseline_name
-                if len(world_claimants) < 2 or not world_baseline.is_file():
+                if ((len(world_claimants) < 2 and not (weighted_encounters and kind == 'wmset'))
+                        or not world_baseline.is_file()):
                     continue
                 inputs = []
                 for mod in enabled:
@@ -1206,6 +1282,8 @@ def compose(project_root: Path, runtime_root: Path,
                     semantic_merged.add(world_key)
                     semantic_conflicts_by_path[world_key] = unit_conflicts
                 else:
+                    if weighted_encounters and kind == 'wmset':
+                        raise ValueError(f'Encounter weight composition failed: {fallback}')
                     semantic_fallback_by_path[world_key] = fallback
             for encounter_key, encounter_claimants in claims.items():
                 encounter_baseline = _field_encounter_baseline(

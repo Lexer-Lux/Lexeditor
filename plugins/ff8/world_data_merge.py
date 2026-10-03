@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import world_geometry, world_map, world_textures
+from . import encounter_chances, world_geometry, world_map, world_textures
 
 
 def _wmset_units(data: bytes) -> list[tuple[str, int, int]]:
@@ -93,6 +93,48 @@ UNIT_READERS = {
 
 def merge(vanilla: bytes, mods: list[tuple[str, bytes]], kind: str, path: str
           ) -> tuple[bytes | None, list[dict], str]:
+    if kind == 'wmset':
+        return _merge_wmset(vanilla, mods, path)
+    return _merge_fixed(vanilla, mods, kind, path)
+
+
+def _merge_wmset(vanilla, mods, path):
+    # Ordinary files keep the existing opaque fallback behaviour, including
+    # files beyond the bounded space supported by our appended weight table.
+    if (not encounter_chances.has_extension(vanilla)
+            and not any(encounter_chances.has_extension(source) for _, source in mods)):
+        return _merge_fixed(vanilla, mods, 'wmset', path)
+    try:
+        count = len(world_map.parse(vanilla)['groups'])
+        if not count:
+            return _merge_fixed(vanilla, mods, 'wmset', path)
+        base, defaults = encounter_chances.read_extension(vanilla, count)
+        if base != vanilla:
+            return None, [], f'vanilla {path} must not contain an encounter weight extension'
+        stripped, weight_claims = [], {}
+        for mod_id, source in mods:
+            source_base, weights = encounter_chances.read_extension(source, count)
+            stripped.append((mod_id, source_base))
+            for group, (before, after) in enumerate(zip(defaults, weights)):
+                if before != after:
+                    weight_claims.setdefault(group, []).append((mod_id, after))
+        output, conflicts, reason = _merge_fixed(vanilla, stripped, 'wmset', path)
+        if output is None:
+            return None, [], reason
+        changes = {}
+        for group, claims in weight_claims.items():
+            changes[group] = list(claims[-1][1])
+            if len({values for _, values in claims}) > 1:
+                conflicts.append({'unit': f'{path}:group:{group}:initialOutcomes',
+                                  'winner': claims[-1][0],
+                                  'claimants': [mod_id for mod_id, _ in claims]})
+        return encounter_chances.with_weights(output, count, changes), conflicts, ''
+    except ValueError as error:
+        return None, [], f'unsupported encounter weight composition in {path}: {error}'
+
+
+def _merge_fixed(vanilla: bytes, mods: list[tuple[str, bytes]], kind: str, path: str
+                 ) -> tuple[bytes | None, list[dict], str]:
     """Merge editor-owned units or return an explicit opaque fallback reason."""
     if kind not in UNIT_READERS:
         raise ValueError(f"Unknown world merge kind: {kind}")

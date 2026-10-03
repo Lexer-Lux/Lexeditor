@@ -73,13 +73,18 @@ def _group_count(value: int) -> int:
     return value
 
 
+def has_extension(data: bytes) -> bool:
+    """Recognize the reserved footer; validation remains read_extension's job."""
+    return len(data) >= _FOOTER.size and data[-_FOOTER.size:-_FOOTER.size+8] == _MAGIC
+
+
 def read_extension(data: bytes, group_count: int) -> tuple[bytes, list[tuple[int, ...]]]:
     """Read only our checksummed trailer; preserve every original game byte."""
     group_count = _group_count(group_count)
     if not isinstance(data, (bytes, bytearray)) or len(data) < 192 or len(data) > MAX_WMSET_SIZE:
         raise ValueError('World encounter data is outside the supported bounded size')
     data = bytes(data)
-    if len(data) < _FOOTER.size or data[-_FOOTER.size:-_FOOTER.size+8] != _MAGIC:
+    if not has_extension(data):
         return data, [DEFAULT_OUTCOMES]*group_count
     _, base_size, stored_count, digest = _FOOTER.unpack_from(data, len(data)-_FOOTER.size)
     payload_start = base_size + base_size % 2
