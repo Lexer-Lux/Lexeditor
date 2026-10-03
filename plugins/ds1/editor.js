@@ -98,6 +98,21 @@ async function discard(){
   await edits;
   try{await api("/api/discard",{});attackPreviews.clear();await refreshState();await loadItems();render();}catch(error){notify(error);}
 }
+// An item's in-game name lives in the game's text, which the mod carries
+// beside its parameters; the server renames it there.
+function renameRecord(row,name){
+  if(state.readOnly)return;
+  state.pending++;shell.refresh();
+  edits=edits.then(async()=>{
+    try{
+      const result=await api("/api/rename",{table:row.table,id:row.id,name});
+      state.dirty=result.dirtyCount;
+      if(state.row&&key(state.row)===key(row))state.row=result.row;
+      for(const listed of state.rows||[])if(key(listed)===key(row))listed.name=result.row.name;
+    }catch(error){notify(error);}
+    finally{state.pending--;render();}
+  });
+}
 function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
   state.pending++;shell.refresh();
@@ -235,6 +250,9 @@ function renderItems(){
       sort:column=>{state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
       columns:[{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]}),
+    rename:renameRecord,
+    // Items have in-game names; monsters and attacks have only reference names.
+    renamable:row=>state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks

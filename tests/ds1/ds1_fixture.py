@@ -59,3 +59,37 @@ def make_archive():
     header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')
     struct.pack_into('>II', header, 28, len(plain), len(compressed))
     return bytes(header) + compressed
+
+
+def make_text_archive(names=None):
+    """A synthetic msg/ENGLISH/item.msgbnd.dcx: every name table twice (the
+    base and later copies Remastered ships), holding `names` by table."""
+    from plugins.ds1 import texts
+    names = names or {'EquipParamGoods': {100: 'Fixture Stone', 101: 'Fixture Key'},
+                      'EquipParamWeapon': {100: 'Fixture Sword'}}
+    blank = b'\0\0\x01\0' + bytes(4) + b'\x01\0\0\0' + bytes(texts.HEADER - 12)
+    entries = []
+    for base in (10, 110):
+        for offset, (table, file_name) in enumerate(texts.NAME_TABLES.items()):
+            payload = texts.build_fmg(blank, [], dict(names.get(table, {})))
+            entries.append((base + offset, 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92)) + file_name, payload))
+    encoded = [name.encode('shift_jis') + b'\0' for _, name, _ in entries]
+    directory_end = 32 + len(entries) * 24
+    names_end = directory_end + sum(map(len, encoded))
+    plain = bytearray(names_end)
+    plain[:4] = b'BND3'
+    plain[4:12] = b'TEST0000'
+    plain[12] = 0x74
+    struct.pack_into('<II', plain, 16, len(entries), names_end)
+    name_offset = directory_end
+    for index, ((member_id, _name, payload), name) in enumerate(zip(entries, encoded)):
+        while len(plain) % 16:
+            plain.append(0)
+        struct.pack_into('<6I', plain, 32 + index * 24, 0x40, len(payload), len(plain), member_id, name_offset, len(payload))
+        plain[name_offset:name_offset + len(name)] = name
+        name_offset += len(name)
+        plain.extend(payload)
+    compressed = zlib.compress(plain, 9)
+    header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')
+    struct.pack_into('>II', header, 28, len(plain), len(compressed))
+    return bytes(header) + compressed

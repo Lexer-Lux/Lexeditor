@@ -1,4 +1,10 @@
-"""Reversible native replacement of the installed DS1 item parameter archive.
+"""Reversible native replacement of the installed DS1 files a mod changes.
+
+Two loose files: the item parameter archive, and the English item text
+archive (msg/ENGLISH/item.msgbnd.dcx) that holds every item's in-game name.
+Each is guarded the same way and on its own, with its own backup and marker
+next to it; what follows is written about the parameter archive, and holds
+for both.
 
 Dark Souls Remastered ships param/GameParam/GameParam.parambnd.dcx as a plain
 loose file next to the executable, not packed inside a BHD5/dvdbnd archive
@@ -32,6 +38,10 @@ import stat
 from core.plugin_files import atomic_write
 from .formats import ItemDocument, MAX_ARCHIVE
 from .store import MARKER, RELATIVE
+from . import texts
+
+# Each managed file, and the reader that proves a copy of it is sound.
+FILES = ((RELATIVE, ItemDocument), (texts.RELATIVE, texts.TextDocument))
 
 MOD_ID = "lexeditor-ds1"
 NOTE = (
@@ -41,12 +51,12 @@ NOTE = (
 )
 
 
-def _backup_path(game_root: Path) -> Path:
-    return game_root / RELATIVE.parent / (RELATIVE.name + ".lexeditor-original")
+def _backup_path(game_root: Path, relative: Path = RELATIVE) -> Path:
+    return game_root / relative.parent / (relative.name + ".lexeditor-original")
 
 
-def _marker_path(game_root: Path) -> Path:
-    return game_root / RELATIVE.parent / ".lexeditor-ds1-deployment.json"
+def _marker_path(game_root: Path, relative: Path = RELATIVE) -> Path:
+    return game_root / relative.parent / ".lexeditor-ds1-deployment.json"
 
 
 def _hash_file(path: Path) -> str:
@@ -146,21 +156,21 @@ def _assert_disjoint(game_root: Path, project_root: Path) -> None:
         raise ValueError("The mod project must be outside the installed game.")
 
 
-def vanilla_source(game_root: Path) -> Path:
+def vanilla_source(game_root: Path, relative: Path = RELATIVE) -> Path:
     """The true pristine original: the preserved backup once Apply owns the installed
     file, otherwise the installed file itself (still pristine, since nothing has
     taken control of it yet). Once a marker exists, the live file may hold a
     deployed mod's bytes, so an unverifiable backup must refuse rather than fall
     back to live and silently label modded data as Vanilla."""
     game_root = Path(game_root).resolve()
-    backup = _backup_path(game_root)
-    marker = _read_marker(_marker_path(game_root))
+    backup = _backup_path(game_root, relative)
+    marker = _read_marker(_marker_path(game_root, relative))
     if marker is None:
-        return game_root / RELATIVE
+        return game_root / relative
     if backup.is_file() and _hash_file(backup) == marker["originalHash"]:
         return backup
     raise RuntimeError(
-        f"The preserved original copy of {RELATIVE.as_posix()} is missing or has changed at {backup}. "
+        f"The preserved original copy of {relative.as_posix()} is missing or has changed at {backup}. "
         "Vanilla cannot be shown safely because the installed file may hold a deployed mod instead. "
         "Restore the preserved copy manually, or use Apply/Restore original to re-establish a verified state."
     )
@@ -174,7 +184,7 @@ def _reconcile(marker: dict, marker_path: Path, live: Path) -> dict:
     its own explicit error rather than a silent rewrite."""
     if not live.is_file():
         raise RuntimeError(
-            f"The installed parameter archive is missing at {live}. Verify or restore the game's "
+            f"The installed {live.name} is missing at {live}. Verify or restore the game's "
             "files before continuing; Lexeditor will not recreate a missing file automatically."
         )
     live_hash = _hash_file(live)
@@ -194,8 +204,29 @@ def _reconcile(marker: dict, marker_path: Path, live: Path) -> dict:
             _write_marker(marker_path, marker)
         return marker
     raise RuntimeError(
-        "The installed parameter archive changed outside Lexeditor; restore or verify game files before continuing."
+        f"The installed {live.name} changed outside Lexeditor; restore or verify game files before continuing."
     )
+
+
+def _text_status(game_root: Path, project_root: Path | None) -> dict:
+    """Whether the installed item text matches what this project would apply."""
+    live = game_root / texts.RELATIVE
+    marker = _read_marker(_marker_path(game_root, texts.RELATIVE))
+    live_hash = _hash_file(live) if live.is_file() else None
+    source = (project_root / texts.RELATIVE) if project_root else None
+    wanted = _hash_file(source) if source and source.is_file() else None
+    applied = bool(marker and marker.get("enabled") and live_hash == marker.get("activeHash"))
+    pending = (marker or {}).get("pendingHash")
+    return {
+        "sourceReady": wanted is not None,
+        "enabled": applied,
+        # In step with the project: its names are installed, or it has none
+        # and the original text is.
+        "current": (applied and live_hash == wanted) if wanted else not applied,
+        "changedExternally": bool(marker and live_hash and live_hash != pending
+                                  and live_hash not in (marker["originalHash"], marker.get("activeHash"))),
+        "pendingRecovery": bool(marker and pending and live_hash == pending),
+    }
 
 
 def status(game_root: Path | None, project_root: Path | None) -> dict:
@@ -226,7 +257,9 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     active_project_root = (marker or {}).get("activeProjectRoot") or ""
     this_project_active = bool(enabled and project_root is not None and active_project_root == str(project_root))
     stale = bool(this_project_active and source_ready and _hash_file(source) != marker.get("activeHash"))
+    text = _text_status(game_root, project_root)
     return {
+        "texts": text,
         "isProject": is_project,
         "sourceReady": source_ready,
         "sourcePath": str(source) if source else "",
@@ -236,9 +269,10 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
         "backupOk": backup_ok,
         "enabled": enabled,
         "matchesOriginal": matches_original,
-        "changedExternally": changed_externally,
-        "stale": stale,
-        "pendingRecovery": pending_recovery,
+        "changedExternally": changed_externally or text["changedExternally"],
+        # Out of date when either file differs from what Apply would install.
+        "stale": stale or bool(this_project_active and not text["current"]),
+        "pendingRecovery": pending_recovery or text["pendingRecovery"],
         "activeProjectRoot": active_project_root,
         "thisProjectActive": this_project_active,
         "appliedAt": (marker or {}).get("appliedAt") or "",
@@ -262,27 +296,42 @@ def apply(game_root: Path, project_root: Path | None) -> dict:
     source = project_root / RELATIVE
     if not source.is_file():
         raise FileNotFoundError(f"Save the project before applying it; no {RELATIVE.as_posix()} was found in it.")
-    if source.stat().st_size > MAX_ARCHIVE:
-        raise ValueError("The parameter archive is too large to apply.")
     _assert_disjoint(game_root, project_root)
+    # Every file the project holds is checked before any of them is written.
+    sources = {}
+    for relative, reader in FILES:
+        candidate = project_root / relative
+        _assert_no_reparse_points(candidate, project_root)
+        if not candidate.is_file():
+            continue
+        if candidate.stat().st_size > MAX_ARCHIVE:
+            raise ValueError(f"{candidate.name} is too large to apply.")
+        payload = candidate.read_bytes()
+        reader(payload)  # Reject corrupt/unsupported project output before any backup or live write.
+        sources[relative] = (candidate, payload)
+    for relative, _reader in FILES:
+        if relative in sources:
+            _apply_file(game_root, project_root, relative, *sources[relative])
+        elif _read_marker(_marker_path(game_root, relative)):
+            # The project no longer changes this file: put the original back.
+            _restore_file(game_root, relative)
+    return status(game_root, project_root)
 
-    live = game_root / RELATIVE
-    backup = _backup_path(game_root)
-    marker_path = _marker_path(game_root)
+
+def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes) -> None:
+    live = game_root / relative
+    backup = _backup_path(game_root, relative)
+    marker_path = _marker_path(game_root, relative)
     for path in (live, backup, marker_path):
         _assert_no_reparse_points(path, game_root)
-    _assert_no_reparse_points(source, project_root)
     if source.resolve() == live.resolve():
         raise RuntimeError("The mod project's saved archive and the installed file must not be the same path.")
-
-    new_bytes = source.read_bytes()
-    ItemDocument(new_bytes)  # Reject corrupt/unsupported project output before any backup or live write.
     new_hash = hashlib.sha256(new_bytes).hexdigest()
     marker = _read_marker(marker_path)
 
     if marker is None:
         if not live.is_file():
-            raise FileNotFoundError(f"The installed game has no {RELATIVE.as_posix()}; cannot safely preserve its original data.")
+            raise FileNotFoundError(f"The installed game has no {relative.as_posix()}; cannot safely preserve its original data.")
         if backup.exists():
             raise RuntimeError(
                 f"An unmanaged backup already exists at {backup}; remove or restore it manually before continuing."
@@ -314,18 +363,24 @@ def apply(game_root: Path, project_root: Path | None) -> dict:
                    "enabled": True, "appliedAt": datetime.now(timezone.utc).isoformat(),
                    "pendingHash": None, "pendingKind": None})
     _write_marker(marker_path, marker)
-    return status(game_root, project_root)
 
 
 def disable(game_root: Path) -> dict:
     """Restore the exact preserved original bytes, leaving the backup in place for later reapply."""
     game_root = _assert_no_reparse_ancestry(game_root).resolve()
-    marker_path = _marker_path(game_root)
+    for relative, _reader in FILES:
+        if _read_marker(_marker_path(game_root, relative)) is not None:
+            _restore_file(game_root, relative)
+    return status(game_root, None)
+
+
+def _restore_file(game_root: Path, relative: Path) -> None:
+    marker_path = _marker_path(game_root, relative)
     marker = _read_marker(marker_path)
     if marker is None:
-        return status(game_root, None)
-    live = game_root / RELATIVE
-    backup = _backup_path(game_root)
+        return
+    live = game_root / relative
+    backup = _backup_path(game_root, relative)
     for path in (live, backup, marker_path):
         _assert_no_reparse_points(path, game_root)
     if not backup.is_file() or _hash_file(backup) != marker["originalHash"]:
@@ -342,4 +397,3 @@ def disable(game_root: Path) -> dict:
         raise RuntimeError("Restoring the original copy failed verification; the installed file may be inconsistent.")
     marker.update({"activeHash": None, "activeProjectRoot": None, "enabled": False, "pendingHash": None, "pendingKind": None})
     _write_marker(marker_path, marker)
-    return status(game_root, None)

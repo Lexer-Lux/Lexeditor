@@ -5571,10 +5571,12 @@ ${contents.path}`});
       if (event.type === "keydown") return Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
       return Boolean(target.closest?.(".lex-toggle")) || changesOnPointer(target, event);
     };
+    requestModForEdit = () => protectManagedEdit({type: "request", target: document.querySelector("main") || document.body,
+      preventDefault() {}, stopImmediatePropagation() {}});
     const protectManagedEdit = async event => {
       const current = snapshot?.projects?.find(row => row.current);
       if (event.type === "keydown" && !typesIntoValue(event)) return;
-      if (copyPromptOpen || !isEditAttempt(event.target, event)) return;
+      if (copyPromptOpen || (event.type !== "request" && !isEditAttempt(event.target, event))) return;
       // A game with no mod has nothing to write into, so the attempt to edit
       // the game's own data is the moment to offer the way out of it.
       if (current?.noMod || current?.vanilla || sessionHasNoMod() ||
@@ -7740,6 +7742,12 @@ ${contents.path}`});
         // list's rows to move the selection itself.
         onclick: options.select ? event => {
           const marked = options.selectedClass || "selected";
+          // Clicking the row that is already the only selection changes
+          // nothing, so it re-selects nothing: re-rendering for it threw away
+          // a name being double-clicked for editing in that row.
+          const only = root.querySelectorAll(':scope > .lex-list-row[aria-selected="true"]');
+          if (event.currentTarget.getAttribute("aria-selected") === "true" && only.length === 1 &&
+              !event.shiftKey && !event.ctrlKey && !event.metaKey) return;
           for (const sibling of root.querySelectorAll(":scope > .lex-list-row")) {
             sibling.classList.toggle(marked, sibling === event.currentTarget);
             sibling.setAttribute("aria-selected", String(sibling === event.currentTarget));
@@ -7873,6 +7881,23 @@ ${contents.path}`});
   // pinned properties as columns. A row supplies a pinned value as
   // row.values[key] (or row[key]), and may give row.display[key] to show.
   let pagedPinOwner = null;
+  // A list whose records' names the game stores renames them in its table's
+  // Name column and in the detail heading, by double-click, through one
+  // option: pagedListDetail({rename(row, name), renamable(row)}).
+  let pagedRenameOwner = null;
+  // Set by the shell's mod control: what an edit attempt on a locked project
+  // does (offer to create a mod).
+  let requestModForEdit = null;
+  const renameColumn = (column, owner) => owner && column.key === "name" && !column.edit && !column.editor ? {
+    ...column,
+    edit: (row, value) => {
+      const name = String(value ?? "").trim();
+      if (name && name !== String(row.name ?? "") && owner.renamable(row)) owner.rename(row, name);
+    },
+    editValue: row => row.name ?? "",
+    cellClass: row => [typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "",
+      owner.renamable(row) ? "" : "lex-cell-fixed"].filter(Boolean).join(" "),
+  } : column;
   const autoPinStores = new Map();
   const autoPins = viewKey => {
     if (!autoPinStores.has(viewKey)) {
@@ -8115,9 +8140,34 @@ ${contents.path}`});
   // Editing is a per-cell action, not a table mode: double-click a value and
   // the column's own editor takes over that cell until it is committed or
   // dismissed. Tables that never declare an editor stay read-only.
+  // A double-click on an editable cell, counted by hand: when the first
+  // click selects the row and the list re-renders, the second click lands on
+  // a new cell and the browser sends no dblclick at all. Two clicks on the
+  // same row's same column within the double-click time are one.
+  let lastCellClick = null;
+  document.addEventListener("click", event => {
+    const cell = event.target.closest?.(".lex-column-list-cell");
+    const row = cell?.closest(".lex-list-row[data-key], [data-key]");
+    if (!cell || !row) { lastCellClick = null; return; }
+    const identity = `${row.dataset.key} ${cell.dataset.columnKey}`;
+    const now = performance.now();
+    if (lastCellClick?.identity === identity && now - lastCellClick.at < 500) {
+      lastCellClick = null;
+      // This click may re-render the list too, so the editor opens after it,
+      // in whichever cell is there by then.
+      const rowKey = row.dataset.key, columnKey = cell.dataset.columnKey;
+      setTimeout(() => {
+        const current = [...document.querySelectorAll(`[data-key="${CSS.escape(rowKey)}"] .lex-column-list-cell[data-column-key="${CSS.escape(columnKey)}"]`)]
+          .find(node => node.isConnected && node.lexBeginEdit);
+        current?.lexBeginEdit();
+      }, 0);
+      return;
+    }
+    lastCellClick = {identity, at: now};
+  }, true);
   const beginCellEdit = (cell, column, row, refresh) => {
-    if (!column?.edit || cell.classList.contains("lex-cell-editing")) return;
-    if (shellIsReadonly()) return;
+    if (!column?.edit || cell.classList.contains("lex-cell-editing") || cell.classList.contains("lex-cell-fixed")) return;
+    if (shellIsReadonly()) { requestModForEdit?.(); return; }
     const content = cell.querySelector(".lex-column-cell-content");
     if (!content) return;
     const original = [...content.childNodes];
@@ -8247,8 +8297,10 @@ ${contents.path}`});
     // list then adds none, so no pin is ever dead.
     if (options.columnPreferences && pagedPinOwner) pagedPinOwner.declined = true;
     const pinOwner = options.columnPreferences ? null : pagedPinOwner;
-    const ownColumns = pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
-      .filter(column => !(options.columns || []).some(own => own.key === column.pinnedProperty))] : options.columns;
+    const renameOwner = pagedRenameOwner;
+    const ownColumns = (pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
+      .filter(column => !(options.columns || []).some(own => own.key === column.pinnedProperty))] : options.columns || [])
+      .map(column => renameColumn(column, renameOwner));
     const columns = preferredColumns
       ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
@@ -8467,14 +8519,16 @@ ${contents.path}`});
           : (!column.render && typeof rendered === "number"
             ? (column.numeric === true ? magnitudeValue(rendered, magnitudeMetrics.get(column.key) || {}) : numberValue(rendered))
             : rendered);
+        const ownClass = typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "";
         const cell = element("div", {
           class: ["lex-column-list-cell",
-            column.edit ? "lex-cell-editable" : "",
+            // A record that cannot be renamed keeps a plain name cell.
+            column.edit && !String(ownClass).split(" ").includes("lex-cell-fixed") ? "lex-cell-editable" : "",
             column.key === pointerColumn ? "lex-column-pointer-cell" : "",
             isNumbered ? "lex-numbered-id-cell" : "",
             column.numeric === true ? "lex-numeric-cell" : "",
             alignmentClass(column),
-            typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
+            ownClass].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
         // A bare string handed straight to the flex content span cannot be
@@ -8486,12 +8540,10 @@ ${contents.path}`});
           (typeof content === "string" || typeof content === "number")
             ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
             : content));
-        if (column.edit) {
-          cell.addEventListener("dblclick", event => {
-            event.preventDefault();
-            beginCellEdit(cell, column, row, options.refresh);
-          });
-        }
+        // The double-click is caught once, at the document: a list whose
+        // click selects the row re-renders between the two clicks, so the
+        // cell the double-click lands on is a new one, not the first.
+        if (column.edit) cell.lexBeginEdit = () => beginCellEdit(cell, column, row, options.refresh);
         return cell;
       }),
     });
@@ -9780,8 +9832,21 @@ ${contents.path}`});
       try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
       change("pins",{});
     }};
+    const renameOwner=typeof options.rename==="function"
+      ?{rename:options.rename,renamable:row=>typeof options.renamable==="function"?options.renamable(row)!==false:true}:null;
     const makeDetail=record=>{
       const node=options.detail(record);
+      // The heading's name renames the record too, by double-click.
+      const heading=renameOwner&&renameOwner.renamable(record)?node.querySelector?.(".lex-detail-panel-name"):null;
+      if(heading){
+        heading.title="Double-click to rename";
+        heading.addEventListener("dblclick",event=>{
+          event.preventDefault();event.stopPropagation();
+          if(shellIsReadonly()){requestModForEdit?.();return;}
+          renameValue(heading,{value:String(record.name??heading.textContent),label:"this record",
+            commit:name=>renameOwner.rename(record,name)});
+        });
+      }
       if(typeof options.change==="function"&&!pinOwner.declined)autoPinDetail(node,pinOwner);
       const chosen=records.filter(row=>selection.keys.has(keyOf(row)));
       if(chosen.length>1){
@@ -9864,8 +9929,9 @@ ${contents.path}`});
     // While the master builds its tables, tell them that this list owns the
     // order: a click on one of their headers re-sorts the list, then the list
     // re-renders through the plugin's own change callback.
-    const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner;
+    const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner, outerRenameOwner = pagedRenameOwner;
     pagedPinOwner = typeof options.change === "function" ? pinOwner : null;
+    pagedRenameOwner = renameOwner;
     pagedSortOwner = typeof options.change === "function" ? {
       state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
       sort: (column, direction, compare) => {
@@ -9911,6 +9977,7 @@ ${contents.path}`});
     } finally {
       pagedSortOwner = outerSortOwner;
       pagedPinOwner = outerPinOwner;
+      pagedRenameOwner = outerRenameOwner;
       if (pinOwner.declined) detailNode?.querySelectorAll?.("[data-lex-auto-pin]").forEach(node => node.remove());
     }
     // The floor belongs to THIS table's record set. Leaving it set made an

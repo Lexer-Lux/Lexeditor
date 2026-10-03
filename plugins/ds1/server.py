@@ -74,7 +74,7 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable',
+            if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable',
                             '/api/tweaks/save', '/api/tweaks/trust', '/api/tweaks/apply', '/api/tweaks/restore'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
@@ -89,6 +89,9 @@ class Handler(PluginRequestHandler):
             with LOCK:
                 if path == '/api/edit':
                     row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
+                    result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
+                elif path == '/api/rename':
+                    row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'))
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/save':
                     result = STORE.save()

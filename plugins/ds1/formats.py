@@ -200,6 +200,9 @@ class ItemDocument:
         self.params = {}
         self.schemas = {table: schema(table) for table in TABLES}
         self.dirty = set()
+        # The game's own item names (texts.TextDocument), when the store has
+        # them; reference names stand in for the rest.
+        self.texts = None
         for table, (row_size, version) in TABLES.items():
             member = self.members.get(table + '.param')
             if member is None:
@@ -222,7 +225,24 @@ class ItemDocument:
 
     @property
     def dirty_count(self):
-        return len(self.dirty)
+        return len(self.dirty) + (len(self.texts.dirty) if self.texts else 0)
+
+    def display_name(self, table, row_id, row=None):
+        """The item's in-game name, else its reference name, else a number."""
+        named = self.texts.name(table, row_id) if self.texts else None
+        if named: return named
+        row = row or self.params[table].row(row_id)
+        return self.schemas[table]['names'].get(row_id) or row.name or (f'Attack {row_id}' if table == 'AtkParam_Npc' else f'Item {row_id}')
+
+    def renamable(self, table):
+        return bool(self.texts and self.texts.renamable(table))
+
+    def rename(self, table, row_id, name):
+        if not self.renamable(table):
+            raise FormatError('These records have no in-game name to change.')
+        self._row(table, row_id)
+        self.texts.rename(table, row_id, name)
+        return self.read_row(table, row_id)
 
     def _row(self, table, row_id):
         if table not in TABLES or type(row_id) is not int:
@@ -268,14 +288,14 @@ class ItemDocument:
                 ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
                 if (tab == 'ammo') != ammo: continue
             values, display = self.row_values(table, row.row_id)
-            result.append({'id': row.row_id, 'name': self.schemas[table]['names'].get(row.row_id) or row.name or (f'Attack {row.row_id}' if table == 'AtkParam_Npc' else f'Item {row.row_id}'), 'table': table,
+            result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row), 'table': table,
                            'values': values, 'display': display})
         if tab == 'spells':
             table = 'EquipParamGoods'
             for row in self.params[table].rows:
                 if self.value(table, row.row_id, 'goodsType') in (5, 6, 7):
                     values, display = self.row_values(table, row.row_id)
-                    result.append({'id': row.row_id, 'name': 'Spell item: ' + (self.schemas[table]['names'].get(row.row_id) or row.name or str(row.row_id)), 'table': table,
+                    result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
                                    'values': values, 'display': display})
         return result
 
@@ -311,7 +331,8 @@ class ItemDocument:
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
-        result = {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or (f'Attack {row_id}' if table == 'AtkParam_Npc' else f'Item {row_id}'), 'fields': fields}
+        result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
+                  'renamable': self.renamable(table), 'fields': fields}
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
