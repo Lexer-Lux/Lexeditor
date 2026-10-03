@@ -27,6 +27,7 @@ import tempfile
 import threading
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer
+from decimal import Decimal, InvalidOperation
 
 # keep the game's xi: prefix on XInclude tags (ET would rename to ns0:)
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
@@ -1613,6 +1614,18 @@ def catalog_origin_marker_sets(ds="mine"):
     _ORIGIN_MARKER_CACHE[cache_key] = result
     return result
 
+def _catalog_quantity(raw):
+    """Read integral XML quantities without float or JSON-number rounding."""
+    try:
+        value = Decimal(raw)
+        if not value.is_finite() or value != value.to_integral_value():
+            raise ValueError("Catalog quantity must be a finite whole number")
+        integer = int(value)
+    except (InvalidOperation, TypeError, OverflowError) as error:
+        raise ValueError("Catalog quantity must be a finite whole number") from error
+    return integer if abs(integer) <= 9007199254740991 else str(integer)
+
+
 def cost_list(container):
     """Parse an <acquirecosts>/<sellprices> element into a list of costs."""
     out = []
@@ -1625,7 +1638,7 @@ def cost_list(container):
             for part in items_el.findall("item"):
                 parts.append({
                     "item": txt(part, "item"),
-                    "qty": int(float(part.find("quantity").get("value", "0"))) if part.find("quantity") is not None else 0,
+                    "qty": _catalog_quantity(part.find("quantity").get("value", "0")) if part.find("quantity") is not None else 0,
                 })
         q = cost.find("quantity")
         unlocks = []
@@ -1635,7 +1648,7 @@ def cost_list(container):
         out.append({
             "key": txt(cost, "key"),
             "costtype": txt(cost, "costtype"),
-            "yield": int(float(q.get("value", "1"))) if q is not None else 1,
+            "yield": _catalog_quantity(q.get("value", "1")) if q is not None else 1,
             "parts": parts,
             "unlocks": unlocks,
         })
@@ -1683,9 +1696,9 @@ def _build_catalog(ds="mine"):
             for group in groups.findall("item") if groups is not None else []:
                 count = attr_value(group, "count")
                 if count is not None:
-                    counts.append(int(float(count)))
+                    counts.append(_catalog_quantity(count))
             shop_listings.setdefault(txt(entry, "item"), []).append({
-                "shop": shop_type, "quantities": sorted(set(counts)) or [1]
+                "shop": shop_type, "quantities": sorted(set(counts), key=int) or [1]
             })
     items = []
     for it in root.find("catalog").find("items").findall("item"):
