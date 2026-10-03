@@ -242,6 +242,10 @@ def test_bad_labels_or_modes_do_not_publish_valid_goal(challenges, family, bad, 
 
 @pytest.mark.parametrize('family', ['label', 'mode'])
 def test_duplicate_labels_and_modes_reject(challenges, family):
+    if family == 'mode':
+        record = s.load_file(s.CHALLENGES_FILE)['root'].find('challenges/Item')
+        ET.SubElement(ET.SubElement(record, 'ranks'), 'Item')
+        s.save_file(s.CHALLENGES_FILE)
     before = snapshot(challenges)
     mode = {'challenge': 'Challenge', 'mode': 'series'}
     with pytest.raises(ValueError, match='Duplicate'):
@@ -423,3 +427,97 @@ def test_split_strand_reward_uses_logical_rank_and_exact_owner(rewards):
     assert s.apply_challenge_edits([], reward_edits=[edit]) == 1
     s._files.clear()
     assert s.load_file(s.CHALLENGES_FILE)['root'].find('.//unlock').text == 'FIXTURE_UNLOCK_2'
+
+
+@pytest.fixture
+def strands(challenges):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    collection = root.find('challenges')
+    template = collection.find('Item')
+    collection.remove(template)
+    for number in [1, 2]:
+        record = ET.fromstring(ET.tostring(template))
+        record.find('name').text = f'SP_CHAL_FIXTURE_ROOT_{number}'
+        ranks = ET.SubElement(record, 'ranks')
+        ranks.append(ET.Comment(f'rank note {number}'))
+        item = ET.SubElement(ranks, 'Item')
+        ET.SubElement(item, 'RankMarker').text = str(number)
+        ET.SubElement(item, 'OpaqueRank').text = f'keep {number}'
+        collection.append(record)
+    s.save_file(s.CHALLENGES_FILE)
+    return challenges
+
+
+MODE = {'challenge': 'SP_CHAL_FIXTURE_ROOT', 'mode': 'series'}
+
+
+def test_series_merge_preserves_rank_order_comments_and_metadata(strands):
+    assert s.apply_challenge_edits([GOAL], mode_edits=[MODE]) == 2
+    s._files.clear()
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    records = root.findall('challenges/Item')
+    assert len(records) == 1
+    assert records[0].findtext('name') == MODE['challenge']
+    assert [item.findtext('RankMarker') for item in records[0].findall('ranks/Item')] == ['1', '2']
+    assert [item.findtext('OpaqueRank') for item in records[0].findall('ranks/Item')] == ['keep 1', 'keep 2']
+    assert records[0].findtext('Opaque') == 'keep'
+    assert records[0].findtext('uiInfo/challengeDescLabel') == 'Old label'
+    payload = s.data_file_path(s.CHALLENGES_FILE, 'mine').read_bytes()
+    assert b'<!--rank note 1-->' in payload and b'<!--rank note 2-->' in payload
+    assert s.load_file(s.GOALS_FILE)['root'].find('.//desiredGoal').get('value') == '12'
+
+
+@pytest.mark.parametrize('change', ['duplicate_identity', 'mixed_identity', 'different_root_data',
+                                  'different_rank_attributes', 'unknown_rank_metadata',
+                                  'missing_ranks', 'duplicate_name', 'root_tail'])
+@pytest.mark.parametrize('backups', [False, True])
+def test_unsafe_series_merge_preserves_original_strands(strands, change, backups):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    record = root.findall('challenges/Item')[1]
+    if change == 'duplicate_identity':
+        record.find('name').text = 'SP_CHAL_FIXTURE_ROOT_1'
+    elif change == 'mixed_identity':
+        record.find('name').text = MODE['challenge']
+    elif change == 'different_root_data':
+        record.find('Opaque').text = 'different data'
+    elif change == 'different_rank_attributes':
+        record.find('ranks').set('future', 'keep')
+    elif change == 'unknown_rank_metadata':
+        ET.SubElement(record.find('ranks'), 'Future').text = 'keep'
+    elif change == 'missing_ranks':
+        record.remove(record.find('ranks'))
+    elif change == 'duplicate_name':
+        ET.SubElement(record, 'name').text = 'SP_CHAL_FIXTURE_ROOT_2'
+    else:
+        record.tail = 'future text'
+    s.save_file(s.CHALLENGES_FILE)
+    if backups:
+        for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+            path = s.data_file_path(name, 'mine')
+            path.with_suffix(path.suffix + '.bak').write_bytes(b'original')
+    before = snapshot(strands)
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([GOAL], mode_edits=[MODE])
+    assert snapshot(strands) == before
+    assert s.load_file(s.CHALLENGES_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+def test_series_merge_disk_failure_retains_original_strands(strands, monkeypatch):
+    before = snapshot(strands)
+    roots = {name: s.load_file(name)['root'] for name in (s.GOALS_FILE, s.CHALLENGES_FILE)}
+    replace = s.os.replace
+    failed = False
+    target = s.data_file_path(s.CHALLENGES_FILE, 'mine')
+    def fail(source, destination):
+        nonlocal failed
+        if destination == target and not failed:
+            failed = True
+            raise OSError('injected final strand publication failure')
+        return replace(source, destination)
+    monkeypatch.setattr(s.os, 'replace', fail)
+    with pytest.raises(OSError):
+        s.apply_challenge_edits([GOAL], mode_edits=[MODE])
+    assert snapshot(strands) == before
+    assert all(s.load_file(name)['root'] is root for name, root in roots.items())

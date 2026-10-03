@@ -4696,24 +4696,34 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             group = next((records for name, records in challenge_groups(challenges_el) if name == logical), None)
             if not group:
                 raise ValueError('Unknown challenge mode target')
-            is_parallel = all(number > 0 for number, _ in group)
-            if requested == "parallel" and not is_parallel:
-                source = group[0][1]
-                source_ranks = source.findall("./ranks/Item")
-                if len(source_ranks) < 2:
-                    continue
-                insert_at = list(challenges_el).index(source)
-                challenges_el.remove(source)
-                for rank_number, source_rank in enumerate(source_ranks, 1):
-                    clone = copy.deepcopy(source)
-                    clone.find("name").text = f"{logical}_{rank_number}"
-                    clone_ranks = clone.find("ranks")
-                    for child in list(clone_ranks):
-                        clone_ranks.remove(child)
-                    clone_ranks.append(copy.deepcopy(source_rank))
-                    challenges_el.insert(insert_at + rank_number - 1, clone)
-                mode_changed += 1
-            elif requested == "series" and is_parallel:
+            numbers = [number for number, _ in group]
+            if len(numbers) != len(set(numbers)) or (0 in numbers and len(numbers) > 1):
+                raise ValueError('Challenge strand identity is ambiguous')
+            for _, record in group:
+                if len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1:
+                    raise ValueError('Challenge strand structure is missing or ambiguous')
+            is_parallel = all(number > 0 for number in numbers)
+            if is_parallel:
+                def signature(node):
+                    return (node.tag, tuple(sorted(node.attrib.items())),
+                            (node.text or '').strip(), (node.tail or '').strip(),
+                            tuple(signature(child) for child in node))
+
+                def root_metadata(record):
+                    return (tuple(sorted(record.attrib.items())), (record.text or '').strip(),
+                            tuple(signature(child) for child in record if child.tag not in {'name', 'ranks'}))
+
+                first_record = group[0][1]
+                first_ranks = first_record.find('ranks')
+                for _, record in group:
+                    ranks = record.find('ranks')
+                    name = record.find('name')
+                    if (root_metadata(record) != root_metadata(first_record) or
+                            (record.tail or '').strip() or len(name) or
+                            name.attrib != first_record.find('name').attrib or (name.tail or '').strip() or
+                            ranks.attrib != first_ranks.attrib or (ranks.text or '').strip() or (ranks.tail or '').strip() or
+                            not ranks.findall('Item') or any(child.tag not in {'Item', ET.Comment} for child in ranks)):
+                        raise ValueError('Challenge strands contain incompatible or unsupported metadata')
                 insert_at = min(list(challenges_el).index(record) for _, record in group)
                 merged = copy.deepcopy(group[0][1])
                 merged.find("name").text = logical
@@ -4721,7 +4731,7 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 for child in list(merged_ranks):
                     merged_ranks.remove(child)
                 for _, record in group:
-                    for rank in record.findall("./ranks/Item"):
+                    for rank in record.find('ranks'):
                         merged_ranks.append(copy.deepcopy(rank))
                     challenges_el.remove(record)
                 challenges_el.insert(insert_at, merged)
