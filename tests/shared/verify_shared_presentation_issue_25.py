@@ -1,21 +1,25 @@
 """Static contracts for Lexeditor issue 25 shared list presentation."""
 
 from pathlib import Path
+import re
+
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-rdr = (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
+ff8 = plugin_ui("ff8")
+rdr2 = plugin_ui("rdr2")
+rdr = plugin_ui("rdr")
 
-# Tweaks was deliberately returned to the ordinary tab run. Settings is the
-# only shared special tab; Tweaks may keep its subtle lex-tweaks-tab marker but
-# must not be grouped with Settings again.
-assert 'const isSpecialTab = tab =>' in framework and 'tab.id === "settings"' in framework
-assert '["settings", "tweaks"].includes(tab.id)' not in framework
-assert 'tab.id === "tweaks" ? "lex-tweaks-tab"' in framework
+# The live request requires Tweaks last and distinct. The ordinary-fill
+# assertion contradicted that request and the later navigation regression.
+_special = framework.split('const isSpecialTab = tab =>', 1)[1].split(';', 1)[0]
+assert 'tab.id === "settings"' in _special and 'tab.id === "tweaks"' in _special
+assert 'const rank = tab => tab.id === "tweaks" ? 2' in framework
+assert 'isSpecialTab(tab) ? "lex-settings-tab"' in framework
+assert '"lex-tweaks-tab"' in framework
 assert 'localeCompare' in framework
 assert 'lex-settings-tab' in framework and '.lex-settings-tab' in css
 for source in (ff8, rdr, rdr2):
@@ -23,7 +27,9 @@ for source in (ff8, rdr, rdr2):
     assert '["settings","Settings"]' not in source and 'id:"settings",label:"Settings"' not in source
 assert 'lex-page-summary' in framework and '${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}' in framework
 assert 'of ${formatNumber(total)} ${noun}' not in framework
-assert 'main{flex:1;min-height:0;height:auto' in ff8
+_main = re.search(r'^main\s*\{([^}]+)', css, re.M)[1]
+assert 'flex:1' in _main and 'min-height:0' in _main
+assert re.search(r'(?:^|;)\s*height\s*:', _main) is None, 'main must retain natural flex sizing'
 assert '--lex-fitted-row-height:36px' not in ff8
 assert 'function sharedDetail' in ff8 and 'identity:el("span",{class:"lex-pinnable-property"}' in ff8
 assert 'Character ID' not in ff8 and 'Item ID' not in ff8
@@ -35,7 +41,7 @@ assert 'root.style.setProperty("--lex-pager-height"' in framework
 # shared value into `fittedHeight` - failed a check whose behaviour was intact.
 _resize = framework.split("resize: (height, measurement) =>", 1)
 assert len(_resize) == 2, "the fitted page no longer has a resize hook"
-_body = _resize[1][:400]
+_body = _resize[1].split('change: nextSize =>', 1)[0]
 assert "measurement?.full" in _body and "${height}px" in _body, (
     "the fitted height is no longer derived from a full measurement")
 assert "masterNode.style.height" in _body and "detailNode.style.height" in _body, (
