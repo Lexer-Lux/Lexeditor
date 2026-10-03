@@ -282,6 +282,16 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                     control.fill(invalid)
                     error = page.evaluate("async()=>{try{await save();return '';}catch(error){return error.message;}}")
                     assert label in error, (label, error)
+                    if invalid == '18446744073709551616':
+                        page.get_by_role('button', name='Save changes', exact=True).click()
+                        warning = page.get_by_text('Correct Research unit count before saving.', exact=True)
+                        warning.wait_for(timeout=3000)
+                        page.wait_for_function('document.body.inert===false')
+                        assert not errors, errors
+                        page.wait_for_function('node=>Number(getComputedStyle(node).opacity)>=.99', arg=warning.element_handle())
+                        page.screenshot(path=str(OUT / 'factorio-invalid-save.png'))
+                        warning.click()
+                        warning.wait_for(state='detached')
                     assert control.input_value() == invalid
                     assert page.evaluate('dirtyCount()') == 4
                     assert (project / 'overrides.json').read_bytes() == before_invalid_save

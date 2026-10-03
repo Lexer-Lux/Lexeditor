@@ -803,7 +803,8 @@ async function save() {
     const valid = input.lexValidateNumber ? input.lexValidateNumber()
       : input.closest('.lex-exact-integer')?.lexValidateInteger?.() ?? input.checkValidity();
     if (!valid) {
-      input.reportValidity();
+      // The shell releases its busy/inert state before the next frame.
+      requestAnimationFrame(() => { if (input.isConnected) input.reportValidity(); });
       throw new Error(`Correct ${input.getAttribute('aria-label') || 'the numeric value'} before saving.`);
     }
   }

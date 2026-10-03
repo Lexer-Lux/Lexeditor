@@ -7639,6 +7639,7 @@ ${contents.path}`});
       if (saveBusy || save.disabled) return;
       setSaveBusy(true);
       try { await options.save?.(); playThemeSound("save"); }
+      catch (error) { showToast(error?.message || "Save failed.", true); }
       finally { setSaveBusy(false); }
     };
     save.oncontextmenu = event => {
