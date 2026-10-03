@@ -31,8 +31,10 @@ def run():
     engine.mem_map(0x530000, 0x10000)
     engine.mem_write(0x530000, image[0x530000-base:0x540000-base])
     engine.mem_map(0x1DCD000, 0x3000)
+    engine.mem_map(0x1CFE000, 0x2000)
     engine.mem_map(0x30000000, 0x10000)
     counter = [0]
+    forced_random = []
 
     def random_stub(uc, address, size, _):
         if address != 0x534AA0:
@@ -40,26 +42,56 @@ def run():
         # A deterministic sequence covers level/card combinations without
         # replacing the hand builder's division, filtering or duplicate logic.
         counter[0] = (counter[0] * 1664525 + 1013904223) & 0xFFFFFFFF
-        uc.reg_write(UC_X86_REG_EAX, counter[0] >> 16)
+        uc.reg_write(UC_X86_REG_EAX, forced_random.pop(0) if forced_random else counter[0] >> 16)
         stack = uc.reg_read(UC_X86_REG_ESP)
         target, = struct.unpack("<I", uc.mem_read(stack, 4))
         uc.reg_write(UC_X86_REG_ESP, stack + 4)
         uc.reg_write(UC_X86_REG_EIP, target)
 
     engine.hook_add(UC_HOOK_CODE, random_stub)
-    for mask in range(128):
-        engine.mem_write(0x1DCD7B0, struct.pack("<I", mask))
+    def hand(mask, chance=0, owner=0):
+        engine.mem_write(0x1DCD7B0, struct.pack("<I", mask | chance << 8))
         engine.mem_write(0x1DCD76C, bytes(10))
         stack = 0x3000FF00
-        engine.mem_write(stack, struct.pack("<III", 0x30000000, 1, 0))
+        engine.mem_write(stack, struct.pack("<III", 0x30000000, 1, owner))
         engine.reg_write(UC_X86_REG_ESP, stack)
         engine.emu_start(0x537640, 0x30000000, count=100000)
         assert engine.reg_read(UC_X86_REG_EIP) == 0x30000000
-        hand = list(engine.mem_read(0x1DCD771, 5))
+        return list(engine.mem_read(0x1DCD771, 5))
+
+    for mask in range(128):
+        cards = hand(mask)
         effective = mask or 1
-        assert len(set(hand)) == 5, (mask, hand)
-        assert all(card != 47 and card < 77 and effective & (1 << (card // 11)) for card in hand), (mask, hand)
+        assert len(set(cards)) == 5, (mask, cards)
+        assert all(card != 47 and card < 77 and effective & (1 << (card // 11)) for card in cards), (mask, cards)
     print("PASS native hand generation: all 128 level masks, zero fallback, five distinct cards, PuPu excluded")
+
+    # These are controlled match-time ownership bytes, not a claimed static
+    # deck table. Execute the game's actual comparison for every rare card
+    # and every byte-valued owner; keep the source and ownership state intact.
+    for owner in range(256):
+        for rare in range(33):
+            ownership = bytearray([owner ^ 1] * 33)
+            ownership[rare] = owner
+            engine.mem_write(0x1CFEF85, bytes(ownership))
+            cards = hand(1, 100, owner)
+            if owner:
+                assert cards[0] == rare + 77, (owner, rare, cards)
+                assert len(set(cards)) == 5 and all(card < 11 for card in cards[1:]), cards
+            else:
+                assert all(card < 11 for card in cards), cards
+            assert bytes(engine.mem_read(0x1CFEF85, 33)) == bytes(ownership)
+        assert all(card < 11 for card in hand(1, 0, owner))
+        assert all(card < 11 for card in hand(1, 100, 0))
+        assert all(card < 11 for card in hand(1, 100, owner ^ 2))
+    print("PASS native rare-card selection: all 33 cards and 256 ownership values; zero chance, deck zero and mismatched ownership excluded")
+
+    engine.mem_write(0x1CFEF85, bytes([7] * 33))
+    forced_random[:] = [99, 49, 50, 0, 0, 0]
+    assert hand(1, 100, 7) == [77, 78, 80, 81, 82]
+    assert not forced_random
+    assert bytes(engine.mem_read(0x1CFEF85, 33)) == bytes([7] * 33)
+    print("PASS native rare-card order and probability: ascending IDs, strict percentage boundary, half the original chance after the first success, at most five cards")
 
 
 if __name__ == "__main__":

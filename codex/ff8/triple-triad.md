@@ -55,6 +55,29 @@ between opponents that pass the same deck ID. A pool preview must therefore
 use the selected CARDGAME call's level mask. The exact hand and available rare
 cards depend on match-time state, so a static editor must not invent them.
 
+## Rare-card ownership and selection
+
+The native hand builder receives the side and deck ID. Deck zero skips rare
+selection. For a nonzero deck, it compares all 33 ownership bytes at
+`0x1CFEF85` against that ID. Index 0 is card 77, and index 32 is card 109.
+These bytes share the card inventory array at `0x1CFEF38`; rare cards use an
+owner byte where common cards use a count/seen byte. They are mutable save
+state, not an executable table of five-card decks.
+
+Matching rare cards are considered in ascending card-ID order. A candidate
+succeeds when the native RNG result modulo 100 is less than the rare-card
+chance. After the first success, each remaining candidate uses half the
+original chance, rounded down; the chance does not halve again on each
+success. Selection stops at five cards. The common-card builder fills any
+remaining slots.
+
+`verify_ff8_card_hand_levels.py` executes the actual supported routine for all
+33 rare cards and all 256 ownership byte values. It checks zero chance,
+deck zero, mismatched ownership, unchanged ownership state and the strict
+percentage boundary. A controlled multi-card case proves the ordering,
+five-card limit and half-chance rule. Only RNG is replaced. This is native
+execution evidence, not a live match acceptance result.
+
 An argument can be a literal or a variable reference. The latter selects a
 variable whose value is read during play; it is not the current match value.
 Edits preserve the original argument opcode and unrelated script bytes.

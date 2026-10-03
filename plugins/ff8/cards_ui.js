@@ -351,7 +351,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const decks=cardDecks(),query=deckView.query.trim().toLowerCase();
     const rows=decks.filter(deck=>!query||`${deck.id} ${deck.members.map(member=>member.name).join(' ')}`.toLowerCase().includes(query));
     const detail=deck=>detailPanel({title:`Deck ${deck.id}`,identity:recordId(deck.id),
-      help:"A deck is the number a CARDGAME call names: it identifies the opponent's rare-card ownership, and several opponents can share one. Which rare cards a deck holds is set in the game's program and is not read yet.",
+      help:"Several opponents can share this deck number. Rare cards belong to a deck in your save and can change owners during play. Common cards come from each opponent's allowed levels. Deck zero uses no rare cards. This page does not read your save's card ownership yet.",
       body:[detailSection({title:'OPPONENTS',help:infoHelp('Every opponent whose script names this deck. Open one to change its settings or its deck.'),
         body:[columnList({rows:deck.members,key:member=>member.key,fill:true,localSort:false,class:'ff8-record-list',
           'aria-label':`Opponents using deck ${deck.id}`,template:'minmax(140px,1fr) minmax(140px,1fr)',
