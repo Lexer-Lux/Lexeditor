@@ -10,6 +10,7 @@ on:
       - 'plugins/ff8/ffnx_gameplay_extensions/**'
       - 'plugins/ff8/ffnx_status_bars/**'
       - 'tools/prepare_ff8_native_build.py'
+      - 'tools/prepare_ff8_native_dependencies.py'
       - 'tools/ff8_native_workflow.py'
       - 'plugins/ff8/ffnx_issue_51/**'
       - 'plugins/ff8/ffnx_toasts/**'
@@ -59,6 +60,12 @@ jobs:
         run: |
           $free = (Get-PSDrive D).Free
           if ($free -lt 25GB) { throw "FFNx needs about 16 GB plus dependency cache; less than 25 GB is free." }
+      - name: Prepare pinned x264 Git transport overlay
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python editor/tools/prepare_ff8_native_dependencies.py ffnx --overlay dependency-ports --provenance candidate/DEPENDENCIES.txt
       - uses: actions/cache/restore@v4
         with:
           path: D:\vcpkg-cache
@@ -84,7 +91,7 @@ jobs:
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
           cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
           Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
-          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
+          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" "-DVCPKG_OVERLAY_PORTS=$env:GITHUB_WORKSPACE/dependency-ports" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
           foreach ($gate in @('FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME','FFNX_LEXEDITOR_LIVE_CONDITIONS')) {
             if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
           }
