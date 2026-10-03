@@ -3650,6 +3650,8 @@ body:has(.lex-data-map-table) #main {
 .lex-global-settings > :is(.lex-global-settings-head,.lex-settings-columns,.lex-dialog-status,.lex-dialog-actions) {
   grid-column: 1 / -1;
 }
+.lex-global-settings > .lex-dialog-status:empty { display:none; }
+.lex-global-settings > .lex-dialog-actions { margin-top:0; }
 
   .settings-section { width:100%;
                       margin:0; min-width:0; border:1px solid var(--lex-border); background:var(--lex-panel); }
