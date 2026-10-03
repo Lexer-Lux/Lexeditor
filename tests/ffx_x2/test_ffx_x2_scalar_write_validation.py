@@ -11,7 +11,10 @@ from test_ffx_x2_ffx2_abilities import _table as x2_table, _record as x2_record
 
 @pytest.fixture(params=['ctb', 'auto', 'x2', *ffx_commands.TABLES])
 def codec(request):
-    kind = request.param
+    return authored_codec(request.param)
+
+
+def authored_codec(kind):
     if kind == 'ctb':
         raw = ctb_table([(10, 3), (20, 7)])
         return raw, ctb_base.apply_edits, dict(id=0, tickSpeed=255, icvBonus=0), {0x14: b'\xff\0'}
