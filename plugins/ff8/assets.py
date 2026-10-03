@@ -1299,8 +1299,8 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                           "Empty placeholder weapon file shipped by the game.")
         else:
             name, note, _enemy = _model_identity(filename, "unmapped")
-            note = ("These bytes are not a battle-model container; the file "
-                    "can only be replaced or reverted as a whole.")
+            note = ("This file's contents are not decoded. It has no preview "
+                    "here; only whole-file replacement or reversion is supported.")
         row.update(modelKind="locked" if info["sizeBytes"] else "empty",
                    name=name, sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"], sha256=info["sha256"],

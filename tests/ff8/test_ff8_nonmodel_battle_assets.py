@@ -110,3 +110,14 @@ def test_formation_file_keeps_its_editor_link(monkeypatch, tmp_path):
     assert row['modelKind'] == 'formations'
     assert row['editor'] == 'encounters'
     assert row['counts'] is None
+
+
+def test_unsupported_effect_does_not_claim_it_is_not_a_model(monkeypatch, tmp_path):
+    target = tmp_path / 'mag184_f.dat'
+    target.write_bytes(struct.pack('<I', 125))
+    monkeypatch.setattr(assets, '_battle_path', lambda *args: target)
+    row = assets._model_row(target.name, 'vanilla', {}, set())
+    assert row['modelKind'] == 'locked'
+    assert row['counts'] is None and row['tims'] == []
+    assert "not decoded" in row['note']
+    assert "not a battle-model" not in row['note']

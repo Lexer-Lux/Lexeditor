@@ -56,6 +56,7 @@ GF
 
 Models
 - models: 90% of things here have no preview, say "locked", and have basically nothing in their details panel. what gives?
+    > status 2026-10-03: Audited the installed vanilla inventory: 853 battle files, with 48 still unsupported. Current decoding recognizes monsters, stages, bodies, weapons, summon/effect meshes, textures, sounds and other resources; non-model resources do not all have a 3D preview. The 4-byte unsupported files hold nonzero numeric values, so they were not relabelled as empty placeholders. Decode failure now says the contents are not decoded instead of claiming they cannot be a model; eight focused resource checks pass. Remaining format identification, preview coverage and rendered acceptance stay open.
 
 SFX / Text
 
