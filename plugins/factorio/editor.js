@@ -127,7 +127,6 @@ function inputNumber(value, options, change) {
         event.target.reportValidity();
         return;
       }
-      if (number === Number(value)) return;
       void change(number);
     },
   });
@@ -174,6 +173,19 @@ function rowChanges(kind, row) {
 }
 
 let rowEditQueue = Promise.resolve();
+let rowRenderPending = false;
+function flushRowRender() {
+  if (!rowRenderPending) return;
+  const main = document.querySelector("#main"), active = document.activeElement;
+  if (main.contains(active) && active.matches("input,select,textarea,[contenteditable=true]") &&
+      !active.disabled && !active.readOnly) return;
+  rowRenderPending = false;
+  void render();
+}
+function requestRowRender() {
+  rowRenderPending = true;
+  flushRowRender();
+}
 function commitRow(kind, row) {
   const apply = () => applyRowEdit(kind, row);
   rowEditQueue = rowEditQueue.then(apply, apply);
@@ -183,6 +195,12 @@ function commitRow(kind, row) {
 async function applyRowEdit(kind, row) {
   try {
     const current = state.data[kind].find(value => value.name === row.name) || row;
+    if (row._changedKey) {
+      const key = row._changedKey;
+      const unchanged = key === "unitCount" ? String(row[key]) === String(current[key])
+        : JSON.stringify(row[key]) === JSON.stringify(current[key]);
+      if (unchanged) return;
+    }
     const candidate = row._changedKey ? changedCopy(current, row._changedKey, row[row._changedKey]) : row;
     const result = await jsonPost("/api/edit", {
       kind, name: row.name, changes: rowChanges(kind, candidate),
@@ -191,11 +209,11 @@ async function applyRowEdit(kind, row) {
     const index = rows.findIndex(value => value.name === row.name);
     if (index >= 0) rows[index] = result.row;
     state.config.dirty = result.dirty;
-    render();
+    requestRowRender();
     refreshShell();
   } catch (error) {
     LexeditorUI.showToast?.(error.message, true);
-    render();
+    requestRowRender();
   }
 }
 
@@ -322,7 +340,7 @@ function technologyPanel(row) {
       : unitField(LexeditorUI.exactIntegerInput({value:row.unitCount,
           label:"Research unit count", min:1, max:UINT64_MAX,
           validate:value=>researchCountIssue(value,row.unitCount),
-          change:value=>{if(value!==String(row.unitCount))void commitRow("technologies",changedCopy(row,"unitCount",value));}
+          change:value=>{void commitRow("technologies",changedCopy(row,"unitCount",value));}
         }), "units", {boxed:true});
   const time = row.unitTime === null || row.unitTime === undefined
     ? readonlyField("—")
@@ -730,6 +748,7 @@ async function renderDataMap() {
 }
 
 async function render() {
+  rowRenderPending = false;
   const main = document.querySelector("#main");
   if (!state.error && state.tab === "datamap" && !state.datamap) {
     main.replaceChildren(loadingState("Loading Data Map…"));
@@ -865,6 +884,7 @@ async function boot() {
   }
 }
 
+document.querySelector("#main").addEventListener("focusout", () => requestAnimationFrame(flushRowRender));
 document.querySelector("#main").replaceChildren(loadingState());
 refreshShell();
 void boot();

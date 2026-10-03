@@ -215,12 +215,51 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 tech_search.fill("automation")
                 page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(120)
+                # Keep the count response pending until the reader has begun
+                # typing in the next field. It must not unmount that draft.
+                page.evaluate('''()=>{
+                  window.factorioOriginalFetch=window.fetch;
+                  window.fetch=async(...args)=>{
+                    const response=await factorioOriginalFetch(...args);
+                    if(String(args[0])==='/api/edit'&&!window.factorioHeldOnce){
+                      window.factorioHeldOnce=true;
+                      await new Promise(resolve=>window.releaseFactorioEdit=resolve);
+                    }
+                    return response;
+                  };
+                }''')
                 count = page.get_by_label("Research unit count", exact=True)
                 count.fill("25")
                 count.blur()
+                page.wait_for_function("typeof window.releaseFactorioEdit==='function'")
                 unit_time = page.get_by_label("Research unit time", exact=True)
+                time_control = unit_time.element_handle()
                 unit_time.fill("10")
-                unit_time.blur()
+                page.evaluate("()=>{window.fetch=factorioOriginalFetch;releaseFactorioEdit();}")
+                page.evaluate("rowEditQueue")
+                assert time_control.evaluate("input=>input.isConnected&&document.activeElement===input&&input.value==='10'"), "Count response discarded the active unit-time draft"
+                page.screenshot(path=str(OUT / 'factorio-active-research-draft.png'))
+                count.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 10
+                # Retained controls must compare with current state, so going
+                # back to their initial value still submits a real reversal.
+                unit_time.fill("15")
+                count.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 15
+                count.fill("10")
+                unit_time.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitCount") == 10
+                unit_time.fill("10")
+                count.focus()
+                count.fill("25")
+                count.blur()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 10
+                page.wait_for_function("rowRenderPending===false")
+                assert not time_control.evaluate("input=>input.isConnected"), "Completed edits were never redrawn after leaving the control"
                 page.wait_for_function("dirtyCount() === 3")
 
                 tech_search.fill("automation-2")
