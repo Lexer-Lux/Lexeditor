@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+from core.numeric_values import integer_value
 
 from . import kernel_text, paths, runtime_layout, world_geometry, world_textures
 from .fs_archive import FsArchive
@@ -557,10 +558,7 @@ def rows(dataset: str = "current") -> dict:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    try:
-        value = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{label} must be an integer") from error
+    value = integer_value(value, label)
     if not minimum <= value <= maximum:
         raise ValueError(f"{label} must be {minimum} to {maximum}")
     return value
@@ -584,7 +582,7 @@ def apply_rail_edits(data: bytes | bytearray, edits: list[dict]) -> bytearray:
         offset = track_id * RAIL_BLOCK_SIZE
         struct.pack_into("<II", raw, offset + 4, stop1, stop2)
         for point_id, point in enumerate(points):
-            if not isinstance(point, dict) or int(point.get("id", -1)) != point_id:
+            if not isinstance(point, dict) or integer_value(point.get("id", -1), "Rail keypoint ID") != point_id:
                 raise ValueError(f"Rail track {track_id} keypoints must stay in order")
             point_offset = offset + RAIL_HEADER_SIZE + point_id * RAIL_POINT_SIZE
             for component_offset, key, label in (
