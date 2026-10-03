@@ -203,6 +203,12 @@
     const next=/\bweight\([^)]+\)/.test(stats)?stats.replace(/\bweight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
     setItemField(item,"stats",next);const control=document.querySelector('[data-lex-property="stats"] textarea');if(control)control.value=next;
   }
+  function setItemOtherStats(item,value){
+    const calls=WarbandFieldControls.parseCalls(String(effectiveItemField(item,"stats")))||[];
+    const weights=WarbandFieldControls.callExpression(calls.filter(call=>call.name==="weight"));
+    setItemField(item,"stats",[weights,value].filter(part=>part&&part!=="0").join("|")||"0");
+    render();
+  }
   const ITEM_HELP={
     id:"Stable Module System identifier referenced by troops, shops, scripts, and other records. It is read-only because Lexeditor does not rewrite every reference when an item ID changes.",
     name:"Player-facing item name compiled into the module's item data.",
@@ -262,7 +268,7 @@
       body.push(detailGroup({title:"Stats",help:LexeditorUI.infoHelp("One row per stat macro in this item's stats field. Weight has its own row above, so it is not repeated here."),
         body:WarbandFieldControls.statRows({calls:named,macros:(state.items?.choices?.stats||[]).filter(name=>name!=="weight"),readOnly,
           arguments:state.items?.choices?.statArguments||{},
-          apply:value=>{setItemField(item,"stats",value||"0");render();}})}));
+          apply:value=>setItemOtherStats(item,value)})}));
     }else{
       handled.push("stats");
       body.push(detailGroup({title:"Stats",body:[detailField({label:"Stat macros",property:"stats",dataType:"EXPR",description:ITEM_HELP.stats,
