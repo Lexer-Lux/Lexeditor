@@ -53,6 +53,7 @@ def service(tmp_path, monkeypatch):
         except HTTPError as error:
             return error.code, json.load(error)
 
+    request.base_url = f'http://127.0.0.1:{http.server_address[1]}'
     yield project, baseline, request
     http.shutdown()
     http.server_close()
