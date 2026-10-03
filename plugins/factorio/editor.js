@@ -801,7 +801,7 @@ async function save() {
   for (const input of document.querySelectorAll('#main input[type="number"],#main input[data-lex-exact-integer]')) {
     if (input.disabled || input.readOnly || !input.getClientRects().length) continue;
     const valid = input.lexValidateNumber ? input.lexValidateNumber()
-      : input.closest('.lex-exact-integer')?.lexValidateInteger?.() ?? input.checkValidity();
+      : input.lexValidateInteger?.() ?? input.checkValidity();
     if (!valid) {
       // The shell releases its busy/inert state before the next frame.
       requestAnimationFrame(() => { if (input.isConnected) input.reportValidity(); });

@@ -989,6 +989,7 @@
     root.select = () => input.select();
     root.lexCommitInteger = commit;
     root.lexValidateInteger = () => validate() !== null;
+    input.lexValidateInteger = root.lexValidateInteger;
     validate();
     return root;
   };
