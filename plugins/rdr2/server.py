@@ -931,10 +931,15 @@ def _commit_file_outputs(outputs, label):
     """Stage all bytes, then replace them with rollback on an I/O failure."""
     if len({target.resolve() for target, _ in outputs}) != len(outputs):
         raise ValueError(f"{label} outputs must have distinct paths")
+    for parent in {target.parent for target, _ in outputs}:
+        pending = next(parent.glob('.lexeditor-save-recovery-*'), None)
+        if pending is not None:
+            raise OSError(f"{label} save is blocked by unresolved recovery at {pending}. Restore the recorded original state before saving again")
     original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
     timestamps = {target: (target.stat().st_atime_ns, target.stat().st_mtime_ns)
                   for target, data in original.items() if data is not None}
     temporary, committed, created_dirs = [], [], []
+    recovery, retained = {}, set()
     succeeded = False
     def stage(target, data):
         missing, parent = [], target.parent
@@ -951,6 +956,18 @@ def _commit_file_outputs(outputs, label):
         return temp_path
     try:
         staged = [(target, stage(target, data)) for target, data in outputs]
+        # Originals must already be on disk before any live file is replaced.
+        # One fixed folder per target bounds recovery storage and blocks retries.
+        for target, _ in outputs:
+            folder = target.parent / ('.lexeditor-save-recovery-' + target.name)
+            folder.mkdir()
+            recovery[target] = folder
+            (folder / 'state.json').write_text(json.dumps({
+                'target': str(target.resolve()), 'existed': original[target] is not None,
+                'timestamps': timestamps.get(target),
+            }), encoding='utf-8')
+            if original[target] is not None:
+                (folder / 'original').write_bytes(original[target])
         for target, temp_path in staged:
             temp_path.replace(target)
             committed.append(target)
@@ -965,11 +982,17 @@ def _commit_file_outputs(outputs, label):
                     stage(target, original[target]).replace(target)
                     os.utime(target, ns=timestamps[target])
             except Exception as rollback_error:
-                failures.append(f"{target.name}: {rollback_error}")
+                retained.add(target)
+                failures.append(f"{target.name}: {rollback_error}; original state retained at {recovery[target]}")
         if failures:
             raise RuntimeError(f"{label} save failed: {error}; rollback failed: {'; '.join(failures)}") from error
         raise
     finally:
+        for target, folder in recovery.items():
+            if target not in retained:
+                (folder / 'original').unlink(missing_ok=True)
+                (folder / 'state.json').unlink(missing_ok=True)
+                folder.rmdir()
         for temp_path in temporary:
             temp_path.unlink(missing_ok=True)
         if not succeeded:
