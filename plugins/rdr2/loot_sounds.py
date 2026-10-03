@@ -22,8 +22,13 @@ def read(text):
 
 
 def apply(text, edits):
+    if not isinstance(edits,list): raise ValueError('Pickup sound edits must be a list')
     model=read(text);rows={row['id']:row for row in model['rows']}; changes={}
     for edit in edits:
+        if not isinstance(edit,dict) or set(edit)!={'id','value'}:
+            raise ValueError('Each pickup sound edit requires only id and value')
+        if not isinstance(edit['id'],str) or not isinstance(edit['value'],str):
+            raise ValueError('Pickup sound identities and choices must be text')
         row=rows.get(edit.get('id'))
         if row is None: raise ValueError('Unknown pickup sound mapping')
         value=edit.get('value')

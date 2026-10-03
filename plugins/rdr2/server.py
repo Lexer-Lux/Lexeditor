@@ -4732,7 +4732,9 @@ def get_loot_sounds(ds="mine"):
 
 def save_loot_sounds(edits):
     import shutil
+    if not isinstance(edits,list): raise ValueError('Pickup sound edits must be a list')
     if not edits: return 0
+    if DATASETS['mine'].get('readonly'): raise ValueError('This dataset is read-only')
     target = loot_sounds_path("mine")
     # Preserve unresolved recovery from this or an earlier version. No retry may
     # create another copy or report success from partially installed data.
