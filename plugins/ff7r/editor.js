@@ -1,7 +1,7 @@
   "use strict";
   const {el,columnList,columnPreferences,detailPanel,detailSection,detailNote,detailField,readonlyField,infoHelp,infoIcon,panelLayout,clone,EditHistory}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
-  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload;try{payload=await response.json()}catch(_error){throw new Error(`${path}: Invalid JSON response`)}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
   const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"tag",dir:1},
     tab:"misc",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
@@ -412,11 +412,12 @@
     // Engine Config edits Engine.ini directly and needs no catalog entry, so
     // it stays usable even when the catalog yields no tweak groups.
     if(!list.length)return LexeditorUI.stack(
-      loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
+      emptyPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
       enginePanel.element());
-    if(!state.tweaks||(!Object.keys(state.tweaks).length&&state.tweaksPending))
+    if(!Object.keys(state.tweaks||{}).length&&state.tweaksPending>0)
       return loadingPanel("Loading tweaks",`Reading ${state.tweaksPending} tweak group${state.tweaksPending===1?"":"s"}…`);
-    if(state.tweaksError&&!Object.keys(state.tweaks).length)return errorPanel(state.tweaksError);
+    if(state.tweaksError&&!Object.keys(state.tweaks||{}).length)return errorPanel(state.tweaksError);
+    if(!state.tweaks)return emptyPanel("Tweaks","No tweak data has been loaded.");
     const cards=list.map(item=>tweakCard(state.tweaks[item.asset])).filter(Boolean);
     if(state.tweaksPending)cards.push(el("section",{class:"ff7r-card ff7r-tweaks-pending"},
       el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
@@ -600,9 +601,9 @@
   function curatedPanel(spec){
     if(state.busy)return loadingPanel(spec.label,`Reading ${spec.basename}…`);
     if(state.error&&!state.data)return errorPanel(state.error);
-    if(!curatedAsset(spec))return loadingPanel(spec.label,
+    if(!curatedAsset(spec))return emptyPanel(spec.label,
       `The installed FF7R archives do not contain a ${spec.basename} table.`);
-    if(!state.data)return loadingPanel(spec.label,"Open this tab to read the table.");
+    if(!state.data)return emptyPanel(spec.label,"No table has been loaded.");
     // Say which of the game's tables this is when there is more than one. The
     // reader was seeing one field map's enemies with nothing on screen to say
     // that seven more tables of the same name exist.
@@ -667,7 +668,7 @@
   function economyViewRows(){const q=state.economyQuery.toLocaleLowerCase(),buy=property("BuyValue"),sale=property("SaleValue"),maxCount=property("MaxCount");return records().map(record=>{const semantic=economySemanticRow(record.tag);return{record,tag:record.tag,name:semantic?.name||record.tag,buy:buy?record.values[buy.name]:"—",sale:sale?record.values[sale.name]:"—",maxCount:maxCount?record.values[maxCount.name]:"—"}}).filter(row=>!q||`${row.tag} ${row.name} ${row.buy} ${row.sale} ${row.maxCount}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.economySort.key],b[state.economySort.key])*state.economySort.dir)}
   function economyTablePanel(){const rows=economyViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.economySort,sort:key=>{state.economySort=state.economySort.key===key?{key,dir:-state.economySort.dir}:{key,dir:1};render()},columnPreferences:economyPrefs,columns:economyColumns,class:"ff7r-table","aria-label":"FF7 Remake item prices and carry capacity"})}
   function economyRecordPanel(row=selectedRecord()){
-    const table=currentEconomyTable();if(!row||!table)return loadingPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:economyPrefs.pinButton("tag","ID")})];
+    const table=currentEconomyTable();if(!row||!table)return emptyPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:economyPrefs.pinButton("tag","ID")})];
     const specs=[["BuyValue","BUY PRICE"],["SaleValue","SELL PRICE"],["CanSale","CAN SELL"],["MaxCount","MAX CARRY"]];for(const[name,label]of specs){const prop=property(name);if(prop){let help=null;if(name==="BuyValue")help=infoHelp("The installed FF7R table exposes BuyValue directly; this control writes that same DataObject field.");else if(name==="MaxCount")help=infoHelp("FF7R's Item/Equipment schema exposes MaxCount as the inventory carry/stack cap; this control writes that authoritative DataObject field.");fields.push(detailField({label,control:propertyControl(row,prop),dataType:semanticType(prop),min:name==="CanSale"?undefined:semanticMin(prop),max:name==="CanSale"?undefined:semanticMax(prop),help}))}}
     if(semantic?.textId)fields.splice(1,0,detailField({label:"TEXT ID",control:readonlyField(semantic.textId)}));
     // The description is the same text resource the name comes from, so it is
@@ -734,7 +735,7 @@
     if(match)state.textSelected=match.id;
     render();
   }
-  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return LexeditorUI.stack(pagedTable({id:`economy-${state.tab}`,noun:"items",
+  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return emptyPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return emptyPanel("Item settings","No item tables have been loaded.");if(state.data?.asset!==table.asset)return state.error?errorPanel(state.error):emptyPanel("Item table unavailable","The selected item table has not been loaded.");return LexeditorUI.stack(pagedTable({id:`economy-${state.tab}`,noun:"items",
       modOnly:modOnlySpec(row=>row.record),
       rows:economyViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -770,11 +771,11 @@
     return infoHelp("The installed table exposes this array without a matching percent array, so Lexeditor cannot tell whether the number is a count or a steal rate. It is shown and written as the raw "+spec.quantityProperty+" value.");
   }
   function lootRecordPanel(row=selectedRecord()){
-    if(!row)return loadingPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",help:infoHelp("These drops live in the game's BattleItemPossession table, one row per battle. The Data ID is that row's key."),body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
+    if(!row)return emptyPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",help:infoHelp("These drops live in the game's BattleItemPossession table, one row per battle. The Data ID is that row's key."),body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
     const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailNote("This drop array is empty on this record, so there are no slots to edit.")];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
     return detailPanel({className:"ff7r-detail",title:row.tag||"Battle",body:sections});
   }
-  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return LexeditorUI.stack(pagedTable({id:"loot",noun:"enemies",
+  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return emptyPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return emptyPanel("Enemy loot","No loot table has been loaded.");if(state.data?.asset!==state.loot.asset)return state.error?errorPanel(state.error):emptyPanel("Enemy loot unavailable","The selected loot table has not been loaded.");return LexeditorUI.stack(pagedTable({id:"loot",noun:"enemies",
       modOnly:modOnlySpec(row=>row.record),
       rows:lootViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -829,7 +830,7 @@
     return detailPanel({className:"ff7r-detail",title:row.key||"Unnamed text entry",meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
-  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
+  function textPanel(){if(!textAssets().length)return emptyPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);if(!state.textPacks)return emptyPanel("Text resources","No localized text resources have been loaded.");return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
       filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},
@@ -841,6 +842,7 @@
 
   // The shared, themed loading state; the title says what is being read.
   function loadingPanel(title,message){return LexeditorUI.loadingPanel({className:"ff7r-detail",label:`${title}: ${message}`})}
+  function emptyPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[LexeditorUI.notice({message})]})}
   function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:LexeditorUI.notice({tone:"warning",message})})]})]})}
   function openMapRow(row){
     const asset=row.target||row.view;if(!asset)return;

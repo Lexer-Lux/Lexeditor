@@ -1,5 +1,7 @@
 """Dataset failures identify the failed request and do not publish a partial project."""
 import threading
+import os
+from pathlib import Path
 from playwright.sync_api import sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
 from plugins.project_zomboid import server
 from verify_project_zomboid_ui import write_fixture
@@ -72,25 +74,39 @@ def test_failed_and_malformed_inventory_response_then_real_reload(tmp_path, monk
                 expect_error('/api/zedscript: Inventory temporarily unavailable')
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
+                for target in ('items','metadata','scripts'):
+                    page.locator(f'nav button[data-tab="{target}"]').click()
+                    expect_error('/api/zedscript: Inventory temporarily unavailable')
+                    assert page.locator('#main .lex-panel-loading').count() == 0
+                if folder := os.environ.get('LEXEDITOR_NAV_FAILURE_SHOTS'):
+                    page.screenshot(path=str(Path(folder)/'zomboid-startup-failure.png'))
                 page.unroute(url + '/api/zedscript')
                 clear_diagnostics()
-                page.reload()
+                page.get_by_role('button',name='Retry',exact=True).click()
                 expect_recovery('HTTP-error reload')
+                assert page.evaluate('tab') == 'scripts'
+                assert not page_errors, diagnostics()
                 page.route(url + '/api/zedscript', lambda route: route.fulfill(status=200,
                            body='not JSON', content_type='application/json'))
                 clear_diagnostics()
                 page.reload()
                 expect_error('/api/zedscript: Invalid JSON response')
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
+                page.locator('nav button[data-tab="items"]').click()
+                expect_error('/api/zedscript: Invalid JSON response')
+                assert page.locator('#main .lex-panel-loading').count() == 0
                 page.unroute(url + '/api/zedscript')
                 page.route(url + '/api/zedscript', lambda route: route.abort('failed'))
                 clear_diagnostics()
                 page.reload()
                 expect_error('/api/zedscript:', contains=True)
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
+                page.locator('nav button[data-tab="metadata"]').click()
+                expect_error('/api/zedscript:', contains=True)
+                assert page.locator('#main .lex-panel-loading').count() == 0
                 page.unroute(url + '/api/zedscript')
                 clear_diagnostics()
-                page.reload()
+                page.get_by_role('button',name='Retry',exact=True).click()
                 expect_recovery('Network-error reload')
             finally:
                 browser.close()

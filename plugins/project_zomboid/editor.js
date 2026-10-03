@@ -1,5 +1,6 @@
 "use strict";
 const main=document.getElementById("main");
+let loadError=null;
 let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},datamap={rows:[]},deployment=null,shell=null;
 const shellTabs=[
   {id:"metadata",label:"Metadata"},
@@ -99,13 +100,14 @@ async function api(path,options={}){
 }
 function setStatus(message,error=false){LexeditorUI.showToast?.(message,error)}
 async function reload(){
+  loadError=null;
   renderLoading();
   try{
     [metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([
       api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")
     ]);
     render();
-  }catch(error){setStatus(error.message,true);renderLoadError(error)}
+  }catch(error){loadError=error;setStatus(error.message,true);render()}
 }
 function renderLoadError(error){
   const message=error.message||String(error);
@@ -114,6 +116,7 @@ function renderLoadError(error){
       LexeditorUI.detailNote(message,{className:"pz-error-message"}),
       sharedReadonly("Recovery","Reload after fixing the project or install problem.","The error above is the actual load failure. Fix its cause, then reload this plugin."),
     ]}),
+    LexeditorUI.actionRow(LexeditorUI.el("button",{type:"button",onclick:reload},"Retry")),
   ]}));
 }
 function renderMetadata(){
@@ -471,7 +474,7 @@ function renderInfo(){
   ]}));
 }
 async function changeDeployment(path){try{deployment=await api(path,{method:"POST",body:"{}"});setStatus(path.endsWith("undeploy")?"Owned deployment removed":"Local mod deployed");await reload()}catch(error){setStatus(error.message,true)}}
-function render(){if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
+function render(){if(loadError){renderLoadError(loadError);shell?.refresh?.();return}if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
 function navigate(value){
   tab=value;renderLoading(`Opening ${shellTabs.find(entry=>entry.id===value)?.label||value}…`);shell?.refresh?.();
   queueMicrotask(render);
