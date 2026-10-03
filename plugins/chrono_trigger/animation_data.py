@@ -133,14 +133,20 @@ def save_chip_animations(store: OverlayStore, path: str, expected_sha256: str, e
     seen = set()
 
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Chip-animation edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Chip-animation token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate chip-animation edit")
         seen.add(token)
         row = by_token[token]
         if not row["editable"]:
             raise ValueError("Misaligned chip offsets are preserved read-only")
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Chip-animation values must be an object")
         allowed = {"destinationChip"}
         for frame_index in range(row["frameCount"]):
             allowed.add(f"durationCode{frame_index}")
@@ -158,7 +164,7 @@ def save_chip_animations(store: OverlayStore, path: str, expected_sha256: str, e
         for frame_index in range(row["frameCount"]):
             duration_key = f"durationCode{frame_index}"
             if duration_key in values:
-                code = int(values[duration_key])
+                code = integer_value(values[duration_key], "Frame duration code")
                 if code not in KNOWN_DURATION_CODES:
                     raise ValueError("Frame duration must use a documented Steam duration code")
                 output[duration_start + frame_index] = code | row[f"durationLowBits{frame_index}"]

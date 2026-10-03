@@ -121,17 +121,25 @@ def save_sprite_assembly(
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Sprite assembly edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Sprite assembly token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate sprite assembly edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Sprite assembly values must be an object")
         unknown = set(values) - {"chipIndex", "x", "y", "flipHorizontal"}
         if unknown:
             raise ValueError(f"Unsupported sprite assembly fields: {', '.join(sorted(unknown))}")
+        if "flipHorizontal" in values and type(values["flipHorizontal"]) is not bool:
+            raise ValueError("Sprite flip must be a boolean")
         raw_chip = _encode_chip(values.get("chipIndex", row["chipIndex"]), row["weirdSourceBit"])
-        flags = row["unknownFlags"] | (0x01 if bool(values.get("flipHorizontal", row["flipHorizontal"])) else 0)
+        flags = row["unknownFlags"] | (0x01 if values.get("flipHorizontal", row["flipHorizontal"]) else 0)
         offset = row["byteOffset"]
         struct.pack_into("<H", output, offset, raw_chip)
         output[offset + 2] = _signed_byte("Sprite X", values.get("x", row["x"]))
