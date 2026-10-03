@@ -11,6 +11,8 @@ from test_shared_ui_feedback import page, framework
 from tests.warband.test_warband_dataset_creation import record_service
 from tests.warband.test_warband_module_records import FIXTURES
 from plugins.warband.module_records import SCHEMAS, dataset_data
+from plugins.warband import server
+from tests.warband.test_warband_troop_editor import SOURCE as TROOPS
 
 
 @pytest.mark.parametrize("dataset,field,label,correct", [
@@ -93,3 +95,75 @@ def test_hidden_numeric_draft_precedes_global_writers(page, tmp_path, record_ser
     if destination := os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR"):
         Path(destination).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(Path(destination) / f"warband-numeric-{dataset}.png"))
+
+
+@pytest.mark.parametrize("stat", ["strength", "agility", "intelligence", "charisma", "level"])
+def test_troop_stat_drafts_block_hidden_global_save_and_reload(page, tmp_path, record_service, stat):
+    source = tmp_path / "module_troops.py"
+    source.write_text(TROOPS, encoding="utf-8")
+    (tmp_path / "header_troops.py").write_text("tf_hero=16\nstr_4=4\nagi_4=1024\nint_4=262144\ncha_4=67108864\n")
+    data = server.troop_data(tmp_path)
+    before = source.read_bytes()
+    writes = []
+    page.on("request", lambda request: writes.append(request.url) if request.method == "POST" else None)
+
+    def api(route):
+        path = route.request.url.split("http://fixture", 1)[1]
+        if path.startswith("/api/troops"):
+            body = route.request.post_data_json if route.request.method == "POST" else None
+            status, result = record_service(path[len("/api/troops"):], body, "/api/troops")
+            route.fulfill(status=status, json=result)
+        elif path == "/api/build/start":
+            route.fulfill(json={"started": True})
+        elif path.startswith("/api/build/status"):
+            route.fulfill(json={"running": False, "returnCode": 0, "cursor": 1, "lines": ["Build verified: fixture"]})
+        else:
+            route.fulfill(status=400, json={"error": "Unexpected writer: " + path})
+
+    framework(page)
+    page.route("http://fixture/api/**", api)
+    page.add_style_tag(path=str(ROOT / "plugins/warband/editor.css"))
+    page.evaluate("document.body.prepend(Object.assign(document.createElement('div'),{id:'toolbar'}))")
+    for script in ("field_controls.js", "editor.js", "troop_editor.js"):
+        page.add_script_tag(path=str(ROOT / "plugins/warband" / script))
+    page.add_script_tag(content="const shell={refresh(){},history:{clear(){}}};")
+    page.evaluate("""data=>{
+      state.troops=data;state.activeSource='mine';
+      moduleRecords={preflight(){},dirtyCount:()=>0,saveAll:async()=>({saved:0,files:[]}),snapshot(){return {}},restore(){}};
+      document.querySelector('main').replaceChildren(troopEditorPanel(data.rows[0]));
+    }""", data)
+    control = page.locator(".lex-detail-field").filter(has=page.locator(".lex-detail-field-label", has_text=stat)).locator("input")
+    for invalid in ("", "1.5", "-1", "256"):
+        control.fill(invalid)
+        assert not control.evaluate("n=>n.checkValidity()")
+        assert page.evaluate("dirtyCount()") == 1
+        saved = page.evaluate("historyCapture()")
+        assert not saved["troopEdits"]["0"]["fields"]
+        page.evaluate("document.querySelector('main').replaceChildren(troopEditorPanel(state.troops.rows[1]));state.settingEdits={2:'0'};saveAll()")
+        page.get_by_role("button", name="Confirm and Close", exact=True).click()
+        assert not writes
+        assert page.evaluate("state.settingEdits[2]") == "0"
+        assert source.read_bytes() == before
+        page.evaluate("async value=>{await historyRestore(value);document.querySelector('main').replaceChildren(troopEditorPanel(state.troops.rows[0]))}", saved)
+        assert control.input_value() == invalid
+    control.fill("255")
+    page.evaluate("document.querySelector('main').replaceChildren(troopEditorPanel(state.troops.rows[0]))")
+    assert control.input_value() == "255"
+    control.fill(str(data["rows"][0]["stats"][stat]))
+    assert page.evaluate("dirtyCount()") == 0
+    for value in ("255", "254", "255"):
+        control.fill(value)
+    expression = page.evaluate("Object.values(state.troopEdits)[0].fields.attributes")
+    assert expression.count("& ~0x") == 1
+    page.evaluate("saveAll()")
+    assert page.evaluate("state.status") == "Saved and build verified"
+    actual = server.troop_data(tmp_path)
+    assert actual["rows"][0]["stats"] == {**data["rows"][0]["stats"], stat: 255}
+    assert actual["rows"][1]["fields"] == data["rows"][1]["fields"]
+    assert b'upgrade(troops, "soldier", "cut")' in source.read_bytes()
+    assert page.evaluate("dirtyCount()") == 0
+    page.evaluate("document.querySelector('main').replaceChildren(troopEditorPanel(state.troops.rows[0]))")
+    assert control.input_value() == "255"
+    if stat == "level" and (destination := os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR")):
+        Path(destination).mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(Path(destination) / "warband-troop-numeric.png"))

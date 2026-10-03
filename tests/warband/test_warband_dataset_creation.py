@@ -29,8 +29,8 @@ def record_service(tmp_path, monkeypatch):
     worker = threading.Thread(target=service.serve_forever, daemon=True)
     worker.start()
 
-    def request(path, body=None):
-        url = f"http://127.0.0.1:{service.server_port}/api/module-records{path}"
+    def request(path, body=None, endpoint="/api/module-records"):
+        url = f"http://127.0.0.1:{service.server_port}{endpoint}{path}"
         payload = None if body is None else json.dumps(body).encode("utf-8")
         req = Request(url, data=payload, headers={"Content-Type": "application/json"})
         try:
