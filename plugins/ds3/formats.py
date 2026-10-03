@@ -23,6 +23,7 @@ import struct
 import zlib
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from core.numeric_values import integer_value
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
@@ -403,6 +404,7 @@ class ParamView:
         return self.data[offset:(len(self.data) if end < 0 else end)].decode("shift_jis", errors="replace")
 
     def row(self, row_id: int) -> ParamRow:
+        row_id = integer_value(row_id, "PARAM row ID", DS3FormatError)
         matches = [row for row in self.rows if row.row_id == row_id]
         if len(matches) != 1:
             raise DS3FormatError(f"Expected one row ID {row_id}; found {len(matches)}")
@@ -802,6 +804,7 @@ class RegulationDocument:
         }
 
     def edit(self, table: str, row_id: int, field_key: str, value):
+        row_id = integer_value(row_id, "PARAM row ID", DS3FormatError)
         schema=self.schemas[table]; field=schema.field(field_key); param=self.params[table]; row=param.row(row_id)
         if field.enum and schema.enums.get(field.enum):
             if str(value) not in schema.enums[field.enum]:
