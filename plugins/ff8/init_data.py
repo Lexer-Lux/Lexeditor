@@ -160,14 +160,19 @@ def _read_fields(data: bytes, definitions: list[dict]) -> list[dict]:
             for definition in definitions]
 
 
-def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dict],
-         gfs: list[dict], abilities: list[dict]) -> dict:
+def _general_fields(weapons: list[dict]) -> list[dict]:
     party_entries = [{"id": index, "name": name} for index, name in enumerate(PARTY_NAMES)] + [{"id": 255, "name": "Empty"}]
     general_defs = deepcopy(GENERAL_FIELDS)
     for definition in general_defs[:3]:
         definition["lookup"]["entries"] = party_entries
     for definition in general_defs[4:7]:
         definition["lookup"]["entries"] = weapons
+    return general_defs
+
+
+def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dict],
+         gfs: list[dict], abilities: list[dict]) -> dict:
+    general_defs = _general_fields(weapons)
     character_rows = []
     for character_id, name in enumerate(CHARACTER_NAMES):
         base = CHARACTER_OFFSET + character_id * CHARACTER_SIZE
@@ -192,7 +197,7 @@ def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dic
 
 def _definition_map(*, weapons: list[dict], magic: list[dict], gfs: list[dict], abilities: list[dict]) -> dict[tuple[str, int, str], dict]:
     definitions: dict[tuple[str, int, str], dict] = {}
-    for definition in GENERAL_FIELDS:
+    for definition in _general_fields(weapons):
         definitions[("general", 0, definition["field"])] = definition
     for definition in CONFIG_FIELDS:
         definitions[("config", 0, definition["field"])] = definition
@@ -331,6 +336,9 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
             raise ValueError(f"{definition['label']} must be {definition['minimum']} to {definition['maximum']}")
         if field_name in {"weapon_id", "weapon_laguna", "weapon_kiros", "weapon_ward"} and value not in weapon_ids:
             raise ValueError(f"Invalid weapon id: {value}")
+        lookup = definition.get("lookup", {})
+        if lookup.get("type") == "enum" and value not in {entry["id"] for entry in lookup["entries"]}:
+            raise ValueError(f"Invalid {definition['label']} choice: {value}")
         offset, size = int(definition["offset"]), int(definition["size"])
         result[offset:offset + size] = value.to_bytes(size, "little")
         changed += 1
