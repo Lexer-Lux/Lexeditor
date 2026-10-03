@@ -237,22 +237,43 @@
             targetId:rule.id,targetLabel:`encounter rule ${rule.id}`,
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
+  // Native initial selection, before the previous-scene retry. These are
+  // outcome counts, not the executable's subtly different threshold bytes.
+  // See codex/ff8/world-encounter-selection.md and the native execution check.
+  const encounterInitialOutcomes=Object.freeze([38,37,37,37,36,36,24,11]);
+  function encounterGroupInitialChances(row){
+    const formations=new Map();
+    row.encounters.forEach((value,index)=>{
+      const id=Number(value);
+      if(!formations.has(id))formations.set(id,{id,slots:[],outcomes:0});
+      const formation=formations.get(id);
+      formation.slots.push(index+1);
+      formation.outcomes+=encounterInitialOutcomes[index];
+    });
+    return columnList({rows:[...formations.values()],key:formation=>formation.id,fill:false,localSort:false,
+      class:'ff8-encounter-initial-chances',"aria-label":`Initial formation chances for encounter group ${row.id}`,
+      columns:[{key:'id',label:'FORMATION',numberedId:true,sortable:false,
+        render:formation=>hoverable({content:String(formation.id),targetType:'encounters',targetId:formation.id,
+          targetLabel:`battle formation ${formation.id}`,
+          activate:()=>showEncounterSubtab('formations','encounters',formation.id)})},
+        {key:'chance',label:'CHANCE',sortable:false,render:formation=>`${formation.outcomes*100/256}%`},
+        {key:'slots',label:'SLOTS',sortable:false,render:formation=>formation.slots.join(', ')}]});
+  }
   function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail',heading={}){
-    // This counts repeated scene IDs, not their unequal selection weights.
-    // The native selector also retries once for the previous scene; see
-    // codex/ff8/world-encounter-selection.md before displaying probabilities.
-    const share=value=>row.encounters.filter(entry=>Number(entry)===Number(value)).length;
     const formations=row.encounters.map((value,index)=>{
       const strip=LexeditorUI.stack({fill:false,className:'ff8-encounter-formation-row',attrs:{
         'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`}},
         LexeditorUI.actionRow({fillFirst:true,className:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
-          el('span',{class:'ff8-encounter-formation-share lex-action-meta','data-formation-share':share(value)},`${share(value)} ${share(value)===1?'slot':'slots'}`)),
+          el('span',{class:'ff8-encounter-formation-position lex-action-meta'},`Slot ${index+1}`)),
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
       help:'All eight slots can use different formations, but they have unequal chances. A repeated formation combines its slots\' chances. The game retries once if it chooses the previous battle. Hover a formation ID to replace that slot. Enemy edits affect every use of that formation. Special level uses a rule we do not yet understand.',
-      body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
+      body:[detailSection({title:'INITIAL CHANCES',
+          help:infoHelp('These use the vanilla English Steam game\'s slot weights. They assume every random value is equally likely, before the previous-battle retry. Repeated formations combine their slots\' chances. Replace a slot to change those totals. Other executable patches can change these weights.'),
+          body:[encounterGroupInitialChances(row)]}),
+        detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),
           body:[encounterGroupUsage(row)]})]});
