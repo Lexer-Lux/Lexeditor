@@ -22,6 +22,8 @@ from playwright.sync_api import sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 FIXTURE = ROOT / "tests" / "factorio" / "fixtures"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "factorio-browser"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -388,8 +390,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert page.get_by_label(
                     "SPACE AGE", exact=True
                 ).input_value() == "installed; active in imported mod set"
-                page.get_by_role("button", name="Export Mod", exact=True).click()
-                page.get_by_text("Candidate built only", exact=False).wait_for()
+                reveal(page,page.get_by_role("button", name="Export Mod", exact=True,include_hidden=True)).click()
+                result=page.get_by_text("Candidate built only", exact=False)
+                result.wait_for(state='attached')
+                reveal(page,result)
                 export_name = page.locator(
                     ".factorio-export-result strong").inner_text()
                 assert export_name == "lexeditor-factorio-fixture_0.1.0.zip"
