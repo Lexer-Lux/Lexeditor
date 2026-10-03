@@ -12,6 +12,10 @@ window is dead space.
 
 Usage:
     python tests/shared/verify_no_dead_space.py [plugin ...] [--size WxH] [--live]
+
+FFX/X-2 uses the existing authored browser datasets in non-live mode so CI
+measures every populated dataset without proprietary VBF archives. --live
+continues to measure the installed game.
 """
 
 from __future__ import annotations
@@ -118,7 +122,70 @@ def tabs_of(cdp) -> list[str]:
         return []
 
 
+def findings(plugin: str, tab: str, box: dict, stacked: list) -> list[str]:
+    result = []
+    for entry in stacked or []:
+        if entry.get("stacked"):
+            result.append(f"{plugin}/{tab or 'default'}: {entry['stacked']} rows painted on "
+                          f"top of each other in {entry['cls']}")
+        else:
+            result.append(f"{plugin}/{tab or 'default'}: {entry['rows']} rows in a table that "
+                          f"declares {entry['declared']} grid tracks ({entry['cls']})")
+    gap = box["bottom"] - box["lowest"]
+    if gap > box["height"] * ALLOWED_GAP and f"{plugin}/{tab}" not in ACCEPTED:
+        result.append(f"{plugin}/{tab or 'default'}: {gap}px of dead space under the "
+                      f"content ({box['height']}px window)")
+    return result
+
+
+def check_ffx_fixture(width: int, height: int) -> list[str]:
+    """Measure actual populated editors, not missing proprietary VBF errors."""
+    from playwright.sync_api import expect, sync_playwright
+    from tests.ffx_x2.test_ffx_x2_browser_check import (
+        BASE, DATASETS, fixture_store, _serve, _open_dataset)
+
+    failures = []
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": width, "height": height})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script(STUB)
+            _serve(page, fixture_store())
+            page.goto(BASE + "/", wait_until="networkidle")
+
+            def measure(tab):
+                print(f"measuring ffx_x2/{tab} (authored data) at {width}x{height}", flush=True)
+                expect(page.locator('#main .lex-panel-loading')).to_have_count(0)
+                expect(page.locator('#main [role="alert"]')).to_have_count(0)
+                failures.extend(findings('ffx_x2', tab, page.evaluate(PROBE),
+                                         page.evaluate(OVERLAP_PROBE)))
+
+            for group, datasets in DATASETS.items():
+                for dataset in datasets:
+                    _open_dataset(page, group, dataset)
+                    # _open_dataset requires the real list and detail, so an
+                    # error or empty placeholder cannot substitute for a view.
+                    measure(dataset)
+            page.locator('#plugin-data-map').click()
+            expect(page.locator('.lex-data-map')).to_be_visible()
+            measure('datamap')
+            page.locator('#plugin-info').click()
+            expect(page.locator('#main > .lex-panel-layout')).to_be_visible()
+            measure('info')
+            page.locator('[data-tab="mods"]').click()
+            expect(page.locator('#main .lex-mods-page')).to_be_visible()
+            measure('mods')
+            assert not errors, errors
+        finally:
+            browser.close()
+    return failures
+
+
 def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
+    if plugin == 'ffx_x2' and not live:
+        return check_ffx_fixture(width, height)
     failures: list[str] = []
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-gap-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-gap-project-")
@@ -177,20 +244,7 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
                     stacked = json.loads(cdp.eval(f"JSON.stringify({OVERLAP_PROBE})"))
                 except Exception:
                     stacked = []
-                for entry in stacked or []:
-                    if entry.get("stacked"):
-                        failures.append(
-                            f"{plugin}/{tab or 'default'}: {entry['stacked']} rows painted on "
-                            f"top of each other in {entry['cls']}")
-                    else:
-                        failures.append(
-                            f"{plugin}/{tab or 'default'}: {entry['rows']} rows in a table that "
-                            f"declares {entry['declared']} grid tracks ({entry['cls']})")
-                gap = box["bottom"] - box["lowest"]
-                if gap > box["height"] * ALLOWED_GAP and f"{plugin}/{tab}" not in ACCEPTED:
-                    failures.append(
-                        f"{plugin}/{tab or 'default'}: {gap}px of dead space under the "
-                        f"content ({box['height']}px window)")
+                failures.extend(findings(plugin, tab, box, stacked))
     finally:
         if cdp:
             cdp.close()
