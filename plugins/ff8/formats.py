@@ -1136,12 +1136,13 @@ def save_enemy_tables(edits: list[dict]) -> dict:
     grouped: dict[int, list[dict]] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy table record id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append(edit)
     changed = 0
     files = []
+    prepared = []
     for monster_id, monster_edits in grouped.items():
         filename = f"c0m{monster_id:03d}.dat"
         raw = bytearray(_enemy_source_path(filename).read_bytes())
@@ -1149,8 +1150,10 @@ def save_enemy_tables(edits: list[dict]) -> dict:
             raw, _enemy_info_start(raw), monster_edits, SCHEMA_ROOT,
             {int(row["id"]) for row in MAGIC}, set(ITEM_NAMES))
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, bytes(raw))
+        prepared.append((destination, bytes(raw)))
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
