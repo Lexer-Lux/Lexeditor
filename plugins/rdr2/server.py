@@ -4808,31 +4808,49 @@ def apply_bounty_hunter_edits(edits):
 
 def apply_dispatch_edits(edits):
     """edits: [{group, field, value}] (group '' = top-level scalar)"""
-    root = load_file(DISPATCH_FILE)["root"]
-    changed = dispatch_changed = incident_changed = 0
+    if not isinstance(edits, list):
+        raise ValueError("Dispatch edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    prepared = {}
+    seen = set()
     for e in edits:
-        if e["group"] == WANTED_INCIDENT_GROUP:
-            if e["field"] != "TimeEvadingForEscape":
-                continue
-            incident_root = load_file(INCIDENTS_FILE)["root"]
-            evasion = _bounty_incident_evasion(incident_root)
-            el = evasion.find(e["field"]) if evasion is not None else None
-            if el is not None and el.get("value") is not None:
-                el.set("value", str(e["value"]))
-                changed += 1
-                incident_changed += 1
-            continue
-        parent = root if not e["group"] else root.find(e["group"])
-        el = parent.find(e["field"]) if parent is not None else None
-        if el is not None and el.get("value") is not None:
-            el.set("value", str(e["value"]))
-            changed += 1
-            dispatch_changed += 1
-    if dispatch_changed:
-        save_file(DISPATCH_FILE)
-    if incident_changed:
-        save_file(INCIDENTS_FILE)
-    return changed
+        if not isinstance(e, dict) or set(e) != {'group', 'field', 'value'}:
+            raise ValueError("Dispatch edits require only group, field and value")
+        group, field = e['group'], e['field']
+        if not isinstance(group, str) or not isinstance(field, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', field):
+            raise ValueError("Invalid dispatch identity")
+        if (group, field) in seen:
+            raise ValueError("Duplicate dispatch edit")
+        seen.add((group, field))
+        if group == WANTED_INCIDENT_GROUP:
+            if field != 'TimeEvadingForEscape':
+                raise ValueError("Unknown incident dispatch field")
+            name = INCIDENTS_FILE
+        else:
+            if group not in DISPATCH_GROUPS and (group != '' or field not in DISPATCH_SCALARS):
+                raise ValueError("Unknown dispatch field or group")
+            name = DISPATCH_FILE
+        if name not in prepared:
+            entry = load_file(name)
+            prepared[name] = (entry, copy.deepcopy(entry['root']))
+        _, root = prepared[name]
+        if group == WANTED_INCIDENT_GROUP:
+            incidents = [item for item in root.findall('./Tunables/Item') if (item.findtext('Name') or '').strip() == 'CBountyIncident']
+            parents = incidents[0].findall('Evasion') if len(incidents) == 1 else []
+        else:
+            parents = [root] if not group else root.findall(group)
+        nodes = parents[0].findall(field) if len(parents) == 1 else []
+        if len(nodes) != 1 or nodes[0].get('value') is None:
+            raise ValueError("Dispatch field is missing or ambiguous")
+        node = nodes[0]
+        finite_number(node.get('value'), 'Source dispatch value')
+        finite_number(e['value'], 'Dispatch value')
+        node.set('value', str(e['value']).strip())
+    _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()])
+    return len(edits)
 
 
 # ---------------- researched data map ----------------
@@ -6079,7 +6097,10 @@ class Handler(PluginRequestHandler):
                 elif path == "/api/crime/save":
                     self._json({"saved": apply_crime_edits(body.get("edits", []))})
                 elif path == "/api/dispatch/save":
-                    self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/loot-sounds/save":
                     self._json({"saved": save_loot_sounds(body.get("edits", []))})
                 elif path == "/api/bounty-hunters/save":
