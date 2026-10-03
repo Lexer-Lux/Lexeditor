@@ -5,6 +5,7 @@ reserving an unused c0m*.dat bit. The runtime consumes the same project-owned
 configuration separately.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from . import formats, gameplay_settings, paths, reptile_atb
 
@@ -59,15 +60,21 @@ def install() -> None:
         return payload
 
     def save_enemies(edits: list[dict]) -> dict:
+        if not isinstance(edits, list):
+            raise ValueError("Enemy edits must be an array")
         reptile_edits = []
         binary_edits = []
         seen = set()
         valid_ids = {int(row["com_id"]) for row in formats.MONSTERS}
         for edit in edits:
-            if str(edit.get("field")) != FIELD_NAME:
+            if not isinstance(edit, dict) or set(edit) != {"id", "field", "value"}:
+                raise ValueError("Enemy edit requires id, field and value")
+            if not isinstance(edit["field"], str):
+                raise ValueError("Enemy field must be text")
+            if edit["field"] != FIELD_NAME:
                 binary_edits.append(edit)
                 continue
-            monster_id = int(edit["id"])
+            monster_id = integer_value(edit["id"], "Reptile enemy id")
             if monster_id not in valid_ids or monster_id in seen:
                 raise ValueError(f"Invalid or duplicate Reptile enemy edit: {monster_id}")
             seen.add(monster_id)
@@ -75,9 +82,6 @@ def install() -> None:
                 raise ValueError("Reptile must be true or false")
             reptile_edits.append((monster_id, bool(edit["value"])))
 
-        result = original_save_enemies(binary_edits) if binary_edits else {
-            "saved": 0, "file": "", "files": []
-        }
         if reptile_edits:
             current = reptile_atb.load(paths.PROJECT_ROOT)
             ids = set(current["enemyIds"])
@@ -86,9 +90,15 @@ def install() -> None:
                     ids.add(monster_id)
                 else:
                     ids.discard(monster_id)
+            enabled = bool(current["enabled"] or ids)
+            reptile_atb.build(enabled=enabled, reptile_enemy_ids=ids)
+        result = original_save_enemies(binary_edits) if binary_edits else {
+            "saved": 0, "file": "", "files": []
+        }
+        if reptile_edits:
             target = reptile_atb.write(
                 paths.PROJECT_ROOT,
-                enabled=bool(current["enabled"] or ids),
+                enabled=enabled,
                 reptile_enemy_ids=ids,
             )
             result = dict(result)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from core.numeric_values import integer_value
 
 from . import formats, gameplay_settings, gf_spellbooks, paths
 
@@ -73,6 +74,14 @@ def install() -> None:
         return result
 
     def save_kernel(section_id: int, edits: list[dict]) -> dict:
+        section_id = integer_value(section_id, "Kernel section id")
+        if not isinstance(edits, list):
+            raise gf_spellbooks.SpellbookError("Kernel edits must be an array")
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {"id", "field", "value"}:
+                raise gf_spellbooks.SpellbookError("Kernel edit requires id, field and value")
+            if not isinstance(edit["field"], str):
+                raise gf_spellbooks.SpellbookError("Kernel field must be text")
         if section_id != 3:
             return original_save_kernel(section_id, edits)
         binary_edits, spellbook_edits = [], []
@@ -81,7 +90,7 @@ def install() -> None:
             if edit.get("field") != FIELD:
                 binary_edits.append(edit)
                 continue
-            gf = int(edit.get("id", -1))
+            gf = integer_value(edit["id"], "GF spellbook id", gf_spellbooks.SpellbookError)
             if not 0 <= gf < 16 or gf in seen:
                 raise gf_spellbooks.SpellbookError("Invalid or duplicate GF spellbook edit")
             seen.add(gf)
@@ -90,11 +99,10 @@ def install() -> None:
                 raise gf_spellbooks.SpellbookError("GF spellbook pages must be a list or null")
             spellbook_edits.append((gf, pages))
 
-        result = original_save_kernel(section_id, binary_edits) if binary_edits else {
-            "saved": 0, "file": "", "files": []
-        }
         if not spellbook_edits:
-            return result
+            return original_save_kernel(section_id, binary_edits) if binary_edits else {
+                "saved": 0, "file": "", "files": []
+            }
         current = gf_spellbooks.load(paths.PROJECT_ROOT)
         by_gf = {book["gfId"]: book for book in current["books"]}
         for gf, pages in spellbook_edits:
@@ -106,10 +114,15 @@ def install() -> None:
             "schemaVersion": gf_spellbooks.SCHEMA_VERSION,
             "books": [by_gf[key] for key in sorted(by_gf)],
         })
-        gf_spellbooks.save(paths.PROJECT_ROOT, document)
         settings = gameplay_settings.load()
-        _sync_runtime(paths.PROJECT_ROOT, enabled=bool(settings.get("gfSpellbooksEnabled"))
-                      and bool(settings.get("singleGf")) and not bool(settings.get("sharedMagicInventory")))
+        active = (bool(settings.get("gfSpellbooksEnabled")) and bool(settings.get("singleGf"))
+                  and not bool(settings.get("sharedMagicInventory")))
+        runtime = gf_spellbooks.runtime_bytes(document if active else {"schemaVersion": 1, "books": []})
+        result = original_save_kernel(section_id, binary_edits) if binary_edits else {
+            "saved": 0, "file": "", "files": []
+        }
+        gf_spellbooks.save(paths.PROJECT_ROOT, document)
+        gf_spellbooks._atomic(paths.PROJECT_ROOT / gf_spellbooks.RUNTIME_RELATIVE, runtime)
         result = dict(result)
         result["saved"] = int(result.get("saved", 0)) + len(spellbook_edits)
         files = list(result.get("files", []))
