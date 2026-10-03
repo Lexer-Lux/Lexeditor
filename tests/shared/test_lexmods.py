@@ -93,6 +93,23 @@ class InstallTests(unittest.TestCase):
         self.install("v1", {"Combat": module("Combat"), "Extra": module("Extra")}, modules=["Extra"])
         self.assertEqual(sorted(p.name for p in self.library.iterdir()), ["Extra"])
 
+    def test_empty_archive_cannot_create_a_library(self):
+        self.assertFalse(self.library.exists())
+        with self.assertRaisesRegex(lexmods.LexmodError, 'no published modules'):
+            self.install('empty', {})
+        self.assertFalse(self.library.exists())
+
+    def test_empty_update_preserves_existing_modules_and_unrelated_files(self):
+        self.install('v1', {'Combat': module('Combat', settings={'x': 1})})
+        (self.library / 'personal.txt').write_text('keep')
+        before = {str(path.relative_to(self.library)): path.read_bytes()
+                  for path in self.library.rglob('*') if path.is_file()}
+        with self.assertRaisesRegex(lexmods.LexmodError, 'no published modules'):
+            self.install('empty', {})
+        after = {str(path.relative_to(self.library)): path.read_bytes()
+                 for path in self.library.rglob('*') if path.is_file()}
+        self.assertEqual(after, before)
+
     def test_an_update_replaces_files_but_keeps_settings_and_switches(self):
         self.install("v1", {"Combat": module("Combat", settings={"x": 1})})
         (self.library / "Combat" / "settings.json").write_text(json.dumps({"values": {"x": 9}}))

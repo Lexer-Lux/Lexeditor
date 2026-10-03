@@ -2,7 +2,7 @@
 
 The first-run screen lists a Lexmod's features from its README's Features
 section, which must end with the customisable-modules line (core/lexmods.py).
-A Lexmod that is not published (missing, or private to its owner) is
+A Lexmod with no published modules (empty, missing, or private to its owner) is
 reported and skipped: players cannot download it either.
 """
 from __future__ import annotations
@@ -31,11 +31,11 @@ def main() -> int:
     failures = []
     for plugin_id, repository in declared().items():
         try:
-            readme = lexmods._raw(repository, "HEAD", "README.md").decode("utf-8", "replace")
+            catalog = lexmods.catalog(repository)
         except lexmods.LexmodError as error:
             print(f"{plugin_id}: {repository}: not checked ({error})")
             continue
-        problems = lexmods.readme_problems(readme)
+        problems = catalog['readmeProblems']
         print(f"{plugin_id}: {repository}: {'; '.join(problems) or 'ok'}")
         failures += [f"{repository}: {problem}" for problem in problems]
     if failures:

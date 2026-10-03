@@ -156,6 +156,8 @@ def catalog(repository: str) -> dict:
         modules.append({"folder": folder, "name": str(info.get("name") or folder),
                         "author": str(info.get("author") or ""), "description": str(info.get("description") or ""),
                         "enabled": info.get("enabled") is not False})
+    if not modules:
+        raise LexmodError("Lexer's mod has no published modules yet")
     return {**version, "repository": repository, "url": f"https://github.com/{repository}",
             "features": features(readme), "readmeProblems": readme_problems(readme), "modules": modules}
 
@@ -240,6 +242,8 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
     data = _download(version["zip"], progress, cancel) if fetch is None else fetch["zip"]
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         upstream = _modules_in(archive)
+    if not upstream:
+        raise LexmodError("Lexer's mod has no published modules yet")
     present = installed(library, repository)
     wanted = set(upstream) if modules is None else set(modules) | set(present)
     unknown = (set(modules or ()) - set(upstream))
