@@ -105,6 +105,25 @@ def capture(page, screenshots: list[str], name: str) -> None:
     screenshots.append(path.name)
 
 
+def native_scale_page(browser, previous, width: int, height: int, percent: int, errors):
+    """Model native zoom's smaller CSS viewport and larger physical pixels."""
+    scale = percent / 100
+    page = browser.new_page(viewport={"width": round(width / scale), "height": round(height / scale)},
+                            device_scale_factor=scale)
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(previous.url, wait_until="domcontentloaded")
+    wait_editor_ready(page)
+    previous.close()
+    slider = page.locator('.lex-ui-scale input[aria-label="UI scale"]')
+    slider.evaluate('''(node,percent)=>{
+      node.value=percent;
+      node.dispatchEvent(new Event('input',{bubbles:true}));
+      node.dispatchEvent(new Event('change',{bubbles:true}));
+    }''', percent)
+    page.wait_for_function("scale=>document.documentElement.style.getPropertyValue('--lex-ui-scale')===String(scale)", arg=scale)
+    return page
+
+
 def reveal_settings_locator(page, target, label: str) -> None:
     page.locator("#main .lex-tweaks-pages").last.wait_for(state="attached")
     if not target.count() or not target.is_visible():
@@ -363,8 +382,7 @@ def main() -> None:
                     page.wait_for_timeout(100)
                     assert pip.get_attribute("aria-describedby")
 
-                    page.set_viewport_size({"width": 700, "height": 760})
-                    page.evaluate("document.body.style.zoom='1.5'")
+                    page = native_scale_page(browser, page, 700, 760, 150, errors)
                     for tab in ("metadata", "dependencies", "content", "localization", "source", "assets"):
                         page.evaluate(f'navigate("{tab}")')
                         page.wait_for_timeout(180)
@@ -392,10 +410,10 @@ def main() -> None:
                     page.locator(".lex-column-list-row").filter(has_text="BrowserExtra17").first.click()
                     page.wait_for_function("assetCurrent?.path?.includes('BrowserExtra17')")
                     reveal_settings_locator(page, page.get_by_role("button", name="Delete asset", exact=True), "Delete asset")
+                    page.get_by_role("button", name="Delete asset", exact=True).click(trial=True)
                     capture(page, screenshots, "assets-narrow-150.png")
 
-                    page.evaluate("document.body.style.zoom='1'")
-                    page.set_viewport_size({"width": 1000, "height": 760})
+                    page = native_scale_page(browser, page, 1000, 760, 100, errors)
                     page.locator("#plugin-data-map").click()
                     page.locator(".lex-data-map-view").wait_for()
                     no_horizontal_overflow(page, "data-map-medium")
