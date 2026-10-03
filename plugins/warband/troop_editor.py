@@ -3,13 +3,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 import threading
 from core.numeric_values import integer_value
+from .source_save import publish_source
 
 FIELDS = ('id','name','plural','flags','scene','reserved','faction','inventory','attributes','proficiencies','skills','face1','face2','image')
 _LOCK = threading.Lock()
@@ -302,12 +302,5 @@ def save_troops(root,expected,edits):
                 result=subprocess.run([str(python27),'-c',"import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')",str(probe)],capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 if result.returncode:raise ValueError(result.stderr.decode('utf-8',errors='replace'))
         if not patches:return {'saved':0}
-        if path.read_bytes()!=raw:raise ValueError('Troop source changed while validating; reload before saving')
-        backup=path.with_suffix('.py.lexeditor.bak');backup.write_bytes(raw)
-        fd,tmp=tempfile.mkstemp(prefix='.troops-',dir=root)
-        try:
-            with os.fdopen(fd,'wb') as stream:stream.write(encoded)
-            os.replace(tmp,path)
-        finally:
-            if os.path.exists(tmp):os.unlink(tmp)
+        backup=publish_source(path,encoded,raw)
         return {'saved':len(edited),'sha256':hashlib.sha256(encoded).hexdigest(),'backup':str(backup)}

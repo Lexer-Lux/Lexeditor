@@ -10,7 +10,6 @@ import ast
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -18,6 +17,7 @@ import tempfile
 import threading
 from core.numeric_values import finite_number, integer_value
 from .sound_preview import sample_names
+from .source_save import publish_source
 
 _LOCK = threading.Lock()
 
@@ -825,18 +825,7 @@ def _write_candidate(path, candidate, encoding, raw):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = candidate.encode(encoding)
     _validate_python(encoded)
-    if path.read_bytes() != raw:
-        raise ValueError(f"{path.name} changed while validating; reload before saving")
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(encoded)
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    backup = publish_source(path, encoded, raw)
     return {"sha256": hashlib.sha256(encoded).hexdigest(), "backup": str(backup)}
 
 

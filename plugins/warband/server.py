@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
+from .source_save import publish_source
 from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
@@ -484,18 +485,7 @@ def _write_items_candidate(candidate: str, encoding: str, raw: bytes) -> dict:
             r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = _validate_module_items_candidate(candidate, encoding)
-    if source.read_bytes() != raw:
-        raise ValueError("module_items.py changed while validating; reload before saving")
-    backup = source.with_name(source.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(encoded)
-        os.replace(temporary_name, source)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    backup = publish_source(source, encoded, raw)
     return {"backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
