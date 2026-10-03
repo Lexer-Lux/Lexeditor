@@ -12307,6 +12307,25 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const ink=range.getBoundingClientRect(),room=text.getBoundingClientRect();
     return ink.right>room.right+1||ink.left<room.left-1;
   };
+  const placeBooleanHelp = label => {
+    if(!label.parentElement?.classList.contains('lex-boolean-field'))return;
+    const text=label.querySelector(':scope > .lex-detail-field-label-text');
+    const wrapper=label.querySelector(':scope > .lex-field-help');
+    const help=wrapper?.querySelector(':scope > .lex-info-help');
+    if(!text||!help)return;
+    const range=document.createRange();range.selectNodeContents(text);
+    const line=[...range.getClientRects()].filter(box=>box.width&&box.height).at(-1);
+    const box=wrapper.getBoundingClientRect();
+    if(!line||!box.width||!box.height)return;
+    // Keep the reserved help lane, but put the circle beside the final word
+    // rather than beside the centre of a wrapped name's whole rectangle.
+    const scaleX=box.width/(wrapper.offsetWidth||box.width);
+    const scaleY=box.height/(wrapper.offsetHeight||box.height);
+    const x=(line.right+4*scaleX-box.left)/scaleX;
+    const y=(line.top+line.height/2-box.top-box.height/2)/scaleY;
+    const transform=`translate(${x}px,${y}px)`;
+    if(help.style.transform!==transform)help.style.transform=transform;
+  };
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
     // The name lane has a fixed width. Fit the font inside it.
@@ -12383,6 +12402,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       const height=Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect().height));
       label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
     }
+    placeBooleanHelp(label);
 
     // Property labels use contain:size. A plain cell instead hugs its text,
     // so remember its dimensions after fitting to avoid resetting that font
