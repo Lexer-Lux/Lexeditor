@@ -11,8 +11,8 @@ function aiFieldType(row){
 function aiChoices(rows,row){return [...new Set(rows.filter(r=>r.field===row.field&&!r.readonly&&typeof r.value==="string").map(r=>r.value))];}
 function aiDraftError(row,value,rows){
   const type=aiFieldType(row);
-  if(type==="readonly")return "This AI field is read-only.";
-  if(typeof value!=="string")return "AI values must be text.";
+  if(type==="readonly")return "This field is read-only.";
+  if(typeof value!=="string")return "Field values must be text.";
   if(type==="number")return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)&&Number.isFinite(Number(value))?"":"Enter a finite number.";
   if(type==="boolean")return /^(true|false)$/i.test(value)?"":"Choose true or false.";
   return aiChoices(rows,row).includes(value)?"":"Choose a value present in the source data.";
@@ -32,16 +32,21 @@ async function preflightAISave(){
   for(const [file,body] of bodies)await api("/api/ai/"+file+"/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
 }
 function aiValueControl(file,row,rows,reference){
-  const key=row.path.join("."),edits=state.aiEdits[file],cur=edits[key]?.value??row.value,type=aiFieldType(row),editable=!isRO()&&type!=="readonly";
-  const changed=value=>{if(!editable)return;if(value===row.value||(type==="boolean"&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value};refreshGlobalSave();};
+  const key=row.path.join("."),edits=state.aiEdits[file],type=aiFieldType(row);
+  const changed=value=>{if(value===row.value||(type==="boolean"&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value};refreshGlobalSave();};
+  return xmlScalarControl(row,rows,{value:edits[key]?.value??row.value,edited:()=>key in edits,change:changed,reference});
+}
+function xmlScalarControl(row,rows,{value:cur,edited,change,label=row.field,reference}){
+  const type=aiFieldType(row),editable=!isRO()&&type!=="readonly";
   let control;
+  const changed=value=>{if(!editable)return;change(value);control.classList.toggle("edited",edited());};
   if(type==="readonly")return LexeditorUI.readonlyField(String(cur));
-  if(type==="boolean")control=el("input",{type:"checkbox",checked:cur.toLowerCase()==="true",disabled:!editable,"aria-label":row.field,onchange:e=>changed(e.target.checked?"true":"false")});
+  if(type==="boolean")control=el("input",{type:"checkbox",checked:cur.toLowerCase()==="true",disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.checked?"true":"false")});
   else if(type==="number"){
-    control=el("input",{type:"number",step:"any",required:true,disabled:!editable,value:cur,"aria-label":row.field,"data-lex-validate-number":"true",oninput:e=>{changed(e.target.value);e.target.setCustomValidity(aiDraftError(row,e.target.value,rows));e.target.classList.toggle("edited",key in edits);}});
+    control=el("input",{type:"number",step:"any",required:true,disabled:!editable,value:cur,"aria-label":label,"data-lex-validate-number":"true",oninput:e=>{changed(e.target.value);e.target.setCustomValidity(aiDraftError(row,e.target.value,rows));}});
     control.setCustomValidity(aiDraftError(row,cur,rows));
-  }else control=el("select",{disabled:!editable,"aria-label":row.field,onchange:e=>changed(e.target.value)},...aiChoices(rows,row).map(value=>el("option",{value,selected:value===cur},value)));
-  control.classList.toggle("edited",key in edits);
+  }else control=el("select",{disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.value)},...aiChoices(rows,row).map(value=>el("option",{value,selected:value===cur},value)));
+  control.classList.toggle("edited",edited());
   const validReference=reference!==undefined&&!aiDraftError(row,reference,rows);
   return refField(control,validReference?[["UCO","ucotag",reference]]:null,cur,(value)=>{if(!editable)return;if(type==="boolean"){control.checked=value.toLowerCase()==="true";control.dispatchEvent(new Event("change",{bubbles:true}));}else{control.value=value;control.dispatchEvent(new Event(type==="number"?"input":"change",{bubbles:true}));}},String);
 }

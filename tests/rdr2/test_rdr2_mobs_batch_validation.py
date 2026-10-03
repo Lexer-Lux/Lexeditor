@@ -60,6 +60,7 @@ BAD=[None, {}, False, '', [None], [{}], [dict(SECOND, extra=1)], [dict(SECOND,fi
      [dict(FIRST,path=[1,1,7])], [dict(FIRST,path=[1,1,2],kind='text',value='maybe')],
      [dict(FIRST,path=[1,1,5],kind='ref',value='invented')]]
 BAD += [[dict(SECOND,value=v)] for v in [None,True,[],{},'', 'NaN','Inf','1_0','1e999',float('nan'),float('inf')]]
+BAD += [[dict(FIRST,path=[1,1,0],kind='text',value='GANG_FIXTURE')]]
 
 
 @pytest.mark.parametrize('mask',[0,1,2,3])
@@ -207,3 +208,21 @@ def test_missing_later_vanilla_source_does_not_create_earlier_copy(mobs):
         s.apply_mob_edits([FIRST,SECOND])
     assert snapshot(root)==before
     assert not any(path.exists() for path in paths)
+
+
+@pytest.mark.parametrize('mask',[0,1,2,3])
+def test_validate_only_checks_complete_batch_and_loader_without_creating_outputs(mobs,mask):
+    entries=existing_files(mobs,mask)
+    root,_,_,install=mobs
+    before=snapshot(root)
+    assert s.apply_mob_edits([FIRST,SECOND],validate_only=True)==2
+    with pytest.raises(ValueError):
+        s.apply_mob_edits([FIRST,dict(SECOND,path=[-1])],validate_only=True)
+    assert snapshot(root)==before
+    unchanged_cache(entries)
+    install.write_text('<Install/>')
+    before=snapshot(root)
+    with pytest.raises(ValueError,match='Resources'):
+        s.apply_mob_edits([FIRST,SECOND],validate_only=True)
+    assert snapshot(root)==before
+    unchanged_cache(entries)

@@ -4,14 +4,14 @@
 // The ped-model -> profile/archetype binding is not in either file.
 const MOB_LAYERS={
   combat:{label:"Combat profiles",file:"combat",
-    hint:"One record per faction. WeaponAccuracy is the base hit chance before any situational modifier — PLAYER is 0.1, GANG_ODRISCOLLS is 0.6. Changing a row changes every ped bound to that profile."},
+    hint:"Combat profiles control faction accuracy and combat behavior. A profile change affects every character assigned to it. Situational accuracy settings are on the AI tab."},
   health:{label:"Health archetypes",file:"health",
-    hint:"One record per health archetype. DefaultEnergy is the HP pool; the ENEMY_EASIEST→HARDEST and LAW_* ladders are the difficulty tiers."},
+    hint:"Health archetypes control health, armour and injury thresholds. A change affects every character assigned to that archetype."},
 };
 const MOB_COMBAT_COLUMNS=[
-  ["WeaponAccuracy","Accuracy","Base hit chance for this faction, before pedaccuracy.meta's situational modifiers. This is the value behind an enemy who cannot hit you."],
+  ["WeaponAccuracy","Accuracy","Base hit chance for this faction before situational accuracy modifiers."],
   ["AccuracyOffsetModifier","Acc offset","Scales the aim offset applied to shots that are meant to miss."],
-  ["CombatAbility","Ability","CA_Poor / CA_Average / CA_Professional. A named tier the combat code reads, not a number."],
+  ["CombatAbility","Ability",""],
   ["WeaponShootRateModifier","Shoot rate",""],
   ["BlindFireChance","Blind fire",""],
   ["FiringPatternHash","Firing pattern",""],
@@ -21,8 +21,24 @@ const MOB_COMBAT_COLUMNS=[
   ["AttackRanges","Attack range",""],
   ["CombatMovement","Movement",""],
 ];
+
+function mobRecordKey(record){return record.fields[0]?.path.slice(0,-1).join(".")||`${record.section||""}/${record.name}`;}
+function mobsSaveBody(){
+  const edits=Object.values(state.mobEdits),seen=new Set();
+  for(const edit of edits){
+    if(!edit||Object.keys(edit).sort().join(",")!=="file,kind,path,value"||!Object.hasOwn(MOB_LAYERS,edit.file)||!Array.isArray(edit.path)||!edit.path.length||edit.path.some(i=>!Number.isSafeInteger(i)||i<0))throw new Error("Invalid Mobs target.");
+    const rows=state.mobs?.[edit.file]?.records?.flatMap(record=>record.fields)||[],key=edit.path.join("."),identity=edit.file+"|"+key,matches=rows.filter(row=>row.path.join(".")===key),row=matches[0];
+    if(matches.length!==1||seen.has(identity)||row.kind!==edit.kind)throw new Error("Unknown or duplicate Mobs target.");
+    seen.add(identity);const error=aiDraftError(row,edit.value,rows);if(error)throw new Error(error);
+  }
+  return {edits};
+}
+async function preflightMobsSave(){
+  const body=mobsSaveBody();if(!body.edits.length)return;
+  await api("/api/mobs/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+}
 const MOB_HEALTH_COLUMNS=[
-  ["DefaultEnergy","HP","Health pool for this archetype."],
+  ["DefaultEnergy","HP",""],
   ["DefaultArmour","Armour",""],
   ["InjuredHealthThreshold","Injured at",""],
   ["CriticallyInjuredHealthThreshold","Critical at",""],
@@ -110,52 +126,39 @@ async function renderMobArchetypes(){
     savebar(saveMobs));
   const m=$("#main");m.innerHTML="";
   if(!data||!data.available)return noData(`No ${layerKey==="health"?"pedhealth.meta":"combatbehaviour.meta"} in this dataset and no vanilla extract to fall back on.`);
-  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},layer.label+": "),layer.hint,
-    el("div",{class:"subtle"},`Source: ${data.source}. Accuracy is finished off by pedaccuracy.meta on the AI tab, which ships only companion and Default — that global stack is what halves incoming accuracy against a moving target.`)));
   const columns=layerKey==="health"?MOB_HEALTH_COLUMNS:MOB_COMBAT_COLUMNS;
   const q=(f.mobQ||"").toUpperCase();
   let rows=data.records.filter(r=>r.group===f.mobGroup&&(!q||r.name.toUpperCase().includes(q)));
   if(layerKey==="health")rows=rows.filter(r=>r.section==="HealthConfig");
-  tb.insertBefore(el("span",{class:"count"},`${rows.length} record${rows.length===1?"":"s"}`),tb.querySelector(".savebar"));
   if(!rows.length)return m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"Nothing in this group matches the filter."));
   const fieldOf=(record,name)=>record.fields.find(x=>x.field===name);
   const getters={name:r=>r.name};
   columns.forEach(col=>{getters[col[0]]=r=>{const hit=fieldOf(r,col[0]);if(!hit)return "";const n=parseFloat(hit.value);return Number.isFinite(n)&&String(n)!==""?n:hit.value;};});
-  const statControl=(record,col)=>{
-    const field=fieldOf(record,col[0]);
-    if(!field)return "—";
+  const allFields=data.records.flatMap(record=>record.fields);
+  const statControl=(record,field)=>{
     const editKey=`${layer.file}|${field.path.join(".")}`;
     const cur=(editKey in state.mobEdits)?state.mobEdits[editKey].value:field.value;
-    const numeric=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(String(field.value)),boolean=/^(true|false)$/i.test(String(field.value));
-    const choices=[...new Set([...data.records.flatMap(r=>r.fields.filter(x=>x.field===field.field).map(x=>String(x.value))),String(cur)])].sort();
-    const input=el(!numeric&&!boolean?"select":"input",{type:boolean?"checkbox":numeric?"number":"text",...(boolean?{checked:String(cur).toLowerCase()==="true"}:{value:cur}),
-      class:editKey in state.mobEdits?"edited":"",
-      "aria-label":`${record.name} ${field.field}`,
-      title:`${field.field} (${field.kind})`,
-      onchange:ev=>{
-        const value=boolean?String(ev.target.checked):ev.target.value;
-        if(numeric&&(!value.trim()||!Number.isFinite(Number(value)))){ev.target.setCustomValidity("Enter a finite number");ev.target.reportValidity();return;}
-        ev.target.setCustomValidity("");
-        if(value===field.value)delete state.mobEdits[editKey];
+    return xmlScalarControl(field,allFields,{value:cur,edited:()=>editKey in state.mobEdits,label:`${record.name} ${field.field}`,change:value=>{
+        if(value===field.value||(aiFieldType(field)==="boolean"&&value.toLowerCase()===field.value.toLowerCase()))delete state.mobEdits[editKey];
         else state.mobEdits[editKey]={file:layer.file,path:field.path,kind:field.kind,value};
-        ev.target.classList.toggle("edited",editKey in state.mobEdits);
-        renderToolbarOnly();
+        refreshGlobalSave();
       }});
-    if(!numeric&&!boolean)input.replaceChildren(...choices.map(value=>el("option",{value,selected:value===String(cur)},value)));
-    if(isRO())input.disabled=true;
-    return input;
   };
-  m.append(columnList({class:"mob-table",align:"start",headerAlign:"start","aria-label":"Mob archetypes",
-    rows:sortedRows("mobs",rows,getters),key:record=>record.name,editable:true,localSort:false,
-    template:`minmax(180px,1fr) repeat(${columns.length},minmax(0,.8fr))`,
-    columns:[{key:"name",label:"Record",cellClass:"key"},
-      ...columns.map(col=>({key:col[0],
-        label:col[2]?()=>el("span",{},col[1],fieldHelp(col[2])):col[1],
-        render:record=>statControl(record,col)}))]}));
+  const ordered=sortedRows("mobs",rows,getters);
+  // names: Game profile identities stay fixed; changing their names would change runtime bindings.
+  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:mobRecordKey,selected:f.mobSelected?.[layer.file]||mobRecordKey(ordered[0]),renamable:false,pageSize:15,noun:"archetypes",slots:false,splitKey:"rdr2-mobs",
+    sync:view=>{f.mobSelected ||= {};f.mobSelected[layer.file]=view.selected},
+    master:view=>columnList({class:"mob-table",rows:view.rows,key:mobRecordKey,selected:view.selected,select:view.select,"aria-label":"Mob archetypes",columns:[{key:"name",label:"Record"},{key:"group",label:"Group"}]}),
+    detail:record=>LexeditorUI.detailPanel({title:record.name,help:fieldHelp(layer.hint+" Numeric limits are not yet established. Unsupported values are read-only."),body:record.fields.filter(field=>field.field!=="Name").map(field=>{
+      const definition=columns.find(col=>col[0]===field.field);
+      return LexeditorUI.detailField({label:definition?.[1]||field.field,help:definition?.[2]?fieldHelp(definition[2]):null,control:statControl(record,field)});
+    })})}));
 }
 
 async function saveMobs(){
-  const edits=Object.values(state.mobEdits);if(!edits.length)return 0;
-  const r=await api("/api/mobs/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});
+  if(isRO())return 0;
+  const body=mobsSaveBody();if(!body.edits.length)return 0;
+  await api("/api/mobs/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const r=await api("/api/mobs/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   state.mobEdits={};state.mobs=null;toast(`Saved ${r.saved} mob stat field(s)`);renderMobs();return r.saved;
 }

@@ -186,3 +186,18 @@ def test_source_enum_choices_remain_valid_when_two_rows_swap(ai):
         {'path': [4], 'kind': 'text', 'value': 'A'},
     ]) == 2
     assert [node.text for node in s.parse_with_comments(path).findall('Mode')] == ['B', 'A']
+
+
+@pytest.mark.parametrize('validate_only',[False,True])
+def test_fixed_runtime_profile_name_is_readonly_and_cannot_be_saved(ai,validate_only):
+    root,_,source,_=ai
+    doc=s.parse_with_comments(source)
+    ET.SubElement(doc,'Name').text='FIXED_PROFILE'
+    source.write_bytes(ET.tostring(doc))
+    rows=s.get_ai_file(s.PED_PERCEPTION_FILE)['fields']
+    name=next(row for row in rows if row['field']=='Name')
+    assert name['readonly']
+    before=snapshot(root)
+    with pytest.raises(ValueError):
+        s.apply_ai_edits(s.PED_PERCEPTION_FILE,[dict(FIRST,path=name['path'],kind='text',value='FIXED_PROFILE')],validate_only=validate_only)
+    assert snapshot(root)==before

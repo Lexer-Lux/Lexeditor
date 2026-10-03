@@ -17,10 +17,12 @@ const lootValidation = loot.slice(loot.indexOf('function lootNumericError('), lo
 const matrixValidation = loot.slice(loot.indexOf('function matrixQuantityError('), loot.indexOf('async function renderMatrix()'));
 const crime = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/crime.js'), 'utf8');
 const ai = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/ai.js'), 'utf8');
+const mobs = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/mobs.js'), 'utf8');
 const dispatchValidation = crime.slice(crime.indexOf('function bountyCompareNumbers('), crime.indexOf('function bountyNumber(')) +
   crime.slice(crime.indexOf('function honorAmountValid('), crime.indexOf('function normalizeHonorActions(')) +
   crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()')) +
-  ai.slice(ai.indexOf('function aiFieldType('), ai.indexOf('function aiValueControl('));
+  ai.slice(ai.indexOf('function aiFieldType('), ai.indexOf('function aiValueControl(')) +
+  mobs.slice(0, mobs.indexOf('async function renderMobs()'));
 const challenges = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/challenges.js'), 'utf8');
 const challengeValidation = challenges.slice(challenges.indexOf('function validateChallengeDrafts('), challenges.indexOf('function challengeUiInput('));
 const challengeSave = challenges.slice(challenges.indexOf('async function saveChallenges()'));

@@ -5777,7 +5777,7 @@ def _ai_scalar_rows(root):
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
                              "context": next_context, "value": value, "kind": kind,
-                             "readonly": bool(len(child) or (kind == "attr" and (set(child.attrib) != {'value'} or (child.text or '').strip())) or (kind == "text" and child.attrib))})
+                             "readonly": child.tag == 'Name' or bool(len(child) or (kind == "attr" and (set(child.attrib) != {'value'} or (child.text or '').strip())) or (kind == "text" and child.attrib))})
             elif len(child):
                 walk(child, child_path, child_tags, next_context)
     walk(root, [], [], "GLOBAL")
@@ -5851,7 +5851,7 @@ def apply_ai_edits(name, edits, *, validate_only=False):
                 raise ValueError("AI indices must be nonnegative integers")
             identity = tuple(indices)
             row = rows.get(identity)
-            if row is None or identity in seen or edit['kind'] != row['kind']:
+            if row is None or row.get('readonly') or identity in seen or edit['kind'] != row['kind']:
                 raise ValueError("AI target is unknown, duplicate or has the wrong kind")
             seen.add(identity)
             node = root
@@ -5933,15 +5933,18 @@ def _record_fields(item, base_path):
             name = "/".join(tags + [child.tag])
             if child.get("value") is not None:
                 fields.append({"path": child_path, "kind": "attr",
-                               "field": name, "value": child.get("value")})
+                               "field": name, "value": child.get("value"),
+                               "readonly": bool(len(child) or set(child.attrib) != {'value'} or (child.text or '').strip())})
             elif child.get("ref") is not None:
                 fields.append({"path": child_path, "kind": "ref",
-                               "field": name, "value": child.get("ref")})
+                               "field": name, "value": child.get("ref"),
+                               "readonly": bool(len(child) or set(child.attrib) != {'ref'} or (child.text or '').strip())})
             elif len(child):
                 walk(child, child_path, tags + [child.tag])
             else:
                 fields.append({"path": child_path, "kind": "text",
-                               "field": name, "value": (child.text or "").strip()})
+                               "field": name, "value": (child.text or "").strip(),
+                               "readonly": bool(child.attrib) or name == 'Name'})
 
     walk(item, base_path, [])
     return fields
@@ -6108,7 +6111,7 @@ def _validate_mob_value(previous, value, choices):
     return candidate
 
 
-def apply_mob_edits(edits):
+def apply_mob_edits(edits, *, validate_only=False):
     if not isinstance(edits, list):
         raise ValueError("Mobs edits must be a list")
     if not edits:
@@ -6152,7 +6155,7 @@ def apply_mob_edits(edits):
                 prepared[family] = (name, game_path, path, entry, raw, root, rows, choices)
             name, game_path, path, entry, raw, root, rows, choices = prepared[family]
             row = rows.get(tuple(indices))
-            if row is None or edit['kind'] != row['kind']:
+            if row is None or row.get('readonly') or edit['kind'] != row['kind']:
                 raise ValueError("Unknown mobs target or wrong scalar kind")
             node = root
             for index in indices:
@@ -6168,6 +6171,8 @@ def apply_mob_edits(edits):
         install = ds_dir('mine') / 'install.xml'
         original_install = install.read_bytes() if install.exists() else None
         mapping = _prepare_file_replacements([(p[1], p[0]) for p in prepared.values()])
+        if validate_only:
+            return len(edits)
         outputs, expected, existing = [], {}, []
         if mapping is not None:
             outputs.append((install, mapping))
@@ -6591,9 +6596,10 @@ class Handler(PluginRequestHandler):
                         self._json({"saved": save_projectile_speeds(body.get("entries", []))})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/mobs/save":
+                elif path in {"/api/mobs/save", "/api/mobs/validate"}:
                     try:
-                        self._json({"saved": apply_mob_edits(body.get("edits", []))})
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_mob_edits(body.get("edits", []), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path.startswith("/api/ai/") and path.endswith(("/save", "/validate")):
