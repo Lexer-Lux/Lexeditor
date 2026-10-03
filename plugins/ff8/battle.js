@@ -587,7 +587,7 @@
     if(!field)return LexeditorUI.noImage();
     const image=el("img",{class:"field-background-image lex-overlay-base",alt:`${field.name} background`}),
       canvas=el("canvas",{class:"field-overlay-canvas lex-overlay-layer","aria-hidden":"true"}),
-      stack=el("div",{class:"field-preview-stack lex-overlay-stack world-to-field-picture",style:"visibility:hidden"},image,canvas);
+      stack=el("div",{class:"field-preview-stack lex-overlay-stack lex-overlay-fill world-to-field-picture",style:"visibility:hidden"},image,canvas);
     const dataset=state.activeSource==="mine"?"current":state.activeSource,cacheKey=`${dataset}:${field.key}`;
     const show=picture=>{image.onload=()=>{stack.style.visibility=""};image.src=picture.url;drawWorldToFieldPoint(row,field,canvas,picture.geometry)};
     (async()=>{

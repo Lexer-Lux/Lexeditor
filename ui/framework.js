@@ -2232,7 +2232,7 @@
     const switches = list.length > 0 && list.every(part => part instanceof Element && part.matches(".lex-toggle"));
     const columns = Math.max(1, Number(options.columns) || Math.min(3, list.length) || 1);
     return element("div", {
-      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.className || ""]
+      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.fixedFirst ? "lex-detail-parts-fixed-first" : "", options.className || ""]
         .filter(Boolean).join(" "),
       style: `--lex-part-columns:${columns};--lex-multi-number-columns:${columns}`,
       "data-lex-copy-parts": options.copy ? "" : null,

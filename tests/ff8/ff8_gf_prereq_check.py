@@ -58,7 +58,7 @@ def main():
             kind.value = "slot";
             const slot = U.el("select", {class: "gf-prereq-slot", "aria-label": "Required ability"},
               ...slots.map(name => U.el("option", {}, name)));
-            return U.controlGroup([kind, slot], {className: "gf-prereq-cell"});
+            return U.controlGroup([kind, slot], {className: "gf-prereq-cell", fixedFirst: true});
           };
           const table = U.columnList({
             rows, key: row => row.key, fill: true, template,

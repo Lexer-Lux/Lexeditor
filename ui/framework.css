@@ -3126,9 +3126,10 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
 .lex-source-control {
   --lex-reference-rail-width:var(--lex-reference-requested-width,5em);
   position:relative;
-  display:grid;
+  display:var(--lex-source-display, grid);
   grid-template-columns:minmax(0,1fr) var(--lex-reference-rail-width);
-  align-items:center;
+  align-items:var(--lex-source-align, center);
+  flex:var(--lex-source-flex, 0 1 auto);
   gap:8px;
   min-width:0;
 }
@@ -4462,6 +4463,8 @@ body:has(.lex-data-map-table) #main {
 .lex-overlay-stack { position:relative; display:inline-block; max-width:100%; }
 .lex-overlay-stack > .lex-overlay-base { display:block; max-width:100%; height:auto; }
 .lex-overlay-stack > .lex-overlay-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.lex-overlay-stack.lex-overlay-fill { display:block; width:100%; align-self:start; }
+.lex-overlay-stack.lex-overlay-fill > .lex-overlay-base { width:100%; }
 .lex-image-map-stage > .lex-overlay-stack { display:block; width:100%; height:100%; }
 .lex-image-map-stage > .lex-overlay-stack > .lex-overlay-base { width:100%; height:100%; }
 .lex-stack { display:flex; flex-direction:column; gap:var(--lex-panel-gap); height:100%; min-height:0; }
@@ -6084,6 +6087,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part { flex:0 1 auto; min-width:0; margin-right:0; }
 /* The last box takes every pixel that is left: "the edit boxes use up all space as needed". */
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part:last-child { flex:1 1 auto; }
+.lex-column-list-cell .lex-detail-parts-fixed-first > .lex-detail-part:first-child { flex:none; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
 .lex-detail-parts-bare :is(.lex-detail-part-label,.lex-detail-part-spare) { display:none; }
 .lex-detail-parts-stacked { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
