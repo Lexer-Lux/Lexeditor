@@ -42,14 +42,19 @@ def test_tab_hover_does_not_move_or_resize_label(page):
     label.hover();page.wait_for_timeout(100)
     assert label.bounding_box()==before
     assert label.evaluate('n=>getComputedStyle(n).fontSize')==font
-    # The hand stands outside the chosen tab (Lexer: never inside a tab), so
-    # its tip ends at or before the tab's own left edge.
-    assert page.locator('nav button.active').evaluate('''n=>{
+    # The later request puts the hand on top of the tab's edge without
+    # reserving space (see test_tab_hand_outside). Keep that overlay above
+    # navigation while the label retains its exact hover geometry.
+    marker = page.locator('nav button.active').evaluate('''n=>{
       const p=getComputedStyle(n,'::before');
-      if(p.content==='none')return true;
-      const tip=n.getBoundingClientRect().left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left)+parseFloat(p.width);
-      return tip<=n.getBoundingClientRect().left+1
+      const tab=n.getBoundingClientRect();
+      const left=tab.left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left);
+      return {content:p.content,position:p.position,z:Number(p.zIndex),
+        left,right:left+parseFloat(p.width),tabLeft:tab.left,tabRight:tab.right};
     }''')
+    assert marker['content'] != 'none' and marker['position'] == 'absolute', marker
+    assert marker['z'] >= 5, marker
+    assert marker['left'] < marker['tabLeft'] < marker['right'] < marker['tabRight'], marker
 
 
 def test_instruction_wheel_turns_page_without_scrolling_footer(page):
