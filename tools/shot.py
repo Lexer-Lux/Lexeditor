@@ -24,7 +24,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
+sys.path.insert(0, str(ROOT / "tests" / "shared"))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 import browser_guard  # noqa: E402
@@ -40,6 +40,11 @@ STUB = """
     mod_projects:async()=>({canCreate:true,projects:[{name:'Test Mod',path:'Rendered test project',valid:true,current:true}]}),
     set_dirty_count:async()=>null,
     game_process_status:async()=>null,
+    mods_overview:async plugin=>({canManage:true,rows:[{name:'Test Mod',
+      path:`Rendered test library/${plugin}/Test Mod`,folder:'Test Mod',
+      author:'Fixture author',description:'Authored layout fixture',credits:'',
+      enabled:true}],remote:[]}),
+    lexmod_update:async()=>({updated:false}),
     lexeditor_settings:async()=>window.__lexSettings,
     save_lexeditor_settings:async v=>Object.assign(window.__lexSettings,v),
     save_developer_setting_defaults:async v=>Object.assign(window.__lexSettings.defaultValues,v),

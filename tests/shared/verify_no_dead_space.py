@@ -144,6 +144,7 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
             cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": STUB})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state==='undefined'||!state.booting", 120)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 120)
             time.sleep(1.5)
             found = tabs_of(cdp)
             for tab in found or [""]:
@@ -158,13 +159,17 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
                     if not reached:
                         raise AssertionError(f"The reachable tab disappeared: {plugin}/{tab}")
                     time.sleep(1.8)
+                    # A loading spinner's centre is not the page's bottom.
+                    # This applies to every shared or plugin-owned page.
+                    wait_eval(cdp, "![...document.querySelectorAll('#main .lex-panel-loading')].some(node=>"
+                              "node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0)", 120)
                 raw = cdp.eval(f"JSON.stringify({PROBE})")
                 try:
                     box = json.loads(raw)
                 except Exception:
                     box = None
                 if not box:
-                    continue
+                    raise AssertionError(f"No usable main-panel measurement: {plugin}/{tab or 'default'}")
                 try:
                     stacked = json.loads(cdp.eval(f"JSON.stringify({OVERLAP_PROBE})"))
                 except Exception:
