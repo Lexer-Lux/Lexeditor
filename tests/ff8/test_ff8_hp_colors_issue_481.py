@@ -96,17 +96,36 @@ class BetterHpColorsTests(unittest.TestCase):
             self.assertEqual(disabled.count("enable_ff8_better_hp_colors = false"), 1)
 
     def test_editor_exposes_control_and_semantics(self):
-        # The Tweaks page draws every tweak mod from its schema: the switch is
-        # labelled with the mod's name and the help bubble is the schema help.
-        editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
-        self.assertIn('"aria-label":row.name', editor)
-        self.assertIn("panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker)", editor)
+        # The shared renderer draws schema help and the current mod state.
+        # Enabling the mod belongs to the Mods tab.
         with FixtureLibrary() as fixture:
             fixture.add("better-hp-colors", "Better HP Colors", "enable_ff8_better_hp_colors", HELP)
             row = next(row for row in gameplay_settings.load(fixture.project, fixture.game)["tweaks"]
                        if row["id"] == "better-hp-colors")
             self.assertEqual((row["name"], row["schema"]["title"]), ("Better HP Colors", "BETTER HP COLORS"))
             self.assertIs(row["schema"]["needsDriver"], True)
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as play:
+                browser = play.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={"width": 1200, "height": 800})
+                    page.route('http://fixture/', lambda route: route.fulfill(
+                        body='<main></main>', content_type='text/html'))
+                    page.goto('http://fixture/')
+                    page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
+                    page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
+                    page.evaluate('''row => {
+                        const U=LexeditorUI;
+                        document.querySelector('main').append(...U.tweakModPanels({rows:[row]}).panels);
+                    }''', row)
+                    self.assertIn('BETTER HP COLORS', page.locator('main').inner_text())
+                    self.assertEqual(page.locator('main .lex-badge').inner_text(), 'OFF')
+                    self.assertEqual(page.locator('main input[type="checkbox"]').count(), 0)
+                    page.locator('main .lex-info-help').hover()
+                    page.locator('.lex-help-popover').wait_for(state='visible')
+                    self.assertIn(HELP, page.locator('.lex-help-popover').inner_text())
+                finally:
+                    browser.close()
 
     def test_library_mod_semantics(self):
         mod = Path(paths.MODS_ROOT) / "Better HP Colors"

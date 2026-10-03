@@ -45,15 +45,17 @@ def run():
             make(library, "max-spell", [{"key": "limit", "type": "int", "min": 1, "max": 255, "default": 100}])
             for mod_id in ("no-magic-consumption", "drops-after-mug"):
                 make(library, mod_id, [])
+            make(library, settings.SHARED_MAGIC_MOD, [])
             settings.initialize_project(project)
             assert all(not row["enabled"] for row in settings.load(project, game)["tweaks"])
             for cap in (1, 2, 10, 99, 100, 127, 128, 150, 254, 255):
                 for shared in (False, True):
                     for consume in (False, True):
-                        enabled = {"max-spell": True, "drops-after-mug": True, "no-magic-consumption": consume}
+                        enabled = {"max-spell": True, "drops-after-mug": True, "no-magic-consumption": consume,
+                                   settings.SHARED_MAGIC_MOD: shared}
                         changes = {key: {"enabled": value} for key, value in enabled.items()}
                         changes["max-spell"]["values"] = {"limit": cap}
-                        settings.save({"sharedMagicInventory": shared, "tweaks": changes},
+                        settings.save({"tweaks": changes},
                                       game, project, runtime_root=runtime)
                         saved = settings.load(project, game)
                         assert {row["id"]: row["enabled"] for row in saved["tweaks"]} == enabled
@@ -74,6 +76,7 @@ def run():
                     raise AssertionError(f"Invalid stock cap accepted: {cap!r}")
             settings.save({"tweaks": {key: {"enabled": False} for key in enabled}}, game, project, runtime_root=runtime)
             assert tomllib.loads(runtime_config.path(project).read_text())["magicStockLimit"] == 100
+            assert tomllib.loads(runtime_config.path(project).read_text())["sharedMagicInventory"] is False
             assert not settings.materialized_tweak_patches(runtime, set(enabled))
             assert script_mods.values(library / "max-spell")["limit"] == 255
             assert list(game.iterdir()) == []

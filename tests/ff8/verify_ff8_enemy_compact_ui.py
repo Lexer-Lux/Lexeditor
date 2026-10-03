@@ -15,6 +15,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests/shared'))
+from paged_detail import reveal
 from plugins.ff8 import enemy_tables
 from plugins.ff8.formats import ENEMY_FIELDS
 
@@ -192,7 +194,9 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             assert not toggle.is_checked()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.elementDefence[0].stored')==100
             death=page.get_by_label('Death defence percent',exact=True)
-            death.fill('75');death.blur();page.locator('[data-defence="Death"] input[type=checkbox]').check()
+            reveal(page, death)
+            death.fill('75');death.blur()
+            reveal(page, page.locator('[data-defence="Death"] input[type=checkbox]')).check()
             assert death.is_disabled()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.statusDefence[0].stored')==255
             page.locator('[data-defence="Death"] input[type=checkbox]').uncheck();assert death.input_value()=='75'
@@ -211,8 +215,8 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             page.get_by_role('tab',name='Cards',exact=True).click()
             page.get_by_label('Clear card slot 1',exact=True).click()
             page.evaluate("fixtureState.enemyDetailTab='defense';rerender()")
-            page.locator('[data-defence="Fire"] input[type=checkbox]').check()
-            page.locator('[data-defence="Death"] input[type=checkbox]').check()
+            reveal(page, page.locator('[data-defence="Fire"] input[type=checkbox]')).check()
+            reveal(page, page.locator('[data-defence="Death"] input[type=checkbox]')).check()
             page.evaluate('captureSave()')
             payload=page.evaluate('savedPayloads.find(value=>value.path==="/api/enemy-tables/save")')
             assert payload,page.evaluate('savedPayloads')

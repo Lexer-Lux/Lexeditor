@@ -80,8 +80,11 @@ class InteractionIndicatorTests(unittest.TestCase):
 
     def test_editor_exposes_non_invasive_semantics(self):
         editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
-        self.assertIn('"aria-label":row.name', editor)
-        self.assertIn("panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker)", editor)
+        self.assertIn('LexeditorUI.tweakModPanels({rows:settings.tweaks||[]', editor)
+        row = next(row for row in gameplay_settings.load(self.project, self.game)["tweaks"]
+                   if row["id"] == "interaction-indicators")
+        self.assertIn("never presses a button", row["schema"]["help"])
+        self.assertIs(row["schema"]["needsDriver"], True)
         mod = Path(paths.MODS_ROOT) / "Interaction Indicators"
         if not script_mods.is_script_mod(mod):
             self.skipTest(f"The Interaction Indicators tweak mod is not installed in {paths.MODS_ROOT}")

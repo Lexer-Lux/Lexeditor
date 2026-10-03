@@ -92,6 +92,7 @@ World
     > status 2026-10-03: RDR, DS3 and Terraria also passed CI. FF7R, Warband and Chrono Trigger browser checks now follow detail pages and pass locally, including their save assertions. Warband contrast measurement now handles CSS color-mix and checks Mods plus ordinary tabs. Pushed for CI; remaining workflow failures and the wider audit remain open.
     > status 2026-10-03: FF7R, Warband, Chrono Trigger, Project Zomboid and Stardew Valley passed CI. New Palworld and Bannerlord failures were detail-page assumptions; their corrected browser checks pass locally. FF8's missing Formulae Rework notice is an actionable missing-mod state, now recognized by the page-note check. Other FF8 failures and shared/native workflows remain open.
 - Complete integration verification on local master, including native FF8 package validation and remaining CI checks.
+    > status 2026-10-03: All other plugin workflows passed at 3f5c58eb. FF8's remaining failures came from checks targeting removed inline tweak toggles or assuming unpaged detail panes; the updated focused checks pass, including 40 stock-cap save/composition cases. Shared and native workflows are still running, and the updated FF8 checks await CI.
 
 
 ==================================================================== ANSWERS (finished items; the replies you may still want)
