@@ -21,6 +21,14 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
     result = page.evaluate('''async()=>{
       const inputs=[...document.querySelectorAll('input[type=number]')];
       const counts=inputs.map(()=>0);
+      let layoutScans=0;
+      for(const prototype of [Document.prototype,Element.prototype]){
+        const original=prototype.querySelectorAll;
+        prototype.querySelectorAll=function(selector){
+          if(selector==='.lex-detail-field[data-lex-layout-field]')layoutScans++;
+          return original.call(this,selector);
+        };
+      }
       inputs.forEach((input,i)=>{
         const measure=input.__lexAutoFitMeasure;
         input.__lexAutoFitMeasure=()=>{counts[i]++;return measure()};
@@ -31,12 +39,13 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
         inputs[0].dispatchEvent(new Event('change',{bubbles:true}));
         await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
       }
-      return {edited:counts[0],unrelated:counts.slice(1).reduce((a,b)=>a+b,0),
+      return {edited:counts[0],unrelated:counts.slice(1).reduce((a,b)=>a+b,0),layoutScans,
         values:inputs.slice(1).every((input,i)=>input.value===String(40+(i+1)%60))};
     }''')
     assert result['values']
     assert result['edited'] >= 5, result
     assert result['unrelated'] == 0, result
+    assert result['layoutScans'] == 0, result
 
 
 def test_loaded_font_refits_controls_and_mounted_reference_rails(page):

@@ -7152,13 +7152,35 @@ ${contents.path}`});
     clearPropertyDrop();
   });
   let layoutPending = false;
-  new MutationObserver(() => {
+  const changedLayoutRoots = new Set();
+  new MutationObserver(records => {
+    for (const record of records) {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      if (!target || target.closest('.lex-detail-field')) continue;
+      const changed = [...record.addedNodes, ...record.removedNodes].filter(node => node instanceof Element &&
+        (node.matches('.lex-detail-field[data-lex-layout-field],.lex-detail-section,.lex-detail-section-content') ||
+         node.querySelector('.lex-detail-field[data-lex-layout-field],.lex-detail-section')));
+      if (!changed.length) continue;
+      const existing = target.closest('.lex-detail-panel') || target.closest('.lex-detail-section');
+      if (existing) changedLayoutRoots.add(existing);
+      for (const node of changed) {
+        if (!node.isConnected) continue;
+        const fields = node.matches('.lex-detail-field[data-lex-layout-field]') ? [node] :
+          [...node.querySelectorAll('.lex-detail-field[data-lex-layout-field]')];
+        for (const field of fields) {
+          const root = propertyRoot(field);
+          if (root) changedLayoutRoots.add(root);
+        }
+      }
+    }
+    if (!changedLayoutRoots.size) return;
     if (layoutPending) return;
     layoutPending = true;
     requestAnimationFrame(() => {
       layoutPending = false;
-      const roots = new Set([...document.querySelectorAll(".lex-detail-field[data-lex-layout-field]")].map(propertyRoot).filter(Boolean));
-      roots.forEach(preparePropertyLayout);
+      const roots = [...changedLayoutRoots];
+      changedLayoutRoots.clear();
+      roots.filter(root=>root.isConnected).forEach(preparePropertyLayout);
     });
   }).observe(document.documentElement, {childList: true, subtree: true});
 
