@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+from core.numeric_values import integer_value
 
 from . import kernel_text, paths, runtime_layout
 from .fs_archive import FsArchive
@@ -165,7 +166,7 @@ def _entry_index(edits: list[dict], count: int) -> list[tuple[int, str]]:
     seen: set[int] = set()
     for edit in edits:
         try:
-            index = int(edit["index"])
+            index = integer_value(edit["index"], "Name dictionary index")
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("A namedic.bin edit needs an index") from error
         if not 0 <= index < count:
@@ -186,25 +187,29 @@ def apply_edits(raw: bytes, edits: list[dict]) -> bytes:
     """Write the names, rebuilding the offset table when a name changes length."""
     document = parse(raw)
     count = document["count"]
-    texts = [entry["text"] for entry in document["entries"]]
-    for index, text in _entry_index(edits, count):
-        texts[index] = text
-    encoded = [kernel_text.encode(text, compress=False) for text in texts]
+    replacements = dict(_entry_index(edits, count))
     header_size = COUNT_SIZE + count * OFFSET_SIZE
     offsets: list[int] = []
     body = bytearray()
     position = header_size
-    for payload in encoded:
+    for entry in document["entries"]:
+        index = entry["index"]
+        if index in replacements:
+            payload = (kernel_text.encode(replacements[index], compress=False) + b"\x00"
+                       + b"\x00" * entry["padding"])
+        else:
+            payload = raw[entry["offset"]:entry["offset"] + entry["length"]]
         if position > MAX_FILE_SIZE:
             raise ValueError(
                 f"These names need {position} bytes; namedic.bin holds 16-bit offsets")
         offsets.append(position)
-        body += payload + b"\x00"
-        position += len(payload) + 1
+        body += payload
+        position += len(payload)
+    if position > MAX_FILE_SIZE:
+        raise ValueError(f"These names need {position} bytes; namedic.bin holds {MAX_FILE_SIZE}")
     output = bytearray(struct.pack("<H", count))
     output += struct.pack(f"<{count}H", *offsets)
     output += body
-    output += b"\x00" * document["tail"]
     return bytes(output)
 
 
