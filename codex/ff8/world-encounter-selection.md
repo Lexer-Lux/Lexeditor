@@ -109,6 +109,10 @@ SHA-256 digest of the weight records. The reader rejects invalid bounds,
 counts, checksums, distributions and a modified alternative-group fallback.
 Updating the extension replaces it rather than appending another copy;
 restoring all defaults returns the exact original file.
+Runtime composition can retain an all-default extension while the weighted
+selector remains loaded. This keeps its fixed table address valid even when a
+live condition selects no weighted source. Removing every weighted mod removes
+that generated data and its Hext from the runtime.
 
 The original world-load table names `dat\\wmsetus.obj;1` with destination
 `0x1E9DC3C`. The file helper `0x52D400` seeks to EOF, reads that complete size
@@ -153,3 +157,54 @@ first/second staging and publication failures with new and existing files,
 retries, retained failed-restore originals, external edits, unsupported
 executables and combined ground-name publication. The selector's actual
 supported-executable behavior is established separately by the native checks.
+
+## Composing weighted mods and live world-data outcomes
+
+`world_data_merge` strips the validated extension before merging the original
+world fields. Each group's complete eight-weight distribution is one merge
+unit; individual slots are not independently combined because their total
+must remain 256. Separate groups and ordinary world fields survive together.
+Different distributions for one group follow low-to-high mod order and report
+the winning group unit. Identical distributions do not conflict.
+
+`runtime_layout` freezes the world-data and generated-Hext sources before
+staging. Every weighted source must have the generated patch for the original
+file length and group-data offset, and the installed executable must match
+the supported hash. Missing, orphaned, modified or corrupt pairs reject.
+Opaque world edits cannot silently replace the table while its selector
+remains active. Rejection leaves the previous runtime intact.
+
+For live conditional world paths, every enumerated outcome and fallback goes
+through the same world merger against one immutable original. Each output
+includes the full validated table, including all-default outcomes with no
+selected world source. The table stays at the same offset in every output.
+The Hext is loaded once; live routes change the data, not the selector.
+
+`test_ff8_encounter_weight_merge.py` proves authored-fixture ordinary and live
+composition in both orders, independent and conflicting groups, outcomes with
+and without static world sources, exact table offsets and checksums, fallback
+parity, rejection preserving the previous runtime, and removal of weighted
+mods. It does not prove the live evaluator in a running game.
+
+## Player-facing chance controls
+
+Groups and Rules use the same group panel and per-slot Initial chance control.
+Percentages use exact steps of `100 / 256`, or 0.390625%, within 0–100%.
+The formation summary combines the current slot weights for repeated scene
+IDs. Zero excludes a slot; 100% leaves that slot as the only initial choice.
+The previous-scene retry still applies.
+
+Invalid numeric drafts survive tab navigation and remain pending changes.
+Header Save validates every group's complete distribution before starting any
+writer, including groups whose controls are hidden. Vanilla controls are
+disabled. Valid edits use the loaded world-source hash and the paired Save
+transaction above; restoring all defaults returns the exact original file
+and empties the generated Hext.
+
+`test_ff8_encounter_chance_controls.py` runs the production editor in a headless
+browser and sends World requests through the production HTTP handler using
+authored data and executable-signature fixtures. It covers bounds, invalid
+steps and drafts, hidden errors blocking unrelated formation writes, summary
+updates, zero/100% choices, header Save, reload, Rules/Groups parity, default
+restoration and disabled Vanilla controls. The existing Encounter browser
+verifier separately covers group/formation/enemy pickers and shared layouts.
