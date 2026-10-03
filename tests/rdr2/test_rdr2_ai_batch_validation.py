@@ -154,3 +154,35 @@ def test_loader_changed_after_preparation_is_preserved_without_ai_publication(ai
         s.apply_ai_edits(s.PED_PERCEPTION_FILE, [FIRST])
     before[str(install.relative_to(root))] = external
     assert snapshot(root) == before
+
+
+@pytest.mark.parametrize('existing', [False, True])
+def test_validate_only_checks_complete_batch_and_loader_without_publication(ai, existing):
+    root, path, source, install = ai
+    entry = None
+    if existing:
+        path.parent.mkdir(parents=True)
+        path.write_bytes(source.read_bytes())
+        entry = s.load_file(s.PED_PERCEPTION_FILE)
+        original_root = entry['root']
+    before = snapshot(root)
+    assert s.apply_ai_edits(s.PED_PERCEPTION_FILE, [FIRST], validate_only=True) == 1
+    with pytest.raises(ValueError):
+        s.apply_ai_edits(s.PED_PERCEPTION_FILE, [FIRST, dict(FIRST, path=[-1])], validate_only=True)
+    assert snapshot(root) == before
+    if entry:
+        assert entry['root'] is original_root
+    install.write_text('<Install/>')
+    before = snapshot(root)
+    with pytest.raises(ValueError, match='Resources'):
+        s.apply_ai_edits(s.PED_PERCEPTION_FILE, [FIRST], validate_only=True)
+    assert snapshot(root) == before
+
+
+def test_source_enum_choices_remain_valid_when_two_rows_swap(ai):
+    _, path, _, _ = ai
+    assert s.apply_ai_edits(s.PED_PERCEPTION_FILE, [
+        {'path': [3], 'kind': 'text', 'value': 'B'},
+        {'path': [4], 'kind': 'text', 'value': 'A'},
+    ]) == 2
+    assert [node.text for node in s.parse_with_comments(path).findall('Mode')] == ['B', 'A']

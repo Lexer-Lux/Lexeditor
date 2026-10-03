@@ -5768,7 +5768,8 @@ def _ai_scalar_rows(root):
                 value = child.text.strip(); kind = "text"
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
-                             "context": next_context, "value": value, "kind": kind})
+                             "context": next_context, "value": value, "kind": kind,
+                             "readonly": bool(len(child) or (kind == "attr" and (set(child.attrib) != {'value'} or (child.text or '').strip())) or (kind == "text" and child.attrib))})
             elif len(child):
                 walk(child, child_path, child_tags, next_context)
     walk(root, [], [], "GLOBAL")
@@ -5803,7 +5804,7 @@ def get_ai_reference(name):
             "reference": "Ultimate Combat Overhaul 1.0.7"}
 
 
-def apply_ai_edits(name, edits):
+def apply_ai_edits(name, edits, *, validate_only=False):
     allowed = {f for files in AI_FILES.values() for f in files}
     if not isinstance(name, str) or name not in allowed:
         raise ValueError("unknown AI file")
@@ -5826,6 +5827,11 @@ def apply_ai_edits(name, edits):
             entry = load_file(name)
             root = copy.deepcopy(entry["root"])
         rows = {tuple(row['path']): row for row in _ai_scalar_rows(root)}
+        source_choices = {}
+        for node in root.iter():
+            if isinstance(node.tag, str):
+                for kind in ('attr', 'text'):
+                    source_choices.setdefault((node.tag, kind), set()).add(str(node.get('value') if kind == 'attr' else node.text).strip())
         seen = set()
         for edit in edits:
             if not isinstance(edit, dict) or set(edit) != {'path', 'kind', 'value'}:
@@ -5847,8 +5853,7 @@ def apply_ai_edits(name, edits):
                 raise ValueError("AI target has unsupported scalar metadata")
             if not isinstance(edit['value'], (str, int, float)) or isinstance(edit['value'], bool):
                 raise ValueError("AI scalar values must be text or numbers")
-            choices = {str(sibling.get('value') if row['kind'] == 'attr' else sibling.text).strip()
-                       for sibling in root.iter(node.tag)}
+            choices = source_choices[(node.tag, row['kind'])]
             numeric = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
             if re.fullmatch(numeric, row['value'].strip()):
                 finite_number(row['value'], 'AI source')
@@ -5870,6 +5875,8 @@ def apply_ai_edits(name, edits):
             if payload is not None:
                 outputs.append((install, payload))
                 expected[install] = original
+        if validate_only:
+            return len(edits)
         if entry is not None:
             _commit_xml_roots([(name, entry, root)], outputs, expected)
         else:
@@ -6535,10 +6542,11 @@ class Handler(PluginRequestHandler):
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/mobs/save":
                     self._json({"saved": apply_mob_edits(body.get("edits", []))})
-                elif path.startswith("/api/ai/") and path.endswith("/save"):
-                    name = path[len("/api/ai/"):-len("/save")]
+                elif path.startswith("/api/ai/") and path.endswith(("/save", "/validate")):
+                    validate_only = path.endswith('/validate')
+                    name = path[len("/api/ai/"):-len("/validate" if validate_only else "/save")]
                     try:
-                        self._json({"saved": apply_ai_edits(name, body.get("edits", []))})
+                        self._json({"validated" if validate_only else "saved": apply_ai_edits(name, body.get("edits", []), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 else:

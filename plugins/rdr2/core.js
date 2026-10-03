@@ -928,6 +928,7 @@ async function saveAllChanges() {
     validateCrimeDrafts();
     validateBountyHunterDrafts();
     validateHonorActionDrafts();
+    await preflightAISave();
     await preflightChallengeSave();
     if(Object.keys(state.settingEdits).length)await saveSettings();
     if(state.customCraftingDirty)await saveCustomCrafting();
