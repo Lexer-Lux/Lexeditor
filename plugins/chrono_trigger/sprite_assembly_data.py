@@ -7,6 +7,7 @@ does not resize frames or tile lists. The odd stored source bit and all flag
 bits except documented flip-X are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -25,7 +26,7 @@ def _signed(value: int) -> int:
 
 
 def _signed_byte(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not -128 <= number <= 127:
         raise ValueError(f"{name} must be between -128 and 127")
     return number & 0xFF
@@ -36,7 +37,7 @@ def _decode_chip(value: int) -> tuple[int, bool]:
 
 
 def _encode_chip(chip: int, weird_bit: bool) -> int:
-    number = int(chip)
+    number = integer_value(chip, "Chip index")
     if not 0 <= number <= MAX_CHIP_INDEX:
         raise ValueError(f"Sprite assembly chip index must be between 0 and {MAX_CHIP_INDEX}")
     return (number & 0x07) | ((number & 0x7FF8) << 1) | (0x08 if weird_bit else 0)

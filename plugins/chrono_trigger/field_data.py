@@ -1,5 +1,6 @@
 """Fixed-size Steam field exits and treasure records from CTViewer's PC layouts."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import struct
 
@@ -73,7 +74,7 @@ def load_exits(store: OverlayStore, source: str = "mine") -> dict:
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number

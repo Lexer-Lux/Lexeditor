@@ -1,5 +1,6 @@
 """Fixed-size Chrono Trigger Steam area-header editing from CTViewer's PC layout."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -86,7 +87,7 @@ def load_scenes(store: OverlayStore, source: str = "mine", language: str = "en")
 
 
 def _bounded(name: str, value, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not 0 <= number <= high:
         raise ValueError(f"{name} must be between 0 and {high}")
     return number

@@ -7,6 +7,7 @@ to determine the existing layer-1/layer-2 upper tile-bank flags; it never
 rewrites that stream, dimensions, layer-enable bits, or map header.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 
@@ -159,7 +160,7 @@ def save_scene_map(store: OverlayStore, path: str, expected_sha256: str, edits: 
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the scene-map tile index is editable")
         row = by_token[token]
-        tile = int(values.get("tileIndex", row["tileIndex"]))
+        tile = integer_value(values.get("tileIndex", row["tileIndex"]), "Tile index")
         low = 256 if row["upperBank"] else 0
         high = low + 255
         if row["layer"] == 3:
@@ -274,7 +275,7 @@ def load_scene_properties(store: OverlayStore, path: str, source: str = "mine") 
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number

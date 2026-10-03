@@ -5,6 +5,7 @@ Game/common/bankc6.bin. The eighth header is unused. Lexeditor edits only
 documented active-header bytes and preserves the rest of bankc6.bin verbatim.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from .project import OverlayStore, digest
 
@@ -71,7 +72,7 @@ def load_worlds(store: OverlayStore, source: str = "mine") -> dict:
 
 
 def _u8(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not 0 <= number <= 0xFF:
         raise ValueError(f"{name} must be between 0 and 255")
     return number

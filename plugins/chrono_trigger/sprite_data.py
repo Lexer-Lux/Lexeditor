@@ -7,6 +7,7 @@ runtime replaces the stored bitmap/assembly/palette references with the sprite
 index; those bytes and all unknown flags/data remain read-only and preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 
@@ -21,7 +22,7 @@ def _signed(value: int) -> int:
 
 
 def _u8_signed(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not -128 <= number <= 127:
         raise ValueError(f"{name} must be between -128 and 127")
     return number & 0xFF
@@ -90,10 +91,10 @@ def save_sprite_header(
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported sprite descriptor fields: {', '.join(sorted(unknown))}")
-    size_group = int(values.get("sizeGroupCode", payload[3] & 0x03))
+    size_group = integer_value(values.get("sizeGroupCode", payload[3] & 0x03), "Size group")
     if not 0 <= size_group <= 3:
         raise ValueError("Sprite size-group code must be between 0 and 3")
-    animation = int(values.get("animationIndex", payload[4]))
+    animation = integer_value(values.get("animationIndex", payload[4]), "Animation index")
     if not 0 <= animation <= 255:
         raise ValueError("Sprite animation index must be between 0 and 255")
 

@@ -7,6 +7,7 @@ animation/frame counts. Duration low nibbles, terminators and trailing bytes are
 preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -116,7 +117,7 @@ def load_chip_animations(store: OverlayStore, source: str = "mine") -> dict:
 
 
 def _chip(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not 0 <= number <= MAX_CHIP_INDEX:
         raise ValueError(f"{name} must be between 0 and {MAX_CHIP_INDEX}")
     return number

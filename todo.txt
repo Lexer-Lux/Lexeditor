@@ -2,6 +2,7 @@
 
 - Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
     > status 2026-10-03: Palworld now preserves schema bounds and inline enums, rejects invalid saves, and protects unresolved constraints. RDR2 weapons protect unknown hash fields and use boolean checkboxes; invalid save batches no longer leak into cached data. DS3 protects unknown fields, rejects fractional integer edits, and bounds floats to their storage format. Focused checks pass and rendered controls inspected. The remaining plugin audit is still open.
+    > status 2026-10-03: Chrono Trigger and FFX/X2 numeric writers now reject fractional integer values instead of truncating them; Terraria rejects nonfinite numeric values before generating source. Focused save/reload and rejected-write preservation checks pass. The broader audit remains open.
 - Audit remaining supported record-creation gaps in Warband, DS3, Factorio, Bannerlord, Project Zomboid, and Terraria localization; finish missing record families and verify save/reload.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
     > status 2026-09-27: detector repaired. Every FF8 tab, subtab and panel tab swept at 1600x900; the one find (Encounters > Rules #000 column) is fixed. Not done: other games, smaller window sizes.

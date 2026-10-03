@@ -7,6 +7,7 @@ live trigger records only. Counts, the unknown block, script addresses,
 sentinel records, unmodelled flag bits and trailing bytes are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -153,7 +154,7 @@ def load_world_navigation(store: OverlayStore, source: str = "mine", language: s
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number

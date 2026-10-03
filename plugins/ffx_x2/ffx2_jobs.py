@@ -7,6 +7,7 @@ writes only those pairs. Stat-growth coefficients, weapons, creature data,
 text references, flags, and trailing strings remain byte-identical.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 import struct
@@ -61,12 +62,7 @@ def _u16(raw: bytes, offset: int) -> int:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise FFX2JobError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFX2JobError(f"{label} must be an integer") from error
+    parsed = integer_value(value, label, FFX2JobError)
     if not minimum <= parsed <= maximum:
         raise FFX2JobError(f"{label} must be between {minimum} and {maximum}")
     return parsed

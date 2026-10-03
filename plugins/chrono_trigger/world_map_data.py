@@ -10,6 +10,7 @@ Lexeditor never resizes these resources and preserves trailing bytes and color
 bit 15.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -112,7 +113,7 @@ def save_world_tiles(store: OverlayStore, path: str, expected_sha256: str, edits
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the world-map tile index is editable")
         row = by_token[token]
-        value = int(values.get("tileIndex", row["tileIndex"]))
+        value = integer_value(values.get("tileIndex", row["tileIndex"]), "Tile index")
         low, high = ((0, 255) if row["layer"] == 1 else (256, 511))
         if not low <= value <= high:
             raise ValueError(f"Layer {row['layer']} tile index must be between {low} and {high}")
@@ -166,7 +167,7 @@ def save_world_properties(store: OverlayStore, path: str, expected_sha256: str, 
         if unknown:
             raise ValueError(f"Unsupported world property fields: {', '.join(sorted(unknown))}")
         row = by_token[token]
-        merged = {key: int(values.get(key, row[key])) for key in allowed}
+        merged = {key: integer_value(values.get(key, row[key]), key) for key in allowed}
         for key, value in merged.items():
             if key in values and value not in PROPERTY_NAMES:
                 raise ValueError("Edited world property values must be documented codes 0 through 4")
@@ -220,8 +221,8 @@ def save_world_music(store: OverlayStore, path: str, expected_sha256: str, edits
         if set(values) - {"leftMusic", "rightMusic"}:
             raise ValueError("Only the two stored world music indexes are editable")
         row = by_token[token]
-        left = int(values.get("leftMusic", row["leftMusic"]))
-        right = int(values.get("rightMusic", row["rightMusic"]))
+        left = integer_value(values.get("leftMusic", row["leftMusic"]), "Left music")
+        right = integer_value(values.get("rightMusic", row["rightMusic"]), "Right music")
         if not 0 <= left <= 15 or not 0 <= right <= 15:
             raise ValueError("World music index must be between 0 and 15")
         output[row["index"]] = (left << 4) | right

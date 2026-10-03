@@ -9,6 +9,7 @@ Lexeditor never resizes these files. Unknown bits in the third assembly byte and
 any trailing bytes are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -76,7 +77,7 @@ def save_graphics_set(
         raise ValueError(f"Unsupported graphics-set fields: {', '.join(sorted(unknown))}")
     output = bytearray(payload)
     for key, value in values.items():
-        number = int(value)
+        number = integer_value(value, key)
         if not 0 <= number <= 0xFF:
             raise ValueError(f"{key} must be between 0 and 255")
         output[int(key.removeprefix("graphicsSet"))] = number

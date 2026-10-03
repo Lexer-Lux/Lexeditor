@@ -1,5 +1,6 @@
 """Structured editing for Final Fantasy X ``takara.bin`` treasure rewards."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 import hashlib
@@ -71,12 +72,7 @@ def parse_treasures(data: bytes) -> tuple[TreasureRecord, ...]:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise TreasureError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise TreasureError(f"{label} must be an integer") from error
+    parsed = integer_value(value, label, TreasureError)
     if not minimum <= parsed <= maximum:
         raise TreasureError(f"{label} must be between {minimum} and {maximum}")
     return parsed
