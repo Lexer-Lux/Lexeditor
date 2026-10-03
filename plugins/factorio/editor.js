@@ -90,6 +90,7 @@ function inputNumber(value, options, change) {
     step: options.step ?? "any",
     "aria-label": options.label,
     onchange: event => {
+      event.target.setCustomValidity("");
       if (event.target.value === "") {
         event.target.setCustomValidity("A numeric value is required.");
         event.target.reportValidity();
@@ -101,13 +102,27 @@ function inputNumber(value, options, change) {
         event.target.reportValidity();
         return;
       }
-      const validation = typeof options.validate === "function" ? options.validate(number) : "";
+      // Shared thousands grouping uses a text face for large numeric ranges.
+      // Validate the declared bounds and integer step before committing even
+      // when native input validity no longer covers those attributes.
+      const validation = options.step === 1 && !Number.isSafeInteger(number)
+        ? "Enter a whole number within the exact integer range."
+        : options.min !== undefined && number < options.min
+          ? `Enter a number of at least ${options.min}.`
+          : options.max !== undefined && number > options.max
+            ? `Enter a number no greater than ${options.max}.`
+            : typeof options.validate === "function" ? options.validate(number) : "";
       if (validation) {
         event.target.setCustomValidity(validation);
         event.target.reportValidity();
         return;
       }
       event.target.setCustomValidity("");
+      if (!event.target.checkValidity()) {
+        event.target.reportValidity();
+        return;
+      }
+      if (number === Number(value)) return;
       void change(number);
     },
   });
@@ -218,7 +233,7 @@ function recipePanel(row) {
 function itemPanel(row) {
   const stack = inputNumber(row.stackSize, {
     label: "Stack size", min: 1, max: 4294967295, step: 1, unit: "items",
-  }, value => commitRow("items", changedCopy(row, "stackSize", Math.trunc(value))));
+  }, value => commitRow("items", changedCopy(row, "stackSize", value)));
   return detailPanel({
     title: row.name, identity: null,
     meta: `${row.prototypeType}${row.modified ? " · modified by this project" : ""}`,
@@ -291,7 +306,7 @@ function technologyPanel(row) {
       ? readonlyField("Trigger-only technology")
       : inputNumber(row.unitCount, {
           label: "Research unit count", min: 1, max: Number.MAX_SAFE_INTEGER, step: 1, unit: "units",
-        }, value => commitRow("technologies", changedCopy(row, "unitCount", Math.trunc(value))));
+        }, value => commitRow("technologies", changedCopy(row, "unitCount", value)));
   const time = row.unitTime === null || row.unitTime === undefined
     ? readonlyField("—")
     : inputNumber(row.unitTime, {
@@ -386,7 +401,11 @@ function numberCellEdit(kind, key, options = {}) {
       LexeditorUI.showToast?.("Enter a finite number.", true);
       return;
     }
-    const next = options.integer ? Math.trunc(number) : number;
+    if (options.integer && !Number.isSafeInteger(number)) {
+      LexeditorUI.showToast?.("Enter a whole number within the exact integer range.", true);
+      return;
+    }
+    const next = number;
     const validation = typeof options.validate === "function" ? options.validate(next) : "";
     if (validation) {
       LexeditorUI.showToast?.(validation, true);

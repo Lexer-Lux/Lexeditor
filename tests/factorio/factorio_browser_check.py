@@ -188,6 +188,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.locator('.lex-column-list-row[data-key="iron-plate"]').click()
                 page.wait_for_timeout(120)
                 stack = page.get_by_label("Stack size", exact=True)
+                for invalid in ("250.5", "0", "4294967296", ""):
+                    stack.fill(invalid)
+                    stack.blur()
+                    assert page.evaluate("dirtyCount()") == 0
+                    assert page.evaluate("state.data.items.find(row=>row.name==='iron-plate').stackSize") == 100
                 stack.fill("250")
                 stack.blur()
                 page.wait_for_function("dirtyCount() === 1")
@@ -247,7 +252,17 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Research unit count", exact=True).input_value() == "25"
-                assert page.get_by_label("Research unit time", exact=True).input_value() == "10"
+                count = page.get_by_label("Research unit count", exact=True)
+                for invalid in ("25.5", "0", "9007199254740992"):
+                    count.fill(invalid)
+                    count.blur()
+                    assert page.evaluate("dirtyCount()") == 0
+                    assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitCount") == 25
+                count.fill("25")
+                count.blur()
+                assert count.evaluate("input=>input.checkValidity()")
+                assert page.evaluate("dirtyCount()") == 0
+                assert page.get_by_label("Research unit time", exact=True).input_value() == "10", page.evaluate("({data:state.data.technologies.find(row=>row.name==='automation'),toasts:[...document.querySelectorAll('.lex-toast')].map(node=>node.textContent)})")
                 tech_search.fill("automation-2")
                 page.locator('.lex-column-list-row[data-key="automation-2"]').click()
                 page.wait_for_timeout(100)
@@ -315,7 +330,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert narrow["body"] <= narrow["viewport"] + 2, narrow
                 assert narrow["identities"], narrow
                 assert all(row["scroll"] <= row["client"] + 1 for row in narrow["identities"]), narrow
-                assert page.locator(".lex-toast").count() == 0
+                assert page.locator(".lex-toast").count() == 0, page.locator(".lex-toast").all_text_contents()
                 page.screenshot(
                     path=str(OUT / "factorio-recipes-900.png"), full_page=True)
 
@@ -333,7 +348,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                         "pageerror", lambda error: scaled_errors.append(str(error)))
                     scaled_page.goto(base_url, wait_until="domcontentloaded")
                     scaled_page.wait_for_selector(".lex-column-list-row")
-                    scaled_page.get_by_role(
+                    scaled_page.locator('.lex-paged-list-detail > .lex-pager').get_by_role(
                         "button", name="Last page", exact=True).click()
                     scaled_page.wait_for_timeout(200)
                     scale_control = scaled_page.get_by_label("UI scale", exact=True)
