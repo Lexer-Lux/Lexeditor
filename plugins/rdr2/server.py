@@ -2521,17 +2521,55 @@ def _buyer_node(parent, name, parent_i, child_i, sibling_i, previous_i, attr_sta
     ET.SubElement(node, "isEnabled", {"value": "true"})
 
 
+def _normalized_buyer_map(data, label, modes=False):
+    if not isinstance(data, dict) or set(data) - set(BUYER_SHOPS):
+        raise ValueError(f"{label} must map supported shops only")
+    result = {}
+    for shop in BUYER_SHOPS:
+        values = data.get(shop, {} if modes else [])
+        if not isinstance(values, dict if modes else list):
+            raise ValueError(f"{label} shop entries must be {'objects' if modes else 'lists'}")
+        normalized = {} if modes else []
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError(f"{label} item IDs must be text")
+            item = value.strip().upper()
+            if not re.fullmatch(r"(?:0X[0-9A-F]{8}|[A-Z][A-Z0-9_]{0,127})", item):
+                raise ValueError(f"{label} has an invalid item ID")
+            if modes:
+                mode = values[value]
+                if not isinstance(mode, str) or mode not in {"accept", "reject"}:
+                    raise ValueError("Merchant overrides must be accept or reject")
+                if item in normalized:
+                    raise ValueError(f"Duplicate normalized merchant override: {shop}/{item}")
+                normalized[item] = mode
+            else:
+                normalized.append(item)
+        result[shop] = normalized if modes else sorted(set(normalized))
+    return result
+
+
 def write_shop_buyer_data(buyers, vanilla_buyers=None, overrides=None):
     """Write explicit PDATA buyer lists without inventing empty shop overrides."""
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    normalized = _normalized_buyer_map(buyers, "Merchant buyers")
+    old = json.loads(BUYER_STATE_FILE.read_text(encoding="utf-8")) if BUYER_STATE_FILE.exists() else {}
+    if not isinstance(old, dict):
+        raise ValueError("Merchant state must be an object")
+    if vanilla_buyers is None:
+        vanilla_buyers = old.get("vanillaBuyers", old.get("buyers", normalized))
+    if overrides is None:
+        overrides = old.get("overrides", {})
+    vanilla_normalized = _normalized_buyer_map(vanilla_buyers, "Vanilla merchant buyers")
+    override_normalized = _normalized_buyer_map(overrides, "Merchant overrides", modes=True)
     root = ET.Element("UNK_MEMBER_0xDE396FE2")
     attrs = ET.SubElement(root, "attributes")
     _buyer_attr(attrs, "RELEASE", "1", 1, "0x2339EEB0")
     strings = []
     attr_index = 1
-    normalized = {}
     for shop in BUYER_SHOPS:
-        values = sorted(set(str(v).strip().upper() for v in buyers.get(shop, []) if str(v).strip()))
-        normalized[shop] = values
+        values = normalized[shop]
         if not values:
             continue
         strings.extend(values)
@@ -2568,43 +2606,54 @@ def write_shop_buyer_data(buyers, vanilla_buyers=None, overrides=None):
             _buyer_node(nodes, "INVITEM", shop_node, 65535,
                         current + 1 if i + 1 < item_count else 65535,
                         current - 1 if i else 65535, start + 1 + i, 1)
-    BUYER_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(root, space="  ")
-    BUYER_DATA_FILE.write_text('<?xml version="1.0" encoding="utf-8" standalone="no"?>\n' +
-                               ET.tostring(root, encoding="unicode") + "\n", encoding="utf-8")
-    if vanilla_buyers is None or overrides is None:
-        old = json.loads(BUYER_STATE_FILE.read_text(encoding="utf-8")) if BUYER_STATE_FILE.exists() else {}
-        vanilla_buyers = old.get("vanillaBuyers", old.get("buyers", normalized))
-        overrides = old.get("overrides", {})
-    vanilla_normalized = {
-        shop: sorted(set(str(v).strip().upper() for v in vanilla_buyers.get(shop, []) if str(v).strip()))
-        for shop in BUYER_SHOPS
-    }
-    override_normalized = {
-        shop: {str(item).strip().upper(): mode for item, mode in overrides.get(shop, {}).items()
-               if str(item).strip() and mode in ("accept", "reject")}
-        for shop in BUYER_SHOPS
-    }
-    BUYER_STATE_FILE.write_text(json.dumps({"source": "runtime vanilla dump",
-        "vanillaBuyers": vanilla_normalized, "buyers": normalized,
-        "overrides": override_normalized}, indent=2) + "\n", encoding="utf-8")
-    BUYER_OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    pdata = ('<?xml version="1.0" encoding="utf-8" standalone="no"?>\n' +
+             ET.tostring(root, encoding="unicode") + "\n").encode("utf-8")
+    state_data = {**old, "source": old.get("source", "runtime vanilla dump"),
+                  "vanillaBuyers": vanilla_normalized, "buyers": normalized,
+                  "overrides": override_normalized}
+    outputs = [(BUYER_DATA_FILE, pdata),
+               (BUYER_STATE_FILE, (json.dumps(state_data, indent=2) + "\n").encode("utf-8"))]
     lines = ["shop,item,mode"]
     for shop in BUYER_SHOPS:
         for item, mode in sorted(override_normalized[shop].items()):
             lines.append(f"{shop},{item},{mode}")
-    BUYER_OVERRIDE_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    outputs.append((BUYER_OVERRIDE_FILE, ("\n".join(lines) + "\n").encode("utf-8")))
     install = EDITABLE_MOD_ROOT / "install.xml"
     if install.exists():
-        tree = ET.parse(install); install_root = tree.getroot()
+        try:
+            tree = ET.parse(install)
+        except ET.ParseError as error:
+            raise ValueError(f"Invalid merchant install.xml: {error}") from error
+        install_root = tree.getroot()
         game_path = "update:/x64/levels/rdr3/script/parseddata/0x0BA63B3D.ymt"
-        if not any((node.findtext("GamePath") or "") == game_path for node in install_root.findall(".//FileReplacement")):
+        try:
+            file_path = BUYER_DATA_FILE.resolve().relative_to(EDITABLE_MOD_ROOT.resolve()).as_posix()
+        except ValueError as error:
+            raise ValueError("Merchant PDATA must be inside the editable mod") from error
+        replacement = next((node for node in install_root.findall(".//FileReplacement")
+                            if (node.findtext("GamePath") or "") == game_path), None)
+        changed = False
+        if replacement is None:
+            resources = install_root.find("Resources")
+            if resources is None:
+                raise ValueError("Missing Resources element in merchant install.xml")
             resource = install_root.find("./Resources/Resource")
+            if resource is None:
+                resource = ET.SubElement(resources, "Resource")
             replacement = ET.SubElement(resource, "FileReplacement")
             ET.SubElement(replacement, "GamePath").text = game_path
-            ET.SubElement(replacement, "FilePath").text = "parseddata/0x0BA63B3D.ymt"
+            changed = True
+        mapped = replacement.find("FilePath")
+        if mapped is None:
+            mapped = ET.SubElement(replacement, "FilePath")
+        if mapped.text != file_path:
+            mapped.text = file_path
+            changed = True
+        if changed:
             ET.indent(install_root, space="    ")
-            install.write_text('<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(install_root, encoding="unicode") + "\n", encoding="utf-8")
+            outputs.append((install, ('<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(install_root, encoding="unicode") + "\n").encode("utf-8")))
+    _commit_file_outputs(outputs, "Merchant")
 
 
 def apply_shop_buyer_edits(edits):
