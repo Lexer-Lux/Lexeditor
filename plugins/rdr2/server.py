@@ -4467,7 +4467,22 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             if value not in allowed_sources:
                 raise ValueError(f"unknown challenge score source: {value[0]} + {value[1]}")
     for edit in reward_edits or []:
-        for reward in edit.get("rewards", []):
+        shape(edit, {'challenge', 'rank', 'rewards'}, {'owner', 'ownerRank'})
+        identity(edit['challenge'], 'reward challenge')
+        if offset(edit['rank'], 'reward rank') == 0:
+            raise ValueError('Challenge reward rank must be positive')
+        if 'owner' in edit:
+            identity(edit['owner'], 'reward owner')
+        if 'ownerRank' in edit and offset(edit['ownerRank'], 'reward owner rank') == 0:
+            raise ValueError('Challenge reward owner rank must be positive')
+        if not isinstance(edit['rewards'], list):
+            raise ValueError('Challenge rewards must be a list')
+        for reward in edit['rewards']:
+            if not isinstance(reward, dict):
+                raise ValueError('Challenge reward must be an object')
+            shape(reward, {'type', 'value'})
+            identity(reward['type'], 'reward type')
+            identity(reward['value'], 'reward value')
             if "CHALLENGE_REWARD_TYPE_MONEY_" in reward.get("value", ""):
                 raise ValueError("MyOverhaul challenge money rewards are disabled")
             if (reward.get("type"), reward.get("value")) not in allowed_rewards:
@@ -4566,19 +4581,50 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
     reward_changed = 0
     if reward_edits:
         challenges = candidate(CHALLENGES_FILE)
-        by_name = {txt(c, "name"): c for c in challenges.find("challenges").findall("Item")}
+        collections = challenges.findall('challenges')
+        if len(collections) != 1:
+            raise ValueError('Challenge collection is missing or ambiguous')
+        seen_rewards = set()
         for edit in reward_edits:
-            challenge = by_name.get(edit.get("owner") or edit.get("challenge"))
-            ranks_el = challenge.find("ranks") if challenge is not None else None
-            ranks = ranks_el.findall("Item") if ranks_el is not None else []
-            rank_index = int(edit.get("ownerRank") or edit.get("rank", 0)) - 1
-            if not (0 <= rank_index < len(ranks)):
-                continue
-            rewards_el = ranks[rank_index].find("./reward/rewards")
-            if rewards_el is None:
-                continue
+            logical = edit['challenge']
+            rank_number = offset(edit['rank'], 'reward rank')
+            group = next((records for name, records in challenge_groups(collections[0]) if name == logical), [])
+            matches = []
+            for split_rank, record in group:
+                if len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1:
+                    raise ValueError('Challenge reward owner is ambiguous')
+                for local_rank, rank in enumerate(record.findall('./ranks/Item'), 1):
+                    if (split_rank or local_rank) == rank_number:
+                        matches.append((record, local_rank, rank))
+            if len(matches) != 1:
+                raise ValueError('Challenge reward rank is missing or ambiguous')
+            record, local_rank, rank = matches[0]
+            owner = txt(record, 'name')
+            if ('owner' in edit and edit['owner'] != owner) or ('ownerRank' in edit and offset(edit['ownerRank'], 'reward owner rank') != local_rank):
+                raise ValueError('Challenge reward owner does not match its logical rank')
+            key = (owner, local_rank)
+            if key in seen_rewards:
+                raise ValueError('Duplicate challenge reward target')
+            seen_rewards.add(key)
+            containers = rank.findall('reward')
+            rewards = containers[0].findall('rewards') if len(containers) == 1 else []
+            if len(rewards) != 1:
+                raise ValueError('Challenge reward collection is missing or ambiguous')
+            rewards_el = rewards[0]
+            if (rewards_el.text or '').strip():
+                raise ValueError('Source challenge rewards contain unsupported text')
+            for item in rewards_el.findall('Item'):
+                reward_type = item.get('type')
+                tag = 'unlock' if reward_type == 'CUnlockReward' else 'rewardType'
+                values = item.findall(tag)
+                if ((item.text or '').strip() or (item.tail or '').strip() or
+                        set(item.attrib) != {'type'} or len(values) != 1 or
+                        len(item) != 1 or len(values[0]) or values[0].attrib or
+                        (reward_type, (values[0].text or '').strip()) not in allowed_rewards):
+                    raise ValueError('Source challenge reward has unsupported data')
             for child in list(rewards_el):
-                rewards_el.remove(child)
+                if child.tag == 'Item':
+                    rewards_el.remove(child)
             rewards_el.text = "\n              "
             rows = edit.get("rewards", [])
             for i, row in enumerate(rows):

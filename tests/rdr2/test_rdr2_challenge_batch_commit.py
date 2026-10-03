@@ -15,6 +15,8 @@ LABEL = {'file': s.CHALLENGES_FILE, 'owner': 'Challenge', 'rank': 0,
 SOURCE = {'index': 0, 'base': 'SECOND', 'permutation': ''}
 CONDITION = {'goal': 'Goal', 'index': 0, 'type': 'CAIConditionGoalContext',
              'field': 'ContextHash', 'value': 'CHAL_CTX_SCOPED_KIT'}
+REWARD = {'challenge': 'Challenge', 'rank': 1, 'owner': 'Challenge', 'ownerRank': 1,
+          'rewards': [{'type': 'CUnlockReward', 'value': 'FIXTURE_UNLOCK_2'}]}
 
 
 @pytest.fixture
@@ -290,3 +292,134 @@ def test_goal_and_rank_labels_save_reload_without_touching_other_fields(challeng
     assert root.find('.//rankDescLabel').text == 'New rank'
     assert root.find('.//challengeDescLabel').text == 'New label'
     assert root.find('.//Opaque').text == 'keep'
+
+
+@pytest.fixture
+def rewards(challenges, monkeypatch):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    record = root.find('challenges/Item')
+    record.append(ET.fromstring('<ranks><Item><reward><rewards><!--reward note--><Opaque mode="keep">opaque text</Opaque><Item type="CUnlockReward"><unlock>FIXTURE_UNLOCK_1</unlock></Item></rewards></reward><Other>keep rank</Other></Item></ranks>',
+                               parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))))
+    s.save_file(s.CHALLENGES_FILE)
+    assert b'<!--reward note-->' in s.data_file_path(s.CHALLENGES_FILE, 'mine').read_bytes()
+    original = s.get_challenges
+    def definitions(ds):
+        result = original(ds)
+        result['allowedRewards'] = [{'type': 'CUnlockReward', 'value': value}
+                                    for value in ['FIXTURE_UNLOCK_1', 'FIXTURE_UNLOCK_2']]
+        return result
+    monkeypatch.setattr(s, 'get_challenges', definitions)
+    return challenges
+
+
+BAD_REWARDS = [{}, dict(REWARD, challenge='Unknown'), dict(REWARD, challenge=[]),
+               dict(REWARD, rank=0), dict(REWARD, rank=True), dict(REWARD, rank=1.5),
+               dict(REWARD, rank=2), dict(REWARD, owner='Other'), dict(REWARD, owner=[]),
+               dict(REWARD, ownerRank=True), dict(REWARD, ownerRank=1.5), dict(REWARD, ownerRank=2),
+               dict(REWARD, extra=1), dict(REWARD, rewards=None), dict(REWARD, rewards={}),
+               dict(REWARD, rewards=[None]), dict(REWARD, rewards=[{}]),
+               dict(REWARD, rewards=[{'type': [], 'value': 'FIXTURE_UNLOCK_2'}]),
+               dict(REWARD, rewards=[{'type': 'CUnlockReward', 'value': []}]),
+               dict(REWARD, rewards=[{'type': 'CUnlockReward', 'value': 'Unknown'}]),
+               dict(REWARD, rewards=[{'type': 'CUnlockReward', 'value': 'FIXTURE_UNLOCK_2', 'extra': 1}]),
+               dict(REWARD, rewards=[{'type': 'CUnlockReward', 'value': 'CHALLENGE_REWARD_TYPE_MONEY_UNKNOWN'}])]
+
+
+@pytest.mark.parametrize('bad', BAD_REWARDS)
+@pytest.mark.parametrize('backups', [False, True])
+def test_bad_reward_batch_preserves_files_backups_and_roots(rewards, bad, backups):
+    if backups:
+        for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+            path = s.data_file_path(name, 'mine')
+            path.with_suffix(path.suffix + '.bak').write_bytes(b'original')
+    before = snapshot(rewards)
+    roots = {name: s.load_file(name)['root'] for name in (s.GOALS_FILE, s.CHALLENGES_FILE)}
+    cached = {name: ET.tostring(root) for name, root in roots.items()}
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([GOAL], reward_edits=[bad], ui_edits=[LABEL])
+    assert snapshot(rewards) == before
+    for name, root in roots.items():
+        assert s.load_file(name)['root'] is root
+        assert ET.tostring(root) == cached[name]
+
+
+@pytest.mark.parametrize('change', ['unknown_value', 'extra_field', 'extra_attribute', 'nested_value',
+                                  'duplicate_value', 'duplicate_owner', 'duplicate_container', 'text'])
+def test_unsupported_reward_source_is_protected(rewards, change):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    container = root.find('.//rewards')
+    item = container.find('Item')
+    if change == 'unknown_value':
+        item.find('unlock').text = 'Unknown'
+    elif change == 'extra_field':
+        ET.SubElement(item, 'Future').text = 'keep'
+    elif change == 'extra_attribute':
+        item.set('future', 'keep')
+    elif change == 'nested_value':
+        ET.SubElement(item.find('unlock'), 'Future').text = 'keep'
+    elif change == 'duplicate_value':
+        ET.SubElement(item, 'unlock').text = 'FIXTURE_UNLOCK_1'
+    elif change == 'duplicate_owner':
+        root.find('challenges').append(ET.fromstring(ET.tostring(root.find('challenges/Item'))))
+    elif change == 'duplicate_container':
+        root.find('.//reward').append(ET.fromstring(ET.tostring(container)))
+    else:
+        container.text = 'future text'
+    s.save_file(s.CHALLENGES_FILE)
+    before = snapshot(rewards)
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([GOAL], reward_edits=[REWARD])
+    assert snapshot(rewards) == before
+    assert s.load_file(s.CHALLENGES_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+def test_duplicate_reward_target_rejects(rewards):
+    before = snapshot(rewards)
+    with pytest.raises(ValueError, match='Duplicate'):
+        s.apply_challenge_edits([GOAL], reward_edits=[REWARD, REWARD])
+    assert snapshot(rewards) == before
+
+
+def test_http_reward_save_remove_reload_preserves_opaque_siblings(rewards):
+    http = s.create_server(0)
+    worker = threading.Thread(target=http.serve_forever, daemon=True)
+    worker.start()
+    def post(reward):
+        return Request(f'http://127.0.0.1:{http.server_port}/api/challenges/save',
+                       data=json.dumps({'edits': [GOAL], 'rewards': [reward]}).encode(),
+                       headers={'Content-Type': 'application/json'})
+    try:
+        before = snapshot(rewards)
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(dict(REWARD, rank=1.5)))
+        assert error.value.code == 400
+        assert snapshot(rewards) == before
+        for values in [REWARD['rewards'], []]:
+            with urlopen(post(dict(REWARD, rewards=values))) as response:
+                assert json.load(response)['saved'] == 2
+            s._files.clear()
+            root = s.load_file(s.CHALLENGES_FILE)['root']
+            assert [node.text for node in root.findall('.//rewards/Item/unlock')] == [row['value'] for row in values]
+            assert root.find('.//rewards/Opaque').text == 'opaque text'
+            assert root.find('.//rewards/Opaque').get('mode') == 'keep'
+            assert root.find('.//Other').text == 'keep rank'
+            assert b'<!--reward note-->' in s.data_file_path(s.CHALLENGES_FILE, 'mine').read_bytes()
+        assert s.load_file(s.GOALS_FILE)['root'].find('.//desiredGoal').get('value') == '12'
+    finally:
+        http.shutdown()
+        http.server_close()
+        worker.join()
+
+
+def test_split_strand_reward_uses_logical_rank_and_exact_owner(rewards):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    record = root.find('challenges/Item')
+    record.find('name').text = 'SP_CHAL_FIXTURE_ROOT_2'
+    s.save_file(s.CHALLENGES_FILE)
+    edit = dict(REWARD, challenge='SP_CHAL_FIXTURE_ROOT', rank='2',
+                owner='SP_CHAL_FIXTURE_ROOT_2', ownerRank='1')
+    assert s.apply_challenge_edits([], reward_edits=[edit]) == 1
+    s._files.clear()
+    assert s.load_file(s.CHALLENGES_FILE)['root'].find('.//unlock').text == 'FIXTURE_UNLOCK_2'
