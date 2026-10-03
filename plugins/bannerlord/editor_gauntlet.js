@@ -65,6 +65,48 @@ function gauntletElementLabel(element){
   return hint?`${element.tag} · ${hint}`:element.tag;
 }
 
+// New prefabs and elements are copies of existing ones, like every other
+// record Bannerlord creates: pick what to copy, then name the new prefab.
+function beginGauntletPrefabCreation(){
+  const files=state.gauntletFiles||[];
+  if(!files.length||gauntletDirty())return;
+  let template=state.gauntlet?.relativePath&&files.includes(state.gauntlet.relativePath)?state.gauntlet.relativePath:files[0];
+  const name=textInput(template.split(/[\\/]/).pop().replace(/\.xml$/i,"")+"Copy",()=>{},
+    {required:true,"aria-label":"New prefab name",spellcheck:"false",pattern:"[A-Za-z0-9_][A-Za-z0-9_. \\-]{0,78}"});
+  const source=select(template,files.map(path=>[path,path]),value=>{template=value});
+  source.setAttribute("aria-label","Copy from prefab");
+  main.replaceChildren(BLUI.detailPanel({title:"Add Gauntlet prefab",body:[
+    BLUI.detailField({label:"Copy from",control:source,help:BLUI.infoHelp("The new prefab starts as an exact copy of this one, in the same folder.")}),
+    BLUI.detailField({label:"Name",control:name}),
+    LexeditorUI.actionRow(uiButton("Cancel",()=>{state.gauntletView="files";render()}),uiButton("Create prefab",async()=>{
+      if(!name.reportValidity())return;
+      try{
+        const created=await post("/api/gauntlet/create",{source:template,name:name.value});
+        state.gauntletFiles=null;await ensureGauntletFiles();
+        state.gauntletView="widgets";await loadGauntlet(created.relativePath,false);
+      }catch(error){showAlert?.(String(error.message||error),"Could not create the prefab")}
+    })),
+  ]}));
+}
+
+function beginGauntletElementCreation(){
+  const elements=(state.gauntlet?.elements||[]).filter(element=>element.depth>0);
+  if(!elements.length||gauntletDirty())return;
+  let template=elements.find(element=>element.path===state.gauntletElementPath)?.path||elements[0].path;
+  const source=select(template,elements.map(element=>[element.path,`${gauntletElementLabel(element)} (${element.path})`]),value=>{template=value});
+  source.setAttribute("aria-label","Copy from element");
+  main.replaceChildren(BLUI.detailPanel({title:"Add Gauntlet element",body:[
+    BLUI.detailField({label:"Copy from",control:source,help:BLUI.infoHelp("Copies this element and everything inside it to just after it. The rest of the prefab keeps its exact formatting.")}),
+    LexeditorUI.actionRow(uiButton("Cancel",()=>render()),uiButton("Create element",async()=>{
+      try{
+        const result=await post("/api/gauntlet/duplicate",{path:state.gauntlet.relativePath,elementPath:template,sourceHash:state.savedGauntlet?.sourceHash||""});
+        state.gauntlet=result;state.savedGauntlet=clone(result);
+        state.gauntletElementPath=result.created||template;render();
+      }catch(error){showAlert?.(String(error.message||error),"Could not add the element")}
+    })),
+  ]}));
+}
+
 function renderGauntlet(){
   if(state.gauntletFiles===null){
     main.replaceChildren(uiLoading("Gauntlet","Scanning GUI/Prefabs…"));
@@ -86,6 +128,7 @@ function renderGauntlet(){
     });
     main.replaceChildren(tableView({
       key:"gauntlet-files",rows:files,keyOf:item=>item.path,columns,detail,noun:"Gauntlet prefab files",
+      add:beginGauntletPrefabCreation,
       placeholder:"Search prefab files…",selected:uiState("gauntlet-files").selected,setSelected:()=>{}
     }));return;
   }
@@ -130,6 +173,8 @@ function renderGauntlet(){
   ];
   main.replaceChildren(tableView({
     key:`gauntlet-${state.gauntlet.relativePath}`,rows:items,keyOf:item=>item.key,columns,detail,noun:"Gauntlet elements",
+    add:beginGauntletElementCreation,addDisabled:gauntletDirty(),
+    addDisabledReason:"Save or reload this prefab's pending edits before adding an element.",
     placeholder:"Search widgets and attributes…",selected:state.gauntletElementPath,
     setSelected:value=>state.gauntletElementPath=String(value),filters
   }));
