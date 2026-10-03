@@ -13,12 +13,6 @@
     > status 2026-10-03: FF8 swept (every tab, subtab and panel tab): fine. Other games not swept yet.
 
 
-==================================================================== GITHUB
-
-- Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
-    > status 2026-10-03: Redundant Plugin issues deleted, dependencies and workflow labels repaired. Still going through the remaining issues one by one.
-
-
 ==================================================================== FF8 - PAGES
 
 Encounters
