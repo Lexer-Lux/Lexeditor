@@ -7815,8 +7815,10 @@ ${contents.path}`});
     // switch: unpinning the name column would otherwise leave every real
     // column at max-content and the table wider than its panel.
     const firstDescription = columns.findIndex(column => !column.generated && !column.width && !column.numberedId && !column.numeric);
-    const firstReal = firstDescription >= 0 ? firstDescription : columns.findIndex(column => !column.generated && !column.width);
-    const automaticGrow = nameIndex >= 0 ? nameIndex : firstReal;
+    // If every field is numeric, keep every track at its content width.
+    // Giving the first coordinate the unused width makes X look like a
+    // description column while Y and Z stay compact.
+    const automaticGrow = nameIndex >= 0 ? nameIndex : firstDescription;
     return columns.map((column, index) => {
       if (column.width) return column.width;
       const grow = Number(column.grow)
