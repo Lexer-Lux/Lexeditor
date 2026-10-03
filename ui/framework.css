@@ -1312,6 +1312,7 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-detail-field-control > .lex-column-pin { position:absolute;z-index:3;top:4px;right:4px; }
 .lex-tabbed-panel { display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden; }
 .lex-tabbed-panel > .lex-tabbed-panel-tabs { flex:0 0 auto; }
+.lex-tabbed-panel-content.lex-tabbed-panel-empty { display:grid; align-content:center; }
 /* A detail panel whose body is one tabbed panel carries that tab bar along its
    own top edge, like every other tabbed panel, with the record's heading
    under it: "if a details panel is made tabbed, then the tab bar should run

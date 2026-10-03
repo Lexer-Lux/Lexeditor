@@ -242,6 +242,15 @@
 
   function tweaks(){
     const section=LexeditorUI.reshadeSection({snapshot:reshade,act:actReshade});
+    const tabs=[
+      {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
+      {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
+      {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue."},
+    ];
+    const changeTab=id=>{tweakTab=id;render()};
+    if(tweakTab==="reshade"&&!section)return LexeditorUI.detailPanel({paginate:false,
+      body:LexeditorUI.tabbedPanel({tabs,active:tweakTab,label:"Presentation tools",change:changeTab,
+        content:LexeditorUI.notice({message:"ReShade is not set up for this game yet."})})});
     const cards=tweakTab==="injector"
       ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
       : tweakTab==="engine"
@@ -254,11 +263,7 @@
       action:el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
         onclick:clearShaderCache},notice.actionLabel)}):null;
     return LexeditorUI.settingsColumns(cards,{columnWidth:"520px",notice:banner,
-      tabs:[
-        {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
-        {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
-        {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue."},
-      ],activeTab:tweakTab,tabsLabel:"Presentation tools",changeTab:id=>{tweakTab=id;render()}});
+      tabs,activeTab:tweakTab,tabsLabel:"Presentation tools",changeTab});
   }
 
   async function loadDataMap(){

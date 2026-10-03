@@ -1339,6 +1339,9 @@
     const content = typeof options.content === "function"
       ? options.content(active, selected)
       : options.content;
+    const contentNodes = [content || []].flat(Infinity).filter(Boolean);
+    const empty = contentNodes.length === 1 && contentNodes[0] instanceof Element
+      && contentNodes[0].classList.contains("lex-notice");
     return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
       class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
@@ -1350,7 +1353,7 @@
       shortcuts: false,
       change: options.change,
     }), element("div", {
-      class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
+      class: ["lex-tabbed-panel-content", empty ? "lex-tabbed-panel-empty" : "", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
     }, sectionFlow("lex-detail-panel-body", content, options.paginate, true) || content || [])));
