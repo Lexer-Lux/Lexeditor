@@ -1,7 +1,7 @@
 """Editing one value must not refit untouched controls in a large panel."""
 import pytest
 
-from test_shared_ui_feedback import page, framework
+from test_shared_ui_feedback import page, framework, ROOT
 
 
 @pytest.mark.parametrize('count', [40, 400])
@@ -37,3 +37,35 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
     assert result['values']
     assert result['edited'] >= 5, result
     assert result['unrelated'] == 0, result
+
+
+def test_loaded_font_refits_controls_and_mounted_reference_rails(page):
+    pending=[]
+    page.route('http://fixture/probe-font.ttf', lambda route: pending.append(route))
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      window.probeFace=new FontFace('ProbeFont','url(http://fixture/probe-font.ttf)');
+      document.fonts.add(probeFace);
+      const input=U.el('input',{type:'number',min:0,max:255,value:88});
+      const control=U.provenanceControl({control:input,current:()=>Number(input.value),
+        vanilla:25,references:[{name:'Reference',shortName:'R1',value:30}],apply:value=>{input.value=value}});
+      control.style.fontFamily='ProbeFont,monospace';input.style.fontFamily='ProbeFont,monospace';
+      document.querySelector('main').replaceChildren(U.detailField({label:'Value',control}));
+    }''')
+    page.wait_for_function("document.querySelector('input').__lexAutoFitMeasure&&document.querySelector('.lex-source-control').style.getPropertyValue('--lex-internal-reference-requested-width')!==''")
+    page.wait_for_timeout(100)
+    assert pending
+    page.evaluate('''()=>{
+      const input=document.querySelector('input'),measure=input.__lexAutoFitMeasure;
+      window.fontMeasurements=0;
+      input.__lexAutoFitMeasure=()=>{fontMeasurements++;return measure()};
+    }''')
+    pending[0].fulfill(body=(ROOT/'ui/assets/fonts/Lexend-Variable.ttf').read_bytes(),content_type='font/ttf')
+    page.wait_for_function("probeFace.status==='loaded'&&fontMeasurements>0")
+    page.wait_for_timeout(100)
+    assert page.evaluate('''()=>{
+      const input=document.querySelector('input'),root=input.closest('.lex-source-control');
+      const box=input.getBoundingClientRect(),text=root.querySelector('.lex-reference-text').getBoundingClientRect();
+      return input.value==='88'&&text.left>=box.left&&text.right<=box.right;
+    }''')

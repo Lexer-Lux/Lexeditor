@@ -1476,17 +1476,26 @@
     control.__lexAutoFitReset = reset;
     control.__lexAutoFitApply = apply;
     autoFitObserver?.observe(control);
-    document.fonts?.ready?.then(() => queueAutoFit(control));
     queueAutoFit(control);
     return control;
   };
+  document.fonts?.addEventListener?.("loadingdone", event => {
+    if (!event.fontfaces.length) return;
+    document.querySelectorAll("input,select,textarea").forEach(control => {
+      if (control.__lexAutoFitUpdate) queueAutoFit(control);
+    });
+  });
 
   // Every value box on a panel should end at the same edge, so the reference
   // rail takes the widest requirement in that panel rather than each control
   // keeping its own.
   const alignReferenceRails = (container = document) => {
+    const controlsFor=selector=>[
+      ...(container instanceof Element&&container.matches(selector)?[container]:[]),
+      ...(container.querySelectorAll?.(selector)||[])
+    ];
     const panels = new Set();
-    container.querySelectorAll?.(".lex-source-control[data-lex-rail-tag]")
+    controlsFor(".lex-source-control[data-lex-rail-tag]")
       .forEach(control => panels.add(
         control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
     for (const panel of panels) {
@@ -1552,7 +1561,8 @@
     // stood above it, which read as a rail that had left its box. These
     // controls have no outside rail, so their share is measured on its own -
     // a graph card's variable drawer is a panel with nothing else in it.
-    container.querySelectorAll?.(".lex-source-control[data-lex-inside-rail]").forEach(control => {
+    const insideRails = [];
+    controlsFor(".lex-source-control[data-lex-inside-rail]").forEach(control => {
       const stack = control.querySelector(":scope > .lex-reference-values");
       const count = stack?.children.length || 0;
       if (!count) return;
@@ -1562,6 +1572,14 @@
       const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
         || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
       const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
+      const fontSize=Math.max(8,parseFloat(getComputedStyle(control).fontSize)||16);
+      insideRails.push({control,cap,count,fontSize});
+    });
+    // Reserve every rail together. Reading each probe immediately after
+    // mounting it forced a full panel layout for each property, delaying the
+    // initial reservation until the reader's first edit on large panels.
+    for (const rail of insideRails) {
+      const {control,cap,count,fontSize}=rail;
       control.style.setProperty("--lex-reference-cap", `${cap}px`);
       control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
       // The lane is measured from the longest entry this rail can paint, at the
@@ -1573,9 +1591,17 @@
         "aria-hidden": "true"},
         element("span", {class: "lex-reference-tag"}, control.dataset.lexInsideTag || "V"),
         element("span", {class: "lex-reference-text"}, control.dataset.lexInsideValue || ""));
+      // Measure at the rail's preferred size, before its own reservation
+      // constrains it. Measuring the constrained font fed the previous width
+      // back into the next reservation and resized every value box again.
+      probe.style.fontSize=`${fontSize}px`;
       control.append(probe);
-      const width = Math.ceil(probe.getBoundingClientRect().width) + 2;
+      rail.probe=probe;
+    }
+    const widths=insideRails.map(({probe})=>Math.ceil(probe.getBoundingClientRect().width)+2);
+    insideRails.forEach(({control,probe},index)=>{
       probe.remove();
+      const width=widths[index];
       if (width > 2) control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
     });
   };
@@ -1587,14 +1613,20 @@
     container.querySelectorAll?.("[data-lex-record-provenance]").forEach(node => node.refreshRecordProvenance?.());
     alignReferenceRails(container);
   };
-  // The first pass measures the rail against whatever face is loaded at the
-  // time. A face only starts loading when something asks to paint with it, so
-  // a panel that mounts after the document is otherwise ready measures its
-  // rail against the fallback and re-reserves it a pixel or two later, on the
-  // reader's first edit. Every batch of faces that finishes re-reserves it
-  // instead, which is what the rail exists to prevent.
-  document.fonts?.addEventListener?.("loadingdone", () => alignReferenceRails(document));
-  document.fonts?.ready?.then(() => alignReferenceRails(document));
+  // Reserve newly mounted rails immediately, including panels added after
+  // fonts are ready. A successfully loaded face can change their text width;
+  // failed font requests do not require another pass over every control.
+  document.fonts?.addEventListener?.("loadingdone", event => {
+    if(event.fontfaces.length)alignReferenceRails(document);
+  });
+  new MutationObserver(records=>{
+    const roots=new Set();
+    for(const record of records)for(const node of record.addedNodes){
+      if(node instanceof Element&&node.isConnected&&
+        (node.matches('.lex-source-control')||node.querySelector('.lex-source-control')))roots.add(node);
+    }
+    for(const root of roots)alignReferenceRails(root);
+  }).observe(document.documentElement,{childList:true,subtree:true});
 
   // A section heading is renamed the same way a property name is: a
   // developer double-clicks it, types, and the wording ships for everyone
