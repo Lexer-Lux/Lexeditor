@@ -10573,6 +10573,7 @@ ${contents.path}`});
         type: "button",
         class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),
         "data-reference-index": String(source.referenceIndex),
+        disabled: !!options.readOnly,
         title: `Use ${source.name}: ${exact}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
@@ -10601,6 +10602,8 @@ ${contents.path}`});
     const root = element("div", {
       class: ["lex-source-control", internal ? "lex-source-control-internal" : "", stacked ? "lex-source-control-stacked" : ""].filter(Boolean).join(" "),
     }, options.control);
+    const readOnly = () => (typeof options.readOnly === "function" ? options.readOnly() : options.readOnly === true)
+      || !!options.control?.matches?.(":disabled,[readonly]");
     // A number sharing its box with a reference gets its own up and down at
     // the box's right edge. The browser's arrows sit at the end of the text,
     // so the space kept for the reference showed as an empty band to the
@@ -10681,7 +10684,7 @@ ${contents.path}`});
       }
       const vanillaEntry = root.querySelector('.lex-reference-values .lex-reference-value[data-reference-index="0"]');
       if (vanillaEntry instanceof HTMLElement) { vanillaEntry.click(); return true; }
-      options.apply?.(options.vanilla, event, sources[0]);
+      if (!readOnly()) options.apply?.(options.vanilla, event, sources[0]);
       refresh();
       return true;
     };
@@ -10689,8 +10692,9 @@ ${contents.path}`});
       root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !(options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b)))(currentValue(),options.vanilla));
       root.querySelector(":scope > :is(.lex-reference-values,.lex-reference-placeholder)")?.remove();
       const reference = referenceDisplay({
-        current: currentValue(), sources, format: options.format, same: options.same,
+        current: currentValue(), sources, format: options.format, same: options.same, readOnly: readOnly(),
         apply: (value, event, source) => {
+          if (readOnly()) return;
           const selector = "main,.lex-shell-main,.lex-panel-layout-pane,.lex-detail,.lex-barrelled-master,.lex-column-list,.lex-data-map-view";
           const ordinals = new Map();
           const scroll = [...document.querySelectorAll(selector)].map(node => {

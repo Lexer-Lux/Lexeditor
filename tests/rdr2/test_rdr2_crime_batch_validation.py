@@ -86,6 +86,8 @@ def test_unsupported_source_is_not_mutated(crimes,kind):
     elif kind=='missing-field':variation.find('CrimeInformation').remove(node)
     else:node.set('value','NaN')
     s.save_file(s.CRIME_FILE);before=snapshot(root)
+    readonly=s.get_crime()['crimes'][0]['readonlyFields']
+    assert 'CrimeValue' in readonly
     with pytest.raises(ValueError):s.apply_crime_edits([{'key':'SECOND','field':'severity','value':'Medium'},FIRST])
     assert snapshot(root)==before
 

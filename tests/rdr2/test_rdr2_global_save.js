@@ -10,13 +10,14 @@ const globalSave = html.slice(html.indexOf('async function saveAllChanges()'), h
 const catalogSave = html.slice(html.indexOf('async function saveCatalog()'), html.indexOf('// ----- GameplayTweaks settings -----'));
 const items = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/items.js'), 'utf8');
 const integerValidation = items.slice(items.indexOf('function catalogQuantityIsValid('), items.indexOf('function catalogQuantityInput('));
+const dollarValidation = items.slice(items.indexOf('function catalogDollarCents('), items.indexOf('function catalogMoneyInput('));
 const draftValidation = items.slice(items.indexOf('function validateCatalogQuantityDrafts('), items.indexOf('function purchaseQuantityCell('));
 const loot = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/loot.js'), 'utf8');
 const lootValidation = loot.slice(loot.indexOf('function lootNumericError('), loot.indexOf('// Saves every dirty loot file.'));
 const matrixValidation = loot.slice(loot.indexOf('function matrixQuantityError('), loot.indexOf('async function renderMatrix()'));
 const crime = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/crime.js'), 'utf8');
 const dispatchValidation = crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()'));
-async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false) {
+async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false, invalidCrime=false) {
   const calls = [], messages = [], errors = [];
   let saved = { available: true, vanilla: {CONSUMABLE_RUM: 0.17, CONSUMABLE_MOONSHINE: 0.3}, overrides: {CONSUMABLE_MOONSHINE: 1} };
   const context = vm.createContext({
@@ -38,18 +39,19 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
       throw new Error('Unexpected save endpoint: ' + url);
     }
   });
-  vm.runInContext(stateSource + '\n' + integerValidation + '\n' + draftValidation + '\n' + lootValidation + '\n' + matrixValidation + '\n' + dispatchValidation + '\n' + globalSave + '\n' + catalogSave, context);
+  vm.runInContext(stateSource + '\n' + integerValidation + '\n' + dollarValidation + '\n' + draftValidation + '\n' + lootValidation + '\n' + matrixValidation + '\n' + dispatchValidation + '\n' + globalSave + '\n' + catalogSave, context);
   vm.runInContext("state.ds='mine';state.catalog={items:[],effects:[]};state.alcoholEdits={CONSUMABLE_RUM:0.23};", context);
   if(invalid)vm.runInContext("state.yieldEdits={'fixture': '1.5'}",context);
   if(invalidLoot)vm.runInContext("state.lootDirty={fixture:new Set(['T'])};state.loot={fixture:{tables:[{key:'T',entries:[{min:'1.5'}]}]}}",context);
   if(invalidMatrix)vm.runInContext("state.catalog.items=[{key:'ITEM'}];state.matrixDirty=new Set(['ANIMAL']);state.matrix={animals:[{key:'ANIMAL',rows:[{damage:'Poor',skin:'Perfect',item:'ITEM',qty:'1.5'}]}]}",context);
   if(invalidDispatch)vm.runInContext("state.store.mine={dispatch:{rows:[{group:'',field:'ParoleDuration',value:'9000'}]}};state.dispatchEdits={'|ParoleDuration':''}",context);
+  if(invalidCrime)vm.runInContext("state.store.mine={crime:{crimes:[{key:'CRIME',NumWitnesses:'2'}]}};state.crimeEdits={'CRIME|NumWitnesses':'1.5'}",context);
   await context.saveAllChanges();
-  if(invalid||invalidLoot||invalidMatrix||invalidDispatch){
+  if(invalid||invalidLoot||invalidMatrix||invalidDispatch||invalidCrime){
     assert.equal(calls.length,0,'invalid catalog drafts must block unrelated pending writers');
-    assert.equal(vm.runInContext(invalidDispatch?"state.dispatchEdits['|ParoleDuration']":invalidMatrix?"state.matrix.animals[0].rows[0].qty":invalidLoot?"state.loot.fixture.tables[0].entries[0].min":"state.yieldEdits.fixture",context),invalidDispatch?'':'1.5');
+    assert.equal(vm.runInContext(invalidCrime?"state.crimeEdits['CRIME|NumWitnesses']":invalidDispatch?"state.dispatchEdits['|ParoleDuration']":invalidMatrix?"state.matrix.animals[0].rows[0].qty":invalidLoot?"state.loot.fixture.tables[0].entries[0].min":"state.yieldEdits.fixture",context),invalidDispatch?'':'1.5');
     assert.equal(vm.runInContext("state.alcoholEdits.CONSUMABLE_RUM",context),0.23);
-    assert(errors.some(message=>message.includes(invalidDispatch?'finite number':'whole quantity')));
+    assert(errors.some(message=>message.includes(invalidCrime?'whole number':invalidDispatch?'finite number':'whole quantity')));
     assert(!messages.includes('All changes saved to mod files'));
     return;
   }
@@ -76,4 +78,5 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
   await run(false,false,true); console.log('PASS: invalid loot drafts block unrelated pending writers');
   await run(false,false,false,true); console.log('PASS: invalid skinning drafts block unrelated pending writers');
   await run(false,false,false,false,true); console.log('PASS: invalid dispatch drafts block unrelated pending writers');
+  await run(false,false,false,false,false,true); console.log('PASS: invalid crime drafts block unrelated pending writers');
 })().catch(error => {console.error(error);process.exitCode = 1;});

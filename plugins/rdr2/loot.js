@@ -568,7 +568,7 @@ async function renderMatrix() {
         state.matrixDirty.add(a.key);
         renderMatrix();
       };
-      const quantity=!editable&&matrixQuantityError(yieldRow.qty)?LexeditorUI.readonlyField(yieldRow.qty??""):el("input",{type:"number",step:1,min:1,required:true,disabled:!editable,"data-lex-validate-number":"",value:yieldRow.qty??"",oninput:ev=>{if(!editable)return;yieldRow.qty=ev.target.value;state.matrixDirty.add(a.key);ev.target.setCustomValidity(matrixQuantityError(yieldRow.qty));renderToolbarOnly()}});
+      const quantity=!editable&&matrixQuantityError(yieldRow.qty)?LexeditorUI.readonlyField(yieldRow.qty??""):el("input",{type:"number",step:1,min:1,required:true,disabled:!editable,"data-lex-validate-number":"true",value:yieldRow.qty??"",oninput:ev=>{if(!editable)return;yieldRow.qty=ev.target.value;state.matrixDirty.add(a.key);ev.target.setCustomValidity(matrixQuantityError(yieldRow.qty));renderToolbarOnly()}});
       if(quantity.type==="number"){quantity.setAttribute("value","0");quantity.value=yieldRow.qty??"";quantity.setCustomValidity(matrixQuantityError(yieldRow.qty));}
       yields.append(LexeditorUI.stack({fill:false},LexeditorUI.controlGroup([
         {label:"Item",control:editable?linkedCatalogKeyEditor(yieldRow.item,value=>{if(!editable)return;yieldRow.item=value;state.matrixDirty.add(a.key);renderMatrix()}):LexeditorUI.readonlyField(yieldRow.item)},

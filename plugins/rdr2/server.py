@@ -4659,6 +4659,15 @@ def get_crime(ds="mine"):
             row[f] = attr_value(wit, f) if wit is not None else None
         conf = ci.find("Confrontation")
         row["ConfrontChance"] = attr_value(conf, "Chances") if conf is not None else None
+        row['readonlyFields'] = []
+        for field in [*CRIME_CI_FIELDS, *CRIME_WIT_FIELDS, 'ConfrontChance', 'severity']:
+            try:
+                if len(root.findall('CrimeInformations')) != 1 or sum(item.get('key') == row['key'] for item in root.find('CrimeInformations').findall('Item')) != 1:
+                    raise ValueError('Ambiguous crime identity')
+                _crime_edit_node(crime, field)
+                row[field] = _crime_value(field, row[field])
+            except ValueError:
+                row['readonlyFields'].append(field)
         out.append(row)
     return {"crimes": out, "fields": CRIME_CI_FIELDS + CRIME_WIT_FIELDS + ["ConfrontChance", "severity"]}
 

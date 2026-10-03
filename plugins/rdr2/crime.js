@@ -231,6 +231,23 @@ function validateDispatchDrafts(){
     const error=dispatchNumericError(value);if(error)throw new Error(`${key}: ${error}`);
   }
 }
+const CRIME_INTEGER_FIELDS=new Set(["CrimeValue","PunishingCrimeValue","MinWantedLevelSP","ForcedWantedLevelIncreaseSP","NumWitnesses","NumInvestigators","NumLawInvestigators"]);
+const CRIME_MONEY_FIELDS=new Set(["CrimeValue","PunishingCrimeValue"]);
+function crimeValueError(field,raw,draft=false){
+  if(field==="severity")return ["None","Low","Medium","High"].includes(raw)?"":"Choose a supported severity.";
+  if(field==="Disabled")return ["true","false"].includes(raw)?"":"Choose true or false.";
+  if(CRIME_MONEY_FIELDS.has(field)&&draft)return typeof raw==="string"&&catalogDollarCents(raw)!==null?"":"Enter a nonnegative amount with at most two decimal places.";
+  if(CRIME_INTEGER_FIELDS.has(field))return catalogQuantityIsValid(String(raw),0)?"":"Enter a nonnegative whole number.";
+  return !dispatchNumericError(raw)&&Number(raw)>=0?"":"Enter a nonnegative finite number.";
+}
+function validateCrimeDrafts(){
+  for(const [key,value] of Object.entries(state.crimeEdits)){
+    const [identity,field]=key.split("|");
+    const rows=state.store.mine?.crime?.crimes.filter(row=>row.key===identity)||[];
+    if(rows.length!==1||rows[0].readonlyFields?.includes(field)||!Object.hasOwn(rows[0],field)||crimeValueError(field,rows[0][field]))throw new Error(`${key} is read-only or unavailable.`);
+    const error=crimeValueError(field,value,true);if(error)throw new Error(`${key}: ${error}`);
+  }
+}
 function dispatchSection() {
   const st = refStore(state.ds);
   if (!st.dispatch || !st.dispatch.rows.length) return el("div");
@@ -248,7 +265,7 @@ function dispatchSection() {
     const editable=!isRO()&&!r.readonly&&!dispatchNumericError(r.value);
     const cur=isRO()?r.value:(state.dispatchEdits[ek]??r.value);
     const vRow=vd&&vd.rows.find(x=>x.group===r.group&&x.field===r.field);
-    const inp=!editable&&dispatchNumericError(r.value)?LexeditorUI.readonlyField(r.value??""):el("input",{type:"number",step:"any",required:true,disabled:!editable,"data-lex-validate-number":"",value:cur,
+    const inp=!editable&&dispatchNumericError(r.value)?LexeditorUI.readonlyField(r.value??""):el("input",{type:"number",step:"any",required:true,disabled:!editable,"data-lex-validate-number":"true",value:cur,
       "aria-label":`${dispatchLabel(r.group)} ${r.field}`,
       class:ek in state.dispatchEdits?"edited":"",
       oninput:ev=>{
@@ -307,9 +324,7 @@ async function renderCrime() {
     const d=await ensureHonorActions();if(!current())return;tb.append(el("span",{class:"count"},`${d.events?.length||0} events · ${d.tiers?.length||0} shared tiers`),savebar(saveHonorActions));
     await renderHonorActions();refreshGlobalSave();installTabContext();return;
   }
-  tb.append(el("input", { type: "text", placeholder: "Search crimes… (e.g. MURDER, ROBBERY)", value: f.crimeQ || "",
-      oninput: ev => { f.crimeQ = ev.target.value; filterRerender(ev,renderCrime); } }),
-    el("span", { class: "count", id: "crimecount" }),savebar(saveCrime));
+  tb.append(el("span", { class: "count", id: "crimecount" }),savebar(saveCrime));
   const q = (f.crimeQ || "").trim().toUpperCase();
   let rows = data.crimes.filter(c => !q || c.key.toUpperCase().includes(q)||humanName("crimes",c.key).toUpperCase().includes(q));
   const crimeGetters={name:c=>humanName("crimes",c.key)||c.key,severity:c=>c.severity};CRIME_COLS.forEach(([field])=>crimeGetters[field]=c=>field==="Disabled"?String(c[field]):+c[field]);
@@ -328,73 +343,82 @@ async function renderCrime() {
   const tweakRow = c => cc && cc.crimes.find(x => x.key === c.key);
   const fieldControl = (c, [field, label, kind]) => {
     const ek = c.key + "|" + field;
-    const raw = isRO() ? c[field] : (state.crimeEdits[ek] ?? c[field]);
+    const editable=!isRO()&&!c.readonlyFields?.includes(field)&&!crimeValueError(field,c[field]);
+    const raw = !editable ? c[field] : (state.crimeEdits[ek] ?? c[field]);
     const vRow = vanillaRow(c), ctRow = tweakRow(c);
     if (raw === null || raw === undefined) return "—";
+    if(crimeValueError(field,c[field])){const locked=LexeditorUI.readonlyField(c[field]);locked.setAttribute("aria-label",`${c.key} ${label}`);return locked;}
     if (kind === "bool") {
-      const cb = el("input", { type: "checkbox", "aria-label": `${c.key} ${label}`,
+      const cb = el("input", { type: "checkbox",disabled:!editable, "aria-label": `${c.key} ${label}`,
         onchange: ev => {
+          if(!editable)return;
           const v = ev.target.checked ? "true" : "false";
           if (v === c[field]) delete state.crimeEdits[ek]; else state.crimeEdits[ek] = v;
           renderToolbarOnly();
         } });
       cb.checked = String(raw) === "true";
-      return refField(cb, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
-        (v)=>{cb.checked=String(v)==="true";cb.dispatchEvent(new Event("change"));}, v=>String(v),
-        { bool: true });
+      return lootReferenceControl(editable,refField(cb, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
+        (v)=>{if(editable){cb.checked=String(v)==="true";cb.dispatchEvent(new Event("change"));}}, v=>String(v),
+        { bool: true }));
     }
     const isMoney = kind === "money";
-    const inp = el("input", { type: "number", step: isMoney ? "0.01" : "any",
-      value: isMoney ? fmtMoney(+raw) : (+raw % 1 ? (+raw).toFixed(2) : String(+raw)),
+    const inp = el("input", { type: "number", step: isMoney ? "0.01" : CRIME_INTEGER_FIELDS.has(field)?"1":"any",min:"0",required:true,disabled:!editable,"data-lex-validate-number":"true",
+      value: isMoney ? editable&&Object.hasOwn(state.crimeEdits,ek)?raw:fmtMoney(c[field]) : raw,
       class: ek in state.crimeEdits ? "edited" : "",
       "aria-label": `${c.key} ${label}`,
-      onchange: ev => {
-        const v = isMoney ? String(Math.round(parseFloat(ev.target.value || "0") * 100))
-                          : String(+ev.target.value || 0);
-        if (v === String(+c[field])) delete state.crimeEdits[ek];
+      oninput: ev => {
+        if(!editable)return;
+        const v = ev.target.value;
+        if (v === (isMoney?fmtMoney(c[field]):String(c[field]))) delete state.crimeEdits[ek];
         else state.crimeEdits[ek] = v;
         ev.target.classList.toggle("edited", ek in state.crimeEdits);
+        ev.target.setCustomValidity(crimeValueError(field,v,true));
         renderToolbarOnly();
       } });
-    return refField(inp, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
-      (v,ev)=>applyToInput(ev,isMoney?fmtMoney(+v):String(+v)), v=>isMoney?"$"+fmtMoney(+v):String(+v));
+    inp.setCustomValidity(crimeValueError(field,inp.value,true));
+    return lootReferenceControl(editable,refField(inp, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], isMoney&&Object.hasOwn(state.crimeEdits,ek)?catalogDollarCents(raw)??raw:raw,
+      (v)=>{if(editable){inp.value=isMoney?fmtMoney(v):String(v);inp.dispatchEvent(new Event("input",{bubbles:true}));}}, v=>isMoney?"$"+fmtMoney(v):String(v)));
   };
   const severityControl = c => {
     const sevEk = c.key + "|severity";
     const severityValue = isRO() ? c.severity : (state.crimeEdits[sevEk] ?? c.severity);
+    const editable=!isRO()&&!c.readonlyFields?.includes("severity")&&!crimeValueError("severity",c.severity);
+    if(crimeValueError("severity",c.severity)){const locked=LexeditorUI.readonlyField(c.severity);locked.setAttribute("aria-label",`${c.key} severity`);return locked;}
     const vRow = vanillaRow(c), ctRow = tweakRow(c);
-    const sev = el("select", { class: "key", disabled: isRO(),
+    const sev = el("select", { class: "key", disabled: !editable,
       "aria-label": `${c.key} severity`,
       onchange: ev => {
+        if(!editable)return;
         if (ev.target.value === c.severity) delete state.crimeEdits[sevEk];
         else state.crimeEdits[sevEk] = ev.target.value;
         ev.target.classList.toggle("edited", sevEk in state.crimeEdits);
         renderToolbarOnly();
       } },...["None","Low","Medium","High"].map(value=>{const option=el("option",{value},value);if(value===severityValue)option.selected=true;return option;}));
-    return refField(sev, [["V","vtag",vRow?.severity],["CT","cttag",ctRow?.severity]], severityValue,
-      (v,ev)=>applyToInput(ev,v), v=>String(v));
+    return lootReferenceControl(editable,refField(sev, [["V","vtag",vRow?.severity],["CT","cttag",ctRow?.severity]], severityValue,
+      (v)=>{if(editable)applyToControl(sev,v)}, v=>String(v)));
   };
-  m.append(columnList({class:"crime-table",align:"start",headerAlign:"start","aria-label":"Crimes",
-    rows,key:c=>c.key,editable:true,localSort:false,
-    template:`minmax(220px,1.4fr) repeat(${CRIME_COLS.length},minmax(0,.9fr)) 120px`,
-    columns:[{key:"name",label:()=>el("span",{},"Name / crime",fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")),
-        cellClass:"key",
-        render:c=>el("span",{class:"crime-name"},humanNameInput("crimes",c.key),el("span",{class:"crime-key"},c.key.replace("CRIME_","")))},
-      ...CRIME_COLS.map(col=>({key:col[0],
-        label:col[3]?()=>el("span",{},col[1],fieldHelp(col[3])):col[1],
-        cellClass:col[2]==="bool"?"bool-cell":"",
-        render:c=>fieldControl(c,col)})),
-      {key:"severity",label:()=>el("span",{},"Severity",fieldHelp("Qualitative severity class used by crime escalation and law-response rules.")),
-        render:severityControl}]}));
+  m.append(LexeditorUI.pagedListDetail({rows,key:c=>c.key,selected:f.crimeSelected||rows[0]?.key,
+    page:f.crimePage||0,pageSize:15,noun:"crimes",slots:false,splitKey:"rdr2-crime",defaultSplit:35,
+    search:{value:f.crimeQ||"",label:"Search crimes",change:value=>{f.crimeQ=value;f.crimePage=0;renderCrime()}},
+    sync:view=>{f.crimePage=view.page;f.crimeSelected=view.selected},
+    change:view=>{f.crimePage=view.page;f.crimeSelected=view.selected;if(view.reason!=="select"&&view.reason!=="sync")renderCrime()},
+    master:view=>columnList({class:"crime-table",rows:view.rows,key:c=>c.key,selected:view.selected,select:view.select,
+      columns:[{key:"name",label:"Crime",render:c=>LexeditorUI.stack({fill:false},el("strong",{},humanName("crimes",c.key)||c.key),humanName("crimes",c.key)?el("span",{class:"crime-key"},c.key):null)}],"aria-label":"Crimes"}),
+    detail:c=>LexeditorUI.detailPanel({title:humanName("crimes",c.key)||c.key,body:[
+      LexeditorUI.detailField({label:"Name",control:humanNameInput("crimes",c.key),help:fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")}),
+      ...CRIME_COLS.map(col=>LexeditorUI.detailField({label:col[1],control:fieldControl(c,col),help:col[3]?fieldHelp(col[3]):undefined})),
+      LexeditorUI.detailField({label:"Severity",control:severityControl(c),help:fieldHelp("Qualitative severity class used by crime escalation and law-response rules.")})
+    ]})}));
   installTabContext();
 }
 
 async function saveCrime() {
   if (isRO()) return;
   validateDispatchDrafts();
+  validateCrimeDrafts();
   const edits = Object.entries(state.crimeEdits).map(([k, value]) => {
     const [key, field] = k.split("|");
-    return { key, field, value };
+    return { key, field, value:CRIME_MONEY_FIELDS.has(field)?catalogDollarCents(value):value };
   });
   const dEdits = Object.entries(state.dispatchEdits).map(([k, value]) => {
     const [group, field] = k.split("|");
