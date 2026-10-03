@@ -398,7 +398,7 @@ def main():
         }""")
         for formation,text in shares:
             count=sum(1 for other,_ in shares if other==formation)
-            assert text==f'{count} of 8',(formation,text,shares)
+            assert text==f"{count} {'slot' if count==1 else 'slots'}",(formation,text,shares)
         usage=page.locator('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]')
         reveal(page, usage)
         assert usage.is_visible()

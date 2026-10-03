@@ -238,20 +238,20 @@
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
   function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail',heading={}){
-    // A formation can fill several of the eight slots, so the group does not
-    // give every formation the same share (Lexer: "encounter chances aren't
-    // actually equal ... the editor doesn't say that at all").
+    // This counts repeated scene IDs, not their unequal selection weights.
+    // The native selector also retries once for the previous scene; see
+    // codex/ff8/world-encounter-selection.md before displaying probabilities.
     const share=value=>row.encounters.filter(entry=>Number(entry)===Number(value)).length;
     const formations=row.encounters.map((value,index)=>{
       const strip=LexeditorUI.stack({fill:false,className:'ff8-encounter-formation-row',attrs:{
         'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`}},
         LexeditorUI.actionRow({fillFirst:true,className:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
-          el('span',{class:'ff8-encounter-formation-share lex-action-meta','data-formation-share':share(value)},`${share(value)} of ${row.encounters.length}`)),
+          el('span',{class:'ff8-encounter-formation-share lex-action-meta','data-formation-share':share(value)},`${share(value)} ${share(value)===1?'slot':'slots'}`)),
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
-      help:'The game chooses one of these eight slots when this group starts a battle. A formation can fill several slots; the count beside it says how many. If the game picks a slot evenly, a formation in three slots comes up three times as often as one in a single slot; how it picks is not yet proven. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
+      help:'All eight slots can use different formations, but they have unequal chances. A repeated formation combines its slots\' chances. The game retries once if it chooses the previous battle. Hover a formation ID to replace that slot. Enemy edits affect every use of that formation. Special level uses a rule we do not yet understand.',
       body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),
