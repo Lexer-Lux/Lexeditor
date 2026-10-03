@@ -410,10 +410,10 @@ def save_weapons(edits: list[dict]) -> dict:
     changed = 0
     kernel_edits = []
     for edit in edits:
-        weapon_id = int(edit["id"])
+        weapon_id = integer_value(edit["id"], "Weapon id")
         if not 0 <= weapon_id < len(raw) // 12:
             raise ValueError(f"Invalid weapon id: {weapon_id}")
-        price = int(edit["upgradePrice"])
+        price = integer_value(edit["upgradePrice"], "Upgrade price")
         if not 0 <= price <= 2550 or price % 10:
             raise ValueError("Upgrade price must be 0 to 2550 in steps of 10")
         offset = weapon_id * 12
@@ -422,7 +422,8 @@ def save_weapons(edits: list[dict]) -> dict:
         if len(ingredients) != 4:
             raise ValueError("A weapon recipe must have four slots")
         for slot, ingredient in enumerate(ingredients):
-            item_id, quantity = int(ingredient["itemId"]), int(ingredient["quantity"])
+            item_id = integer_value(ingredient["itemId"], "Weapon ingredient item id")
+            quantity = integer_value(ingredient["quantity"], "Weapon ingredient quantity")
             if (item_id not in ITEM_NAMES or
                     (item_id == 0 and quantity != 0) or
                     (item_id != 0 and not 1 <= quantity <= 255)):
@@ -432,9 +433,13 @@ def save_weapons(edits: list[dict]) -> dict:
         for field in edit.get("fields", []):
             kernel_edits.append({"id": weapon_id, "field": field["field"], "value": field["value"]})
         changed += 1
-    _atomic_write(output_path("mwepon.bin"), bytes(raw))
+    # Both formats must validate before either destination is written.
+    kernel_data = None
     if kernel_edits:
-        save_kernel(5, kernel_edits)
+        kernel_data, _ = _apply_kernel_edits(source_path("kernel.bin").read_bytes(), 5, kernel_edits)
+    _atomic_write(output_path("mwepon.bin"), bytes(raw))
+    if kernel_data is not None:
+        _atomic_write(output_path("kernel.bin"), kernel_data)
     return {"saved": changed, "file": str(output_path("mwepon.bin"))}
 
 
@@ -614,24 +619,26 @@ def kernel_rows(section_id: int, dataset: str = "current") -> dict:
     return {"section": section["section_name"], "rows": rows, "source": source_label("kernel.bin")}
 
 
-def save_kernel(section_id: int, edits: list[dict]) -> dict:
+def _apply_kernel_edits(data: bytes, section_id: int, edits: list[dict]) -> tuple[bytes, int]:
+    section_id = integer_value(section_id, "Kernel section id")
     section = SECTIONS.get(section_id)
     if not section:
         raise ValueError(f"Unsupported kernel section: {section_id}")
     definitions = {field["name"]: field for field in _public_fields(section_id)}
-    raw = bytearray(source_path("kernel.bin").read_bytes())
+    raw = bytearray(data)
     section_start = int.from_bytes(raw[section_id * 4:section_id * 4 + 4], "little")
     changed = 0
     seen: set[tuple[int, str]] = set()
     for edit in edits:
-        record_id, field_name = int(edit["id"]), str(edit["field"])
+        record_id = integer_value(edit["id"], "Kernel record id")
+        field_name = str(edit["field"])
         definition = definitions.get(field_name)
         key = (record_id, field_name)
         if key in seen or not definition or not 0 <= record_id < section["number_sub_section"]:
             raise ValueError("Invalid or duplicate kernel field edit")
         seen.add(key)
         size, relative = int(definition["size"]), int(definition["offset"])
-        value = int(edit["value"])
+        value = integer_value(edit["value"], f"Kernel {field_name}")
         minimum = int(definition.get("minimum", 0))
         maximum = int(definition.get("maximum", (1 << (size * 8)) - 1))
         if not minimum <= value <= maximum:
@@ -661,7 +668,12 @@ def save_kernel(section_id: int, edits: list[dict]) -> dict:
                 raise ValueError(f"{field_name}: choose a documented option")
         raw[absolute:absolute + size] = value.to_bytes(size, "little")
         changed += 1
-    _atomic_write(output_path("kernel.bin"), bytes(raw))
+    return bytes(raw), changed
+
+
+def save_kernel(section_id: int, edits: list[dict]) -> dict:
+    data, changed = _apply_kernel_edits(source_path("kernel.bin").read_bytes(), section_id, edits)
+    _atomic_write(output_path("kernel.bin"), data)
     return {"saved": changed, "file": str(output_path("kernel.bin"))}
 
 

@@ -375,7 +375,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/weapons/save":
                 self.json_response(formats.save_weapons(body.get("edits", [])))
             elif path == "/api/kernel/save":
-                self.json_response(formats.save_kernel(int(body["section"]), body.get("edits", [])))
+                self.json_response(formats.save_kernel(body["section"], body.get("edits", [])))
             elif path == "/api/cards/save":
                 self.json_response(cards.save(body.get("edits", [])))
             elif path == "/api/text/save":
