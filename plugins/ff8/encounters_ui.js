@@ -219,7 +219,7 @@
     const vanilla=worldRow(state.vanilla,"group",row.id)?.encounters?.[index];
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
-    return sourceControl(LexeditorUI.choiceField(link,finder),()=>row.encounters[index],vanilla,references,accept,
+    return sourceControl(LexeditorUI.choiceField(link,finder,{fillValue:true,hoverAction:true}),()=>row.encounters[index],vanilla,references,accept,
       next=>`Formation #${next}`);
   }
   function encounterGroupUsage(row){
@@ -243,10 +243,10 @@
     // actually equal ... the editor doesn't say that at all").
     const share=value=>row.encounters.filter(entry=>Number(entry)===Number(value)).length;
     const formations=row.encounters.map((value,index)=>{
-      const strip=el('div',{class:'ff8-encounter-formation-row',
-        'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`},
-        el('div',{class:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
-          el('span',{class:'ff8-encounter-formation-share','data-formation-share':share(value)},`${share(value)} of ${row.encounters.length}`)),
+      const strip=LexeditorUI.stack({fill:false,className:'ff8-encounter-formation-row',attrs:{
+        'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`}},
+        LexeditorUI.actionRow({fillFirst:true,className:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
+          el('span',{class:'ff8-encounter-formation-share lex-action-meta','data-formation-share':share(value)},`${share(value)} of ${row.encounters.length}`)),
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });

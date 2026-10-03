@@ -415,7 +415,7 @@
       activate:()=>{state.worldTab=tab;state.selected.world=row.id;state.worldMapPoint=null;state.worldMapSky=null;
         state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
-  function worldLinkList(links){return links.length?el("span",{class:"world-cell-links"},...links):el("span",{},"None")}
+  function worldLinkList(links){if(!links.length)return el("span",{},"None");const list=LexeditorUI.toolbar(...links);list.classList.add("world-cell-links");return list;}
   function worldCellContents(cellId,region,segment){
     const rows=kind=>state.data.world.rows.filter(row=>row.kind===kind);
     const placed=row=>!(row.x===0&&row.z===0)&&worldCellOf(worldMapFraction(row.x,row.z))===cellId;

@@ -1665,7 +1665,10 @@
   options.action || null);
 
   // Buttons that act on the thing above them, in one wrapping row.
-  const actionRow = (...children) => element("div", {class: "lex-action-row"}, ...children);
+  const actionRow = (...children) => {
+    const options=children[0] && typeof children[0]==='object' && !Array.isArray(children[0]) && !(children[0] instanceof Node) ? children.shift() : {};
+    return element("div", {class:["lex-action-row",options.fillFirst?"lex-action-row-fill-first":"",options.className||""].filter(Boolean).join(" ")}, ...children);
+  };
 
   // A table that is its own pane, with its pager under it.
   const pagedPane = (content, pagerNode) => {
@@ -1822,7 +1825,8 @@
     return element("span", {class:"lex-record-source", role:"img",
       title:options.label, "aria-label":options.label}, options.icon);
   };
-  const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
+  const choiceField = (value, action, options={}) => element("span", {
+    class:["lex-choice-field",options.fillValue?"lex-choice-field-fill":"",options.hoverAction?"lex-choice-field-hover":""].filter(Boolean).join(" ")}, value, action);
   const quantityChoice = (choice, quantity) => element("div", {class:"lex-quantity-choice"},
     choice, element("span", {class:"lex-quantity-mark","aria-hidden":"true"}, "×"), quantity);
   const iconValue = ({icon,label,toggle,control}) => element("div",{class:"lex-icon-value"},
@@ -2002,6 +2006,15 @@
     const image=stage.querySelector('img');
     if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;
+    const sideControls=[];
+    root.lexSideControls = ({left,right}={}) => {
+      sideControls.splice(0).forEach(node=>node.remove());
+      for(const [side,content] of [['left',left],['right',right]]){
+        if(!content)continue;
+        const controls=element('div',{class:`lex-image-map-side-controls ${side}`},content);
+        sideControls.push(controls);root.append(controls);
+      }
+    };
     // A map in a panel is small, and a stored coordinate is not. The magnifier
     // opens the same map at the size of the window, with the same markers and the
     // same click, so a point is placed against the art. `magnify` returns that

@@ -1046,7 +1046,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    content did and the tabs floated partway down a tall window. */
 .lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; padding:0; }
 .lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
-.lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); }
+.lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); --lex-map-side-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px); }
 /* The overlay heading is shorter than what it holds once the panel is short, so
    its own clip cut the bottom of the record's identity away. The picture box
    below it is still a hard bound, so the heading can show its content. */
@@ -4139,7 +4139,9 @@ body:has(.lex-data-map-table) #main {
 }
 
 /* ---- Action rows ----------------------------------------------------- */
-.lex-action-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.lex-action-row { display:flex; flex-wrap:var(--lex-action-wrap,wrap); align-items:var(--lex-action-align,center); gap:var(--lex-action-gap,8px); min-width:0; }
+.lex-action-row-fill-first > :first-child { flex:1 1 auto; min-width:0; }
+.lex-action-meta { display:flex; align-items:center; flex:0 0 auto; padding:0 10px; white-space:nowrap; color:var(--lex-text); opacity:var(--lex-action-meta-opacity,1); }
 .lex-detail-field-control > .lex-action-row { width:100%; }
 .lex-detail-field-control > .lex-action-row > :is(.lex-unit-field,input:not([type=checkbox])) { flex:1 1 0; width:100%; }
 /* The row's buttons wear the dialog buttons' theme, the first-choice one in
@@ -4333,6 +4335,9 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
 .lex-paged-pane-content > .lex-curve-editor .lex-curve-svg { height:100%; aspect-ratio:auto; }
 .lex-choice-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; width:100%; min-width:0; }
+.lex-choice-field-fill > :first-child { width:100%; }
+.lex-choice-field-hover > button:last-child { opacity:0; }
+.lex-choice-field-hover:where(:hover,:focus-within) > button:last-child { opacity:1; }
 .lex-choice-field > button:last-child,
 .lex-record-card-action > button { display:grid; place-items:center; width:1.8em; min-width:1.8em; min-height:1.6em; padding:2px; font:inherit; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel-2)); border:var(--lex-input-border,1px solid var(--lex-border)); border-color:var(--lex-input-border-color,var(--lex-border)); }
 .lex-choice-field > button svg,
@@ -4465,9 +4470,10 @@ body:has(.lex-data-map-table) #main {
 .lex-overlay-stack > .lex-overlay-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .lex-overlay-stack.lex-overlay-fill { display:block; width:100%; align-self:start; }
 .lex-overlay-stack.lex-overlay-fill > .lex-overlay-base { width:100%; }
+.lex-image-pending { visibility:hidden; }
 .lex-image-map-stage > .lex-overlay-stack { display:block; width:100%; height:100%; }
 .lex-image-map-stage > .lex-overlay-stack > .lex-overlay-base { width:100%; height:100%; }
-.lex-stack { display:flex; flex-direction:column; gap:var(--lex-panel-gap); height:100%; min-height:0; }
+.lex-stack { display:flex; flex-direction:column; gap:var(--lex-stack-gap,var(--lex-panel-gap)); height:100%; min-height:0; min-width:0; }
 .lex-stack > * { flex:0 0 auto; min-height:0; }
 .lex-stack > :last-child { flex:1 1 auto; }
 .lex-stack-natural { height:auto; }
@@ -4611,6 +4617,9 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-cells > button:hover { outline:1px solid var(--lex-text); outline-offset:-1px; }
 .lex-image-map-cells > button.lex-map-cell-filled { background:var(--lex-map-cell-fill); }
 .lex-image-map-tools { position:absolute; z-index:5; top:6px; left:6px; display:flex; gap:6px; }
+.lex-image-map-side-controls { position:absolute; z-index:2; top:var(--lex-map-side-top,6px); max-width:36%; min-height:0; max-height:calc(100% - var(--lex-map-side-top,6px)); overflow:auto; }
+.lex-image-map-side-controls.left { left:0; }
+.lex-image-map-side-controls.right { right:0; }
 .lex-image-map-tools > button { min-height:30px; padding:0 10px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
 .lex-image-map-tools > button:hover,.lex-image-map-tools > button:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
 .lex-image-map-tools > button[aria-pressed="true"] { color:var(--lex-text); border-color:var(--lex-highlight); background:color-mix(in srgb,var(--lex-accent) 55%,var(--lex-panel)); }

@@ -101,7 +101,7 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,textureSourc
     }finally{clearTimeout(timer);stage?.lexDispose?.();stage?.remove();}
   }
   window.FF8ModelThumbnail = options => {
-    const image=LexeditorUI.el('img',{alt:`${options.label} model`,class:'ff8-model-thumbnail'});
+    const image=LexeditorUI.el('img',{alt:`${options.label} model`,class:'ff8-model-thumbnail lex-image-pending'});
     const key=JSON.stringify([options.dataset,options.file,options.revision]);
     // Wait for the card to mount before scheduling work. Discard queued work
     // when every card waiting for it has left the page.
@@ -127,7 +127,7 @@ window.FF8ModelViewer = function ({file,dataset,label,objectId=null,textureSourc
           job.images.push(image);
           source=await job.promise;
         }
-        if(image.isConnected&&source){image.src=source;image.dataset.modelReady='true';}
+        if(image.isConnected&&source){image.src=source;image.dataset.modelReady='true';image.classList.remove('lex-image-pending');}
       }catch(_error){if(image.isConnected)image.replaceWith(LexeditorUI.noImage('Model preview unavailable'));}
     });
     return image;
