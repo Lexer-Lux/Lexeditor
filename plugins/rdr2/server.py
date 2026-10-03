@@ -225,7 +225,9 @@ HONOR_ACTIONS_FILE = Path(os.environ.get(
 
 
 def get_honor_actions():
-    return _read_honor_actions(HONOR_ACTIONS_FILE)
+    data = _read_honor_actions(HONOR_ACTIONS_FILE)
+    for tier in data['tiers']:tier['amount'] = str(tier['amount'])
+    return data
 
 
 def save_honor_actions(edits):

@@ -63,6 +63,8 @@ def test_http_rejects_then_exact_signed_amount_and_boolean_reload(controls):
         assert next(row for row in data['tiers'] if row['id']=='tier_+5')['amount']==-9007199254740993
         assert not next(row for row in data['events'] if row['id']=='HONOR_EVENT_THEFT')['enabled']
         assert len(data['events'])==21 and len(data['tiers'])==19
+        api_data=json.load(urlopen(f'http://127.0.0.1:{http.server_port}/api/honor-actions'))
+        assert next(row for row in api_data['tiers'] if row['id']=='tier_+5')['amount']=='-9007199254740993'
     finally:http.shutdown();http.server_close();worker.join()
 
 

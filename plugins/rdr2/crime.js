@@ -199,10 +199,24 @@ async function saveBountyHunters(){
   state.bountyHunterEdits={};state.bountyHunters.mine=null;toast(`Saved ${r.saved} bounty-hunter setting(s)`);renderCrime();return r.saved;
 }
 
+const HONOR_PANEL_HELP="Honor uses 21 event switches and 19 shared amounts. A replacement changes every honor action that uses its Vanilla amount. Event switches remain independent.";
+function honorAmountValid(value){
+  return (typeof value==="string"||typeof value==="number"&&Number.isSafeInteger(value))&&catalogQuantityIsValid(value);
+}
+function validateHonorActionDrafts(){
+  const data=state.honorActions;
+  for(const [id,edit] of Object.entries(state.honorActionEdits)){
+    const rows=[...(data?.tiers||[]),...(data?.events||[])].filter(row=>row.id===id);
+    if(rows.length!==1||typeof rows[0].enabled!=="boolean"||!(edit&&typeof edit==="object")||!Object.keys(edit).length||Object.keys(edit).some(key=>!["enabled","amount"].includes(key)))throw new Error(`${id} is read-only or unavailable.`);
+    if(data.tiers.includes(rows[0])&&!honorAmountValid(rows[0].amount))throw new Error(`${id} is read-only or unavailable.`);
+    if("enabled" in edit&&typeof edit.enabled!=="boolean")throw new Error(`${id}: choose enabled or disabled.`);
+    if("amount" in edit&&(!data.tiers.includes(rows[0])||!honorAmountValid(rows[0].amount)||!honorAmountValid(edit.amount)))throw new Error(`${id}: enter a whole number.`);
+  }
+}
 function normalizeHonorActions(data){
   const d=data&&typeof data==="object"?data:{};d.events=Array.isArray(d.events)?d.events:[];d.tiers=Array.isArray(d.tiers)?d.tiers:[];
-  d.events.forEach((r,i)=>{r.id=safeDisplay(r.id,`honor_event_${i+1}`);r.label=safeDisplay(r.label,humanizeId(r.id,"Honor event"));r.enabled=Boolean(r.enabled);});
-  d.tiers.forEach((r,i)=>{r.id=safeDisplay(r.id,`honor_tier_${i+1}`);r.vanilla=safeDisplay(r.vanilla,"—");r.amount=r.amount??(r.vanilla==="—"?0:Number(r.vanilla));r.enabled=Boolean(r.enabled);});
+  d.events.forEach((r,i)=>{r.id=safeDisplay(r.id,`honor_event_${i+1}`);r.label=safeDisplay(r.label,humanizeId(r.id,"Honor event"));});
+  d.tiers.forEach((r,i)=>{r.id=safeDisplay(r.id,`honor_tier_${i+1}`);r.vanilla=safeDisplay(r.vanilla,"—");});
   return d;
 }
 async function ensureHonorActions(){if(!state.honorActions)state.honorActions=normalizeHonorActions(await api("/api/honor-actions"));return state.honorActions;}
@@ -210,40 +224,46 @@ async function renderHonorActions(){
   const current=renderScope("renderHonorActions");
   const d=await ensureHonorActions();if(!current())return;const m=$("#main");m.innerHTML="";
   if(!d.available)return noData("Honor runtime controls are unavailable for this profile.");
-  const table=(title,rows,tier)=>{
+  const table=(title,rows)=>{
     const enabledBox=r=>{
       const edit=state.honorActionEdits[r.id]||{};
-      const box=el("input",{type:"checkbox","aria-label":`${safeDisplay(r.label,r.id)} enabled`,
-        onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),enabled:e.target.checked};refreshGlobalSave();}});
+      const editable=!isRO()&&typeof r.enabled==="boolean"&&(!Object.hasOwn(r,"vanilla")||honorAmountValid(r.amount));
+      if(typeof r.enabled!=="boolean")return LexeditorUI.readonlyField(String(r.enabled));
+      const box=el("input",{type:"checkbox",disabled:!editable,"aria-label":`${safeDisplay(r.label,r.id)} enabled`,
+        onchange:e=>{if(!editable)return;const next={...(state.honorActionEdits[r.id]||{})};if(e.target.checked===r.enabled)delete next.enabled;else next.enabled=e.target.checked;if(Object.keys(next).length)state.honorActionEdits[r.id]=next;else delete state.honorActionEdits[r.id];refreshGlobalSave();}});
       box.checked=edit.enabled??r.enabled;
       return box;
     };
     const amountBox=r=>{
       const edit=state.honorActionEdits[r.id]||{};
-      return el("input",{type:"number",step:"1",value:edit.amount??r.amount,
+      const editable=!isRO()&&honorAmountValid(r.amount)&&typeof r.enabled==="boolean";
+      if(!honorAmountValid(r.amount))return LexeditorUI.readonlyField(String(r.amount));
+      const input=el("input",{type:"number",step:"1",required:true,disabled:!editable,"data-lex-validate-number":"true",value:edit.amount??r.amount,
         "aria-label":`Replacement for vanilla honor amount ${safeDisplay(r.vanilla)}`,
         title:"Editable replacement applied to every honor action that uses this vanilla amount.",
         class:("amount" in edit)?"edited":"",
-        onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),amount:Number(e.target.value)};refreshGlobalSave();}});
+        oninput:e=>{if(!editable)return;const raw=e.target.value,next={...(state.honorActionEdits[r.id]||{})};if(honorAmountValid(raw)&&BigInt(raw)===BigInt(r.amount))delete next.amount;else next.amount=raw;if(Object.keys(next).length)state.honorActionEdits[r.id]=next;else delete state.honorActionEdits[r.id];e.target.setCustomValidity(honorAmountValid(raw)?"":"Enter a whole number.");e.target.classList.toggle("edited","amount" in next);refreshGlobalSave();}});
+      input.setAttribute("value","0");input.value=String(edit.amount??r.amount);
+      input.setCustomValidity(honorAmountValid(input.value)?"":"Enter a whole number.");return input;
     };
-    const list=columnList({class:"honor-table",align:"start",headerAlign:"start","aria-label":title,
-      rows,key:r=>r.id,editable:true,localSort:false,
-      template:tier?"minmax(160px,1fr) 110px minmax(160px,1fr)":"minmax(220px,1fr) 110px",
-      columns:[{key:"name",label:tier?"Vanilla amount":"Honor event",cellClass:"key",
-          render:r=>el("span",{},tier?safeDisplay(r.vanilla):safeDisplay(r.label,humanizeId(r.id,"Honor event")),
-            LexeditorUI.detailNote(safeDisplay(r.id,"honor_control")))},
-        {key:"enabled",label:"Enabled",cellClass:"bool-cell",render:enabledBox},
-        ...(tier?[{key:"amount",label:"Replacement amount",render:amountBox}]:[])]});
-    return LexeditorUI.detailSection({title,body:list});};
+    const selectedKey="honorSelected";
+    // names: Fixed runtime control identities cannot rename game honor actions.
+    const list=LexeditorUI.pagedListDetail({rows,key:r=>r.id,selected:state.filters[selectedKey]||rows[0]?.id,renamable:false,
+      pageSize:15,noun:"honor controls",slots:false,splitKey:"rdr2-honor",
+      sync:view=>{state.filters[selectedKey]=view.selected},
+      master:view=>columnList({class:"honor-table",rows:view.rows,key:r=>r.id,selected:view.selected,select:view.select,
+        columns:[{key:"name",label:"Honor control",render:r=>el("span",{},Object.hasOwn(r,"vanilla")?`Honor amount ${r.vanilla}`:safeDisplay(r.label),LexeditorUI.detailNote(r.id))},{key:"kind",label:"Kind",render:r=>Object.hasOwn(r,"vanilla")?"Shared amount":"Event"}],"aria-label":title}),
+      detail:r=>LexeditorUI.detailPanel({title:Object.hasOwn(r,"vanilla")?`Honor amount ${r.vanilla}`:r.label,help:fieldHelp(HONOR_PANEL_HELP),body:[
+        LexeditorUI.detailField({label:"Enabled",control:enabledBox(r)}),
+        ...(Object.hasOwn(r,"vanilla")?[LexeditorUI.detailField({label:"Replacement amount",control:amountBox(r)})]:[])
+      ]})});
+    return list;};
   // Amounts used to be buried below all 21 event toggles, which made the page
   // look toggle-only. Put the editable table first and state its proven shared
   // scope instead of inventing independent per-event values the game lacks.
-  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Honor amounts are editable in the first table. "),
-    "Each replacement changes every action that uses that vanilla amount; event toggles remain independent."),
-    LexeditorUI.stack({fill:false},
-      table("Editable honor amounts",d.tiers,true),table("Independent event toggles",d.events,false)));
+  m.append(table("Honor controls",[...d.tiers,...d.events]));
 }
-async function saveHonorActions(){const edits=Object.entries(state.honorActionEdits).map(([id,v])=>({id,...v}));if(!edits.length)return 0;const r=await api("/api/honor-actions/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.honorActionEdits={};state.honorActions=null;toast(`Saved ${r.saved} honor control(s)`);renderCrime();return r.saved;}
+async function saveHonorActions(){if(isRO())return 0;validateHonorActionDrafts();const edits=Object.entries(state.honorActionEdits).map(([id,v])=>({id,...v}));if(!edits.length)return 0;const r=await api("/api/honor-actions/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.honorActionEdits={};state.honorActions=null;toast(`Saved ${r.saved} honor control(s)`);renderCrime();return r.saved;}
 
 const DISPATCH_LABELS = {
   "SinglePlayerWantedLevelThresholds": "Wanted level thresholds (crime score to reach level)",
@@ -373,7 +393,7 @@ async function renderCrime() {
     await renderBountyHunters();refreshGlobalSave();installTabContext();return;
   }
   if(f.crimeSection==="honor"){
-    const d=await ensureHonorActions();if(!current())return;tb.append(el("span",{class:"count"},`${d.events?.length||0} events · ${d.tiers?.length||0} shared tiers`),savebar(saveHonorActions));
+    await ensureHonorActions();if(!current())return;tb.append(savebar(saveHonorActions));
     await renderHonorActions();refreshGlobalSave();installTabContext();return;
   }
   tb.append(el("span", { class: "count", id: "crimecount" }),savebar(saveCrime));
