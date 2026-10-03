@@ -35,20 +35,27 @@ def test_create_each_supported_family_through_shared_add(tmp_path,monkeypatch,ki
             try:
                 page=browser.new_page(viewport={'width':1500,'height':950})
                 startup_errors=[]
+                pending=set()
+                page.on('request',lambda request:pending.add(request.url) if '/api/' in request.url else None)
+                page.on('requestfinished',lambda request:pending.discard(request.url))
+                page.on('requestfailed',lambda request:pending.discard(request.url))
                 page.on('pageerror',lambda error:startup_errors.append(f'JavaScript: {error}'))
                 page.on('requestfailed',lambda request:startup_errors.append(
                     f'Network: {request.url}: {request.failure}'))
                 page.on('response',lambda response:startup_errors.append(
                     f'HTTP: {response.status} {response.url}')
                     if '/api/' in response.url and response.status>=400 else None)
+                def wait_for_records(condition,stage,arg=None):
+                    try:
+                        page.wait_for_function(f'arg=>({condition}) || !!document.querySelector(".pz-error-message")',arg=arg)
+                    except BrowserTimeout:
+                        pytest.fail(f'Project Zomboid {stage} timed out: {startup_errors}; '
+                                    f'pending API requests: {sorted(pending)}; '
+                                    f'page: {page.locator("body").inner_text()}')
+                    assert page.evaluate(f'arg=>({condition})',arg), (
+                        stage,startup_errors,sorted(pending),page.locator('.pz-error-message').all_text_contents())
                 page.goto(f'http://127.0.0.1:{service.server_port}')
-                try:
-                    page.wait_for_function('items.rows.length>0 || !!document.querySelector(".pz-error-message")')
-                except BrowserTimeout:
-                    pytest.fail(f'Project Zomboid startup timed out: {startup_errors}; '
-                                f'page: {page.locator("body").inner_text()}')
-                assert page.evaluate('items.rows.length>0'), (
-                    startup_errors, page.locator('.pz-error-message').all_text_contents())
+                wait_for_records('items.rows.length>0','startup')
                 page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 name='Created'+kind
                 original=next(row for row in zedscript.inventory(project)['rows'] if row['kind']==kind)
@@ -76,7 +83,7 @@ def test_create_each_supported_family_through_shared_add(tmp_path,monkeypatch,ki
                 assert any(row['name']==name and row['kind']==kind for row in zedscript.inventory(project)['rows'])
                 assert source.read_bytes().decode('utf-8-sig')[original['start']:original['end']]==template
                 page.reload()
-                page.wait_for_function('name=>scripts.rows.some(row=>row.name===name)',arg=name)
+                wait_for_records('scripts.rows.some(row=>row.name===arg)','reload',name)
                 page.evaluate('tab=>navigate(tab)',tab)
                 assert page.locator('.pz-record-table').get_by_text(name,exact=True).count()==1
             finally:

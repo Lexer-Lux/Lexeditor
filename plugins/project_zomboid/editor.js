@@ -87,7 +87,16 @@ function renderEmpty(title,message){
     LexeditorUI.el("p",{class:"lex-detail-note"},message),
   ]});
 }
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);return payload}
+async function api(path,options={}){
+  let response;
+  try{response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}})}
+  catch(error){throw new Error(`${path}: ${error.message||String(error)}`)}
+  let payload;
+  try{payload=await response.json()}
+  catch{throw new Error(`${path}: ${response.ok?"Invalid JSON response":`Request failed (${response.status})`}`)}
+  if(!response.ok)throw new Error(`${path}: ${payload.error||`Request failed (${response.status})`}`);
+  return payload;
+}
 function setStatus(message,error=false){LexeditorUI.showToast?.(message,error)}
 async function reload(){
   renderLoading();
