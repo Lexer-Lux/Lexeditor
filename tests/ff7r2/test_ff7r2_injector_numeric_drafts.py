@@ -53,11 +53,11 @@ def test_injector_integer_float_drafts_and_real_ini_save(tmp_path):
                         assert ini.read_text() == original
                         page.evaluate("tweakTab='injector';render()")
                         assert reveal(page, control).input_value() == raw
-                    reveal(page, page.get_by_role("button", name="Revert", exact=True)).click()
+                    reveal(page, page.get_by_role("button", name="Revert", exact=True, include_hidden=True)).click()
                     assert not page.evaluate("injectorDirty()")
                     assert reveal(page, control).input_value() == str(saved)
                     reveal(page, control).fill(valid)
-                    reveal(page, page.get_by_role("button", name="Save settings", exact=True)).click()
+                    reveal(page, page.get_by_role("button", name="Save settings", exact=True, include_hidden=True)).click()
                     page.wait_for_function("!injectorBusy&&!injectorDirty()")
                     assert si.read_settings(folder)["values"][section][key] == float(valid)
                     assert "Keep=untouched" in ini.read_text()
