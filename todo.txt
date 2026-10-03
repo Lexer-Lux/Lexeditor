@@ -82,6 +82,7 @@ World
 - (reopened) Warband: created records (e.g. troops from the template copy) still get no created-in-mod pen; the server has no "created" flag yet.
     > status 2026-09-27: creating a troop, item or sound now records it and the lists show the pen automatically. Records made before today can't be told apart from shipped ones.
     > Lexer: What? How...huh? The pen component should just be something automatic. You should not have to manually do it so I'm kind of confused by this. Doubly confused b/c I never created any new records in Warband!!!
+    > status 2026-10-03: The shared table now automatically renders the pen from explicit created-record metadata; Warband's per-list pen renderers were removed. Focused browser checks verify item/troop creation and reload, unchanged originals, sorting and no duplicate source icons. Rendered troop list inspected. This proves fixture-created records, not that Lexer created records; the broader origin bookkeeping question remains open.
 
 
 ==================================================================== CI / INTEGRATION

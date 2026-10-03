@@ -10,10 +10,6 @@
   };
 
   let moduleRecords=null;
-  // A record this mod's create action made carries the shared created-in-mod
-  // pen; the server keeps the ledger of those ids (todo: "created records
-  // ... still get no created-in-mod pen").
-  function createdName(row,name){return row?.created?LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:true}),name):name}
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
   // "Mod contents only" keeps the records this project has actually changed.
   // Warband records edits against the record itself, so the filter is the set
@@ -81,7 +77,7 @@
   // The cells read the edited values, so a change in the detail pane shows in
   // the row it belongs to instead of waiting for a save.
   function itemColumns(){return [
-    {key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>createdName(row,el("span",{title:effectiveItemField(row,"name")},effectiveItemField(row,"name"))),
+    {key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:effectiveItemField(row,"name")},effectiveItemField(row,"name")),
       sortValue:row=>effectiveItemField(row,"name")},
     {key:"id",label:"ID",width:"minmax(6em,.8fr)"},
     {key:"type",label:"Type",width:"minmax(6em,.7fr)",render:row=>el("span",{title:itemTypeFromFlags(effectiveItemField(row,"flags"))},itemTypeFromFlags(effectiveItemField(row,"flags"))),
@@ -370,7 +366,7 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name",render:row=>createdName(row,el("span",{},row.name))},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{
       add:beginTroopCreation,addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!base.some(row=>row.status!=='CUT'&&!row.problem),
       addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating a troop.":state.build.running?"Wait for the current build to finish.":"An active troop is needed as a template.",
       key:troopRowKey,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});

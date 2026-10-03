@@ -8446,6 +8446,11 @@ ${contents.path}`});
       columns.find(column => ["name", "title", "item", "ability", "gf", "enemy", "shop", "weapon", "magic"]
         .includes(String(column.key).toLowerCase()))?.key ||
       columns.find(column => String(column.key).toLowerCase() !== "id")?.key || columns[0]?.key;
+    // Origin belongs to the record, so every table paints its pen without a
+    // game-specific name renderer. Keep existing source icons supplied by
+    // callers, and require the explicit boolean rather than a field's value.
+    const sourceColumn = columns.find(column => ["name", "title"].includes(String(column.key).toLowerCase()))?.key
+      || columns.find(column => !["enabled", "status"].includes(String(column.key).toLowerCase()))?.key;
     const header = element("div", {
       class: ["lex-column-list-header", options.headerClass || ""].filter(Boolean).join(" "),
       role: "row",
@@ -8590,6 +8595,11 @@ ${contents.path}`});
           (typeof content === "string" || typeof content === "number")
             ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
             : content));
+        if (row?.created === true && column.key === sourceColumn &&
+            !cell.querySelector(".lex-record-source")) {
+          const value = cell.querySelector(".lex-column-cell-content");
+          value.replaceChildren(inlineLabel(recordSource({created:true}), ...value.childNodes));
+        }
         // The double-click is caught once, at the document: a list whose
         // click selects the row re-renders between the two clicks, so the
         // cell the double-click lands on is a new one, not the first.
