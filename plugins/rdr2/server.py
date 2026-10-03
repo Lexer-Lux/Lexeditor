@@ -916,7 +916,17 @@ def _commit_localization_save(prepared):
     outputs = [(path, payload)]
     if install_payload is not None:
         outputs.append((ds_dir("mine") / "install.xml", install_payload))
+    _commit_file_outputs(outputs, "Localization")
+    return count
+
+
+def _commit_file_outputs(outputs, label):
+    """Stage all bytes, then replace them with rollback on an I/O failure."""
+    if len({target.resolve() for target, _ in outputs}) != len(outputs):
+        raise ValueError(f"{label} outputs must have distinct paths")
     original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
+    timestamps = {target: (target.stat().st_atime_ns, target.stat().st_mtime_ns)
+                  for target, data in original.items() if data is not None}
     temporary, committed = [], []
     def stage(target, data):
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
@@ -937,15 +947,40 @@ def _commit_localization_save(prepared):
                     target.unlink()
                 else:
                     stage(target, original[target]).replace(target)
+                    os.utime(target, ns=timestamps[target])
             except Exception as rollback_error:
                 failures.append(f"{target.name}: {rollback_error}")
         if failures:
-            raise RuntimeError(f"Localization save failed: {error}; rollback failed: {'; '.join(failures)}") from error
+            raise RuntimeError(f"{label} save failed: {error}; rollback failed: {'; '.join(failures)}") from error
         raise
     finally:
         for temp_path in temporary:
             temp_path.unlink(missing_ok=True)
-    return count
+
+
+def _commit_xml_roots(prepared):
+    """Publish prepared mine XML and first backups only after the batch saves."""
+    if not prepared:
+        return
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    outputs = []
+    published = []
+    for name, entry, root in prepared:
+        path = entry.get("path") or data_file_path(name, "mine")
+        body = ET.tostring(root, encoding="unicode")
+        payload = (entry["decl"] + "\n" + body).encode("utf-8")
+        if entry["bom"]:
+            payload = b"\xef\xbb\xbf" + payload
+        backup = path.with_suffix(path.suffix + ".bak")
+        if not backup.exists():
+            outputs.append((backup, path.read_bytes()))
+        outputs.append((path, payload))
+        published.append((entry, root, path))
+    _commit_file_outputs(outputs, "XML batch")
+    for entry, root, path in published:
+        entry["root"] = root
+        entry["mtime"] = path.stat().st_mtime_ns
 
 
 def save_localization(edits):
@@ -1913,12 +1948,7 @@ def _commit_quick_select_edits(prepared):
         return 0
     entry, original_root, root, changed = prepared
     if changed:
-        entry["root"] = root
-        try:
-            save_file(QUICK_SELECT_FILE)
-        except Exception:
-            entry["root"] = original_root
-            raise
+        _commit_xml_roots([(QUICK_SELECT_FILE, entry, root)])
     return changed
 
 
@@ -3682,21 +3712,16 @@ def apply_catalog_edits(edits):
         if (description.text or "").strip() != key:
             description.text = key
             changed += 1
+    prepared_files = []
     if changed:
-        catalog_entry["root"] = root
-        try:
-            save_file(CATALOG_FILE)
-        except Exception:
-            catalog_entry["root"] = original_root
-            raise
-        for name, (entry, original, prepared) in bundle_files.items():
-            entry["root"] = prepared
-            try:
-                save_file(name)
-            except Exception:
-                entry["root"] = original
-                raise
-    return changed + _commit_quick_select_edits(quick_select)
+        prepared_files.append((CATALOG_FILE, catalog_entry, root))
+        prepared_files.extend((name, entry, prepared)
+                              for name, (entry, original, prepared) in bundle_files.items())
+    quick_changed = quick_select[3] if quick_select is not None else 0
+    if quick_changed:
+        prepared_files.append((QUICK_SELECT_FILE, quick_select[0], quick_select[2]))
+    _commit_xml_roots(prepared_files)
+    return changed + quick_changed
 
 
 # ---------------- loot tables ----------------
