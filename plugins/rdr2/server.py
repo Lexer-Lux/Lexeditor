@@ -590,24 +590,35 @@ def _craft_recipe_json(recipe):
 def _craft_recipe_from_json(row):
     if not isinstance(row, dict):
         raise ValueError("every custom recipe must be an object")
+    text_fields = {"recipe_id", "category", "title", "description", "station", "output_item", "unlock"}
+    if set(row) - (text_fields | {"output_quantity", "ingredients"}):
+        raise ValueError("custom recipe contains unsupported fields")
+    for key in text_fields:
+        if key in row and not isinstance(row[key], str):
+            raise ValueError(f"{key} must be text")
     ingredients = row.get("ingredients", [])
     if not isinstance(ingredients, list):
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: ingredients must be a list")
     if any(not isinstance(part, dict) for part in ingredients):
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: every ingredient must be an object")
+    for part in ingredients:
+        if set(part) - {"item", "quantity"}:
+            raise ValueError("ingredient contains unsupported fields")
+        if "item" in part and not isinstance(part["item"], str):
+            raise ValueError("ingredient item must be text")
     try:
         return _CraftRecipe(
-            recipe_id=str(row.get("recipe_id", "")).strip(),
-            category=str(row.get("category", "")).strip(),
-            title=str(row.get("title", "")).strip(),
-            description=str(row.get("description", "")).strip(),
-            station=str(row.get("station", "")).strip(),
-            output_item=str(row.get("output_item", "")).strip(),
+            recipe_id=row.get("recipe_id", "").strip(),
+            category=row.get("category", "").strip(),
+            title=row.get("title", "").strip(),
+            description=row.get("description", "").strip(),
+            station=row.get("station", "").strip(),
+            output_item=row.get("output_item", "").strip(),
             output_quantity=integer_value(row.get("output_quantity", 1), "Output quantity"),
-            ingredients=[_CraftIngredient(str(part.get("item", "")).strip(),
+            ingredients=[_CraftIngredient(part.get("item", "").strip(),
                                           integer_value(part.get("quantity", 1), "Ingredient quantity"))
                          for part in ingredients],
-            unlock=str(row.get("unlock", "")).strip(),
+            unlock=row.get("unlock", "").strip(),
         )
     except (TypeError, ValueError) as ex:
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: quantities must be whole numbers") from ex
@@ -5452,6 +5463,9 @@ class Handler(PluginRequestHandler):
 
     def do_PUT(self):
         try:
+            path = urlparse(self.path).path
+            if path == "/api/custom-crafting" and self.refuse_write_when_read_only(path + "/save"):
+                return
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length) or b"{}")
             path = urlparse(self.path).path
