@@ -13,6 +13,7 @@ import sys
 import threading
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from paged_detail import reveal
 
 ROOT=Path(__file__).resolve().parents[2]
 OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(DEV_CACHE / 'global-browser')))
@@ -78,6 +79,7 @@ def main():
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     base=f'http://127.0.0.1:{server.server_port}'
     results=[]
+    plugins=json.loads((ROOT/'ui/credits.json').read_text(encoding='utf-8'))['plugins']
     try:
         with sync_playwright() as pw:
             executable=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium')
@@ -89,10 +91,11 @@ def main():
                 page.wait_for_timeout(300)
                 # Actual Blank Info action mounts one shared credits panel, even after refresh.
                 print('Clicking info',flush=True);page.get_by_role('button',name='Open Blank setup and runtime information',exact=True).click()
-                page.wait_for_selector('.lex-plugin-credits h3')
+                page.wait_for_selector('.lex-plugin-credits h3',state='attached')
+                reveal(page,page.locator('.lex-plugin-credits h3').first)
                 assert page.locator('.lex-plugin-credits').count()==1
                 assert page.locator('.lex-plugin-credits').inner_text().find('Shared application')>=0
-                for plugin in json.loads((ROOT/'ui/credits.json').read_text(encoding='utf-8'))['plugins']:
+                for plugin in plugins:
                     page.evaluate('id=>{document.querySelector("#main").replaceChildren(LexeditorUI.creditsPanel(id));}',plugin)
                     page.wait_for_selector('.lex-plugin-credits h3')
                     assert not page.locator('.lex-plugin-credits [role=alert]').count(),plugin
@@ -109,11 +112,13 @@ def main():
                 assert box and box['x']>=0 and box['y']>=0 and box['x']+box['width']<=width+1
                 page.keyboard.press('Escape');assert page.locator('.lex-help-popover').count()==0
                 assert not errors,errors
-                results.append({'size':[width,height],'credits_plugins':8,'keyboard_help':'pass','page_errors':errors})
+                results.append({'size':[width,height],'credits_plugins':len(plugins),'keyboard_help':'pass','page_errors':errors})
                 page.close()
             page=browser.new_page(viewport={'width':1200,'height':800});errors=[]
             page.set_default_timeout(5000);page.on('pageerror',lambda e:(errors.append(str(e)),print('PAGE ERROR',e,flush=True)));page.add_init_script(STUB)
             load_page(page,base,'/ui/chooser.html');page.wait_for_selector('#lexer-handle:visible');page.locator('#lexer-handle').click()
+            assert page.evaluate('window.__calls.length')==0
+            page.locator('#lexer-helpers-toggle').click()
             page.wait_for_selector('.lexer-helper-versions')
             text=page.locator('#lexer-panel').inner_text()
             assert all(t in text for t in ['Pinned: 1.0','Installed: 1.1','Latest upstream: 1.2','Installed: Not detected','2026-09-01','Offline']),text
