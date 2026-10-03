@@ -201,7 +201,7 @@ function catalogQuantityInput({store,key,base,value,minimum=null,...attrs}){
   const validate=()=>{input.setCustomValidity(catalogQuantityIsValid(input.value,minimum)?"":"Enter a whole quantity"+(minimum===null?".":` of at least ${minimum}.`));return input.checkValidity()};
   input.lexValidateNumber=validate;validate();
   if(isRO())input.readOnly=true;
-  else input.addEventListener("input",()=>{
+  else if(!input.readOnly)input.addEventListener("input",()=>{
     const raw=input.value,valid=validate();
     if(valid&&BigInt(raw)===BigInt(base))delete store[key];else store[key]=raw;
     input.classList.toggle("edited",key in store);renderToolbarOnly();
@@ -211,6 +211,11 @@ function catalogQuantityInput({store,key,base,value,minimum=null,...attrs}){
 function validateCatalogQuantityDrafts(){
   for(const [label,store,minimum] of [["Purchase quantity",state.yieldEdits,1],["Bundle output",state.bundleEdits,1],["Carry quantity",state.carryEdits,null]]){
     for(const raw of Object.values(store))if(!catalogQuantityIsValid(raw,minimum))throw new Error(`${label}: enter a whole quantity${minimum===null?".":` of at least ${minimum}.`}`);
+  }
+  for(const [key,raw] of Object.entries(state.effectEdits)){
+    const field=key.slice(key.lastIndexOf("|")+1);
+    if(["value","time","timeunits"].includes(field)&&!catalogQuantityIsValid(raw))throw new Error(`Effect ${field}: enter a whole number.`);
+    if(field==="percent"&&(String(raw).trim()===""||!Number.isFinite(Number(raw))))throw new Error("Effect percent: enter a finite number.");
   }
 }
 
