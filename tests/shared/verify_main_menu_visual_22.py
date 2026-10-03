@@ -21,22 +21,23 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    covers = Path(os.environ["LOCALAPPDATA"]) / "Lexeditor" / "cover-art"
+    # This is a chooser-layout fixture, independent of installed games and
+    # their downloaded artwork. Use the repository's authored sample cover.
+    cover = ROOT / "ui" / "assets" / "blank-game-cover.png"
+    if not cover.is_file():
+        raise FileNotFoundError(cover)
     rows = [
-        ("blank", "Blank Game", "added", "", str(ROOT / "ui" / "assets" / "blank-game-cover.png")),
-        ("ff8", "Final Fantasy VIII", "added", "", "ff8-39150.jpg"),
-        ("warband", "Mount & Blade: Warband", "warning", "The game executable is missing.", "warband-48700.jpg"),
-        ("rdr", "Red Dead Redemption", "not-added", "The game is not installed.", "rdr-2668510.jpg"),
-        ("rdr2", "Red Dead Redemption 2", "added", "", "rdr2-1174180.jpg"),
+        ("blank", "Blank Game", "added", ""),
+        ("ff8", "Final Fantasy VIII", "added", ""),
+        ("warband", "Mount & Blade: Warband", "warning", "The game executable is missing."),
+        ("rdr", "Red Dead Redemption", "not-added", "The game is not installed."),
+        ("rdr2", "Red Dead Redemption 2", "added", ""),
         # The longest name any plugin carries. The card clamps its title, so
         # this is the one that shows whether a name is being cut off.
-        ("ff7r", "Final Fantasy 7 Remake Intergrade", "added", "", "ff8-39150.jpg"),
+        ("ff7r", "Final Fantasy 7 Remake Intergrade", "added", ""),
     ]
     payload = []
-    for plugin_id, name, status, problem, filename in rows:
-        cover = Path(filename) if Path(filename).is_absolute() else covers / filename
-        if not cover.is_file():
-            raise FileNotFoundError(cover)
+    for plugin_id, name, status, problem in rows:
         font_items = ([{"name": "Redemption", "installed": True}, {"name": "RDR Lino", "installed": True}]
                       if plugin_id in {"rdr", "rdr2"} else [])
         payload.append({
@@ -217,6 +218,9 @@ def main() -> int:
         assert result["social"] == ["Open Lexeditor on GitHub", "Open @LexerLux on Twitter"], result
         assert result["twitterBefore"] == {"bird": "block", "x": "none"}, result
         twitter_box = cdp.eval("""(()=>{const box=document.querySelector('#home-twitter').getBoundingClientRect();return{x:box.left+box.width/2,y:box.top+box.height/2}})()""")
+        # The loading transition can still cover the cards after their DOM is
+        # measurable. Start the physical hover only once its target is exposed.
+        wait_eval(cdp, """(()=>{const node=document.querySelector('#home-twitter'),r=node.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('#home-twitter')===node})()""", 10)
         cdp.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": twitter_box["x"], "y": twitter_box["y"]})
         wait_eval(cdp, "getComputedStyle(document.querySelector('#home-twitter .twitter-x')).display==='block'", 5)
         twitter_hover = cdp.eval("""(()=>{const node=document.querySelector('#home-twitter');return{bird:getComputedStyle(node.querySelector('.twitter-bird')).display,x:getComputedStyle(node.querySelector('.twitter-x')).display}})()""")
