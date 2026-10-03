@@ -90,9 +90,9 @@ except ImportError:
     from projectile_speed import cartridge_mapping as _cartridge_mapping, load_multipliers as _load_speed_multipliers, serialize_multipliers as _serialize_speed_multipliers
 
 try:
-    from .honor_actions import read_honor_actions as _read_honor_actions, save_honor_actions as _save_honor_actions
+    from .honor_actions import read_honor_actions as _read_honor_actions, prepare_honor_actions as _prepare_honor_actions
 except ImportError:
-    from honor_actions import read_honor_actions as _read_honor_actions, save_honor_actions as _save_honor_actions
+    from honor_actions import read_honor_actions as _read_honor_actions, prepare_honor_actions as _prepare_honor_actions
 
 try:
     from .data_map import build_data_map as _build_data_map
@@ -231,7 +231,14 @@ def get_honor_actions():
 def save_honor_actions(edits):
     if not isinstance(edits, list):
         raise ValueError("edits must be a list")
-    return _save_honor_actions(HONOR_ACTIONS_FILE, edits)
+    if not edits:return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        original = HONOR_ACTIONS_FILE.read_bytes() if HONOR_ACTIONS_FILE.exists() else None
+        count, payload = _prepare_honor_actions(HONOR_ACTIONS_FILE, edits)
+        _commit_file_outputs([(HONOR_ACTIONS_FILE, payload)], 'Honor controls', expected_originals={HONOR_ACTIONS_FILE: original})
+        return count
 # The game LAYERS weapon data: the base weapons.ymt plus per-weapon override
 # files in pack_patch/ plus weaponcomponents.meta layers. Replacing only the
 # base file reverts Rockstar's own weapon patches (repeater double-fire,
