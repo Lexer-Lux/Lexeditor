@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 import struct
 import sys
+from core.numeric_values import integer_value
 
 from . import paths, runtime_layout
 from .fs_archive import FsArchive
@@ -238,10 +239,7 @@ def preview_vertices(data: bytes) -> bytes:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{label} must be an integer") from error
+    number = integer_value(value, label)
     if not minimum <= number <= maximum:
         raise ValueError(f"{label} must be {minimum} to {maximum}")
     return number
