@@ -1,6 +1,6 @@
 """Dataset failures identify the failed request and do not publish a partial project."""
 import threading
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import sync_playwright, expect, TimeoutError as PlaywrightTimeoutError
 from plugins.project_zomboid import server
 from verify_project_zomboid_ui import write_fixture
 
@@ -21,8 +21,37 @@ def test_failed_and_malformed_inventory_response_then_real_reload(tmp_path, monk
             try:
                 page = browser.new_page(viewport={'width': 1500, 'height': 950})
                 failed_requests = []
+                page_errors = []
+                api_errors = []
                 page.on('requestfailed', lambda request: failed_requests.append(
                     {'url': request.url, 'failure': request.failure}))
+                page.on('pageerror', lambda error: page_errors.append(str(error)))
+                page.on('response', lambda response: api_errors.append(
+                    {'url': response.url, 'status': response.status})
+                    if '/api/' in response.url and not response.ok else None)
+
+                def diagnostics():
+                    return {
+                        'page': page.evaluate('''()=>({url:location.href,
+                          items:items.rows.length,scripts:scripts.rows.length,
+                          error:document.querySelector('.pz-error-message')?.textContent,
+                          loading:!!document.querySelector('.lex-plugin-loading-screen')})'''),
+                        'failedRequests': failed_requests,
+                        'apiErrors': api_errors,
+                        'pageErrors': page_errors,
+                    }
+
+                def expect_recovery(stage):
+                    try:
+                        page.wait_for_function('items.rows.length>0&&scripts.rows.length>0')
+                    except PlaywrightTimeoutError as error:
+                        raise AssertionError(f'{stage} did not recover: {diagnostics()!r}') from error
+                    assert page.locator('.pz-error-message').count() == 0, diagnostics()
+
+                def clear_diagnostics():
+                    failed_requests.clear()
+                    api_errors.clear()
+                    page_errors.clear()
 
                 def expect_error(text, *, contains=False):
                     try:
@@ -33,7 +62,7 @@ def test_failed_and_malformed_inventory_response_then_real_reload(tmp_path, monk
                             message.to_have_text(text)
                     except AssertionError as error:
                         raise AssertionError(
-                            f'{error}\nFailed requests in this load: {failed_requests!r}'
+                            f'{error}\nLoad diagnostics: {diagnostics()!r}'
                         ) from error
 
                 url = f'http://127.0.0.1:{http.server_port}'
@@ -44,26 +73,25 @@ def test_failed_and_malformed_inventory_response_then_real_reload(tmp_path, monk
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 page.unroute(url + '/api/zedscript')
-                failed_requests.clear()
+                clear_diagnostics()
                 page.reload()
-                page.wait_for_function('items.rows.length>0&&scripts.rows.length>0')
-                assert page.locator('.pz-error-message').count() == 0
+                expect_recovery('HTTP-error reload')
                 page.route(url + '/api/zedscript', lambda route: route.fulfill(status=200,
                            body='not JSON', content_type='application/json'))
-                failed_requests.clear()
+                clear_diagnostics()
                 page.reload()
                 expect_error('/api/zedscript: Invalid JSON response')
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.unroute(url + '/api/zedscript')
                 page.route(url + '/api/zedscript', lambda route: route.abort('failed'))
-                failed_requests.clear()
+                clear_diagnostics()
                 page.reload()
                 expect_error('/api/zedscript:', contains=True)
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.unroute(url + '/api/zedscript')
+                clear_diagnostics()
                 page.reload()
-                page.wait_for_function('items.rows.length>0&&scripts.rows.length>0')
-                assert page.locator('.pz-error-message').count() == 0
+                expect_recovery('Network-error reload')
             finally:
                 browser.close()
     finally:
