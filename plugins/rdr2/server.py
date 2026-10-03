@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer
@@ -912,9 +913,38 @@ def _commit_localization_save(prepared):
     if prepared is None:
         return 0
     path, payload, install_payload, count = prepared
-    path.write_bytes(payload)
+    outputs = [(path, payload)]
     if install_payload is not None:
-        (ds_dir("mine") / "install.xml").write_bytes(install_payload)
+        outputs.append((ds_dir("mine") / "install.xml", install_payload))
+    original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
+    temporary, committed = [], []
+    def stage(target, data):
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
+            temp_path = Path(stream.name)
+            temporary.append(temp_path)
+            stream.write(data)
+        return temp_path
+    try:
+        staged = [(target, stage(target, data)) for target, data in outputs]
+        for target, temp_path in staged:
+            temp_path.replace(target)
+            committed.append(target)
+    except Exception as error:
+        failures = []
+        for target in reversed(committed):
+            try:
+                if original[target] is None:
+                    target.unlink()
+                else:
+                    stage(target, original[target]).replace(target)
+            except Exception as rollback_error:
+                failures.append(f"{target.name}: {rollback_error}")
+        if failures:
+            raise RuntimeError(f"Localization save failed: {error}; rollback failed: {'; '.join(failures)}") from error
+        raise
+    finally:
+        for temp_path in temporary:
+            temp_path.unlink(missing_ok=True)
     return count
 
 
