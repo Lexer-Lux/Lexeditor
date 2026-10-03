@@ -114,6 +114,26 @@ def test_challenge_target_drafts_source_slots_and_readonly(tmp_path):
                 assert page.evaluate('window.__requests.length') == 0
                 assert page.evaluate("state.challengeRewardEdits['ROOT|1']") == []
                 page.evaluate('state.challengeRewardEdits={}')
+            page.evaluate('''async()=>{
+              const req=state.store.mine.challenges.goals[0].requirements[0];
+              window.__originalChallengeSources=structuredClone(req.sources);
+              req.sources=[{index:0,base:'BASE',permutation:'PERM',removal:{group:0,branch:0,count:2}},
+                {index:1,base:'SECOND',permutation:'',removal:{group:0,branch:0,count:2}},
+                {index:2,base:'BASE',permutation:'PERM',removal:{group:0,branch:1,count:2}}];
+              await renderChallenges();
+            }''')
+            remove = page.get_by_role('button', name='Remove this counter from the summed requirement', exact=True)
+            assert remove.count() == 2
+            page.get_by_role('combobox', name='GOAL score source 0', exact=True).locator('..').get_by_role('button', name='Remove this counter from the summed requirement', exact=True).click()
+            assert page.get_by_role('combobox', name='GOAL score source 0', exact=True).count() == 0
+            assert page.get_by_role('combobox', name='GOAL score source 1', exact=True).count() == 0
+            expect(page.get_by_role('combobox', name='GOAL score source 2', exact=True)).to_be_visible()
+            assert remove.count() == 0
+            page.evaluate('''async()=>{window.__requests=[];await saveChallenges()}''')
+            requests = page.evaluate("window.__requests.filter(row=>row.path==='/api/challenges/save')")
+            assert requests[0]['body']['edits'] == [{'name': 'GOAL', 'index': 0, 'value': '10',
+                'sources': [{'index': 0, 'remove': True}]}]
+            page.evaluate('state.store.mine.challenges.goals[0].requirements[0].sources=window.__originalChallengeSources')
             page.evaluate("async()=>{state.store.mine.challenges.goals[0].requirements[0].readonly=true;await renderChallenges()}")
             expect(control).to_be_disabled()
             expect(page.get_by_role('textbox', name='GOAL score source 1', exact=True)).to_have_value('BASE + PERM')

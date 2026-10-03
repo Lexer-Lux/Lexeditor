@@ -214,6 +214,91 @@ def test_exact_goal_source_and_condition_save_reload(challenges):
     assert b'<!--goals-->' in s.data_file_path(s.GOALS_FILE, 'mine').read_bytes()
 
 
+@pytest.fixture
+def score_branches(challenges):
+    root = s.load_file(s.GOALS_FILE)['root']
+    goal = root.find('goals/Item')
+    goal.remove(goal.find('scoreParams'))
+    goal.append(ET.fromstring('<score><desiredGoal value="10"/><scoreParams>'
+        '<Item><statId><BaseId>BASE</BaseId><PermutationId>PERM</PermutationId></statId><Opaque>first</Opaque></Item>'
+        '<Item><statId><BaseId>SECOND</BaseId></statId><Opaque>second</Opaque></Item>'
+        '</scoreParams></score>'))
+    s.save_file(s.GOALS_FILE)
+    return challenges
+
+
+@pytest.mark.parametrize('backups', [False, True])
+@pytest.mark.parametrize('change', ['final', 'unmodeled', 'duplicate', 'edit_removed', 'unknown_member', 'ambiguous_member'])
+def test_invalid_branch_removal_preserves_all_outputs(score_branches, change, backups):
+    root = s.load_file(s.GOALS_FILE)['root']
+    score = root.find('.//score')
+    first = score.find('scoreParams/Item')
+    edits = [{'index': 0, 'remove': True}]
+    if change == 'final':
+        edits.append({'index': 1, 'remove': True})
+    elif change == 'unmodeled':
+        stat = first.find('statId');first.remove(stat);score.insert(1, stat)
+    else:
+        stat = ET.fromstring(ET.tostring(first.find('statId')))
+        first.append(stat)
+        if change == 'duplicate':
+            edits.append({'index': 1, 'remove': True})
+        elif change == 'edit_removed':
+            edits.append(dict(SOURCE, index=1))
+        elif change == 'unknown_member':
+            stat.find('BaseId').text = 'Unknown'
+        else:
+            ET.SubElement(stat, 'BaseId').text = 'BASE'
+    s.save_file(s.GOALS_FILE)
+    if backups:
+        for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+            path = s.data_file_path(name, 'mine')
+            path.with_suffix(path.suffix + '.bak').write_bytes(b'original')
+    before = snapshot(score_branches)
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([dict(GOAL, sources=edits)], ui_edits=[LABEL])
+    assert snapshot(score_branches) == before
+    assert s.load_file(s.GOALS_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+@pytest.mark.parametrize('compound', [False, True])
+def test_http_branch_removal_and_reader_topology_reload(score_branches, monkeypatch, compound):
+    if compound:
+        branch = s.load_file(s.GOALS_FILE)['root'].find('.//scoreParams/Item')
+        branch.append(ET.fromstring(ET.tostring(branch.find('statId'))))
+        s.save_file(s.GOALS_FILE)
+    original = s.get_challenges
+    monkeypatch.setattr(s, 'get_challenges', lambda ds='mine': original(ds) if ds == 'vanilla' else REAL_GET_CHALLENGES(ds))
+    http = s.create_server(0)
+    worker = threading.Thread(target=http.serve_forever, daemon=True);worker.start()
+    try:
+        base = f'http://127.0.0.1:{http.server_port}'
+        with urlopen(base + '/api/challenges') as response:
+            sources = json.load(response)['goals'][0]['requirements'][0]['sources']
+        assert [row['removal'] for row in sources] == [
+            {'group': 0, 'branch': 0, 'count': 2}] * (2 if compound else 1) + [
+            {'group': 0, 'branch': 1, 'count': 2}]
+        request = Request(base + '/api/challenges/save', data=json.dumps({
+            'edits': [dict(GOAL, sources=[{'index': 0, 'remove': True}])]}).encode(),
+            headers={'Content-Type': 'application/json'})
+        with urlopen(request) as response:
+            assert json.load(response)['saved'] == 2
+        s._files.clear()
+        with urlopen(base + '/api/challenges') as response:
+            data = json.load(response)
+        assert data['goals'][0]['requirements'][0]['sources'][0]['base'] == 'SECOND'
+        assert data['goals'][0]['requirements'][0]['sources'][0]['removal'] == {'group': 0, 'branch': 0, 'count': 1}
+        root = s.load_file(s.GOALS_FILE)['root']
+        assert len(root.findall('.//scoreParams/Item')) == 1
+        assert root.find('.//scoreParams/Item/Opaque').text == 'second'
+        assert root.find('goals/Item/Opaque').text == 'keep'
+        assert b'<!--goals-->' in s.data_file_path(s.GOALS_FILE, 'mine').read_bytes()
+    finally:
+        http.shutdown();http.server_close();worker.join()
+
+
 BAD_LABELS = [{}, dict(LABEL, file='unknown.meta'), dict(LABEL, file=[]),
               dict(LABEL, owner='Unknown'), dict(LABEL, owner=[]), dict(LABEL, extra=1),
               dict(LABEL, field='../Opaque'), dict(LABEL, field='Unknown'),

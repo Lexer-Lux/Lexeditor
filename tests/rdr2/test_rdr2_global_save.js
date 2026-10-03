@@ -23,7 +23,8 @@ const challengeSave = challenges.slice(challenges.indexOf('async function saveCh
 
 async function challengeSaveGuards() {
   const data={goals:[{name:'GOAL',requirements:[{index:0,value:'10',sources:[
-    {index:0,base:'BASE',permutation:'PERM'},{index:1,base:'SECOND',permutation:''}]}],
+    {index:0,base:'BASE',permutation:'PERM',removal:{group:0,branch:0,count:2}},
+    {index:1,base:'SECOND',permutation:'',removal:{group:0,branch:1,count:2}}]}],
     conditions:[{index:0,type:'CAIConditionGoalContext',fields:{ContextHash:'TRAIN'}}]}],
     allowedSourcePairs:[{base:'BASE',permutation:'PERM'},{base:'SECOND',permutation:''}],
     allowedConditionValues:[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']} ],
@@ -44,6 +45,9 @@ async function challengeSaveGuards() {
     ['readonly requirement',s=>{s.store.mine.challenges.goals[0].requirements[0].readonly=true;s.challengeSourceEdits['GOAL|0|0']=source;}],
     ['ambiguous goal',s=>{s.store.mine.challenges.goals.push(structuredClone(s.store.mine.challenges.goals[0]));s.challengeSourceEdits['GOAL|0|0']=source;}],
     ['remove every source',s=>{s.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true},'GOAL|0|1':{index:1,remove:true}};}],
+    ['unmodeled branch removal',s=>{s.store.mine.challenges.goals[0].requirements[0].sources[0].removal=null;s.challengeSourceEdits['GOAL|0|0']={index:0,remove:true};}],
+    ['duplicate branch removal',s=>{s.store.mine.challenges.goals[0].requirements[0].sources[1].removal={group:0,branch:0,count:2};s.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true},'GOAL|0|1':{index:1,remove:true}};}],
+    ['edit removed branch',s=>{s.store.mine.challenges.goals[0].requirements[0].sources[1].removal={group:0,branch:0,count:2};s.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true},'GOAL|0|1':{index:1,base:'BASE',permutation:'PERM'}};}],
     ['condition key mismatch',s=>s.challengeConditionEdits['GOAL|0|WrongField']=condition],
     ['condition fractional index',s=>s.challengeConditionEdits['GOAL|0.5|ContextHash']={...condition,index:0.5}],
     ['condition unknown type',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,type:'Unknown'}],

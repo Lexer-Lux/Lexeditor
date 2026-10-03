@@ -4269,6 +4269,18 @@ def challenge_groups(challenges_el):
         groups[logical].append((int(match.group(2)) if match else 0, challenge))
     return [(logical, sorted(groups[logical], key=lambda row: row[0])) for logical in order]
 
+def challenge_source_branch(parent, stat):
+    """Locate the scoreParams Item removed by a source-removal action."""
+    parents = {child: node for node in parent.iter() for child in node}
+    branch = stat
+    while branch in parents and parents[branch].tag != 'scoreParams':
+        branch = parents[branch]
+    container = parents.get(branch)
+    if container is None or container.tag != 'scoreParams' or branch.tag != 'Item':
+        raise ValueError('Cannot remove the final or unmodeled challenge score branch')
+    return container, branch
+
+
 def challenge_reward_collection(rank, allowed=None):
     """Resolve only the reward shape that the replacement writer preserves."""
     containers = rank.findall('reward')
@@ -4362,7 +4374,15 @@ def get_challenges(ds="mine"):
                 for source_index, stat in enumerate(parent.iter("statId")):
                     base = txt(stat, "BaseId")
                     permutation = txt(stat, "PermutationId")
+                    try:
+                        container, branch = challenge_source_branch(parent, stat)
+                        removal = {'group': list(parent.iter('scoreParams')).index(container),
+                                   'branch': container.findall('Item').index(branch),
+                                   'count': len(container.findall('Item'))}
+                    except ValueError:
+                        removal = None
                     sources.append({"index": source_index, "base": base, "permutation": permutation,
+                                    "removal": removal,
                                     "readonly": len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or not (base or permutation)})
             try:
                 finite_number(desired.get('value'), 'Challenge target')
@@ -4578,14 +4598,23 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             if remove_indices:
                 # A summed requirement stores each counter in an Item directly
                 # beneath scoreParams. Remove that whole branch, not just statId.
-                parent_map = {child: node for node in parent.iter() for child in node}
-                for source_index in sorted(set(remove_indices), reverse=True):
-                    node = stat_ids[source_index]
-                    while node in parent_map and parent_map[node].tag != "scoreParams":
-                        node = parent_map[node]
-                    container = parent_map.get(node)
-                    if container is None or container.tag != 'scoreParams' or node.tag != 'Item' or len(container.findall('Item')) <= 1:
+                removals = []
+                for source_index in remove_indices:
+                    container, node = challenge_source_branch(parent, stat_ids[source_index])
+                    if any(node is other for _, other in removals):
+                        raise ValueError('Duplicate challenge score branch removal')
+                    members = list(node.iter('statId'))
+                    if any(len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or
+                           (txt(stat, 'BaseId'), txt(stat, 'PermutationId')) not in allowed_sources for stat in members):
+                        raise ValueError('Challenge score branch contains unsupported sources')
+                    if any(stat_ids[offset(row['index'], 'source index')] in members
+                           for row in edit.get('sources', []) if not row.get('remove')):
+                        raise ValueError('Cannot edit a removed challenge score branch')
+                    removals.append((container, node))
+                for container, node in removals:
+                    if sum(owner is container for owner, _ in removals) >= len(container.findall('Item')):
                         raise ValueError('Cannot remove the final or unmodeled challenge score branch')
+                for container, node in removals:
                     container.remove(node)
                     changed += 1
     condition_changed = 0
