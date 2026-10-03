@@ -9,6 +9,7 @@ function showSaveFailure(error){const message=error?.message||String(error);toas
 const state = {
   booting: true,
   loadError: null,
+  pageError: false,
   tab: "items",
   ds: "mine",           // current dataset (mine | kiddos | vanilla)
   store: {},            // ds -> {catalog, quickSelect, effectByKey, loot, matrix}
@@ -881,7 +882,8 @@ function renderScope(page){
 }
 
 function render() {
-  renderRevision++;
+  const revision=++renderRevision;
+  const tab=state.tab;
   document.querySelectorAll("nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === state.tab));
   if (state.booting) {
@@ -899,12 +901,20 @@ function render() {
   document.body.classList.toggle("weapon-detail-view",state.tab==="weapons");
   document.body.classList.toggle("shop-workspace-view",
     state.tab==="shops" && state.filters.shopMode!=="report");
-  if(state.renderedTab!==state.tab){
+  if(state.renderedTab!==state.tab||state.pageError){
     const main=$("#main");
     if(main){main.scrollLeft=0;main.replaceChildren(LexeditorUI.loadingPanel());}
     state.renderedTab=state.tab;
+    state.pageError=false;
   }
-  const rendered=Promise.resolve(TABS[state.tab]()).finally(()=>installTabContext());
+  const rendered=Promise.resolve().then(()=>{if(revision===renderRevision)return TABS[tab]();}).catch(error=>{
+    if(revision!==renderRevision)return;
+    state.pageError=true;
+    $("#toolbar").replaceChildren();
+    $("#main").replaceChildren(LexeditorUI.notice({title:"Could not load editor data",
+      message:error?.message||String(error),tone:"warning",
+      action:el("button",{type:"button",onclick:()=>render()},"Retry")}));
+  }).finally(()=>{if(revision===renderRevision)installTabContext();});
   refreshGlobalSave();
   return rendered;
 }
