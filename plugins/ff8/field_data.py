@@ -1179,10 +1179,10 @@ def _prepare_camera_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int
         raise ValueError(f"Field map {key} has no camera setups")
     normalized = []
     for edit in edits:
-        normalized.append({"camera": int(edit.get("camera", -1)),
+        normalized.append({"camera": edit.get("camera", -1),
                            "field": str(edit.get("field", "")),
                            "axis": str(edit.get("axis", "")),
-                           "value": int(edit.get("value"))})
+                           "value": edit.get("value")})
     raw, changed = field_camera.apply_edits(source.read_bytes(), normalized)
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.ca")
@@ -1196,10 +1196,10 @@ def _prepare_movie_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int]
         raise ValueError(f"Field map {key} has no movie camera frames")
     normalized = []
     for edit in edits:
-        normalized.append({"frame": int(edit.get("frame", -1)),
-                           "point": int(edit.get("point", -1)),
+        normalized.append({"frame": edit.get("frame", -1),
+                           "point": edit.get("point", -1),
                            "axis": str(edit.get("axis", "")),
-                           "value": int(edit.get("value"))})
+                           "value": edit.get("value")})
     raw, changed = field_movie.apply_edits(source.read_bytes(), normalized)
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.msk")

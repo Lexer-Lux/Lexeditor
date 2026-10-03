@@ -88,6 +88,7 @@ def assert_reload(source):
     assert (source / 'one.mrt').read_bytes() == struct.pack('<4H', 10, 20, 30, 40)
     assert (source / 'one.rat').read_bytes() == bytes([1, 2, 3, 4])
     assert (source / 'two.mrt').read_bytes() == struct.pack('<4H', 10, 20, 30, 40)
+    assert (source / 'two.rat').read_bytes() == bytes([1, 2, 3, 4])
 
 
 def test_field_encounter_valid_save_preserves_other_slots_and_reloads(files):

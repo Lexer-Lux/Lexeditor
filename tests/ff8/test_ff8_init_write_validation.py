@@ -109,7 +109,7 @@ def valid_edits():
 
 
 def assert_reload(source, output):
-    original = (source / 'init.out').read_bytes()
+    original = bytes([0xA5]) * (init_data.FULL_SIZE + 19)
     expected = bytearray(original)
     base = init_data.CHARACTER_OFFSET + init_data.CHARACTER_SIZE
     for offset, width, value in [
