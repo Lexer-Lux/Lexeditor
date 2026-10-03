@@ -11,6 +11,7 @@ from . import deployment
 from .formats import FormatError
 from .store import ItemStore
 from . import tweak_mods
+from . import data_map
 from core import script_mods
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,11 +28,13 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks'):
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map'):
             try:
                 with LOCK:
                     if path == '/api/state':
                         result = STORE.state()
+                    elif path == '/api/data-map':
+                        result = data_map.payload(STORE)
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
                         result['dirtyCount'] = STORE.get().dirty_count
@@ -56,7 +59,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks"]})
+                            "capabilities": ["data-map", "items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):

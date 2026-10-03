@@ -3,7 +3,8 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,reshade:null};
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,reshade:null,
+  dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -22,6 +23,7 @@ const shell=LexeditorUI.mountShell({
     {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
+  help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Dark Souls Data Map",
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:state.tabs;
@@ -74,7 +76,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
+    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();else if(tab==="datamap")state.dataMap=await api("/api/data-map");
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
@@ -343,8 +345,16 @@ function renderTweaks(){
   requestAnimationFrame(()=>bind(view));
   return view;
 }
+function renderDataMap(){
+  const view=LexeditorUI.dataMap({plugin:"ds1",rows:state.dataMap.rows,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,
+    open:row=>row.target&&navigate(row.target,row.sub),
+    changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},
+    changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},
+    changeSort:key=>{state.mapSort=[key,state.mapSort[0]===key?-state.mapSort[1]:1];render()}});
+  state.mapPage=view.page;return view.content;
+}
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="datamap"?renderDataMap():state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
   shell.refresh();
 }
 async function boot(){
