@@ -34,6 +34,37 @@ def test_probe_ignores_an_ellipsis_it_can_see(page):
     assert json.loads(page.evaluate(INK)) == []
 
 
+def test_probe_checks_outer_clip_after_a_roomy_inner_clip(page):
+    page.set_content('''<style>body{margin:0;font:20px/30px Arial}
+      .outer{width:90px;overflow:hidden}
+      .inner{width:300px;overflow:hidden;white-space:nowrap}
+      </style><div class="outer"><div class="inner">Outer clip cuts this text</div></div>''')
+    hits=json.loads(page.evaluate(INK))
+    assert [hit['text'] for hit in hits]==['Outer clip cuts this text'],hits
+    assert hits[0]['clippedBy']=='outer',hits
+
+
+def test_ink_probe_tracks_positioned_containing_blocks_and_scrolling(page):
+    page.set_content('''<style>body{margin:0;font:20px/30px Arial}
+      .cut{width:90px;height:35px;overflow:hidden;margin-bottom:10px}
+      .line{white-space:nowrap}
+      </style>
+      <div class="cut"><div class="line" style="position:relative">Relative child clipped</div></div>
+      <div class="cut"><div style="position:relative;width:300px;height:30px">
+        <span class="line" style="position:absolute">Absolute child clipped</span></div></div>
+      <div style="position:relative;height:45px"><div class="cut">
+        <span class="line" style="position:absolute">Absolute child escapes</span></div></div>
+      <div class="cut"><span class="line" style="position:fixed;top:160px">Fixed child escapes</span></div>
+      <div class="cut" style="transform:translateX(0)">
+        <span class="line" style="position:fixed">Fixed transformed child clipped</span></div>
+      <div class="cut"><div class="line" style="overflow:auto">Scrollable child reachable</div></div>
+      <div style="width:90px;overflow:auto"><div class="cut line">Inner hard clip remains</div></div>''')
+    hits=json.loads(page.evaluate(INK))
+    assert {hit['text'] for hit in hits}=={
+        'Relative child clipped','Absolute child clipped',
+        'Fixed transformed child clipped','Inner hard clip remains'},hits
+
+
 @pytest.mark.parametrize('zoom', [1, 1.5])
 @pytest.mark.parametrize('width', [1280, 1000])
 def test_shared_tab_labels_hold_their_ink(page, width, zoom):
