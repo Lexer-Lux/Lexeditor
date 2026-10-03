@@ -172,12 +172,21 @@ def save_world_navigation(
     seen = set()
 
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World navigation edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World navigation token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world navigation edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World navigation values must be an object")
+        for field in ("enabled", "halfTileLeft", "halfTileUp"):
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"World navigation {field} must be a boolean")
         if row["recordType"] == "exit":
             allowed = {
                 "xTile", "enabled", "yTile", "nameIndex", "destinationScene",
@@ -200,6 +209,8 @@ def save_world_navigation(
             if bool(values.get("halfTileUp", row["halfTileUp"])):
                 facing_raw |= 0x10
             if row["scripted"]:
+                if "facing" in values:
+                    raise ValueError("A scripted world exit has no facing field")
                 if "destinationScene" in values:
                     raise ValueError("A scripted world exit cannot be converted into a destination exit")
                 maximum = max(0, min(3, current["scriptAddressCount"] - 1))
