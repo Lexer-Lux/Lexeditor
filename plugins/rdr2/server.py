@@ -4588,6 +4588,47 @@ CRIME_CI_FIELDS = ["CrimeValue", "PunishingCrimeValue", "ImmediateDetectionRange
                    "MinWantedLevelSP", "ForcedWantedLevelIncreaseSP", "Disabled"]
 CRIME_WIT_FIELDS = ["NumWitnesses", "NumInvestigators", "NumLawInvestigators"]
 CRIME_SEVERITIES = {"None", "Low", "Medium", "High"}
+CRIME_INTEGER_FIELDS = {'CrimeValue', 'PunishingCrimeValue', 'MinWantedLevelSP',
+                        'ForcedWantedLevelIncreaseSP', *CRIME_WIT_FIELDS}
+
+
+def _crime_value(field, value):
+    if field == 'severity':
+        if not isinstance(value, str) or value not in CRIME_SEVERITIES:
+            raise ValueError('Choose a supported crime severity')
+        return value
+    if field == 'Disabled':
+        if isinstance(value, bool):
+            return 'true' if value else 'false'
+        if not isinstance(value, str) or value not in {'true', 'false'}:
+            raise ValueError('Crime Disabled must be true or false')
+        return value
+    if field in CRIME_INTEGER_FIELDS:
+        number = integer_value(value, f'Crime {field}')
+    else:
+        number = finite_number(value, f'Crime {field}')
+    if number < 0:
+        raise ValueError(f'Crime {field} must be nonnegative')
+    return str(number) if field in CRIME_INTEGER_FIELDS else str(value).strip()
+
+
+def _crime_edit_node(crime, field):
+    variations = crime.findall('Variations')
+    matches = [v for v in variations[0].findall('Item')
+               if len(v.findall('FilterFlags')) == 1 and re.search(r'\bSP\b', v.findtext('FilterFlags') or '')] if len(variations) == 1 else []
+    infos = matches[0].findall('CrimeInformation') if len(matches) == 1 else []
+    if len(infos) != 1:
+        raise ValueError('Crime SP variation is missing or ambiguous')
+    parent = infos[0]
+    if field in CRIME_WIT_FIELDS or field == 'ConfrontChance':
+        parents = parent.findall('WitnessInformation' if field in CRIME_WIT_FIELDS else 'Confrontation')
+        if len(parents) != 1:
+            raise ValueError('Crime field is missing or ambiguous')
+        parent = parents[0]
+    nodes = parent.findall('Severity' if field == 'severity' else 'Chances' if field == 'ConfrontChance' else field)
+    if len(nodes) != 1 or (field != 'severity' and nodes[0].get('value') is None):
+        raise ValueError('Crime field is missing or ambiguous')
+    return nodes[0]
 
 
 def _sp_variation(crime):
@@ -4624,45 +4665,39 @@ def get_crime(ds="mine"):
 
 def apply_crime_edits(edits):
     """edits: [{key, field, value}] — applied to the SP variation."""
-    root = load_file(CRIME_FILE)["root"]
-    changed = 0
-    for crime in root.find("CrimeInformations").findall("Item"):
-        my = [e for e in edits if e["key"] == crime.get("key")]
-        if not my:
-            continue
-        var = _sp_variation(crime)
-        ci = var.find("CrimeInformation") if var is not None else None
-        if ci is None:
-            continue
-        for e in my:
-            f, v = e["field"], str(e["value"])
-            if f == "severity":
-                if v not in CRIME_SEVERITIES:
-                    raise ValueError(f"invalid crime severity: {v}")
-                el = ci.find("Severity")
-                if el is not None:
-                    el.text = v
-                    changed += 1
-            elif f == "ConfrontChance":
-                conf = ci.find("Confrontation")
-                el = conf.find("Chances") if conf is not None else None
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-            elif f in CRIME_WIT_FIELDS:
-                wit = ci.find("WitnessInformation")
-                el = wit.find(f) if wit is not None else None
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-            elif f in CRIME_CI_FIELDS:
-                el = ci.find(f)
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-    if changed:
-        save_file(CRIME_FILE)
-    return changed
+    if not isinstance(edits, list):
+        raise ValueError('Crime edits must be a list')
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError('This dataset is read-only')
+    entry = load_file(CRIME_FILE)
+    root = copy.deepcopy(entry['root'])
+    collections = root.findall('CrimeInformations')
+    if len(collections) != 1:
+        raise ValueError('Crime collection is missing or ambiguous')
+    seen = set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {'key', 'field', 'value'}:
+            raise ValueError('Crime edits require only key, field and value')
+        key, field = edit['key'], edit['field']
+        if not isinstance(key, str) or not isinstance(field, str) or field not in {*CRIME_CI_FIELDS, *CRIME_WIT_FIELDS, 'ConfrontChance', 'severity'}:
+            raise ValueError('Unknown crime identity or field')
+        if (key, field) in seen:
+            raise ValueError('Duplicate crime edit')
+        seen.add((key, field))
+        records = [crime for crime in collections[0].findall('Item') if crime.get('key') == key]
+        if len(records) != 1:
+            raise ValueError('Crime identity is missing or ambiguous')
+        node = _crime_edit_node(records[0], field)
+        _crime_value(field, (node.text or '').strip() if field == 'severity' else node.get('value'))
+        value = _crime_value(field, edit['value'])
+        if field == 'severity':
+            node.text = value
+        else:
+            node.set('value', value)
+    _commit_xml_roots([(CRIME_FILE, entry, root)])
+    return len(edits)
 
 
 # ---------------- dispatch (law response tuning) ----------------
@@ -6106,7 +6141,10 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/crime/save":
-                    self._json({"saved": apply_crime_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_crime_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/dispatch/save":
                     try:
                         self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
