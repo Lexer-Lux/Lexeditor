@@ -36,17 +36,19 @@ function aiValueControl(file,row,rows,reference){
   const changed=value=>{if(value===row.value||(type==="boolean"&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value};refreshGlobalSave();};
   return xmlScalarControl(row,rows,{value:edits[key]?.value??row.value,edited:()=>key in edits,change:changed,reference});
 }
-function xmlScalarControl(row,rows,{value:cur,edited,change,label=row.field,reference}){
+function xmlScalarControl(row,rows,{value:cur,edited,change,label=row.field,reference,wrapReferences=true,className=""}){
   const type=aiFieldType(row),editable=!isRO()&&type!=="readonly";
   let control;
   const changed=value=>{if(!editable)return;change(value);control.classList.toggle("edited",edited());};
-  if(type==="readonly")return LexeditorUI.readonlyField(String(cur));
+  if(type==="readonly")return LexeditorUI.readonlyField(String(cur),{class:className});
   if(type==="boolean")control=el("input",{type:"checkbox",checked:cur.toLowerCase()==="true",disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.checked?"true":"false")});
   else if(type==="number"){
     control=el("input",{type:"number",step:"any",required:true,disabled:!editable,value:cur,"aria-label":label,"data-lex-validate-number":"true",oninput:e=>{changed(e.target.value);e.target.setCustomValidity(aiDraftError(row,e.target.value,rows));}});
     control.setCustomValidity(aiDraftError(row,cur,rows));
   }else control=el("select",{disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.value)},...aiChoices(rows,row).map(value=>el("option",{value,selected:value===cur},value)));
   control.classList.toggle("edited",edited());
+  if(className)control.classList.add(...className.split(/\s+/));
+  if(!wrapReferences)return control;
   const validReference=reference!==undefined&&!aiDraftError(row,reference,rows);
   return refField(control,validReference?[["UCO","ucotag",reference]]:null,cur,(value)=>{if(!editable)return;if(type==="boolean"){control.checked=value.toLowerCase()==="true";control.dispatchEvent(new Event("change",{bubbles:true}));}else{control.value=value;control.dispatchEvent(new Event(type==="number"?"input":"change",{bubbles:true}));}},String);
 }

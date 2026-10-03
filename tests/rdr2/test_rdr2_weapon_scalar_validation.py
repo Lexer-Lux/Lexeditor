@@ -76,13 +76,14 @@ def test_weapon_boolean_and_protected_controls_render(tmp_path):
             page.goto('http://fixture/')
             page.add_style_tag(path=str(repo / 'ui/framework.css'))
             page.add_script_tag(path=str(repo / 'ui/framework.js'))
-            page.add_script_tag(content='const el=LexeditorUI.el; const isRO=()=>false;')
+            page.add_script_tag(content='const el=LexeditorUI.el; const isRO=()=>false; const state={weaponData:{}};')
+            page.add_script_tag(path=str(repo / 'plugins/rdr2/ai.js'))
             page.add_script_tag(path=str(repo / 'plugins/rdr2/weapons.js'))
             page.evaluate('''()=>{
               const U=LexeditorUI;
               window.value='false';
-              const boolean=weaponValueControl({},'weapons',{writable:true},value,false,v=>value=v);
-              const unknown=weaponValueControl({},'weapons',{writable:false},'7',false,()=>{throw Error('Protected edit')});
+              const boolean=weaponValueControl({},'weapons',{field:'Enabled',path:[1],value,writable:true},value,()=>false,v=>value=v);
+              const unknown=weaponValueControl({},'weapons',{field:'Opaque',path:[2],value:'7',writable:false},'7',()=>false,()=>{throw Error('Protected edit')});
               document.querySelector('main').append(U.detailPanel({title:'Weapon',body:[
                 U.detailField({label:'Enabled',control:boolean}),
                 U.detailField({label:'Unknown field',control:unknown})]}));

@@ -24,6 +24,7 @@ const dispatchValidation = crime.slice(crime.indexOf('function bountyCompareNumb
   crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()')) +
   ai.slice(ai.indexOf('function aiFieldType('), ai.indexOf('function aiValueControl(')) +
   mobs.slice(0, mobs.indexOf('async function renderMobs()')) +
+  weapons.slice(weapons.indexOf('function weaponFieldDomain('), weapons.indexOf('function weaponValueControl(')) +
   weapons.slice(weapons.indexOf('function weaponSaveBody('), weapons.indexOf('async function saveWeapons('));
 const challenges = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/challenges.js'), 'utf8');
 const challengeValidation = challenges.slice(challenges.indexOf('function validateChallengeDrafts('), challenges.indexOf('function challengeUiInput('));
@@ -43,7 +44,7 @@ async function weaponSaveGuards(){
     const st=vm.runInContext('state',context);
     st.filters.weaponSection='weapons';st.filters.weapon='A';
     st.catalog={items:[],effects:[]};
-    st.weaponData.mine={weapons:[{name:'A',sourceFile:'weapons.ymt.xml'},{name:'HIDDEN',sourceFile:'layer.xml'}]};
+    st.weaponData.mine={weapons:[{name:'A',sourceFile:'weapons.ymt.xml',fields:[{path:[1],kind:'attr',field:'Damage',value:'37',writable:true}]},{name:'HIDDEN',sourceFile:'layer.xml',fields:[{path:[1],kind:'attr',field:'Damage',value:'1',writable:true}]}]};
     st.weaponEdits={'weapons|A':{field:{path:[1],kind:'attr',value:'9007199254740993'}}};
     if(global){st.weaponEdits['weapons|HIDDEN']={field:{path:[1],kind:'attr',value:'12.3456789'}};st.settingEdits={pending:true};}
     st.localizationEdits={LABEL:'pending text'};

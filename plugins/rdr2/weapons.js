@@ -268,26 +268,9 @@ function weaponFieldDomain(data,section,row,current){
 }
 
 function weaponValueControl(data,section,row,current,edited,onChange){
-  if(row.writable===false)return LexeditorUI.readonlyField(current,{class:"weapon-value",format:false});
-  if(/^(true|false)$/i.test(String(current)))return el("input",{class:`weapon-value${edited?" edited":""}`,type:"checkbox",checked:String(current).toLowerCase()==="true",disabled:isRO(),onchange:event=>onChange(event.target.checked?"true":"false")});
-  const values=weaponFieldDomain(data,section,row,current);
-  const numeric=values.every(value=>/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value));
-  // No title on any of these: a hover that only restates the widget you are
-  // already looking at is noise. Field meaning lives on the "?" instead.
-  const attrs={class:`weapon-value${edited?" edited":""}`};
-  if(numeric){
-    Object.assign(attrs,{type:"number",step:"any",value:current,onchange:ev=>onChange(ev.target.value)});
-    if(isRO())attrs.readonly="readonly";
-    return el("input",attrs);
-  }
-  if(values.length<=100){
-    attrs.onchange=ev=>onChange(ev.target.value);
-    if(isRO())attrs.disabled="disabled";
-    return el("select",attrs,...values.map(value=>{const option=el("option",{value},value);if(value===String(current))option.selected=true;return option;}));
-  }
-  Object.assign(attrs,{type:"text",value:current,onchange:ev=>onChange(ev.target.value)});
-  if(isRO())attrs.readonly="readonly";
-  return el("input",attrs);
+  const scalar={...row,readonly:row.writable===false};
+  const choices=weaponFieldDomain(data,section,row,row.value).map(value=>({field:row.field,value}));
+  return xmlScalarControl(scalar,choices,{value:current,edited,change:onChange,wrapReferences:false,className:"weapon-value"});
 }
 
 async function renderWeapons() {
@@ -481,11 +464,11 @@ function weaponDetail(d,section,record,f){
             return LexeditorUI.inlineLabel(el("span",{},row.field),help?fieldHelp(help):null);}},
         {key:"value",label:()=>el("span",{},"My value",fieldHelp("Value with V / WR references beside the control (shared refField layout).")),
           render:row=>{const key=editKey(row),cur=edits[key]?.value??row.value;
-            const setValue=value=>{if(isRO()||row.writable===false)return;edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
-            const control=weaponValueControl(d,section,row,cur,key in edits,setValue);
+            const setValue=value=>{if(isRO()||row.writable===false)return;if(value===row.value||(/^(true|false)$/i.test(row.value)&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
+            const control=weaponValueControl(d,section,row,cur,()=>key in edits,setValue);
             return refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
               (value,ev)=>{const target=ev.currentTarget.closest('[role="row"]').querySelector(".weapon-value");
-                if(target){if(target.type==="checkbox")target.checked=String(value).toLowerCase()==="true";else target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
+                if(target){if(target.type==="checkbox")target.checked=String(value).toLowerCase()==="true";else target.value=value;target.dispatchEvent(new Event(target.type==="number"?"input":"change",{bubbles:true}));}},String);}}]});
     const details=LexeditorUI.detailSection({title:`${group.label} (${group.rows.length})`,
       collapsible:true,open:!!q,attrs:{"data-group":group.key},
       help:fieldHelp(group.description),body:table});
@@ -500,7 +483,19 @@ function weaponSaveBody(key){
   const cut=key.indexOf("|"),section=key.slice(0,cut),name=key.slice(cut+1);
   const records=state.weaponData.mine?.[section]?.filter(row=>row.name===name)||[];
   if(cut<0||!["weapons","ammo"].includes(section)||!name||records.length!==1)throw new Error("Weapon record is missing or ambiguous.");
-  return {section,name,sourceFile:records[0].sourceFile,edits:Object.values(state.weaponEdits[key]||{})};
+  const edits=Object.values(state.weaponEdits[key]||{}),record=records[0],seen=new Set(),type=section==="weapons"?"CWeaponInfo":"CAmmoInfo";
+  for(const edit of edits){
+    if(!edit||!Array.isArray(edit.path)||!edit.path.length||edit.path.some(i=>!Number.isSafeInteger(i)||i<0))throw new Error("Invalid weapon field path.");
+    const targetType=edit.targetType??type,targetName=edit.targetName??name,identity=JSON.stringify([targetType,targetName,edit.path]);
+    const matches=(record.fields||[]).filter(row=>row.path.join(".")===edit.path.join(".")&&(row.targetType||type)===targetType&&(row.targetName||name)===targetName&&row.kind===edit.kind);
+    if(!matches.length||seen.has(identity))throw new Error("Unknown or duplicate weapon target.");
+    seen.add(identity);
+    for(const row of matches){
+      const choices=weaponFieldDomain(state.weaponData.mine,section,row,row.value).map(value=>({field:row.field,value}));
+      const error=aiDraftError({...row,readonly:row.writable===false},edit.value,choices);if(error)throw new Error(error);
+    }
+  }
+  return {section,name,sourceFile:record.sourceFile,edits};
 }
 async function preflightWeaponSave(){
   const bodies=Object.entries(state.weaponEdits).filter(([,map])=>Object.keys(map).length).map(([key])=>[key,weaponSaveBody(key)]);
