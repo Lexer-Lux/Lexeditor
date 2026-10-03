@@ -8,6 +8,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0,str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 from ds1_fixture import make_archive, make_text_archive
 from plugins.ds1 import texts
 from plugins.ds1.formats import ItemDocument, SUBTABS
@@ -54,8 +56,7 @@ def main():
                         counts[tab] = page.evaluate('state.rows.length')
                         assert counts[tab] > 0
                         assert page.locator('.lex-column-list .lex-list-row').count() > 0
-                        control = page.locator('input[data-field-key][type="number"]:visible').first
-                        control.wait_for()
+                        control = reveal(page,page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))
                         low, high = float(control.get_attribute('min')), float(control.get_attribute('max'))
