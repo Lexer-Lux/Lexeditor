@@ -27,6 +27,9 @@ on:
       - 'tests/ff8/verify_ff8_reptile_atb_binary.py'
       - 'tests/ff8/verify_ff8_interaction_indicators_302.py'
       - 'tests/ff8/test_ff8_interaction_indicators_issue_302.py'
+      - 'tests/ff8/test_ff8_hp_colors_issue_481.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
       - 'plugins/ff8/gameplay_settings.py'
       - 'plugins/ff8/editor.html'
       - '.github/workflows/ff8-stock-build.yml'
@@ -84,7 +87,8 @@ jobs:
           foreach ($arch in @('x86','x64')) {
             @("set(VCPKG_TARGET_ARCHITECTURE $arch)", 'set(VCPKG_CRT_LINKAGE static)', 'set(VCPKG_LIBRARY_LINKAGE static)', 'set(VCPKG_BUILD_TYPE release)') | Set-Content -Encoding ascii "triplets/$arch-windows-static.cmake"
           }
-          python -m pip install cmake==4.2.0 ninja pefile==2024.8.26 unicorn==2.1.4 pillow pytest
+          python -m pip install cmake==4.2.0 ninja pefile==2024.8.26 unicorn==2.1.4 pillow pytest playwright
+          python -m playwright install chromium
           cmd /c ffnx\vcpkg\bootstrap-vcpkg.bat -disableMetrics
       - name: Configure x86 derivative with both required compile gates
         id: configure
