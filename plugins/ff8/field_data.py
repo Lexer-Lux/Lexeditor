@@ -19,6 +19,8 @@ import struct
 import tempfile
 import threading
 
+from core.numeric_values import integer_value
+
 from . import (field_background, field_camera, field_dialogue, field_encounters,
                field_movie, field_scripts, field_walkmesh, paths, runtime_layout)
 from .fs_archive import FsArchive
@@ -1045,7 +1047,7 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
     scalar_offsets = _inf_scalar_offsets(parsed)
     for edit in edits:
         kind = str(edit.get("kind", ""))
-        slot = int(edit.get("slot", -1))
+        slot = integer_value(edit.get("slot", -1), "Field entrance slot")
         field = str(edit.get("field", ""))
         if kind == "misc":
             identity = (kind, field)
@@ -1059,7 +1061,7 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
             raise ValueError("Invalid or duplicate field entrance edit")
         seen.add(identity)
         offset, fmt, minimum, maximum = scalar_offsets[identity]
-        value = int(edit.get("value"))
+        value = integer_value(edit.get("value"), "Field entrance value")
         if not minimum <= value <= maximum:
             raise ValueError(f"Field entrance value must be {minimum} to {maximum}")
         struct.pack_into("<" + fmt, raw, offset, value)
@@ -1236,10 +1238,13 @@ def save(edits: list[dict]) -> dict:
             prepared_dialogue = _prepare_dialogue_edits(key, dialogue_edits)
         prepared_walkmesh = None
         if walkmesh_edits:
+            if any(set(edit) - {"type", "map", "triangle", "vertex", "x", "y", "z", "adjacent"}
+                   for edit in walkmesh_edits):
+                raise ValueError("Field walkmesh edit has unsupported fields")
             prepared_walkmesh = _prepare_walkmesh_edits(key, [{
-                "triangle": int(edit.get("triangle", -1)),
-                "vertex": int(edit.get("vertex", -1)),
-                **{field: int(edit[field]) for field in ("x", "y", "z", "adjacent")
+                "triangle": edit.get("triangle", -1),
+                "vertex": edit.get("vertex", -1),
+                **{field: edit[field] for field in ("x", "y", "z", "adjacent")
                    if field in edit},
             } for edit in walkmesh_edits])
         prepared_background = (_prepare_background_edits(key, background_edits)

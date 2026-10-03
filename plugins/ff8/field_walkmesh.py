@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 
 HEADER_SIZE = 4
 VERTICES_PER_TRIANGLE = 3
@@ -73,8 +75,8 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
             raise ValueError("Field walkmesh edit has unsupported fields")
         if "triangle" not in edit or "vertex" not in edit:
             raise ValueError("Field walkmesh edit needs triangle and vertex")
-        triangle_id = int(edit["triangle"])
-        vertex_id = int(edit["vertex"])
+        triangle_id = integer_value(edit["triangle"], "Field walkmesh triangle")
+        vertex_id = integer_value(edit["vertex"], "Field walkmesh vertex")
         if not 0 <= triangle_id < count or not 0 <= vertex_id < VERTICES_PER_TRIANGLE:
             raise ValueError("Field walkmesh edit identifies an invalid vertex")
         key = (triangle_id, vertex_id)
@@ -88,7 +90,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
         for field, offset in (("x", 0), ("y", 2), ("z", 4)):
             if field not in edit:
                 continue
-            value = int(edit[field])
+            value = integer_value(edit[field], f"Field walkmesh {field}")
             if not -32768 <= value <= 32767:
                 raise ValueError(f"Field walkmesh {field} must be a signed 16-bit value")
             encoded = struct.pack("<h", value)
@@ -97,7 +99,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
                 result[start:start + 2] = encoded
                 changed += 1
         if "adjacent" in edit:
-            adjacent = int(edit["adjacent"])
+            adjacent = integer_value(edit["adjacent"], "Field walkmesh adjacency")
             if adjacent < -1 or adjacent >= count:
                 raise ValueError("Field walkmesh adjacency must be -1 or an existing triangle")
             encoded = struct.pack("<h", adjacent)
