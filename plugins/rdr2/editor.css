@@ -27,6 +27,18 @@
     --rdr-font-body:"Lex RDR Lino", "Arial Narrow", "Segoe UI", sans-serif;
     --rdr-font-display:"Lex Redemption", Georgia, serif;
     --lex-tab-font-size:28px;
+    --lex-tab-lift:0px;
+    --lex-toolbar-padding:0 var(--lex-panel-gap);
+    --lex-subtab-bar-bg:var(--accent);
+    --lex-subtab-bar-border:0;
+    --lex-subtab-border:0;
+    --lex-subtab-bg:transparent;
+    --lex-subtab-active-bg:transparent;
+    --lex-subtab-fg:var(--text);
+    --lex-subtab-active-fg:var(--text);
+    --lex-subtab-hover-bg:transparent;
+    --lex-subtab-hover-fg:var(--accent2);
+    --lex-subtab-active-shadow:inset 0 -3px 0 var(--text);
   }
 
   :root {
