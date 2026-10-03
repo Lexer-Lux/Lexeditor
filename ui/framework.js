@@ -2285,7 +2285,7 @@
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
       ? `(${min === null || min === undefined || min === "" ? "…" : formatNumber(min)}-${max === null || max === undefined || max === "" ? "…" : formatNumber(max)})` : "");
-    if (input && !readOnly && dataType === "INT" && !input.dataset.lexExactInteger) {
+    if (input && !readOnly && dataType === "INT" && !input.dataset.lexExactInteger && !input.dataset.lexValidateNumber) {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";
       let lastValid = /^-?\d+$/.test(String(input.value)) ? String(input.value) : "0";
@@ -12591,7 +12591,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
     for (const input of inputs) {
       window.LexeditorUI.autoFitControlText(input,{minimum:8});
-      if (input.dataset.lexExactInteger || groupedBoxes.has(input) || !wantsGrouping(input)) continue;
+      if (input.dataset.lexExactInteger || input.dataset.lexValidateNumber || groupedBoxes.has(input) || !wantsGrouping(input)) continue;
       groupedBoxes.add(input);
       const plain = () => String(input.value ?? "").replace(/,/g, "");
       // A text box does not enforce min and max the way a number box does, so

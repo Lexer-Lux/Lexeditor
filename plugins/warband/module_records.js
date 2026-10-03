@@ -11,6 +11,14 @@
     const viewState=dataset=>view[dataset]||(view[dataset]={query:"",page:0,pageSize:20,selected:""});
     const editBucket=dataset=>edits[dataset]||(edits[dataset]={});
     const editKey=row=>String(row.recordIndex);
+    function numericIssue(spec,raw){
+      if((typeof raw!=="string"&&typeof raw!=="number")||String(raw).trim()===""||!Number.isFinite(Number(raw)))return "Enter a finite number.";
+      const number=Number(raw);
+      if(spec.kind==="integer"&&!Number.isSafeInteger(number))return "Enter a whole number within the editor's exact integer range.";
+      if(spec.min!==undefined&&number<spec.min)return `Enter at least ${spec.min}.`;
+      if(spec.max!==undefined&&number>spec.max)return `Enter at most ${spec.max}.`;
+      return "";
+    }
     const effective=(dataset,row,key)=>{
       const changed=editBucket(dataset)[editKey(row)]?.fields;
       return Object.prototype.hasOwnProperty.call(changed||{},key)?changed[key]:row.fields?.[key];
@@ -129,15 +137,15 @@
         return LexeditorUI.multiNumberRow(value.map((component,index)=>({
           label:spec.components?.[index]||String(index+1),
           control:LexeditorUI.el("input",{type:"number",step:"any",value:component,disabled,
-            oninput:event=>{if(event.target.value==="")return;const next=[...effective(dataset,row,spec.key)];next[index]=Number(event.target.value);setField(dataset,row,spec.key,next);}})
+            oninput:event=>{if(event.target.disabled||numericIssue({kind:'number'},event.target.value))return;const next=[...effective(dataset,row,spec.key)];next[index]=Number(event.target.value);setField(dataset,row,spec.key,next);}})
         })),{columns:Math.min(count,3)});
       }
       const attrs={value:value??"",disabled};
       if(spec.kind==="integer"||spec.kind==="number"){
         if(typeof value!=="number")return LexeditorUI.el("input",{value:String(value??""),disabled:true,title:problem||"This source value is not a numeric literal; edit it in source."});
-        Object.assign(attrs,{type:"number",step:spec.kind==="integer"?1:"any"});
+        Object.assign(attrs,{type:"number",step:spec.kind==="integer"?1:"any","data-lex-validate-number":"true"});
         if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;
-        attrs.oninput=event=>{if(event.target.value==="")return;setField(dataset,row,spec.key,spec.kind==="integer"?Number.parseInt(event.target.value,10):Number(event.target.value));};
+        attrs.oninput=event=>{const input=event.target;if(input.disabled)return;const issue=numericIssue(spec,input.value);input.setCustomValidity(issue);if(issue)return;setField(dataset,row,spec.key,Number(input.value));};
         return LexeditorUI.el("input",attrs);
       }
       if(spec.kind==="expr"){
@@ -233,8 +241,10 @@
         if(["string","text","integer","number"].includes(spec.kind)){
           column.editValue=row=>effective(active,row,key);
           column.edit=(row,value)=>{
-            const parsed=spec.kind==="integer"?Number.parseInt(value,10):spec.kind==="number"?Number(value):value;
-            if((spec.kind==="integer"||spec.kind==="number")&&!Number.isFinite(parsed))return;
+            if(state.activeSource!=="mine"||row.problem||row.fieldProblems?.[key])return;
+            const numeric=spec.kind==="integer"||spec.kind==="number";
+            if(numeric&&(typeof effective(active,row,key)!=="number"||numericIssue(spec,value)))return;
+            const parsed=numeric?Number(value):value;
             setField(active,row,key,parsed);renderApp();
           };
           if(spec.kind==="integer"||spec.kind==="number"){column.numeric=true;column.step=spec.kind==="integer"?1:"any";if(spec.min!==undefined)column.min=spec.min;if(spec.max!==undefined)column.max=spec.max;}

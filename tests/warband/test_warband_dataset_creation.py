@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "tests/shared"))
 from test_shared_ui_feedback import framework, page
 from tests.warband import test_warband_module_records as fixtures
 from plugins.warband import server
-from plugins.warband.module_records import SCHEMAS, create_dataset_record, dataset_data
+from plugins.warband.module_records import SCHEMAS, create_dataset_record, dataset_data, save_dataset
 
 
 @pytest.mark.parametrize("dataset", list(SCHEMAS))
@@ -54,7 +54,6 @@ def test_each_dataset_copies_template_then_saves_and_reloads(tmp_path, dataset):
         value = 1
     else:
         value = f"({value})"
-    from plugins.warband.module_records import save_dataset
     save_dataset(tmp_path, dataset, after["sha256"], [{"recordIndex": result["recordIndex"],
         "originalId": "copied_record", "fields": {spec["key"]: value}}])
     assert dataset_data(tmp_path, dataset)["rows"][-1]["fields"][spec["key"]] == value
@@ -71,8 +70,11 @@ def test_dataset_add_reopens_created_record_and_sends_source_to_build(page, tmp_
         if route.request.method == "POST":
             body = route.request.post_data_json
             assert body["dataset"] == dataset
-            result = server.note_created(dataset, create_dataset_record(tmp_path, dataset,
-                body["sha256"], body["recordIndex"], body["originalId"], body["id"]))
+            if route.request.url.endswith("/save"):
+                result = save_dataset(tmp_path, dataset, body["sha256"], body["edits"])
+            else:
+                result = server.note_created(dataset, create_dataset_record(tmp_path, dataset,
+                    body["sha256"], body["recordIndex"], body["originalId"], body["id"]))
         else:
             result = server.mark_created(dataset, dataset_data(tmp_path, dataset))
         route.fulfill(json=result)
@@ -103,6 +105,23 @@ def test_dataset_add_reopens_created_record_and_sends_source_to_build(page, tmp_
     assert server.created_ids(dataset) == {"copied_record"}
     assert dataset_data(tmp_path, dataset)["rows"][-1]["id"] == "copied_record"
     assert page.locator(".lex-record-source").count() == 1
+    if dataset == "skills":
+        before = source.read_bytes()
+        level = page.locator(".lex-detail-field").filter(has_text="Maximum level").locator("input")
+        for invalid in ("1.5", "-1", ""):
+            level.fill(invalid)
+            level.evaluate("n=>{n.dispatchEvent(new Event('change',{bubbles:true}));n.blur();}")
+            page.wait_for_timeout(50)
+            assert level.input_value() == invalid
+            assert not level.evaluate("n=>n.checkValidity()")
+            assert page.evaluate("moduleRecords.dirtyCount()") == 0
+            assert source.read_bytes() == before
+        level.fill("12")
+        assert level.evaluate("n=>n.checkValidity()")
+        assert page.evaluate("moduleRecords.dirtyCount()") == 1
+        page.evaluate("moduleRecords.saveAll()")
+        assert dataset_data(tmp_path, dataset)["rows"][-1]["fields"]["maxLevel"] == 12
+        assert dataset_data(tmp_path, dataset)["rows"][0]["fields"]["maxLevel"] == 10
     destination = os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR")
     if destination:
         Path(destination).mkdir(parents=True, exist_ok=True)

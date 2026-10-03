@@ -66,6 +66,16 @@ def test_warband_structured_numeric_fields_reject_booleans_and_nonfinite_values(
             }])
         assert path.read_bytes() == original
         assert not path.with_name(path.name + ".lexeditor.bak").exists()
+    data = module_records.dataset_data(tmp_path, "presentations")
+    assert "backgroundMesh" in data["rows"][0]["fieldProblems"]
+    path = tmp_path / data["filename"]
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match="supported literal"):
+        module_records.save_dataset(tmp_path, "presentations", data["sha256"], [{
+            "recordIndex": 0, "originalId": "sheet", "fields": {"flags": "1", "backgroundMesh": 1},
+        }])
+    assert path.read_bytes() == original
+    assert not path.with_name(path.name + ".lexeditor.bak").exists()
     data = module_records.dataset_data(tmp_path, "postfx")
     module_records.save_dataset(tmp_path, "postfx", data["sha256"], [{
         "recordIndex": "0", "originalId": "default", "fields": {"params1": [1.5, 2, 3, 4]},

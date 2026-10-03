@@ -905,6 +905,8 @@ def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
                 spec = specs.get(key)
                 if spec is None or key == "id":
                     raise ValueError("Unknown or fixed Module System field")
+                if key in row.get("fieldProblems", {}):
+                    raise ValueError(f"{spec['label']} is not a supported literal; edit it in source")
                 field_index = schema["fields"].index(spec)
                 if field_index >= len(row["_spans"]):
                     raise ValueError(f"{spec['label']} is not present in this source record")
