@@ -183,12 +183,12 @@ function showShopRequirements(shop,row,it){
     const grid=LexeditorUI.stack({fill:false});
     draft.forEach((group,groupIndex)=>{
       const content=LexeditorUI.stack({fill:false});
-      content.append(LexeditorUI.detailField({label:"Count",control:el("input",{type:"number",step:1,value:group.count??"1",disabled:readonly,oninput:ev=>group.count=ev.target.value})}));
+      content.append(LexeditorUI.detailField({label:"Count",control:el("input",{type:"number",step:1,required:true,"data-lex-validate-number":"true",value:group.count??"1",disabled:readonly,oninput:ev=>group.count=ev.target.value})}));
       for(const [requirementIndex,requirement] of (group.requirements||[]).entries())content.append(LexeditorUI.detailSection({title:`Condition ${requirementIndex+1}`,body:[
         LexeditorUI.tileGrid([
           {label:"Type",control:el("input",{list:typeList,value:requirement.type||"",disabled:readonly,oninput:ev=>requirement.type=ev.target.value})},
           {label:"Key",control:el("input",{list:keyList,value:requirement.key||"",disabled:readonly,oninput:ev=>requirement.key=ev.target.value})},
-          {label:"State",control:el("input",{type:"number",step:1,value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value})},
+          {label:"State",control:el("input",{type:"number",step:1,required:true,"data-lex-validate-number":"true",value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value})},
           {label:"Lock",control:el("input",{type:"checkbox",checked:String(requirement.lock)==="true",disabled:readonly,onchange:ev=>requirement.lock=String(ev.target.checked)})}].map(LexeditorUI.detailField)),
         el("button",{disabled:readonly,title:"Remove this condition",onclick:()=>{group.requirements.splice(requirementIndex,1);renderEditor()}},"Remove condition")]}));
       content.append(LexeditorUI.actionRow(newButton({disabled:readonly,title:"Add condition",onclick:()=>{group.requirements.push({type:"",key:"",state:"1",lock:"false"});renderEditor()}}),
