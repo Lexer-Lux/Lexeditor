@@ -36,7 +36,10 @@ CONFIG = json.loads((TESTS / "plugin_checks.json").read_text(encoding="utf-8"))
 PLUGINS = sorted(p.name for p in (ROOT / "plugins").iterdir()
                  if p.is_dir() and (p / "plugin.py").is_file())
 SHARED = "shared"
-SCRIPT_SKIP = {"verify_all.py"}
+# These launch other checks rather than owning a check themselves. Individual
+# shared checks are discovered below; cross-plugin UI callers run once through
+# the explicit global extra command.
+SCRIPT_SKIP = {"verify_all.py", "verify_regressions.py", "verify_browser_regressions.py"}
 
 
 def utf8_console() -> None:
