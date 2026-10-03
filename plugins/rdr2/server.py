@@ -822,6 +822,11 @@ def ensure_localization_install():
 
 def _prepare_file_replacement(game_path, file_path, install_path=None):
     """Prepare one LML mapping without changing the player's files."""
+    return _prepare_file_replacements([(game_path, file_path)], install_path)
+
+
+def _prepare_file_replacements(replacements, install_path=None):
+    """Prepare a complete replacement batch in one copied install document."""
     install_path = install_path or ds_dir("mine") / "install.xml"
     if not install_path.exists():
         raise ValueError(f"Missing install.xml in {ds_dir('mine')}")
@@ -830,9 +835,11 @@ def _prepare_file_replacement(game_path, file_path, install_path=None):
     except ET.ParseError as error:
         raise ValueError(f"Invalid install.xml: {error}") from error
     root = tree.getroot()
-    if any((node.findtext("GamePath") or "").strip() == game_path
-           and (node.findtext("FilePath") or "").strip() == file_path
-           for node in root.findall(".//FileReplacement")):
+    missing = [(game_path, file_path) for game_path, file_path in replacements
+               if not any((node.findtext("GamePath") or "").strip() == game_path
+                          and (node.findtext("FilePath") or "").strip() == file_path
+                          for node in root.findall(".//FileReplacement"))]
+    if not missing:
         return None
     resources = root.find("Resources")
     if resources is None:
@@ -841,9 +848,10 @@ def _prepare_file_replacement(game_path, file_path, install_path=None):
                      if node.find("FileReplacement") is not None), None)
     if resource is None:
         resource = ET.SubElement(resources, "Resource")
-    replacement = ET.SubElement(resource, "FileReplacement")
-    ET.SubElement(replacement, "GamePath").text = game_path
-    ET.SubElement(replacement, "FilePath").text = file_path
+    for game_path, file_path in missing:
+        replacement = ET.SubElement(resource, "FileReplacement")
+        ET.SubElement(replacement, "GamePath").text = game_path
+        ET.SubElement(replacement, "FilePath").text = file_path
     ET.indent(tree, space="    ")
     return ET.tostring(root, encoding="utf-8")
 
@@ -6079,6 +6087,8 @@ def get_mob_models(ds="mine"):
 def _validate_mob_value(previous, value, choices):
     """Keep source scalar types and source enum choices."""
     import math
+    if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+        raise ValueError("Expected a text or numeric scalar")
     original = str(previous).strip()
     candidate = str(value).strip()
     if original.lower() in ("true", "false"):
@@ -6086,57 +6096,98 @@ def _validate_mob_value(previous, value, choices):
             raise ValueError("Expected true or false")
     elif re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", original):
         try:
-            valid = bool(candidate) and math.isfinite(float(candidate))
-        except ValueError:
+            valid = bool(re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", candidate)) and math.isfinite(float(original)) and math.isfinite(float(candidate))
+        except (ValueError, OverflowError):
             valid = False
         if not valid:
             raise ValueError("Expected a finite number")
+    elif original.lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+        raise ValueError("Unsupported nonfinite source")
     elif candidate != original and candidate not in choices:
         raise ValueError("Choose a value present in the source data")
     return candidate
 
 
 def apply_mob_edits(edits):
-    changed = 0
-    touched = set()
-    for edit in edits:
-        target = MOB_FILES.get(edit.get("file"))
-        if target is None:
-            raise ValueError(f"unknown mobs file: {edit.get('file')}")
-        name, game_path, vanilla_path = target
-        path = ds_dir("mine") / name
-        if not path.exists():
-            if not vanilla_path.exists():
-                raise ValueError(f"vanilla {name} extract is missing")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(vanilla_path, path)
-        root = load_file(name)["root"]
-        node = root
-        try:
-            for index in edit["path"]:
-                node = list(node)[int(index)]
-        except (IndexError, TypeError, ValueError, KeyError):
-            continue
-        kind = edit.get("kind")
-        attr = "value" if kind == "attr" else "ref" if kind == "ref" else None
-        previous = node.get(attr) if attr else node.text
-        choices = {str(sibling.get(attr) if attr else sibling.text).strip()
-                   for sibling in root.iter(node.tag)}
-        value = _validate_mob_value(previous, edit["value"], choices)
-        if kind == "attr" and node.get("value") is not None:
-            node.set("value", value)
-        elif kind == "ref" and node.get("ref") is not None:
-            node.set("ref", value)
-        elif kind == "text" and len(node) == 0:
-            node.text = value
+    if not isinstance(edits, list):
+        raise ValueError("Mobs edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        prepared, seen = {}, set()
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {'file', 'path', 'kind', 'value'}:
+                raise ValueError("Mobs edits require file, path, kind and value")
+            family = edit['file']
+            if not isinstance(family, str) or family not in MOB_FILES:
+                raise ValueError("Unknown mobs file")
+            indices = edit['path']
+            if not isinstance(indices, list) or not indices or any(type(i) is not int or i < 0 for i in indices):
+                raise ValueError("Mobs path requires nonnegative integer indices")
+            identity = (family, tuple(indices))
+            if identity in seen:
+                raise ValueError("Duplicate mobs target")
+            seen.add(identity)
+            if family not in prepared:
+                name, game_path, vanilla_path = MOB_FILES[family]
+                path = data_file_path(name, 'mine')
+                entry, raw = None, None
+                if path.exists():
+                    entry = load_file(name)
+                    root = copy.deepcopy(entry['root'])
+                else:
+                    if not vanilla_path.exists():
+                        raise ValueError(f"Vanilla {name} extract is missing")
+                    raw = vanilla_path.read_bytes()
+                    root = ET.fromstring(raw.decode('utf-8-sig'), parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+                records = (_combat_records if family == 'combat' else _pedhealth_records)(root)
+                rows = {tuple(row['path']): row for record in records for row in record['fields']}
+                choices = {}
+                for node in root.iter():
+                    if isinstance(node.tag, str):
+                        for kind, attr in [('attr', 'value'), ('ref', 'ref'), ('text', None)]:
+                            choices.setdefault((node.tag, kind), set()).add(str(node.get(attr) if attr else node.text).strip())
+                prepared[family] = (name, game_path, path, entry, raw, root, rows, choices)
+            name, game_path, path, entry, raw, root, rows, choices = prepared[family]
+            row = rows.get(tuple(indices))
+            if row is None or edit['kind'] != row['kind']:
+                raise ValueError("Unknown mobs target or wrong scalar kind")
+            node = root
+            for index in indices:
+                node = list(node)[index]
+            attr = {'attr': 'value', 'ref': 'ref'}.get(row['kind'])
+            if len(node) or (attr and (set(node.attrib) != {attr} or (node.text or '').strip())) or (not attr and node.attrib):
+                raise ValueError("Mobs target has unsupported scalar metadata")
+            value = _validate_mob_value(row['value'], edit['value'], choices[(node.tag, row['kind'])])
+            if attr:
+                node.set(attr, value)
+            else:
+                node.text = value
+        install = ds_dir('mine') / 'install.xml'
+        original_install = install.read_bytes() if install.exists() else None
+        mapping = _prepare_file_replacements([(p[1], p[0]) for p in prepared.values()])
+        outputs, expected, existing = [], {}, []
+        if mapping is not None:
+            outputs.append((install, mapping))
+            expected[install] = original_install
+        for name, game_path, path, entry, raw, root, rows, choices in prepared.values():
+            if entry is not None:
+                existing.append((name, entry, root))
+            else:
+                text = raw.decode('utf-8-sig')
+                decl = text.split('\n', 1)[0].strip() if text.lstrip().startswith('<?xml') else '<?xml version="1.0" encoding="UTF-8"?>'
+                payload = (decl + '\n' + ET.tostring(root, encoding='unicode')).encode('utf-8')
+                if raw.startswith(b'\xef\xbb\xbf'):
+                    payload = b'\xef\xbb\xbf' + payload
+                outputs.append((path, payload))
+                expected[path] = None
+        if existing:
+            _commit_xml_roots(existing, outputs, expected)
         else:
-            continue
-        changed += 1
-        touched.add((name, game_path))
-    for name, game_path in touched:
-        save_file(name)
-        ensure_file_replacement(game_path, name)
-    return changed
+            _commit_file_outputs(outputs, 'Mobs batch', expected_originals=expected)
+        return len(edits)
 
 
 # ---------------- HTTP ----------------
@@ -6541,7 +6592,10 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/mobs/save":
-                    self._json({"saved": apply_mob_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_mob_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path.startswith("/api/ai/") and path.endswith(("/save", "/validate")):
                     validate_only = path.endswith('/validate')
                     name = path[len("/api/ai/"):-len("/validate" if validate_only else "/save")]
