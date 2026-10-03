@@ -126,3 +126,30 @@ state, and actual selection from the loaded extension for the first and last
 normal groups across all random shifts. The unmodified game-data parser also
 returns exactly the same original records. This establishes the native loading
 path in emulation, separately from deployment and running-game acceptance.
+
+## Saving a weight/data pair
+
+The world-map API exposes `initialOutcomes` on each group. A group Save can
+provide that complete eight-value distribution with its eight scene IDs.
+Changing a distribution requires the SHA-256 of the loaded world source;
+a stale or absent hash rejects before publication. The generated Hext must
+match the existing weight extension exactly before either is updated. An
+unsupported executable or externally modified generated patch rejects.
+
+The shared FF8 project-file publisher stages the complete world result and
+the generated Hext before replacing either. Combined rail, texture, geometry
+and ground-name outputs join the same batch. Prepared source bytes and output
+snapshots guard publication. Failed publication restores only files still
+holding the bytes installed by this operation, including their timestamps;
+failed restoration retains one recovery set and blocks later World saves.
+Restoring every default removes the trailer and leaves the generated Hext
+empty. Card saves use the same publisher with their existing recovery folder
+and restoration callback.
+
+`test_ff8_encounter_chance_save.py` uses the production HTTP handler with
+authored world-data and executable-signature fixtures. It covers Save/read,
+separate-group updates, exact default restoration, malformed/stale requests,
+first/second staging and publication failures with new and existing files,
+retries, retained failed-restore originals, external edits, unsupported
+executables and combined ground-name publication. The selector's actual
+supported-executable behavior is established separately by the native checks.

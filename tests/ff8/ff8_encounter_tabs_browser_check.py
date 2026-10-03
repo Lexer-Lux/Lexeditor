@@ -413,6 +413,12 @@ def main():
         assert actual==[['#0','24.21875%','1, 7'],['#1','18.75%','2, 8'],
                         ['#2','14.453125%','3'],['#3','14.453125%','4'],
                         ['#4','14.0625%','5'],['#5','14.0625%','6']],actual
+        page.evaluate("state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes=[0,0,0,0,0,0,0,256];renderEncounters()")
+        custom=page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances')
+        assert custom.locator('.lex-column-list-row [data-column-key="chance"]').all_text_contents()==['0%','100%','0%','0%','0%','0%']
+        shot('saved-chances')
+        page.evaluate("delete state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes;renderEncounters()")
+        rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         usage=page.locator('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]')
         reveal(page, usage)
         assert usage.is_visible()

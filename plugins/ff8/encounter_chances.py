@@ -10,6 +10,7 @@ import struct
 from .executable_text import SUPPORTED_EXE_SHA256
 
 SELECTOR_START, SELECTOR_END = 0x541E2D, 0x541EDF
+HEXT_RELATIVE = 'hext/ff8/en_nv/lexeditor-encounter-chances.txt'
 DEFAULT_OUTCOMES = (38, 37, 37, 37, 36, 36, 24, 11)
 # The next known world-data address is 0x1F9DC40, just beyond this bound
 # relative to the wmset load destination 0x1E9DC3C. Never extend across it.

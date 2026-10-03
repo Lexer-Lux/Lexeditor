@@ -248,7 +248,7 @@
       if(!formations.has(id))formations.set(id,{id,slots:[],outcomes:0});
       const formation=formations.get(id);
       formation.slots.push(index+1);
-      formation.outcomes+=encounterInitialOutcomes[index];
+      formation.outcomes+=(row.initialOutcomes||encounterInitialOutcomes)[index];
     });
     return columnList({rows:[...formations.values()],key:formation=>formation.id,fill:false,localSort:false,
       class:'ff8-encounter-initial-chances',"aria-label":`Initial formation chances for encounter group ${row.id}`,
@@ -271,7 +271,7 @@
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
       help:'All eight slots can use different formations, but they have unequal chances. A repeated formation combines its slots\' chances. The game retries once if it chooses the previous battle. Hover a formation ID to replace that slot. Enemy edits affect every use of that formation. Special level uses a rule we do not yet understand.',
       body:[detailSection({title:'INITIAL CHANCES',
-          help:infoHelp('These use the vanilla English Steam game\'s slot weights. They assume every random value is equally likely, before the previous-battle retry. Repeated formations combine their slots\' chances. Replace a slot to change those totals. Other executable patches can change these weights.'),
+          help:infoHelp('These use this group\'s saved slot weights, or vanilla weights when none are set. They assume every random value is equally likely, before the previous-battle retry. Repeated formations combine their slots\' chances. Replace a slot to change those totals. Other executable patches can change these weights.'),
           body:[encounterGroupInitialChances(row)]}),
         detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',

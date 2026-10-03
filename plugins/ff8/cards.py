@@ -10,10 +10,9 @@ import json
 import threading
 import os
 import tempfile
-import shutil
 from pathlib import Path
 
-from . import executable_text
+from . import executable_text, project_files
 
 COUNT = 110
 RECORD_SIZE = 8
@@ -226,58 +225,8 @@ def _write(path: Path, data: bytes) -> None:
 
 def _commit_project_files(project: Path, pending: list, original: list) -> None:
     """Keep one bounded recovery set until both files commit or restore."""
-    project = project.resolve()
-    project.mkdir(parents=True, exist_ok=True)
-    stage = project / ".cards-recovery"
-    try:
-        stage.mkdir()
-    except FileExistsError as error:
-        raise OSError(f"Card save has pending recovery at {stage}; resolve it before saving again") from error
-    retain = False
-    installed = []
-    try:
-        records = []
-        for index, ((path, value), (old_path, before)) in enumerate(zip(pending, original)):
-            assert path == old_path
-            relative = path.resolve().relative_to(project)
-            records.append({"path": relative.as_posix(), "before": None if before is None else f"{index}.before"})
-            if before is not None:
-                (stage / f"{index}.before").write_bytes(before)
-            (stage / f"{index}.after").write_bytes(value)
-        (stage / "files.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
-        for path, before in original:
-            if (path.read_bytes() if path.exists() else None) != before:
-                raise ValueError("Card files changed during save; reload before retrying")
-        try:
-            for index, (path, value) in enumerate(pending):
-                before = original[index][1]
-                if (path.read_bytes() if path.exists() else None) != before:
-                    raise ValueError("Card files changed during save; reload before retrying")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(stage / f"{index}.after", path)
-                installed.append(index)
-        except Exception as save_error:
-            failures = []
-            for index in reversed(installed):
-                path, value = pending[index]
-                before = original[index][1]
-                try:
-                    if not path.exists() or path.read_bytes() != value:
-                        raise OSError("File changed after installation; refusing to overwrite it")
-                    if before is None:
-                        path.unlink()
-                    else:
-                        _write(path, before)
-                except Exception as error:
-                    failures.append(str(error))
-            if failures:
-                retain = True
-                raise OSError(f"Card save and restore failed. Originals are retained at {stage}") from save_error
-            raise
-    finally:
-        if not retain:
-            assert stage.resolve().parent == project
-            shutil.rmtree(stage)
+    project_files.commit_files(project, pending, original, label='Card',
+                               recovery_name='.cards-recovery', write=_write)
 
 
 def _project_snapshot(path: Path) -> bytes | None:
