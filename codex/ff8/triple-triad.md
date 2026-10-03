@@ -78,6 +78,16 @@ percentage boundary. A controlled multi-card case proves the ordering,
 five-card limit and half-chance rule. Only RNG is replaced. This is native
 execution evidence, not a live match acceptance result.
 
+The initial ownership is code, not a stored card-list table. After loading
+`init.out` into the GF/start-data records, `0x56DA10` calls the separate card
+initializer at `0x8DFF20`. It clears common-card counts and assigns rare cards
+77–109 to owners 200–232 respectively. The same focused verifier executes
+this initializer and checks all 33 assignments, common-card counts, the return
+stack and adjacent state. Editing `init.out` cannot change these assignments:
+they are made afterward. A modded starting assignment requires a guarded
+Hext change to the card initializer; existing saves retain their current
+owners unless another proven path changes them.
+
 An argument can be a literal or a variable reference. The latter selects a
 variable whose value is read during play; it is not the current match value.
 Edits preserve the original argument opcode and unrelated script bytes.

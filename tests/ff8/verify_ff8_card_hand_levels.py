@@ -30,6 +30,8 @@ def run():
     engine = Uc(UC_ARCH_X86, UC_MODE_32)
     engine.mem_map(0x530000, 0x10000)
     engine.mem_write(0x530000, image[0x530000-base:0x540000-base])
+    engine.mem_map(0x8D0000, 0x10000)
+    engine.mem_write(0x8D0000, image[0x8D0000-base:0x8E0000-base])
     engine.mem_map(0x1DCD000, 0x3000)
     engine.mem_map(0x1CFE000, 0x2000)
     engine.mem_map(0x30000000, 0x10000)
@@ -92,6 +94,23 @@ def run():
     assert not forced_random
     assert bytes(engine.mem_read(0x1CFEF85, 33)) == bytes([7] * 33)
     print("PASS native rare-card order and probability: ascending IDs, strict percentage boundary, half the original chance after the first success, at most five cards")
+
+    # init.out loads into the GF records, then calls this separate card
+    # initializer. Execute it rather than treating nearby data as a table.
+    assert image[0xC78C90-base:0xC78C99-base] == b"init.out\0"
+    assert image[0x56DA75-base:0x56DA7A-base] == bytes.fromhex("E8 A6 24 37 00")
+    engine.mem_write(0x1CFEF37, b"\xA5" * 130)
+    stack = 0x3000FF00
+    engine.mem_write(stack, struct.pack("<I", 0x30000000))
+    engine.reg_write(UC_X86_REG_ESP, stack)
+    engine.emu_start(0x8DFF20, 0x30000000, count=10000)
+    assert engine.reg_read(UC_X86_REG_EIP) == 0x30000000
+    assert engine.reg_read(UC_X86_REG_ESP) == stack + 4
+    assert bytes(engine.mem_read(0x1CFEF38, 77)) == bytes(77)
+    assert bytes(engine.mem_read(0x1CFEF85, 33)) == bytes(range(200, 233))
+    assert bytes(engine.mem_read(0x1CFEF37, 1)) == b"\xA5"
+    assert bytes(engine.mem_read(0x1CFEFB8, 1)) == b"\xA5"
+    print("PASS native card initialization after init.out: rare cards 77-109 start with owners 200-232; adjacent state preserved")
 
 
 if __name__ == "__main__":
