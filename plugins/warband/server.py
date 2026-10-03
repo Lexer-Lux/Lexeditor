@@ -534,6 +534,10 @@ def create_item(record_index: int, original_id: str, item_id: str, name: str,
 
 
 def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> dict:
+    if not isinstance(edits, list):
+        raise ValueError("Item edits must be a list")
+    if expected_sha256 is not None and not isinstance(expected_sha256, str):
+        raise ValueError("Item source checksum must be text")
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
         raise FileNotFoundError(source)
@@ -549,29 +553,39 @@ def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> di
         by_index = {record["recordIndex"]: record for record in records}
         replacements: list[tuple[int, int, str]] = []
         edited_records: set[int] = set()
+        seen_records: set[int] = set()
         for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {"recordIndex", "originalId", "fields"}:
+                raise ValueError("Item edits require recordIndex, originalId and fields only")
+            if not isinstance(edit["originalId"], str) or not edit["originalId"]:
+                raise ValueError("Original item ID must be nonempty text")
+            if not isinstance(edit["fields"], dict):
+                raise ValueError("Item fields must be an object")
             record_index = integer_value(edit.get("recordIndex", -1), "Item record index")
             record = by_index.get(record_index)
             if record is None:
                 raise ValueError(f"Item record {record_index} no longer exists")
-            original_id = str(edit.get("originalId", ""))
+            original_id = edit["originalId"]
             if original_id and original_id != record["id"]:
                 raise ValueError(
                     f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving"
                 )
-            if record_index in edited_records:
+            if record_index in seen_records:
                 raise ValueError("Send each item record only once")
+            seen_records.add(record_index)
             row_changed = False
             field_order = record["fieldOrder"]
-            for field, value in dict(edit.get("fields") or {}).items():
+            for field, value in edit["fields"].items():
+                if not isinstance(field, str) or not isinstance(value, str):
+                    raise ValueError("Item field names and values must be text")
                 if field not in field_order:
                     raise ValueError(f"Item {record['id']} has no field named {field}")
                 if field == "id":
                     raise ValueError("Item IDs are fixed because other Module System records reference them")
                 replacement = (
-                    _python_string(str(value))
+                    _python_string(value)
                     if field == "name"
-                    else _validate_item_expression(str(value))
+                    else _validate_item_expression(value)
                 )
                 field_index = field_order.index(field)
                 left, right = record["_fieldSpans"][field_index]
@@ -930,7 +944,9 @@ class Handler(PluginRequestHandler):
                 self.json_response(note_created("troops", create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
                                                 body.get("originalId"), body.get("id"), body.get("name"), body.get("plural"))))
             elif path == "/api/items/save":
-                self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
+                if not isinstance(body, dict) or set(body) != {"edits", "sha256"} or not isinstance(body["sha256"], str):
+                    raise ValueError("Expected item edits and text sha256 only")
+                self.json_response(save_item_edits(body["edits"], body["sha256"]))
             elif path == "/api/items/create":
                 self.json_response(note_created("items", create_item(body.get("recordIndex"), body.get("originalId"),
                                                body.get("id"), body.get("name"), body.get("sha256", ""))))
