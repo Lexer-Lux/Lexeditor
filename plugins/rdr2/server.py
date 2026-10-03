@@ -5577,23 +5577,17 @@ def get_projectile_speeds(ds="mine"):
     root = load_file(WEAPONS_FILE, ds)["root"]
     mappings = _cartridge_mapping(root)
     ammo_names = sorted({row["ammo"] for row in mappings})
-    # Reference datasets show coherent defaults; only mine reads editable CSV.
-    values = _load_speed_multipliers(PROJECTILE_SPEED_FILE, ammo_names) if ds == "mine" else _load_speed_multipliers(Path("__missing__"), ammo_names)
-    base = _projectile_speed_base() if ds == "mine" else None
     by_ammo = {ammo: [] for ammo in ammo_names}
     for row in mappings:
         by_ammo[row["ammo"]].append({key: row[key] for key in ("weapon", "damageMode", "fireType")})
     return {
         "available": True,
         "file": str(PROJECTILE_SPEED_FILE),
-        "baseSpeed": base,
         "runtimeSwitching": False,
-        "runtimeStatus": "RDR2 stores Speed once per weapon. The editor persists real cartridge mappings and multipliers, but the ASI runtime switch is not installed yet.",
+        "runtimeStatus": "Per-cartridge speed changes are unavailable. This view lists the weapon and ammunition links in the game data.",
         "mappings": mappings,
         "cartridges": [
-            {"ammo": ammo, "multiplier": values[ammo],
-             "effectiveSpeed": base * values[ammo] if base is not None else None,
-             "uses": by_ammo[ammo]}
+            {"ammo": ammo, "uses": by_ammo[ammo]}
             for ammo in ammo_names
         ],
     }

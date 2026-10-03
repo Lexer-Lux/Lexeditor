@@ -318,49 +318,19 @@ async function renderWeapons() {
 function renderProjectileSpeeds(data,sectionTabs){
   const tb=$("#toolbar"),m=$("#main");tb.innerHTML="";m.innerHTML="";
   if(!data.available){tb.append(sectionTabs);return noData("Projectile-speed data is unavailable.");}
-  const edits=state.projectileSpeedEdits;
-  const toolbar=LexeditorUI.toolbar(
-    el("input",{type:"text",placeholder:"Filter cartridges or weapons…",value:state.filters.velocityQ||"",oninput:ev=>{state.filters.velocityQ=ev.target.value;filterRerender(ev,renderWeapons);}}),
-    el("span",{class:"count"},`${data.cartridges.length} cartridges`));
-  // The issue explicitly forbids editable/displayed per-cartridge values when
-  // there is no real runtime switch. Keep the proven mapping visible, but do
-  // not offer a save action for settings the game would ignore.
-  if(data.runtimeSwitching)toolbar.append(savebar(saveProjectileSpeeds));
-  tb.append(sectionTabs,toolbar);
-  const status=LexeditorUI.stack({fill:false,className:"lex-notice"},
-    el("b",{},`Global base: ${data.baseSpeed} game-speed units. `),
-    data.runtimeSwitching?"The ASI applies the selected cartridge multiplier at runtime.":data.runtimeStatus);
+  tb.append(sectionTabs);
   const q=(state.filters.velocityQ||"").toUpperCase();
   const rows=data.cartridges.filter(row=>!q||row.ammo.includes(q)||row.uses.some(use=>use.weapon.includes(q)||use.damageMode.includes(q)));
-  const speedOf=row=>{
-    const value=edits[row.ammo]??row.multiplier;
-    return data.runtimeSwitching?Number(data.baseSpeed)*Number(value):Number(data.baseSpeed);
-  };
-  const table=columnList({class:"velocity-table",align:"start",headerAlign:"start","aria-label":"Cartridge speeds",
-    rows,key:row=>row.ammo,editable:true,
-    template:"minmax(160px,1fr) 120px 150px minmax(0,2fr)",
-    columns:[{key:"ammo",label:"Cartridge",cellClass:"key",render:row=>weaponRecordLink("ammo",row.ammo)},
-      {key:"multiplier",label:data.runtimeSwitching?"Multiplier":"Multiplier (inactive)",
-        sortValue:row=>Number(edits[row.ammo]??row.multiplier),
-        render:row=>el("input",{class:`weapon-value${row.ammo in edits?" edited":""}`,type:"number",min:"0.05",max:"10",step:"0.01",
-          value:edits[row.ammo]??row.multiplier,"aria-label":`Speed multiplier for ${row.ammo}`,
-          disabled:(!data.runtimeSwitching||isRO())?true:undefined,
-          onchange:ev=>{const n=Number(ev.target.value);if(Number.isFinite(n)&&n>=0.05&&n<=10)edits[row.ammo]=n;renderToolbarOnly();}})},
-      {key:"speed",label:data.runtimeSwitching?"Effective speed":"Current runtime speed",
-        sortValue:row=>speedOf(row),
-        render:row=>Number.isFinite(speedOf(row))?speedOf(row).toFixed(2):"—"},
-      {key:"uses",label:"Real weapon / damage-mode mappings",
-        sortValue:row=>row.uses.map(use=>use.weapon).join("|"),
-        render:row=>el("span",{},...row.uses.map(use=>el("div",{class:"n"},weaponRecordLink("weapons",use.weapon),` / ${use.damageMode}`)))}]});
-  m.append(status,el("div",{class:"weapon-fieldscroll"},table));
-}
-
-async function saveProjectileSpeeds(){
-  const data=state.projectileSpeeds.mine;
-  if(!data?.runtimeSwitching)throw new Error("Per-cartridge projectile speed is not active in the runtime");
-  const entries=data.cartridges.map(row=>({ammo:row.ammo,multiplier:state.projectileSpeedEdits[row.ammo]??row.multiplier}));
-  const r=await api("/api/weapons/projectile-speeds/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({entries})});
-  state.projectileSpeedEdits={};delete state.projectileSpeeds.mine;toast(`Saved ${r.saved} cartridge multipliers`);renderWeapons();
+  // names: Cartridge identities are fixed ammunition names in the game data.
+  m.append(LexeditorUI.pagedListDetail({rows,key:row=>row.ammo,selected:state.filters.velocitySelected||rows[0]?.ammo,renamable:false,pageSize:15,noun:"cartridges",slots:false,splitKey:"rdr2-weapons-ammo",
+    emptyDetail:()=>LexeditorUI.detailPanel({title:"Cartridge mappings",body:LexeditorUI.detailNote("No cartridge mappings match the filter.")}),
+    search:{key:"rdr2-cartridge-mappings",value:state.filters.velocityQ||"",placeholder:"Search cartridges or weapons…",change:value=>{state.filters.velocityQ=value;renderWeapons();}},
+    sync:view=>{state.filters.velocitySelected=view.selected},
+    master:view=>columnList({class:"velocity-table",rows:view.rows,key:row=>row.ammo,selected:view.selected,select:view.select,"aria-label":"Cartridge mappings",columns:[{key:"ammo",label:"Cartridge",render:row=>weaponRecordLink("ammo",row.ammo)}]}),
+    detail:row=>LexeditorUI.detailPanel({title:row.ammo,help:fieldHelp(`Weapon mappings cover ${data.cartridges.length} cartridge${data.cartridges.length===1?"":"s"}. ${data.runtimeStatus}`),body:row.uses.map(use=>LexeditorUI.detailSection({title:weaponRecordLink("weapons",use.weapon),body:[
+      LexeditorUI.detailField({label:"Damage mode",control:LexeditorUI.readonlyField(use.damageMode)}),
+      LexeditorUI.detailField({label:"Fire type",control:LexeditorUI.readonlyField(use.fireType)})
+    ]}))})}));
 }
 
 // The six stats the game shows in-game. Only Damage and Fire Rate exist as
