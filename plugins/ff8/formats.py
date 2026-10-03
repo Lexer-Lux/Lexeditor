@@ -1337,7 +1337,9 @@ def data_map_rows() -> dict:
             row["status"] = "partial"
         if row["filename"] == "FFNx.toml" and not (paths.GAME_ROOT / "FFNx.toml").is_file():
             row.update(status="not-integrated", coverage="unavailable", openable=False)
-        row["notes"] = "FFNx.toml is missing; its settings editor becomes available after FFNx creates it."
+            # Only this row: the line once sat one level out and replaced
+            # every row's notes with it.
+            row["notes"] = "FFNx.toml is missing; its settings editor becomes available after FFNx creates it."
     return {"rows": rows}
 
 
