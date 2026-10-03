@@ -31,7 +31,7 @@ from http.server import ThreadingHTTPServer
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
-from core.numeric_values import integer_value
+from core.numeric_values import finite_number, integer_value
 from core.plugin_http import PluginRequestHandler
 
 try:
@@ -3062,6 +3062,52 @@ def set_item_shop_presence(root, item_key, shop_type, present, destination_categ
     return {"stock": stock_changed, "catalogue": page_changed}
 
 
+def _catalog_numeric_edits(edits):
+    """Prepare numeric values for the whole batch before touching cached XML."""
+    if not isinstance(edits, dict):
+        raise ValueError("catalog edits must be an object")
+    prepared = copy.deepcopy(edits)
+    for family, rows in prepared.items():
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError(f"{family}: edits must be a list of objects")
+    def whole(row, key, label, minimum=None, default=None):
+        value = integer_value(row.get(key, default), label)
+        if minimum is not None and value < minimum:
+            raise ValueError(f"{label} must be at least {minimum}")
+        row[key] = value
+    for family, key, minimum, default in (
+        ("prices", "qty", 0, None), ("yields", "qty", 1, None),
+        ("bundles", "qty", 1, None), ("carry", "qty", None, None),
+        ("sellability", "cents", 0, 100), ("buyability", "cents", 0, 100),
+    ):
+        for row in prepared.get(family, []):
+            whole(row, key, f"{family} {key}", minimum, default)
+    for family, key in (("buyability", "buyable"), ("sellability", "sellable")):
+        for row in prepared.get(family, []):
+            if not isinstance(row.get(key), bool):
+                raise ValueError(f"{key} must be true or false")
+    for row in prepared.get("effects", []):
+        field = row.get("field")
+        if not isinstance(field, str):
+            raise ValueError("effect field must be text")
+        if field in {"value", "time", "timeunits"}:
+            whole(row, "value", f"effect {field}")
+        elif field == "percent":
+            row["value"] = finite_number(row.get("value"), "Effect percent")
+    for row in prepared.get("craft", []):
+        entries = row.get("entries", [])
+        if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+            raise ValueError("craft entries must be a list of objects")
+        for entry in entries:
+            whole(entry, "yield", "Craft yield", 1, 1)
+            parts = entry.get("parts", [])
+            if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
+                raise ValueError("craft parts must be a list of objects")
+            for part in parts:
+                whole(part, "qty", "Craft ingredient quantity", 1, 1)
+    return prepared
+
+
 def apply_catalog_edits(edits):
     """edits: {prices: [{item, section, costKey, partItem, qty}],
               yields: [{item, section, costKey, qty}],
@@ -3070,6 +3116,7 @@ def apply_catalog_edits(edits):
               itemTags: [{item, tags: [{key, type}]}],
               descriptions: [{item, key}],
               quickSelect: [{item, slots: [{id, sortOrder}]}]}"""
+    edits = _catalog_numeric_edits(edits)
     root = load_file(CATALOG_FILE)["root"]
     # Allowed tag pairs = observed tags from this mod + vanilla/kiddos references
     # + curated alcohol-strength options. New free-typed hashes are rejected.
@@ -3160,7 +3207,7 @@ def apply_catalog_edits(edits):
                     if el is not None:
                         raw = e["value"]
                         if field in ("value", "time", "timeunits"):
-                            raw = str(int(float(raw)))
+                            raw = str(raw)
                         else:
                             raw = str(float(raw))
                         el.set("value", raw)
@@ -5348,7 +5395,11 @@ class Handler(PluginRequestHandler):
             ds = parse_qs(url.query).get("ds", ["mine"])[0]
             with _lock:
                 if path == "/api/catalog/save":
-                    n = apply_catalog_edits(body)
+                    try:
+                        n = apply_catalog_edits(body)
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
+                        return
                     self._json({"saved": n})
                 elif path == "/api/catalog/create":
                     self._json(create_catalog_item(body))
