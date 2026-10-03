@@ -20,6 +20,8 @@ if str(ROOT) not in sys.path:
 
 from plugins.palworld.plugin import PalworldSession
 from plugins.palworld.package import default_info
+sys.path.insert(0,str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "palworld-browser"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -214,14 +216,14 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert build_error
                     assert "aaa_bad.json" in build_error
                     bad.unlink()
-                    page.get_by_role("button", name="Refresh", exact=True).click()
+                    reveal(page,page.get_by_role("button", name="Refresh", exact=True,include_hidden=True)).click()
                     page.wait_for_function("palBuildState?.ready === true && palWorkshopState?.ready === true && palLoaderState?.readOnly === true && !palBuildLoading")
                     loader = page.evaluate("palLoaderState")
                     assert loader["readOnly"] is True
                     assert loader["active"] is True
                     assert loader["listed"] is True
                     assert loader["packageName"] == "BrowserFixture"
-                    page.get_by_role("button", name="Build package", exact=True).click()
+                    reveal(page,page.get_by_role("button", name="Build package", exact=True,include_hidden=True)).click()
                     page.wait_for_function("palBuildState?.current === true && palWorkshopState?.buildCurrent === true && !palBuildLoading")
                     built = project / "build" / "official-package"
                     assert (built / "Info.json").is_file()

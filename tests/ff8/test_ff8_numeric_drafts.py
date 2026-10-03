@@ -117,6 +117,13 @@ def test_save_rejects_invalid_draft_before_any_jobs_or_sync(page):
     source=(ROOT/'plugins'/'ff8'/'boot.js').read_text(encoding='utf-8')
     start,end='  async function saveAll(){','  function post('
     assert source.count(start)==source.count(end)==1
+    encounters=(ROOT/'plugins'/'ff8'/'encounters_ui.js').read_text(encoding='utf-8')
+    group_start,group_end='  function encounterGroupRows(){','  function encounterGroupById('
+    chance_start,chance_end='  const encounterInitialOutcomes=','  function syncEncounterChanceSummary('
+    for anchor in (group_start,group_end,chance_start,chance_end):
+        assert encounters.count(anchor)==1
+    validators=encounters[encounters.index(group_start):encounters.index(group_end)]+encounters[
+        encounters.index(chance_start):encounters.index(chance_end)]
     page.add_script_tag(content='''
       const state={tab:'items',data:{},selected:{}};
       window.syncCalls=0;window.alerts=[];window.jobs=[];
@@ -124,7 +131,7 @@ def test_save_rejects_invalid_draft_before_any_jobs_or_sync(page):
       function setStatus(value){window.saveStatus=value}
       function showAlert(value){alerts.push(value)}
       function api(...args){jobs.push(args)}
-    '''+source[source.index(start):source.index(end)])
+    '''+validators+source[source.index(start):source.index(end)])
     page.get_by_role('spinbutton',name='byte',exact=True).fill('8')
     page.get_by_role('spinbutton',name='price',exact=True).fill('51')
     error=page.evaluate("saveAll().then(()=>null,error=>error.message)")
@@ -138,6 +145,11 @@ def test_save_rejects_invalid_draft_before_any_jobs_or_sync(page):
     page.get_by_role('spinbutton',name='price',exact=True).fill('60')
     assert page.evaluate("saveAll().then(()=>null,error=>error.message)")=='Reached save processing'
     assert page.evaluate('syncCalls')==1
+    page.evaluate('state.data.world={rows:[{kind:"group",id:0,initialOutcomes:[256,1,0,0,0,0,0,0]}]}')
+    assert page.evaluate("saveAll().then(()=>null,error=>error.message)")=='Initial chances for encounter group 0 must total 100%.'
+    assert page.evaluate('syncCalls')==1
+    assert page.evaluate('jobs')==[]
+    page.evaluate('state.data.world.rows=[]')
     # Unavailable controls and detached/hidden panels must not block Save.
     price=page.get_by_role('spinbutton',name='price',exact=True)
     price.fill('51')
