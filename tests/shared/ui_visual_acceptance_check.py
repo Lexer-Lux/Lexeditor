@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / "ui-visual-acceptance"
@@ -146,12 +146,9 @@ with sync_playwright() as p:
             assert first_geom['label']['scrollWidth'] <= first_geom['label']['clientWidth'] + 1, (width, 'property label overflows horizontally', first_geom)
             assert first_geom['label']['scrollHeight'] <= first_geom['label']['clientHeight'] + 1, (width, 'property label changes row height/overflows vertically', first_geom)
             if first_geom['help']:
-                # The rail sits immediately left of where the name starts.
-                # Centring it between the row edge and the END of the label made
-                # its position depend on the name's length, so the marker landed
-                # somewhere different on every row.
-                gap = first_geom['text']['left'] - first_geom['help']['right']
-                assert 4 <= gap <= 14, (width, 'info bubble is not just left of the property name', gap, first_geom)
+                # Help follows the property name in the shared label lane.
+                gap = first_geom['help']['left'] - first_geom['text']['right']
+                assert 4 <= gap <= 14, (width, 'info bubble is not beside the property name', gap, first_geom)
                 assert abs(first_geom['help']['width'] - first_geom['help']['height']) <= 0.5, (width, 'info bubble is not circular', first_geom)
                 glyph = first_geom['glyph']
                 assert glyph, (width, 'info bubble ? glyph is missing', first_geom)
@@ -232,9 +229,9 @@ with sync_playwright() as p:
             enabled_pin = page.locator('[data-lex-pin-column="enabled"]').first
             if enabled_pin.count():
                 was_pressed = enabled_pin.get_attribute('aria-pressed')
-                enabled_pin.click(); page.wait_for_timeout(180)
+                enabled_pin.click()
                 enabled_pin = page.locator('[data-lex-pin-column="enabled"]').first
-                assert enabled_pin.get_attribute('aria-pressed') != was_pressed, (width, "Enabled pin did not toggle")
+                expect(enabled_pin).to_have_attribute('aria-pressed', 'false' if was_pressed=='true' else 'true')
                 detail_after = page.locator('.lex-detail-panel').last.bounding_box()
                 assert abs(detail_after['x'] - detail_before['x']) < 3, (width, 'pinning flashed/reset the split', detail_before, detail_after)
 
@@ -313,6 +310,10 @@ with sync_playwright() as p:
             # underneath it; numeric track/fill stays inside its property box.
             page.evaluate("navigate('tweaks')"); page.wait_for_timeout(150)
             bool_field = page.locator('.lex-boolean-field').first
+            # The packaged wide-box style hides the arrow. Select arrow style
+            # explicitly before measuring that optional presentation.
+            page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{booleanBoxStyle:false}}))")
+            page.wait_for_timeout(100)
             arrow = bool_field.locator('.lex-field-boolean-arrow').first
             tweak_checkbox = bool_field.locator('input[type=checkbox]').first
             if arrow.count() and tweak_checkbox.count():
@@ -359,9 +360,10 @@ with sync_playwright() as p:
             heading_box = page.locator('.lex-curve-heading').first.bounding_box()
             assert heading_box['width'] <= 2 and heading_box['height'] <= 2, (width, 'graph heading is not visually hidden', heading_box)
             assert pseudo['display'] == 'none' or pseudo['content'] in ('none','""'), (width, 'redundant graph-name pseudo box still exists', pseudo)
-            # The variable strip is a hover overlay anchored to the plot
-            # bottom, and the title is painted into the plot backdrop.
-            assert variables_box['y'] + variables_box['height'] >= plot_box['y'] + plot_box['height'] - 2, (width, 'variable strip is not bottom-anchored', variables_box, plot_box)
+            # The shared variable strip drops down over the plot's top edge;
+            # it does not take height away from the plotted curve.
+            assert abs(variables_box['y']-plot_box['y']) <= 2, (width, 'variable strip is not top-anchored', variables_box, plot_box)
+            assert variables_box['x'] >= plot_box['x']-1 and variables_box['x']+variables_box['width'] <= plot_box['x']+plot_box['width']+1
             plot_title = page.locator('.lex-curve-plot').first.evaluate("e=>getComputedStyle(e,'::before').content")
             assert 'LINEAR' in plot_title.upper(), (width, 'graph title is not painted into the plot', plot_title)
             # Left-hand scale: the Y name runs vertical in the left margin;
@@ -386,6 +388,7 @@ with sync_playwright() as p:
             label = field.locator('.lex-detail-field-label').first
             field_box = field.bounding_box(); label_box = label.bounding_box()
             label_ratio = label_box['width'] / field_box['width'] if field_box['width'] else 0
+            page.screenshot(path=str(OUT / f"{prefix}-label-lanes.png"))
             # The lane is ten percent of the row wherever ten percent can hold a
             # property name, and a font-relative floor below that. In a narrow
             # panel the tenth is a twenty-pixel column that cuts every label off,
