@@ -215,6 +215,9 @@
 
   async function saveAll(){
     try{
+      const invalid=[...document.querySelectorAll('input[data-lex-validate-number]:invalid')]
+        .find(input=>!input.disabled&&!input.readOnly&&input.getClientRects().length);
+      if(invalid){invalid.reportValidity();throw new Error(`Correct ${invalid.getAttribute("aria-label")||"the invalid numeric field"} before saving.`)}
       syncEnemyScanDetails();
       const jobs=[],kernelEdits=[];let textEdits=[],enemyAiDocuments=[],enemyBattleTextEdits=[];
       const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power","startingOwner"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});

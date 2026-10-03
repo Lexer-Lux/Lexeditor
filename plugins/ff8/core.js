@@ -155,17 +155,38 @@
   // `panelIcon` is the record's own picture in the panel's heading slot. It is
   // separate from `icon`, which decorates the name in the title line.
   function sharedDetail(row,prefs,body,className="",note="",icon=null,actions=null,modelPreview=null,panelIcon=null){const named=row.titleContent??(icon?LexeditorUI.inlineLabel(icon,el("span",{},row.name)):row.name);icon=null;return detailPanel({className:`lex-detail detail ${className}`.trim(),title:named,identity:el("span",{class:"lex-pinnable-property"},prefs?.pinButton("id","ID"),recordId(row.id)),meta:note||null,icon:panelIcon,actions,body,modelPreview})}
-  function numberControl(value,min,max,step,onchange,attrs={}){const digits=String(step).includes(".")?String(step).split(".")[1].length:0,display=number=>formatNumber(number,{minimumFractionDigits:0,maximumFractionDigits:digits}),control=el("input",{type:"number",min,max,step,value:Number(value),"data-min":min,"data-max":max,"data-step":step,/* The bounds were enforced on input but never stated, so a field like Status Defence looked like it capped at an arbitrary 155. It is a ubyte shown as stored-100, so -100 to 155 is the whole byte - obvious once the range is visible, baffling when it is not. */title:`Range ${display(min)} to ${display(max)}`,...attrs,oninput:event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))onchange(Math.max(min,Math.min(max,next)));if(!event.target.lexValueSliderDragging)shell.refresh();},onchange:event=>{if(!event.target.lexValueSliderDragging)shell.refresh()},onblur:event=>{const next=Number(String(event.target.value).replaceAll(",",""));event.target.value=String(Number.isFinite(next)?Math.max(min,Math.min(max,next)):value)},onkeydown:event=>{if(event.key!=="ArrowUp"&&event.key!=="ArrowDown")return;event.preventDefault();const current=Number(String(event.target.value).replaceAll(",",""))||0,next=Math.max(min,Math.min(max,current+(event.key==="ArrowUp"?step:-step)));event.target.value=String(next);event.target.dispatchEvent(new Event("input",{bubbles:true}))}});return control}
+  function numberControl(value,min,max,step,onchange,attrs={}){
+    const digits=String(step).includes(".")?String(step).split(".")[1].length:0;
+    const display=number=>formatNumber(number,{minimumFractionDigits:0,maximumFractionDigits:digits});
+    const valid=control=>control.value!==""&&Number.isFinite(control.valueAsNumber)&&control.checkValidity();
+    const control=el("input",{type:"number",min,max,step,value:Number(value),
+      "data-min":min,"data-max":max,"data-step":step,title:`Range ${display(min)} to ${display(max)}`,
+      ...attrs,"data-lex-validate-number":"true",required:true,
+      oninput:event=>{
+        const input=event.target;
+        if(input.disabled||input.readOnly||!valid(input))return;
+        onchange(input.valueAsNumber);
+        if(!input.lexValueSliderDragging)shell.refresh();
+      },
+      onkeydown:event=>{
+        if(event.key!=="ArrowUp"&&event.key!=="ArrowDown")return;
+        event.preventDefault();
+        const input=event.target;
+        if(input.disabled||input.readOnly)return;
+        if(!valid(input)){input.reportValidity();return;}
+        const before=input.value;
+        if(event.key==="ArrowUp")input.stepUp();else input.stepDown();
+        if(input.value!==before)input.dispatchEvent(new Event("input",{bubbles:true}));
+      }});
+    return control;
+  }
   function ratio255Control(value,onchange,label="Hit rate"){
     let raw=Math.max(0,Math.min(255,Math.round(Number(value)||0)));
     const percentage=()=>formatNumber(raw/255*100,{maximumFractionDigits:2});
-    const percent=el("input",{type:"number",min:0,max:100,step:.01,value:percentage(),"aria-label":`${label} percentage`});
-    const exact=el("input",{type:"number",min:0,max:255,step:1,value:String(raw),"aria-label":`${label} out of 255`});
-    const setRaw=next=>{raw=Math.max(0,Math.min(255,Math.round(next)));exact.value=String(raw);percent.value=percentage();onchange(raw);shell.refresh()};
-    percent.addEventListener("input",event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))setRaw(next/100*255)});
-    exact.addEventListener("input",event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))setRaw(next)});
-    percent.addEventListener("blur",()=>{percent.value=percentage()});
-    exact.addEventListener("blur",()=>{exact.value=String(raw)});
+    const percent=numberControl(Number(percentage()),0,100,.01,value=>setRaw(value/100*255),
+      {"aria-label":`${label} percentage`});
+    const exact=numberControl(raw,0,255,1,setRaw,{"aria-label":`${label} out of 255`});
+    function setRaw(next){raw=Math.round(next);exact.value=String(raw);percent.value=percentage();onchange(raw)}
     return LexeditorUI.controlGroup([unitField(percent,"%"),unitField(exact,"/255")]);
   }
   // A long list holds only its current choice until the select is used.
