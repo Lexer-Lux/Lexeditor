@@ -292,12 +292,26 @@ def save(data: dict, game_root: Path | None = None,
     catalog = runtime_layout.catalog(project, mods_root)
     tweak_rows = {row["id"]: row for row in tweak_mods.tweak_rows(project, mods_root)}
     enabled_changes, value_changes = _tweak_changes(data, tweak_rows)
+    # Metadata must be valid before switches, values or runtime files change.
+    # Prepare the spellbook snapshot before composition so the active runtime
+    # receives the snapshot for the requested switches in this transaction.
+    from . import gf_spellbooks, reptile_atb
+    reptile_atb.load(project)
+    planned_enabled = {mod_id for mod_id, row in tweak_rows.items()
+                       if enabled_changes.get(mod_id, row["enabled"])}
+    spellbooks_active = (SPELLBOOKS_MOD in planned_enabled and SINGLE_GF_MOD in planned_enabled
+                         and SHARED_MAGIC_MOD not in planned_enabled)
+    spellbooks = (gf_spellbooks.load(project) if spellbooks_active
+                  else {"schemaVersion": gf_spellbooks.SCHEMA_VERSION, "books": []})
+    spellbook_runtime = gf_spellbooks.runtime_bytes(spellbooks)
+    spellbook_target = project / gf_spellbooks.RUNTIME_RELATIVE
     active_root = _runtime_root(runtime_root, project)
     direct_root = active_root / "direct"
 
     changed_files = [
         patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project),
         shared_magic_runtime_config.path(project),
+        spellbook_target,
         *(runtime_layout._metadata_path(Path(row["path"])) for row in catalog if not row["selected"]),
         *(Path(tweak_rows[mod_id]["path"]) / script_mods.VALUES_FILE for mod_id in value_changes),
     ]
@@ -322,6 +336,7 @@ def save(data: dict, game_root: Path | None = None,
                        if "max-spell" in enabled_now else DEFAULT_MAX_SPELL)
         _atomic_text(shared_magic_runtime_config.path(project), shared_magic_runtime_config.build(
             shared_magic_inventory=shared_magic, magic_stock_limit=stock_limit))
+        gf_spellbooks._atomic(spellbook_target, spellbook_runtime)
         runtime_layout.compose(
             project, active_root, runtime_layout.catalog(project, mods_root),
             paths.BASELINE_ROOT, formats.SECTIONS,

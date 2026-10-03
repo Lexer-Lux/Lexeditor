@@ -43,7 +43,6 @@ def install() -> None:
     original_enemy_rows = formats.enemy_rows
     original_save_enemies = formats.save_enemies
     original_load_settings = gameplay_settings.load
-    original_save_settings = gameplay_settings.save
     original_initialize_project = gameplay_settings.initialize_project
 
     def enemy_rows(dataset: str = "current") -> dict:
@@ -122,30 +121,6 @@ def install() -> None:
         result["reptileFireMultiplier"] = reptile_atb.FIRE_MULTIPLIER
         return result
 
-    def save_settings(data: dict, game_root=None, project_root=None, *,
-                      install_runtime=False, runtime_root=None) -> dict:
-        project = (project_root or paths.PROJECT_ROOT).resolve()
-        current = reptile_atb.load(project)
-        requested = data.get("reptileAtb", current["enabled"])
-        if not isinstance(requested, bool):
-            raise ValueError("Reptile must be true or false")
-        result = original_save_settings(
-            data, game_root, project_root,
-            install_runtime=install_runtime, runtime_root=runtime_root,
-        )
-        reptile_atb.write(
-            project,
-            enabled=requested,
-            reptile_enemy_ids=current["enemyIds"],
-        )
-        # original_save_settings returns gameplay_settings.payload(); refresh so
-        # callers see the newly committed Reptile value in the same response.
-        return gameplay_settings.payload(
-            project, saved=int(result.get("saved", 1)),
-            game_root=(game_root or paths.GAME_ROOT).resolve(),
-            runtime_root=runtime_root,
-        )
-
     def initialize_project(project_root) -> None:
         original_initialize_project(project_root)
         reptile_atb.write(project_root, enabled=False, reptile_enemy_ids=[])
@@ -153,5 +128,4 @@ def install() -> None:
     formats.enemy_rows = enemy_rows
     formats.save_enemies = save_enemies
     gameplay_settings.load = load_settings
-    gameplay_settings.save = save_settings
     gameplay_settings.initialize_project = initialize_project

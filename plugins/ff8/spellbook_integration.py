@@ -25,13 +25,6 @@ def _root_for_dataset(dataset: str) -> Path | None:
     return None
 
 
-def _sync_runtime(project: Path, *, enabled: bool) -> Path:
-    target = Path(project) / gf_spellbooks.RUNTIME_RELATIVE
-    document = gf_spellbooks.load(project) if enabled else {"schemaVersion": 1, "books": []}
-    gf_spellbooks._atomic(target, gf_spellbooks.runtime_bytes(document))
-    return target
-
-
 def install() -> None:
     global _installed
     if _installed:
@@ -40,7 +33,6 @@ def install() -> None:
 
     original_kernel_rows = formats.kernel_rows
     original_save_kernel = formats.save_kernel
-    original_settings_save = gameplay_settings.save
     original_initialize = gameplay_settings.initialize_project
 
     def kernel_rows(section_id: int, dataset: str = "current") -> dict:
@@ -135,18 +127,6 @@ def install() -> None:
             result["file"] = files[0]
         return result
 
-    def settings_save(data: dict, game_root=None, project_root=None, *,
-                      install_runtime=False, runtime_root=None) -> dict:
-        result = original_settings_save(
-            data, game_root, project_root,
-            install_runtime=install_runtime, runtime_root=runtime_root,
-        )
-        project = (project_root or paths.PROJECT_ROOT).resolve()
-        # Monogamy is a tweak mod, so the saved result says whether it is on.
-        active = bool(result.get("gfSpellbooksEnabled")) and bool(result.get("singleGf")) and not bool(result.get("sharedMagicInventory"))
-        _sync_runtime(project, enabled=active)
-        return result
-
     def initialize_project(project_root) -> None:
         original_initialize(project_root)
         document = {"schemaVersion": gf_spellbooks.SCHEMA_VERSION, "books": []}
@@ -154,5 +134,4 @@ def install() -> None:
 
     formats.kernel_rows = kernel_rows
     formats.save_kernel = save_kernel
-    gameplay_settings.save = settings_save
     gameplay_settings.initialize_project = initialize_project
