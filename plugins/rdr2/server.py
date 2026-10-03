@@ -820,17 +820,20 @@ def ensure_localization_install():
         (ds_dir("mine") / "install.xml").write_bytes(payload)
 
 
-def ensure_file_replacement(game_path, file_path, install_path=None):
-    """Add one LML replacement mapping without disturbing existing mappings."""
+def _prepare_file_replacement(game_path, file_path, install_path=None):
+    """Prepare one LML mapping without changing the player's files."""
     install_path = install_path or ds_dir("mine") / "install.xml"
     if not install_path.exists():
         raise ValueError(f"Missing install.xml in {ds_dir('mine')}")
-    tree = ET.parse(install_path, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    try:
+        tree = ET.parse(install_path, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     root = tree.getroot()
     if any((node.findtext("GamePath") or "").strip() == game_path
            and (node.findtext("FilePath") or "").strip() == file_path
            for node in root.findall(".//FileReplacement")):
-        return False
+        return None
     resources = root.find("Resources")
     if resources is None:
         raise ValueError(f"Missing Resources element in {install_path}")
@@ -842,7 +845,15 @@ def ensure_file_replacement(game_path, file_path, install_path=None):
     ET.SubElement(replacement, "GamePath").text = game_path
     ET.SubElement(replacement, "FilePath").text = file_path
     ET.indent(tree, space="    ")
-    tree.write(install_path, encoding="utf-8", xml_declaration=False)
+    return ET.tostring(root, encoding="utf-8")
+
+
+def ensure_file_replacement(game_path, file_path, install_path=None):
+    """Add one LML replacement mapping without disturbing existing mappings."""
+    payload = _prepare_file_replacement(game_path, file_path, install_path)
+    if payload is None:
+        return False
+    (install_path or ds_dir("mine") / "install.xml").write_bytes(payload)
     return True
 
 
@@ -1025,14 +1036,14 @@ def _commit_file_outputs(outputs, label, *, expected_originals=None):
                     pass  # Do not remove directories populated by another writer.
 
 
-def _commit_xml_roots(prepared, additional_outputs=()):
+def _commit_xml_roots(prepared, additional_outputs=(), additional_expected=None):
     """Publish prepared mine XML and first backups only after the batch saves."""
     if not prepared:
         return
     if DATASETS["mine"]["readonly"]:
         raise PermissionError("dataset 'mine' is read-only")
     outputs = []
-    expected = {}
+    expected = dict(additional_expected or {})
     published = []
     for name, entry, root in prepared:
         path = entry.get("path") or data_file_path(name, "mine")
@@ -5772,7 +5783,7 @@ def get_ai_file(name, ds="mine"):
     if name == PED_PERCEPTION_FILE and not path.exists():
         if not VANILLA_PED_PERCEPTION_FILE.exists():
             return {"file": name, "fields": [], "available": False}
-        root = ET.parse(VANILLA_PED_PERCEPTION_FILE).getroot()
+        root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
         return {"file": name, "fields": _ai_scalar_rows(root),
                 "available": True, "source": "vanilla extract"}
     return {"file": name, "fields": _ai_scalar_rows(load_file(name, ds)["root"]),
@@ -5781,7 +5792,7 @@ def get_ai_file(name, ds="mine"):
 
 def get_ai_reference(name):
     if name == PED_PERCEPTION_FILE and VANILLA_PED_PERCEPTION_FILE.exists():
-        root = ET.parse(VANILLA_PED_PERCEPTION_FILE).getroot()
+        root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
         return {"file": name, "fields": _ai_scalar_rows(root), "available": True,
                 "reference": "Vanilla"}
     path = UCO_REF_DIR / Path(name).name
@@ -5794,32 +5805,83 @@ def get_ai_reference(name):
 
 def apply_ai_edits(name, edits):
     allowed = {f for files in AI_FILES.values() for f in files}
-    if name not in allowed:
+    if not isinstance(name, str) or name not in allowed:
         raise ValueError("unknown AI file")
-    path = ds_dir("mine") / name
-    if name == PED_PERCEPTION_FILE and not path.exists():
-        if not VANILLA_PED_PERCEPTION_FILE.exists():
-            raise ValueError("vanilla pedperception.meta extract is missing")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(VANILLA_PED_PERCEPTION_FILE, path)
-    root = load_file(name)["root"]
-    changed = 0
-    for edit in edits:
-        node = root
-        try:
-            for index in edit["path"]:
-                node = list(node)[int(index)]
-        except (IndexError, TypeError, ValueError):
-            continue
-        if edit.get("kind") == "attr" and node.get("value") is not None:
-            node.set("value", str(edit["value"])); changed += 1
-        elif edit.get("kind") == "text" and len(node) == 0:
-            node.text = str(edit["value"]); changed += 1
-    if changed:
-        save_file(name)
+    if not isinstance(edits, list):
+        raise ValueError("AI edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        path = data_file_path(name, "mine")
+        missing = not path.exists()
+        if missing:
+            if name != PED_PERCEPTION_FILE or not VANILLA_PED_PERCEPTION_FILE.exists():
+                raise ValueError("AI source file is missing")
+            raw = VANILLA_PED_PERCEPTION_FILE.read_bytes()
+            root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
+            entry = None
+        else:
+            entry = load_file(name)
+            root = copy.deepcopy(entry["root"])
+        rows = {tuple(row['path']): row for row in _ai_scalar_rows(root)}
+        seen = set()
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {'path', 'kind', 'value'}:
+                raise ValueError("AI edits require path, kind and value")
+            indices = edit['path']
+            if not isinstance(indices, list) or not indices:
+                raise ValueError("AI path must be a nonempty list of indices")
+            if any(type(index) is not int or index < 0 for index in indices):
+                raise ValueError("AI indices must be nonnegative integers")
+            identity = tuple(indices)
+            row = rows.get(identity)
+            if row is None or identity in seen or edit['kind'] != row['kind']:
+                raise ValueError("AI target is unknown, duplicate or has the wrong kind")
+            seen.add(identity)
+            node = root
+            for index in indices:
+                node = list(node)[index]
+            if len(node) or (row['kind'] == 'attr' and (set(node.attrib) != {'value'} or (node.text or '').strip())) or (row['kind'] == 'text' and node.attrib):
+                raise ValueError("AI target has unsupported scalar metadata")
+            if not isinstance(edit['value'], (str, int, float)) or isinstance(edit['value'], bool):
+                raise ValueError("AI scalar values must be text or numbers")
+            choices = {str(sibling.get('value') if row['kind'] == 'attr' else sibling.text).strip()
+                       for sibling in root.iter(node.tag)}
+            numeric = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
+            if re.fullmatch(numeric, row['value'].strip()):
+                finite_number(row['value'], 'AI source')
+                if not re.fullmatch(numeric, str(edit['value']).strip()):
+                    raise ValueError('AI value must be a finite number')
+            elif row['value'].strip().lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+                raise ValueError('AI source is nonfinite')
+            value = _validate_mob_value(row['value'], edit['value'], choices)
+            if row['kind'] == 'attr':
+                node.set('value', value)
+            else:
+                node.text = value
+        outputs = []
+        expected = {}
         if name == PED_PERCEPTION_FILE:
-            ensure_file_replacement(PED_PERCEPTION_GAME_PATH, name)
-    return changed
+            install = ds_dir('mine') / 'install.xml'
+            original = install.read_bytes() if install.exists() else None
+            payload = _prepare_file_replacement(PED_PERCEPTION_GAME_PATH, name)
+            if payload is not None:
+                outputs.append((install, payload))
+                expected[install] = original
+        if entry is not None:
+            _commit_xml_roots([(name, entry, root)], outputs, expected)
+        else:
+            text = raw.decode('utf-8-sig')
+            decl = text.split('\n', 1)[0].strip() if text.lstrip().startswith('<?xml') else '<?xml version="1.0" encoding="UTF-8"?>'
+            payload = (decl + '\n' + ET.tostring(root, encoding='unicode')).encode('utf-8')
+            if raw.startswith(b'\xef\xbb\xbf'):
+                payload = b'\xef\xbb\xbf' + payload
+            outputs.append((path, payload))
+            expected[path] = None
+            _commit_file_outputs(outputs, 'AI batch', expected_originals=expected)
+        return len(edits)
 
 
 # ---------------- mobs (#190) ----------------
@@ -6475,7 +6537,10 @@ class Handler(PluginRequestHandler):
                     self._json({"saved": apply_mob_edits(body.get("edits", []))})
                 elif path.startswith("/api/ai/") and path.endswith("/save"):
                     name = path[len("/api/ai/"):-len("/save")]
-                    self._json({"saved": apply_ai_edits(name, body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_ai_edits(name, body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 else:
                     self._json({"error": "not found"}, 404)
         except Exception as ex:
