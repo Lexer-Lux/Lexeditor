@@ -16,6 +16,8 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 from plugins.ff9 import memoria_baseline
 from plugins.ff9.plugin import FF9Session
@@ -82,8 +84,7 @@ def csv_bytes(relative: str) -> bytes:
 
 def field(page, label: str):
     row = page.locator(".lex-detail-field").filter(has=page.get_by_text(label, exact=True)).first
-    expect(row).to_be_visible()
-    return row
+    return reveal(page, row)
 
 
 def numeric_field(page, label: str):
@@ -266,7 +267,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.screenshot(path=str(OUT / "ff9-enemy-save-reopen.png"), full_page=True)
 
             page.evaluate("navigate('info')")
-            expect(page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True)).to_be_visible()
+            reveal(page, page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True))
             expect(page.get_by_label("ENABLED", exact=True)).to_have_value("None detected")
             expect(page.get_by_label("RUNTIME ORDER", exact=True)).to_have_value("No active mod folders")
             expect(page.get_by_label("METADATA WARNINGS", exact=True)).to_have_value("None detected")
@@ -404,7 +405,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(field(page, "ICON").locator("select")).to_have_count(1)
             page.screenshot(path=str(OUT / "ff9-tetra-master.png"), full_page=True)
             raised = "A" if selected_card["ATK(UP)"] % 10 + 1 == 10 else str(selected_card["ATK(UP)"] % 10 + 1)
-            ranks.first.click()
+            reveal(page, ranks.first).click()
             expect(ranks.first).to_have_text(raised)
             ranks.first.click(button="right")
             expect(ranks.first).to_have_text(shown("ATK(UP)"))
@@ -565,6 +566,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # An edit attempt is refused and offers the one action that ends
             # the read-only state, instead of leaving a dead control.
             price.click()
+            # Focusing a text-formatted number only reads it. Typing is the
+            # edit attempt that must offer mod creation without changing data.
+            price.press('3')
             dialog = page.locator(".lex-dialog")
             dialog.wait_for(state="visible", timeout=5000)
             assert "Create a mod" in dialog.inner_text(), dialog.inner_text()

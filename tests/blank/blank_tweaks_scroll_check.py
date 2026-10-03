@@ -19,7 +19,7 @@ def main():
    page.evaluate("navigate('two')")
    for width,height in [(2048,1080),(1350,850),(900,550)]:
     page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(300)
-    gaps=page.evaluate("""()=>{const main=document.querySelector('main'),panel=main.querySelector('.blank-detail'),pager=document.querySelector('.lex-pager');const m=main.getBoundingClientRect(),p=panel.getBoundingClientRect();return {left:parseFloat(getComputedStyle(main).paddingLeft),right:m.right-p.right,bottom:pager.getBoundingClientRect().top-p.bottom}}""")
+    gaps=page.evaluate("""()=>{const main=document.querySelector('main'),panel=main.querySelector('.blank-detail'),pager=main.querySelector('.blank-layout > .lex-pager');const m=main.getBoundingClientRect(),p=panel.getBoundingClientRect();return {left:parseFloat(getComputedStyle(main).paddingLeft),right:m.right-p.right,bottom:pager.getBoundingClientRect().top-p.bottom}}""")
     assert abs(gaps['left']-gaps['bottom'])<1,gaps
     assert abs(gaps['right']-gaps['bottom'])<1,gaps
    print('Panel bottom and side gaps match at three window sizes.')

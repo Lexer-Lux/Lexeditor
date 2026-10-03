@@ -17,6 +17,8 @@ from playwright.sync_api import sync_playwright, expect
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
 from plugins.ff7r2.plugin import Ff7r2Session
@@ -136,7 +138,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 assert battle_values.evaluate_all(
                     "els=>els.some(el=>el.value.includes('0: AbilityTest'))"
                 )
-                assert page.locator(".ff7r2-battle-player-detail input:not([readonly])").count() == 0
+                assert page.locator(".ff7r2-battle-player-detail .lex-detail-field input:not([readonly])").count() == 0
                 page.screenshot(path=str(OUT / "battle-params.png"), full_page=True)
 
                 page.evaluate('navigate("formulae")')
@@ -155,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                     "Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.",
                     exact=True,
                 )).to_be_visible()
-                assert page.locator(".ff7r2-formulae-detail input:not([readonly])").count() == 0
+                assert page.locator(".ff7r2-formulae-detail .lex-detail-field input:not([readonly])").count() == 0
                 page.screenshot(path=str(OUT / "formulae.png"), full_page=True)
 
                 page.evaluate('navigate("datamap")')
@@ -205,19 +207,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.wait_for_selector(".lex-data-map")
 
                 page.evaluate('navigate("info")')
-                expect(page.get_by_text("IOSTORE TOOLING", exact=True)).to_be_visible()
-                expect(page.get_by_text("NATIVE MOD LOAD ORDER", exact=True)).to_be_visible()
+                reveal(page, page.get_by_text("IOSTORE TOOLING", exact=True))
+                reveal(page, page.get_by_text("NATIVE MOD LOAD ORDER", exact=True))
                 precedence_field = page.locator(".lex-detail-field").filter(has_text="PRECEDENCE").first
-                expect(precedence_field).to_be_visible()
+                reveal(page, precedence_field)
                 assert "~mods is not available" in precedence_field.locator("input.lex-readonly-field").input_value()
                 retoc_field = page.locator(".lex-detail-field").filter(has_text="RETOC").first
-                expect(retoc_field).to_be_visible()
+                reveal(page, retoc_field)
                 retoc_value = retoc_field.locator("input.lex-readonly-field")
                 assert "v0.1.5" in retoc_value.input_value(), retoc_value.input_value()
                 preflight = page.locator(".lex-detail-field").filter(has_text="PACKAGING PREFLIGHT").first
-                expect(preflight).to_be_visible()
+                reveal(page, preflight)
                 candidate_button = page.get_by_role("button", name="Build isolated candidate")
-                expect(candidate_button).to_be_visible()
+                reveal(page, candidate_button)
                 expect(candidate_button).to_be_disabled()
                 page.screenshot(path=str(OUT / "information.png"), full_page=True)
 
@@ -237,7 +239,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.set_viewport_size({"width": 1440, "height": 900})
                 page.evaluate('document.documentElement.style.zoom="150%"')
                 page.wait_for_timeout(100)
-                expect(page.locator('input[aria-label="HPMax"]')).to_be_visible()
+                reveal(page, page.locator('input[aria-label="HPMax"]'))
                 # CSS zoom approximates desktop-host UI scale. A full-page
                 # capture multiplies Chromium's document height and adds an
                 # artificial blank tail that is not visible in the host.
