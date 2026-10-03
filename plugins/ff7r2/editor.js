@@ -7,6 +7,7 @@
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
   let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
+  const injectorNumericDrafts=new Map();
   let packageBusy=false;
   // What the Data Map shows and where the reader has got to in it.
   const state={dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
@@ -30,6 +31,7 @@
 
   // ---- Shader Injector ------------------------------------------------------
   function acceptInjector(state){
+    injectorNumericDrafts.clear();
     injector=state;
     injectorDraft=state?.settings?clone(state.settings.values):null;
   }
@@ -43,6 +45,10 @@
   }
   async function injectorAction(route,body,done){
     if(injectorBusy)return;
+    if(route==="settings"&&injectorNumericDrafts.size){
+      LexeditorUI.showToast?.(`Correct ${injectorNumericDrafts.values().next().value.label} before saving.`,true);
+      return;
+    }
     injectorBusy=true;render();
     try{
       const response=await fetch(`/api/shader-injector/${route}`,{method:"POST",
@@ -162,11 +168,32 @@
         ...options.map(([code,name])=>{const option=el("option",{value:String(code)},name);option.selected=code===Number(value);return option}));
       return select;
     }
-    const step=setting.kind==="float"?(setting.key==="MenuScale"?0.05:0.01):1;
-    return el("input",{type:"number",value:String(value),step,disabled,"aria-label":label,
-      ...(setting.minimum!==null?{min:setting.minimum}:{}),...(setting.maximum!==null?{max:setting.maximum}:{}),
-      onchange:event=>{const next=Number(event.target.value);if(Number.isFinite(next))set(setting.kind==="float"?next:Math.round(next))}});
+    const key=JSON.stringify([setting.section,setting.key]);
+    const text=injectorNumericDrafts.get(key)?.text??String(value);
+    const commit=next=>{injectorNumericDrafts.delete(key);section[setting.key]=Number(next)};
+    const remember=(input,valid)=>{
+      if(valid)commit(input.value);else injectorNumericDrafts.set(key,{text:input.value,label});
+      refreshInjectorButtons();
+    };
+    if(setting.kind==="int"){
+      const control=LexeditorUI.exactIntegerInput({value:text,min:setting.minimum,max:setting.maximum,label,
+        change:next=>{commit(next);refreshInjectorButtons()}});
+      const input=control.querySelector("input");input.disabled=disabled;
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
+      return control;
+    }
+    const input=el("input",{type:"number",value:text,step:"any",disabled,required:true,"aria-label":label,
+      "data-lex-validate-number":"true",
+      ...(setting.minimum!==null?{min:setting.minimum}:{}),...(setting.maximum!==null?{max:setting.maximum}:{})});
+    const validate=()=>{input.setCustomValidity("");if(input.value===""||!Number.isFinite(Number(input.value)))input.setCustomValidity("Enter a finite number.");return input.checkValidity()};
+    input.lexValidateNumber=validate;
+    input.oninput=()=>remember(input,validate());
+    input.onchange=()=>{if(validate()){commit(input.value);refreshInjectorButtons()}};
+    return input;
   }
+
+  function injectorDirty(){return injectorNumericDrafts.size>0||JSON.stringify(injector?.settings?.values)!==JSON.stringify(injectorDraft)}
+  function refreshInjectorButtons(){for(const button of document.querySelectorAll('[data-injector-draft-action]'))button.disabled=!injectorDirty()||injectorBusy}
 
   function injectorSettingsCard(){
     if(!injector?.available||!injectorDraft)return null;
@@ -179,16 +206,16 @@
       sections.push(detailSection({title:titles[name],body:fields}));
     }
     const saved=injector.settings.values;
-    const dirty=JSON.stringify(saved)!==JSON.stringify(injectorDraft);
+    const dirty=injectorDirty();
     const file=injector.settings;
     const fileRows=[
       detailField({label:"FILE",control:readonlyField(file.exists
         ?file.path:`${file.path} — not created yet. The injector writes it on first start; saving here creates it now.`)}),
       detailField({label:"SAVE",control:el("div",{class:"lex-reshade-actions"},
-        el("button",{type:"button",class:"lex-dialog-action primary",disabled:!dirty||injectorBusy,
+        el("button",{type:"button",class:"lex-dialog-action primary",disabled:!dirty||injectorBusy,"data-injector-draft-action":"save",
           onclick:()=>injectorAction("settings",{changes:injectorDraft},"Saved ShaderInjector.ini. Restart the game to apply.")},"Save settings"),
-        el("button",{type:"button",class:"lex-dialog-action",disabled:!dirty||injectorBusy,
-          onclick:()=>{injectorDraft=clone(saved);render()}},"Revert"))}),
+        el("button",{type:"button",class:"lex-dialog-action",disabled:!dirty||injectorBusy,"data-injector-draft-action":"revert",
+          onclick:()=>{injectorNumericDrafts.clear();injectorDraft=clone(saved);render()}},"Revert"))}),
     ];
     for(const problem of file.problems||[]){
       fileRows.push(detailField({label:"FILE PROBLEM",control:readonlyField(problem),tone:"warning"}));
