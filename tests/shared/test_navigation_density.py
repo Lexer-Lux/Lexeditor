@@ -41,7 +41,7 @@ def test_row_pointer_follows_clickable_label(page,with_icon):
 def test_pages_are_alphabetical_whatever_order_they_are_declared_in(page):
     """Lexer: "the tabs aren't alphabetically sorted anymore. wtf? how does this
     keep hapening?" Pages are alphabetical by name; only `order` and the
-    settings/tweaks rule move them.
+    shared leftmost Mods tab and the settings/tweaks rule move them.
     """
     framework(page)
     page.evaluate('''()=>{
@@ -55,7 +55,7 @@ def test_pages_are_alphabetical_whatever_order_they_are_declared_in(page):
     page.wait_for_timeout(300)
     order = page.evaluate('''()=>[...document.querySelectorAll('.lex-shell-header nav button[data-tab]')]
       .map(node=>node.dataset.tab)''')
-    assert order[:3] == ['alpha','middle','zebra'], order
+    assert order == ['mods','alpha','middle','zebra'], order
 
 
 @pytest.mark.parametrize('width',[700,1000,1600])
