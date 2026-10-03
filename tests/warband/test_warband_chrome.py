@@ -8,8 +8,14 @@ from test_shared_ui_feedback import page, framework
 ROOT = Path(__file__).resolve().parents[2]
 
 RATIO_FN = '''(fg, bg) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext('2d', {willReadFrequently: true});
   const lum = c => {
-    const m = c.match(/[\\d.]+/g).map(Number).slice(0, 3).map(v => {
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = c;
+    context.fillRect(0, 0, 1, 1);
+    const m = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(v => {
       v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
     });
     return .2126 * m[0] + .7152 * m[1] + .0722 * m[2];
@@ -55,16 +61,16 @@ def test_tab_text_readable_in_every_state(page):
       const ratio = {RATIO_FN};
       return tabs.map(t => ratio(getComputedStyle(t).color, getComputedStyle(t).backgroundColor));
     }}''')
-    assert len(ratios) == 2, ratios
+    assert page.locator('.lex-shell-header nav button .lex-tab-label-text').all_text_contents() == ['Mods', 'Items', 'Troops']
     assert all(r >= 4.5 for r in ratios), ratios
     rest = page.locator('.lex-shell-header nav button:not(.active)')
-    rest.hover()
-    page.wait_for_timeout(300)
-    hovered = page.evaluate(f'''() => {{
-      const t = document.querySelector('.lex-shell-header nav button:not(.active)');
-      return ({RATIO_FN})(getComputedStyle(t).color, getComputedStyle(t).backgroundColor);
-    }}''')
-    assert hovered >= 4.5, hovered
+    for tab in rest.all():
+        tab.hover()
+        page.wait_for_timeout(300)
+        hovered = tab.evaluate(f'''t =>
+          ({RATIO_FN})(getComputedStyle(t).color, getComputedStyle(t).backgroundColor)
+        ''')
+        assert hovered >= 4.5, hovered
 
 
 def test_preview_thumbnail_sits_left(page):

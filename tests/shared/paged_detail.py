@@ -8,6 +8,13 @@ a reader would, instead of assuming the whole record is on screen.
 
 def reveal(page, locator, pages: int = 12):
     """Turn the detail panel's pages until `locator` is visible; return it."""
+    if locator.count() and locator.first.is_visible():
+        return locator.first
+    pager = page.locator(".lex-tweaks-pages")
+    first = pager.get_by_role("button", name="First page", exact=True)
+    if first.count() and first.first.is_enabled():
+        first.first.click()
+        page.wait_for_timeout(150)
     for _ in range(pages):
         if locator.count() and locator.first.is_visible():
             return locator.first

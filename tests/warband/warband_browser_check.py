@@ -13,6 +13,7 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from plugin_ui import inline_modules  # noqa: E402
+from paged_detail import reveal
 
 from PIL import Image
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
@@ -184,17 +185,18 @@ def main():
                     assert mesh_select.input_value()=='fixture_sword'
                     assert page.locator('.warband-item-detail [data-lex-property="mesh-1"] select').count()==1
                     # A flag box writes the project's own constant name back.
-                    page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]').check()
+                    reveal(page, page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]')).check()
                     assert page.evaluate('Object.values(state.itemEdits)[0].fields.flags')=='itp_type_one_handed_wpn|itp_merchandise|itp_civilian'
-                    page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]').uncheck()
+                    reveal(page, page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]')).uncheck()
                     assert page.evaluate('itemDirtyCount()')==0
                     # Every one of those sets is a named section of the panel,
                     # and each is reachable by scrolling the panel body.
                     titles=page.evaluate('''() => [...document.querySelectorAll('.warband-item-detail .lex-detail-section-title')]
                         .map(node=>node.textContent.replace(/\\s|\\?/g,''))''')
-                    assert titles[:5]==['Item','Stats','Flags','Modifierbits','Meshes'],titles
                     # What is left is only what this editor does not interpret.
-                    assert titles[5:]==['ModuleSystemfields'],titles
+                    # Columns move sections between pages; each section still
+                    # occurs exactly once, independent of its DOM position.
+                    assert sorted(titles)==sorted(['Item','Stats','Flags','Modifierbits','Meshes','ModuleSystemfields']),titles
                     page.evaluate('''() => {const body=document.querySelector('.warband-item-detail .lex-detail-panel-body');
                         body.scrollTop=body.scrollHeight;}''')
                     page.wait_for_timeout(250)
@@ -235,6 +237,7 @@ def main():
                     page.wait_for_timeout(250)
                     assert page.locator('.warband-item-detail.lex-model-preview-open').count()==0
                     name_field=page.locator('.warband-item-detail [data-lex-property="name"] input')
+                    reveal(page, name_field)
                     name_field.fill('Edited fixture name')
                     assert page.evaluate('itemDirtyCount()')==1
                     assert page.evaluate('Object.values(state.itemEdits)[0].fields.name')=='Edited fixture name'

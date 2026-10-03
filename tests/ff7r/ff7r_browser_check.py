@@ -12,12 +12,15 @@ import argparse
 import copy
 import json
 import re
+import sys
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 MISC = "Fixture/GameContents/DataObject/MiscData"
 EQUIPMENT = "Fixture/GameContents/DataObject/Equipment"
@@ -573,16 +576,20 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         }""")
         assert "packaged mod-loading file is missing" not in page.locator("#main").inner_text().lower()
         assert "packaged credits file is missing" not in page.locator("#main").inner_text().lower()
-        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-mod-loading").count() == 1
-        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-credits").count() == 1
+        assert page.locator(".lex-information-panel .lex-detail-panel-body .lex-plugin-mod-loading").count() == 1
+        assert page.locator(".lex-information-panel .lex-detail-panel-body .lex-plugin-credits").count() == 1
         shared = page.locator(".lex-information-panel .lex-detail-panel-body")
-        shared.evaluate("node => { node.scrollTop = node.scrollHeight; }")
+        reveal(page, shared.locator('.lex-plugin-mod-loading'))
+        reveal(page, shared.locator('.lex-plugin-credits'))
         page.wait_for_timeout(100)
         page.screenshot(path=str(output / "info-shared-sections-1200.png"), full_page=True)
         remove = page.get_by_role("button", name="Remove deployed PAK", exact=True)
+        page.locator('.lex-information-panel .lex-tweaks-pages').get_by_role('button', name='First page', exact=True).click()
+        reveal(page, remove)
         expect(remove).to_be_enabled()
         remove.click()
         page.wait_for_function("state.info.projectDeployment.state==='absent'")
+        reveal(page, remove)
         expect(page.get_by_role("button", name="Remove deployed PAK", exact=True)).to_be_disabled()
         assert "Removed Lexeditor's deployed PAK" in page.locator("#main").inner_text()
         page.screenshot(path=str(output / "info-remove-1200.png"), full_page=True)
