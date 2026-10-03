@@ -250,7 +250,11 @@
     worldMapNavigation(map,map.lexStage);
     return map;
   }
-  function worldDrawPointGives(row){
+  const worldDrawAmountHelp="Vanilla chooses a random amount each time you draw. Available stock space can reduce it. Other mods can change this range.";
+  const worldDrawAmount=entry=>entry?(entry.highYield?'2–5 spells':'1–2 spells'):'Unavailable';
+  const worldDrawPointAmount=row=>worldDrawAmount(state.data.drawPointData?.rows?.find(entry=>entry.id===row.drawId));
+  const worldColumnValue=(row,key)=>key==='vanillaAmount'&&row.kind==='drawPoint'?worldDrawPointAmount(row):rowSortValue(row,key);
+  function worldDrawPointGives(row,prefs){
     const data=state.data.drawPointData;
     if(data?.error)return detailSection({title:"WHAT IT GIVES",body:[LexeditorUI.detailNote(data.error)]});
     const entry=data?.rows?.find(value=>value.id===row.drawId);
@@ -270,11 +274,14 @@
       return sourceControl(box,()=>entry[key],vanilla?.[key],refs(key),value=>{entry[key]=!!value;changed()},LexeditorUI.booleanMark);
     };
     return detailSection({title:"WHAT IT GIVES",
-      help:infoHelp("The magic this draw point gives, whether it fills again after it is drawn, and whether it gives a high yield. The game keeps these in FF8_EN.exe; Lexeditor changes them with a Hext patch in the mod and never writes the executable. A high yield gives about twice as much; the game stores no other amount."),
+      help:infoHelp("Choose the spell, refill and high yield. Lexeditor saves these as a Hext patch in your mod. It never writes the executable. The amount below shows vanilla's random range with the selected high-yield setting."),
       body:[detailField({label:"MAGIC",
           control:sourceControl(spell,()=>entry.magicId,vanilla?.magicId,refs("magicId"),value=>{entry.magicId=Number(value);changed()},magicName)}),
         detailField({label:"REFILL",help:infoHelp("On: the point stocks up again some time after it is drawn. Off: once drawn, it stays empty."),control:flag("refill","refill")}),
-        detailField({label:"HIGH YIELD",help:infoHelp("On: each draw gives more of the spell."),control:flag("highYield","high yield")})]});
+        detailField({label:"HIGH YIELD",help:infoHelp("On: each draw gives more of the spell."),control:flag("highYield","high yield")}),
+        detailField({label:"VANILLA AMOUNT",pin:prefs?.pinButton('vanillaAmount','Vanilla amount'),
+          help:infoHelp(worldDrawAmountHelp),control:LexeditorUI.readonlyField(worldDrawAmount(entry),
+            {'aria-label':`Draw Point ${row.drawId} vanilla amount`})})]});
   }
   function worldDrawPointDetail(row,prefs,titleContent=null){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
@@ -307,7 +314,7 @@
     // What it gives lives in the executable's draw point table, one byte per
     // draw ID, and is edited through the project's Hext patch (Lexer: "edit
     // the amount and spell on the draw points ... some hext editing").
-    const gives=worldDrawPointGives(row);
+    const gives=worldDrawPointGives(row,prefs);
     // The list shows the draw point's own draw ID, so the panel does too.
     return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`,...(titleContent?{titleContent}:{})},prefs,[...(gives?[gives]:[]),detailSection({className:"world-draw-position",help:infoHelp("Where the player finds this draw point on the world map. Moving it into another block changes which draw point the game finds there."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
@@ -651,11 +658,13 @@
         {key:"ruleCount",label:"RULES",help:"Encounter rules that start battles on this ground type.",sortValue:row=>row.rules.length,render:row=>row.rules.length}],
         worldDetail,"90px minmax(180px,2fr) minmax(70px,.5fr) minmax(70px,.5fr)",{noun:"ground types",defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:true},false));
     }
-    const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
+    const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(worldColumnValue(left,sortKey)).localeCompare(String(worldColumnValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
     const columns=kind==="region"?[{key:"id",label:"ID",help:worldPropertyHelp.region.cell},{key:"x",label:"X",help:worldPropertyHelp.region.x},{key:"y",label:"Y",help:worldPropertyHelp.region.y},{key:"regionId",label:"REGION",help:worldPropertyHelp.region.regionId}]:kind==="fieldReturn"?[{key:"id",label:"ID",help:worldPropertyHelp.fieldReturn.index},{key:"x",label:"X",help:worldPropertyHelp.fieldReturn.x},{key:"y",label:"Y",help:worldPropertyHelp.fieldReturn.y},{key:"z",label:"Z",help:worldPropertyHelp.fieldReturn.z}]:kind==="drawPoint"?[{key:"drawId",label:"DRAW ID",help:worldPropertyHelp.drawPoint.drawId},{key:"x",label:"X",help:worldPropertyHelp.drawPoint.x},{key:"y",label:"Y",help:worldPropertyHelp.drawPoint.y},{key:"subId",label:"SUB-ID",help:worldPropertyHelp.drawPoint.subId}]:kind==="skyColor"?[{key:"id",label:"RECORD",help:"Identifier of this sky colour record."},{key:"skyTop",label:"SKY GRADIENT",grow:1,cellClass:"lex-cell-fill",help:"Preview of the top, centre, and bottom sky colours.",render:worldSkySwatch}]:kind==="railTrack"?[{key:"id",label:"TRACK",help:"Identifier of the train route."},{key:"pointCount",label:"POINTS",help:"Number of points forming the route."},{key:"trainStop1",label:"STOP 1",help:"First stop point in this route."},{key:"trainStop2",label:"STOP 2",help:"Second stop point in this route."}]:[{key:"id",label:"TEXTURE",help:"Identifier of the world texture."},{key:"name",label:"ASSET",help:"Name of the texture image record."},{key:"paletteCount",label:"PALETTES",help:"Number of colour tables in this indexed image."},{key:"depth",label:"BPP",help:"Bits per pixel, which determines how pixel indices refer to palette colours."}];
+    if(kind==='drawPoint')columns.push({key:'vanillaAmount',label:'Vanilla amount',pinned:false,
+      help:worldDrawAmountHelp,render:worldDrawPointAmount});
     delete state.columnPrefs.world;
-    const coordinateTable=kind==="region"||kind==="fieldReturn";
-    const content=showPaged("world",visible,coordinateTable?columns.map(column=>({...column,numeric:true})):columns,worldDetail,kind==="skyColor"?"90px minmax(180px,1fr)":"90px minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1fr)",{defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:!coordinateTable&&kind!=="skyColor"},false);
+    const coordinateTable=kind==="region"||kind==="fieldReturn"||kind==="drawPoint";
+    const content=showPaged("world",visible,coordinateTable?columns.map(column=>({...column,numeric:column.key!=='vanillaAmount'})):columns,worldDetail,kind==="skyColor"?"90px minmax(180px,1fr)":"90px minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1fr)",{defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:!coordinateTable&&kind!=="skyColor"},false);
     return wrap(content);
   }
   function renderWorldMap(){return renderWorldMapContent(true)}

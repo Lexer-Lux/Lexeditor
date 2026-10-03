@@ -127,6 +127,7 @@ def main() -> int:
             assert rendered["tabs"] == ["Cells", "Draw Points", "Field Returns", "Ground Types", "Map",
                                         "Sky Colours", "Train Tracks", "World → Field", "World Textures"], rendered["tabs"]
             assert rendered["inputs"] == ["Draw Point 129 refill", "Draw Point 129 high yield",
+                                          "Draw Point 129 vanilla amount",
                                           "Draw Point 129 X", "Draw Point 129 Y",
                                           "Draw Point 129 SUB-ID"], rendered["inputs"]
             # The world map is the game's 4:3 art, so the panel shows it 4:3.
