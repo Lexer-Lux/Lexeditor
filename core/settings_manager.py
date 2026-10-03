@@ -23,6 +23,7 @@ DEFAULTS = {
     "updateCheckFrequency": "daily",
     "hoverableAltClick": False,
     "showHoverTooltips": False,
+    "showHiddenProperties": False,
     "pageWrapAround": True,
     "booleanBoxStyle": True,
     "selectionHoldMs": 650,
@@ -165,6 +166,7 @@ class SettingsStore:
             "modLibraryPath": payload.get("modLibraryPath", "") if isinstance(payload.get("modLibraryPath", ""), str) else "",
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
             "showHoverTooltips": payload.get("showHoverTooltips", defaults["showHoverTooltips"]) is True,
+            "showHiddenProperties": payload.get("showHiddenProperties", defaults["showHiddenProperties"]) is True,
             "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
             "booleanBoxStyle": payload.get("booleanBoxStyle", defaults.get("booleanBoxStyle", True)) is not False,
@@ -219,13 +221,16 @@ class SettingsStore:
              panel_tab_target: str | None = None,
              pager_bar_height_percent: float | None = None,
              boolean_box_style: bool | None = None,
-             show_hover_tooltips: bool | None = None) -> dict:
+             show_hover_tooltips: bool | None = None,
+             show_hidden_properties: bool | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
         if show_hover_tooltips is None:
             show_hover_tooltips = current["showHoverTooltips"]
+        if show_hidden_properties is None:
+            show_hidden_properties = current["showHiddenProperties"]
         if panel_tab_target is None:
             panel_tab_target = current["panelTabTarget"]
         if panel_tab_target not in ("hover", "focus"):
@@ -260,6 +265,7 @@ class SettingsStore:
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "showHoverTooltips": bool(show_hover_tooltips),
+                "showHiddenProperties": bool(show_hidden_properties),
                 "pageWrapAround": bool(page_wrap_around),
                 "booleanBoxStyle": bool(boolean_box_style),
                 "panelTabTarget": panel_tab_target,
@@ -304,6 +310,7 @@ class SettingsStore:
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "showHoverTooltips": bool(current["showHoverTooltips"]),
+            "showHiddenProperties": bool(current.get("showHiddenProperties", False)),
             "pageWrapAround": bool(current["pageWrapAround"]),
             "booleanBoxStyle": bool(current.get("booleanBoxStyle", True)),
             "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",

@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tests.shared.plugin_ui import plugin_ui
 
+from core import script_mods  # noqa: E402
 from plugins.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
 from plugins.ff8.ffnx_issue_51 import runtime_config, runtime_package  # noqa: E402
 
@@ -162,7 +163,10 @@ def verify_final_package_if_staged() -> bool:
 def main() -> int:
     editor = plugin_ui('ff8')
     gameplay_view = editor[editor.index("function renderGameplaySettings"):editor.index("function renderPlatformSettings")]
-    assert 'panel("SHARED PARTY MAGIC INVENTORY"' in gameplay_view
+    # Shared Party Magic Inventory is a tweak mod: the page draws it with
+    # every other tweak, never as a switch of its own.
+    assert "LexeditorUI.tweakModPanels(" in gameplay_view
+    assert "LexeditorUI.tweakPanel(" not in gameplay_view
     settings_dirty = editor.index("const settingsDirty=")
     other_saves = editor.index("const results=await Promise.all(jobs);")
     settings_save = editor.index('results.push(await api("/api/settings/save"')
@@ -290,16 +294,29 @@ def main() -> int:
             # real junction, then restores it after a later config failure.
             ffnx_manager._ensure_direct_link(game, old_direct)
             project = root / "mod"
-            # The project's own empty tweak library: saving never builds or
-            # enables the reader's real tweak mods.
-            (project / ".lexeditor-mods").mkdir(parents=True)
+            # The project's own tweak library, holding only the sharing mod:
+            # saving never builds or enables the reader's real tweak mods, and
+            # trusting it never touches the reader's trust list.
+            sharing = project / ".lexeditor-mods" / "Shared Party Magic Inventory"
+            (sharing / "script").mkdir(parents=True)
+            (sharing / "script" / "__init__.py").write_text("", encoding="utf-8")
+            (sharing / "script" / "tweak.py").write_text(
+                "def build(settings, context):\n    context.need_driver()\n    return {}\n", encoding="utf-8")
+            (sharing / "settings.schema.json").write_text('{"fields": []}', encoding="utf-8")
+            (sharing / "mod.json").write_text(json.dumps({
+                "id": gameplay_settings.SHARED_MAGIC_MOD, "name": "Shared Party Magic Inventory",
+                "enabled": False, "script": {"version": 1}}), encoding="utf-8")
+            old_trust = os.environ.get(script_mods.TRUST_ENV)
+            os.environ[script_mods.TRUST_ENV] = str(root / "trust.json")
+            script_mods.set_trusted(sharing, True)
             runtime_config.write(project, shared_magic_inventory=False)
             old_state_path = ffnx_manager.STATE_PATH
             old_game_running = ffnx_manager._game_running
             ffnx_manager.STATE_PATH = state_path
             ffnx_manager._game_running = lambda: False
             loaded = gameplay_settings.load(project, game)
-            assert loaded["tweaks"] == [] and loaded["sharedMagicInventory"] is False
+            assert [row["id"] for row in loaded["tweaks"]] == [gameplay_settings.SHARED_MAGIC_MOD]
+            assert loaded["sharedMagicInventory"] is False
             watched = [
                 game / runtime_package.DRIVER_NAME,
                 game / "FFNx.toml",
@@ -308,7 +325,7 @@ def main() -> int:
                 *(game / "shaders" / shader.name for shader in (package_root / "shaders").glob("*") if shader.is_file()),
                 state_path,
                 gameplay_settings.patch_path(project),
-                gameplay_settings.settings_path(project),
+                sharing / "mod.json",
                 runtime_config.path(project),
             ]
             before_save = file_state(watched)
@@ -328,8 +345,8 @@ def main() -> int:
             ffnx_manager.install_derivative = install_temporary
             try:
                 gameplay_settings.save(
-                    {"gfSpellbooksEnabled": loaded["gfSpellbooksEnabled"],
-                     "sharedMagicInventory": True}, game, project, install_runtime=True,
+                    {"tweaks": {gameplay_settings.SHARED_MAGIC_MOD: {"enabled": True}}},
+                    game, project, install_runtime=True,
                 )
             except OSError as error:
                 assert "injected config failure" in str(error)
@@ -340,6 +357,10 @@ def main() -> int:
                 ffnx_manager.install_derivative = real_install
                 ffnx_manager.STATE_PATH = old_state_path
                 ffnx_manager._game_running = old_game_running
+                if old_trust is None:
+                    os.environ.pop(script_mods.TRUST_ENV, None)
+                else:
+                    os.environ[script_mods.TRUST_ENV] = old_trust
             assert_file_state(before_save)
             assert link_state(link) == before_link
 

@@ -78,8 +78,13 @@
         const method = window.pywebview?.api?.[message.method];
         if (typeof method !== "function" || message.method.startsWith("_")) throw new Error("Unknown host action");
         result = await method(...message.args);
-        // Restart can change the service port before the frame navigates.
-        if (message.method === "restart_plugin" && result?.url) origin = new URL(result.url).origin;
+        // Every call that restarts the plugin - restart, and creating,
+        // renaming, choosing or copying a mod - starts it on a new port before
+        // the frame navigates there. Only restart_plugin used to move the
+        // origin, so the new page's calls (editor_ready among them) were
+        // dropped as foreign and its loading screen never left. A restart's
+        // result names the session it started; a plain link does not.
+        if (result?.url && result?.identity) origin = new URL(result.url).origin;
       }
       source.postMessage({type: "lexeditor-host-result", id: message.id, result}, event.origin);
     } catch (error) {

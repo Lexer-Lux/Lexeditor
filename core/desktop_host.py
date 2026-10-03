@@ -631,6 +631,7 @@ class HostApi:
             payload.get("pagerBarHeightPercent"),
             None if "booleanBoxStyle" not in payload else bool(payload["booleanBoxStyle"]),
             show_hover_tooltips=None if "showHoverTooltips" not in payload else bool(payload["showHoverTooltips"]),
+            show_hidden_properties=None if "showHiddenProperties" not in payload else bool(payload["showHiddenProperties"]),
         )
         return self.lexeditor_settings()
 
@@ -886,14 +887,16 @@ class HostApi:
         for game in games:
             directory = game.pop("directory")
             code = codes.get(directory, {})
+            lexmod = self._plugins[game["id"]].lexmod
             rows.append({"id": game["id"], "game": game["name"], "issueLabel": game["issueLabel"],
+                         "lexmod": f"https://github.com/{lexmod}" if lexmod else "",
                          "quotes": quote_by_dir.get(directory),
                          "copiedLines": code.get("copiedLines") if code else None,
                          "copiedRecorded": code.get("recorded") if code else None,
                          "copiedOver": bool(code.get("over")) if code else False})
         # Global comes first: the shared application's own issues and quotes.
         # It has no plugin subissues or plugin code of its own.
-        global_row = {"id": GLOBAL_ISSUE_LABEL, "game": "Global", "global": True,
+        global_row = {"id": GLOBAL_ISSUE_LABEL, "game": "Global", "global": True, "lexmod": "",
                       "issueLabel": GLOBAL_ISSUE_LABEL,
                       "quotes": quote_counts["global"],
                       "copiedLines": None, "copiedRecorded": None, "copiedOver": False}
@@ -1706,6 +1709,131 @@ class HostApi:
         project = self._projects.select(plugin_id, selected)
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, selected)}
+
+    # --- Mods tab, Lexer's Mod and first-run -------------------------------
+
+    def _game_mods(self, plugin_id: str) -> Path:
+        from core import mods_service
+        self._library_plugin(plugin_id)
+        return mods_service.game_library(Path(self.mod_library_location()["root"]), plugin_id)
+
+    def _mods_downloads(self):
+        from core import mods_service
+        if getattr(self, "_downloads", None) is None:
+            self._downloads = mods_service.Downloads()
+        return self._downloads
+
+    def _onboarding(self):
+        from core import mods_service
+        from core.runtime_bootstrap import user_data_dir
+        return mods_service.Onboarding(user_data_dir() / "onboarding.json")
+
+    def mods_overview(self, plugin_id: str) -> dict:
+        """Every mod in this game's library, then Lexer's Mod modules not yet here."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        plugin = self._plugins[plugin_id]
+        result = mods_service.overview(root, plugin.lexmod)
+        status = self.mod_library_status(plugin_id)
+        return {**result, "root": str(root), "canManage": bool(status.get("canManage")),
+                "message": status.get("message", "")}
+
+    def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
+        from core import mod_metadata, mods_service
+        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+        mod_metadata.write(folder, details)
+        return mods_service.mod_row(folder)
+
+    def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
+        """Switch one mod, then let the game's loader take the new set."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        folder = mods_service.checked_mod(root, path)
+        mods_service.set_enabled(folder, enabled)
+        if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
+            enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+            self.activate_library_mods(plugin_id, enabled_paths, [])
+        return mods_service.mod_row(folder)
+
+    def save_mod_settings(self, plugin_id: str, path: str, values: dict) -> dict:
+        from core import mods_service, script_mods
+        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+        script_mods.save_values(folder, values)
+        return mods_service.mod_row(folder)
+
+    def trust_mod(self, plugin_id: str, path: str, trusted: bool) -> dict:
+        from core import mods_service, script_mods
+        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+        if type(trusted) is not bool:
+            raise ValueError("Trusted is yes or no")
+        script_mods.set_trusted(folder, trusted)
+        return mods_service.mod_row(folder)
+
+    def activate_enabled_mods(self, plugin_id: str) -> dict:
+        """Hand the library's enabled mods to the game's loader, when it has one."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
+            return {"activated": False}
+        enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+        self.activate_library_mods(plugin_id, enabled, [])
+        return {"activated": True, "mods": len(enabled)}
+
+    def open_lexmod(self, plugin_id: str) -> dict:
+        """Open only the repository this game's own manifest names."""
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            raise ValueError("This game has no Lexer's mod")
+        url = f"https://github.com/{repository}"
+        return {"opened": bool(webbrowser.open(url, new=2, autoraise=True)), "url": url}
+
+    def lexmod_info(self, plugin_id: str) -> dict:
+        """Lexer's Mod for this game: its link, features and modules, or why not."""
+        from core import mods_service, lexmods
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            return {"available": False, "repository": ""}
+        try:
+            catalog = mods_service.catalog(repository)
+        except lexmods.LexmodError as error:
+            return {"available": False, "repository": repository, "error": str(error)}
+        return {"available": True, "repository": repository, "url": catalog["url"],
+                "version": catalog["version"], "features": catalog["features"],
+                "readmeProblems": catalog["readmeProblems"], "modules": catalog["modules"]}
+
+    def lexmod_download(self, plugin_id: str, modules: list[str] | None = None) -> dict:
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            raise ValueError("This game has no Lexer's mod")
+        if modules is not None and (not isinstance(modules, list) or not all(isinstance(m, str) for m in modules)):
+            raise ValueError("Choose modules by folder name")
+        return self._mods_downloads().start(plugin_id, repository, self._game_mods(plugin_id), modules)
+
+    def lexmod_download_progress(self, plugin_id: str) -> dict:
+        return self._mods_downloads().progress(plugin_id)
+
+    def lexmod_download_cancel(self, plugin_id: str) -> dict:
+        return self._mods_downloads().cancel(plugin_id)
+
+    def lexmod_update(self, plugin_id: str) -> dict:
+        """Keep downloaded Lexer's Mod modules on the latest version."""
+        from core import mods_service, lexmods
+        from core.runtime_bootstrap import user_data_dir
+        repository = self._plugins[plugin_id].lexmod
+        try:
+            return mods_service.update_if_due(repository, self._game_mods(plugin_id),
+                                              user_data_dir() / "lexmod-updates.json")
+        except lexmods.LexmodError as error:
+            return {"updated": False, "error": str(error)}
+
+    def onboarding_status(self, plugin_id: str) -> dict:
+        self._library_plugin(plugin_id)
+        return {"show": not self._onboarding().seen(plugin_id), "game": self._plugins[plugin_id].name}
+
+    def finish_onboarding(self, plugin_id: str) -> dict:
+        self._library_plugin(plugin_id)
+        self._onboarding().finish(plugin_id)
+        return {"show": False}
 
     def _library_plugin(self, plugin_id: str) -> None:
         # The id becomes a folder under the mod library, so only a registered

@@ -53,8 +53,10 @@
     return input;
   }
   // Each gameplay tweak is a tweak mod in the mod library; this page shows
-  // every one from its own settings schema. Only changed switches and values
-  // are sent, so saving never rewrites a tweak the reader did not touch.
+  // every one from its own settings schema. A value edited on another screen
+  // (GF HP Casting's costs on Magic) waits for Save with that screen's data;
+  // only changed switches and values are sent, so saving never rewrites a
+  // tweak the reader did not touch.
   const settingsPayload=()=>{
     const settings=state.data.settings,before=state.base.settings||{},tweaks={};
     for(const row of settings.tweaks||[]){
@@ -64,8 +66,30 @@
       if(signature(row.values)!==signature(old.values))change.values=row.values;
       if(Object.keys(change).length)tweaks[row.id]=change;
     }
-    return {gfSpellbooksEnabled:settings.gfSpellbooksEnabled,sharedMagicInventory:settings.sharedMagicInventory,tweaks};
+    return {tweaks};
   };
+  // A tweak's settings belong to its mod, not to the open project, so the
+  // Tweaks page saves them at once, to both copies, like trust - on Vanilla
+  // too. The number boxes report every keystroke; the save waits for a pause.
+  const tweakSaves=new Map();
+  function saveTweakValues(row){
+    clearTimeout(tweakSaves.get(row.id));
+    tweakSaves.set(row.id,setTimeout(async()=>{
+      tweakSaves.delete(row.id);
+      const values=clone(row.values);
+      try{
+        const result=await api("/api/settings/save",post({tweaks:{[row.id]:{values}}}));
+        const fresh=result.tweaks.find(item=>item.id===row.id);
+        for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id);if(match&&fresh)match.values=clone(fresh.values)}
+      }catch(error){
+        const saved=(state.base.settings?.tweaks||[]).find(item=>item.id===row.id);
+        if(saved)row.values=clone(saved.values);
+        showAlert({title:"Could not save the tweak",message:error.message||String(error)});
+        renderSettings();
+      }
+      shell.refresh();
+    },400));
+  }
   const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
   const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
   async function trustTweak(row,trusted){
@@ -77,15 +101,9 @@
     }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
   }
   function renderGameplaySettings(){
-    if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
     const settings=state.data.settings;
-    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:()=>shell.refresh(),trust:trustTweak,
+    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,trust:trustTweak,
       sounds:soundEntries,number:numberControl,select:selectControl});
-    const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
-    const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
-    panels.push(
-      LexeditorUI.tweakPanel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
-      LexeditorUI.tweakPanel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic));
     if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
     const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
     $("#main").replaceChildren(settingsView);

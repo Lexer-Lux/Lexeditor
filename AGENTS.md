@@ -33,6 +33,10 @@ work, even if your tool does not load skills on its own.
   game's own data, read-only, and the mod selector names that source Vanilla;
   creating or copying a mod is an explicit action. An edit attempt in that
   state offers to create one. See `codex/shared/no-mod-state.md`.
+- Every mod, for every game, is one folder with a root `mod.json` holding at
+  least a name (author, description and credits optional); every game gets
+  the shared Mods tab and first-run screen from the shell. Lexer's Mod for a
+  game is `lexmod` in its plugin.json. See `codex/shared/mod-format.md`.
 - Every game plugin exposes a Data Map screen. A generic Files tab is not the
   player-facing editor for data that needs a format-specific view.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the

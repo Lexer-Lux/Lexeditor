@@ -1,5 +1,5 @@
-"""The DS1 Tweaks tab lists tweak mods, saves their switches and trust, and
-reports the installed executable. Uses its own small tweak-mod library and a
+"""The DS1 Tweaks tab lists tweak mods without switches of their own (the
+Mods tab enables a mod), saves trust, and reports the installed executable. Uses its own small tweak-mod library and a
 game folder without an executable, so it never touches real files."""
 import json
 import os
@@ -69,10 +69,12 @@ def main():
                     page.get_by_role('button', name='Trust this tweak').wait_for()
                     if output:
                         page.screenshot(path=str(output / 'ds1-tweaks.png'))
-                    # A switch saves straight to the library mod.
-                    page.get_by_role('checkbox', name='Equip Load Percentage').check()
-                    page.wait_for_function('!state.tweakBusy && state.tweaks.tweaks.find(r=>r.id==="equip-load-percentage").enabled')
-                    assert json.loads((equip / 'mod.json').read_text(encoding='utf-8'))['enabled'] is True
+                    # A tweak is a mod: the Tweaks tab has no switch, only
+                    # an OFF mark while its mod is disabled.
+                    assert page.get_by_role('checkbox', name='Equip Load Percentage').count() == 0
+                    assert page.locator('.lex-tweak-off').count() == 2
+                    data = json.loads((equip / 'mod.json').read_text(encoding='utf-8'))
+                    (equip / 'mod.json').write_text(json.dumps({**data, 'enabled': True}), encoding='utf-8')
                     page.get_by_role('button', name='Trust this tweak').click()
                     page.wait_for_function('!state.tweakBusy && state.tweaks.tweaks.every(r=>r.trust==="trusted")')
                     assert script_mods.trust_state(ammo) == 'trusted'
@@ -80,14 +82,15 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="tweaks"]').click()
                     page.wait_for_function('state.tab==="tweaks" && state.tweaks')
-                    assert page.get_by_role('checkbox', name='Equip Load Percentage').is_checked()
+                    page.wait_for_function('!state.tweakBusy')
+                    assert page.locator('.lex-tweak-off').count() == 1
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
                     assert not errors, errors
                 finally:
                     browser.close()
         finally:
             session.stop()
-    print(json.dumps({'tweakMods': 2, 'switchSaved': True, 'trusted': True, 'missingExecutableReported': True}))
+    print(json.dumps({'tweakMods': 2, 'noSwitch': True, 'trusted': True, 'missingExecutableReported': True}))
 
 
 if __name__ == '__main__':

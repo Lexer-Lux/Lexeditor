@@ -148,6 +148,21 @@ def schema(table):
         if table == 'AtkParam_Npc' and key == 'atkAttribute':
             choices = {**choices, '0': 'Standard'}
         padding = dtype == 'dummy8' or 'Padding' in attrs or key.lower().startswith('pad')
+        # Goods and Magic carry sixteen one-bit covenant slots. Their own
+        # annotations named them differently (Goods by number only, Magic by
+        # name up to 9, then by number), so both read the game's covenant
+        # list. DS1 has nine covenants and "none"; the other slots stay as
+        # stored and are not shown.
+        vow = re.fullmatch(r'vowType(\d+)', key) if table in ('EquipParamGoods', 'Magic') else None
+        if vow:
+            covenant = _enum('VOW_TYPE').get(vow[1], '').removeprefix('Covenant: ')
+            if not covenant or covenant.isdigit():
+                padding = True
+            else:
+                thing = 'spell' if table == 'Magic' else 'item'
+                label = 'Usable with no covenant' if covenant == 'None' else f'Usable in {covenant}'
+                description = (f'If ON, this {thing} can be used while in no covenant.' if covenant == 'None'
+                               else f'If ON, this {thing} can be used while in the {covenant} covenant.')
         protected = padding or count != 1 or 'Obsolete' in attrs or not annotation or (enum_name and not choices) or bool(re.search(r'unknown|unused|dummy|reserved|^unk', label, re.I))
         if table == 'NpcParam' and key not in RESISTANCES:
             protected = True

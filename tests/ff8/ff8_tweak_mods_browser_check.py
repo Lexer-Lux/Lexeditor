@@ -46,7 +46,7 @@ def main(output: Path | None = None) -> int:
                 {"key": "amount", "label": "Amount", "type": "int", "default": 5, "min": 0, "max": 50, "unit": "%"}]}, True)
         dependent = make(library, "dependent-tweak", "Dependent Tweak", 110, {
             "title": "DEPENDENT TWEAK", "help": "Needs Base Tweak.", "requires": ["base-tweak"], "fields": [
-                {"key": "loud", "label": "Loud", "type": "bool", "default": False}]}, False)
+                {"key": "loud", "label": "Loud", "type": "bool", "default": False}]}, True)
         unfinished = make(library, "unfinished-tweak", "Unfinished Tweak", 120, {
             "title": "UNFINISHED TWEAK", "help": "Not ready.", "blocker": "Its hooks are not proved yet."}, False)
         for root in (base, dependent, unfinished):
@@ -69,27 +69,33 @@ def main(output: Path | None = None) -> int:
                     page.wait_for_function("()=>!document.documentElement.classList.contains('lex-loading-live')")
                     page.evaluate("()=>{state.settingsTab='gameplay';navigate('settings')}")
                     page.get_by_text("BASE TWEAK", exact=True).wait_for()
-                    for title in ("DEPENDENT TWEAK", "UNFINISHED TWEAK", "STRANGER TWEAK",
-                                  "GF SPELLBOOKS", "SHARED PARTY MAGIC INVENTORY"):
+                    # GF Spellbooks and Shared Party Magic Inventory are tweak
+                    # mods now, so they are only here when the library has them.
+                    for title in ("DEPENDENT TWEAK", "UNFINISHED TWEAK", "STRANGER TWEAK"):
                         page.get_by_text(title, exact=True).wait_for()
-                    assert page.get_by_role("checkbox", name="Base Tweak").is_checked()
-                    assert page.get_by_role("checkbox", name="Unfinished Tweak").is_disabled()
+                    # A tweak is a mod: the Mods tab switches it, so here
+                    # there is no switch, only an OFF mark on a disabled one.
+                    assert page.get_by_role("checkbox", name="Base Tweak").count() == 0
+                    assert page.locator(".lex-tweak-off").count() == 2
                     page.get_by_text("NOT AVAILABLE YET").first.wait_for()
                     page.get_by_role("button", name="Trust this tweak").wait_for()
                     if output:
                         page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                         page.screenshot(path=str(output / "tweak-mods.png"), full_page=True)
-                    # Turning the needed tweak off greys out the one that needs it.
-                    page.get_by_role("checkbox", name="Base Tweak").uncheck()
-                    page.wait_for_function("()=>document.querySelector('input[aria-label=\"Dependent Tweak\"]').disabled")
-                    page.get_by_role("checkbox", name="Base Tweak").check()
-                    page.get_by_role("checkbox", name="Dependent Tweak").check()
                     amount = page.get_by_role("spinbutton", name="Amount")
                     amount.fill("12")
                     amount.press("Tab")
                     page.get_by_role("checkbox", name="Loud").check()
-                    page.evaluate("()=>saveAll()")
-                    page.wait_for_function("()=>!state.saving&&state.data.settings.tweaks.find(r=>r.id==='dependent-tweak').enabled&&state.base.settings.tweaks.find(r=>r.id==='dependent-tweak').enabled", timeout=120000)
+                    # A tweak's values save to its mod at once: no Save, and
+                    # nothing pending in the open project.
+                    page.wait_for_function("()=>{const base=state.base.settings.tweaks;return base.find(r=>r.id==='base-tweak').values.amount===12&&base.find(r=>r.id==='dependent-tweak').values.loud===true}", timeout=120000)
+                    assert page.evaluate("()=>dirtyCount()") == 0
+                    # Vanilla shows the same page, still editable: the
+                    # values belong to the library, not the open mod.
+                    page.evaluate("()=>{state.activeSource='vanilla';navigate('settings')}")
+                    page.get_by_text("BASE TWEAK", exact=True).wait_for()
+                    assert page.get_by_role("spinbutton", name="Amount").is_enabled()
+                    page.evaluate("()=>{state.activeSource='mine';navigate('settings')}")
                     # Trust is applied at once, not saved with the page.
                     page.get_by_role("button", name="Trust this tweak").click()
                     page.wait_for_function("()=>state.data.settings.tweaks.find(r=>r.id==='stranger-tweak').trust==='trusted'")
@@ -98,7 +104,6 @@ def main(output: Path | None = None) -> int:
                     page.wait_for_function("()=>!document.documentElement.classList.contains('lex-loading-live')")
                     page.evaluate("()=>{state.settingsTab='gameplay';navigate('settings')}")
                     page.get_by_text("DEPENDENT TWEAK", exact=True).wait_for()
-                    assert page.get_by_role("checkbox", name="Dependent Tweak").is_checked()
                     assert page.get_by_role("spinbutton", name="Amount").input_value() == "12"
                     if output:
                         page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
@@ -133,7 +138,7 @@ def main(output: Path | None = None) -> int:
         assert json.loads((dependent / "mod.json").read_text(encoding="utf-8"))["enabled"] is True
         assert script_mods.values(casting)["costs"][1] == 321
         assert not errors, errors
-    print(json.dumps({"tweakMods": 5, "dependencyGreying": True, "savedAndRebuilt": True, "trusted": True,
+    print(json.dumps({"tweakMods": 5, "noSwitch": True, "savedAndRebuilt": True, "trusted": True,
                       "magicCostSavedReloaded": True, "magicCostHiddenWhenDisabled": True}))
     return 0
 

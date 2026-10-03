@@ -1198,8 +1198,25 @@
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || []),
-      typeof options.paginate === "object" ? options.paginate : {}) : element("div", {class: bodyClass}, options.body || []));
+    }, heading, sectionFlow(bodyClass, options.body, options.paginate));
+  };
+  // Every record pane lays its sections out the same way: in as many columns
+  // as the pane is wide, a section too tall for its column going on in the
+  // next. That used to be a per-call `paginate` flag, so three panes had it
+  // and the rest stayed one long column however wide the window was. Now any
+  // body made only of sections flows; `paginate: false` keeps one column,
+  // and an object still passes options through.
+  const sectionFlow = (bodyClass, body, paginate, onlyFlow = false) => {
+    const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
+    const sections = nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-section"));
+    const flow = paginate === false ? null
+      : paginate ? (typeof paginate === "object" ? paginate : {})
+      : sections ? {inline: true} : null;
+    // A tab's content that does not flow is left exactly as it was given.
+    if (!flow && onlyFlow) return null;
+    const box = element("div", {class: bodyClass}, nodes);
+    return flow ? paginateSettings(box, flow) : box;
   };
 
   // A panel can own local navigation without turning those choices into
@@ -1256,7 +1273,7 @@
       class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
-    }, content || [])));
+    }, sectionFlow("lex-detail-panel-body", content, options.paginate, true) || content || [])));
   };
 
   // A select that shows one of hundreds of choices holds only that choice
@@ -4652,6 +4669,7 @@
     // Lexer liked a boolean drawn as one wide box and asked for it as the
     // default, with the arrow-and-checkbox layout as the alternative.
     document.documentElement.dataset.lexBooleanStyle = settings.booleanBoxStyle === false ? "arrow" : "box";
+    document.documentElement.dataset.lexShowHidden = settings.showHiddenProperties === true ? "true" : "false";
     document.documentElement.style.setProperty("--lex-panel-gap", `${Number(settings.panelGapPercent || 1)}vw`);
     // The pagination bar is one height on every page, and that height is a
     // setting rather than a number buried in the stylesheet.
@@ -5145,7 +5163,7 @@
     // in its mod.json (core/mod_metadata.py). Creating one asks for them here.
     const author = options.details ? element("input", {type: "text", maxlength: "200", value: options.author || "",
       placeholder: "Author (optional)", "aria-label": "Author"}) : null;
-    const about = options.details ? element("textarea", {maxlength: "4000", rows: "3",
+    const about = options.details ? element("textarea", {maxlength: "4000", rows: "5",
       placeholder: "Description (optional)", "aria-label": "Description"}, options.about || "") : null;
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close(null);
@@ -5231,7 +5249,11 @@ ${contents.path}`});
     const named = await askProjectName(options.pluginName || pluginId,
       {...options, details: true, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
     if (!named) return null;
-    return callWindow("create_mod_project", pluginId, named.name, named.parent || "", named.details || {});
+    const result = await callWindow("create_mod_project", pluginId, named.name, named.parent || "", named.details || {});
+    // The host restarted the editor on the new mod; the old page's service
+    // is gone, so every caller follows it there.
+    if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
+    return result;
   };
 
   const mountProjectControl = (options, host) => {
@@ -5514,7 +5536,7 @@ ${contents.path}`});
     // Clicking a property, or typing into a control, is an edit attempt. A
     // button inside one is not: pins, copy buttons and question marks stay
     // usable while the page is read-only.
-    const isEditAttempt = target => {
+    const isEditAttempt = (target, event) => {
       if (!target?.closest?.("main") || target.closest?.("button") ||
           target.closest?.(READONLY_EXEMPT)) return false;
       // A developer's double-click on a property name, a section heading or
@@ -5528,13 +5550,16 @@ ${contents.path}`});
       if (sharedSettingsSnapshot?.developerMode &&
           target.closest?.(".lex-detail-field-label-text,.lex-detail-section-title,.lex-info-help"))
         return false;
-      return Boolean(target.closest?.(".lex-detail-field,.lex-toggle"))
-        || Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
+      // Clicking into a text box, selecting in it or dragging its resize
+      // grip reads the value; only typing into it would change it. A switch,
+      // a list or a number's spin arrows change it on the click itself.
+      if (event.type === "keydown") return Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
+      return Boolean(target.closest?.(".lex-toggle")) || changesOnPointer(target, event);
     };
     const protectManagedEdit = async event => {
       const current = snapshot?.projects?.find(row => row.current);
-      if (event.type === "keydown" && ["Tab","Escape","Shift","Control","Alt"].includes(event.key)) return;
-      if (copyPromptOpen || !isEditAttempt(event.target)) return;
+      if (event.type === "keydown" && !typesIntoValue(event)) return;
+      if (copyPromptOpen || !isEditAttempt(event.target, event)) return;
       // A game with no mod has nothing to write into, so the attempt to edit
       // the game's own data is the moment to offer the way out of it.
       if (current?.noMod || current?.vanilla || sessionHasNoMod() ||
@@ -5849,6 +5874,7 @@ ${contents.path}`});
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"showHoverTooltips", scope:"user", title:"Show hover tooltips", type:"checkbox"},
+        {key:"showHiddenProperties", scope:"user", title:"Show hidden properties", description:"Shows the properties Lexeditor hides as not worth editing, dimmed.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
         {key:"booleanBoxStyle", scope:"user", title:"Wide boolean boxes", description:"An on/off property is one wide box that fills its row, ticked when on. Off draws a small checkbox at the end of an arrow from the property name.", type:"checkbox"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
@@ -6716,11 +6742,17 @@ ${contents.path}`});
     try { applyPropertyLayout(state, JSON.parse(localStorage.getItem(state.key) || "null")); } catch (_error) {}
     return state;
   };
-  const capturePropertyLayout = state => Object.fromEntries([...state.groups.values()].map(group =>
-    [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))]));
+  // A layout is each group's property order, plus the properties the
+  // developer hid. Group ids always hold a colon, so "hidden" never clashes.
+  const capturePropertyLayout = state => ({
+    ...Object.fromEntries([...state.groups.values()].map(group =>
+      [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))])),
+    hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id)});
   const applyPropertyLayout = (state, layout) => {
     if (!layout || typeof layout !== "object") return;
     const byId = new Map([...state.fields].map(([field, id]) => [id, field]));
+    const hidden = new Set(Array.isArray(layout.hidden) ? layout.hidden : []);
+    for (const [field, id] of state.fields) field.classList.toggle("lex-property-hidden", hidden.has(id));
     const used = new Set();
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
@@ -6744,21 +6776,65 @@ ${contents.path}`});
     try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value}); }
     catch (_error) { showToast("Layout saved on this device; the shared default could not be saved."); }
   };
+  // Developer Mode: holding the right button on a property hides it for
+  // everyone, or shows it again. It is a layout change like a drag, so it is
+  // saved and undone the same way. A plain right-click still restores the
+  // vanilla value; the hold swallows the right-click it ends with.
+  let hideTimer = 0, hideHeld = false;
+  document.addEventListener("pointerdown", event => {
+    clearTimeout(hideTimer);
+    hideHeld = false;
+    if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    const root = field && propertyRoot(field);
+    if (!root) return;
+    field.classList.add("lex-property-holding");
+    hideTimer = setTimeout(() => {
+      field.classList.remove("lex-property-holding");
+      const state = preparePropertyLayout(root);
+      if (!state.fields.has(field)) return;
+      hideHeld = true;
+      const before = capturePropertyLayout(state);
+      field.classList.toggle("lex-property-hidden");
+      const after = capturePropertyLayout(state);
+      const apply = layout => storePropertyLayout(state, layout);
+      labelUndo.push({before, after, apply});
+      labelRedo.length = 0;
+      labelHistoryChanged();
+      void apply(after);
+      const name = field.querySelector(".lex-detail-field-label-text")?.textContent || "This property";
+      showToast(field.classList.contains("lex-property-hidden")
+        ? `${name} is hidden for everyone without Show hidden properties.` : `${name} is shown again.`);
+    }, 700);
+  }, true);
+  for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
+    clearTimeout(hideTimer);
+    document.querySelectorAll(".lex-property-holding").forEach(node => node.classList.remove("lex-property-holding"));
+  }, true);
+  document.addEventListener("contextmenu", event => {
+    if (!hideHeld) return;
+    hideHeld = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
   let propertyDrag = null, propertyDrop = null;
   const clearPropertyDrop = () => {
     propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after");
     propertyDrop = null;
   };
+  // In Developer Mode a property is dragged by its whole row - anywhere but
+  // its value box, which still selects text and edits as usual.
   document.addEventListener("pointerover", event => {
-    const label = event.target.closest?.(".lex-detail-field-label-text");
-    if (label?.closest(".lex-detail-field")) label.draggable = !!sharedSettingsSnapshot?.developerMode;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    if (!field) return;
+    field.draggable = !!sharedSettingsSnapshot?.developerMode &&
+      !event.target.closest(".lex-detail-field-control,.lex-label-rename,.lex-help-edit");
   });
   document.addEventListener("dragstart", event => {
-    const label = event.target.closest?.(".lex-detail-field-label-text");
-    const field = label?.closest(".lex-detail-field");
-    if (!field) return;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    if (!field || event.target.closest(".lex-detail-field-control")) return;
     const root = propertyRoot(field);
-    if (!sharedSettingsSnapshot?.developerMode || !root || label.querySelector("input")) { event.preventDefault(); return; }
+    if (!sharedSettingsSnapshot?.developerMode || !root || field.querySelector(".lex-detail-field-label input")) { event.preventDefault(); return; }
     const state = preparePropertyLayout(root);
     if (!state.fields.has(field)) { event.preventDefault(); return; }
     propertyDrag = {state, field, before: capturePropertyLayout(state)};
@@ -6897,6 +6973,29 @@ ${contents.path}`});
   };
 
   const mountShell = options => {
+    // Every game has the shared Mods tab, always leftmost. The shell draws it
+    // itself; every other tab still belongs to the plugin.
+    const pluginNavigate = options.navigate, pluginActiveTab = options.activeTab;
+    const mods = modsPage(options.plugin.id, options.plugin.name);
+    let shellPage = null;
+    options = {...options,
+      tabs: [{id: "mods", label: "Mods", help: "Every mod in this game's library: switch them on or off, edit their details and settings, or add new ones."},
+        ...(options.tabs || []).filter(tab => tab.id !== "mods")],
+      activeTab: () => shellPage || pluginActiveTab(),
+      navigate: tab => {
+        if (tab === "mods") {
+          shellPage = "mods";
+          const toolbar = document.querySelector("#toolbar");
+          if (toolbar) toolbar.hidden = true;
+          mods.show(document.querySelector("#main"));
+          refreshShellTabs();
+          return;
+        }
+        shellPage = null;
+        mods.hide();
+        return pluginNavigate(tab);
+      }};
+    let refreshShellTabs = () => {};
     activeShellReadonly = sessionHasNoMod() ? () => true
       : typeof options.readonly === "function" ? options.readonly : null;
     const host = typeof options.host === "string" ? document.querySelector(options.host) : options.host;
@@ -6969,6 +7068,7 @@ ${contents.path}`});
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
+      if ((left.id === "mods") !== (right.id === "mods")) return left.id === "mods" ? -1 : 1;
       if (leftSettings !== rightSettings) return leftSettings ? 1 : -1;
       const rank = tab => tab.id === "tweaks" ? 2 : (tab.id === "misc" || /^misc\.?$/i.test(String(tab.label))) ? 1 : 0;
       // A page whose order carries meaning - Blank's component levels run from
@@ -6996,7 +7096,9 @@ ${contents.path}`});
         "data-tab": tab.id,
         class: [tab.id === options.activeTab() ? "active" : "",
         isSpecialTab(tab) ? "lex-settings-tab" : "",
-        isSpecialTab(tab) || tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
+        isSpecialTab(tab) || tab.id === "tweaks" || tab.id === "mods" ? "lex-tweaks-tab" : "",
+        // Mods wears the same special fill as Tweaks; the sort puts it first.
+        tab.id === "mods" ? "lex-settings-tab lex-mods-tab" : ""].filter(Boolean).join(" "),
         onclick: () => {
           playThemeSound("confirm");
           githubWorkspace?.hide();
@@ -7493,6 +7595,16 @@ ${contents.path}`});
     const removeControlHelp = installControlHelp(document.body);
     window.addEventListener("pagehide", removeControlHelp, {once:true});
 
+    refreshShellTabs = refresh;
+    // The first time a game opens, offer Lexer's Mod and show where things are.
+    // Downloaded Lexer's Mod modules stay up to date: checked as the game
+    // opens (at most hourly, in the background) as well as on the Mods tab.
+    const startFirstRun = () => {
+      callWindow("lexmod_update", options.plugin.id).catch(() => {});
+      return firstRun(options.plugin.id, options.plugin.name).catch(() => {});
+    };
+    if (window.pywebview?.api) startFirstRun();
+    else window.addEventListener("pywebviewready", startFirstRun, {once: true});
     return {
       header, nav, context, settings, help, info, github, restart, githubWorkspace: () => githubWorkspace,
       save, game, undo, redo, minimize, maximize, close, history, navigationHistory, refresh,
@@ -8960,6 +9072,7 @@ ${contents.path}`});
   };
 
   const bottomSearchChangeTimers = new Map();
+  let typingSearch = null;
   const bottomSearch = options => {
     const key = String(options.key || options.label || "records");
     let composing = false;
@@ -9000,6 +9113,28 @@ ${contents.path}`});
       else apply();
     };
     control.addEventListener("input", change);
+    // A page may rebuild its search box again later than the keystroke - DS1
+    // loads the newly selected record and renders once more - and the restore
+    // above only covers a rebuild inside the keystroke. So the box being typed
+    // in is remembered, and a box built under the same key while that one
+    // has left the page (taking focus with it, to <body>) takes over.
+    const remember = () => { typingSearch = {key, control, start: control.selectionStart,
+      end: control.selectionEnd, direction: control.selectionDirection}; };
+    for (const type of ["input", "keyup", "focus", "select"]) control.addEventListener(type, remember);
+    control.addEventListener("blur", () => {
+      // A blur while still on the page is the reader leaving the box.
+      setTimeout(() => { if (typingSearch?.control === control && control.isConnected) typingSearch = null; }, 0);
+    });
+    queueMicrotask(() => {
+      const last = typingSearch;
+      if (!last || last.key !== key || last.control === control || last.control.isConnected || !control.isConnected) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) return;
+      control.focus({preventScroll: true});
+      if (Number.isInteger(last.start)) control.setSelectionRange(last.start,
+        Number.isInteger(last.end) ? last.end : last.start, last.direction || "none");
+      remember();
+    });
     control.addEventListener("compositionstart", () => {
       composing = true;
       clearTimeout(bottomSearchChangeTimers.get(key));
@@ -9155,22 +9290,61 @@ ${contents.path}`});
     ".lex-dialog-backdrop", ".lex-modal", ".lex-global-settings", ".lex-project-control",
     ".lex-shortcut-panel", ".lex-github-workspace", ".lex-toast-stack", ".lex-data-map",
     ".lex-label-rename", ".lex-help-edit",
+    // Switching, configuring and downloading mods manages the mod library,
+    // which exists whether or not a mod is open for editing.
+    ".lex-mods-page", ".lex-first-run", ".lex-tweak-panel",
     "header", "nav"].join(",");
+  // A control whose value a click changes, as opposed to one a click only
+  // focuses. A number box changes on a click only on its spin arrows.
+  const changesOnPointer = (target, event) => {
+    // Only the value box is reaching for the value. The property's name and
+    // the rest of its row are for reading it, and in Developer Mode for
+    // dragging it; a click there edits nothing, so it asks nothing. A
+    // disabled control takes no pointer events, so a click on it lands on its
+    // box. A switch row is one control from end to end.
+    const own = target?.closest?.("input,select,textarea");
+    const field = own || target?.closest?.(".lex-detail-field-control,.lex-toggle")
+      ?.querySelector("input,select,textarea");
+    if (!field || field.matches(".lex-readonly-field,[type='search']")) return false;
+    // A locked value cannot be typed into, so the click is the only way to
+    // reach for it - except a text area's resize grip, which only reads.
+    if (field.disabled || field.readOnly) {
+      if (!field.matches("textarea") || !event || own !== field) return true;
+      const box = field.getBoundingClientRect();
+      return !(event.clientX > box.right - 18 && event.clientY > box.bottom - 18);
+    }
+    // A switch, a list or a number's spin arrows change on the click itself;
+    // clicking into a live text or number box only focuses it.
+    if (field.matches("select,[type='checkbox'],[type='radio'],[type='range'],[type='color'],[type='file']")) return true;
+    if (!field.matches("[type='number']") || !event || own !== field) return false;
+    const box = field.getBoundingClientRect();
+    return event.clientX > box.right - 20;
+  };
+  // A key that would change a text value: a character, deleting, or a
+  // cut or paste shortcut. Moving the caret, selecting and copying read.
+  const typesIntoValue = event => {
+    if (event.ctrlKey || event.metaKey) return ["v", "x", "z", "y"].includes(String(event.key).toLowerCase());
+    return event.key.length === 1 || ["Backspace", "Delete", "Enter"].includes(event.key);
+  };
   const readonlyProject = () =>
     document.documentElement.getAttribute("data-lex-project-readonly") === "true";
-  const refusesEdit = target => {
+  const refusesEdit = (target, event) => {
     if (!readonlyProject()) return false;
     if (!(target instanceof HTMLElement)) return false;
     const control = target.closest("input,select,textarea,[contenteditable='true']");
     if (!control) return false;
     if (control.matches("[type='search'],[type='button'],[type='submit'],[type='reset']")) return false;
-    return !control.closest(READONLY_EXEMPT);
+    if (control.closest(READONLY_EXEMPT)) return false;
+    // Clicking only focuses a text box: the caret, selection and resize grip
+    // stay usable, and beforeinput refuses the typing itself.
+    if (event?.type === "mousedown" || event?.type === "click") return changesOnPointer(target, event);
+    return true;
   };
   // A locked project refuses every record edit, not only the ones a plugin
   // remembered to disable. Capture phase, so it survives every re-render.
   for (const kind of ["beforeinput", "paste", "drop", "keydown", "mousedown", "click", "change"]) {
     document.addEventListener(kind, event => {
-      if (!refusesEdit(event.target)) return;
+      if (!refusesEdit(event.target, event)) return;
       // Reading a locked project still means moving through it, so navigation
       // keys and copying are left alone.
       if (kind === "keydown" && (event.ctrlKey || event.metaKey || event.key.length > 1)) return;
@@ -10990,19 +11164,22 @@ ${contents.path}`});
   })();
 
   // One panel per tweak mod, drawn from its settings schema. Every game's
-  // Tweaks page uses this: the switch, the fields, the trust prompt and the
-  // "not available yet" badge look and behave the same everywhere.
+  // Tweaks page uses this: the fields, the trust prompt and the "not
+  // available yet" badge look and behave the same everywhere. There is no
+  // switch: a tweak is a mod, and the Mods tab enables it.
   const tweakPanel = (title, help, toggle, body = [], blocker = "") => {
     // A tweak that cannot be switched on yet says so where it stands: what it
     // does in the help bubble, why it is unavailable in the body.
     const heading = blocker
       ? inlineLabel(element("span", {}, title), badge("NOT AVAILABLE YET", {tone: "warning", title: blocker}))
       : title;
-    return detailPanel({title: heading, help, actions: toggle,
+    const panel = detailPanel({title: heading, help, actions: toggle,
       body: [...(blocker ? [detailNote(blocker)] : []), ...body]});
+    panel.classList?.add("lex-tweak-panel");
+    return panel;
   };
   const tweakModPanels = (options = {}) => {
-    const changed = () => options.change?.();
+    const changed = row => options.change?.(row);
     const number = options.number || ((value, min, max, step, onchange, attrs) => element("input", {
       ...attrs, type: "number", value, min, max, step,
       onchange: event => { if (event.target.checkValidity()) onchange(Number(event.target.value)); else event.target.reportValidity(); },
@@ -11015,7 +11192,7 @@ ${contents.path}`});
     });
     const field = (row, item) => {
       const values = row.values, label = item.label || item.key;
-      const set = value => { values[item.key] = value; changed(); };
+      const set = value => { values[item.key] = value; changed(row); };
       let control;
       if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
         "aria-label": label, disabled: !!options.readOnly, onchange: event => set(event.target.checked)});
@@ -11033,10 +11210,10 @@ ${contents.path}`});
       (a.schema?.title || a.name).localeCompare(b.schema?.title || b.name));
     const panels = rows.map(row => {
       const schema = row.schema || {fields: []}, blocker = schema.blocker || "";
-      const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": row.name,
-        disabled: !!options.readOnly || (Boolean(blocker) && !row.enabled),
-        onchange: event => { row.enabled = event.target.checked; changed(); }});
-      toggles.set(row.id, toggle);
+      // A tweak is a mod: the Mods tab switches it. Here it only says
+      // whether it is on, so its settings never read as live when it is off.
+      const toggle = row.enabled ? null
+        : badge("OFF", {title: "Switch this mod on in the Mods tab."});
       const body = [];
       if (row.error) body.push(detailNote(row.error));
       if (row.trust !== "trusted") body.push(detailNote(row.trust === "changed"
@@ -11044,13 +11221,249 @@ ${contents.path}`});
         : "This tweak runs its own script when it builds. Trust it only if you know where it came from."),
       actionRow(element("button", {type: "button", onclick: () => options.trust?.(row, true)}, "Trust this tweak")));
       body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
-      return tweakPanel(schema.title || row.name.toUpperCase(), schema.help, toggle, body, blocker);
+      // A mod's own details pane already names the mod and has its switch.
+      if (options.fieldsOnly) return element("div", {class: "lex-tweak-fields"}, ...(blocker ? [detailNote(blocker)] : []), ...body);
+      const panel = tweakPanel(schema.title || row.name.toUpperCase(), schema.help, toggle, body, blocker);
+      if (!row.enabled) panel.classList?.add("lex-tweak-off");
+      return panel;
     });
     // A tweak another one requires greys out the dependent while it is off.
     const bind = root => bindSettingDependencies(root, rows.flatMap(row =>
       (row.schema?.requires || []).filter(need => toggles.has(need))
         .map(need => ({key: `${need}->${row.id}`, dependency: toggles.get(need), dependent: toggles.get(row.id)}))));
     return {panels, toggles, bind};
+  };
+
+  // --- Mods tab and first run -------------------------------------------
+  // Every game gets the same Mods tab, always leftmost: its library's mods
+  // in a table, the selected one's details and settings beside it, and
+  // Lexer's Mod modules the reader has not downloaded, greyed, at the end.
+  const modsDialog = (title, build) => new Promise(resolve => {
+    const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
+    const dialog = element("section", {class: "lex-dialog lex-mods-dialog", role: "dialog", "aria-modal": "true", "aria-label": title});
+    const close = value => { backdrop.remove(); resolve(value); };
+    dialog.append(element("h2", {}, title), ...build(close));
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+  });
+  const watchDownload = async (pluginId, onProgress) => {
+    for (;;) {
+      const progress = await callWindow("lexmod_download_progress", pluginId);
+      onProgress?.(progress);
+      if (progress.state !== "running") return progress;
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
+  };
+  const progressText = progress => progress.state === "failed" ? progress.error
+    : progress.phase === "install" ? `Installing ${progress.done} of ${progress.total} modules…`
+    : progress.total ? `Downloading… ${Math.round(progress.done / progress.total * 100)}%`
+    : `Downloading… ${(progress.done / 1048576).toFixed(1)} MB`;
+
+  const modsPage = (pluginId, pluginName) => {
+    let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
+    const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
+    const load = async () => { data = await callWindow("mods_overview", pluginId); };
+    const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
+    const keyOf = row => row.path;
+    const replaceRow = fresh => { data.rows = data.rows.map(row => row.path === fresh.path ? fresh : row); };
+    const add = () => modsDialog("Add a mod", close => [
+      element("p", {}, "Create a new mod from this game's starter, or add one you already have."),
+      element("div", {class: "lex-dialog-actions"},
+        element("button", {type: "button", class: "lex-dialog-action", onclick: () => close(null)}, "Cancel"),
+        element("button", {type: "button", class: "lex-dialog-action", disabled: !data?.canManage,
+          title: data?.canManage ? "" : (data?.message || "This game's mod loader cannot add mods yet."),
+          onclick: () => close("folder")}, "Add a folder…"),
+        element("button", {type: "button", class: "lex-dialog-action", disabled: !data?.canManage,
+          onclick: () => close("zip")}, "Add a ZIP…"),
+        element("button", {type: "button", class: "lex-dialog-action primary", onclick: () => close("create")}, "Create a new mod"))
+    ]).then(async choice => {
+      if (!choice) return;
+      try {
+        if (choice === "create") { await createModProject(pluginId, {pluginName}); return; }
+        const picked = await callWindow("choose_mod_package", pluginId, choice);
+        if (!picked || picked.cancelled) return;
+        const inspected = await callWindow("inspect_mod_package", pluginId, picked.source, "", null);
+        const known = inspected.metadata || {};
+        // A mod is stored with its name, author and description; ask for
+        // whatever the package did not say about itself.
+        const named = await askProjectName(pluginName, {details: true, value: known.missing?.length ? "" : known.name,
+          author: known.author, about: known.description, createLabel: "Add",
+          description: "Name the mod. The author and description may stay blank."});
+        if (!named) return;
+        await callWindow("import_mod_package", pluginId, picked.source, named.name, "", null,
+          {...named.details, credits: known.credits || ""});
+        await load(); selected = data.rows.find(row => row.name === named.name)?.path || selected; draw();
+      } catch (error) { failure("Could not add the mod", error); }
+    });
+    const textControl = (row, key, label, multiline) => {
+      const control = element(multiline ? "textarea" : "input", {
+        ...(multiline ? {rows: key === "credits" ? 6 : 3} : {type: "text"}),
+        "aria-label": label, value: row[key] || "", placeholder: key === "name" ? "Required" : "Optional",
+        onchange: async event => {
+          const details = {name: row.name, author: row.author, description: row.description, credits: row.credits,
+            [key]: event.target.value};
+          try { replaceRow(await callWindow("save_mod_details", pluginId, row.path, details)); draw(); }
+          catch (error) { event.target.value = row[key] || ""; failure("Could not save the mod's details", error); }
+        }});
+      if (multiline) control.value = row[key] || "";
+      return control;
+    };
+    const download = async (row, button, note) => {
+      button.disabled = true;
+      try {
+        await callWindow("lexmod_download", pluginId, [row.folder]);
+        const result = await watchDownload(pluginId, progress => { note.textContent = progressText(progress); });
+        if (result.state === "failed") throw new Error(result.error);
+        await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
+      } catch (error) { button.disabled = false; failure("Could not download the module", error); }
+    };
+    const detail = () => {
+      const row = rows().find(item => keyOf(item) === selected);
+      if (!row) return detailPanel({title: "Mods", body: [detailNote(rows().length
+        ? "Select a mod." : "This game has no mods yet. Press + to create one or add one you already have.")]});
+      if (row.remote) {
+        const note = detailNote("");
+        const button = element("button", {type: "button", class: "lex-mods-detail-download", onclick: () => download(row, button, note)}, "Download");
+        return detailPanel({title: row.name, help: "A module of Lexer's Mod that is not in your library yet. Once downloaded it stays up to date.",
+          body: [detailSection({title: "DETAILS", body: [
+            detailField({label: "AUTHOR", control: readonlyField(row.author || "—")}),
+            detailField({label: "DESCRIPTION", control: readonlyField(row.description || "—")})]}),
+            actionRow(button), note]});
+      }
+      const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
+        onchange: async event => {
+          try { replaceRow(await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked)); draw(); }
+          catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
+        }});
+      const sections = [];
+      if (row.script) {
+        const {panels} = tweakModPanels({rows: [{id: row.folder, name: row.name, enabled: row.enabled, ...row.script}],
+          toggle: false, fieldsOnly: true,
+          change: async () => {
+            try { replaceRow(await callWindow("save_mod_settings", pluginId, row.path, row.script.values)); }
+            catch (error) { failure("Could not save the mod's settings", error); await load(); draw(); }
+          },
+          trust: async () => {
+            try { replaceRow(await callWindow("trust_mod", pluginId, row.path, true)); draw(); }
+            catch (error) { failure("Could not trust the mod", error); }
+          }});
+        sections.push(detailSection({title: "SETTINGS", body: panels}));
+      }
+      sections.push(
+        detailSection({title: "DETAILS", body: [
+          detailField({label: "NAME", control: textControl(row, "name", "Name")}),
+          detailField({label: "AUTHOR", control: textControl(row, "author", "Author")}),
+          detailField({label: "DESCRIPTION", control: textControl(row, "description", "Description", true)}),
+          detailField({label: "CREDITS", control: textControl(row, "credits", "Credits", true)})]}),
+        detailSection({title: "SOURCE", body: [
+          detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
+          ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
+          detailField({label: "FOLDER", control: readonlyField(row.path)}),
+          actionRow(element("button", {type: "button", onclick: () => callWindow("open_mod_folder", pluginId, row.path).catch(error => failure("Could not open the folder", error))}, "Open folder"))]}));
+      const notes = [row.error ? detailNote(row.error) : null,
+        row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
+      return detailPanel({title: row.name, actions: [toggle], body: [...notes, ...sections], paginate: {inline: true}});
+    };
+    const draw = () => {
+      if (!main) return;
+      if (!data) { main.replaceChildren(loadingPanel({label: "Loading mods"})); return; }
+      const filtered = rows().filter(row => `${row.name} ${row.author || ""}`.toLowerCase().includes(query.toLowerCase()));
+      if (!filtered.some(row => keyOf(row) === selected)) selected = filtered[0] ? keyOf(filtered[0]) : null;
+      const view = pagedListDetail({className: "lex-mods-page", rows: filtered, key: keyOf, selected, slots: false, noun: "mods",
+        page, pageSize, defaultSplit: 40, minLeft: 260, minRight: 360, splitKey: `${pluginId}-mods`, rowsKey: `${pluginId}-mods`,
+        search: {key: `${pluginId}-mods-search`, value: query, label: "Search mods", change: value => { query = value; page = 0; draw(); }},
+        sync: next => { page = next.page; pageSize = next.pageSize; if (next.selected !== selected) { selected = next.selected; draw(); } },
+        change: next => { page = next.page; pageSize = next.pageSize; draw(); },
+        add, addTitle: "Add a mod",
+        master: ({rows: listed, selected: current, select}) => columnList({
+          // The switch column below replaces the automatic on/off mark.
+          rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
+          select: row => { select(row); selected = keyOf(row); draw(); },
+          columns: [
+            {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.name)},
+            {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
+            {key: "on", label: "On", sortable: false, render: row => row.remote
+              ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,
+                  onclick: event => { event.stopPropagation(); selected = keyOf(row); draw();
+                    const button = document.querySelector(".lex-mods-page .lex-detail-panel .lex-mods-detail-download");
+                    button?.click(); }}, "Download")
+              : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
+                  onclick: event => event.stopPropagation(),
+                  onchange: async event => {
+                    try { replaceRow(await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked)); draw(); }
+                    catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
+                  }})}]}),
+        detail, emptyDetail: () => detail()});
+      main.replaceChildren(view);
+    };
+    return {
+      async show(target) {
+        main = target;
+        draw();
+        try { await load(); } catch (error) { main.replaceChildren(notice({tone: "warning", message: error.message || String(error)})); return; }
+        draw();
+        // Downloaded Lexer's Mod modules stay up to date.
+        callWindow("lexmod_update", pluginId).then(async result => {
+          if (result?.updated && main?.isConnected) { await load(); draw(); }
+        }).catch(() => {});
+      },
+      hide() { main = null; },
+    };
+  };
+
+  const firstRun = async (pluginId, pluginName) => {
+    let status;
+    try { status = await callWindow("onboarding_status", pluginId); } catch (_error) { return; }
+    if (!status?.show) return;
+    const info = await callWindow("lexmod_info", pluginId).catch(() => ({available: false}));
+    const game = status.game || pluginName;
+    const backdrop = element("div", {class: "lex-dialog-backdrop lex-important-backdrop", "data-lex-history-control": true});
+    const dialog = element("section", {class: "lex-dialog lex-first-run", role: "dialog", "aria-modal": "true", "aria-label": `Welcome to ${game}`});
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    const link = (text, action) => element("button", {type: "button", class: "lex-dialog-link lex-inline-link", onclick: action}, text);
+    const step = (title, body, actions) => dialog.replaceChildren(element("h2", {}, title), ...body,
+      element("div", {class: "lex-dialog-actions"}, ...actions));
+    const next = (label, action) => element("button", {type: "button", class: "lex-dialog-action primary", onclick: action}, label);
+    const finish = async () => { backdrop.remove(); await callWindow("finish_onboarding", pluginId).catch(() => {}); };
+    const enjoy = () => step("Please enjoy!", [], [next("Done", finish)]);
+    const tweaks = () => step("Tweaks", [element("p", {}, "You can configure all your mod settings at a glance from the Tweaks tab on the right.")], [next("Next", enjoy)]);
+    const mods = () => step("Mods", [element("p", {}, "You can enable or disable mods from the Mods tab, or add your own from there.")], [next("Next", tweaks)]);
+    const ready = () => step(`Lexer's Mod for ${game} is ready to play!`, [element("p", {},
+      "I hope you enjoy it, and please ", link("contact me", () => callWindow("open_home_link", "twitter")),
+      " with any suggestions you have or bugs you may find!")], [next("Next", mods)]);
+    const downloading = async () => {
+      const bar = element("progress", {max: 1, value: 0, "aria-label": "Download progress"});
+      const text = element("p", {class: "lex-dialog-status", "aria-live": "polite"}, "Starting…");
+      const forward = next("Next", async () => {
+        try { await callWindow("activate_enabled_mods", pluginId); } catch (_error) { /* the Mods tab can still apply them */ }
+        ready();
+      });
+      forward.disabled = true;
+      const back = element("button", {type: "button", class: "lex-dialog-action", onclick: async () => {
+        back.disabled = true;
+        await callWindow("lexmod_download_cancel", pluginId).catch(() => {});
+        decide();
+      }}, "Back");
+      step(`Downloading Lexer's Mod for ${game}`, [bar, text], [back, forward]);
+      try {
+        await callWindow("lexmod_download", pluginId, null);
+        const result = await watchDownload(pluginId, progress => {
+          text.textContent = progressText(progress);
+          if (progress.total) { bar.max = progress.total; bar.value = progress.done; } else bar.removeAttribute("value");
+        });
+        if (result.state === "done") {
+          bar.max = 1; bar.value = 1;
+          text.textContent = `Installed ${result.installed.length} modules.`;
+          forward.disabled = false;
+        } else if (result.state === "failed") text.textContent = result.error;
+      } catch (error) { text.textContent = error.message || String(error); }
+    };
+    const decide = () => step(`Lexer's Mod for ${game}`, [
+      element("p", {}, "Download ", link("my mod", () => callWindow("open_lexmod", pluginId)), " for this game? It has:"),
+      element("ul", {class: "lex-first-run-features"}, ...(info.features || []).map(item => element("li", {}, item)))],
+      [element("button", {type: "button", class: "lex-dialog-action", onclick: mods}, "No thanks"), next("Download", downloading)]);
+    if (info.available && (info.features || []).length) decide(); else mods();
   };
 
 window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};

@@ -84,7 +84,8 @@ def main():
                     assert edited==changes.keys()
                     # The preview reads the live document, unsaved edits included.
                     open_monster(120000); links.first.hover(); preview.wait_for()
-                    assert '321' in preview.inner_text()
+                    # Values are the shared read-only fields: inputs, so read their values.
+                    assert '321' in preview.locator('input').evaluate_all('n=>n.map(x=>x.value)')
                     page.mouse.move(0,0)
                     page.locator('#global-save').click(); page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload(); page.wait_for_selector('body[data-ds1-ready="true"]')

@@ -70,8 +70,19 @@ def plugin_defaults(plugin_file: str | Path) -> dict:
         "can_launch": data.get("canLaunch", True) is not False,
         "mods_load": data.get("modsLoad", False) is True,
         "issue_label": str(data.get("issueLabel", "")),
+        "lexmod": lexmod_repository(data.get("lexmod", "")),
     }
     return defaults
+
+
+def lexmod_repository(value) -> str:
+    """Lexer's Mod for a game, as "Owner/Repository"; "" when there is none."""
+    import re
+    if value in ("", None):
+        return ""
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value):
+        raise ValueError(f"lexmod must be an Owner/Repository name, not {value!r}")
+    return value
 
 
 def install_spec(plugin_file: str | Path, **overrides) -> GameInstallSpec | None:

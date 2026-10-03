@@ -61,7 +61,6 @@ def main() -> int:
             assert loaded["sharedMagicInventory"] is False
             assert loaded["singleGf"] is False
             assert len(loaded["tweaks"]) == 1 and loaded["tweaks"][0]["enabled"] is False
-            assert json.loads(settings.settings_path(project).read_text()) == {"gfSpellbooksEnabled": False}
 
             result = settings.save({"tweaks": {"fixture": {
                 "enabled": True, "values": {"amount": 200},
@@ -81,7 +80,7 @@ def main() -> int:
             sidecar = runtime_layout._metadata_path(archive)
             sidecar.write_text('{"enabled": false, "order": 9999}\n', encoding="utf-8")
 
-            watched = [mod / "mod.json", mod / "settings.json", settings.settings_path(project),
+            watched = [mod / "mod.json", mod / "settings.json",
                        runtime_config.path(project), generated[0], sidecar]
             before = {path: path.read_bytes() for path in watched}
             for invalid in (
@@ -104,7 +103,7 @@ def main() -> int:
             # output, not merely restore settings JSON.
             real_atomic = settings._atomic_text
             def fail_settings(target, text):
-                if target == settings.settings_path(project):
+                if target == runtime_config.path(project):
                     raise OSError("injected settings failure")
                 return real_atomic(target, text)
             with patch.object(settings, "_atomic_text", side_effect=fail_settings):

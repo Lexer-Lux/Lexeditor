@@ -171,10 +171,11 @@ async function attackPreview(id){
     error=>{attackPreviews.delete(id);throw error;}));
   const row=await attackPreviews.get(id);
   const users=row.impact.variants.length;
-  return el("div",{class:"ds1-attack-preview"},el("strong",{},`${row.name} #${row.id}`),
-    el("dl",{},...row.fields.flatMap(field=>[el("dt",{},field.label),
-      el("dd",{},field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))])),
-    el("p",{},users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
+  // The shared label-and-value rows, read-only: a preview is a small panel.
+  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},`${row.name} #${row.id}`),
+    ...row.fields.map(field=>detailField({label:field.label,control:readonlyField(
+      field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))})),
+    LexeditorUI.detailText(users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
 }
 function monsterAttacksSection(){
   const links=state.monsterAttacks;
@@ -197,9 +198,13 @@ function monsterDetail(groups){
 }
 function detail(){
   const impact=state.row?.impact;
-  const title=state.tab==="attacks"?(impact?.variants.length>1?"Shared attack damage":impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Monster":"Properties";
-  if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
-  if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  // A record's heading is its name, on every tab. An attack's sharing is
+  // said under it, never in its place.
+  const noun=state.tab==="attacks"?"Attack":state.tab==="enemies"?"Monster":"Item";
+  if(!state.row)return detailPanel({title:noun,body:[LexeditorUI.detailNote("Select a record.")]});
+  if(key(state.row)!==state.selected)return detailPanel({title:noun,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  const title=state.row.name;
+  const meta=state.tab==="attacks"&&impact?(impact.variants.length>1?"Shared attack damage":impact.variants.length===0?"Unresolved attack ownership":"Attack damage"):"";
   const groups=fieldSections(state.row);
   if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,body:[monsterDetail(groups)]});
   let help;
@@ -212,13 +217,13 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  return detailPanel({title,help,paginate:{inline:true},
+  return detailPanel({title,meta,help,
     body:[...groups].map(([title,body])=>detailSection({title,body}))});
 }
 function renderItems(){
   const noun=state.tab==="attacks"?"attacks":state.tab==="enemies"?"monsters":"items";
   const label=state.tab==="attacks"?"Attacks":state.tab==="enemies"?"Enemies":"Items";
-  const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,noun,
+  const view=pagedListDetail({rows:sortedRows(),key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     sync:next=>{
@@ -234,7 +239,7 @@ function renderItems(){
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
-  return el("div",{class:"ds1-items"},subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
+  return LexeditorUI.stack(subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";

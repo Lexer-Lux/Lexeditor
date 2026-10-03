@@ -837,7 +837,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-project-source-status.enabled { color:#59d66f; }
 .lex-project-source-status.disabled { color:#ef5d61; }
 .lex-project-menu-action:hover { background: var(--lex-panel-2); }
-.lex-project-dialog input { width: 100%; box-sizing: border-box; }
+/* Every box in the dialog spans it; the description is several lines tall,
+   because it holds a paragraph, and only grows downward. */
+.lex-project-dialog :is(input,textarea) { width: 100%; box-sizing: border-box; }
+.lex-project-dialog textarea { min-height: 7em; resize: vertical; }
 
 @media (max-width: 1100px) {
   .lex-project-select {
@@ -1104,7 +1107,18 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 
 /* The lock sits inside the value box, right-aligned and the normal way up.
    It used to live in the vertical type rail, which is why it was rotated. */
+/* A property the developer hid is gone for every reader, unless they asked to
+   see hidden properties; then it stays, dimmed. Holding the right button on
+   one fills it with the accent while the hold counts. */
+.lex-property-hidden:is(:root:not([data-lex-show-hidden="true"]) *) { display:none; }
+:root[data-lex-show-hidden="true"] .lex-property-hidden { opacity:.45; }
+.lex-property-holding { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent));
+  background-repeat:no-repeat; animation:lex-property-hold .7s linear forwards; }
+@keyframes lex-property-hold { from { background-size:0 100%; } to { background-size:100% 100%; } }
 .lex-has-readonly-lock { position:relative; }
+/* A locked list cannot open, so its arrow would only promise a menu - and it
+   sat under the lock. The lock takes its place. */
+.lex-has-readonly-lock select:disabled { appearance:none; -webkit-appearance:none; }
 .lex-detail-field-control.lex-has-readonly-lock { --lex-readonly-lock-inset:10px; }
 /* A nameless field gives its name lane to the control - unless the lane holds
    the field's help, which would otherwise vanish with it. */
@@ -8446,3 +8460,14 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 
 /* A linked record's hover card holds a few short values, not a paragraph. */
 .lex-help-popover.lex-hover-preview { width:max-content; max-width:min(360px,calc(100vw - 24px)); }
+
+/* Mods tab: Lexer's Mod modules not downloaded yet sit greyed at the end. */
+.lex-mods-remote { opacity: .55; }
+.lex-mods-download { padding: 2px 10px; }
+.lex-first-run { max-width: 560px; }
+.lex-first-run progress { width: 100%; height: 14px; }
+.lex-first-run-features { display: table; margin: .4em auto 0; padding-left: 1.3em; text-align: left; }
+.lex-first-run-features li { margin: .2em 0; }
+.lex-inline-link { display: inline; margin: 0; }
+/* A tweak whose mod is off: its settings wait, readable but not live. */
+.lex-tweak-off .lex-detail-panel-body { opacity: .6; }

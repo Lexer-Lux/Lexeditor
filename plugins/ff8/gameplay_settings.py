@@ -1,19 +1,20 @@
-"""FF8 gameplay tweaks: library tweak mods plus the project's own runtime data.
+"""FF8 gameplay tweaks: library tweak mods plus the runtime files they switch.
 
 Every gameplay tweak is a tweak mod in the mod library (plugins/ff8/
-tweak_mods.py builds them). What stays here is what is not a tweak:
+tweak_mods.py builds them), including Shared Party Magic Inventory and GF
+Spellbooks: enabling the mod is the switch. What stays here is what a mod's
+own files cannot carry:
 
-- the project's data features that the editor itself authors: Shared Party
-  Magic Inventory (direct/lexeditor/gameplay.toml) and GF Spellbooks;
-- the Lexeditor FFNx derivative those features and several tweaks run on,
-  and the FFNx.toml keys enabled tweaks ask for;
+- direct/lexeditor/gameplay.toml, which combines Shared Party Magic
+  Inventory with Max Spell's cap;
+- the Lexeditor FFNx derivative several tweaks run on, and the FFNx.toml
+  keys enabled tweaks ask for;
 - the one transaction that applies all of that, then composes the runtime.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
 import re
 import time
@@ -29,6 +30,10 @@ from .ffnx_issue_51 import runtime_config as shared_magic_runtime_config
 
 DEFAULT_SHARED_MAGIC_INVENTORY = False
 DEFAULT_MAX_SPELL = 100
+# Tweak mods other features of the editor ask about.
+SHARED_MAGIC_MOD = "shared-party-magic-inventory"
+SPELLBOOKS_MOD = "gf-spellbooks"
+SINGLE_GF_MOD = "monogamy"
 DEFAULT_CAMERA_SPEED = 1.0
 SUPPORTED_EXE_SHA256 = tweak_mods.SUPPORTED_EXE_SHA256
 # The single combined patch every gameplay tweak used to share. Saving
@@ -73,10 +78,6 @@ def _boolean(value, label: str) -> bool:
     return value
 
 
-def settings_path(project_root: Path | None = None) -> Path:
-    return (project_root or paths.PROJECT_ROOT) / "lexeditor-settings.json"
-
-
 def patch_path(project_root: Path | None = None) -> Path:
     """Where the retired combined patch lived, so saving can remove it."""
     return (project_root or paths.PROJECT_ROOT) / "hext" / FFNX_HEXT_SUFFIX / PATCH_NAME
@@ -112,18 +113,18 @@ def _mods_root(project: Path) -> Path:
     return private if private.is_dir() else paths.MODS_ROOT
 
 
-def _shared_magic_payload(project: Path, game: Path,
+def _shared_magic_payload(project: Path, game: Path, enabled: bool,
                           runtime_root: Path | None = None) -> dict:
     runtime_direct = _runtime_root(runtime_root, project) / "direct"
     runtime = ffnx_manager.status(
         game, ffnx_manager.STATE_PATH, direct_root=runtime_direct,
     )
     try:
-        configured = shared_magic_runtime_config.load(project)["sharedMagicInventory"]
+        shared_magic_runtime_config.load(project)
         config_error = ""
     except shared_magic_runtime_config.RuntimeConfigError as error:
-        configured = False
         config_error = str(error)
+    configured = enabled
     # A verified package makes the request selectable. Launch then installs
     # and verifies that package before FF8 starts.
     package_available = bool(runtime.get("sharedMagicInventoryPackageAvailable"))
@@ -159,14 +160,6 @@ def _validate_shared_magic_launch(project: Path, game: Path,
     return enabled
 
 
-def _stored(project: Path) -> dict:
-    try:
-        data = json.loads(settings_path(project).read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
 def _tweak_payload(project: Path, game: Path) -> list[dict]:
     """Every tweak mod as the Tweaks page shows it; trusted ones may describe more."""
     rows = []
@@ -192,10 +185,10 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     enabled = {row["id"] for row in tweaks if row["enabled"]}
     return {
         "tweaks": tweaks,
-        "gfSpellbooksEnabled": _stored(project).get("gfSpellbooksEnabled", False) is True,
         # Features outside the library ask whether these tweak mods are on.
-        "singleGf": "monogamy" in enabled,
-        **_shared_magic_payload(project, game, runtime_root),
+        "gfSpellbooksEnabled": SPELLBOOKS_MOD in enabled,
+        "singleGf": SINGLE_GF_MOD in enabled,
+        **_shared_magic_payload(project, game, SHARED_MAGIC_MOD in enabled, runtime_root),
     }
 
 
@@ -254,9 +247,9 @@ def _restore_files(snapshots: list[tuple[Path, bool, bytes]]) -> None:
 
 
 def initialize_project(project_root: Path) -> None:
-    """A new mod starts with no project-owned gameplay features switched on."""
+    """A new mod starts with the runtime file sharing reads, sharing off until
+    the first save writes what the enabled tweak mods ask for."""
     project = project_root.resolve()
-    _atomic_text(settings_path(project), json.dumps({"gfSpellbooksEnabled": False}, indent=2) + "\n")
     shared_magic_runtime_config.write(
         project, shared_magic_inventory=DEFAULT_SHARED_MAGIC_INVENTORY,
         magic_stock_limit=DEFAULT_MAX_SPELL,
@@ -291,10 +284,11 @@ def save(data: dict, game_root: Path | None = None,
     mods_root = _mods_root(project)
     if not isinstance(data, dict):
         raise ValueError("Settings must be an object")
-    spellbooks = _boolean(data.get("gfSpellbooksEnabled", _stored(project).get("gfSpellbooksEnabled", False)),
-                          "GF Spellbooks")
-    current_shared = _shared_magic_payload(project, game, runtime_root)["sharedMagicInventory"]
-    shared_magic = _boolean(data.get("sharedMagicInventory", current_shared), "Shared Party Magic Inventory")
+    # GF Spellbooks and Shared Party Magic Inventory were switches here; they
+    # are tweak mods now, so an old request for them must not pass silently.
+    if set(data) - {"tweaks"}:
+        raise ValueError(f"Unknown settings: {', '.join(sorted(set(data) - {'tweaks'}))}. "
+                         "Every gameplay switch is a tweak mod; enable it in the Mods tab.")
     catalog = runtime_layout.catalog(project, mods_root)
     tweak_rows = {row["id"]: row for row in tweak_mods.tweak_rows(project, mods_root)}
     enabled_changes, value_changes = _tweak_changes(data, tweak_rows)
@@ -303,7 +297,7 @@ def save(data: dict, game_root: Path | None = None,
 
     changed_files = [
         patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project),
-        settings_path(project), shared_magic_runtime_config.path(project),
+        shared_magic_runtime_config.path(project),
         *(runtime_layout._metadata_path(Path(row["path"])) for row in catalog if not row["selected"]),
         *(Path(tweak_rows[mod_id]["path"]) / script_mods.VALUES_FILE for mod_id in value_changes),
     ]
@@ -321,10 +315,9 @@ def save(data: dict, game_root: Path | None = None,
         built = tweak_mods.build_enabled(project, mods_root, game, paths.BASELINE_ROOT)
         for old_patch in (patch_path(project), legacy_patch_path(project), obsolete_english_patch_path(project)):
             old_patch.unlink(missing_ok=True)
-        # Every other switch that used to live here is a tweak mod now.
-        _atomic_text(settings_path(project), json.dumps(
-            {"gfSpellbooksEnabled": spellbooks}, indent=2, sort_keys=True) + "\n")
+        # Every switch that used to live here is a tweak mod now.
         enabled_now = {row["id"]: row for row in tweak_mods.tweak_rows(project, mods_root) if row["enabled"]}
+        shared_magic = SHARED_MAGIC_MOD in enabled_now
         stock_limit = (enabled_now["max-spell"]["values"]["limit"]
                        if "max-spell" in enabled_now else DEFAULT_MAX_SPELL)
         _atomic_text(shared_magic_runtime_config.path(project), shared_magic_runtime_config.build(

@@ -202,6 +202,9 @@ class GamePlugin:
     # reads it since the developer page moved to the Mod Loader issue's status.
     mods_load: bool = False
     managed_mod: object | None = None
+    # Lexer's Mod for this game: "Owner/Repository" on GitHub, or "" when the
+    # game has none. A Lexmod is a collection of modules, each one a mod.
+    lexmod: str = ""
     # Trusted, persistent boolean tweak callbacks for shared bundled components.
     # Keys are stable IDs referenced by mod.json; packages never supply code.
     bundled_tweaks: dict | None = None

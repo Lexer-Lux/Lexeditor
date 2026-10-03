@@ -17,7 +17,9 @@ def test_heading_scrolls_away_and_gutters_match(page):
       main.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;height:500px';
       const fields = n => Array.from({length: n}, (_, i) => U.detailField({label: 'Field ' + i,
         control: U.el('input', {type: 'number', value: i})}));
-      main.append(U.detailPanel({title: 'Long record', attrs: {id: 'long'},
+      // Sections flow into paged columns by default; a panel that opts out
+      // of that flow is the one that scrolls, heading and all.
+      main.append(U.detailPanel({title: 'Long record', attrs: {id: 'long'}, paginate: false,
         body: [U.detailSection({title: 'DATA', body: fields(30)})]}));
       main.append(U.detailPanel({title: 'Tabbed record', attrs: {id: 'tabbed'},
         body: [U.tabbedPanel({tabs: [{id: 'a', label: 'A'}, {id: 'b', label: 'B'}], active: 'a',

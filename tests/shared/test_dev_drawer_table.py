@@ -69,7 +69,7 @@ def test_drawer_mounts_one_shared_table_with_per_game_rows():
                 headers = table.locator('[role="columnheader"]').all_inner_texts()
                 assert [h.strip().upper() for h in headers] == [
                     "GAME", "EDITOR", "UX", "MODLOADER", "THEME", "RESHADE",
-                    "", "", "", "", "✕", "QUOTES", "COPIED LINES"]
+                    "", "", "", "", "✕", "LEXMOD?", "QUOTES", "COPIED LINES"]
                 assert page.locator("#lexer-dev-table .lex-column-list").count() == 1
                 assert table.locator('.lex-column-list-row').count() == 3
                 first = table.locator('.lex-column-list-row').first

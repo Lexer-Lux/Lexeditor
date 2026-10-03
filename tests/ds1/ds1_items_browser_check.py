@@ -78,7 +78,7 @@ def main():
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     page.locator('[data-subtab="weapons"]').click()
                     page.wait_for_timeout(500)
-                    assert page.locator('.ds1-records').is_visible()
+                    assert page.locator('#main > .lex-stack .lex-column-list').first.is_visible()
                     expected = set(page.evaluate('state.row.fields.filter(f=>f.editable).map(f=>f.key)'))
                     seen = set()
                     for _ in range(30):
