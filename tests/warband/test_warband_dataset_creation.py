@@ -2,6 +2,11 @@
 import os
 from pathlib import Path
 import sys
+import json
+import threading
+from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -13,8 +18,37 @@ from plugins.warband import server
 from plugins.warband.module_records import SCHEMAS, create_dataset_record, dataset_data, save_dataset
 
 
+@pytest.fixture
+def record_service(tmp_path, monkeypatch):
+    """Exercise the production routes against isolated Module System files."""
+    monkeypatch.setattr(server, "MODULE_SYSTEM", tmp_path)
+    monkeypatch.setattr(server, "CREATED_LEDGER", tmp_path / ".lexeditor-created.json")
+    monkeypatch.setenv("LEXEDITOR_MOD_READ_ONLY", "0")
+    monkeypatch.setenv("LEXEDITOR_NO_MOD", "0")
+    service = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    worker = threading.Thread(target=service.serve_forever, daemon=True)
+    worker.start()
+
+    def request(path, body=None):
+        url = f"http://127.0.0.1:{service.server_port}/api/module-records{path}"
+        payload = None if body is None else json.dumps(body).encode("utf-8")
+        req = Request(url, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urlopen(req, timeout=5) as response:
+                return response.status, json.load(response)
+        except HTTPError as error:
+            return error.code, json.load(error)
+
+    try:
+        yield request
+    finally:
+        service.shutdown()
+        service.server_close()
+        worker.join(timeout=5)
+
+
 @pytest.mark.parametrize("dataset", list(SCHEMAS))
-def test_each_dataset_copies_template_then_saves_and_reloads(tmp_path, dataset):
+def test_each_dataset_copies_template_then_saves_and_reloads(tmp_path, dataset, record_service):
     schema = SCHEMAS[dataset]
     path = tmp_path / schema["filename"]
     path.write_text(fixtures.FIXTURES[path.name], encoding="utf-8")
@@ -29,20 +63,27 @@ def test_each_dataset_copies_template_then_saves_and_reloads(tmp_path, dataset):
         (0, template["id"], "invalid id", before["sha256"]),
         (0, template["id"], "copied_record", "stale"),
     ]:
-        with pytest.raises(ValueError):
-            create_dataset_record(tmp_path, dataset, digest, index, old_id, new_id)
+        status, rejected = record_service("/create", {"dataset": dataset, "sha256": digest,
+            "recordIndex": index, "originalId": old_id, "id": new_id})
+        assert status == 400 and rejected["error"]
         assert path.read_bytes() == original
         assert not path.with_name(path.name + ".lexeditor.bak").exists()
-    result = create_dataset_record(tmp_path, dataset, before["sha256"], 0, template["id"], "copied_record")
-    after = dataset_data(tmp_path, dataset)
+        assert server.created_ids(dataset) == set()
+    status, result = record_service("/create", {"dataset": dataset, "sha256": before["sha256"],
+        "recordIndex": 0, "originalId": template["id"], "id": "copied_record"})
+    assert status == 200
+    status, after = record_service("?dataset=" + dataset)
+    assert status == 200
     # A protected field's AST error includes a process-local object address.
     # Its diagnostic keys and every source/value field must stay unchanged.
     for old, current in zip(before["rows"], after["rows"][:-1]):
-        assert {k: v for k, v in current.items() if k != "fieldProblems"} == {
+        assert not current.get("created", False)
+        assert {k: v for k, v in current.items() if k not in {"fieldProblems", "created"}} == {
             k: v for k, v in old.items() if k != "fieldProblems"}
         assert set(current.get("fieldProblems", {})) == set(old.get("fieldProblems", {}))
     assert result["recordIndex"] == len(before["rows"])
     assert after["rows"][-1]["fields"] == {**template["fields"], "id": "copied_record"}
+    assert after["rows"][-1]["created"]
     assert Path(result["backup"]).read_bytes() == original
     compile(path.read_bytes(), str(path), "exec")
     # This copy remains a normal editable record, including opaque expressions.
@@ -54,9 +95,22 @@ def test_each_dataset_copies_template_then_saves_and_reloads(tmp_path, dataset):
         value = 1
     else:
         value = f"({value})"
-    save_dataset(tmp_path, dataset, after["sha256"], [{"recordIndex": result["recordIndex"],
-        "originalId": "copied_record", "fields": {spec["key"]: value}}])
-    assert dataset_data(tmp_path, dataset)["rows"][-1]["fields"][spec["key"]] == value
+    created_source = path.read_bytes()
+    status, saved = record_service("/save", {"dataset": dataset, "sha256": after["sha256"],
+        "edits": [{"recordIndex": result["recordIndex"], "originalId": "copied_record",
+            "fields": {spec["key"]: value}}]})
+    assert status == 200, saved
+    status, reopened = record_service("?dataset=" + dataset)
+    assert status == 200
+    assert reopened["rows"][-1]["fields"][spec["key"]] == value
+    assert reopened["rows"][-1]["created"]
+    assert Path(result["backup"]).read_bytes() == created_source
+    saved_source = path.read_bytes()
+    status, rejected = record_service("/create", {"dataset": dataset, "sha256": reopened["sha256"],
+        "recordIndex": 0, "originalId": template["id"], "id": "copied_record"})
+    assert status == 400 and "already exists" in rejected["error"]
+    assert path.read_bytes() == saved_source
+    assert server.created_ids(dataset) == {"copied_record"}
 
 
 @pytest.mark.parametrize("dataset", ["skills", "quests"])
