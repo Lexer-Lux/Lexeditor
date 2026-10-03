@@ -8,7 +8,10 @@ const html = ['core.js','crafting.js','tweaks.js'].map(name=>fs.readFileSync(pat
 const stateSource = html.slice(html.indexOf('const state = {'), html.indexOf('\n};', html.indexOf('const state = {')) + 3);
 const globalSave = html.slice(html.indexOf('async function saveAllChanges()'), html.indexOf('\nfunction savebar('));
 const catalogSave = html.slice(html.indexOf('async function saveCatalog()'), html.indexOf('// ----- GameplayTweaks settings -----'));
-async function run(fail) {
+const items = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/items.js'), 'utf8');
+const integerValidation = items.slice(items.indexOf('function catalogQuantityIsValid('), items.indexOf('function catalogQuantityInput('));
+const draftValidation = items.slice(items.indexOf('function validateCatalogQuantityDrafts('), items.indexOf('function purchaseQuantityCell('));
+async function run(fail, invalid=false) {
   const calls = [], messages = [], errors = [];
   let saved = { available: true, vanilla: {CONSUMABLE_RUM: 0.17, CONSUMABLE_MOONSHINE: 0.3}, overrides: {CONSUMABLE_MOONSHINE: 1} };
   const context = vm.createContext({
@@ -30,9 +33,18 @@ async function run(fail) {
       throw new Error('Unexpected save endpoint: ' + url);
     }
   });
-  vm.runInContext(stateSource + '\n' + globalSave + '\n' + catalogSave, context);
+  vm.runInContext(stateSource + '\n' + integerValidation + '\n' + draftValidation + '\n' + globalSave + '\n' + catalogSave, context);
   vm.runInContext("state.ds='mine';state.catalog={items:[],effects:[]};state.alcoholEdits={CONSUMABLE_RUM:0.23};", context);
+  if(invalid)vm.runInContext("state.yieldEdits={'fixture': '1.5'}",context);
   await context.saveAllChanges();
+  if(invalid){
+    assert.equal(calls.length,0,'invalid catalog drafts must block unrelated pending writers');
+    assert.equal(vm.runInContext("state.yieldEdits.fixture",context),'1.5');
+    assert.equal(vm.runInContext("state.alcoholEdits.CONSUMABLE_RUM",context),0.23);
+    assert(errors.some(message=>message.includes('whole quantity')));
+    assert(!messages.includes('All changes saved to mod files'));
+    return;
+  }
   const posts = calls.filter(row => row.url === '/api/alcohol-strengths/save');
   assert.equal(posts.length, 1, 'header Save must dispatch alcohol-only edits');
   assert.deepEqual(posts[0].body, {entries: {CONSUMABLE_RUM: 0.23}}, 'never send unrelated drinks');
@@ -52,4 +64,5 @@ async function run(fail) {
 (async () => {
   await run(false); console.log('PASS: header Save dispatches an alcohol-only sparse edit');
   await run(true); console.log('PASS: rejected alcohol save preserves edits and cannot report success');
+  await run(false,true); console.log('PASS: invalid catalog drafts block alcohol and all other writers');
 })().catch(error => {console.error(error);process.exitCode = 1;});
