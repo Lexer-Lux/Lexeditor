@@ -4839,17 +4839,32 @@
     shortcutPanel?.remove();
     shortcutPanel = null;
   };
-  const openShortcutPanel = developerMode => {
+  // What Developer Mode adds with the mouse. Every change here is shipped
+  // to everyone, and Ctrl+Z takes it back. Right-click the shortcuts button
+  // for this list.
+  const DEVELOPER_GESTURES = [
+    {id: "rename-property", keys: ["Double-click", "property name"], label: "Rename the property"},
+    {id: "rename-section", keys: ["Double-click", "section heading"], label: "Rename the section"},
+    {id: "edit-help", keys: ["Double-click", "?"], label: "Edit the help bubble's text"},
+    {id: "move-property", keys: ["Drag", "property row"], label: "Move the property, within or between sections"},
+    {id: "hide-property", keys: ["Hold right", "property"], label: "Hide it for readers without Show hidden properties; again to show it"},
+    {id: "add-section", keys: ["Hold right", "section heading"], label: "Add a new section below it; on an empty added section, remove it"},
+    {id: "save-view", keys: ["Hold right", "page tab or subtab"], label: "Save the page's view as the shipped default"},
+    {id: "undo-layout", keys: ["Ctrl", "Z"], label: "Undo any of these"},
+  ];
+  const openShortcutPanel = (developerMode, gestures = false) => {
     if (shortcutPanel) { closeShortcutPanel(); return; }
-    const rows = SHORTCUTS.filter(entry => !entry.developer || developerMode).map(entry =>
+    const list = gestures ? DEVELOPER_GESTURES : SHORTCUTS.filter(entry => !entry.developer || developerMode);
+    const title = gestures ? "Developer Mode gestures" : "Keyboard shortcuts";
+    const rows = list.map(entry =>
       element("div", {class: "lex-shortcut-row", "data-lex-shortcut": entry.id},
         element("span", {class: "lex-shortcut-keys"},
           ...entry.keys.map(key => element("kbd", {}, key))),
         element("span", {class: "lex-shortcut-label"}, entry.label)));
     const dialog = element("section", {
       class: "lex-dialog lex-shortcut-panel", role: "dialog", "aria-modal": "false",
-      "aria-label": "Keyboard shortcuts",
-    }, element("h2", {}, "Keyboard shortcuts"), ...rows);
+      "aria-label": title,
+    }, element("h2", {}, title), ...rows);
     shortcutPanel = element("div", {
       class: "lex-dialog-backdrop lex-shortcut-backdrop",
       onclick: closeShortcutPanel,
@@ -6712,7 +6727,7 @@ ${contents.path}`});
       const section = node.closest(".lex-detail-section");
       const name = section?.dataset.lexLayoutSection || "properties";
       const index = [...groups.values()].filter(group => group.name === name).length;
-      const group = {id: `${name}:${index}`, name, node};
+      const group = {id: `${name}:${index}`, name, node, custom: section?.dataset.lexCustomSection === "true"};
       groups.set(node, group);
       return group;
     };
@@ -6747,10 +6762,63 @@ ${contents.path}`});
   const capturePropertyLayout = state => ({
     ...Object.fromEntries([...state.groups.values()].map(group =>
       [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))])),
-    hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id)});
+    hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id),
+    sections: (state.custom || []).map(spec => ({...spec}))});
+  // A section the developer added: a heading and an empty body that
+  // properties are dragged into. It belongs to the layout, after the section
+  // it was added below, and its title is the layout's, not a shipped label.
+  const customSectionNode = (state, spec) => {
+    const text = element("span", {class: "lex-detail-section-title-text"}, spec.title);
+    text.addEventListener("dblclick", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      renameValue(text, {value: spec.title, label: "this section", commit: typed => {
+        const before = capturePropertyLayout(state);
+        spec.title = typed;
+        const after = capturePropertyLayout(state);
+        const apply = layout => storePropertyLayout(state, layout);
+        labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+        void apply(after);
+      }});
+    });
+    const section = detailSection({title: text, body: []});
+    section.dataset.lexLayoutSection = spec.id;
+    section.dataset.lexCustomSection = "true";
+    return section;
+  };
+  const placeCustomSections = (state, specs) => {
+    state.custom = (Array.isArray(specs) ? specs : []).filter(spec => spec && typeof spec.id === "string")
+      .map(spec => ({id: spec.id, title: String(spec.title || "New section"), after: String(spec.after || "")}));
+    const wanted = new Set(state.custom.map(spec => `${spec.id}:0`));
+    for (const [node, group] of [...state.groups]) {
+      if (!group.custom || wanted.has(group.id)) continue;
+      // A removed section gives its properties back to where they came from.
+      const home = [...state.groups.values()].find(other => !other.custom);
+      for (const field of [...node.children]) if (state.fields.has(field)) home?.node.append(field);
+      node.closest(".lex-detail-section")?.remove();
+      state.groups.delete(node);
+    }
+    for (const spec of state.custom) {
+      const id = `${spec.id}:0`;
+      const existing = [...state.groups.values()].find(group => group.id === id);
+      if (existing) {
+        const text = existing.node.closest(".lex-detail-section")?.querySelector(".lex-detail-section-title-text");
+        if (text && text.textContent !== spec.title) text.textContent = spec.title;
+        continue;
+      }
+      const section = customSectionNode(state, spec);
+      const anchor = [...state.groups.values()].find(group => group.id === spec.after)?.node.closest(".lex-detail-section");
+      if (anchor) anchor.after(section);
+      else (state.root.querySelector(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body") || state.root).append(section);
+      const node = section.querySelector(".lex-detail-section-content") || section;
+      state.groups.set(node, {id, name: spec.id, node, anchors: [], custom: true});
+    }
+  };
   const applyPropertyLayout = (state, layout) => {
     if (!layout || typeof layout !== "object") return;
     const byId = new Map([...state.fields].map(([field, id]) => [id, field]));
+    placeCustomSections(state, layout.sections);
     const hidden = new Set(Array.isArray(layout.hidden) ? layout.hidden : []);
     for (const [field, id] of state.fields) field.classList.toggle("lex-property-hidden", hidden.has(id));
     const used = new Set();
@@ -6805,6 +6873,36 @@ ${contents.path}`});
       const name = field.querySelector(".lex-detail-field-label-text")?.textContent || "This property";
       showToast(field.classList.contains("lex-property-hidden")
         ? `${name} is hidden for everyone without Show hidden properties.` : `${name} is shown again.`);
+    }, 700);
+  }, true);
+  document.addEventListener("pointerdown", event => {
+    if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    const section = heading?.closest(".lex-detail-section");
+    const root = section && (section.closest(".lex-detail-panel") || section);
+    if (!root || event.target.closest(".lex-detail-field")) return;
+    clearTimeout(hideTimer);
+    heading.classList.add("lex-property-holding");
+    hideTimer = setTimeout(() => {
+      heading.classList.remove("lex-property-holding");
+      const fieldInside = root.querySelector(".lex-detail-field[data-lex-layout-field]");
+      if (!fieldInside) return;
+      const state = preparePropertyLayout(propertyRoot(fieldInside));
+      hideHeld = true;
+      const before = capturePropertyLayout(state);
+      const group = [...state.groups.values()].find(entry => entry.node.closest(".lex-detail-section") === section);
+      const holdsFields = group && [...group.node.children].some(node => state.fields.has(node));
+      let specs = [...(state.custom || [])];
+      if (group?.custom && !holdsFields) specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+      else specs.push({id: `custom-${Date.now().toString(36)}`, title: "New section", after: group?.id || ""});
+      placeCustomSections(state, specs);
+      const after = capturePropertyLayout(state);
+      const apply = layout => storePropertyLayout(state, layout);
+      labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+      void apply(after);
+      showToast(specs.length > (before.sections || []).length
+        ? "Added a section. Double-click its heading to name it, and drag properties into it."
+        : "Removed the empty section.");
     }, 700);
   }, true);
   for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
@@ -7177,6 +7275,11 @@ ${contents.path}`});
       id: "lexeditor-shortcuts", class: "lex-settings-button", title: "Keyboard shortcuts",
       "aria-label": "Show keyboard shortcuts", "data-lex-history-control": true,
       onclick: () => openShortcutPanel(!!sharedSettingsSnapshot?.developerMode),
+      oncontextmenu: event => {
+        if (!sharedSettingsSnapshot?.developerMode) return;
+        event.preventDefault();
+        openShortcutPanel(true, true);
+      },
     }, keyboardIcon());
     const settings = element("button", {
       id: "lexeditor-settings", class: "lex-settings-button", title: "Lexeditor settings",
