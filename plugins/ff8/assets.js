@@ -166,19 +166,21 @@
     if(['effect','surface'].includes(row.modelKind)){
       const meshes=(row.effectMeshes||[]).filter(mesh=>mesh.triangles||mesh.quads);
       if(!meshes.length)return null;
+      let viewer=null;
       return {label:`${row.name} geometry`,openLabel:`Open the ${row.name} geometry`,closeLabel:`Close the ${row.name} geometry`,
         content:()=>{
           const host=el('div',{style:'display:contents'});
           const frames=el('div',{style:'display:contents'});
           let selected=meshes[0].id;
-          const draw=frame=>{const sprite=meshes.find(mesh=>String(mesh.id)===String(selected))?.kind==='sprite';host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:sprite?{yaw:0,pitch:0}:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}}));};
+          const draw=frame=>{const sprite=meshes.find(mesh=>String(mesh.id)===String(selected))?.kind==='sprite';viewer?.lexDispose?.();viewer=FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:sprite?{yaw:0,pitch:0}:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}});host.replaceChildren(viewer);};
           const show=id=>{selected=id;frames.replaceChildren();const mesh=meshes.find(mesh=>String(mesh.id)===String(id));
             if(mesh.frameCount>1){const control=selectControl(0,Array.from({length:mesh.frameCount},(_,i)=>({value:i,name:`Frame ${i+1}`})),draw);control.setAttribute('aria-label','Surface frame');frames.append(detailField({label:'FRAME',control}));}draw(0);};
           const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:mesh.kind==='sprite'?`Sprite ${mesh.id} · ${mesh.frameCount} frames`:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
           control.setAttribute('aria-label','Summon mesh object');show(meshes[0].id);
           return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp(row.modelKind==='surface'?'Select an object and frame to inspect its shape. The effect\'s placement and timing are not shown. Surfaces without matching textures stay plain.':'Each object is shown separately, with textures from its first simulated appearance when known. Animation and placement within the summon are not shown. Morph targets have vertices but no standalone surface.')}),frames,host);
-        },onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
+        },onClose:drawer=>{viewer?.lexDispose?.();viewer=null;drawer.replaceChildren();}};
     }
+    let viewer=null;
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
@@ -187,13 +189,13 @@
         let selectedTexture=null;
         const host=el('div',{style:'display:contents'});
         const textureControls=el('div',{style:'display:contents'});
-        const show=id=>{selectedPart=id;host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id,textureSource:selectedTexture,onReady:(_canvas,scene)=>{
+        const show=id=>{selectedPart=id;viewer?.lexDispose?.();viewer=FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id,textureSource:selectedTexture,onReady:(_canvas,scene)=>{
           textureControls.replaceChildren();
           if(!scene.textureChoices?.length)return;
           const control=selectControl(selectedTexture||'', [{value:'',name:'Automatic'},...scene.textureChoices.map(name=>({value:name,name}))],value=>{selectedTexture=value||null;show(selectedPart);});
           control.setAttribute('aria-label','Model preview texture');
           textureControls.append(detailField({label:'TEXTURE',control,help:infoHelp('These images fit the same surfaces. Choose one for the preview and GLB export. Automatic leaves ambiguous surfaces plain.')}));
-        }}));};
+        }});host.replaceChildren(viewer);};
         const controls=[];
         if(row.modelParts?.length){
           const control=selectControl(selectedPart,row.modelParts.map(part=>({value:part.id,name:`Part ${part.id+1} · ${part.vertices} vertices`})),show);
@@ -205,7 +207,7 @@
         LexeditorUI.actionRow(infoHelp(row.modelKind==='stage'?'Drag to turn the stage and use the wheel to zoom. Arrow keys turn it, plus and minus zoom, and Home resets. This preview shows static geometry and textures.':row.modelKind==='effect-model'?'Drag or use arrow keys to turn the model. The wheel, plus and minus zoom, and Home resets the view. Export GLB includes matching textures, its skeleton and animations. Unmatched surfaces stay plain.':'Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
           ...(row.modelKind==='stage'?[]:[el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}${selectedPart==null?'':`&object=${selectedPart}`}${selectedTexture==null?'':`&textureSource=${encodeURIComponent(selectedTexture)}`}`,download:`${row.file.replace(/\.[^.]+$/,'')}${selectedPart==null?'':`-part-${Number(selectedPart)+1}`}.glb`}).click()},'Export GLB')]),...(extra?[extra]:[])),host);
       },
-      onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
+      onClose:drawer=>{viewer?.lexDispose?.();viewer=null;drawer.replaceChildren();}};
   }
   function modelDetail(row,prefs){
     const sections=[];
