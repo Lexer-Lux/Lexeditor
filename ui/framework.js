@@ -1407,7 +1407,7 @@
     if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
     if (control.dataset.lexAutofit === "false") return control;
     if (control.__lexAutoFitUpdate) {
-      control.__lexAutoFitUpdate();
+      queueAutoFit(control);
       return control;
     }
     const minimum = Math.max(8, Number(options.minimum) || (control instanceof HTMLSelectElement ? 8 : 11));
@@ -12481,7 +12481,13 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   window.addEventListener('resize', () => scheduleFit());
   // A panel split drag resizes the lane without adding a node or resizing the
   // window, so watch the region the fields actually live in as well.
-  new ResizeObserver(() => scheduleFit()).observe(document.documentElement);
+  let fitPageWidth = null;
+  new ResizeObserver(entries => {
+    const width = entries[0]?.contentRect.width;
+    if (width === fitPageWidth) return;
+    fitPageWidth = width;
+    scheduleFit();
+  }).observe(document.documentElement);
   // A label measured against the fallback font is re-laid-out when the real
   // face arrives, and the few extra pixels that brings are enough to clip a
   // line that had just fitted. Re-fit once the fonts are actually in.
@@ -12619,7 +12625,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
     for (const input of inputs) {
-      window.LexeditorUI.autoFitControlText(input,{minimum:8});
+      if (!input.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(input,{minimum:8});
       if (input.dataset.lexExactInteger || input.dataset.lexValidateNumber || groupedBoxes.has(input) || !wantsGrouping(input)) continue;
       groupedBoxes.add(input);
       const plain = () => String(input.value ?? "").replace(/,/g, "");

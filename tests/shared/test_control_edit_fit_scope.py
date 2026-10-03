@@ -1,0 +1,39 @@
+"""Editing one value must not refit untouched controls in a large panel."""
+import pytest
+
+from test_shared_ui_feedback import page, framework
+
+
+@pytest.mark.parametrize('count', [40, 400])
+def test_numeric_edit_fitting_stays_with_edited_control(page, count):
+    framework(page)
+    page.evaluate('''count=>{
+      const U=LexeditorUI,rows=[];
+      for(let i=0;i<count;i++){
+        const input=U.el('input',{type:'number',min:0,max:255,value:40+i%60});
+        rows.push(U.detailField({label:`PROPERTY NUMBER ${i}`,dataType:'INT',min:0,max:255,
+          control:U.provenanceControl({control:input,current:()=>Number(input.value),vanilla:25,
+            references:[{name:'Reference Mod 1',shortName:'R1',value:30}],apply:v=>{input.value=v}})}));
+      }
+      document.querySelector('main').replaceChildren(U.detailSection({title:'Stress',body:rows}));
+    }''', count)
+    page.wait_for_timeout(600)
+    result = page.evaluate('''async()=>{
+      const inputs=[...document.querySelectorAll('input[type=number]')];
+      const counts=inputs.map(()=>0);
+      inputs.forEach((input,i)=>{
+        const measure=input.__lexAutoFitMeasure;
+        input.__lexAutoFitMeasure=()=>{counts[i]++;return measure()};
+      });
+      for(let i=0;i<5;i++){
+        inputs[0].value=String(30+i);
+        inputs[0].dispatchEvent(new Event('input',{bubbles:true}));
+        inputs[0].dispatchEvent(new Event('change',{bubbles:true}));
+        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      }
+      return {edited:counts[0],unrelated:counts.slice(1).reduce((a,b)=>a+b,0),
+        values:inputs.slice(1).every((input,i)=>input.value===String(40+(i+1)%60))};
+    }''')
+    assert result['values']
+    assert result['edited'] >= 5, result
+    assert result['unrelated'] == 0, result
