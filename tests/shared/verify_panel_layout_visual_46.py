@@ -304,10 +304,25 @@ def verify_blank() -> dict:
             edited = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),input=row.querySelector('input[type=number]');input.value='26';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return{value:input.value,model:demo.value,dirty:dirtyCount(),reference:row.querySelector('.lex-reference-value')?.textContent.trim(),saveDisabled:document.querySelector('#global-save').disabled};})()""")
             assert edited["value"] == "26" and edited["model"] == 26 and edited["dirty"] == 1, edited
             assert edited["reference"] == "V25" and not edited["saveDisabled"], edited
-            unit_layout = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),root=row.querySelector('.lex-source-control-internal'),input=root.querySelector('input[type=number]'),unit=root.querySelector('.lex-unit'),reference=root.querySelector('.lex-reference-value');const box=node=>{const value=node.getBoundingClientRect();return{left:value.left,right:value.right,top:value.top,bottom:value.bottom,width:value.width}};return{root:box(root),input:box(input),unit:box(unit),reference:box(reference),paddingRight:getComputedStyle(input).paddingRight};})()""")
+            unit_layout = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),root=row.querySelector('.lex-source-control-internal'),input=root.querySelector('input[type=number]'),unit=root.querySelector('.lex-unit'),reference=root.querySelector('.lex-reference-value'),stepper=root.querySelector('.lex-stepper'),up=root.querySelector('.lex-stepper-up');const box=node=>{const value=node.getBoundingClientRect();return{left:value.left,right:value.right,top:value.top,bottom:value.bottom,width:value.width}};const r=reference.getBoundingClientRect();return{root:box(root),input:box(input),unit:box(unit),reference:box(reference),stepper:box(stepper),up:box(up),referenceHit:document.elementFromPoint((r.left+r.right)/2,(r.top+r.bottom)/2)?.closest('.lex-reference-value')===reference,paddingRight:getComputedStyle(input).paddingRight};})()""")
             assert unit_layout["unit"]["right"] <= unit_layout["input"]["right"] - 3, unit_layout
             assert unit_layout["reference"]["left"] >= unit_layout["unit"]["right"] + 3, unit_layout
-            assert 3 <= unit_layout["input"]["right"] - unit_layout["reference"]["right"] <= 8, unit_layout
+            # The reference clears the shared stepper, which occupies the
+            # input's trailing edge. Measuring from the input edge demanded
+            # that the reference occupy the stepper's reserved hit area.
+            assert unit_layout['stepper']['width'] > 0, unit_layout
+            assert unit_layout['stepper']['right'] <= unit_layout['input']['right'], unit_layout
+            assert 3 <= unit_layout['stepper']['left'] - unit_layout['reference']['right'] <= 8, unit_layout
+            assert unit_layout['referenceHit'], unit_layout
+            def click_box(box):
+                point = {'x': (box['left'] + box['right']) / 2, 'y': (box['top'] + box['bottom']) / 2}
+                cdp.call('Input.dispatchMouseEvent', {'type': 'mouseMoved', **point})
+                cdp.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'button': 'left', 'buttons': 1, 'clickCount': 1, **point})
+                cdp.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'button': 'left', 'buttons': 0, 'clickCount': 1, **point})
+            click_box(unit_layout['reference'])
+            wait_eval(cdp, 'demo.value===25&&dirtyCount()===0', 10)
+            click_box(unit_layout['up'])
+            wait_eval(cdp, 'demo.value===26&&dirtyCount()===1', 10)
             cdp.eval("navigate('two')")
             wait_eval(cdp, "!!document.querySelector('.blank-table')", 10)
             cdp.eval("navigate('one')")
