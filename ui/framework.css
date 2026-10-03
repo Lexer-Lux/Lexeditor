@@ -2401,9 +2401,8 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 /* Named axes share the table grid so labels and values scroll together. */
 .lex-matrix-table { grid-template-rows:auto auto repeat(var(--lex-table-row-count),max-content); }
 .lex-matrix-table.lex-table-fill { grid-template-rows:auto auto repeat(var(--lex-table-row-count),minmax(32px,1fr)); }
-.lex-matrix-table > .lex-column-list-row,
-.lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; }
-.lex-matrix-table > .lex-column-list-header { grid-row:2; position:static; }
+.lex-matrix-table > .lex-column-list-row { grid-column:2 / -1; }
+.lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; grid-row:2; position:static; }
 /* The row axis runs the table's full height and a header-coloured corner
    fills the square above the id column, so no bare panel square shows in
    the top-left. The column axis starts over the first data column, its
@@ -4343,8 +4342,13 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane-content:has(> .lex-source-control > .lex-code-field) { display:flex; overflow:hidden; }
 .lex-paged-pane-content > .lex-source-control:has(> .lex-code-field) { flex:1 1 auto; align-items:stretch; }
 .lex-paged-pane-content > .lex-source-control > .lex-code-field { height:100%; resize:none; }
-.lex-instruction-list { min-width:0; width:100%; min-height:100%; display:flex; flex-direction:column; }
-.lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:96px; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
+/* A narrow pane has no room for the controls and the description side by
+   side. The operands wrap, the description moves under them, and the step
+   grows to hold both, rather than the operands spilling under the
+   description's text (Enemies AI at 1100px: "If Battle variable 96..."
+   printed over "Otherwise"); the list is the container that measures it. */
+.lex-instruction-list { min-width:0; width:100%; min-height:100%; display:flex; flex-direction:column; container-type:inline-size; }
+.lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:auto; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
 .lex-instruction-row[draggable="true"], .lex-project-reference[draggable="true"] { cursor:grab; }
 .lex-instruction-index { flex:0 0 22px; font-size:.8em; color:var(--lex-muted); }
 .lex-instruction-controls { display:flex; align-items:flex-end; gap:6px; flex:1 1 75%; min-width:0; }
@@ -4360,13 +4364,6 @@ body:has(.lex-data-map-table) #main {
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
 .lex-instruction-operand :is(input,select) { width:100%; min-width:0; }
 .lex-instruction-description { flex:1 1 180px; min-width:120px; max-width:300px; max-height:84px; overflow:auto; white-space:normal; font-size:.9em; }
-/* A narrow pane has no room for the controls and the description side by
-   side. The operands wrap, the description moves under them, and the step
-   grows to hold both, rather than the operands spilling under the
-   description's text (Enemies AI at 1100px: "If Battle variable 96..."
-   printed over "Otherwise"). */
-.lex-instruction-list { container-type:inline-size; }
-.lex-instruction-row { min-height:auto; }
 @container (max-width: 620px) {
   .lex-instruction-row { flex-wrap:wrap; row-gap:4px; }
   .lex-instruction-controls { flex-wrap:wrap; row-gap:4px; }
@@ -4571,8 +4568,8 @@ body:has(.lex-data-map-table) #main {
 .lex-map-magnifier-dialog > .lex-searcher-bar { position:relative; inset:auto; height:auto; flex:0 0 auto; }
 .lex-map-magnifier-dialog > .lex-searcher-bar .lex-searcher-prompt { white-space:normal; }
 .lex-map-magnifier-body { display:grid; flex:1 1 auto; min-height:0; }
-.lex-map-magnifier-map,.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; }
-.lex-map-magnifier-details { overflow:auto; }
+.lex-map-magnifier-map { display:grid; min-width:0; min-height:0; }
+.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; overflow:auto; }
 /* The crosshair: two hairlines and a ring, at the pixel under the pointer. */
 .lex-map-crosshair { position:absolute; z-index:3; width:0; height:0; pointer-events:none; }
 .lex-map-crosshair::before { position:absolute; top:-100vh; left:-.5px; width:1px; height:200vh; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
