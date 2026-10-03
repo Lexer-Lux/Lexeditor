@@ -99,18 +99,21 @@ async function challengeSaveGuards() {
   }
   console.log(`PASS: ${cases.length} invalid challenge source/condition/reward/mode drafts block direct and global Save without losing edits`);
 }
-async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false, invalidCrime=false, invalidChallenge=false) {
+async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false, invalidCrime=false, invalidChallenge=false, rejectedChallenge=null) {
   const calls = [], messages = [], errors = [];
   let saved = { available: true, vanilla: {CONSUMABLE_RUM: 0.17, CONSUMABLE_MOONSHINE: 0.3}, overrides: {CONSUMABLE_MOONSHINE: 1} };
   const context = vm.createContext({
     console, structuredClone, isRO: () => false, dirtyCount: () => 1,
-    saveLoot: async () => {}, saveLocalization: async () => 0, saveLootSounds: async () => 0,
+    saveLoot: async () => {if(rejectedChallenge)calls.push({url:'loot'});},
+    saveLocalization: async () => {if(rejectedChallenge)calls.push({url:'localization'});return 0;},
+    saveLootSounds: async () => {if(rejectedChallenge)calls.push({url:'sounds'});return 0;},
     render() {}, refreshGlobalSave() {},
     rdr2Shell: { history: { clear() {} } },
     toast: message => messages.push(message),
     showSaveFailure: error => { errors.push(error.message); return error; },
     api: async (url, opts) => {
       calls.push({url, body: opts?.body ? JSON.parse(opts.body) : null});
+      if(url==='/api/challenges/validate'&&rejectedChallenge)throw new Error('ambiguous challenge XML');
       if (url === '/api/alcohol-strengths/save') {
         if (fail) throw new Error('read-only CSV fixture');
         Object.assign(saved.overrides, JSON.parse(opts.body).entries);
@@ -129,7 +132,24 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
   if(invalidDispatch)vm.runInContext("state.store.mine={dispatch:{rows:[{group:'',field:'ParoleDuration',value:'9000'}]}};state.dispatchEdits={'|ParoleDuration':''}",context);
   if(invalidCrime)vm.runInContext("state.store.mine={crime:{crimes:[{key:'CRIME',NumWitnesses:'2'}]}};state.crimeEdits={'CRIME|NumWitnesses':'1.5'}",context);
   if(invalidChallenge)vm.runInContext("state.store.mine={challenges:{goals:[{name:'GOAL',requirements:[{index:0,value:'10',readonly:false}]}]}};state.challengeEdits={'GOAL|0':''}",context);
+  if(rejectedChallenge){
+    vm.runInContext("state.localizationEdits={LABEL:'pending text'};state.store.mine={challenges:{goals:[],strands:[{name:'ROOT',mode:'parallel',ranks:[]}]}}",context);
+    if(rejectedChallenge==='label')vm.runInContext("state.challengeUiEdits={label:{file:'challenges.meta',owner:'ROOT',field:'challengeDescLabel',value:'new label'}}",context);
+    if(rejectedChallenge==='mode')vm.runInContext("state.challengeModeEdits={ROOT:'series'}",context);
+    if(rejectedChallenge==='condition')vm.runInContext("state.store.mine.challenges.goals=[{name:'GOAL',conditions:[{index:0,type:'CAIConditionGoalContext',fields:{ContextHash:'TRAIN'}}]}];state.store.mine.challenges.allowedConditionValues=[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']}];state.challengeConditionEdits={'GOAL|0|ContextHash':{goal:'GOAL',index:0,type:'CAIConditionGoalContext',field:'ContextHash',value:'WATER'}}",context);
+  }
+  const challengeSnapshot=vm.runInContext('JSON.stringify([state.challengeUiEdits,state.challengeModeEdits,state.challengeConditionEdits,state.localizationEdits])',context);
   await context.saveAllChanges();
+  if(rejectedChallenge){
+    assert.equal(calls.length,1,'server XML rejection must precede every writer');
+    assert.equal(calls[0].url,'/api/challenges/validate');
+    assert.equal(vm.runInContext('JSON.stringify([state.challengeUiEdits,state.challengeModeEdits,state.challengeConditionEdits,state.localizationEdits])',context),challengeSnapshot);
+    assert.equal(vm.runInContext('state.alcoholEdits.CONSUMABLE_RUM',context),0.23);
+    assert(errors.includes('ambiguous challenge XML'));
+    assert(!messages.includes('All changes saved to mod files'));
+    await assert.rejects(context.preflightChallengeSave(),/ambiguous challenge XML/);
+    return;
+  }
   if(invalid||invalidLoot||invalidMatrix||invalidDispatch||invalidCrime||invalidChallenge){
     assert.equal(calls.length,0,'invalid catalog drafts must block unrelated pending writers');
     assert.equal(vm.runInContext(invalidChallenge?"state.challengeEdits['GOAL|0']":invalidCrime?"state.crimeEdits['CRIME|NumWitnesses']":invalidDispatch?"state.dispatchEdits['|ParoleDuration']":invalidMatrix?"state.matrix.animals[0].rows[0].qty":invalidLoot?"state.loot.fixture.tables[0].entries[0].min":"state.yieldEdits.fixture",context),invalidDispatch||invalidChallenge?'':'1.5');
@@ -164,4 +184,6 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
   await run(false,false,false,false,false,true); console.log('PASS: invalid crime drafts block unrelated pending writers');
   await run(false,false,false,false,false,false,true); console.log('PASS: invalid challenge drafts block unrelated pending writers');
   await challengeSaveGuards();
+  for(const kind of ['label','mode','condition'])await run(false,false,false,false,false,false,false,kind);
+  console.log('PASS: server label/mode/condition XML rejection blocks localization and every global writer');
 })().catch(error => {console.error(error);process.exitCode = 1;});

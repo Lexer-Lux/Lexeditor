@@ -516,6 +516,52 @@ def test_http_reward_save_remove_reload_preserves_opaque_siblings(rewards):
         worker.join()
 
 
+@pytest.mark.parametrize('backups', [False, True])
+def test_http_validation_runs_every_family_without_publishing(rewards, monkeypatch, backups):
+    for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+        path = s.data_file_path(name, 'mine')
+        backup = path.with_suffix(path.suffix + '.bak')
+        if backups:
+            backup.write_bytes(b'original')
+        else:
+            backup.unlink(missing_ok=True)
+    before = snapshot(rewards)
+    roots = {name: s.load_file(name)['root'] for name in (s.GOALS_FILE, s.CHALLENGES_FILE)}
+    cached = {name: ET.tostring(root) for name, root in roots.items()}
+    commit = s._commit_xml_roots
+    def unexpected_commit(*args):
+        raise AssertionError('Validation must not publish roots or create backups')
+    monkeypatch.setattr(s, '_commit_xml_roots', unexpected_commit)
+    payload = {'edits': [dict(GOAL, sources=[SOURCE])], 'rewards': [REWARD],
+               'conditions': [CONDITION], 'uiEdits': [LABEL],
+               'modes': [{'challenge': 'Challenge', 'mode': 'series'}]}
+    http = s.create_server(0)
+    worker = threading.Thread(target=http.serve_forever, daemon=True);worker.start()
+    def post(path, data):
+        return Request(f'http://127.0.0.1:{http.server_port}{path}', data=json.dumps(data).encode(),
+                       headers={'Content-Type': 'application/json'})
+    try:
+        with urlopen(post('/api/challenges/validate', payload)) as response:
+            assert json.load(response) == {'validated': 5}
+        for bad in [dict(LABEL, owner='Unknown'), dict(LABEL, field='Opaque'), dict(LABEL, value=None)]:
+            with pytest.raises(HTTPError) as error:
+                urlopen(post('/api/challenges/validate', {**payload, 'uiEdits': [bad]}))
+            assert error.value.code == 400
+            assert snapshot(rewards) == before
+        assert snapshot(rewards) == before
+        for name, root in roots.items():
+            assert s.load_file(name)['root'] is root
+            assert ET.tostring(root) == cached[name]
+        monkeypatch.setattr(s, '_commit_xml_roots', commit)
+        with urlopen(post('/api/challenges/save', payload)) as response:
+            assert json.load(response) == {'saved': 5}
+        s._files.clear()
+        assert s.load_file(s.GOALS_FILE)['root'].find('.//desiredGoal').get('value') == '12'
+        assert s.load_file(s.CHALLENGES_FILE)['root'].find('.//unlock').text == 'FIXTURE_UNLOCK_2'
+    finally:
+        http.shutdown();http.server_close();worker.join()
+
+
 def test_split_strand_reward_uses_logical_rank_and_exact_owner(rewards):
     root = s.load_file(s.CHALLENGES_FILE)['root']
     record = root.find('challenges/Item')

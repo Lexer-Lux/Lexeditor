@@ -25,6 +25,7 @@ def test_challenge_target_drafts_source_slots_and_readonly(tmp_path):
               state.store.vanilla.challenges.goals[0].requirements[0].value='5';
               state.tab='challenges';state.filters.challengeStrand='FIXTURE';state.filters.challengeRank=1;
               window.__responses['/api/challenges/save']={saved:1};window.__responses['/api/challenges']=data;
+              window.__responses['/api/challenges/validate']={validated:1};
               await renderChallenges();
             }''')
             control = page.get_by_role('spinbutton', name='GOAL target 0', exact=True)
@@ -48,6 +49,10 @@ def test_challenge_target_drafts_source_slots_and_readonly(tmp_path):
             assert len(requests) == 1
             assert requests[0]['body']['edits'] == [{'name': 'GOAL', 'index': 0, 'value': '9007199254740993.125',
                                                    'sources': [{'index': 1, 'base': 'SECOND', 'permutation': ''}]}]
+            preflight = page.evaluate("window.__requests.filter(row=>row.path==='/api/challenges/validate')")
+            assert len(preflight) == 1
+            assert preflight[0]['body'] == requests[0]['body']
+            assert page.evaluate("window.__requests.findIndex(row=>row.path==='/api/challenges/validate')<window.__requests.findIndex(row=>row.path==='/api/challenges/save')")
             page.evaluate('''async()=>{
               const data=state.store.mine.challenges;
               data.goals[0].conditions[0].fields.ContextHash='TRAIN';

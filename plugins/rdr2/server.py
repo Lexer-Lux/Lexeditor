@@ -4446,7 +4446,7 @@ def get_challenges(ds="mine"):
             "allowedConditionValues": allowed_condition_values}
 
 
-def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edits=None, mode_edits=None):
+def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edits=None, mode_edits=None, *, validate_only=False):
     batches = (edits, reward_edits, ui_edits, condition_edits, mode_edits)
     if not isinstance(edits, list) or any(batch is not None and (not isinstance(batch, list) or
            any(not isinstance(edit, dict) for edit in batch)) for batch in batches):
@@ -4793,8 +4793,9 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
     if ui_changed:
         modified.update(edit.get('file') for edit in ui_edits or []
                         if edit.get('file') in prepared)
-    _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()
-                       if name in modified])
+    if not validate_only:
+        _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()
+                           if name in modified])
     return changed + condition_changed + reward_changed + ui_changed + mode_changed
 
 
@@ -6386,9 +6387,10 @@ class Handler(PluginRequestHandler):
                         self._json({"saved": save_honor_actions(body.get("edits", []))})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/challenges/save":
+                elif path in {"/api/challenges/save", "/api/challenges/validate"}:
                     try:
-                        self._json({"saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []))})
+                        validate_only = path == "/api/challenges/validate"
+                        self._json({"validated" if validate_only else "saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/save":

@@ -67,6 +67,23 @@ function challengeCanRemoveSource(req,index,key,known){
   const removed=new Set(req.sources.filter(row=>row.removal?.group===meta.group&&challengeRemovedBranch(req,row,key)).map(row=>row.removal.branch));
   return removed.size+1<meta.count;
 }
+function challengeSaveBody(){
+  const keys=new Set([...Object.keys(state.challengeEdits), ...Object.keys(state.challengeSourceEdits).map(key=>key.slice(0,key.lastIndexOf('|')))]);
+  const edits=[...keys].map(key=>{const cut=key.lastIndexOf('|'),name=key.slice(0,cut),index=Number(key.slice(cut+1));
+    const req=refStore(state.ds).challenges.goals.find(goal=>goal.name===name).requirements.find(row=>row.index===index);
+    return {name,index,value:state.challengeEdits[key]??req.value,sources:Object.entries(state.challengeSourceEdits).filter(([sourceKey])=>sourceKey.slice(0,sourceKey.lastIndexOf('|'))===key).map(([,value])=>value)};});
+  const rewards=Object.entries(state.challengeRewardEdits).map(([key,list])=>{const cut=key.lastIndexOf('|'),challenge=key.slice(0,cut),rank=Number(key.slice(cut+1));
+    const rankRow=refStore(state.ds).challenges.strands.find(strand=>strand.name===challenge).ranks.find(row=>row.rank===rank);
+    return {challenge,rank,owner:rankRow.owner,ownerRank:rankRow.ownerRank,rewards:list};});
+  return {edits,rewards,conditions:Object.values(state.challengeConditionEdits),uiEdits:Object.values(state.challengeUiEdits),
+    modes:Object.entries(state.challengeModeEdits).map(([challenge,mode])=>({challenge,mode}))};
+}
+async function preflightChallengeSave(){
+  validateChallengeDrafts();
+  const body=challengeSaveBody();
+  if(Object.values(body).some(rows=>rows.length))await api('/api/challenges/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return body;
+}
 function challengeUiInput(key,base,meta){const cur=state.challengeUiEdits[key]?.value??base;return el("input",{class:"key",value:cur,title:"Localization key, not literal English text. The displayed wording lives in localization resources.",onchange:ev=>{if(ev.target.value===base)delete state.challengeUiEdits[key];else state.challengeUiEdits[key]={...meta,value:ev.target.value};renderToolbarOnly();}});}
 const CHALLENGE_XP_AMOUNTS={FIRST:25,SECOND:50,THIRD:100,FOURTH:150};
 function challengeRewardLabel(reward){
@@ -205,14 +222,7 @@ async function renderChallenges() {
 
 async function saveChallenges() {
   if (isRO()) return;
-  validateChallengeDrafts();
-  const keys=new Set([...Object.keys(state.challengeEdits), ...Object.keys(state.challengeSourceEdits).map(k=>k.split("|").slice(0,2).join("|"))]);
-  const edits=[...keys].map(key=>{const cut=key.lastIndexOf("|"); const name=key.slice(0,cut), index=+key.slice(cut+1); const goal=refStore(state.ds).challenges.goals.find(g=>g.name===name); const req=goal.requirements.find(r=>r.index===index);
-    return {name,index,value:state.challengeEdits[key] ?? req.value,sources:Object.entries(state.challengeSourceEdits).filter(([k])=>k.startsWith(key+"|")).map(([,v])=>v)};});
-  const rewards=Object.entries(state.challengeRewardEdits).map(([key,list])=>{const cut=key.lastIndexOf("|"),challenge=key.slice(0,cut),rank=+key.slice(cut+1),strand=refStore(state.ds).challenges.strands.find(s=>s.name===challenge),rankRow=strand?.ranks.find(r=>r.rank===rank);return{challenge,rank,owner:rankRow?.owner,ownerRank:rankRow?.ownerRank,rewards:list};});
-  const conditions=Object.values(state.challengeConditionEdits);
-  const uiEdits=Object.values(state.challengeUiEdits);
-  const modes=Object.entries(state.challengeModeEdits).map(([challenge,mode])=>({challenge,mode}));
-  const localizedSaved=await saveLocalization();const r=await api("/api/challenges/save", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,rewards,conditions,uiEdits,modes})});
+  const body=await preflightChallengeSave();
+  const localizedSaved=await saveLocalization();const r=await api("/api/challenges/save", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   state.challengeEdits={}; state.challengeSourceEdits={};state.challengeConditionEdits={};state.challengeRewardEdits={};state.challengeUiEdits={};state.challengeModeEdits={}; refStore(state.ds).challenges=null; toast(`Saved ${r.saved} challenge + ${localizedSaved} in-game text field(s)`); renderChallenges();
 }
