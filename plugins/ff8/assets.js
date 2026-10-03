@@ -216,6 +216,8 @@
       {label:"VERTICES",control:readonlyField(formatNumber(row.counts.vertices))},
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
+    if(row.storedValue!=null)sections.push(detailSection({title:"CONTENTS",body:[
+      detailField({label:"STORED NUMBER",control:readonlyField(formatNumber(row.storedValue))})]}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
     if(row.motion?.length){
       const multiple=row.motion.length>1;

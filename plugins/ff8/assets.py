@@ -1261,6 +1261,30 @@ def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) ->
     return _battle_file_info(filename, data)
 
 
+def _undecoded_layout(data: bytes) -> dict:
+    """What an undecoded battle file provably holds, from its bytes alone.
+
+    A four-byte file is one little-endian number. A file that opens with a
+    part count followed by that many increasing offsets inside the file is a
+    container, listed part by part. Nothing else is claimed: the meaning of
+    the number, or of a part, is not decoded.
+    """
+    import struct
+    if len(data) == 4:
+        return {"value": struct.unpack("<I", data)[0]}
+    if len(data) >= 8:
+        count = struct.unpack_from("<I", data)[0]
+        if 1 <= count <= 64 and 4 + count * 4 <= len(data):
+            offsets = list(struct.unpack_from(f"<{count}I", data, 4))
+            if (offsets[0] >= 4 + count * 4 and offsets == sorted(offsets)
+                    and len(set(offsets)) == count and offsets[-1] < len(data)):
+                ends = offsets[1:] + [len(data)]
+                return {"sections": [{"index": index, "name": f"Part {index + 1}", "offset": start,
+                                      "size": end - start}
+                                     for index, (start, end) in enumerate(zip(offsets, ends))]}
+    return {}
+
+
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                mod_only_files: set[str]) -> dict:
     from . import effect_mesh
@@ -1322,6 +1346,21 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                    name=name, sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                    enemyId=None, note=note)
+        # Say what the bytes provably hold, so the panel is not empty.
+        if info["sizeBytes"]:
+            try:
+                layout = _undecoded_layout(_model_bytes(filename, dataset)[0])
+            except (OSError, ValueError):
+                layout = {}
+            if "value" in layout:
+                row["storedValue"] = layout["value"]
+                row["note"] = ("This file holds one number. What the game uses it for is "
+                               "not decoded; only whole-file replacement or reversion is supported.")
+            elif layout.get("sections"):
+                row["sections"] = layout["sections"]
+                row["note"] = ("This file is a container of parts, listed below. What each "
+                               "part holds is not decoded; only whole-file replacement or "
+                               "reversion is supported.")
         if summon and info['sizeBytes']:
             row.update(modelKind='effect-data', name=f'Summon data {filename}',
                        note='This file belongs to a summon. Texture previews use upload instructions found in its script. Other contents are not yet decoded.')
