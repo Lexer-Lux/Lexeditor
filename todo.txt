@@ -3,6 +3,7 @@
 - Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
     > status 2026-10-03: Palworld now preserves schema bounds and inline enums, rejects invalid saves, and protects unresolved constraints. RDR2 weapons protect unknown hash fields and use boolean checkboxes; invalid save batches no longer leak into cached data. DS3 protects unknown fields, rejects fractional integer edits, and bounds floats to their storage format. Focused checks pass and rendered controls inspected. The remaining plugin audit is still open.
     > status 2026-10-03: Chrono Trigger and FFX/X2 numeric writers now reject fractional integer values instead of truncating them; Terraria rejects nonfinite numeric values before generating source. Focused save/reload and rejected-write preservation checks pass. The broader audit remains open.
+    > status 2026-10-03: Bannerlord now rejects fractional perk levels and record indexes, boolean numeric values, and nonboolean runtime override switches. Focused checks verify valid save/reload and preserve source plus both deployed files when any edit in a batch is rejected. These changes await CI.
 - Audit remaining supported record-creation gaps in Warband, DS3, Factorio, Bannerlord, Project Zomboid, and Terraria localization; finish missing record families and verify save/reload.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
     > status 2026-09-27: detector repaired. Every FF8 tab, subtab and panel tab swept at 1600x900; the one find (Encounters > Rules #000 column) is fixed. Not done: other games, smaller window sizes.
@@ -80,10 +81,6 @@ World
 
 ==================================================================== OTHER GAMES
 
-- (reopened) Warband: created records (e.g. troops from the template copy) still get no created-in-mod pen; the server has no "created" flag yet.
-    > status 2026-09-27: creating a troop, item or sound now records it and the lists show the pen automatically. Records made before today can't be told apart from shipped ones.
-    > Lexer: What? How...huh? The pen component should just be something automatic. You should not have to manually do it so I'm kind of confused by this. Doubly confused b/c I never created any new records in Warband!!!
-    > status 2026-10-03: The shared table now automatically renders the pen from explicit created-record metadata; Warband's per-list pen renderers were removed. Focused browser checks verify item/troop creation and reload, unchanged originals, sorting and no duplicate source icons. Rendered troop list inspected. This proves fixture-created records, not that Lexer created records; the broader origin bookkeeping question remains open.
 
 
 ==================================================================== CI / INTEGRATION
@@ -99,6 +96,8 @@ World
 
 ==================================================================== ANSWERS (finished items; the replies you may still want)
 
+- Warband created-record pen: the shared table now renders it automatically from record origin; Warband no longer adds the pen separately in each list. Creation actions persist origin in the selected project's ledger without a manual step. Item/troop create-and-reload checks, sorting and duplicate-icon checks pass, the rendered troop list was inspected, and Warband CI passed at f6235a64. This verification created temporary fixture records; it does not mean Lexer created any records. Records with no known origin are not guessed to be newly created.
+    > Lexer: What? How...huh? The pen component should just be something automatic. You should not have to manually do it so I'm kind of confused by this. Doubly confused b/c I never created any new records in Warband!!!
 - FF7 startup: each new editor service reads the game archives; this is not one-time installation setup. The loading screen now explains the archive read. Concurrent startup requests share one load, and identical vanilla/project archives decode only once. On 2026-10-01 the installed 2026 edition opened in 32.3 seconds and reloaded in the same service in 1.9 seconds, with no browser errors. Field decoding accounts for about 24 seconds of the first load. Both editions use this shared loader; the older edition was not separately timed.
 - SFX ID / Text Source header pushed right: a table's first sortable column keeps room on its left for the sort hand, so the hand never hangs off the table's edge. That room was on the left only, so a centred header centred in a lopsided box and sat right of the middle. Centred headers now get the same room on the right. That reserved room is also the extra empty space you saw on the left of the column.
 - Cards > Players rules/trade: only MenuChan (a test opponent) has fixed rules. Every real opponent's script passes Rules and Trade as game variables (Zell: 292 and 293) that the game fills in when the match starts, so there are no fixed rule boxes to tick; the page shows the variable number. Location is the subtitle, Location/Map file and "also uses deck" are gone, and each deck lists the opponents that use it.
