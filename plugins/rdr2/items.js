@@ -143,17 +143,35 @@ async function createNewItem(){
 // "!" badge inside the first price input of a cell (right-aligned, hover text)
 function addInputWarn(container,text){container.append(fieldHelp(text));}
 
+function catalogDollarCents(raw){
+  if(!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(raw))return null;
+  const [whole,fraction=""]=raw.split(".");return String(BigInt(whole||"0")*100n+BigInt(fraction.padEnd(2,"0")));
+}
+function catalogMoneyInput({key,cents,change,...attrs}){
+  const input=el("input",{...attrs,type:"number",step:"0.01",min:"0",required:true,
+    value:!isRO()&&key in state.moneyDrafts?state.moneyDrafts[key]:fmtMoney(cents),"data-lex-validate-number":"true"});
+  const validate=()=>{input.setCustomValidity(catalogDollarCents(input.value)===null?"Enter a nonnegative price with at most two decimal places.":"");return input.checkValidity()};
+  input.lexValidateNumber=validate;validate();
+  if(key in state.moneyDrafts)input.classList.add("edited");
+  if(isRO())input.readOnly=true;
+  else input.addEventListener("input",()=>{
+    if(validate()){delete state.moneyDrafts[key];change(catalogDollarCents(input.value));}
+    else state.moneyDrafts[key]=input.value;
+    input.classList.toggle("edited",key in state.moneyDrafts||key in state.priceEdits);renderToolbarOnly();
+  });
+  return input;
+}
+function clearCatalogMoneyDrafts(item,section){
+  for(const key of Object.keys(state.moneyDrafts))if(key.startsWith(`${item}|${section}|`)||key===`${item}|${section}ability`)delete state.moneyDrafts[key];
+}
 function priceInput(it, section, cost, part) {
   const editKey = [it.key, section, cost.key, part.item].join("|");
   const cur = isRO() ? part.qty : (state.priceEdits[editKey] ?? part.qty);
-  const inp = el("input", { type: "number", step: "0.01", min: "0", value: fmtMoney(cur),
+  const inp = catalogMoneyInput({key:editKey,cents:cur,"aria-label":`${section} price for ${it.key} ${cost.key}`,
     class: editKey in state.priceEdits ? "edited" : "",
-    onchange: ev => {
-      const cents = Math.round(parseFloat(ev.target.value || "0") * 100);
-      if (cents === part.qty) delete state.priceEdits[editKey];
+    change: cents => {
+      if (cents === String(part.qty)) delete state.priceEdits[editKey];
       else state.priceEdits[editKey] = cents;
-      ev.target.classList.toggle("edited", editKey in state.priceEdits);
-      renderToolbarOnly();
     } });
   return LexeditorUI.unitField(inp,"$");
 }
@@ -163,9 +181,9 @@ function sellPriceCell(it,sellCash,sellRef){
   const cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(sellable){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|sellability`,cents:p.qty,"aria-label":`sell price for ${it.key}`,change:cents=>{state.sellabilityEdits[it.key]={sellable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{clearCatalogMoneyDrafts(it.key,"sell");state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash sell price is defined."}),!isRO()?newButton({title:"Add a generic SELL_SHOP_DEFAULT payout. This does not choose which merchants accept the item.",onclick:()=>{state.sellabilityEdits[it.key]={sellable:true,cents:100};render();}}):el("span"),el("span"));
   }
@@ -178,9 +196,9 @@ function buyPriceCell(it,buyCash,buyRef){
   const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(buyable){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|buyability`,cents:part.qty,"aria-label":`buy price for ${it.key}`,change:cents=>{state.buyabilityEdits[it.key]={buyable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{clearCatalogMoneyDrafts(it.key,"buy");state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:(it.shopListings||[]).length?"No cash cost; commonly a free/default option already present in a shop inventory":"No generic cash purchase cost is defined"}),!isRO()?newButton({title:"Add COST_SHOP_DEFAULT cash price; also list it in Shops if it is not already present",onclick:()=>{state.buyabilityEdits[it.key]={buyable:true,cents:100};renderItems();}}):el("span"),el("span"));
   }
@@ -209,6 +227,7 @@ function catalogQuantityInput({store,key,base,value,minimum=null,...attrs}){
   return input;
 }
 function validateCatalogQuantityDrafts(){
+  if(Object.keys(state.moneyDrafts).length)throw new Error("Price: enter a nonnegative amount with at most two decimal places.");
   for(const [label,store,minimum] of [["Purchase quantity",state.yieldEdits,1],["Bundle output",state.bundleEdits,1],["Carry quantity",state.carryEdits,null]]){
     for(const raw of Object.values(store))if(!catalogQuantityIsValid(raw,minimum))throw new Error(`${label}: enter a whole quantity${minimum===null?".":` of at least ${minimum}.`}`);
   }

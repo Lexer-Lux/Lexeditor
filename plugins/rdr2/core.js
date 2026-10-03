@@ -22,6 +22,7 @@ const state = {
   config: null,
   // dirty edit stores
   priceEdits: {},       // "itemKey|section|costKey|partItem" -> qty(cents)
+  moneyDrafts: {},      // invalid dollar text, owned by its price/availability field
   buyabilityEdits: {},  // itemKey -> {buyable, cents}
   sellabilityEdits: {}, // itemKey -> {sellable, cents}
   yieldEdits: {},       // "itemKey|section|costKey" -> quantity received
@@ -231,7 +232,7 @@ function modOnlySpec(touched, resetPage, redraw) {
     change: value => { state.modOnly = value; resetPage(); redraw(); },
   };
 }
-const ITEM_EDIT_MAPS = () => [state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,
+const ITEM_EDIT_MAPS = () => [state.moneyDrafts,state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,
   state.yieldEdits, state.bundleEdits, state.itemEffectEdits, state.itemTagEdits,
   state.quickSelectEdits, state.descriptionKeyEdits, state.carryEdits, state.craftEdits,
   state.localizationEdits];
@@ -239,7 +240,11 @@ function dirtyCount() {
   const catalog = ["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
     "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits"]
     .reduce((n,key)=>n+Object.keys(state[key]).length,0);
-  return catalog + (state.customCraftingDirty?1:0) + Object.keys(state.alcoholEdits).length + Object.keys(state.settingEdits).length + state.shopDirty.size + Object.keys(state.shopBuyerDirty).length + state.matrixDirty.size +
+  const money=Object.keys(state.moneyDrafts).filter(key=>{
+    const [item,family]=key.split("|");return !(key in state.priceEdits)&&
+      !(family==="buyability"&&item in state.buyabilityEdits)&&!(family==="sellability"&&item in state.sellabilityEdits);
+  }).length;
+  return catalog + money + (state.customCraftingDirty?1:0) + Object.keys(state.alcoholEdits).length + Object.keys(state.settingEdits).length + state.shopDirty.size + Object.keys(state.shopBuyerDirty).length + state.matrixDirty.size +
     Object.values(state.lootDirty).reduce((n,s)=>n+s.size,0) +
     Object.keys(state.crimeEdits).length + Object.keys(state.dispatchEdits).length + Object.keys(state.bountyHunterEdits).length + Object.keys(state.honorActionEdits).length + Object.keys(state.lootSoundEdits).length +
     Object.keys(state.challengeEdits).length + Object.keys(state.challengeSourceEdits).length + Object.keys(state.challengeConditionEdits).length +
@@ -255,6 +260,7 @@ function dirtyCount() {
 // reference datasets stay outside each snapshot; the three views that edit
 // loaded rows in place supply their small mutable working sets explicitly.
 const RDR2_HISTORY_KEYS = [
+  "moneyDrafts",
   "priceEdits", "buyabilityEdits", "sellabilityEdits", "yieldEdits", "bundleEdits",
   "craftEdits", "customCraftingDraft", "customCraftingDirty", "crimeEdits",
   "dispatchEdits", "bountyHunterEdits", "honorActionEdits", "lootSoundEdits", "effectEdits",
@@ -284,7 +290,10 @@ async function rdr2HistoryRestore(snapshot){
   }
 }
 
-function fmtMoney(cents) { return (cents / 100).toFixed(2); }
+function fmtMoney(cents) {
+  if(/^[+-]?\d+$/.test(String(cents))){const n=BigInt(cents),a=n<0n?-n:n;return `${n<0n?"-":""}${a/100n}.${String(a%100n).padStart(2,"0")}`;}
+  return (cents / 100).toFixed(2);
+}
 function fmtCompactNumber(value){const n=Number(value);return Number.isFinite(n)?String(n):String(value??"");}
 
 // ---------- data loading ----------
