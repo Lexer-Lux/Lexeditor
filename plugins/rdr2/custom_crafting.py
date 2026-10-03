@@ -17,6 +17,10 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+if __package__ in (None, ""):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from core.numeric_values import integer_value
 
 
 FIELDS = (
@@ -49,7 +53,7 @@ def _clean(value: str | None) -> str:
 
 
 def encode_ingredients(parts: Iterable[Ingredient]) -> str:
-    return ";".join(f"{_clean(part.item)}*{int(part.quantity)}" for part in parts)
+    return ";".join(f"{_clean(part.item)}*{integer_value(part.quantity, 'Ingredient quantity')}" for part in parts)
 
 
 def decode_ingredients(value: str) -> list[Ingredient]:
@@ -79,13 +83,23 @@ def validate_recipes(recipes: Iterable[Recipe], catalog_items: set[str] | None =
             errors.append(f"{prefix}: title is required")
         if not recipe.output_item:
             errors.append(f"{prefix}: output_item is required")
-        if recipe.output_quantity < 1:
-            errors.append(f"{prefix}: output_quantity must be positive")
+        try:
+            output_quantity = integer_value(recipe.output_quantity, "Output quantity")
+            if output_quantity < 1:
+                raise ValueError("Output quantity must be positive")
+        except ValueError:
+            errors.append(f"{prefix}: output_quantity must be a positive whole number")
         if not recipe.ingredients:
             errors.append(f"{prefix}: at least one ingredient is required")
         for part in recipe.ingredients:
-            if not part.item or part.quantity < 1:
-                errors.append(f"{prefix}: every ingredient needs an item and positive quantity")
+            try:
+                quantity = integer_value(part.quantity, "Ingredient quantity")
+                if quantity < 1:
+                    raise ValueError("Ingredient quantity must be positive")
+            except ValueError:
+                errors.append(f"{prefix}: every ingredient needs a positive whole quantity")
+            if not part.item:
+                errors.append(f"{prefix}: every ingredient needs an item")
             if catalog_items is not None and part.item not in catalog_items:
                 errors.append(f"{prefix}: unknown ingredient {part.item}")
         if catalog_items is not None and recipe.output_item not in catalog_items:
@@ -134,7 +148,7 @@ def save_recipes(path: str | Path, recipes: Iterable[Recipe]) -> None:
                     "recipe_id": _clean(recipe.recipe_id), "category": _clean(recipe.category),
                     "title": _clean(recipe.title), "description": _clean(recipe.description),
                     "station": _clean(recipe.station), "output_item": _clean(recipe.output_item),
-                    "output_quantity": recipe.output_quantity,
+                    "output_quantity": integer_value(recipe.output_quantity, "Output quantity"),
                     "ingredients": encode_ingredients(recipe.ingredients), "unlock": _clean(recipe.unlock),
                 })
         os.replace(temporary, path)

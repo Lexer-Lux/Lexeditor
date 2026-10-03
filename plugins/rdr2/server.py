@@ -592,6 +592,8 @@ def _craft_recipe_from_json(row):
     ingredients = row.get("ingredients", [])
     if not isinstance(ingredients, list):
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: ingredients must be a list")
+    if any(not isinstance(part, dict) for part in ingredients):
+        raise ValueError(f"{row.get('recipe_id', 'recipe')}: every ingredient must be an object")
     try:
         return _CraftRecipe(
             recipe_id=str(row.get("recipe_id", "")).strip(),
@@ -600,10 +602,10 @@ def _craft_recipe_from_json(row):
             description=str(row.get("description", "")).strip(),
             station=str(row.get("station", "")).strip(),
             output_item=str(row.get("output_item", "")).strip(),
-            output_quantity=int(row.get("output_quantity", 1)),
+            output_quantity=integer_value(row.get("output_quantity", 1), "Output quantity"),
             ingredients=[_CraftIngredient(str(part.get("item", "")).strip(),
-                                          int(part.get("quantity", 1)))
-                         for part in ingredients if isinstance(part, dict)],
+                                          integer_value(part.get("quantity", 1), "Ingredient quantity"))
+                         for part in ingredients],
             unlock=str(row.get("unlock", "")).strip(),
         )
     except (TypeError, ValueError) as ex:

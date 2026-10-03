@@ -18,6 +18,13 @@ function customCraftingStationSelect(recipe,onSet,readonly=false){
   return select;
 }
 function customCraftingCategory(recipe){return catalogItem(recipe.output_item)?.category||recipe.category||"";}
+function validCraftingQuantity(value){return (typeof value==="number"||typeof value==="string"&&/^[+]?[0-9]+$/.test(value))&&Number.isInteger(Number(value))&&Number(value)>=1;}
+function craftingQuantityControl(value,label,onSet){
+  const control=el("input",{type:"number",min:1,step:1,value:value??1,"aria-label":label,"data-lex-validate-number":"true"});
+  const change=()=>{const raw=control.value,valid=validCraftingQuantity(raw);control.setCustomValidity(valid?"":"Enter a positive whole number");onSet(valid?Number(raw):raw);};
+  control.addEventListener("input",change);control.addEventListener("change",change);
+  return control;
+}
 function customCraftingValidation(){
   const errors=[],byRow={},seen=new Map(),keys=new Set((refStore("mine").catalog?.items||[]).map(item=>item.key));
   const stations=new Set(customCraftingStationValues()),unlocks=new Set(recipeUnlockKeys());
@@ -31,12 +38,12 @@ function customCraftingValidation(){
     else if(recipe.category!==customCraftingCategory(recipe))add(index,`${prefix}: Category must follow the output item`);
     if(!recipe.station||!stations.has(recipe.station))add(index,`${prefix}: Context must be selected from the controlled list`);
     if(recipe.unlock&&!unlocks.has(recipe.unlock))add(index,`${prefix}: Unlock must be selected from an existing recipe unlock`);
-    if(!Number.isInteger(+recipe.output_quantity)||+recipe.output_quantity<1)add(index,`${prefix}: Output quantity must be a positive whole number`);
+    if(!validCraftingQuantity(recipe.output_quantity))add(index,`${prefix}: Output quantity must be a positive whole number`);
     if(!recipe.ingredients?.length)add(index,`${prefix}: Add at least one ingredient`);
     (recipe.ingredients||[]).forEach((part,partIndex)=>{
       if(!String(part.item||"").trim())add(index,`${prefix}: Ingredient ${partIndex+1} needs an item`);
       else if(keys.size&&!keys.has(part.item))add(index,`${prefix}: Unknown ingredient ${part.item}`);
-      if(!Number.isInteger(+part.quantity)||+part.quantity<1)add(index,`${prefix}: Ingredient ${partIndex+1} quantity must be a positive whole number`);
+      if(!validCraftingQuantity(part.quantity))add(index,`${prefix}: Ingredient ${partIndex+1} quantity must be a positive whole number`);
     });
   });
   return {errors,byRow};
@@ -122,10 +129,10 @@ function customCraftingRecipe(entry,group,position,validation){
   const {recipe,index}=entry,update=(field,value)=>{recipe[field]=value;customCraftingTouch();};
   const ingredients=columnList({rows:(recipe.ingredients||[]).map((part,partIndex)=>({part,partIndex})),key:row=>row.partIndex,editable:true,
     columns:[{key:"item",label:"Ingredient",grow:1,render:({part})=>linkedCatalogKeyEditor(part.item,value=>{part.item=value;customCraftingTouch();renderCrafting()})},
-      {key:"quantity",label:"Quantity",width:"100px",render:({part})=>el("input",{type:"number",min:1,step:1,value:part.quantity??1,onchange:ev=>{part.quantity=Math.max(1,Math.round(+ev.target.value||1));customCraftingTouch()}})},
+      {key:"quantity",label:"Quantity",width:"100px",render:({part})=>craftingQuantityControl(part.quantity,`Ingredient quantity for ${part.item}`,value=>{part.quantity=value;customCraftingTouch()})},
       {key:"remove",label:"",width:"45px",render:({partIndex})=>closeButton({title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting()}})}]});
   const name=el("input",{value:recipe.title||"",onchange:ev=>{update("title",ev.target.value.trim());renderCrafting()}});
-  const quantity=el("input",{type:"number",min:1,step:1,value:recipe.output_quantity??1,onchange:ev=>update("output_quantity",Math.max(1,Math.round(+ev.target.value||1)))});
+  const quantity=craftingQuantityControl(recipe.output_quantity,`Output quantity for ${recipe.recipe_id}`,value=>update("output_quantity",value));
   const unlock=validatedKeyEditor("Recipe unlock",recipe.unlock||"ALWAYS KNOWN",recipeUnlockKeys(),value=>{update("unlock",value==="ALWAYS KNOWN"?"":value);renderCrafting()});
   const description=LexeditorUI.textArea({onchange:ev=>update("description",ev.target.value)});description.value=recipe.description||"";
   return LexeditorUI.detailSection({title:`Recipe ${position+1}`,body:[LexeditorUI.actionRow(LexeditorUI.recordId(recipe.recipe_id),
