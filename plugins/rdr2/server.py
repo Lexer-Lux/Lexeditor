@@ -343,7 +343,10 @@ def install_replacements():
     path = ds_dir("mine") / "install.xml"
     if not path.exists():
         return {}
-    root = ET.parse(path).getroot()
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     return {
         (node.findtext("GamePath") or "").strip().casefold():
         (node.findtext("FilePath") or "").strip().replace("\\", "/")
@@ -776,23 +779,33 @@ def get_localization(ds="mine"):
             "alternateAliases": len(aliases)}
 
 
-def ensure_localization_install():
-    """Ensure LML actually loads the localization file edited by LEXEDITOR."""
+def _localization_install_bytes():
+    """Prepare the LML mapping before any localization output is changed."""
     install_path = ds_dir("mine") / "install.xml"
     if not install_path.exists():
-        return
-    tree = ET.parse(install_path)
+        return None
+    try:
+        tree = ET.parse(install_path)
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     resources = tree.getroot().find("Resources")
     if resources is None:
         raise ValueError(f"Missing Resources element in {install_path}")
     if any((node.text or "").strip().lower() == LOCALIZATION_FILE.lower()
            for node in resources.findall("./Resource/DataFile")):
-        return
+        return None
     resource = ET.Element("Resource")
     ET.SubElement(resource, "DataFile").text = LOCALIZATION_FILE
     resources.insert(0, resource)
     ET.indent(tree, space="    ")
-    tree.write(install_path, encoding="utf-8", xml_declaration=False)
+    return ET.tostring(tree.getroot(), encoding="utf-8")
+
+
+def ensure_localization_install():
+    """Ensure LML actually loads the localization file edited by LEXEDITOR."""
+    payload = _localization_install_bytes()
+    if payload is not None:
+        (ds_dir("mine") / "install.xml").write_bytes(payload)
 
 
 def ensure_file_replacement(game_path, file_path, install_path=None):
@@ -841,28 +854,72 @@ def remove_file_replacement(game_path, file_path):
     return changed
 
 
-def save_localization(edits):
+def _validated_localization_edits(edits):
+    if not isinstance(edits, list):
+        raise ValueError("Localization edits must be a list")
+    result, seen = [], set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"key", "value"}:
+            raise ValueError("Localization edits require key and value only")
+        key, value = edit["key"], edit["value"]
+        if not isinstance(key, str) or not valid_gxt_key(key):
+            raise ValueError("Invalid localization key for LML")
+        if not isinstance(value, str) or "\x00" in value:
+            raise ValueError("Localization value must be text without NUL")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("Localization value must be valid Unicode") from error
+        key = key.strip()
+        identity = canonical_localization_key(key)
+        if identity in seen:
+            raise ValueError(f"Duplicate localization key: {key}")
+        seen.add(identity)
+        result.append({"key": key, "value": value.replace("\r", " ").replace("\n", " ")})
+    return result
+
+
+def _prepare_localization_save(edits):
+    edits = _validated_localization_edits(edits)
+    if not edits:
+        return None
     path = ds_dir("mine") / LOCALIZATION_FILE
+    if path.exists():
+        try:
+            path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise ValueError("Existing localization must be valid UTF-8") from error
     values = parse_gxt2(path)
     vanilla, _, _, _ = _localization_baseline("mine")
     for edit in edits:
-        key, value = edit.get("key", "").strip(), edit.get("value", "")
-        if key:
-            if not valid_gxt_key(key):
-                raise ValueError(f"Invalid localization key for LML: {key}")
-            value = value.replace("\r", " ").replace("\n", " ")
-            if value == vanilla.get(key, ""):
-                values.pop(key, None)
-            else:
-                values[key] = value
+        key, value = edit["key"], edit["value"]
+        if value == vanilla.get(key, ""):
+            values.pop(key, None)
+        else:
+            values[key] = value
     invalid = [key for key in values if not valid_gxt_key(key)]
     if invalid:
         raise ValueError("Invalid localization keys already on disk: " + ", ".join(invalid))
     lines = ["[LEXEDITOR OVERRIDES]", ""]
     lines.extend(f"{key} = {values[key]}" for key in sorted(values))
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    ensure_localization_install()
-    return len(edits)
+    payload = ("\n".join(lines) + "\n").encode("utf-8")
+    if b"\x00" in payload:
+        raise ValueError("Existing localization cannot contain NUL")
+    return path, payload, _localization_install_bytes(), len(edits)
+
+
+def _commit_localization_save(prepared):
+    if prepared is None:
+        return 0
+    path, payload, install_payload, count = prepared
+    path.write_bytes(payload)
+    if install_payload is not None:
+        (ds_dir("mine") / "install.xml").write_bytes(install_payload)
+    return count
+
+
+def save_localization(edits):
+    return _commit_localization_save(_prepare_localization_save(edits))
 
 
 def load_file(name, ds="mine"):
@@ -2528,13 +2585,14 @@ def create_catalog_item(data):
     if desc_node is None:
         desc_node = ET.SubElement(ui, "description")
     desc_node.text = description_key
-    root.find("catalog").find("items").append(item)
-    save_file(CATALOG_FILE)
-    record_custom_catalog_origin("items", key)
-    save_localization([
+    localization = _prepare_localization_save([
         {"key": name_key, "value": name},
         {"key": description_key, "value": description},
     ])
+    root.find("catalog").find("items").append(item)
+    save_file(CATALOG_FILE)
+    record_custom_catalog_origin("items", key)
+    _commit_localization_save(localization)
     return {"key": key}
 
 
@@ -5639,7 +5697,10 @@ class Handler(PluginRequestHandler):
                 elif path == "/api/labels/save":
                     self._json({"saved": save_label(body.get("scope", ""), body.get("key", ""), body.get("value", ""))})
                 elif path == "/api/localization/save":
-                    self._json({"saved": save_localization(body.get("edits", []))})
+                    try:
+                        self._json({"saved": save_localization(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path.startswith("/api/loot/") and path.endswith("/save"):
                     name = path[len("/api/loot/"):-len("/save")]
                     if name not in LOOT_FILES:
