@@ -88,6 +88,25 @@ they are made afterward. A modded starting assignment requires a guarded
 Hext change to the card initializer; existing saves retain their current
 owners unless another proven path changes them.
 
+The editor's authored Hext replacement occupies only `0x8DFF20..0x8DFF6F`;
+the next function at `0x8DFF70` remains untouched. Its 47-byte routine clears
+the original inventory and seen flags, preserves unrelated flag bits,
+initializes the RNG state, and copies a 33-byte inline starting-owner map.
+The generated patch requires the supported executable's exact hash. No
+executable file or existing save is edited.
+
+The verifier compares the replacement against the original initializer for
+all 256 initial flag patterns and four owner maps (1,024 comparisons). Only
+the requested rare-owner bytes differ. Adjacent state, nonvolatile registers,
+the return stack and the following function bytes remain intact; edited owners
+also feed the native hand builder. This does not establish live-game acceptance.
+
+Starting maps are complete Hext replacements: the last enabled map wins in
+load order, including its unchanged assignments. Property patches still write
+only changed scalar bytes. The editor allows opponent owners 0–239; zero is
+excluded by native rare selection. Values 240–255 are not offered as opponent
+decks because their other ownership-state effects are not established for editing.
+
 An argument can be a literal or a variable reference. The latter selects a
 variable whose value is read during play; it is not the current match value.
 Edits preserve the original argument opcode and unrelated script bytes.

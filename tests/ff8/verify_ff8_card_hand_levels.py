@@ -6,9 +6,14 @@ No game process, installation, or save is modified.
 from hashlib import sha256
 from pathlib import Path
 import struct
+import sys
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ESP, UC_X86_REG_EIP
+from unicorn.x86_const import UC_X86_REG_ESI, UC_X86_REG_EDI, UC_X86_REG_EBX, UC_X86_REG_EBP
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from plugins.ff8 import cards as card_records
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 EXPECTED = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
@@ -111,6 +116,43 @@ def run():
     assert bytes(engine.mem_read(0x1CFEF37, 1)) == b"\xA5"
     assert bytes(engine.mem_read(0x1CFEFB8, 1)) == b"\xA5"
     print("PASS native card initialization after init.out: rare cards 77-109 start with owners 200-232; adjacent state preserved")
+
+    original_code = bytes(engine.mem_read(card_records.INITIALIZER, card_records.INITIALIZER_SIZE))
+    # Compare complete save-state effects against the original initializer,
+    # not a second implementation of its algorithm. All flag bit patterns and
+    # several owner maps exercise preservation and the exact overwrite bounds.
+    registers = (UC_X86_REG_ESI, UC_X86_REG_EDI, UC_X86_REG_EBX, UC_X86_REG_EBP)
+
+    def initialize(code, seed):
+        engine.mem_write(card_records.INITIALIZER, code)
+        engine.ctl_remove_cache(card_records.INITIALIZER,
+                                card_records.INITIALIZER + card_records.INITIALIZER_SIZE)
+        engine.mem_write(0x1CFEF37, seed)
+        engine.mem_write(stack, struct.pack("<I", 0x30000000))
+        engine.reg_write(UC_X86_REG_ESP, stack)
+        for register in registers:
+            engine.reg_write(register, 0x12345678 + register)
+        engine.emu_start(card_records.INITIALIZER, 0x30000000, count=10000)
+        assert engine.reg_read(UC_X86_REG_EIP) == 0x30000000
+        assert engine.reg_read(UC_X86_REG_ESP) == stack + 4
+        assert all(engine.reg_read(r) == 0x12345678 + r for r in registers)
+        return bytes(engine.mem_read(0x1CFEF37, len(seed)))
+
+    maps = (card_records.DEFAULT_OWNERS, bytes(33), bytes([7] * 33), bytes(range(33)))
+    following = bytes(engine.mem_read(card_records.INITIALIZER + card_records.INITIALIZER_SIZE, 16))
+    for flag in range(256):
+        seed = bytes([flag]) * 130
+        baseline = initialize(original_code, seed)
+        for owners in maps:
+            actual = initialize(card_records.owner_initializer(owners), seed)
+            expected = bytearray(baseline)
+            expected[78:111] = owners
+            assert actual == bytes(expected), (flag, list(owners), actual.hex(), bytes(expected).hex())
+            assert bytes(engine.mem_read(card_records.INITIALIZER + card_records.INITIALIZER_SIZE, 16)) == following
+    initialize(card_records.owner_initializer(bytes([7] * 33)), bytes([0xA5]) * 130)
+    forced_random[:] = [99, 49, 50, 0, 0, 0]
+    assert hand(1, 100, 7) == [77, 78, 80, 81, 82]
+    print("PASS authored starting-deck Hext: 1,024 native initializer comparisons, full adjacent state, nonvolatile registers and stack; edited owners feed native hands")
 
 
 if __name__ == "__main__":
