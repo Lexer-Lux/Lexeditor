@@ -79,8 +79,8 @@ CONFIG_LABELS = [
     "Unknown action 2", "Start action",
 ]
 CONFIG_FLAG_ENTRIES = [
-    {"name": "Battle vibration trigger", "mask": 0x01}, {"name": "Unknown bit 1", "mask": 0x02},
-    {"name": "Unknown bit 2", "mask": 0x04}, {"name": "Unknown bit 3", "mask": 0x08},
+    {"name": "Battle vibration trigger", "mask": 0x01}, {"name": "Unknown bit 1", "mask": 0x02, "readonly": True},
+    {"name": "Unknown bit 2", "mask": 0x04, "readonly": True}, {"name": "Unknown bit 3", "mask": 0x08, "readonly": True},
     {"name": "Vibration hardware present", "mask": 0x10}, {"name": "Use custom controls", "mask": 0x20},
     {"name": "No controller detected", "mask": 0x40}, {"name": "Controls modified", "mask": 0x80},
 ]
@@ -336,10 +336,17 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
             raise ValueError(f"{definition['label']} must be {definition['minimum']} to {definition['maximum']}")
         if field_name in {"weapon_id", "weapon_laguna", "weapon_kiros", "weapon_ward"} and value not in weapon_ids:
             raise ValueError(f"Invalid weapon id: {value}")
+        offset, size = int(definition["offset"]), int(definition["size"])
         lookup = definition.get("lookup", {})
         if lookup.get("type") == "enum" and value not in {entry["id"] for entry in lookup["entries"]}:
             raise ValueError(f"Invalid {definition['label']} choice: {value}")
-        offset, size = int(definition["offset"]), int(definition["size"])
+        if lookup.get("type") == "flags":
+            writable = 0
+            for entry in lookup["entries"]:
+                if not entry.get("readonly"):
+                    writable |= entry["mask"]
+            if (value ^ _read_int(result, offset, size)) & ~writable:
+                raise ValueError(f"{definition['label']}: unknown flags are read-only")
         result[offset:offset + size] = value.to_bytes(size, "little")
         changed += 1
     return bytes(result), changed

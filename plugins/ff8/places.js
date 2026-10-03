@@ -411,7 +411,16 @@
   function rerenderWorldMap(){renderWorldMap()}
 
   function initOwner(dataset,kind,id=0){const init=dataset?.init;if(!init)return null;if(kind==="general"||kind==="config")return init[kind];if(kind==="gf")return init.gfs.rows.find(row=>Number(row.id)===Number(id));if(kind==="character")return init.characters.rows.find(row=>Number(row.id)===Number(id));return null}
-  function initFieldSource(field,kind,id=0){const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,value=>field.value=field.control==="boolean"?Boolean(value):Number(value))}
+  function initFieldSource(field,kind,id=0){
+    const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);
+    const set=value=>{
+      if(field.lookup?.type==="flags"){
+        const writable=field.lookup.entries.filter(entry=>!entry.readonly).reduce((mask,entry)=>mask|Number(entry.mask??entry.value),0);
+        field.value=(field.value&~writable)|(Number(value)&writable);
+      }else field.value=field.control==="boolean"?Boolean(value):Number(value);
+    };
+    return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,set);
+  }
   function startingFields(fields,kind,id=0){return LexeditorUI.tileGrid(fields.map(field=>detailField({label:field.label,help:field.help?infoHelp(field.help):null,control:initFieldSource(field,kind,id),dataType:field.control==="boolean"?"BOOL":field.lookup?.type==="enum"?"ENUM":field.lookup?.type==="flags"?"FLAGS":"INT",min:field.minimum,max:field.maximum})))}
   function startingPicker(label,value,rows,change){return detailField({label,control:selectControl(value,rows.map(row=>({id:row.id,name:row.name})),change)})}
   function initNestedReferences(read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(state.referenceData[reference.id]?.init)})).filter(entry=>entry.value!==undefined)}
