@@ -152,11 +152,17 @@ def save_scene_map(store: OverlayStore, path: str, expected_sha256: str, edits: 
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Scene-map edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Scene-map token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate scene-map tile edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Scene-map values must be an object")
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the scene-map tile index is editable")
         row = by_token[token]

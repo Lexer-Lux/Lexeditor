@@ -105,11 +105,17 @@ def save_world_tiles(store: OverlayStore, path: str, expected_sha256: str, edits
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world-map tile edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the world-map tile index is editable")
         row = by_token[token]
@@ -158,11 +164,17 @@ def save_world_properties(store: OverlayStore, path: str, expected_sha256: str, 
     allowed = {"topLeft", "topRight", "bottomLeft", "bottomRight"}
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world property edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported world property fields: {', '.join(sorted(unknown))}")
@@ -213,11 +225,17 @@ def save_world_music(store: OverlayStore, path: str, expected_sha256: str, edits
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world music edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         if set(values) - {"leftMusic", "rightMusic"}:
             raise ValueError("Only the two stored world music indexes are editable")
         row = by_token[token]
@@ -273,11 +291,20 @@ def save_world_colors(store: OverlayStore, path: str, expected_sha256: str, edit
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world color edit")
         seen.add(token)
-        value = str(edit.get("hex", "")).strip()
+        if set(edit) - {"token", "hex"}:
+            raise ValueError("Only the world color value is editable")
+        value = edit.get("hex", "")
+        if not isinstance(value, str):
+            raise ValueError("World animation color must be text")
+        value = value.strip()
         if len(value) != 7 or not value.startswith("#"):
             raise ValueError("World animation color must be #RRGGBB")
         try:

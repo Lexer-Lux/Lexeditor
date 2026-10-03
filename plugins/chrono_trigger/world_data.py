@@ -85,7 +85,11 @@ def save_worlds(store: OverlayStore, expected_sha256: str, edits: list[dict]) ->
     output = bytearray(payload)
     seen: set[str] = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World header edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World header token must be text")
         if token in seen:
             raise ValueError("Duplicate world header edit")
         seen.add(token)
