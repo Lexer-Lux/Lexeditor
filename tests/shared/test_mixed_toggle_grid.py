@@ -1,6 +1,7 @@
 """A related selector shares the flag grid without reserving another column."""
 from test_shared_ui_feedback import page, framework, ROOT
 import os
+import pytest
 
 
 def test_selector_and_flags_share_grid(page):
@@ -26,9 +27,12 @@ def test_selector_and_flags_share_grid(page):
     assert all(page.locator('.lex-toggle-name .lex-info-help').nth(i).is_visible() for i in range(4))
 
 
-def test_flag_names_and_help_fit_before_adding_columns(page):
+@pytest.mark.parametrize('font', ['theme', 'Arial', 'sans-serif'])
+def test_flag_names_and_help_fit_before_adding_columns(page, font):
     framework(page)
     page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    if font != 'theme':
+        page.evaluate('font=>document.documentElement.style.setProperty("--lex-font",font)', font)
     page.evaluate('''()=>{
       const U=LexeditorUI;
       document.querySelector('main').append(U.detailPanel({title:'Item',body:[U.detailField({label:'Use flags',control:U.toggleRow({
@@ -48,7 +52,13 @@ def test_flag_names_and_help_fit_before_adding_columns(page):
               const text=r.getBoundingClientRect(),help=e.querySelector('.lex-info-help').getBoundingClientRect();
               return r.getClientRects().length===1 && Math.abs((text.top+text.bottom-help.top-help.bottom)/2)<5
                 && e.scrollWidth<=e.clientWidth+1;
-            })'''), (width, scale)
+            })'''), (width, scale, font, page.locator('.lex-toggle-name').evaluate_all('''es=>es.map(e=>{
+              const r=document.createRange();r.selectNodeContents(e.firstChild);
+              const text=r.getBoundingClientRect(),help=e.querySelector('.lex-info-help').getBoundingClientRect(),box=e.getBoundingClientRect();
+              return {label:e.textContent,textWidth:text.width,boxWidth:box.width,textLines:r.getClientRects().length,
+                centerDelta:(text.top+text.bottom-help.top-help.bottom)/2,toggleWidth:e.parentElement.getBoundingClientRect().width,
+                railWidth:e.parentElement.querySelector('.lex-toggle-rail').getBoundingClientRect().width};
+            })'''))
     if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
         page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
 
