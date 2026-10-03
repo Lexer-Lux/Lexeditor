@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 UNDECIDED = {
     "bannerlord/editor_shared.js": 1, "blank/editor.js": 2, "chrono_trigger/editor.js": 1,
     "ds3/editor.js": 1, "factorio/editor.js": 1, "ff7/workspace.js": 1, "ff7r/editor.js": 2,
-    "ff7r2/editor.js": 3, "ff8/cards_ui.js": 2, "ff8/core.js": 1, "ff9/editor.js": 3,
+    "ff7r2/editor.js": 3, "ff8/cards_ui.js": 1, "ff8/core.js": 1, "ff9/editor.js": 3,
     "ffx_x2/editor.js": 2, "palworld/editor.js": 1, "project_zomboid/editor.js": 2, "rdr/editor.js": 3,
     "rdr/rbf.js": 1, "rdr/strings.js": 1, "rdr2/challenges.js": 1, "rdr2/crafting.js": 1,
     "rdr2/effects.js": 2, "rdr2/items.js": 1, "rdr2/loot.js": 2, "rdr2/weapons.js": 1,
