@@ -228,8 +228,8 @@ def main() -> None:
                     capture(page, screenshots, "metadata-desktop.png")
 
                     page.evaluate('navigate("dependencies")')
-                    build_button = page.get_by_role("button", name="Build Mod")
-                    build_button.scroll_into_view_if_needed()
+                    build_button = page.get_by_role("button", name="Build Mod",include_hidden=True)
+                    reveal_settings_locator(page,build_button,"Build Mod")
                     assert build_button.is_visible()
                     no_horizontal_overflow(page, "dependencies-desktop")
                     capture(page, screenshots, "dependencies-desktop.png")
@@ -265,11 +265,12 @@ def main() -> None:
 
                     page.evaluate('navigate("content")')
                     page.locator(".lex-tabbed-panel").wait_for()
-                    assert int(page.locator(".lex-page-total").first.inner_text()) >= 2
-                    page.get_by_role("button", name="Next page").first.click()
+                    record_pager=page.locator('.lex-paged-list-detail > .lex-pager')
+                    assert int(record_pager.locator(".lex-page-total").inner_text()) >= 2
+                    record_pager.get_by_role("button", name="Next page",exact=True).click()
                     page.wait_for_timeout(100)
                     assert page.locator(".lex-paged-list-detail").get_attribute("data-lex-page") == "1"
-                    page.get_by_role("button", name="First page").first.click()
+                    record_pager.get_by_role("button", name="First page",exact=True).click()
                     name_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Name"]')
                     family_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Family"]')
                     name_sort.wait_for(timeout=5000)
