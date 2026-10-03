@@ -27,6 +27,7 @@
 ==================================================================== GITHUB
 
 - Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
+    > status 2026-10-03: #645, #628, #513, #461, #467, #509 and #518 are now actionable: acceptance preparation, unfinished cross-game scope or delivery remains. Live descriptions/comments and the relevant handoffs were checked before changing labels; every result has one workflow label, with discussions intact. #498 retains Needs Testing because its latest native-slider implementation is on master with a concrete checklist. The wider semantic audit remains open.
     > status 2026-10-03: #773-776, #778-779, #782-794 and #802-805 now have game labels, unprefixed titles and actionable status for unfinished design/research without a named Lexer blocker. Title-only repairs preserve specific design questions on #841-847 and #857-858; #836-837, #870-871 and #903 were also corrected. All 37 live results were verified with bodies/comments intact. The open-issue search finds no remaining known game/shared prefixes; workflow semantics and delivery evidence still need auditing.
     > status 2026-10-03: Live descriptions/comments were checked for #754, #781, #795-796, #798-801, #806-814, #820-823, #828-839, #856, #866-869, #872-874, #898 and #904. All 43 now use unprefixed titles and the relevant game/shared labels. Equipment comparison, scaling, damage clarity and shared-system research/design work are actionable where no blocking Lexer action is named. Live results show exactly one workflow label for each; bodies/comments were preserved. The wider semantic audit remains open.
     > status 2026-10-03: #852-855 Binocular Rework now use unprefixed titles with their existing game labels. Their specific design questions, bodies and comments were preserved. Remaining issue audit is still open.
@@ -56,6 +57,7 @@ GF
 
 Models
 - models: 90% of things here have no preview, say "locked", and have basically nothing in their details panel. what gives?
+    > status 2026-10-03: The focused headless Models browser check passes: textured geometry, rotation, zoom, Home reset, GLB export, encounter thumbnails and renderer disposal. Its rendered GIM52A preview was inspected. This verifies the supported model path, not the 48 unsupported files or every resource family.
     > status 2026-10-03: Audited the installed vanilla inventory: 853 battle files, with 48 still unsupported. Current decoding recognizes monsters, stages, bodies, weapons, summon/effect meshes, textures, sounds and other resources; non-model resources do not all have a 3D preview. The 4-byte unsupported files hold nonzero numeric values, so they were not relabelled as empty placeholders. Decode failure now says the contents are not decoded instead of claiming they cannot be a model; eight focused resource checks pass. Remaining format identification, preview coverage and rendered acceptance stay open.
 
 SFX / Text
