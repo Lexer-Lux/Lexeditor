@@ -84,6 +84,12 @@ def session_for(plugin_id: str, project: str | None):
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
     extra_env = {variable: project} if variable and project else {}
+    if plugin_id == "chrono_trigger" and project:
+        from chrono_archive_fixture import create_game
+        game = Path(project) / ".lexeditor-chrono-game"
+        create_game(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_ROOT"] = str(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_PROJECT"] = str(Path(project) / "mod")
     # Bannerlord deliberately refuses to boot against an invalid project or game
     # root. Screenshot/verifier runs use an isolated clean module and fake install
     # so those checks exercise the real UI without depending on C:\\Bannermod or
