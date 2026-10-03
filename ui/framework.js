@@ -2483,7 +2483,9 @@
     if (input && !readOnly && inputType !== "checkbox") {
       // Selecting the whole value on focus keeps a drag inside the field from
       // competing with the slider handle that shares the same box.
-      input.addEventListener("focus", () => requestAnimationFrame(() => input.select?.()));
+      input.addEventListener("focus", () => {
+        if (!input.lexRestoringFocus) requestAnimationFrame(() => input.select?.());
+      });
       if (numericLike) {
         input.addEventListener("beforeinput", event => {
           if (event.data && /[^0-9.eE+-]/.test(event.data)) { event.preventDefault(); rejectValue(); }
@@ -4341,7 +4343,19 @@
       content.replaceChildren(...columns,off);
     };
 
-    const render = () => {
+    const retainContentFocus = action => {
+      const focused = content.contains(document.activeElement) ? document.activeElement : null;
+      const selection = focused && [focused.selectionStart, focused.selectionEnd];
+      action();
+      if (focused?.isConnected && !focused.closest("[hidden]") && focused.getClientRects().length) {
+        focused.lexRestoringFocus = true;
+        try { focused.focus({preventScroll: true}); }
+        finally { delete focused.lexRestoringFocus; }
+        if (selection?.[0] != null && typeof focused.setSelectionRange === "function")
+          focused.setSelectionRange(...selection);
+      }
+    };
+    const render = () => retainContentFocus(() => {
       let visible = cards.filter(card => !card.hidden);
       // Paginating can split a tall section into pieces, so read the cards
       // again afterwards.
@@ -4362,12 +4376,12 @@
         if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
       }
       scroll.style.overflowY = overflows() ? "auto" : "hidden";
-    };
+    });
 
     const turn = value => {page = value; render(); scroll.scrollTop = 0;};
     // Re-break the pages for the box as it is now, keeping the first card on
     // screen on screen.
-    const refit = () => {
+    const refit = () => retainContentFocus(() => {
       let visible = cards.filter(card => !card.hidden);
       const anchor = visible[starts[page]] || null;
       paginate(visible);
@@ -4375,7 +4389,7 @@
       const at = anchor ? Math.max(0, visible.indexOf(anchor)) : 0;
       page = Math.max(0, starts.findLastIndex(start => start <= at));
       render();
-    };
+    });
     wheelPages(scroll, direction => {
       const target = page + direction;
       if (target >= 0 && target < starts.length) turn(target);
