@@ -20,7 +20,7 @@ from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .troop_editor import create_troop, troop_data, save_troops
 from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
-                             _single_bits, create_sound, dataset_data, header_constants, mesh_choices, save_dataset)
+                             _single_bits, create_dataset_record, create_sound, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .sound_preview import sample_path
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
@@ -886,6 +886,10 @@ class Handler(PluginRequestHandler):
                 self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/sounds/create":
                 self.json_response(note_created("sounds", create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
+            elif path == "/api/module-records/create":
+                dataset = body.get("dataset", "")
+                self.json_response(note_created(dataset, create_dataset_record(MODULE_SYSTEM, dataset,
+                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
             elif path == "/api/catalog/file/save":
                 self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":

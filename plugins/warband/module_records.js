@@ -36,32 +36,35 @@
     }
     const dirtyCount=()=>Object.keys(edits).reduce((n,dataset)=>n+datasetDirtyCount(dataset),0);
     const creationBlocked=()=>state.activeSource!=="mine"?"Open an editable mod first.":
-      (options.hasPendingEdits?.()||dirtyCount())?"Save or discard pending edits before creating a sound.":
+      (options.hasPendingEdits?.()||dirtyCount())?"Save or discard pending edits before creating a record.":
       state.build?.running?"Wait for the current build to finish.":"";
-    function beginSoundCreation(data){
+    function beginRecordCreation(data){
       if(creationBlocked())return;
-      const U=LexeditorUI,local=viewState('sounds');
+      const dataset=active,noun=dataset==='sounds'?'sound':'record';
+      const U=LexeditorUI,local=viewState(dataset);
       const templates=data.rows.filter(row=>!row.problem);
-      const source=U.el('select',{'aria-label':'Copy from sound'},...templates.map(row=>
+      const source=U.el('select',{'aria-label':`Copy from ${noun}`},...templates.map(row=>
         U.el('option',{value:row.recordIndex,selected:String(row.recordIndex)===local.selected},row.id)));
-      const id=U.el('input',{type:'text',required:true,pattern:'[a-z][a-z0-9_]*','aria-label':'New sound ID'});
+      const id=U.el('input',{type:'text',required:true,pattern:'[a-z][a-z0-9_]*','aria-label':`New ${noun} ID`});
       const create=U.el('button',{type:'button',onclick:async()=>{
         if(!id.reportValidity()||creationBlocked())return;
         const template=templates.find(row=>row.recordIndex===Number(source.value));if(!template)return;
         create.disabled=true;
         try{
-          const result=await api('/api/sounds/create',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({recordIndex:template.recordIndex,originalId:template.id,id:id.value,sha256:data.sha256})});
+          const result=await api('/api/module-records/create',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({dataset,recordIndex:template.recordIndex,originalId:template.id,id:id.value,sha256:data.sha256})});
           local.query='';local.selected=String(result.recordIndex);
           local.page=Math.floor(result.recordIndex/Math.max(1,local.pageSize));
-          await load('sounds',true);
+          await load(dataset,true);
           local.query=result.created;local.page=0;local.selected=String(result.recordIndex);
           try{await options.onCreated?.(data.filename);}
-          catch(error){U.showToast('Sound created; build failed: '+(error.message||String(error)),true);}
+          catch(error){U.showToast('Record created; build failed: '+(error.message||String(error)),true);}
           renderApp();
         }catch(error){create.disabled=false;U.showToast(error.message||String(error),true);}
       }},'Create and build');
-      main().replaceChildren(U.detailPanel({title:'Add sound',help:'Copies the sound files and playback settings. The new sound plays only when game behaviour references its ID.',body:[
+      main().replaceChildren(U.detailPanel({title:`Add ${noun}`,help:dataset==='sounds'?
+        'Copies the sound files and playback settings. The new sound plays only when game behaviour references its ID.':
+        'Copies the selected record and all its settings. Change its properties after creation. Game behaviour must reference the new ID for it to have an effect.',body:[
         U.detailField({label:'Copy from',control:source}),
         U.detailField({label:'ID',control:id,help:U.infoHelp('Use a unique ID with lowercase letters, digits and underscores. Start with a letter.')}),
         U.actionRow(U.el('button',{type:'button',onclick:renderApp},'Cancel'),create)]}));
@@ -241,9 +244,9 @@
       const prefs=preferencesFor(active,definitions);
       const selectedRow=filtered.find(row=>String(row.recordIndex)===local.selected)||filtered[0];if(selectedRow)local.selected=String(selectedRow.recordIndex);
       main().replaceChildren(host(LexeditorUI.pagedListDetail({
-        add:active==='sounds'?()=>beginSoundCreation(data):undefined,
-        addDisabled:active==='sounds'&&!!creationBlocked(),
-        addDisabledReason:active==='sounds'?creationBlocked():`Warband's module files can take new ${data.schema.label.toLowerCase()}, but Lexeditor only edits existing ones. Adding one is not supported yet.`,rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
+        add:()=>beginRecordCreation(data),
+        addDisabled:!!creationBlocked()||!data.rows.some(row=>!row.problem),
+        addDisabledReason:creationBlocked()||(!data.rows.some(row=>!row.problem)?'No supported template records are available.':''),rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
         noun:data.schema.label.toLowerCase(),splitKey:"warband-module-"+active,className:"warband-paged-table warband-module-data",slots:false,
         fit:{minRowHeight:36},page:local.page,pageSize:local.pageSize,defaultSplit:45,
         search:{key:"warband-module-"+active,value:local.query,placeholder:"Search "+data.schema.label.toLowerCase()+"…",change:value=>{local.query=value;local.page=0;renderApp();}},

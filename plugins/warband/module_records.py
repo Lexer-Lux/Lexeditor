@@ -834,24 +834,31 @@ def _write_candidate(path, candidate, encoding, raw):
 
 def create_sound(root, expected_sha256, record_index, original_id, new_id):
     """Append a sound template; process_sounds numbers existing entries unchanged."""
+    return create_dataset_record(root, 'sounds', expected_sha256, record_index, original_id, new_id)
+
+
+def create_dataset_record(root, dataset, expected_sha256, record_index, original_id, new_id):
+    """Append a structured template without importing source or renumbering records."""
+    if dataset not in SCHEMAS:
+        raise ValueError("Unknown Warband Module System dataset")
     if type(record_index) is not int:
-        raise ValueError("Choose an existing sound")
+        raise ValueError("Choose an existing record")
     if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", new_id):
         raise ValueError("ID must start with a lowercase letter and use letters, digits or underscores")
-    schema = SCHEMAS['sounds']
+    schema = SCHEMAS[dataset]
     path = Path(root) / schema['filename']
     with _LOCK:
         text, encoding, raw = _source(path)
         if hashlib.sha256(raw).hexdigest() != expected_sha256:
-            raise ValueError("Sound source changed; reload before creating")
+            raise ValueError("Record source changed; reload before creating")
         records = _records(text, schema)
         ids = [row['id'] for row in records]
         if any(row.get('problem') for row in records) or len(set(ids)) != len(ids):
             raise ValueError("Repair unsupported or duplicate source records before creating")
         if new_id in ids:
-            raise ValueError("A sound with that ID already exists")
+            raise ValueError("A record with that ID already exists")
         if not 0 <= record_index < len(records) or records[record_index]['id'] != original_id:
-            raise ValueError("Template sound changed; reload before creating")
+            raise ValueError("Template record changed; reload before creating")
         spans = _record_spans(text, schema['variable'])
         start, end = spans[record_index]
         left, right = records[record_index]['_spans'][0]
@@ -860,7 +867,7 @@ def create_sound(root, expected_sha256, record_index, original_id, new_id):
         newline = '\r\n' if '\r\n' in text else '\n'
         candidate = text[:insertion] + ',' + newline + '  ' + copied + text[insertion:]
         if [row['id'] for row in _records(candidate, schema)] != ids + [new_id]:
-            raise ValueError("Creation changed existing sound identities")
+            raise ValueError("Creation changed existing record identities")
         return {**_write_candidate(path, candidate, encoding, raw),
                 'created':new_id, 'recordIndex':len(records)}
 
