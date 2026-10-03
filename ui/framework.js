@@ -8179,7 +8179,7 @@ ${contents.path}`});
     const cell = event.target.closest?.(".lex-column-list-cell");
     const row = cell?.closest(".lex-list-row[data-key], [data-key]");
     if (!cell || !row) { lastCellClick = null; return; }
-    const identity = `${row.dataset.key} ${cell.dataset.columnKey}`;
+    const identity = `${row.dataset.key}|${cell.dataset.columnKey}`;
     const now = performance.now();
     if (lastCellClick?.identity === identity && now - lastCellClick.at < 500) {
       lastCellClick = null;
@@ -8573,7 +8573,12 @@ ${contents.path}`});
         // The double-click is caught once, at the document: a list whose
         // click selects the row re-renders between the two clicks, so the
         // cell the double-click lands on is a new one, not the first.
-        if (column.edit) cell.lexBeginEdit = () => beginCellEdit(cell, column, row, options.refresh);
+        if (column.edit) {
+          cell.lexBeginEdit = () => beginCellEdit(cell, column, row, options.refresh);
+          // A table that stays put between clicks gets the browser's own
+          // double-click; the counted one above covers a re-rendering table.
+          cell.addEventListener("dblclick", event => { event.preventDefault(); cell.lexBeginEdit(); });
+        }
         return cell;
       }),
     });
