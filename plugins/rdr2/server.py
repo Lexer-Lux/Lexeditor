@@ -76,11 +76,11 @@ except ImportError:
 
 try:
     from .bounty_hunters import (read_bounty_hunters as _read_bounty_hunters,
-                                 apply_bounty_hunter_edits as _apply_bounty_hunter_edits,
+                                 prepare_bounty_hunter_edits as _prepare_bounty_hunter_edits,
                                  ensure_bounty_hunter_metadata as _ensure_bounty_hunter_metadata)
 except ImportError:
     from bounty_hunters import (read_bounty_hunters as _read_bounty_hunters,
-                                apply_bounty_hunter_edits as _apply_bounty_hunter_edits,
+                                prepare_bounty_hunter_edits as _prepare_bounty_hunter_edits,
                                 ensure_bounty_hunter_metadata as _ensure_bounty_hunter_metadata)
 
 try:
@@ -5087,8 +5087,12 @@ def apply_bounty_hunter_edits(edits):
         return 0
     if DATASETS['mine'].get('readonly'):
         raise ValueError("This dataset is read-only")
-    return _apply_bounty_hunter_edits(ds_dir("mine") / BOUNTY_HUNTERS_FILE,
-                                      ds_dir("mine") / DISPATCH_FILE, edits)
+    with _lock:
+        count, prepared = _prepare_bounty_hunter_edits(ds_dir("mine") / BOUNTY_HUNTERS_FILE,
+                                                      ds_dir("mine") / DISPATCH_FILE, edits)
+        names = {ds_dir("mine") / name: name for name in [BOUNTY_HUNTERS_FILE, DISPATCH_FILE]}
+        _commit_xml_roots([(names[path], load_file(names[path]), root) for path, root in prepared])
+        return count
 
 
 def apply_dispatch_edits(edits):

@@ -187,3 +187,51 @@ def test_final_cooldown_range_uses_exact_decimals(files, values, backups):
     node = bounty._parse(dispatch).find('.//DelayInGameHoursAfterBountyAcquired/Item')
     assert node.find('Min').get('value') == '5.000000000000000001'
     assert node.find('Max').get('value') == '5.000000000000000002'
+
+
+@pytest.mark.parametrize('backups,fail_at', [(False, n) for n in range(1, 5)] + [(True, n) for n in range(1, 3)])
+@pytest.mark.parametrize('operation', ['stage', 'replace'])
+def test_two_file_failure_rolls_back_files_backups_and_cache(files, monkeypatch, backups, fail_at, operation):
+    root, response, dispatch = files
+    if backups:
+        for path in [response, dispatch]:path.with_suffix(path.suffix + '.bak').write_bytes(b'original backup')
+    entries = [s.load_file(name) for name in [s.BOUNTY_HUNTERS_FILE, s.DISPATCH_FILE]]
+    cached = [(entry['root'], entry['mtime'], bounty.ET.tostring(entry['root'])) for entry in entries]
+    before = snapshot(root)
+    timestamps = [path.stat().st_mtime_ns for path in [response, dispatch]]
+    count = 0
+    original = s.tempfile.NamedTemporaryFile if operation == 'stage' else s.os.replace
+    def fail(*args, **kwargs):
+        nonlocal count
+        count += 1
+        if count == fail_at:raise OSError('injected bounty publication failure')
+        return original(*args, **kwargs)
+    monkeypatch.setattr(s.tempfile if operation == 'stage' else s.os,
+                        'NamedTemporaryFile' if operation == 'stage' else 'replace', fail)
+    with pytest.raises(OSError, match='injected bounty'):
+        s.apply_bounty_hunter_edits([FIRST, {'id': COOLDOWN, 'value': '0.125'}])
+    assert snapshot(root) == before
+    assert [path.stat().st_mtime_ns for path in [response, dispatch]] == timestamps
+    for entry, (doc, mtime, content) in zip(entries, cached):
+        assert entry['root'] is doc and entry['mtime'] == mtime
+        assert bounty.ET.tostring(doc) == content
+
+
+def test_preparation_is_pure_and_success_publishes_both_cached_roots(files):
+    root, response, dispatch = files
+    for path in [response, dispatch]:path.write_bytes(b'\xef\xbb\xbf<?xml version="1.0" encoding="UTF-8"?>\n' + path.read_bytes())
+    before = snapshot(root)
+    edits = [FIRST, {'id': COOLDOWN, 'value': '0.125'}]
+    count, prepared = bounty.prepare_bounty_hunter_edits(response, dispatch, edits)
+    assert count == 2 and len(prepared) == 2
+    assert snapshot(root) == before
+    entries = [s.load_file(name) for name in [s.BOUNTY_HUNTERS_FILE, s.DISPATCH_FILE]]
+    original_roots = [entry['root'] for entry in entries]
+    assert s.apply_bounty_hunter_edits(edits) == 2
+    for entry, old, path in zip(entries, original_roots, [response, dispatch]):
+        assert entry['root'] is not old
+        assert entry['mtime'] == path.stat().st_mtime_ns
+        assert path.read_bytes().startswith(b'\xef\xbb\xbf<?xml version="1.0" encoding="UTF-8"?>\n')
+        assert path.with_suffix(path.suffix + '.bak').read_bytes() == before[str(path.relative_to(root))]
+    assert entries[0]['root'].find('.//MinBounty').get('value') == FIRST['value']
+    assert entries[1]['root'].find('.//DelayInGameHoursAfterBountyAcquired/Item/Min').get('value') == '0.125'

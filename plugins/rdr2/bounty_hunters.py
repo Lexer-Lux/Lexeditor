@@ -436,11 +436,12 @@ def _cooldown_target(root: ET.Element, edit_id: str) -> ET.Element | None:
     return _scalar(_one(item, parts[3]))
 
 
-def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> int:
+def prepare_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> tuple[int, list[tuple[Path, ET.Element]]]:
+    """Validate a candidate batch without writing either file or its backup."""
     if not isinstance(edits, list):
         raise ValueError("Bounty-hunter edits must be a list")
     if not edits:
-        return 0
+        return 0, []
     response_root, dispatch_root = _parse(response_file), _parse(dispatch_file)
     response_changed = dispatch_changed = 0
     seen = set()
@@ -481,29 +482,7 @@ def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: l
         values = [_numeric(node.get('value'), identity) for node in nodes]
         if Decimal(values[0].rstrip('fF')) > Decimal(values[1].rstrip('fF')):
             raise ValueError(f'{identity}: minimum exceeds maximum')
-    if response_changed:
-        _write(response_file, response_root)
-    if dispatch_changed:
-        _write(dispatch_file, dispatch_root)
-    return response_changed + dispatch_changed
-
-
-def read_bounty_hunters_from_roots(response_root: ET.Element, dispatch_root: ET.Element) -> dict:
-    """Small validation view used before writes; roots are not serialized."""
-    phases = []
-    response = response_root.find("./BountyResponses/BountyDispatch")
-    for phase in response.findall("./DispatchPhases/Phase") if response is not None else []:
-        name = (phase.findtext("Name") or "").strip()
-        phases.append({"name": name, "groups": _dispatch_group_rows(phase, name)})
-    return {"phases": phases}
-
-
-def _write(path: Path, root: ET.Element) -> None:
-    raw = path.read_bytes()
-    bom = raw.startswith(b"\xef\xbb\xbf")
-    first = raw.decode("utf-8-sig").splitlines()[0]
-    declaration = first if first.lstrip().startswith("<?xml") else '<?xml version="1.0" encoding="UTF-8"?>'
-    body = ET.tostring(root, encoding="unicode")
-    data = (declaration + "\n" + body).encode("utf-8")
-    path.with_suffix(path.suffix + ".bak").write_bytes(raw) if not path.with_suffix(path.suffix + ".bak").exists() else None
-    path.write_bytes((b"\xef\xbb\xbf" if bom else b"") + data)
+    prepared = []
+    if response_changed:prepared.append((response_file, response_root))
+    if dispatch_changed:prepared.append((dispatch_file, dispatch_root))
+    return response_changed + dispatch_changed, prepared
