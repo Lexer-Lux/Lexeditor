@@ -30072,10 +30072,10 @@ index 0000000..7336b42
 +} // namespace lexeditor_interaction_indicator
 diff --git a/src/lexeditor_ff8_bars.cpp b/src/lexeditor_ff8_bars.cpp
 new file mode 100644
-index 0000000..def0eb9
+index 0000000..c05efe7
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.cpp
-@@ -0,0 +1,792 @@
+@@ -0,0 +1,799 @@
 +#include "lexeditor_ff8_bars.h"
 +#include "lexeditor_ff8_hp_colors.h"
 +
@@ -30679,6 +30679,13 @@ index 0000000..def0eb9
 +        ff8_externals.char_comp_stats_1CFF000.size() != 3) {
 +        return;
 +    }
++    // The blue gauge spanned each name's own width, so Zell's bar was shorter
++    // than Quistis's. Every row's blue gauge now runs as long as the widest
++    // name drawn this frame, as the red gauge has one length for every row.
++    float name_span = 0.0f;
++    for (const auto &row : g_hp_rows)
++        if ((row.hp_visible || row.atb_visible) && row.name_right > row.left)
++            name_span = std::max(name_span, row.name_right - row.left);
 +    for (const auto &row : g_hp_rows) {
 +        // Only rows the native HUD drew this frame.
 +        if (!(row.hp_visible || row.atb_visible) ||
@@ -30704,9 +30711,9 @@ index 0000000..def0eb9
 +                row.top + 14.0f, IM_COL32(236, 0, 0, 255), true);
 +        }
 +        // The blue gauge takes the two pixels above the name, whose text
-+        // starts at row_y+2, and spans the name's own area.
++        // starts at row_y+2, and spans the widest name's area.
 +        if (enable_ff8_gf_hp_bars && row.name_right > row.left)
-+            draw_line(row.gf_current, row.gf_maximum, row.left, row.name_right,
++            draw_line(row.gf_current, row.gf_maximum, row.left, row.left + name_span,
 +                row.top, IM_COL32(48, 128, 255, 255));
 +    }
 +}
@@ -32290,10 +32297,10 @@ index 0000000..4be5c84
 +void lexeditor_ff8_interaction_indicators_draw();
 diff --git a/src/lexeditor_ff8_modern_controls.cpp b/src/lexeditor_ff8_modern_controls.cpp
 new file mode 100644
-index 0000000..862c63c
+index 0000000..7ef5566
 --- /dev/null
 +++ b/src/lexeditor_ff8_modern_controls.cpp
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,405 @@
 +#include "lexeditor_ff8_modern_controls.h"
 +#include "camera_axis.h"
 +#include "battle_camera.h"
@@ -32360,6 +32367,11 @@ index 0000000..862c63c
 +constexpr std::uintptr_t kBattleRepeatCall = 0x004A853D;
 +constexpr std::uintptr_t kBattleKeyTranslate = 0x004A2D60;
 +constexpr int kL2Function = 0x01, kR2Function = 0x02, kR1Function = 0x08;
++// FF8 has no L3/R3 function: its translator only remaps its 12 own bits, and
++// PSX R3 (0x400) never comes out of it. Clicking the right stick sets that bit
++// so Enhanced Scan (battle_shortcuts.py, Hext) has a button of its own; FFNx
++// owns the pad, which is why this one line lives in the driver.
++constexpr int kR3Function = 0x400;
 +// Shot registers its widget in slot 6 of the table at 01D76628 (20-byte
 +// entries, update callback first) and clears it on close (004ADBAC). Its
 +// update ends Shot through its own path when the request byte is set
@@ -32372,7 +32384,7 @@ index 0000000..862c63c
 +KeyTranslate original_translate = nullptr;
 +bool bindings_installed = false;
 +
-+struct BattleButtons { bool fire = false, flee = false, back = false; };
++struct BattleButtons { bool fire = false, flee = false, back = false, scan = false; };
 +BattleButtons buttons_now, buttons_before;
 +std::uint32_t buttons_frame = ~0u;
 +
@@ -32390,6 +32402,8 @@ index 0000000..862c63c
 +    buttons_now.fire = right > 0.5f || down(VK_LBUTTON);
 +    buttons_now.flee = left > 0.5f || down(VK_RBUTTON);
 +    buttons_now.back = b || down(VK_BACK);
++    buttons_now.scan = use_sdl_gamepad ? sdlgamepad.IsPressed(SDL_GAMEPAD_BUTTON_RIGHT_STICK)
++                                       : gamepad.IsPressed(XINPUT_GAMEPAD_RIGHT_THUMB);
 +}
 +
 +// channel: 0 held, 1 newly pressed, 2 repeating.
@@ -32398,11 +32412,21 @@ index 0000000..862c63c
 +    if (!lexeditor_ff8_modern_controls_battle_active()) return bits;
 +    read_battle_buttons();
 +    const bool fire_edge = buttons_now.fire && !buttons_before.fire;
-+    // The right trigger is also FF8's R2. Alone, that is half a flee and
-+    // nothing else, so it is withheld while the trigger means "fire".
-+    if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
-+    if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
++    // Shot fires on R2 (the right trigger) and only while Shot is open. FF8's
++    // own fire button is R1, so during Shot the trigger is handed over as R1
++    // and the real R1 is withheld. Outside Shot the trigger stays plain R2:
++    // turning it into R1 for the whole battle made it open Universal Item's
++    // Item menu, which is R1's job.
++    const bool shot_open = *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate;
++    if (shot_open) {
++        bits &= ~kR1Function;
++        // Alone, the trigger is half a flee and nothing else, so it is
++        // withheld while it means "fire".
++        if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
++        if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
++    }
 +    if (channel == 0 && buttons_now.flee) bits |= kL2Function | kR2Function;
++    if (channel == 0 ? buttons_now.scan : buttons_now.scan && !buttons_before.scan) bits |= kR3Function;
 +    if (channel == 1 && buttons_now.back && !buttons_before.back &&
 +        *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate) {
 +        *reinterpret_cast<std::uint8_t *>(kShotEndRequest) = 1;
@@ -33391,7 +33415,7 @@ index 0000000..a12ef0a
 +void lexeditor_ff8_stock_tweaks_install();
 diff --git a/src/lexeditor_ff8_toast.cpp b/src/lexeditor_ff8_toast.cpp
 new file mode 100644
-index 0000000..fd75e42
+index 0000000..dc2a235
 --- /dev/null
 +++ b/src/lexeditor_ff8_toast.cpp
 @@ -0,0 +1,168 @@
@@ -33423,13 +33447,13 @@ index 0000000..fd75e42
 +
 +lexeditor_toast::Queue g_queue;
 +
-+// FF8's default window: a silver-grey gradient, lighter at the top, inside a
-+// dark outer line and a pale inner one. Lexer asked for the game's own top
-+// notice rather than a blue box, so these follow the default grey window.
-+constexpr ImU32 kFillTop = IM_COL32(150, 150, 158, 236);
-+constexpr ImU32 kFillBottom = IM_COL32(84, 84, 92, 236);
-+constexpr ImU32 kEdgeOuter = IM_COL32(32, 32, 40, 255);
-+constexpr ImU32 kEdgeInner = IM_COL32(224, 224, 232, 255);
++// FF8's window: a dark blue gradient behind a pale double edge. These are the
++// colours the game's own window reads as on screen, not a theme of ours; a
++// message that looked like an overlay would defeat the point of this file.
++constexpr ImU32 kFillTop = IM_COL32(12, 24, 96, 232);
++constexpr ImU32 kFillBottom = IM_COL32(4, 8, 40, 232);
++constexpr ImU32 kEdgeOuter = IM_COL32(24, 32, 72, 255);
++constexpr ImU32 kEdgeInner = IM_COL32(200, 208, 232, 255);
 +constexpr ImU32 kText = IM_COL32(255, 255, 255, 255);
 +constexpr ImU32 kTextWarning = IM_COL32(255, 216, 136, 255);
 +constexpr ImU32 kTextShadow = IM_COL32(0, 0, 0, 200);
@@ -34576,10 +34600,10 @@ index 0000000..c3c89a0
 +} // namespace lexeditor_reptile_atb
 diff --git a/src/toast_layout.h b/src/toast_layout.h
 new file mode 100644
-index 0000000..7d37048
+index 0000000..db3b403
 --- /dev/null
 +++ b/src/toast_layout.h
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,70 @@
 +#pragma once
 +// Where a Lexeditor toast sits on screen, and how it fades.
 +//
@@ -34594,12 +34618,10 @@ index 0000000..7d37048
 +
 +namespace lexeditor_toast {
 +
-+// Lexer asked for the game's own notice: the wide silver box across the top
-+// of the screen that battle uses for "Received ..." and ability names. It
-+// spans nearly the whole frame, sits just below the top edge, and is padded
-+// inside by about one character.
-+constexpr float TOP_MARGIN = 0.02f;      // of the game's height
-+constexpr float SIDE_MARGIN = 0.02f;     // of the game's width
++// FF8's own message boxes sit a little above the bottom edge, indented from
++// both sides, and are padded inside by about one character.
++constexpr float BOTTOM_MARGIN = 0.08f;   // of the game's height
++constexpr float SIDE_MARGIN = 0.06f;     // of the game's width
 +constexpr float PADDING_CHARS = 1.0f;
 +constexpr float PADDING_LINES = 0.5f;
 +// The last fraction of the hold fades out, and the first fraction fades in, so
@@ -34619,22 +34641,23 @@ index 0000000..7d37048
 +    float text_x = 0.0f, text_y = 0.0f;
 +};
 +
-+// The box is always the full width between the margins, like the game's
-+// top notice, and as tall as the text. Its text is centred.
++// Size the box to the text, then place it bottom-centre. A box wider than the
++// frame allows is clamped rather than allowed to hang off the edge, which is
++// the case a long sentence in a small window produces.
 +inline Box layout(const Metrics &metrics, std::size_t lines, std::size_t columns)
 +{
 +    const float padding_x = metrics.char_width * PADDING_CHARS;
 +    const float padding_y = metrics.line_height * PADDING_LINES;
 +    const float limit = metrics.width * (1.0f - 2.0f * SIDE_MARGIN);
 +    Box box;
-+    box.width = limit;
++    box.width = std::min(limit,
++        static_cast<float>(columns) * metrics.char_width + 2.0f * padding_x);
 +    box.height = static_cast<float>(lines ? lines : 1) * metrics.line_height
 +        + 2.0f * padding_y;
 +    box.x = (metrics.width - box.width) * 0.5f;
-+    box.y = metrics.height * TOP_MARGIN;
-+    const float text_width = std::min(limit - 2.0f * padding_x,
-+        static_cast<float>(columns) * metrics.char_width);
-+    box.text_x = box.x + (box.width - text_width) * 0.5f;
++    box.y = metrics.height * (1.0f - BOTTOM_MARGIN) - box.height;
++    if (box.y < 0.0f) box.y = 0.0f;
++    box.text_x = box.x + padding_x;
 +    box.text_y = box.y + padding_y;
 +    return box;
 +}

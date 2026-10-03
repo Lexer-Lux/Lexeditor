@@ -80,9 +80,8 @@ World
 
 - Finish FF8 mod composition for formats without a proven merger; test installing, combining, ordering, and removing real mods.
 - Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
-- FF8: rebuild the native driver so R3 opens Enhanced Scan and Shot fires on R2 (source is in; Timed Hits already on Square).
-    > Lexer: yes go ahead  (to downloading the 63 MB CI build + an FFNx source checkout to package it)
 - Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
+    > status 2026-10-03: The rebuilt driver is packaged on todo with exact source provenance and independent hash pins. Linked-runtime checks reject all eleven mutations; cast-debit, vehicle clamp, camera/vehicle and Reptile artifact checks pass. Shipping-package verification passes, including simulated installation and checkout line endings. The native workflow's retired test reference is repaired; new CI, master integration and in-game acceptance remain outstanding. No game installation was changed.
 - Deliver and verify the implemented proportional FF8 vehicle throttle in-game, including partial trigger pressure, braking, coasting, and digital controls.
 - when i use the shot command in ff8 the crosshair thinsg over my target are so transparent i can barely see them. make them fully opaque. this should be part of the better targeting tweak.
 - FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
@@ -108,6 +107,9 @@ World
 
 ==================================================================== ANSWERS (finished items; the replies you may still want)
 
+- FF8 native driver rebuilt and packaged from Actions run 37093173008 with the current R3 Enhanced Scan and R2 Shot input mappings; Timed Hits retains Square. Complete compilation-source comparison, linked binary checks and shipping-package verification pass. The workflow failed after linking because it called a retired tweak test; its replacement passes against the archived DLL, and the repair awaits CI. This completes the rebuild, not delivery or in-game acceptance, which remain above.
+    > original: FF8: rebuild the native driver so R3 opens Enhanced Scan and Shot fires on R2 (source is in; Timed Hits already on Square).
+    > Lexer: yes go ahead  (to downloading the 63 MB CI build + an FFNx source checkout to package it)
 - Warband created-record pen: the shared table now renders it automatically from record origin; Warband no longer adds the pen separately in each list. Creation actions persist origin in the selected project's ledger without a manual step. Item/troop create-and-reload checks, sorting and duplicate-icon checks pass, the rendered troop list was inspected, and Warband CI passed at f6235a64. This verification created temporary fixture records; it does not mean Lexer created any records. Records with no known origin are not guessed to be newly created.
     > Lexer: What? How...huh? The pen component should just be something automatic. You should not have to manually do it so I'm kind of confused by this. Doubly confused b/c I never created any new records in Warband!!!
 - FF7 startup: each new editor service reads the game archives; this is not one-time installation setup. The loading screen now explains the archive read. Concurrent startup requests share one load, and identical vanilla/project archives decode only once. On 2026-10-01 the installed 2026 edition opened in 32.3 seconds and reloaded in the same service in 1.9 seconds, with no browser errors. Field decoding accounts for about 24 seconds of the first load. Both editions use this shared loader; the older edition was not separately timed.

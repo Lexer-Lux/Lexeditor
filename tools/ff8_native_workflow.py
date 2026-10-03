@@ -19,6 +19,7 @@ on:
       - 'plugins/ff8/ffnx_issue_51/**'
       - 'plugins/ff8/ffnx_toasts/**'
       - 'tests/ff8/verify_ff8_hp_colors_issue_481.py'
+      - 'tests/ff8/verify_ff8_cast_debit_binary.py'
       - 'tests/ff8/verify_ff8_modern_controls_binary.py'
       - 'tests/ff8/verify_ff8_vehicle_drive.py'
       - 'tests/ff8/verify_ff8_vehicle_cap_binary.py'
@@ -119,7 +120,7 @@ jobs:
           'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
           Get-FileHash candidate/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 300 | Add-Content candidate/BUILD.txt
           python editor/tests/ff8/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
-          python editor/tests/ff8/verify_ff8_no_magic_consumption.py --driver candidate/AF3DN.P
+          python editor/tests/ff8/verify_ff8_cast_debit_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_vehicle_cap_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P
