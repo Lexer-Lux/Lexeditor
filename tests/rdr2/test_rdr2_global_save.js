@@ -26,7 +26,10 @@ async function challengeSaveGuards() {
     {index:0,base:'BASE',permutation:'PERM'},{index:1,base:'SECOND',permutation:''}]}],
     conditions:[{index:0,type:'CAIConditionGoalContext',fields:{ContextHash:'TRAIN'}}]}],
     allowedSourcePairs:[{base:'BASE',permutation:'PERM'},{base:'SECOND',permutation:''}],
-    allowedConditionValues:[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']} ]};
+    allowedConditionValues:[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']} ],
+    strands:[{name:'ROOT',mode:'series',ranks:[{rank:1,rewardsReadonly:false,rewards:[{type:'CUnlockReward',value:'UNLOCK'}]}]}],
+    allowedRewards:[{type:'CUnlockReward',value:'UNLOCK'},{type:'CUnlockReward',value:'SECOND_UNLOCK'},
+      {type:'CAttributeReward',value:'CHALLENGE_REWARD_TYPE_MONEY_FIRST_RANK'}]};
   const source={index:0,base:'SECOND',permutation:''};
   const condition={goal:'GOAL',index:0,type:'CAIConditionGoalContext',field:'ContextHash',value:'WATER'};
   const cases=[
@@ -49,6 +52,18 @@ async function challengeSaveGuards() {
     ['condition extra fields',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,extra:true}],
     ['condition unknown original',s=>{s.store.mine.challenges.goals[0].conditions[0].fields.ContextHash='UNKNOWN';s.challengeConditionEdits['GOAL|0|ContextHash']=condition;}],
     ['condition ambiguous index',s=>{s.store.mine.challenges.goals[0].conditions.push(structuredClone(s.store.mine.challenges.goals[0].conditions[0]));s.challengeConditionEdits['GOAL|0|ContextHash']=condition;}],
+    ['reward rank missing',s=>s.challengeRewardEdits['ROOT|2']=[]],
+    ['reward rank noncanonical',s=>s.challengeRewardEdits['ROOT|01']=[]],
+    ['reward collection readonly',s=>{s.store.mine.challenges.strands[0].ranks[0].rewardsReadonly=true;s.challengeRewardEdits['ROOT|1']=[];}],
+    ['reward owner ambiguous',s=>{s.store.mine.challenges.strands.push(structuredClone(s.store.mine.challenges.strands[0]));s.challengeRewardEdits['ROOT|1']=[];}],
+    ['reward unknown original',s=>{s.store.mine.challenges.strands[0].ranks[0].rewards[0].value='UNKNOWN';s.challengeRewardEdits['ROOT|1']=[];}],
+    ['reward non-list draft',s=>s.challengeRewardEdits['ROOT|1']={}],
+    ['reward null entry',s=>s.challengeRewardEdits['ROOT|1']=[null]],
+    ['reward extra fields',s=>s.challengeRewardEdits['ROOT|1']=[{type:'CUnlockReward',value:'UNLOCK',extra:true}]],
+    ['reward unknown choice',s=>s.challengeRewardEdits['ROOT|1']=[{type:'CUnlockReward',value:'UNKNOWN'}]],
+    ['reward money disabled',s=>s.challengeRewardEdits['ROOT|1']=[{type:'CAttributeReward',value:'CHALLENGE_REWARD_TYPE_MONEY_FIRST_RANK'}]],
+    ['parallel mode unsupported',s=>s.challengeModeEdits.ROOT='parallel'],
+    ['unknown mode owner',s=>s.challengeModeEdits.UNKNOWN='series'],
   ];
   for(const [label,mutate] of cases){
     const calls=[],errors=[];
@@ -62,20 +77,23 @@ async function challengeSaveGuards() {
     st.ds='mine';st.catalog={items:[],effects:[]};st.store.mine={challenges:structuredClone(data)};st.store.vanilla={challenges:structuredClone(data)};
     st.alcoholEdits={CONSUMABLE_RUM:0.23};st.localizationEdits={LABEL:'pending text'};
     mutate(st);
-    const before=JSON.stringify([st.challengeSourceEdits,st.challengeConditionEdits,st.alcoholEdits,st.localizationEdits]);
+    const drafts=()=>JSON.stringify([st.challengeSourceEdits,st.challengeConditionEdits,st.challengeRewardEdits,st.challengeModeEdits,st.alcoholEdits,st.localizationEdits]);
+    const before=drafts();
     await assert.rejects(context.saveChallenges(),undefined,label+' must reject direct Save');
     await context.saveAllChanges();
     assert.equal(calls.length,0,label+' must block localization and unrelated global writers');
     assert.equal(errors.length,1,label+' must report the global failure');
-    assert.equal(JSON.stringify([st.challengeSourceEdits,st.challengeConditionEdits,st.alcoholEdits,st.localizationEdits]),before,label+' must retain every draft');
+    assert.equal(drafts(),before,label+' must retain every draft');
     // Prove valid replacements and single-source removal still pass preflight.
     st.store.mine={challenges:structuredClone(data)};
+    st.challengeRewardEdits={'ROOT|1':[{type:'CUnlockReward',value:'SECOND_UNLOCK'}]};st.challengeModeEdits={ROOT:'series'};
     st.challengeSourceEdits={'GOAL|0|0':source};st.challengeConditionEdits={'GOAL|0|ContextHash':condition};
     context.validateChallengeDrafts();
     st.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true}};
+    st.challengeRewardEdits={'ROOT|1':[]};
     context.validateChallengeDrafts();
   }
-  console.log('PASS: 19 invalid challenge source/condition drafts block direct and global Save without losing edits');
+  console.log(`PASS: ${cases.length} invalid challenge source/condition/reward/mode drafts block direct and global Save without losing edits`);
 }
 async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false, invalidCrime=false, invalidChallenge=false) {
   const calls = [], messages = [], errors = [];

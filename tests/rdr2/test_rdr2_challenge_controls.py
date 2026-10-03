@@ -77,8 +77,46 @@ def test_challenge_target_drafts_source_slots_and_readonly(tmp_path):
             assert requests[0]['body']['conditions'] == [{'goal': 'GOAL', 'index': 0,
                 'type': 'CAIConditionGoalContext', 'field': 'ContextHash', 'value': 'WATER'}]
             assert page.evaluate('Object.keys(state.challengeConditionEdits).length') == 0
+            page.evaluate('''async()=>{
+              const data=state.store.mine.challenges,rank=data.strands[0].ranks[0];
+              rank.owner='ROOT';rank.ownerRank=1;rank.rewardsReadonly=false;
+              rank.rewards=[{type:'CUnlockReward',value:'UNLOCK'}];
+              data.allowedRewards=[{type:'CUnlockReward',value:'UNLOCK'},{type:'CUnlockReward',value:'SECOND_UNLOCK'}];
+              state.store.vanilla.challenges=structuredClone(data);
+              state.store.vanilla.challenges.goals[0].requirements[0].value='5';
+              window.__responses['/api/challenges']=data;await renderChallenges();
+            }''')
+            reward = page.get_by_role('combobox', name='ROOT rank 1 reward 0', exact=True)
+            reward.select_option('CUnlockReward::SECOND_UNLOCK')
+            page.get_by_role('button', name='Add reward', exact=True).click()
+            assert len(page.evaluate("state.challengeRewardEdits['ROOT|1']")) == 2
+            page.get_by_role('combobox', name='ROOT rank 1 reward 1', exact=True).locator('..').get_by_role('button', name='Remove reward', exact=True).click()
+            page.evaluate('''async()=>{window.__requests=[];await saveChallenges()}''')
+            requests = page.evaluate("window.__requests.filter(row=>row.path==='/api/challenges/save')")
+            assert len(requests) == 1
+            assert requests[0]['body']['rewards'] == [{'challenge': 'ROOT', 'rank': 1,
+                'owner': 'ROOT', 'ownerRank': 1, 'rewards': [{'type': 'CUnlockReward', 'value': 'SECOND_UNLOCK'}]}]
+            for unsupported in ('structure', 'empty'):
+                page.evaluate('''async kind=>{
+                  const rank=state.store.mine.challenges.strands[0].ranks[0];
+                  rank.rewardsReadonly=kind==='structure';
+                  rank.rewards=[kind==='empty'?{type:'FutureReward',value:''}:{type:'CUnlockReward',value:'UNLOCK'}];
+                  await renderChallenges();
+                }''', unsupported)
+                expect(reward).to_be_disabled()
+                assert page.get_by_role('button', name='Add reward', exact=True).count() == 0
+                assert page.get_by_role('button', name='Remove reward', exact=True).count() == 0
+                if unsupported == 'empty':
+                    expect(reward.locator('option:checked')).to_have_text('FutureReward')
+                page.evaluate("state.challengeRewardEdits={'ROOT|1':[]}")
+                result = page.evaluate('''async()=>{window.__requests=[];try{await saveChallenges();return 'saved'}catch(error){return error.message}}''')
+                assert 'challenge rewards' in result
+                assert page.evaluate('window.__requests.length') == 0
+                assert page.evaluate("state.challengeRewardEdits['ROOT|1']") == []
+                page.evaluate('state.challengeRewardEdits={}')
             page.evaluate("async()=>{state.store.mine.challenges.goals[0].requirements[0].readonly=true;await renderChallenges()}")
             expect(control).to_be_disabled()
+            expect(page.get_by_role('textbox', name='GOAL score source 1', exact=True)).to_have_value('BASE + PERM')
             before = page.evaluate('JSON.stringify(state.challengeEdits)')
             page.get_by_text('V 5', exact=True).click()
             assert page.evaluate('JSON.stringify(state.challengeEdits)') == before

@@ -4269,6 +4269,27 @@ def challenge_groups(challenges_el):
         groups[logical].append((int(match.group(2)) if match else 0, challenge))
     return [(logical, sorted(groups[logical], key=lambda row: row[0])) for logical in order]
 
+def challenge_reward_collection(rank, allowed=None):
+    """Resolve only the reward shape that the replacement writer preserves."""
+    containers = rank.findall('reward')
+    rewards = containers[0].findall('rewards') if len(containers) == 1 else []
+    if len(rewards) != 1:
+        raise ValueError('Challenge reward collection is missing or ambiguous')
+    rewards_el = rewards[0]
+    if (rewards_el.text or '').strip():
+        raise ValueError('Source challenge rewards contain unsupported text')
+    for item in rewards_el.findall('Item'):
+        reward_type = item.get('type')
+        tag = 'unlock' if reward_type == 'CUnlockReward' else 'rewardType'
+        values = item.findall(tag)
+        if ((item.text or '').strip() or (item.tail or '').strip() or
+                set(item.attrib) != {'type'} or len(values) != 1 or
+                len(item) != 1 or len(values[0]) or values[0].attrib or
+                (allowed is not None and (reward_type, (values[0].text or '').strip()) not in allowed)):
+            raise ValueError('Source challenge reward has unsupported data')
+    return rewards_el
+
+
 def get_challenges(ds="mine"):
     """Expose editable goal mechanics without pretending the schema is flat.
 
@@ -4293,16 +4314,24 @@ def get_challenges(ds="mine"):
             for local_rank, rank in enumerate(record_ranks, 1):
                 rank_records.append((split_rank or local_rank, record, local_rank, rank))
         for rank_index, record, local_rank, rank in sorted(rank_records, key=lambda row: row[0]):
+            try:
+                challenge_reward_collection(rank)
+                rewards_readonly = (len(challenge_root.findall('challenges')) != 1 or
+                                    len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1 or
+                                    sum(row[0] == rank_index for row in rank_records) != 1)
+            except ValueError:
+                rewards_readonly = True
             goal_names = [((x.text or "").strip()) for x in rank.findall("./goalHashes/Item") if (x.text or "").strip()]
             rewards = []
             for reward in rank.findall("./reward/rewards/Item"):
                 reward_type = reward.get("type", "")
                 value = txt(reward, "unlock") or txt(reward, "rewardType")
+                rewards.append({"type": reward_type, "value": value})
                 if value:
-                    rewards.append({"type": reward_type, "value": value})
                     allowed_rewards.add((reward_type, value))
             rank_ui = rank.find("uiInfo")
             rank_info = {"rank": rank_index, "goals": goal_names, "rewards": rewards,
+                         "rewardsReadonly": rewards_readonly,
                          "owner": txt(record, "name"), "ownerRank": local_rank,
                          "nameLabel": txt(rank_ui, "challengeNameLabel") if rank_ui is not None else "",
                          "descriptionLabel": txt(rank_ui, "rankDescLabel") if rank_ui is not None else "",
@@ -4612,22 +4641,7 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             if key in seen_rewards:
                 raise ValueError('Duplicate challenge reward target')
             seen_rewards.add(key)
-            containers = rank.findall('reward')
-            rewards = containers[0].findall('rewards') if len(containers) == 1 else []
-            if len(rewards) != 1:
-                raise ValueError('Challenge reward collection is missing or ambiguous')
-            rewards_el = rewards[0]
-            if (rewards_el.text or '').strip():
-                raise ValueError('Source challenge rewards contain unsupported text')
-            for item in rewards_el.findall('Item'):
-                reward_type = item.get('type')
-                tag = 'unlock' if reward_type == 'CUnlockReward' else 'rewardType'
-                values = item.findall(tag)
-                if ((item.text or '').strip() or (item.tail or '').strip() or
-                        set(item.attrib) != {'type'} or len(values) != 1 or
-                        len(item) != 1 or len(values[0]) or values[0].attrib or
-                        (reward_type, (values[0].text or '').strip()) not in allowed_rewards):
-                    raise ValueError('Source challenge reward has unsupported data')
+            rewards_el = challenge_reward_collection(rank, allowed_rewards)
             for child in list(rewards_el):
                 if child.tag == 'Item':
                     rewards_el.remove(child)

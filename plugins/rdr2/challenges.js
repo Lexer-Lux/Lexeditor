@@ -32,10 +32,21 @@ function validateChallengeDrafts(){
     const known=vanilla?.allowedConditionValues?.find(row=>row.type===edit.type&&row.field===edit.field)?.values||[];
     if(!condition||condition.type!==edit.type||!Object.hasOwn(condition.fields,edit.field)||!known.includes(condition.fields[edit.field])||!known.includes(edit.value))throw new Error(`${key}: invalid or read-only challenge condition.`);
   }
+  for(const [key,rewards] of Object.entries(state.challengeRewardEdits)){
+    const cut=key.lastIndexOf('|'),name=key.slice(0,cut),rawRank=key.slice(cut+1),rank=Number(rawRank);
+    const strands=(data?.strands||[]).filter(strand=>strand.name===name),ranks=strands.length===1?strands[0].ranks.filter(row=>row.rank===rank):[];
+    const allowed=vanilla?.allowedRewards||[],known=reward=>allowed.some(row=>row.type===reward.type&&row.value===reward.value);
+    if(cut<1||!/^[1-9]\d*$/.test(rawRank)||!Number.isSafeInteger(rank)||ranks.length!==1||ranks[0].rewardsReadonly||!ranks[0].rewards.every(known)||!Array.isArray(rewards))throw new Error(`${key}: read-only or unavailable challenge rewards.`);
+    if(rewards.some(reward=>!exactShape(reward,['type','value'])||typeof reward.type!=='string'||typeof reward.value!=='string'||!known(reward)||reward.value.includes('CHALLENGE_REWARD_TYPE_MONEY_')))throw new Error(`${key}: invalid challenge reward draft.`);
+  }
+  for(const [name,mode] of Object.entries(state.challengeModeEdits)){
+    if(mode!=='series'||(data?.strands||[]).filter(strand=>strand.name===name).length!==1)throw new Error(`${name}: unsupported challenge strand mode.`);
+  }
 }
 function challengeUiInput(key,base,meta){const cur=state.challengeUiEdits[key]?.value??base;return el("input",{class:"key",value:cur,title:"Localization key, not literal English text. The displayed wording lives in localization resources.",onchange:ev=>{if(ev.target.value===base)delete state.challengeUiEdits[key];else state.challengeUiEdits[key]={...meta,value:ev.target.value};renderToolbarOnly();}});}
 const CHALLENGE_XP_AMOUNTS={FIRST:25,SECOND:50,THIRD:100,FOURTH:150};
 function challengeRewardLabel(reward){
+  if(!reward.value)return reward.type||'(empty reward)';
   const m=reward.value.match(/^CHALLENGE_REWARD_TYPE_XP_(HEALTH|STAMINA|DEADEYE)_(FIRST|SECOND|THIRD|FOURTH)_RANK$/);
   if(m)return `${m[1]==="DEADEYE"?"Dead Eye":m[1][0]+m[1].slice(1).toLowerCase()} XP +${CHALLENGE_XP_AMOUNTS[m[2]]}`;
   return reward.value.replace("CHALLENGE_REWARD_TYPE_","").replaceAll("_"," ");
@@ -101,7 +112,7 @@ async function renderChallenges() {
         if(!req.sources.length)sourceCell.append(el("span",{class:"cat"},"Derived condition (not a stat selector)"));
         const activeSourceCount=req.sources.filter((source,sourceIndex)=>!state.challengeSourceEdits[`${goal.name}|${req.index}|${sourceIndex}`]?.remove).length;
         req.sources.forEach((source,sourceIndex)=>{const sk=`${goal.name}|${req.index}|${sourceIndex}`,edited=state.challengeSourceEdits[sk]||source;if(edited.remove)return;const current=`${edited.base||""}::${edited.permutation||""}`;
-          const supported=!source.readonly&&sourceValues.some(value=>(value.base||'')===(source.base||'')&&(value.permutation||'')===(source.permutation||''));
+          const supported=!req.readonly&&!dispatchNumericError(req.value)&&!source.readonly&&sourceValues.some(value=>(value.base||'')===(source.base||'')&&(value.permutation||'')===(source.permutation||''));
           if(!supported){const locked=LexeditorUI.readonlyField([source.base,source.permutation].filter(Boolean).join(' + ')||'(empty score source)');locked.setAttribute('aria-label',`${goal.name} score source ${sourceIndex}`);sourceCell.append(locked);return;}
           const sel=el("select",{class:"key",onchange:ev=>{const [base,permutation]=ev.target.value.split("::");state.challengeSourceEdits[sk]={index:sourceIndex,base,permutation};renderChallenges();}},
             ...sourceValues.map(v=>{const value=`${v.base||""}::${v.permutation||""}`,label=v.label||[v.base,v.permutation].filter(Boolean).join(" + "),o=el("option",{value,title:value},label);if(value===current)o.selected=true;return o;}));
@@ -125,6 +136,7 @@ async function renderChallenges() {
       }
     });
     const rewardKey=`${strand.name}|${rank.rank}`,rewards=state.challengeRewardEdits[rewardKey]??rank.rewards;
+    const rewardsEditable=!isRO()&&!rank.rewardsReadonly&&rank.rewards.every(reward=>(vanilla.challenges?.allowedRewards||st.challenges.allowedRewards).some(row=>challengeRewardId(row)===challengeRewardId(reward)));
     const vrank=vanilla.challenges?.strands.find(s=>s.name===strand.name)?.ranks.find(r=>r.rank===rank.rank);
     const rewardBox=LexeditorUI.stack({fill:false});
     const rewardControl=(reward,editable)=>{
@@ -134,18 +146,19 @@ async function renderChallenges() {
         const [type,...parts]=event.target.value.split("::");
         mutateChallengeRewards(rewardKey,rank.rewards,next=>{next[index]={type,value:parts.join("::")};});renderChallenges();
       }},...choices.map(row=>{const value=challengeRewardId(row),option=el("option",{value},challengeRewardLabel(row));if(value===current)option.selected=true;return option;}));
+      select.setAttribute('aria-label',`${strand.name} rank ${rank.rank} reward ${index}`);
       if(!editable)select.disabled=true;
       return LexeditorUI.actionRow(select,editable?closeButton({title:"Remove reward",onclick:()=>{
         mutateChallengeRewards(rewardKey,rank.rewards,next=>next.splice(index,1));renderChallenges();
       }}):el("span"));
     };
-    const addReward=isRO()?"":newButton({title:"Add reward",onclick:()=>{
+    const addReward=!rewardsEditable?"":newButton({title:"Add reward",onclick:()=>{
       const fallback=allowedRewards.find(row=>row.type==="CUnlockReward")||allowedRewards[0];
       if(fallback)mutateChallengeRewards(rewardKey,rank.rewards,next=>next.push({...fallback}));renderChallenges();
     }});
     rewardBox.append(multiValueReferences({
       kind:"challenge-rewards",current:rewards,references:vrank?[["V","vtag",vrank.rewards||[]]]:[],
-      keyOf:challengeRewardId,sortKey:challengeRewardLabel,renderCurrent:reward=>rewardControl(reward,!isRO()),
+      keyOf:challengeRewardId,sortKey:challengeRewardLabel,renderCurrent:reward=>rewardControl(reward,rewardsEditable),
       renderGhost:reward=>rewardControl(reward,false),emptyText:"no rewards",
     }));
     if(addReward)rewardBox.append(el("div",{class:"multi-ref-add"},addReward));

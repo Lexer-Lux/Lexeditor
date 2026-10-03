@@ -371,6 +371,8 @@ def test_unsupported_reward_source_is_protected(rewards, change):
     else:
         container.text = 'future text'
     s.save_file(s.CHALLENGES_FILE)
+    reader_rank = REAL_GET_CHALLENGES()['strands'][0]['ranks'][0]
+    assert reader_rank['rewardsReadonly'] is (change != 'unknown_value')
     before = snapshot(rewards)
     cached = ET.tostring(root)
     with pytest.raises(ValueError):
@@ -378,6 +380,17 @@ def test_unsupported_reward_source_is_protected(rewards, change):
     assert snapshot(rewards) == before
     assert s.load_file(s.CHALLENGES_FILE)['root'] is root
     assert ET.tostring(root) == cached
+
+
+def test_reward_reader_keeps_empty_unsupported_reward(rewards):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    rank = REAL_GET_CHALLENGES()['strands'][0]['ranks'][0]
+    assert rank['rewardsReadonly'] is False
+    ET.SubElement(root.find('.//rewards'), 'Item', type='FutureReward')
+    s.save_file(s.CHALLENGES_FILE)
+    rank = REAL_GET_CHALLENGES()['strands'][0]['ranks'][0]
+    assert rank['rewardsReadonly'] is True
+    assert rank['rewards'][-1] == {'type': 'FutureReward', 'value': ''}
 
 
 def test_duplicate_reward_target_rejects(rewards):
