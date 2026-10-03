@@ -70,10 +70,23 @@ function normalizeBountyHunters(data){
 }
 function scrollableCrimeTable(table){return table;}
 
+function bountyCompareNumbers(left,right){
+  const parts=value=>{
+    const match=/^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(String(value).trim().replace(/f$/i,""));
+    const fraction=match[3]||"",digits=(match[2]+fraction).replace(/^0+/,"");
+    return {sign:digits?(match[1]==="-"?-1:1):0,digits,order:BigInt(match[4]||0)+BigInt(digits.length-fraction.length)};
+  };
+  const a=parts(left),b=parts(right);
+  if(a.sign!==b.sign)return a.sign<b.sign?-1:1;
+  if(!a.sign)return 0;
+  if(a.order!==b.order)return (a.order<b.order?-1:1)*a.sign;
+  const width=Math.max(a.digits.length,b.digits.length),x=a.digits.padEnd(width,"0"),y=b.digits.padEnd(width,"0");
+  return (x===y?0:x<y?-1:1)*a.sign;
+}
 function bountyValueError(id,raw){
   const error=dispatchNumericError(raw);
-  if(error||Number(raw)<0)return "Enter a nonnegative finite number.";
-  return id.endsWith("/Chances")&&Number(raw)>1?"Enter a probability between 0 and 1.":"";
+  if(error||bountyCompareNumbers(raw,"0")<0)return "Enter a nonnegative finite number.";
+  return id.endsWith("/Chances")&&bountyCompareNumbers(raw,"1")>0?"Enter a probability between 0 and 1.":"";
 }
 function bountySettings(data){
   const rows=[...(data?.settings||[])];
@@ -90,6 +103,18 @@ function validateBountyHunterDrafts(){
     const matches=rows.filter(row=>row.id===id);
     if(matches.length!==1||state.bountyHunters.mine?.readonlyIds?.includes(id)||bountyValueError(id,String(matches[0].value).replace(/f$/i,"")))throw new Error(`${id} is read-only or unavailable.`);
     const error=bountyValueError(id,value);if(error)throw new Error(`${id}: ${error}`);
+    const cut=id.lastIndexOf("/"),prefix=id.slice(0,cut),field=id.slice(cut+1);
+    const pair={Min:["Min","Max"],Max:["Min","Max"],MinNumPeds:["MinNumPeds","MaxNumPeds"],MaxNumPeds:["MinNumPeds","MaxNumPeds"]}[field];
+    if(!pair||prefix==="cooldown/DelayInGameHoursAfterMyIncidentTargetUndetected/0")continue;
+    const values=pair.map(bound=>{
+      const key=`${prefix}/${bound}`,sources=rows.filter(row=>row.id===key);
+      if(sources.length!==1||state.bountyHunters.mine?.readonlyIds?.includes(key))throw new Error(`${key} is read-only or unavailable.`);
+      const source=String(sources[0].value).replace(/f$/i,"");
+      const current=state.bountyHunterEdits[key]??source;
+      if(bountyValueError(key,source)||bountyValueError(key,current))throw new Error(`${key}: Enter a nonnegative finite number.`);
+      return current;
+    });
+    if(bountyCompareNumbers(...values)>0)throw new Error(`${id}: minimum exceeds maximum.`);
   }
 }
 function bountyNumber(setting,label,help,reference=null){

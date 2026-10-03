@@ -14,7 +14,7 @@ COOLDOWN = 'cooldown/DelayInGameHoursAfterBountyAcquired/0/Min'
 BAD = [None, {}, False, '', [None], [{}], [dict(FIRST, extra=1)],
        [dict(FIRST, id=[])], [FIRST]]
 BAD += [[{'id': COOLDOWN, 'value': value}] for value in
-        [None, True, [], {}, '', 'NaN', 'Inf', '-Inf', float('nan'), float('inf'), -1]]
+        [None, True, [], {}, '', 'NaN', 'Inf', '-Inf', float('nan'), float('inf'), -1, '1_0', '-1e-999', '1e999', '2.000000000000000001']]
 BAD += [[{'id': COOLDOWN.replace('/0/', f'/{index}/'), 'value': '2'}]
         for index in ['-1', '+0', '00', '1.5', 'unknown', '99']]
 BAD += [[{'id': COOLDOWN.replace('DelayInGameHoursAfterBountyAcquired', 'Opaque'), 'value': '2'}]]
@@ -128,7 +128,7 @@ def test_unsupported_sources_are_locked_and_preserved(files, monkeypatch, kind, 
     assert snapshot(root) == before
 
 
-@pytest.mark.parametrize('kind', ['phase', 'phase-name', 'groups', 'group', 'preset', 'conditions', 'condition', 'chance', 'unknown-chance', 'valid'])
+@pytest.mark.parametrize('kind', ['phase', 'phase-name', 'groups', 'group', 'preset', 'conditions', 'condition', 'chance', 'unknown-chance', 'range', 'overchance', 'valid'])
 @pytest.mark.parametrize('backups', [False, True])
 def test_phase_source_lookup_requires_unique_owners(files, monkeypatch, kind, backups):
     root, response, dispatch = files
@@ -159,8 +159,10 @@ def test_phase_source_lookup_requires_unique_owners(files, monkeypatch, kind, ba
     view = bounty.read_bounty_hunters(response, dispatch)
     before = snapshot(root)
     edits = [FIRST, {'id': identity, 'value': '0.75'}]
+    if kind == 'range':edits.append({'id': identity.replace('/Chances', '/MinNumPeds'), 'value': '2.000000000000000001'})
+    if kind == 'overchance':edits[-1]['value'] = '1.000000000000000001'
     if kind != 'valid':
-        assert identity in view['readonlyIds']
+        if kind not in ['range', 'overchance']:assert identity in view['readonlyIds']
         with pytest.raises(ValueError):s.apply_bounty_hunter_edits(edits)
         assert snapshot(root) == before
     else:
@@ -169,3 +171,19 @@ def test_phase_source_lookup_requires_unique_owners(files, monkeypatch, kind, ba
         after = bounty.read_bounty_hunters(response, dispatch)
         assert after['phases'][0]['groups'][0]['chance'] == '0.75'
         assert bounty._parse(response).find('.//Opaque').get('value') == 'keep'
+
+
+@pytest.mark.parametrize('values', [('2.000000000000000001', '2'), ('1e-999', '0'), ('1', '0.999999999999999999')])
+@pytest.mark.parametrize('backups', [False, True])
+def test_final_cooldown_range_uses_exact_decimals(files, values, backups):
+    root, response, dispatch = files
+    if backups:
+        for path in [response, dispatch]:path.with_suffix(path.suffix + '.bak').write_bytes(b'original backup')
+    before = snapshot(root)
+    with pytest.raises(ValueError, match='minimum exceeds maximum'):
+        s.apply_bounty_hunter_edits([FIRST, {'id': COOLDOWN, 'value': values[0]}, {'id': COOLDOWN[:-3] + 'Max', 'value': values[1]}])
+    assert snapshot(root) == before
+    assert s.apply_bounty_hunter_edits([{'id': COOLDOWN, 'value': '5.000000000000000001'}, {'id': COOLDOWN[:-3] + 'Max', 'value': '5.000000000000000002'}]) == 2
+    node = bounty._parse(dispatch).find('.//DelayInGameHoursAfterBountyAcquired/Item')
+    assert node.find('Min').get('value') == '5.000000000000000001'
+    assert node.find('Max').get('value') == '5.000000000000000002'

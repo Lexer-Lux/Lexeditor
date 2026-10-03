@@ -7,8 +7,9 @@ shared dispatch.meta and are reported with that scope made explicit.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-import math
 import re
+import math
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 try:
@@ -373,13 +374,15 @@ def _numeric(value: object, field: str, minimum: float = 0.0, maximum: float | N
         raise ValueError(f"{field} must be numeric")
     text = str(value).strip()
     text_num = text[:-1] if text.lower().endswith("f") else text
+    if not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", text_num):
+        raise ValueError(f"{field} must be numeric")
     try:
-        number = float(text_num)
-    except ValueError as exc:
+        number = Decimal(text_num)
+    except InvalidOperation as exc:
         raise ValueError(f"{field} must be numeric") from exc
-    if not math.isfinite(number):
+    if not number.is_finite() or not math.isfinite(float(text_num)):
         raise ValueError(f"{field} must be finite")
-    if number < minimum or (maximum is not None and number > maximum):
+    if number < Decimal(str(minimum)) or (maximum is not None and number > Decimal(str(maximum))):
         limit = f" between {minimum:g} and {maximum:g}" if maximum is not None else f" at least {minimum:g}"
         raise ValueError(f"{field} must be{limit}")
     return text
@@ -463,11 +466,21 @@ def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: l
         raise ValueError(f"unknown or unavailable bounty-hunter setting: {edit_id}")
 
     # Reject impossible min/max ranges before either file is written.
-    check = read_bounty_hunters_from_roots(response_root, dispatch_root)
-    for phase in check["phases"]:
-        for group in phase["groups"]:
-            if group["min"] is not None and group["max"] is not None and float(group["min"].rstrip("f")) > float(group["max"].rstrip("f")):
-                raise ValueError(f"{phase['name']} {group['preset']}: minimum group size exceeds maximum")
+    for identity in seen:
+        prefix, field = identity.rsplit('/', 1)
+        pair = {'Min': ('Min', 'Max'), 'Max': ('Min', 'Max'), 'MinNumPeds': ('MinNumPeds', 'MaxNumPeds'), 'MaxNumPeds': ('MinNumPeds', 'MaxNumPeds')}.get(field)
+        if pair is None:
+            continue
+        lookup, doc = (_cooldown_target, dispatch_root) if identity.startswith('cooldown/') else (_response_target, response_root)
+        nodes = [lookup(doc, f'{prefix}/{bound}') for bound in pair]
+        # The undetected cooldown intentionally has only Min.
+        if prefix == 'cooldown/DelayInGameHoursAfterMyIncidentTargetUndetected/0' and field == 'Min':
+            continue
+        if any(node is None for node in nodes):
+            raise ValueError(f'{identity}: range boundaries are unavailable or ambiguous')
+        values = [_numeric(node.get('value'), identity) for node in nodes]
+        if Decimal(values[0].rstrip('fF')) > Decimal(values[1].rstrip('fF')):
+            raise ValueError(f'{identity}: minimum exceeds maximum')
     if response_changed:
         _write(response_file, response_root)
     if dispatch_changed:

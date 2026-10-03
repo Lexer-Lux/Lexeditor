@@ -17,6 +17,9 @@ def test_bounty_drafts_hidden_save_exact_values_and_readonly(tmp_path):
             page.wait_for_function("!document.querySelector('.lex-plugin-loading-screen')")
             data = payloads()['/api/bounty-hunters']
             data['settings'][0]['id'] = 'response/RandomWeight'
+            minimum_id='cooldown/DelayInGameHoursAfterBountyAcquired/0/Min'
+            maximum_id='cooldown/DelayInGameHoursAfterBountyAcquired/0/Max'
+            data['cooldowns'][0]['ids']={'min':minimum_id,'max':maximum_id}
             chance_id = 'phase/InitialRiders/random/PoliceDog/Chances'
             data['phases'][0]['groups'][0]['ids']['chance'] = chance_id
             page.evaluate('''async data=>{
@@ -32,7 +35,7 @@ def test_bounty_drafts_hidden_save_exact_values_and_readonly(tmp_path):
             }''', data)
             def control(identity):
                 return page.get_by_role('spinbutton', name=identity, exact=True)
-            for identity, value in [('response/RandomWeight', ''), ('response/RandomWeight', '-1'), (chance_id, '1.01')]:
+            for identity, value in [('response/RandomWeight', ''), ('response/RandomWeight', '-1'), (chance_id, '1.01'), (chance_id, '1.000000000000000001')]:
                 control(identity).fill(value)
                 assert not control(identity).evaluate('e=>e.checkValidity()')
                 assert page.evaluate('id=>Object.hasOwn(state.bountyHunterEdits,id)', identity)
@@ -47,6 +50,17 @@ def test_bounty_drafts_hidden_save_exact_values_and_readonly(tmp_path):
                 assert page.evaluate('state.alcoholEdits.CONSUMABLE_RUM') == 0.25
                 assert page.evaluate('Object.keys(state.bountyHunterEdits).length') == 1
                 page.evaluate('state.alcoholEdits={};state.bountyHunterEdits={};renderCrime()')
+            control(minimum_id).fill('4.000000000000000001')
+            before=page.evaluate('window.__requests.length')
+            assert 'minimum exceeds maximum' in page.evaluate("async()=>{try{await saveBountyHunters();return ''}catch(e){return e.message}}")
+            page.evaluate("state.alcoholEdits={CONSUMABLE_RUM:0.25};document.querySelector('#main').innerHTML='';saveAllChanges()")
+            assert page.evaluate('window.__requests.length')==before
+            assert page.evaluate('state.alcoholEdits.CONSUMABLE_RUM')==0.25
+            page.evaluate('state.alcoholEdits={};state.bountyHunterEdits={};renderCrime()')
+            control(minimum_id).fill('5.000000000000000001')
+            control(maximum_id).fill('5.000000000000000002')
+            assert page.evaluate("()=>{try{validateBountyHunterDrafts();return ''}catch(e){return e.message}}") == ''
+            page.evaluate('state.bountyHunterEdits={};renderCrime()')
             control('response/RandomWeight').fill('0.123456789123456789')
             control(chance_id).fill('1')
             page.evaluate('renderCrime()')
