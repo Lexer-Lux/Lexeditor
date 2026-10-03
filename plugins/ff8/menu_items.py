@@ -48,10 +48,11 @@ def read_rows(data: bytes, item_names: dict[int, str], schema_root: Path) -> dic
     }
 
 
-def apply_edits(data: bytes, edits: list[dict], schema_root: Path) -> tuple[bytes, int]:
+def apply_edits(data: bytes, edits: list[dict], schema_root: Path,
+                parameter_choices: dict | None = None) -> tuple[bytes, int]:
     if len(data) % RECORD_SIZE:
         raise ValueError("mitem.bin has a partial item record")
-    valid_types = {int(row["id"]) for row in _schema(schema_root)["item_type"]}
+    types = {int(row["id"]): row for row in _schema(schema_root)["item_type"]}
     raw = bytearray(data)
     seen: set[int] = set()
     for edit in edits:
@@ -63,10 +64,16 @@ def apply_edits(data: bytes, edits: list[dict], schema_root: Path) -> tuple[byte
         flags = integer_value(edit["flags"], "Menu item flags")
         param1 = integer_value(edit["param1"], "Menu item parameter 1")
         param2 = integer_value(edit["param2"], "Menu item parameter 2")
-        if type_id not in valid_types:
+        if type_id not in types:
             raise ValueError(f"Unknown menu item type: {type_id}")
         if any(not 0 <= value <= 255 for value in (flags, param1, param2)):
             raise ValueError("Menu item flags and parameters must be 0 to 255")
         base = item_id * RECORD_SIZE
+        for key, value, offset in (("param1", param1, 2), ("param2", param2, 3)):
+            kind = types[type_id].get(key)
+            choices = (parameter_choices or {}).get(kind)
+            if (choices is not None and (type_id != data[base] or value != data[base + offset])
+                    and value not in {int(row["id"]) for row in choices}):
+                raise ValueError(f"Menu item {key} must be a documented {kind} choice")
         raw[base:base + RECORD_SIZE] = bytes((type_id, flags, param1, param2))
     return bytes(raw), len(seen)

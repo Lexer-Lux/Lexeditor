@@ -24,6 +24,7 @@ def files(tmp_path, monkeypatch):
     source.write_bytes(ORIGINAL)
     schema = tmp_path / 'schema'
     schema.mkdir()
+    (schema / 'limit_break.json').write_text(json.dumps(dict(quistis_blue_magic=[])), encoding='utf-8')
     (schema / 'mitem.json').write_text(json.dumps(dict(item_type=[dict(id=0, name='Authored')],
                                                     flag=[], param_type=[])), encoding='utf-8')
     monkeypatch.setattr(formats, 'SCHEMA_ROOT', schema)

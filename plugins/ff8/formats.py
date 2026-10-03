@@ -253,9 +253,8 @@ def save_items(edits: list[dict]) -> dict:
     return {"saved": changed, "file": str(output_path("price.bin"))}
 
 
-def menu_item_rows(dataset: str = "current") -> dict:
-    payload = menu_item_format.read_rows(source_path("mitem.bin", dataset).read_bytes(), ITEM_NAMES, SCHEMA_ROOT)
-    payload["parameterChoices"] = {
+def _menu_parameter_choices() -> dict:
+    return {
         "gf_target": [*GFORCES, {"id": 255, "name": "All GFs"}],
         "gf_ability": [
             {"id": int(row["value"]), "name": row["name"]}
@@ -264,13 +263,18 @@ def menu_item_rows(dataset: str = "current") -> dict:
             {"id": int(row["bit"]), "name": row["name"]}
             for row in _json("limit_break.json")["quistis_blue_magic"]],
     }
+
+
+def menu_item_rows(dataset: str = "current") -> dict:
+    payload = menu_item_format.read_rows(source_path("mitem.bin", dataset).read_bytes(), ITEM_NAMES, SCHEMA_ROOT)
+    payload["parameterChoices"] = _menu_parameter_choices()
     payload["source"] = source_label("mitem.bin")
     return payload
 
 
 def save_menu_items(edits: list[dict]) -> dict:
     data, changed = menu_item_format.apply_edits(
-        source_path("mitem.bin").read_bytes(), edits, SCHEMA_ROOT)
+        source_path("mitem.bin").read_bytes(), edits, SCHEMA_ROOT, _menu_parameter_choices())
     destination = output_path("mitem.bin")
     _atomic_write(destination, data)
     return {"saved": changed, "file": str(destination)}
