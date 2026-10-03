@@ -305,7 +305,7 @@ def save_world_colors(store: OverlayStore, path: str, expected_sha256: str, edit
         if not isinstance(value, str):
             raise ValueError("World animation color must be text")
         value = value.strip()
-        if len(value) != 7 or not value.startswith("#"):
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
             raise ValueError("World animation color must be #RRGGBB")
         try:
             red, green, blue = (int(value[offset:offset + 2], 16) for offset in (1, 3, 5))

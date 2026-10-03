@@ -187,7 +187,7 @@ class Handler(PluginRequestHandler):
             elif route == "/api/world-colors/save":
                 result = save_world_colors(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/graphics-sets/save":
-                result = save_graphics_set(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_graphics_set(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/tile-assemblies/save":
                 result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/sprite-headers/save":
@@ -195,7 +195,7 @@ class Handler(PluginRequestHandler):
             elif route == "/api/sprite-assemblies/save":
                 result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/sprite-image/save":
-                result = save_sprite_image(STORE, int(body["index"]), int(body.get("bitmap", 0)), str(body["sha256"]), str(body["imageBase64"]))
+                result = save_sprite_image(STORE, body["index"], body.get("bitmap", 0), str(body["sha256"]), body["imageBase64"])
             elif route == "/api/weapons/save":
                 result = save_weapons(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
             elif route == "/api/armor/save":

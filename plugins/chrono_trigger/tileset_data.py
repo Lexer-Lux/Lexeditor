@@ -72,6 +72,8 @@ def save_graphics_set(
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
     allowed = {f"graphicsSet{index}" for index in range(BGSET_BYTES)}
+    if not isinstance(values, dict):
+        raise ValueError("Graphics-set values must be an object")
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported graphics-set fields: {', '.join(sorted(unknown))}")
