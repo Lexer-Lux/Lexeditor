@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from core.desktop_host import choose_loading_quote  # noqa: E402
+from core.plugin_manifest import loading_quotes as plugin_quotes  # noqa: E402
 HOST = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 CHOOSER = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
@@ -90,29 +91,23 @@ def main() -> int:
     require("left:30px" in FRAMEWORK_CSS and "bottom:27px" in FRAMEWORK_CSS
             and "right:30px" in FRAMEWORK_CSS and "backdrop-filter: brightness(.62)" in FRAMEWORK_CSS,
             "plugin loading must dim the resident UI with the quote and throbber in opposite bottom corners")
-    # Per-game loading lines moved into the plugin that owns them, so a new
-    # game brings its own quotes instead of editing a shared file. The shared
-    # file keeps only the global lines and the sharing map.
-    _ff8_quotes = ROOT / "plugins" / "ff8" / "loading_quotes.json"
-    require(_ff8_quotes.is_file()
-            and len(json.loads(_ff8_quotes.read_text(encoding="utf-8"))) >= 7,
+    # Per-game lines belong to each plugin's manifest. Read them through the
+    # same loader as the host rather than requiring the retired separate file.
+    require(len(plugin_quotes("ff8")) >= 7,
             "the supplied FF8 loading lines must remain editable in its plugin")
-    require("global" in QUOTES and "shares" in QUOTES,
-            "the shared quote file must keep the global lines and the sharing map")
-    _warband_quotes = ROOT / "plugins" / "warband" / "loading_quotes.json"
-    require(_warband_quotes.is_file()
-            and len(json.loads(_warband_quotes.read_text(encoding="utf-8"))) >= 2,
+    require(isinstance(QUOTES.get("global"), list),
+            "the shared quote file must keep the global lines")
+    require(bool(plugin_quotes("ff7-2013"))
+            and set(plugin_quotes("ff7-2013")) <= set(plugin_quotes("ff7")),
+            "the 2013 FF7 edition must retain its borrowed FF7 lines in its manifest")
+    require(len(plugin_quotes("warband")) >= 2,
             "the supplied Warband loading lines must remain editable in its plugin")
     require("--lex-resident-safe-inset" in CHOOSER
             and "sizeResidentHandle" in CHOOSER
             and "--lex-resident-save-size" in CHOOSER,
             "the resident icon and title need one height-relative safe area and scaler")
     def _plugin_quotes(plugin_id: str) -> list:
-        path = ROOT / "plugins" / plugin_id / "loading_quotes.json"
-        if not path.is_file():
-            return []
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-        return loaded if isinstance(loaded, list) else []
+        return plugin_quotes(plugin_id)
 
     require(_plugin_quotes("ff8")[2:3] == [">tfw no GF"],
             "the FF8 GF joke must keep its exact capitalization")
