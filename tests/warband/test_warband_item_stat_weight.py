@@ -152,3 +152,60 @@ def test_unresolved_or_missing_weight_is_read_only(page, tmp_path, monkeypatch, 
         assert control.evaluate("n=>n.readOnly||n.disabled")
     assert page.evaluate("itemDirtyCount()") == 0
     assert source.read_bytes() == original
+
+
+
+@pytest.mark.parametrize("argument,editable", [("1e2", True), ("1e999", False), ("unknown + 1", False)])
+def test_stat_choices_distinguish_numbers_resolved_names_and_unknown_source(page, tmp_path, record_service, argument, editable):
+    source = tmp_path / "module_items.py"
+    source.write_text(SOURCE.replace("spd_rtng(97)", f"spd_rtng({argument})|swing_damage(16,cut)")
+                      .replace("leg_armor(12)", "leg_armor(12)|swing_damage(8,blunt)"), encoding="utf-8")
+    (tmp_path / "header_items.py").write_text("cut=0\nblunt=1\n", encoding="utf-8")
+    original = source.read_bytes()
+    status, data = record_service("", endpoint="/api/items")
+    assert status == 200
+    assert "spd_rtng" not in data["choices"]["statArguments"]
+    assert data["choices"]["statArguments"]["swing_damage"] == [None, ["blunt", "cut"]]
+    framework(page)
+    for script in ("field_controls.js", "editor.js"):
+        page.add_script_tag(path=str(ROOT / "plugins/warband" / script))
+    page.add_script_tag(content="const shell={refresh(){}};")
+    page.evaluate("data=>{state.items=data;document.querySelector('main').replaceChildren(warbandItemDetail(data.rows[0]))}", data)
+    field = page.locator('[data-lex-property="stat-spd_rtng"]')
+    assert field.get_by_role("button", name="Remove the spd_rtng stat", exact=True).evaluate("""button=>{
+      const bounds=button.getBoundingClientRect(),row=button.closest('.lex-action-row').getBoundingClientRect();
+      const text=document.createRange();text.selectNodeContents(button);const label=text.getBoundingClientRect();
+      return bounds.left>=row.left-1&&bounds.right<=row.right+1&&label.left>=bounds.left&&label.right<=bounds.right;
+    }""")
+    if editable:
+        number = page.get_by_label("spd_rtng value 1", exact=True)
+        assert number.input_value() == "1e2"
+        number.fill("125")
+        page.get_by_label("swing_damage argument 2", exact=True).select_option("blunt")
+        assert "spd_rtng(125)" in page.evaluate("effectiveItemField(state.items.rows[0],'stats')")
+        assert "swing_damage(16, blunt)" in page.evaluate("effectiveItemField(state.items.rows[0],'stats')")
+    else:
+        assert field.locator('input[type="number"],select').count() == 0
+        for control in field.locator("input").all():
+            assert control.evaluate("n=>n.readOnly||n.disabled")
+        assert page.evaluate("itemDirtyCount()") == 0
+    assert source.read_bytes() == original
+    if destination := os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR"):
+        Path(destination).mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(Path(destination) / f"warband-stat-source-{editable}.png"))
+
+
+@pytest.mark.parametrize("expression", ["weight(1e999)", "weight(-1e999)", "0L|weight(1e999)"])
+def test_nonfinite_stat_literal_rejects_complete_http_batch(tmp_path, record_service, expression):
+    source = tmp_path / "module_items.py"
+    source.write_text(SOURCE, encoding="utf-8")
+    before = source.read_bytes()
+    data = server.item_data()
+    status, result = record_service("/save", {"sha256": data["sha256"], "edits": [
+        {"recordIndex": 0, "originalId": "sword", "fields": {"name": "Valid earlier edit"}},
+        {"recordIndex": 1, "originalId": "boots", "fields": {"stats": expression}},
+    ]}, "/api/items")
+    assert status == 400
+    assert "finite numeric literals" in result["error"]
+    assert source.read_bytes() == before
+    assert not source.with_name(source.name + ".lexeditor.bak").exists()

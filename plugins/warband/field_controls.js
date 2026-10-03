@@ -209,7 +209,7 @@
       property: `stat-${call.name}`,
       dataType: call.args.every(arg => /^-?\d+(\.\d+)?$/.test(arg)) ? "FLOAT" : "EXPR",
       description: `${call.name}(${options.macros.includes(call.name) ? "value" : "value"}) - change a value here, or remove the stat. Values are numbers because the Module System reads them as numbers.`,
-      control: el("div", {class: "lex-action-row"},
+      control: LexeditorUI.actionRow({fillFirst:true},
         ...call.args.map((arg, position) => {
           const change = value => {
             if (value === "") return;
@@ -221,6 +221,7 @@
           // is a choice among the names this project uses there, not a box.
           const names = options.arguments?.[call.name]?.[position];
           if (Array.isArray(names)) {
+            if(!names.includes(arg)&&(!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(arg.trim())||!Number.isFinite(Number(arg))))return LexeditorUI.readonlyField(arg,{format:false});
             const select = el("select", {disabled: options.readOnly,
               "aria-label": `${call.name} argument ${position + 1}`,
               onchange: event => change(event.target.value)});

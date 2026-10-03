@@ -4149,6 +4149,7 @@ body:has(.lex-data-map-table) #main {
 /* The row's buttons wear the dialog buttons' theme, the first-choice one in
    the accent. No specificity, so a game's own button styling still wins. */
 :where(.lex-action-row) > :where(button) {
+  flex:0 0 auto;
   padding:9px 14px;
   color:var(--lex-text);
   border:1px solid var(--lex-border);

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
+import math
 import os
 import re
 import subprocess
 import tempfile
 import threading
+import tokenize
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -367,12 +370,11 @@ def item_choices(rows: list[dict]) -> dict:
     for record in rows:
         stats_field = record["fields"].get("stats", "")
         used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", stats_field))
-        # A stat argument that is not a number is a name the Module System reads,
-        # such as swing_damage(16, blunt). The names this project uses in that
-        # position are the finite choices for it.
+        # Only resolved header constants are named choices. Other source
+        # expressions must not become enums merely because they contain text.
         for macro, arguments in re.findall(r"([A-Za-z_]\w*)\s*\(([^()]*)\)", stats_field):
             for position, argument in enumerate(part.strip() for part in arguments.split(",")):
-                if not argument or re.fullmatch(r"-?\d+(\.\d+)?", argument):
+                if not re.fullmatch(r"[A-Za-z_]\w*", argument) or argument not in symbols:
                     continue
                 slots = stat_arguments.setdefault(macro, [])
                 while len(slots) <= position:
@@ -438,6 +440,16 @@ def _validate_item_expression(expression: str) -> str:
         cursor += 1
     if stack:
         raise ValueError("Unbalanced item expression")
+    # Tokenize without executing source, including Python 2 long integers.
+    # Comments and quoted text are not numeric expressions.
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(expression).readline):
+            number = token.string.replace("_", "").rstrip("jJ")
+            if (token.type == tokenize.NUMBER and re.fullmatch(r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", number)
+                    and ("." in number or "e" in number.lower()) and not math.isfinite(float(number))):
+                raise ValueError("Item expressions require finite numeric literals")
+    except tokenize.TokenError:
+        pass  # The existing source/candidate syntax checks handle other errors.
     return expression
 
 
