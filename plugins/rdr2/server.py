@@ -5744,6 +5744,13 @@ def apply_weapon_shell_vfx(blanked):
     """Restore/blank all seven shell layers; never publish a partial reference."""
     if not isinstance(blanked, bool):
         raise ValueError("blanked must be a boolean")
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        return _apply_weapon_shell_vfx(blanked)
+
+
+def _apply_weapon_shell_vfx(blanked):
     replacements = install_replacements()
     stack = [(game_path, replacements.get(game_path.casefold(), relative))
              for game_path, relative in WEAPON_STACK]
@@ -5767,28 +5774,14 @@ def apply_weapon_shell_vfx(blanked):
             _assert_weapon_projectile_flags(root, vanilla_root)
             prepared.append((current_file, entry, root, count))
     install_path = ds_dir("mine") / "install.xml"
-    paths = [entry["path"] for _, entry, _, _ in prepared] + [install_path]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    original_roots = {name: entry["root"] for name, entry, _, _ in prepared}
-    try:
-        for name, entry, root, _ in prepared:
-            entry["root"] = root
-            save_file(name)
-        for game_path, relative in stack:
-            ensure_file_replacement(game_path, relative)
-    except Exception:
-        # A late filesystem/serialization failure must not leave some weapons
-        # restored and others blank. Existing one-time .bak files remain intact.
-        for path, data in originals.items():
-            if data is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(data)
-        for name, entry, _, _ in prepared:
-            entry["root"] = original_roots[name]
-            entry["mtime"] = entry["path"].stat().st_mtime_ns
-            entry["source_digest"] = hashlib.sha256(entry["path"].read_bytes()).hexdigest()
-        raise
+    original = install_path.read_bytes() if install_path.exists() else None
+    payload = _prepare_file_replacements(stack)
+    outputs = [(install_path, payload)] if payload is not None else []
+    expected = {install_path: original} if outputs else {}
+    if prepared:
+        _commit_xml_roots([(name, entry, root) for name, entry, root, _ in prepared], outputs, expected)
+    elif outputs:
+        _commit_file_outputs(outputs, "Weapon shell mappings", expected_originals=expected)
     return sum(count for _, _, _, count in prepared)
 
 
@@ -6637,7 +6630,12 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/shell-vfx/save":
-                    self._json({"saved": apply_weapon_shell_vfx(body.get("blanked", False))})
+                    try:
+                        if not isinstance(body, dict) or set(body) != {'blanked'}:
+                            raise ValueError("Shell VFX settings require only blanked")
+                        self._json({"saved": apply_weapon_shell_vfx(body.get("blanked"))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/projectile-speeds/save":
                     try:
                         self._json({"saved": save_projectile_speeds(body.get("entries", []))})
