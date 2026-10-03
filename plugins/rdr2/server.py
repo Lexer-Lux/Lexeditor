@@ -4392,6 +4392,28 @@ def get_challenges(ds="mine"):
 
 
 def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edits=None, mode_edits=None):
+    batches = (edits, reward_edits, ui_edits, condition_edits, mode_edits)
+    if not isinstance(edits, list) or any(batch is not None and (not isinstance(batch, list) or
+           any(not isinstance(edit, dict) for edit in batch)) for batch in batches):
+        raise ValueError("Challenge edits must be lists of objects")
+    if not any(batches):
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    for edit in mode_edits or []:
+        requested = edit.get('mode')
+        if not isinstance(requested, str) or requested not in {'series', 'parallel'}:
+            raise ValueError(f"unknown challenge strand mode: {requested}")
+        if requested == 'parallel':
+            raise ValueError("Parallel roots appear as duplicate challenge strands in game and are not supported")
+    prepared = {}
+
+    def candidate(name):
+        if name not in prepared:
+            entry = load_file(name)
+            prepared[name] = (entry, copy.deepcopy(entry['root']))
+        return prepared[name][1]
+
     vanilla = get_challenges("vanilla")
     allowed_sources = {(s.get("base", ""), s.get("permutation", ""))
                        for s in vanilla["allowedSourcePairs"]}
@@ -4415,7 +4437,7 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
         key = (edit.get("type", ""), edit.get("field", ""))
         if edit.get("value", "") not in allowed_conditions.get(key, set()):
             raise ValueError(f"unknown challenge condition value: {key[0]}.{key[1]}={edit.get('value')}")
-    root = load_file(GOALS_FILE)["root"]
+    root = candidate(GOALS_FILE)
     by_name = {txt(g, "name"): g for g in root.find("goals").findall("Item")}
     changed = 0
     for edit in edits:
@@ -4460,8 +4482,6 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                     if container is not None and container.tag == "scoreParams" and len(container) > 1:
                         container.remove(node)
                         changed += 1
-    if changed:
-        save_file(GOALS_FILE)
     condition_changed = 0
     for edit in condition_edits or []:
         goal = by_name.get(edit.get("goal"))
@@ -4480,11 +4500,9 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
         else:
             field.text = str(edit.get("value", ""))
         condition_changed += 1
-    if condition_changed:
-        save_file(GOALS_FILE)
     reward_changed = 0
     if reward_edits:
-        challenges = load_file(CHALLENGES_FILE)["root"]
+        challenges = candidate(CHALLENGES_FILE)
         by_name = {txt(c, "name"): c for c in challenges.find("challenges").findall("Item")}
         for edit in reward_edits:
             challenge = by_name.get(edit.get("owner") or edit.get("challenge"))
@@ -4507,12 +4525,10 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 value = ET.SubElement(item, tag); value.text = row["value"]
                 value.tail = "\n              "; item.tail = "\n              " if i < len(rows)-1 else "\n            "
             reward_changed += 1
-        if reward_changed:
-            save_file(CHALLENGES_FILE)
     ui_changed = 0
     for edit in ui_edits or []:
         file_name, owner, field, value = edit.get("file"), edit.get("owner"), edit.get("field"), edit.get("value", "")
-        root = load_file(file_name)["root"] if file_name in {GOALS_FILE, CHALLENGES_FILE} else None
+        root = candidate(file_name) if file_name in {GOALS_FILE, CHALLENGES_FILE} else None
         if root is None:
             continue
         collection = root.find("goals") if file_name == GOALS_FILE else root.find("challenges")
@@ -4528,12 +4544,9 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
         if node is not None:
             node.text = value
             ui_changed += 1
-    if ui_changed:
-        if any(e.get("file") == GOALS_FILE for e in ui_edits or []): save_file(GOALS_FILE)
-        if any(e.get("file") == CHALLENGES_FILE for e in ui_edits or []): save_file(CHALLENGES_FILE)
     mode_changed = 0
     if mode_edits:
-        challenge_doc = load_file(CHALLENGES_FILE)["root"]
+        challenge_doc = candidate(CHALLENGES_FILE)
         challenges_el = challenge_doc.find("challenges")
         for edit in mode_edits:
             logical = edit.get("challenge", "")
@@ -4575,8 +4588,16 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                     challenges_el.remove(record)
                 challenges_el.insert(insert_at, merged)
                 mode_changed += 1
-        if mode_changed:
-            save_file(CHALLENGES_FILE)
+    modified = set()
+    if changed or condition_changed:
+        modified.add(GOALS_FILE)
+    if reward_changed or mode_changed:
+        modified.add(CHALLENGES_FILE)
+    if ui_changed:
+        modified.update(edit.get('file') for edit in ui_edits or []
+                        if edit.get('file') in prepared)
+    _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()
+                       if name in modified])
     return changed + condition_changed + reward_changed + ui_changed + mode_changed
 
 
@@ -6169,7 +6190,10 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/challenges/save":
-                    self._json({"saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []))})
+                    try:
+                        self._json({"saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/save":
                     self._json({"saved": apply_weapon_edits(
                         body.get("section", ""), body.get("name", ""),
