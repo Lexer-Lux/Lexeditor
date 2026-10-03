@@ -106,6 +106,12 @@ def capture(page, screenshots: list[str], name: str) -> None:
 
 
 def reveal_settings_locator(page, target, label: str) -> None:
+    page.locator("#main .lex-tweaks-pages").last.wait_for(state="attached")
+    if not target.count() or not target.is_visible():
+        first = page.locator("#main .lex-tweaks-pages").last.get_by_role("button", name="First page", exact=True)
+        if first.count() and not first.is_disabled():
+            first.click()
+            page.wait_for_timeout(80)
     for _ in range(12):
         if target.count() and target.is_visible():
             return
@@ -210,21 +216,20 @@ def main() -> None:
                     capture(page, screenshots, "dependencies-desktop.png")
 
                     page.locator("#plugin-info").click()
-                    page.get_by_text("MOD LOADER", exact=True).wait_for()
+                    page.locator(".lex-information-panel").wait_for()
+                    reveal_settings_locator(page, page.get_by_text("MOD LOADER", exact=True), "Mod Loader")
                     reveal_settings_locator(
                         page,
                         page.locator('input.lex-readonly-field[value*="External Steam runtime"]').first,
                         "External Steam runtime",
                     )
                     info_body = page.locator(".lex-information-panel .lex-detail-panel-body")
-                    info_body.locator(".lex-plugin-mod-loading").wait_for()
-                    info_body.locator(".lex-plugin-credits").wait_for()
-                    placement = info_body.evaluate("""body => {
-                      const loader=body.querySelector('.lex-plugin-mod-loading')?.getBoundingClientRect();
-                      const credits=body.querySelector('.lex-plugin-credits')?.getBoundingClientRect();
-                      return loader&&credits ? {loaderBottom:loader.bottom,creditsTop:credits.top} : null;
-                    }""")
-                    assert placement and placement["creditsTop"] >= placement["loaderBottom"] - 1, placement
+                    # Both shared sections remain reachable when the detail
+                    # layout puts them on separate pages or in separate columns.
+                    reveal_settings_locator(page, info_body.locator(".lex-plugin-mod-loading"), "Mod Loading")
+                    reveal_settings_locator(page, info_body.locator(".lex-plugin-credits"), "Credits")
+                    assert info_body.locator(".lex-plugin-mod-loading").count() == 1
+                    assert info_body.locator(".lex-plugin-credits").count() == 1
                     no_horizontal_overflow(page, "info-desktop")
                     capture(page, screenshots, "info-desktop.png")
 
@@ -290,8 +295,7 @@ def main() -> None:
                     page.get_by_text("Create Content", exact=True).wait_for()
                     assert page.get_by_label("Content family").is_visible()
                     create_button = page.get_by_role("button", name="Create content")
-                    create_button.scroll_into_view_if_needed()
-                    assert create_button.is_visible()
+                    reveal_settings_locator(page, create_button, "Create content")
                     capture(page, screenshots, "content-create-desktop.png")
                     page.get_by_role("tab", name="Scaffolds").click()
                     page.get_by_text("Logic Scaffold", exact=True).wait_for()
@@ -329,8 +333,8 @@ def main() -> None:
                     source_search.fill("AcceptanceCommand.cs")
                     page.locator(".lex-column-list-row").filter(has_text="AcceptanceCommand.cs").first.click()
                     page.wait_for_function("sourceCurrent?.path?.endsWith('AcceptanceCommand.cs')")
-                    page.get_by_role("button", name="Delete source").scroll_into_view_if_needed()
-                    assert page.get_by_role("button", name="Delete source").is_visible()
+                    page.get_by_role("button", name="Delete source", exact=True).scroll_into_view_if_needed()
+                    assert page.get_by_role("button", name="Delete source", exact=True).is_visible()
                     source_width = page.evaluate("""() => {
                       const detail=document.querySelector('#main .lex-detail-panel');
                       const editor=document.querySelector('#main .lex-code-field');
@@ -349,8 +353,7 @@ def main() -> None:
                     asset_search.fill("BrowserExtra17")
                     page.locator(".lex-column-list-row").filter(has_text="BrowserExtra17").first.click()
                     page.wait_for_function("assetCurrent?.path?.includes('BrowserExtra17')")
-                    page.get_by_role("button", name="Delete asset").scroll_into_view_if_needed()
-                    assert page.get_by_role("button", name="Delete asset").is_visible()
+                    reveal_settings_locator(page, page.get_by_role("button", name="Delete asset", exact=True), "Delete asset")
                     no_horizontal_overflow(page, "assets-desktop")
                     capture(page, screenshots, "assets-desktop.png")
 
@@ -371,18 +374,16 @@ def main() -> None:
                     page.wait_for_function("!document.querySelector('#main [role=\"status\"]')", timeout=5000)
                     reveal_settings_text(page, "TRANSLATION MOD")
                     page.evaluate('navigate("dependencies")')
-                    page.get_by_role("button", name="Build Mod").scroll_into_view_if_needed()
-                    assert page.get_by_role("button", name="Build Mod").is_visible()
+                    reveal_settings_locator(page, page.get_by_role("button", name="BUILD MOD", exact=True), "Build Mod")
                     page.evaluate('navigate("content")')
                     page.get_by_role("tab", name="Create").click()
                     create_button = page.get_by_role("button", name="Create content")
-                    create_button.scroll_into_view_if_needed()
-                    assert create_button.is_visible()
+                    reveal_settings_locator(page, create_button, "Create content")
                     page.evaluate('navigate("source")')
                     page.get_by_role("searchbox", name="Search Terraria source files").fill("AcceptanceCommand.cs")
                     page.locator(".lex-column-list-row").filter(has_text="AcceptanceCommand.cs").first.click()
                     page.wait_for_function("sourceCurrent?.path?.endsWith('AcceptanceCommand.cs')")
-                    delete = page.get_by_role("button", name="Delete source")
+                    delete = page.get_by_role("button", name="Delete source", exact=True)
                     delete.scroll_into_view_if_needed()
                     assert delete.is_visible()
                     capture(page, screenshots, "source-narrow-150.png")
@@ -390,8 +391,7 @@ def main() -> None:
                     page.get_by_role("searchbox", name="Search Terraria assets").fill("BrowserExtra17")
                     page.locator(".lex-column-list-row").filter(has_text="BrowserExtra17").first.click()
                     page.wait_for_function("assetCurrent?.path?.includes('BrowserExtra17')")
-                    page.get_by_role("button", name="Delete asset").scroll_into_view_if_needed()
-                    assert page.get_by_role("button", name="Delete asset").is_visible()
+                    reveal_settings_locator(page, page.get_by_role("button", name="Delete asset", exact=True), "Delete asset")
                     capture(page, screenshots, "assets-narrow-150.png")
 
                     page.evaluate("document.body.style.zoom='1'")

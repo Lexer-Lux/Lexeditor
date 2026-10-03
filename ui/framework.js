@@ -771,7 +771,8 @@
       });
       section.replaceChildren(element("h2", {}, "Mod Loading"), list);
     }).catch(error => section.replaceChildren(element("h2", {}, "Mod Loading"),
-      element("p", {role: "alert"}, error.message)));
+      element("p", {role: "alert"}, error.message)))
+      .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
     return section;
   };
 
@@ -810,9 +811,12 @@
       // A frozen distribution supplies notices for the exact Python packages it bundles.
       fetch(new URL("distribution-notices.json", sharedAssetBase)).then(response => response.ok ? response.json() : [])
         .then(entries => entries.forEach(row => section.append(element("details", {},
-          element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))))).catch(() => {});
+          element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))))).catch(() => {})
+        .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
     }).catch(error => section.replaceChildren(element("h2", {}, "Credits"),
-      element("p", {role: "alert"}, error.message)));
+      element("p", {role: "alert"}, error.message)))
+      .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
+    section.addEventListener("toggle", () => section.closest(".lex-tweaks-paged")?.lexFitPage?.(), true);
     return section;
   };
 
@@ -824,8 +828,12 @@
     // Existing Info pages vary, but all use the shared shell. Keep credits inside
     // their scrollable detail body when present, and never create a second header.
     const parent = main.querySelector(".lex-information-panel .lex-detail-panel-body") || main;
-    if (!main.querySelector(".lex-plugin-mod-loading")) parent.append(modLoadingPanel(pluginId));
-    if (!main.querySelector(".lex-plugin-credits")) parent.append(creditsPanel(pluginId));
+    const added = [];
+    if (!main.querySelector(".lex-plugin-mod-loading")) added.push(modLoadingPanel(pluginId));
+    if (!main.querySelector(".lex-plugin-credits")) added.push(creditsPanel(pluginId));
+    const paged = parent.closest(".lex-tweaks-paged");
+    if (paged?.lexAppendCards) paged.lexAppendCards(...added);
+    else parent.append(...added);
   };
 
   const unitField = (control, unit, attrs = {}) => {
@@ -4395,6 +4403,14 @@
       if (target >= 0 && target < starts.length) turn(target);
     }, overflows);
     root.refreshPages = () => {page=0;pagedCount=-1;refit();};
+    root.lexAppendCards = (...added) => {
+      const fresh = added.filter(card => !cards.includes(card));
+      if (!fresh.length) return;
+      cards.push(...fresh);
+      content.append(...fresh);
+      pagedCount = -1;
+      refit();
+    };
     // What the pager decided, for checks and for debugging a page break.
     root.lexPaging = () => ({starts:[...starts],page,
       cards:cards.filter(card=>!card.hidden).map(card=>({title:(card.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||"").trim(),height:cardHeights.get(card)??null}))});
