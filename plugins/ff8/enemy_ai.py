@@ -10,6 +10,7 @@ exact aligned size delta.  Unknown tails remain fail-closed.
 from __future__ import annotations
 
 import re
+from core.numeric_values import integer_value
 
 
 SCRIPT_NAMES = ("Init", "Turn", "Counter", "Death", "Pre-hit")
@@ -414,7 +415,8 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
     seen = set()
     changed = 0
     for edit in edits:
-        key = (int(edit["script"]), int(edit["offset"]), int(edit["operand"]))
+        key = tuple(integer_value(edit[name], f"Enemy AI {name}")
+                    for name in ("script", "offset", "operand"))
         if key in seen or key not in lookup:
             raise ValueError(f"Invalid, unsupported, or duplicate enemy AI operand: {key}")
         seen.add(key)

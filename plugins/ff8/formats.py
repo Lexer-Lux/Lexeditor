@@ -1037,7 +1037,7 @@ def save_enemy_battle_text(edits: list[dict]) -> dict:
     grouped: dict[int, list[dict]] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy dialogue record id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append({
@@ -1046,15 +1046,18 @@ def save_enemy_battle_text(edits: list[dict]) -> dict:
         })
     changed = 0
     files = []
+    prepared = []
     for monster_id in sorted(grouped):
         filename = f"c0m{monster_id:03d}.dat"
         source = _enemy_source_path(filename)
         rebuilt, count = enemy_battle_text_format.apply_edits(
             source.read_bytes(), grouped[monster_id])
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, rebuilt)
+        prepared.append((destination, rebuilt))
         changed += count
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
@@ -1063,7 +1066,7 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     document_map: dict[int, list[dict]] = {}
     for document in documents or []:
-        monster_id = int(document["id"])
+        monster_id = integer_value(document["id"], "Enemy AI document id")
         if monster_id not in valid_ids or monster_id in document_map:
             raise ValueError(f"Invalid or duplicate enemy AI document: {monster_id}")
         has_scripts = "scripts" in document
@@ -1074,12 +1077,13 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
             enemy_ai_format.compile_sources(document["sources"])
             if has_sources else list(document["scripts"]))
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy AI record id")
         if monster_id not in valid_ids or monster_id in document_map:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append(edit)
     changed = 0
     files = []
+    prepared = []
     for monster_id in sorted(set(grouped) | set(document_map)):
         monster_edits = grouped.get(monster_id, [])
         filename = f"c0m{monster_id:03d}.dat"
@@ -1090,9 +1094,11 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
         else:
             rebuilt, count = enemy_ai_format.apply_edits(source.read_bytes(), monster_edits)
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, rebuilt)
+        prepared.append((destination, rebuilt))
         changed += count
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
