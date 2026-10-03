@@ -217,8 +217,35 @@
 
   function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
   function setArrayValue(row,prop,index,value){if(!Array.isArray(row.values[prop.name]))return;row.values[prop.name][index]=value;refreshShell()}
-  function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};const low=semanticMin(prop),high=semanticMax(prop);if(low!==null&&low!==undefined)attrs.min=low;if(high!==null&&high!==undefined)attrs.max=high;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
-  function percentInput(row,prop,index){const current=row.values[prop.name]?.[index]??0;return el("input",{type:"number",min:0,max:100,step:1,value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=Number.parseInt(event.target.value,10);if(Number.isFinite(value)&&value>=0&&value<=100)setArrayValue(row,prop,index,value)},onchange:event=>{let value=Number.parseInt(event.target.value,10);if(!Number.isFinite(value))value=current;value=Math.max(0,Math.min(100,value));event.target.value=String(value);setArrayValue(row,prop,index,value)}})}
+  function numericInput(row,prop,index=null){
+    const current=index===null?row.values[prop.name]:row.values[prop.name][index];
+    const disabled=state.activeSource!=="mine"||!prop.editable;
+    const change=value=>index===null?setScalar(row,prop,value):setArrayValue(row,prop,index,value);
+    const bounds={BYTE:[0,255],INT16:[-32768,32767],UINT16:[0,65535],INT32:[-2147483648,2147483647]}[prop.type];
+    const declaredLow=semanticMin(prop),declaredHigh=semanticMax(prop);
+    const low=bounds?Math.max(declaredLow??bounds[0],bounds[0]):declaredLow;
+    const high=bounds?Math.min(declaredHigh??bounds[1],bounds[1]):declaredHigh;
+    if(prop.type!=="FLOAT"&&bounds&&!disabled){
+      const control=LexeditorUI.exactIntegerInput({value:current,min:low,max:high,label:displayLabel(prop),change:text=>change(Number(text))});
+      const input=control.querySelector("input");
+      input.addEventListener("input",()=>{if(input.lexValidateInteger())change(Number(input.value))});
+      return control;
+    }
+    const input=el("input",{type:"number",value:current,disabled,required:true,
+      step:prop.type==="FLOAT"?"any":1,"data-lex-validate-number":"true","aria-label":displayLabel(prop)});
+    if(low!==null&&low!==undefined)input.min=low;
+    if(high!==null&&high!==undefined)input.max=high;
+    const validate=()=>{
+      input.setCustomValidity("");
+      const value=Number(input.value);
+      if(input.value===""||!Number.isFinite(value))input.setCustomValidity("Enter a finite number.");
+      return input.checkValidity();
+    };
+    input.lexValidateNumber=validate;
+    input.oninput=()=>{if(validate())change(Number(input.value))};
+    return input;
+  }
+  function percentInput(row,prop,index){return numericInput(row,{...prop,type:"BYTE",min:0,max:100},index)}
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
   function nameInput(row,prop,index=null,source=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of (source||state.data).names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
@@ -864,6 +891,14 @@
 
   async function save(){
     if(state.activeSource!=="mine")return;
+    for(const input of document.querySelectorAll('#main input[type="number"],#main input[data-lex-exact-integer],#main input[data-lex-validate-number]')){
+      if(input.disabled||input.readOnly||!input.getClientRects().length)continue;
+      const valid=input.lexValidateNumber?input.lexValidateNumber():input.lexValidateInteger?.()??input.checkValidity();
+      if(!valid){
+        requestAnimationFrame(()=>{if(input.isConnected)input.reportValidity()});
+        throw new Error(`Correct ${input.getAttribute("aria-label")||"the numeric value"} before saving.`);
+      }
+    }
     const gameplay=dataEdits(),text=textEdits(),tweaks=tweakEditGroups();
     if(!gameplay.length&&!text.length&&!tweaks.length)return;
     state.busy=true;state.error="";render();
