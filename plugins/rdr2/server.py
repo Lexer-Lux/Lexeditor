@@ -3869,6 +3869,29 @@ ENTRY_FIELDS = ["Name", "Rate", "Type", "Min", "Max", "RewardCondition"]
 VALUE_FIELDS = {"Rate", "Min", "Max"}  # stored as value="" attributes
 
 
+def _loot_table_readonly(table):
+    if txt(table, "Type") not in {"AggregateDrop", "ContinuousLinearDrop"} or len(table.findall("Type")) != 1:
+        return True
+    for old in table.findall('./Entries/Item'):
+        if old.attrib or any(child.tag not in ENTRY_FIELDS or list(child)
+            or set(child.attrib) - ({"value"} if child.tag in VALUE_FIELDS else {"ref"} if child.tag == "RewardCondition" else set())
+            for child in old if isinstance(child.tag, str)):
+            return True
+        if any(len(old.findall(field)) > 1 for field in ENTRY_FIELDS):
+            return True
+        try:
+            for field in ("Min", "Max"):
+                value = attr_value(old, field)
+                if value not in (None, ""):
+                    _catalog_quantity(value)
+            rate = attr_value(old, "Rate")
+            if rate not in (None, "") and finite_number(rate, "Loot rate") < 0:
+                return True
+        except ValueError:
+            return True
+    return False
+
+
 def get_loot(name, ds="mine"):
     root = load_file(name, ds)["root"]
     tables = []
@@ -3882,6 +3905,11 @@ def get_loot(name, ds="mine"):
                     if f in VALUE_FIELDS:
                         v = attr_value(en, f)
                         if v is not None:
+                            if f in {"Min", "Max"} and v != "":
+                                try:
+                                    v = str(_catalog_quantity(v))
+                                except ValueError:
+                                    pass  # Unsupported source values remain visible, read-only.
                             row[f.lower()] = v
                     elif f == "RewardCondition":
                         condition = en.find(f)
@@ -3898,6 +3926,7 @@ def get_loot(name, ds="mine"):
             "name": t.get("name", ""),
             "type": txt(t, "Type"),
             "entries": entries,
+            "readonly": _loot_table_readonly(t),
         })
     return {"tables": tables}
 
@@ -3917,8 +3946,8 @@ def apply_loot_edits(name, edits):
     prepared, seen = [], set()
     allowed_fields = {field.lower() for field in ENTRY_FIELDS}
     for edit in edits:
-        if not isinstance(edit, dict) or set(edit) != {"tableKey", "entries"}:
-            raise ValueError("Loot edits require tableKey and entries only")
+        if not isinstance(edit, dict) or {"tableKey", "entries"} - set(edit) or set(edit) - {"tableKey", "entries", "type"}:
+            raise ValueError("Loot edits require tableKey, entries and optional type only")
         key = edit["tableKey"]
         if not isinstance(key, str) or key not in tables:
             raise ValueError("Unknown loot table")
@@ -3927,13 +3956,10 @@ def apply_loot_edits(name, edits):
         seen.add(key)
         if not isinstance(edit["entries"], list):
             raise ValueError("Loot entries must be a list")
-        for old in tables[key].findall('./Entries/Item'):
-            if old.attrib or any(child.tag not in ENTRY_FIELDS or list(child)
-                or set(child.attrib) - ({"value"} if child.tag in VALUE_FIELDS else {"ref"} if child.tag == "RewardCondition" else set())
-                for child in old if isinstance(child.tag, str)):
-                raise ValueError(f"Loot table {key} has unmodeled entry data and is read-only")
-            if any(len(old.findall(field)) > 1 for field in ENTRY_FIELDS):
-                raise ValueError(f"Loot table {key} has repeated entry fields and is read-only")
+        if _loot_table_readonly(tables[key]):
+            raise ValueError(f"Loot table {key} has unsupported data and is read-only")
+        if "type" in edit and (not isinstance(edit["type"], str) or edit["type"] not in {"AggregateDrop", "ContinuousLinearDrop"}):
+            raise ValueError("Loot drop type must be selected from the supported choices")
         rows = []
         for incoming in edit["entries"]:
             if not isinstance(incoming, dict) or "name" not in incoming or set(incoming) - allowed_fields:
@@ -3951,7 +3977,7 @@ def apply_loot_edits(name, edits):
             if row.get("min") not in (None, "") and row.get("max") not in (None, "") and row["min"] > row["max"]:
                 raise ValueError("Loot minimum cannot exceed maximum")
             rows.append(row)
-        prepared.append({"tableKey": key, "entries": rows})
+        prepared.append({"tableKey": key, "entries": rows, **({"type": edit["type"]} if "type" in edit else {})})
     edits = prepared
     valid_items = set(_catalog_ids())
     valid_tables = {table["key"] for file in LOOT_FILES if (ds_dir("mine") / file).exists()
@@ -3978,6 +4004,8 @@ def apply_loot_edits(name, edits):
         for t in root.find("LootTables").findall("Item"):
             if t.get("key") != e["tableKey"]:
                 continue
+            if "type" in e:
+                t.find("Type").text = e["type"]
             entries_el = t.find("Entries")
             if entries_el is None:
                 entries_el = ET.SubElement(t, "Entries")

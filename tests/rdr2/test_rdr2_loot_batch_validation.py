@@ -88,10 +88,11 @@ def test_real_http_rejects_then_saves_exact_quantities_known_choices_and_omissio
         assert snapshot(root) == before
         rows = [{**ROW, 'rate': '1.25', 'min': '-9007199254740993', 'max': '9007199254740995', 'rewardcondition': 'KNOWN'},
                 {'name': 'SECOND', 'type': 'Table', 'rate': 0, 'min': '', 'max': '', 'rewardcondition': ''}]
-        with urlopen(request([{'tableKey': 'FIRST', 'entries': rows}]), timeout=5) as response:
+        with urlopen(request([{'tableKey': 'FIRST', 'type': 'ContinuousLinearDrop', 'entries': rows}]), timeout=5) as response:
             assert json.load(response)['saved'] == 1
         s._files.clear()
         loaded = s.get_loot(name)['tables'][0]['entries']
+        assert s.get_loot(name)['tables'][0]['type'] == 'ContinuousLinearDrop'
         assert loaded[0]['min'] == '-9007199254740993'
         assert loaded[0]['max'] == '9007199254740995'
         assert loaded[0]['rate'] == '1.25'
@@ -120,3 +121,34 @@ def test_failed_loot_write_restores_cache_output_and_new_backup(loot, monkeypatc
         s.apply_loot_edits(name, [{'tableKey': 'FIRST', 'entries': [ROW]}])
     assert snapshot(root) == before
     assert s.load_file(name)['root'] is cached
+
+
+@pytest.mark.parametrize('value', [None, True, 'UNKNOWN', []])
+def test_invalid_drop_type_preserves_output(loot, value):
+    root, _, name = loot
+    before = snapshot(root)
+    with pytest.raises(ValueError):
+        s.apply_loot_edits(name, [{'tableKey': 'FIRST', 'entries': [ROW], 'type': value}])
+    assert snapshot(root) == before
+
+
+@pytest.mark.parametrize('fragment', ['<Opaque value="17"/>', '<Min value="1.5"/>'])
+def test_unmodeled_data_is_visible_and_marked_read_only(loot, fragment):
+    _, _, name = loot
+    root = s.load_file(name)['root']
+    if fragment.startswith('<Min'):
+        root.find('.//Entries/Item/Min').set('value', '1.5')
+    else:
+        root.find('.//Entries/Item').append(ET.fromstring(fragment))
+    assert s.get_loot(name)['tables'][0]['readonly'] is True
+
+
+def test_whole_decimal_source_quantities_normalize_without_source_mutation(loot):
+    _, _, name = loot
+    root = s.load_file(name)['root']
+    root.find('.//Entries/Item/Min').set('value', '1.0')
+    before = ET.tostring(root)
+    table = s.get_loot(name)['tables'][0]
+    assert table['entries'][0]['min'] == '1'
+    assert not table['readonly']
+    assert ET.tostring(root) == before

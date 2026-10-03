@@ -233,18 +233,23 @@ function lootFileOf(key){
   return state.lootFile;
 }
 
+function lootReferenceControl(editable,root){
+  if(!editable&&root instanceof Element)root.querySelectorAll("button").forEach(button=>button.disabled=true);
+  return root;
+}
 function lootDetail(t, file) {
   const body=LexeditorUI.stack({fill:false});
+  const editable=!isRO()&&!t.readonly;
   const u = lootUsageOf(t.key);
-  const typeSel = el("select",{class:"droptype",title:
+  const typeSel = !editable&&!["AggregateDrop","ContinuousLinearDrop"].includes(t.type)?LexeditorUI.readonlyField(t.type):el("select",{class:"droptype",disabled:!editable,title:
       "AggregateDrop: every entry rolled independently, several can hit at once.\n"+
       "ContinuousLinearDrop: one roll across the combined rates, entries are mutually exclusive.",
-    onchange:ev=>{t.type=ev.target.value;markLootDirty(t.key,file);renderLoot();}},
+    onchange:ev=>{if(!editable)return;t.type=ev.target.value;markLootDirty(t.key,file);renderLoot();}},
     ...["AggregateDrop","ContinuousLinearDrop"].map(v=>{const o=el("option",{value:v},v);if(t.type===v)o.selected=true;return o;}));
   const deleteBtn=!isRO()?el("button",{class:"lex-ui-symbol icon-link",style:"color:#d77b70;width:auto;padding:0 8px",
     title:"Delete this table from the loot file. Refused if any other table still references it as a Table entry.",
     onclick:()=>deleteLootTableDialog(t,file)},"Delete"):el("span");
-  body.append(LexeditorUI.detailField({label:"Drop type",control:refField(typeSel,[["V","vtag",state.store.vanilla?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null],["K","ktag",state.store.kiddos?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null]],t.type,v=>{t.type=v;markLootDirty(t.key,file);renderLoot()})}),
+  body.append(LexeditorUI.detailField({label:"Drop type",help:t.readonly?fieldHelp("This table contains data the editor cannot safely change. Its entries are read-only."):undefined,control:lootReferenceControl(editable,refField(typeSel,[["V","vtag",state.store.vanilla?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null],["K","ktag",state.store.kiddos?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null]],t.type,v=>{if(!editable)return;t.type=v;markLootDirty(t.key,file);renderLoot()}))}),
     lootRollSummary(t),LexeditorUI.detailSection({title:"Sources",body:lootSourceCell(t)}),lootEntryGrid(t,file,0,new Set([t.key])));
   return LexeditorUI.detailPanel({title:lootTableName(t)||t.key,meta:t.key,actions:deleteBtn,body});
 }
@@ -313,6 +318,7 @@ function lootRollSummary(t){
 // edit the real child table, marking that child's own file dirty.
 function lootEntryGrid(t, file, depth, seen) {
   const grid=LexeditorUI.stack({fill:false});
+  const editable=!isRO()&&!t.readonly;
   // Match the reference entry by name, falling back to position. The fallback is what
   // makes a reference on the NAME field possible at all: when the name is the thing that
   // changed, a name-keyed lookup can never find its own counterpart.
@@ -329,9 +335,16 @@ function lootEntryGrid(t, file, depth, seen) {
     ["K","ktag",lootRefValue(field,entryName,i,"kiddos")],
     ...(hasScope("prices1899","loot",file)?[["1899","p1899tag",lootRefValue(field,entryName,i,"prices1899")]]:[])];
   t.entries.forEach((e,i)=>{
-    const inp=(field,attrs={})=>el("input",{value:e[field]??"",...attrs,
-      onchange:ev=>{e[field]=ev.target.value;ev.target.classList.add("edited");markLootDirty(t.key,file);
-        if(field==="rate")renderLoot();}});
+    const inp=(field,attrs={})=>{
+      if(!editable&&lootNumericError(e,field))return LexeditorUI.readonlyField(e[field]??"");
+      const input=el("input",{value:e[field]??"",disabled:!editable,...attrs,
+        "data-lex-validate-number":"true",oninput:ev=>{
+          if(!editable)return;e[field]=ev.target.value;ev.target.classList.add("edited");markLootDirty(t.key,file);
+          ev.target.setCustomValidity(lootNumericError(e,field));},
+        onchange:()=>{if(editable&&field==="rate"&&!lootNumericError(e,field))renderLoot();}});
+      if(field!=="rate"){input.setAttribute("value","0");input.value=e[field]??"";}
+      input.setCustomValidity(lootNumericError(e,field));return input;
+    };
     const target=e.type==="Table"?findLootTable(e.name):null;
     const cyclic=target&&seen.has(target.table.key);
     // Nested tables are open by default; the toggle collapses them. Depth is capped so a
@@ -349,39 +362,40 @@ function lootEntryGrid(t, file, depth, seen) {
     // nothing in the name distinguishes them.
     const isTable=e.type==="Table";
     const setKind=kind=>{
+      if(!editable)return;
       pickIdentifier(kind==="Table"?"Loot table":"Catalog item",validLootNames(kind),e.name,v=>{
         e.name=v;
         if(kind==="Table")e.type="Table";
         else if(e.type==="Table")e.type="Item";   // leaving Table: default to plain Item
         markLootDirty(t.key,file);renderLoot();});
     };
-    const typeTag=el("button",{type:"button",title:isTable
+    const typeTag=el("button",{type:"button",disabled:!editable,title:isTable
         ? "This entry rolls another loot table. Click the name to point it somewhere else."
         : `Item kind: ${e.type}. Click to change between Item / Collectible / Money / Ammo / Weapon / Horse — these all name a catalog item, so the name alone cannot tell them apart.`,
       onclick:ev=>{ev.stopPropagation();
         if(isTable)return;
         pickIdentifier("Entry type",LOOT_ENTRY_TYPES.filter(x=>x!=="Table"),e.type,
           v=>{e.type=v;markLootDirty(t.key,file);renderLoot();});}},e.type||"?");
-    const nameBtn=el("button",{class:"lex-ui-symbol icon-link",title:isTable?"Choose a different loot table":"Choose a different catalog item",
+    const nameBtn=el("button",{class:"lex-ui-symbol icon-link",disabled:!editable,title:isTable?"Choose a different loot table":"Choose a different catalog item",
       onclick:()=>setKind(isTable?"Table":"Item")},"✎");
     const mention=isTable
       ? target?lootTableLink(target.file,target.table.key,el("span",{class:"nametext"},e.name)):el("span",{class:"badref",title:"No loot table with this name"},e.name||"!")
       : catalogItem(e.name)?itemLink(e.name,true,el("span",{class:"nametext"},e.name)):
         el("span",{class:"badref",title:"No catalog item with this name"},e.name||"(choose…)");
     const conditions=lootConditions();
-    const conditionSel=el("select",{title:"Optional engine-defined reward condition",
-      onchange:ev=>{e.rewardcondition=ev.target.value;markLootDirty(t.key,file);}},
+    const conditionSel=el("select",{disabled:!editable,title:"Optional engine-defined reward condition",
+      onchange:ev=>{if(!editable)return;e.rewardcondition=ev.target.value;markLootDirty(t.key,file);}},
       el("option",{value:""},"Always / no condition"),
       ...conditions.map(v=>{const o=el("option",{value:v},v);if(e.rewardcondition===v)o.selected=true;return o;}));
-    const numeric=(field,attrs)=>{const control=inp(field,attrs);return refField(control,refPairs(field,e.name,i),e[field],value=>applyToControl(control,value))};
+    const numeric=(field,attrs)=>{const control=inp(field,attrs);return lootReferenceControl(editable,refField(control,refPairs(field,e.name,i),e[field],value=>{if(editable)applyToControl(control,value)}))};
     grid.append(LexeditorUI.detailSection({title:`Entry ${i+1}`,body:[
-      LexeditorUI.actionRow(expander,mention,typeTag,nameBtn,refStack(refPairs("name",e.name,i),e.name,v=>{e.name=v;markLootDirty(t.key,file);renderLoot()}),
-        closeButton({title:"Remove entry",onclick:()=>{t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}})),
+      LexeditorUI.actionRow(expander,mention,typeTag,nameBtn,lootReferenceControl(editable,refStack(refPairs("name",e.name,i),e.name,v=>{if(!editable)return;e.name=v;markLootDirty(t.key,file);renderLoot()})),
+        closeButton({title:"Remove entry",disabled:!editable,onclick:()=>{if(!editable)return;t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}})),
       LexeditorUI.tileGrid([
-        {label:"Rate",control:numeric("rate",{type:"number",step:"0.05",min:0})},
+        {label:"Rate",control:numeric("rate",{type:"number",step:"any",min:0})},
         {label:"Min",control:numeric("min",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
         {label:"Max",control:numeric("max",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
-        {label:"Condition",control:refField(conditionSel,refPairs("rewardcondition",e.name,i),e.rewardcondition,v=>{e.rewardcondition=v;markLootDirty(t.key,file);renderLoot()})}].map(LexeditorUI.detailField),{minWidth:150})]}));
+        {label:"Condition",control:lootReferenceControl(editable,refField(conditionSel,refPairs("rewardcondition",e.name,i),e.rewardcondition,v=>{if(!editable)return;e.rewardcondition=v;markLootDirty(t.key,file);renderLoot()}))}].map(LexeditorUI.detailField),{minWidth:150})]}));
     if(cyclic) grid.append(LexeditorUI.detailNote(`↻ ${e.name} already appears higher in this chain`));
     if(target&&isOpen){
       const childFile=lootFileOf(target.table.key);
@@ -397,11 +411,30 @@ function lootEntryGrid(t, file, depth, seen) {
     grid.append(LexeditorUI.detailField({label:"Nothing",control:LexeditorUI.readonlyField(left>=0?left.toFixed(2):"0.00"),help:fieldHelp("Automatic: 1.0 minus the rates above. This is the chance that no entry is selected. Rates above 1.0 can yield more than one entry.")}));
   }
   grid.append(LexeditorUI.actionRow(
-    newButton({title:"Add a catalog item directly to this table",
+    newButton({title:"Add a catalog item directly to this table",disabled:!editable,
       onclick:()=>pickIdentifier("Catalog item",validLootNames("Item"),"",name=>{t.entries.push({name,rate:"1.0",type:"Item"});markLootDirty(t.key,file);renderLoot();})}),
-    newButton({title:"Add a reference that rolls another loot table or reusable Item Group",
+    newButton({title:"Add a reference that rolls another loot table or reusable Item Group",disabled:!editable,
       onclick:()=>pickIdentifier("Loot table",validLootNames("Table").filter(name=>name!==t.key),"",name=>{t.entries.push({name,rate:"1.0",type:"Table"});markLootDirty(t.key,file);renderLoot();})})));
   return grid;
+}
+
+function lootNumericError(entry,field){
+  const raw=entry[field];
+  if(raw===undefined||raw==="")return "";
+  if(field==="rate")return (typeof raw==="string"||typeof raw==="number")&&String(raw).trim()&&Number.isFinite(Number(raw))&&Number(raw)>=0?"":"Enter a nonnegative finite rate.";
+  if(!catalogQuantityIsValid(String(raw)))return "Enter a whole quantity or leave it blank.";
+  if(entry.min!==undefined&&entry.min!==""&&entry.max!==undefined&&entry.max!==""
+    &&catalogQuantityIsValid(String(entry.min))&&catalogQuantityIsValid(String(entry.max))&&BigInt(entry.min)>BigInt(entry.max))return "Minimum cannot exceed maximum.";
+  return "";
+}
+function validateLootDrafts(){
+  for(const [file,dirty] of Object.entries(state.lootDirty))for(const key of dirty){
+    const table=state.loot[file]?.tables.find(t=>t.key===key);
+    if(!table||table.readonly)throw new Error(`${key} is read-only or unavailable.`);
+    for(const entry of table.entries)for(const field of ["rate","min","max"]){
+      const error=lootNumericError(entry,field);if(error)throw new Error(`${key}: ${error}`);
+    }
+  }
 }
 
 // Saves every dirty loot file. Expanding a nested table edits whatever file that child
@@ -409,6 +442,7 @@ function lootEntryGrid(t, file, depth, seen) {
 // view selector ("__all") rather than the edit target.
 async function saveLoot() {
   if (isRO()) return;
+  validateLootDrafts();
   const conditions = new Set(lootConditions());
   const pending = Object.entries(state.lootDirty).filter(([, d]) => d && d.size);
   if (!pending.length) return;
@@ -416,7 +450,7 @@ async function saveLoot() {
   for (const [file, dirty] of pending) {
     const edits = [...dirty].map(key => {
       const t = state.loot[file].tables.find(x => x.key === key);
-      return { tableKey: key, entries: t.entries.filter(e => e.name) };
+      return { tableKey: key, type:t.type, entries: t.entries.filter(e => e.name) };
     });
     for (const edit of edits) for (const e of edit.entries) {
       if (!validLootNames(e.type).includes(e.name)) {
