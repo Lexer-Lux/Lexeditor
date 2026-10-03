@@ -762,6 +762,12 @@ def _expression(value):
     return text
 
 
+def _number_source(number: float) -> str:
+    if number.is_integer() and not (number == 0 and math.copysign(1, number) < 0):
+        return str(int(number))
+    return repr(number)
+
+
 def _encode(value, spec: dict):
     kind = spec["kind"]
     if kind in {"string", "text"}:
@@ -782,7 +788,7 @@ def _encode(value, spec: dict):
             raise ValueError(f"{spec['label']} must be at least {spec['min']}")
         if "max" in spec and number > spec["max"]:
             raise ValueError(f"{spec['label']} must be at most {spec['max']}")
-        return str(int(number)) if number.is_integer() else format(number, ".15g")
+        return _number_source(number)
     if kind in {"vec2", "vec3", "vec4"}:
         count = int(kind[-1])
         if not isinstance(value, (list, tuple)) or len(value) != count:
@@ -790,7 +796,7 @@ def _encode(value, spec: dict):
         rendered = []
         for item in value:
             number = finite_number(item, spec["label"])
-            rendered.append(str(int(number)) if number.is_integer() else format(number, ".15g"))
+            rendered.append(_number_source(number))
         opening, closing = ("(", ")") if spec.get("container") == "tuple" else ("[", "]")
         return opening + ", ".join(rendered) + closing
     return _expression(value)

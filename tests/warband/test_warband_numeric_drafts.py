@@ -17,7 +17,8 @@ from tests.warband.test_warband_troop_editor import SOURCE as TROOPS
 
 @pytest.mark.parametrize("dataset,field,label,correct", [
     ("skills", "maxLevel", "Maximum level", "12"),
-    ("postfx", "params1", "HDR parameters", "1.125"),
+    ("postfx", "params1", "HDR parameters", "1.2345678901234567"),
+    ("meshes", "translateX", "Translate X", "1.2345678901234567"),
 ])
 def test_hidden_numeric_draft_precedes_global_writers(page, tmp_path, record_service,
                                                     dataset, field, label, correct):
