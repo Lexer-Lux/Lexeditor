@@ -67,6 +67,7 @@ with sync_playwright() as p:
     try:
         for game in GAMES:
             for width,height in [(900,620),(1200,800),(1600,1000)]:
+                print(f"checking Data Map {game} at {width}x{height}", flush=True)
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))

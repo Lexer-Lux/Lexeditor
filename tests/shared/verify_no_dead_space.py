@@ -106,7 +106,9 @@ PROBE = r"""
 def tabs_of(cdp) -> list[str]:
     raw = cdp.eval(
         "JSON.stringify([...document.querySelectorAll("
-        "'.lex-shell-header nav button[data-tab]')].map(b=>b.dataset.tab))")
+        "'.lex-shell-header nav button[data-tab]')].filter(b=>!b.disabled&&"
+        "b.getBoundingClientRect().width>0&&b.getBoundingClientRect().height>0)"
+        ".map(b=>b.dataset.tab))")
     try:
         return [tab for tab in json.loads(raw) if tab]
     except Exception:
@@ -147,7 +149,14 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
             for tab in found or [""]:
                 print(f"measuring {plugin}/{tab or 'default'} at {width}x{height}", flush=True)
                 if tab:
-                    cdp.eval(f"navigate({tab!r})")
+                    # Shared shell tabs (notably Mods) own their handler and
+                    # are not entries in each plugin's private navigate map.
+                    # Use the same control the reader uses for every page.
+                    reached = cdp.eval(f"""(()=>{{const button=[...document.querySelectorAll(
+                      '.lex-shell-header nav button[data-tab]')].find(node=>node.dataset.tab==={tab!r});
+                      if(!button||button.disabled)return false;button.click();return true;}})()""")
+                    if not reached:
+                        raise AssertionError(f"The reachable tab disappeared: {plugin}/{tab}")
                     time.sleep(1.8)
                 raw = cdp.eval(f"JSON.stringify({PROBE})")
                 try:

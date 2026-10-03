@@ -96,6 +96,8 @@ SLOW = {
     # Twenty plugins, with a cold load and a settle after every main tab.
     # The prescribed settles alone can exceed the ordinary three-minute cap.
     "verify_no_dead_space": 900,
+    # Every plugin/edition at three sizes, with paging, filter and adapter checks.
+    "data_map_browser_check": 900,
     "verify_browser_regressions": 600,
     "verify_rdr2_runtime": 600,
     # Opens all nineteen plugins through the real chooser one at a time. FF7

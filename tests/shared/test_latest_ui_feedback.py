@@ -123,7 +123,11 @@ def test_tab_key_prompt_uses_the_games_own_font(page):
         tabs:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'}],active:'a',change(){}}))}''')
     page.wait_for_timeout(250)
     badges=page.locator('nav button[data-tab] .lex-tab-shortcut, .lex-subtab-button .lex-tab-shortcut')
-    assert badges.count()==4
+    # The shell adds the shared Mods tab to the two authored pages.
+    assert sorted(page.locator('nav button[data-tab]').evaluate_all(
+        'nodes=>nodes.map(node=>node.dataset.tab)')) == ['items', 'magic', 'mods']
+    assert page.locator('.lex-subtab-button').count()==2
+    assert badges.count()==5
     for badge in badges.all():
         assert badge.evaluate('''n=>{
           const face=game=>game.replace(/["\\']/g,'').split(',')[0].trim();
