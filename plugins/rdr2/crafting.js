@@ -598,11 +598,23 @@ function showCreateEffect(){
   const durations=[...new Set(state.catalog.effects.map(e=>e.durationcategory))].sort();
   const key=el("input",{placeholder:"LEX_EFFECT_SALTED_BEEF"}),label=el("input",{placeholder:"Salty snack"});
   const behavior=el("select",{},...behaviors.map(id=>el("option",{value:id},`${humanName("behaviors",id)||effectBehaviorName({id})||id}${humanName("behaviors",id)||effectBehaviorName({id})?` — ${id}`:""}`)));
-  const value=el("input",{type:"number",value:"0"}),percent=el("input",{type:"number",step:"any",value:"0"});
-  const time=el("input",{type:"number",value:"0"}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
+  const value=el("input",{type:"number",step:"1",value:"0",required:true}),percent=el("input",{type:"number",step:"any",value:"0",required:true});
+  const time=el("input",{type:"number",step:"1",value:"0",required:true}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
+  for(const input of [value,time,percent])input.setAttribute("data-lex-validate-number","true");
+  for(const input of [value,time]){
+    input.setAttribute("value","0");
+    input.addEventListener("input",()=>input.setCustomValidity(catalogQuantityIsValid(input.value)?"":"Enter a whole number."));
+  }
   const duration=el("select",{},...durations.map(id=>el("option",{value:id},id.replace("EFFECT_DURATION_CATEGORY_",""))));
   const close=()=>{backdrop.hidden=true;backdrop.innerHTML="";};
   const create=async()=>{try{
+    for(const input of [value,time]){
+      input.setCustomValidity(catalogQuantityIsValid(input.value)?"":"Enter a whole number.");
+      if(!input.checkValidity()){input.reportValidity();throw new Error("Value and time must be whole numbers.");}
+    }
+    if(!percent.value.trim()||!Number.isFinite(Number(percent.value))||!percent.checkValidity()){
+      percent.reportValidity();throw new Error("Percent must be a finite number.");
+    }
     const result=await api("/api/catalog/effects/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key.value,label:label.value,behavior:behavior.value,value:value.value,percent:percent.value,time:time.value,timeunits:units.value,durationcategory:duration.value})});
     if(result.label){state.labels.effects=state.labels.effects||{};state.labels.effects[result.key]=result.label;}
     if(result.symbol){state.labels.effectSymbols=state.labels.effectSymbols||{};state.labels.effectSymbols[result.key]=result.symbol;}

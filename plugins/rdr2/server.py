@@ -327,7 +327,9 @@ MOB_HUMAN_HINTS = ("PLAYER", "GANG", "LAW", "COMPANION", "BOUNTY", "GUARD",
 
 # (ds, name) -> {"root": Element, "bom": bool, "decl": str}
 _files = {}
-_lock = threading.Lock()
+# HTTP mutations and their metadata helpers share this lock; helpers also
+# acquire it when called directly, so nested acquisition must be supported.
+_lock = threading.RLock()
 
 
 def ds_dir(ds):
@@ -2515,7 +2517,19 @@ def create_catalog_item(data):
 def create_catalog_effect(data):
     """Create a new catalog effect using an engine behavior already present
     in the catalog. New effect records are data; new behaviors require code."""
-    requested_key = str(data.get("key", "")).strip().upper()
+    allowed = {"key", "label", "behavior", "value", "percent", "time", "timeunits", "durationcategory"}
+    if not isinstance(data, dict) or {"key", "behavior"} - set(data) or set(data) - allowed:
+        raise ValueError("Effect creation requires key, behavior and supported fields only")
+    for field in ("key", "label", "behavior", "durationcategory"):
+        if field in data and not isinstance(data[field], str):
+            raise ValueError(f"Effect {field} must be text")
+    value = integer_value(data.get("value", 0), "Effect value")
+    time_value = integer_value(data.get("time", 0), "Effect time")
+    time_units = integer_value(data.get("timeunits", 0), "Effect time units")
+    if time_units not in {0, 1, 2, 3}:
+        raise ValueError("Effect time units must be 0, 1, 2 or 3")
+    percent = finite_number(data.get("percent", 0), "Effect percent")
+    requested_key = data["key"].strip().upper()
     if not re.fullmatch(r"(?:0X[0-9A-F]{8}|[A-Z][A-Z0-9_]{2,63})", requested_key):
         raise ValueError("Effect ID must be a symbolic name or an 8-digit 0x hash")
     key = canonical_effect_key(requested_key)
@@ -2526,21 +2540,21 @@ def create_catalog_effect(data):
     definitions = effects_root.findall("item")
     if any(canonical_effect_key(txt(effect, "key")) == key for effect in definitions):
         raise ValueError(f"Effect already exists: {key}")
-    behavior = str(data.get("behavior", "")).strip()
+    behavior = data["behavior"].strip()
     known_behaviors = {txt(effect, "id") for effect in definitions if txt(effect, "id")}
     if behavior not in known_behaviors:
         raise ValueError("Behavior ID must be selected from an existing engine behavior")
-    duration = str(data.get("durationcategory") or "EFFECT_DURATION_CATEGORY_NONE").strip()
+    duration = data.get("durationcategory", "EFFECT_DURATION_CATEGORY_NONE").strip()
     known_durations = {txt(effect, "durationcategory") for effect in definitions}
     if duration not in known_durations:
         raise ValueError("Duration category must be selected from an existing category")
     effect = ET.Element("item")
     ET.SubElement(effect, "key").text = key
     ET.SubElement(effect, "id").text = behavior
-    ET.SubElement(effect, "value", {"value": str(int(float(data.get("value", 0))))})
-    ET.SubElement(effect, "percent", {"value": f'{float(data.get("percent", 0)):.8f}'})
-    ET.SubElement(effect, "time", {"value": str(int(float(data.get("time", 0))))})
-    ET.SubElement(effect, "timeunits", {"value": str(int(float(data.get("timeunits", 0))))})
+    ET.SubElement(effect, "value", {"value": str(value)})
+    ET.SubElement(effect, "percent", {"value": str(percent)})
+    ET.SubElement(effect, "time", {"value": str(time_value)})
+    ET.SubElement(effect, "timeunits", {"value": str(time_units)})
     ET.SubElement(effect, "durationcategory").text = duration
     effects_root.append(effect)
     ordered = sorted(effects_root.findall("item"),
@@ -2551,7 +2565,7 @@ def create_catalog_effect(data):
         effects_root.append(item)
     save_file(CATALOG_FILE)
     record_custom_catalog_origin("effects", key)
-    label = str(data.get("label", "")).strip()
+    label = data.get("label", "").strip()
     if not requested_key.startswith("0X"):
         save_label("effectSymbols", key, requested_key)
     if label:
@@ -5553,7 +5567,10 @@ class Handler(PluginRequestHandler):
                 elif path == "/api/catalog/create":
                     self._json(create_catalog_item(body))
                 elif path == "/api/catalog/effects/create":
-                    self._json(create_catalog_effect(body))
+                    try:
+                        self._json(create_catalog_effect(body))
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/settings/save":
                     self._json({"saved": save_gameplay_settings(body.get("edits", []))})
                 elif path == "/api/model-preview":
