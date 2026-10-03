@@ -3140,12 +3140,32 @@ def _catalog_numeric_edits(edits):
         if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
             raise ValueError("craft entries must be a list of objects")
         for entry in entries:
+            if set(entry) - {"key", "yield", "parts", "unlocks"}:
+                raise ValueError("craft entry contains unsupported fields")
+            if "key" in entry and (not isinstance(entry["key"], str) or not entry["key"].strip()):
+                raise ValueError("craft key must be nonempty text")
+            unlocks = entry.get("unlocks", [])
+            if not isinstance(unlocks, list) or any(not isinstance(key, str) or not key.strip() for key in unlocks):
+                raise ValueError("craft unlocks must be a list of nonempty text keys")
             whole(entry, "yield", "Craft yield", 1, 1)
             parts = entry.get("parts", [])
             if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
                 raise ValueError("craft parts must be a list of objects")
             for part in parts:
+                if "item" not in part or set(part) - {"item", "qty"}:
+                    raise ValueError("craft ingredient requires item and optional qty only")
+                if not isinstance(part["item"], str) or not part["item"].strip():
+                    raise ValueError("craft ingredient item must be nonempty text")
                 whole(part, "qty", "Craft ingredient quantity", 1, 1)
+    for row in prepared.get("itemTags", []):
+        tags = row["tags"]
+        if not isinstance(tags, list):
+            raise ValueError("item tags must be a list")
+        for tag in tags:
+            if not isinstance(tag, dict) or set(tag) != {"key", "type"}:
+                raise ValueError("item tags require key and type only")
+            if any(not isinstance(tag[field], str) or not tag[field].strip() for field in ("key", "type")):
+                raise ValueError("item tag key and type must be nonempty text")
     return prepared
 
 
