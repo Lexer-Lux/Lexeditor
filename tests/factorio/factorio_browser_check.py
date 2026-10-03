@@ -76,6 +76,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
     raw["tile"] = {
         "fixture-tile": {"type": "tile", "name": "fixture-tile"},
     }
+    raw['technology']['automation-huge'] = json.loads(json.dumps(raw['technology']['automation']))
+    raw['technology']['automation-huge']['name'] = 'automation-huge'
+    raw['technology']['automation-huge']['unit']['count'] = 18446744073709551615
     for index in range(40):
         item = f"fixture-item-{index:02d}"
         recipe = f"fixture-recipe-{index:02d}"
@@ -253,7 +256,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Research unit count", exact=True).input_value() == "25"
                 count = page.get_by_label("Research unit count", exact=True)
-                for invalid in ("25.5", "0", "9007199254740992"):
+                for invalid in ("25.5", "0", "18446744073709551616"):
                     count.fill(invalid)
                     count.blur()
                     assert page.evaluate("dirtyCount()") == 0
@@ -269,6 +272,48 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert page.get_by_label(
                     "Technology prerequisites", exact=True
                 ).locator("option:checked").count() == 0
+
+                tech_search.fill('automation-huge')
+                page.locator('.lex-column-list-row[data-key="automation-huge"]').click()
+                wide = page.get_by_label('Research unit count', exact=True)
+                assert wide.get_attribute('type') == 'number'
+                assert wide.input_value() == '18446744073709551615'
+                # Two edits captured from the same rendered row must compose;
+                # Save waits for both rather than persisting only the first.
+                page.evaluate("""async()=>{
+                  const row=state.data.technologies.find(row=>row.name==='automation-huge');
+                  commitRow('technologies',changedCopy(row,'unitTime',11));
+                  commitRow('technologies',changedCopy(row,'enabled',false));
+                  await save();
+                }""")
+                stored = json.loads((project/'overrides.json').read_text())
+                assert 'unit_count' not in stored['edits']['technologies']['automation-huge']
+                assert stored['edits']['technologies']['automation-huge']['unit_time'] == 11
+                assert stored['edits']['technologies']['automation-huge']['enabled'] is False
+                before_rejection = (project/'overrides.json').read_bytes()
+                try:
+                    post_json(base_url+'api/edit', {'kind':'technologies','name':'automation-huge',
+                        'changes':{'unit_count':'9007199254740993'}})
+                except urllib.error.HTTPError as error:
+                    assert error.code == 400
+                    assert 'cannot represent' in error.read().decode()
+                else:
+                    raise AssertionError('Nonrepresentable Lua count was accepted')
+                assert (project/'overrides.json').read_bytes() == before_rejection
+                wide = page.get_by_label('Research unit count', exact=True)
+                wide.fill('18446744073709551614')
+                wide.blur()
+                assert not wide.evaluate('input=>input.checkValidity()')
+                assert page.evaluate('dirtyCount()') == 0
+                wide.fill('9007199254740994')
+                wide.blur()
+                page.wait_for_function("state.data.technologies.find(row=>row.name==='automation-huge').unitCount==='9007199254740994'")
+                page.evaluate('save()')
+                page.wait_for_function('dirtyCount()===0')
+                page.evaluate('reopen()')
+                page.wait_for_timeout(150)
+                assert page.get_by_label('Research unit count', exact=True).input_value() == '9007199254740994'
+                page.screenshot(path=str(OUT/'factorio-exact-count.png'))
 
                 # Info/version/DLC and deterministic export action.
                 page.evaluate('navigate("info")')
@@ -432,6 +477,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
         assert "p.stack_size = 250" in patch
         assert "p.crafting_speed = 1.25" in patch
         assert "p.unit.count = 25" in patch
+        assert "p.unit.count = 9007199254740994" in patch
         assert "p.unit.time = 10" in patch
         assert "p.prerequisites = {}" in patch
         assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash

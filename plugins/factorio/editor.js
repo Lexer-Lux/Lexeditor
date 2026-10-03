@@ -7,6 +7,11 @@ const {
 } = LexeditorUI;
 
 const KINDS = ["recipes", "items", "machines", "technologies"];
+const UINT64_MAX = "18446744073709551615";
+function researchCountIssue(value, inherited) {
+  return value !== BigInt(inherited) && BigInt(Number(value)) !== value
+    ? "The game would round this count. Enter an exactly representable whole number." : "";
+}
 const LABELS = {
   recipes: "Recipes",
   items: "Items",
@@ -162,16 +167,25 @@ function rowChanges(kind, row) {
     prerequisites: [...(row.prerequisites || [])],
   };
   if (row.unitCount !== null && row.unitCount !== undefined && !row.unitCountFormula)
-    value.unit_count = Number(row.unitCount);
+    value.unit_count = row.unitCount;
   if (row.unitTime !== null && row.unitTime !== undefined)
     value.unit_time = Number(row.unitTime);
   return value;
 }
 
-async function commitRow(kind, row) {
+let rowEditQueue = Promise.resolve();
+function commitRow(kind, row) {
+  const apply = () => applyRowEdit(kind, row);
+  rowEditQueue = rowEditQueue.then(apply, apply);
+  return rowEditQueue;
+}
+
+async function applyRowEdit(kind, row) {
   try {
+    const current = state.data[kind].find(value => value.name === row.name) || row;
+    const candidate = row._changedKey ? changedCopy(current, row._changedKey, row[row._changedKey]) : row;
     const result = await jsonPost("/api/edit", {
-      kind, name: row.name, changes: rowChanges(kind, row),
+      kind, name: row.name, changes: rowChanges(kind, candidate),
     });
     const rows = state.data[kind];
     const index = rows.findIndex(value => value.name === row.name);
@@ -188,6 +202,7 @@ async function commitRow(kind, row) {
 function changedCopy(row, key, value) {
   const copy = LexeditorUI.clone(row);
   copy[key] = value;
+  copy._changedKey = key;
   return copy;
 }
 
@@ -304,9 +319,11 @@ function technologyPanel(row) {
     ? readonlyField(`Formula: ${row.unitCountFormula}`)
     : row.unitCount === null || row.unitCount === undefined
       ? readonlyField("Trigger-only technology")
-      : inputNumber(row.unitCount, {
-          label: "Research unit count", min: 1, max: Number.MAX_SAFE_INTEGER, step: 1, unit: "units",
-        }, value => commitRow("technologies", changedCopy(row, "unitCount", value)));
+      : unitField(LexeditorUI.exactIntegerInput({value:row.unitCount,
+          label:"Research unit count", min:1, max:UINT64_MAX,
+          validate:value=>researchCountIssue(value,row.unitCount),
+          change:value=>{if(value!==String(row.unitCount))void commitRow("technologies",changedCopy(row,"unitCount",value));}
+        }), "units", {boxed:true});
   const time = row.unitTime === null || row.unitTime === undefined
     ? readonlyField("—")
     : inputNumber(row.unitTime, {
@@ -322,8 +339,8 @@ function technologyPanel(row) {
           help: infoHelp("Whether the technology is enabled and available to its normal research conditions.")}),
         detailField({label: "PREREQUISITES", dataType: "REFS", control: prerequisiteControl(row),
           help: infoHelp("A prerequisite must be researched before this technology can be researched, shaping the technology-tree progression.")}),
-        detailField({label: "UNIT COUNT", dataType: row.unitCountFormula ? "FORMULA" : "INT", min: 1, control: count,
-          help: infoHelp("How many research units the technology consumes. Technologies whose cost changes by level keep their authored formula instead of replacing it with a fixed cost.")}),
+        detailField({label: "UNIT COUNT", dataType: row.unitCountFormula ? "FORMULA" : "INT", min: 1, max: UINT64_MAX, control: count,
+          help: infoHelp("How many research units the technology consumes. Technologies whose cost changes by level keep their formula. Very large counts must use values the game can store without rounding.")}),
         detailField({label: "UNIT TIME", dataType: "FLOAT", control: time,
           help: infoHelp("Research time for one unit in a lab running at speed 1. Total research time also depends on the unit count and lab speed.")}),
       ]}),
@@ -378,6 +395,17 @@ function unavailableCellEditor(message, commit) {
 function optionalNumberCellEditor(row, key, commit, options = {}) {
   if (typeof options.available === "function" && !options.available(row))
     return unavailableCellEditor(options.unavailable || "This value is source-controlled.", commit);
+  if (options.exactInteger) {
+    const editor = LexeditorUI.exactIntegerInput({value:row[key],min:options.min,max:options.max,
+      label:options.label||key,validate:options.validate,change:commit});
+    const input = editor.querySelector('input');
+    input.addEventListener('keydown',event=>{
+      if(event.key==='Enter'){event.preventDefault();editor.lexCommitInteger();}
+      if(event.key==='Escape'){event.preventDefault();commit(undefined);}
+    });
+    input.addEventListener('blur',()=>editor.lexCommitInteger());
+    return editor;
+  }
   const input = el("input", {
     type: "number",
     value: row[key] ?? "",
@@ -473,15 +501,12 @@ const columns = {
       editor: (row, commit) => optionalNumberCellEditor(row, "unitCount", commit, {
         available: row => !row.unitCountFormula && row.unitCount !== null && row.unitCount !== undefined,
         unavailable: row?.unitCountFormula ? "Formula-controlled research count." : "Trigger-only technology.",
-        min: 1, max: Number.MAX_SAFE_INTEGER, step: 1, label: "Research unit count",
+        min: 1, max: UINT64_MAX, step: 1, label: "Research unit count", exactInteger:true,
+        validate:value=>researchCountIssue(value,row.unitCount),
       }),
       edit: (row, value) => {
         if (row.unitCountFormula || row.unitCount === null || row.unitCount === undefined) return;
-        numberCellEdit("technologies", "unitCount", {
-          integer: true,
-          validate: number => number >= 1 && number <= Number.MAX_SAFE_INTEGER
-            ? "" : "This UI accepts fixed research counts from 1 through JavaScript's exact integer limit.",
-        })(row, value);
+        void commitRow("technologies", changedCopy(row, "unitCount", String(value)));
       },
     },
     {
@@ -755,6 +780,7 @@ async function loadRows() {
 }
 
 async function save() {
+  await rowEditQueue;
   if (!sourceReady()) return;
   const result = await jsonPost("/api/save", {});
   state.config.dirty = result.dirty;
@@ -762,6 +788,7 @@ async function save() {
 }
 
 async function discard() {
+  await rowEditQueue;
   if (!sourceReady()) return;
   await jsonPost("/api/discard", {});
   state.config = await api("/api/config");
@@ -772,6 +799,7 @@ async function discard() {
 }
 
 async function reopen() {
+  await rowEditQueue;
   document.querySelector("#main").replaceChildren(loadingState("Reopening Factorio project…"));
   refreshShell();
   try {

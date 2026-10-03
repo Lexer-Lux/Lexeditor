@@ -3171,6 +3171,11 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
    see provenanceControl. It sits on the box's edge and shows while the box is
    pointed at or being edited. */
 .lex-source-control-internal.lex-has-stepper { --lex-stepper-width:1.15em; }
+.lex-exact-integer { --lex-stepper-width:1.15em; width:100%; }
+.lex-exact-integer > input { padding-right:calc(var(--lex-stepper-width) + .5em); }
+.lex-unit-field-boxed > .lex-source-control > input {
+  padding-inline-end:calc(var(--lex-unit-reserve) + var(--lex-stepper-width, 0px));
+}
 .lex-has-stepper input[type="number"] { appearance:textfield; -moz-appearance:textfield; }
 .lex-has-stepper input[type="number"]::-webkit-inner-spin-button,
 .lex-has-stepper input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }

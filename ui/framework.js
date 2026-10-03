@@ -837,8 +837,10 @@
   };
 
   const unitField = (control, unit, attrs = {}) => {
-    const boxed = attrs.boxed ?? (control instanceof Element &&
-      control.matches("input,select,textarea,output,.lex-readonly-field"));
+    const scalar = control instanceof Element
+      ? (control.matches("input,select,textarea,output,.lex-readonly-field") ? control
+        : control.querySelector("input,select,textarea,output,.lex-readonly-field")) : null;
+    const boxed = attrs.boxed ?? !!scalar;
     const prefix = attrs.position === "prefix";
     const reserve = Math.max(1.8, String(unit || "").length * .45 + .9);
     const field = element("span", {
@@ -854,7 +856,7 @@
     class: ["lex-unit", unit === "×" ? "lex-unit-multiplier" : "", attrs.unitClass || ""].filter(Boolean).join(" "),
     "aria-hidden": "true",
     }, unit) : null);
-    if (boxed && unit && !prefix) followUnit(field, control);
+    if (boxed && unit && !prefix) followUnit(field, scalar || control);
     return field;
   };
 
@@ -913,13 +915,75 @@
 
   const formatNumber = (value, options = {}) => {
     if (value === null || value === undefined || value === "") return String(value ?? "");
-    const numeric = typeof value === "number" ? value : Number(value);
-    if (!Number.isFinite(numeric)) return String(value);
+    const numeric = typeof value === "bigint" ? value
+      : typeof value === "string" && /^[+-]?\d{16,}$/.test(value.trim()) ? BigInt(value.trim())
+      : typeof value === "number" ? value : Number(value);
+    if (typeof numeric !== "bigint" && !Number.isFinite(numeric)) return String(value);
     return new Intl.NumberFormat("en-US", {
       useGrouping: true,
       maximumFractionDigits: 20,
       ...options,
     }).format(numeric);
+  };
+
+  // Exact wide integers keep the browser's bounded numeric control, while
+  // validation and stepping use decimal strings and BigInt rather than double.
+  const exactIntegerInput = (options = {}) => {
+    const low = BigInt(options.min), high = BigInt(options.max);
+    if (low > high) throw new RangeError("Invalid integer bounds");
+    const input = element("input", {type:"number", min:String(low), max:String(high), step:1,
+      value:String(options.value), "aria-label":options.label,
+      "data-lex-exact-integer":"true", "data-lex-value-type":"INT"});
+    const validate = () => {
+      input.setCustomValidity("");
+      const text = input.value;
+      if (!/^[+-]?\d+$/.test(text)) {
+        input.setCustomValidity("Enter a whole number.");
+        return null;
+      }
+      const value = BigInt(text);
+      if (value < low || value > high) {
+        input.setCustomValidity(`Enter a number from ${low} through ${high}.`);
+        return null;
+      }
+      const issue = options.validate?.(value, text);
+      if (issue) { input.setCustomValidity(issue); return null; }
+      return value;
+    };
+    const commit = () => {
+      if (input.disabled || input.readOnly || refusesEdit(input)) return false;
+      const value = validate();
+      if (value === null) { input.reportValidity(); return false; }
+      input.value = String(value);
+      options.change?.(input.value);
+      return true;
+    };
+    input.addEventListener("change", commit);
+    const step = direction => {
+      if (input.disabled || input.readOnly || refusesEdit(input)) return;
+      const value = validate();
+      if (value === null) { input.reportValidity(); return; }
+      const next = value + BigInt(direction);
+      if (next < low || next > high) return;
+      input.value = String(next);
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      input.dispatchEvent(new Event("change", {bubbles:true}));
+    };
+    input.addEventListener("keydown", event => {
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault(); step(event.key === "ArrowUp" ? 1 : -1);
+      }
+    });
+    const arrow = (direction, label) => element("button", {type:"button", tabindex:"-1",
+      class:direction > 0 ? "lex-stepper-up" : "lex-stepper-down", "aria-label":label,
+      onpointerdown:event=>event.preventDefault(), onclick:()=>step(direction)});
+    const root = element("div", {class:"lex-source-control lex-has-stepper lex-exact-integer"}, input,
+      element("span", {class:"lex-stepper"}, arrow(1, "Increase"), arrow(-1, "Decrease")));
+    root.focus = () => input.focus();
+    root.select = () => input.select();
+    root.lexCommitInteger = commit;
+    validate();
+    return root;
   };
 
   // What a value box holds, as a number. A plugin is free to paint its number
@@ -2221,7 +2285,7 @@
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
       ? `(${min === null || min === undefined || min === "" ? "…" : formatNumber(min)}-${max === null || max === undefined || max === "" ? "…" : formatNumber(max)})` : "");
-    if (input && !readOnly && dataType === "INT") {
+    if (input && !readOnly && dataType === "INT" && !input.dataset.lexExactInteger) {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";
       let lastValid = /^-?\d+$/.test(String(input.value)) ? String(input.value) : "0";
@@ -2390,7 +2454,7 @@
     // Wide ranges still have a coarse slider; direct entry retains precise
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
-    if (input && !readOnly && numericLike &&
+    if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
         Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
@@ -11770,6 +11834,7 @@ ${contents.path}`});
   };
 
 window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
@@ -12526,7 +12591,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
     for (const input of inputs) {
       window.LexeditorUI.autoFitControlText(input,{minimum:8});
-      if (groupedBoxes.has(input) || !wantsGrouping(input)) continue;
+      if (input.dataset.lexExactInteger || groupedBoxes.has(input) || !wantsGrouping(input)) continue;
       groupedBoxes.add(input);
       const plain = () => String(input.value ?? "").replace(/,/g, "");
       // A text box does not enforce min and max the way a number box does, so
