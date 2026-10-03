@@ -127,8 +127,8 @@ def test_dataset_add_reopens_created_record_and_sends_source_to_build(page, tmp_
             if route.request.url.endswith("/save"):
                 result = save_dataset(tmp_path, dataset, body["sha256"], body["edits"])
             else:
-                result = server.note_created(dataset, create_dataset_record(tmp_path, dataset,
-                    body["sha256"], body["recordIndex"], body["originalId"], body["id"]))
+                result = server.create_with_origin(dataset, body["id"], create_dataset_record, tmp_path,
+                    dataset, body["sha256"], body["recordIndex"], body["originalId"], body["id"])
         else:
             result = server.mark_created(dataset, dataset_data(tmp_path, dataset))
         route.fulfill(json=result)

@@ -143,6 +143,7 @@ ITEM_FIELD_NAMES = ("id", "name", "meshes", "flags", "capabilities", "value", "s
 # trace of where a record came from, so the create actions note each new id
 # here and the lists mark those records with the created-in-mod pen.
 CREATED_LEDGER = Path(PROJECT) / ".lexeditor-created.json"
+CREATION_LOCK = threading.Lock()
 
 
 def created_ids(kind: str) -> set[str]:
@@ -154,21 +155,36 @@ def created_ids(kind: str) -> set[str]:
     return {str(item) for item in ids} if isinstance(ids, list) else set()
 
 
-def note_created(kind: str, result: dict) -> dict:
-    record_id = result.get("created") if isinstance(result, dict) else None
-    if not record_id:
-        return result
+def create_with_origin(kind, record_id, create, *args):
+    """Publish a template copy and its origin ledger in the same transaction."""
+    if not isinstance(kind, str) or kind not in {"items", "troops", *MODULE_RECORD_SCHEMAS}:
+        raise ValueError("Unknown record kind")
+    if not isinstance(record_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", record_id):
+        raise ValueError("ID must start with a lowercase letter and use letters, digits or underscores")
+    with CREATION_LOCK:
+        output = _created_output(kind, record_id)
+        return create(*args, additional_outputs=[output])
+
+
+def _created_output(kind, record_id):
     try:
-        value = json.loads(CREATED_LEDGER.read_text(encoding="utf-8"))
-        value = value if isinstance(value, dict) else {}
-    except (OSError, ValueError, TypeError):
-        value = {}
-    ids = [str(item) for item in value.get(kind, []) if isinstance(item, str)]
-    if str(record_id) not in ids:
-        ids.append(str(record_id))
+        raw = CREATED_LEDGER.read_bytes()
+    except FileNotFoundError:
+        raw = None
+    try:
+        value = json.loads(raw.decode("utf-8")) if raw is not None else {}
+    except (UnicodeError, ValueError) as error:
+        raise ValueError("Created-record ledger is invalid; repair it before creating a record") from error
+    if not isinstance(value, dict):
+        raise ValueError("Created-record ledger must be an object")
+    ids = value.get(kind, [])
+    if not isinstance(ids, list) or any(not isinstance(item, str) or not item for item in ids):
+        raise ValueError("Created-record ledger IDs must be a list of nonempty text")
+    ids = list(dict.fromkeys(ids))
+    if record_id not in ids:
+        ids.append(record_id)
     value[kind] = ids
-    CREATED_LEDGER.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    return result
+    return CREATED_LEDGER, (json.dumps(value, indent=2) + "\n").encode("utf-8"), raw
 
 
 def mark_created(kind: str, payload: dict) -> dict:
@@ -479,18 +495,18 @@ def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
     return encoded
 
 
-def _write_items_candidate(candidate: str, encoding: str, raw: bytes) -> dict:
+def _write_items_candidate(candidate: str, encoding: str, raw: bytes, *, additional_outputs=()) -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if any(ord(char) > 127 for char in candidate) and not re.search(
             r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = _validate_module_items_candidate(candidate, encoding)
-    backup = publish_source(source, encoded, raw)
+    backup = publish_source(source, encoded, raw, additional_outputs=additional_outputs)
     return {"backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 def create_item(record_index: int, original_id: str, item_id: str, name: str,
-                expected_sha256: str) -> dict:
+                expected_sha256: str, *, additional_outputs=()) -> dict:
     """Append a template copy without renumbering existing item records."""
     if not isinstance(item_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", item_id):
         raise ValueError("Item ID must start with a lowercase letter and use letters, digits or underscores")
@@ -519,7 +535,7 @@ def create_item(record_index: int, original_id: str, item_id: str, name: str,
         expected_ids = [record["id"] for record in records] + [item_id]
         if [record["id"] for record in _item_records(candidate)] != expected_ids:
             raise ValueError("Creation changed existing item identities; refusing the write")
-        result = _write_items_candidate(candidate, encoding, raw)
+        result = _write_items_candidate(candidate, encoding, raw, additional_outputs=additional_outputs)
         return {**result, "created": item_id, "recordIndex": len(records)}
 
 
@@ -933,25 +949,29 @@ class Handler(PluginRequestHandler):
                     raise ValueError("Expected troop edits and text sha256 only")
                 self.json_response(save_troops(MODULE_SYSTEM, body["sha256"], body["edits"]))
             elif path == "/api/troops/create":
-                self.json_response(note_created("troops", create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
-                                                body.get("originalId"), body.get("id"), body.get("name"), body.get("plural"))))
+                self.json_response(create_with_origin("troops", body.get("id"), create_troop, MODULE_SYSTEM,
+                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"),
+                    body.get("id"), body.get("name"), body.get("plural")))
             elif path == "/api/items/save":
                 if not isinstance(body, dict) or set(body) != {"edits", "sha256"} or not isinstance(body["sha256"], str):
                     raise ValueError("Expected item edits and text sha256 only")
                 self.json_response(save_item_edits(body["edits"], body["sha256"]))
             elif path == "/api/items/create":
-                self.json_response(note_created("items", create_item(body.get("recordIndex"), body.get("originalId"),
-                                               body.get("id"), body.get("name"), body.get("sha256", ""))))
+                self.json_response(create_with_origin("items", body.get("id"), create_item,
+                    body.get("recordIndex"), body.get("originalId"), body.get("id"),
+                    body.get("name"), body.get("sha256", "")))
             elif path == "/api/module-records/save":
                 if not isinstance(body,dict) or set(body)!={"dataset","sha256","edits"}:
                     raise ValueError("Expected dataset, sha256 and edits only")
                 self.json_response(save_dataset(MODULE_SYSTEM, body["dataset"], body["sha256"], body["edits"]))
             elif path == "/api/sounds/create":
-                self.json_response(note_created("sounds", create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
+                self.json_response(create_with_origin("sounds", body.get("id"), create_sound, MODULE_SYSTEM,
+                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id")))
             elif path == "/api/module-records/create":
                 dataset = body.get("dataset", "")
-                self.json_response(note_created(dataset, create_dataset_record(MODULE_SYSTEM, dataset,
-                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
+                self.json_response(create_with_origin(dataset, body.get("id"), create_dataset_record,
+                    MODULE_SYSTEM, dataset, body.get("sha256", ""), body.get("recordIndex"),
+                    body.get("originalId"), body.get("id")))
             elif path == "/api/catalog/file/save":
                 self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":

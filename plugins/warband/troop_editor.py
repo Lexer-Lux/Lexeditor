@@ -209,7 +209,7 @@ def troop_data(root):
             'types':{k:v for k,v in symbols.items() if k.startswith('tf_') and 0<=v<16}}
 
 
-def create_troop(root, expected, record_index, original_id, new_id, name, plural):
+def create_troop(root, expected, record_index, original_id, new_id, name, plural, *, additional_outputs=()):
     from .module_records import _source as read_source, _record_spans, _write_candidate
     if type(record_index) is not int:
         raise ValueError('Choose an existing troop')
@@ -246,7 +246,7 @@ def create_troop(root, expected, record_index, original_id, new_id, name, plural
         active=lambda rows:[r['id'] for r in rows if r['status']!='CUT']
         if active(reparsed)!=active(records)+[new_id]:
             raise ValueError('Creation changed existing troop IDs')
-        result=_write_candidate(path,candidate,encoding,raw)
+        result=_write_candidate(path,candidate,encoding,raw,additional_outputs=additional_outputs)
         created=next(r for r in reparsed if r['id']==new_id)
         return {**result,'created':new_id,'recordIndex':created['recordIndex']}
 

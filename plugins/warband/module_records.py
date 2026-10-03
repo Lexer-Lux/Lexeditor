@@ -819,22 +819,23 @@ def _validate_python(encoded: bytes):
         temporary_path.unlink(missing_ok=True)
 
 
-def _write_candidate(path, candidate, encoding, raw):
+def _write_candidate(path, candidate, encoding, raw, *, additional_outputs=()):
     if encoding != 'utf-8-sig' and any(ord(char) > 127 for char in candidate) and not re.search(
             r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = candidate.encode(encoding)
     _validate_python(encoded)
-    backup = publish_source(path, encoded, raw)
+    backup = publish_source(path, encoded, raw, additional_outputs=additional_outputs)
     return {"sha256": hashlib.sha256(encoded).hexdigest(), "backup": str(backup)}
 
 
-def create_sound(root, expected_sha256, record_index, original_id, new_id):
+def create_sound(root, expected_sha256, record_index, original_id, new_id, *, additional_outputs=()):
     """Append a sound template; process_sounds numbers existing entries unchanged."""
-    return create_dataset_record(root, 'sounds', expected_sha256, record_index, original_id, new_id)
+    return create_dataset_record(root, 'sounds', expected_sha256, record_index, original_id, new_id,
+                                 additional_outputs=additional_outputs)
 
 
-def create_dataset_record(root, dataset, expected_sha256, record_index, original_id, new_id):
+def create_dataset_record(root, dataset, expected_sha256, record_index, original_id, new_id, *, additional_outputs=()):
     """Append a structured template without importing source or renumbering records."""
     if dataset not in SCHEMAS:
         raise ValueError("Unknown Warband Module System dataset")
@@ -865,7 +866,7 @@ def create_dataset_record(root, dataset, expected_sha256, record_index, original
         candidate = text[:insertion] + ',' + newline + '  ' + copied + text[insertion:]
         if [row['id'] for row in _records(candidate, schema)] != ids + [new_id]:
             raise ValueError("Creation changed existing record identities")
-        return {**_write_candidate(path, candidate, encoding, raw),
+        return {**_write_candidate(path, candidate, encoding, raw, additional_outputs=additional_outputs),
                 'created':new_id, 'recordIndex':len(records)}
 
 
