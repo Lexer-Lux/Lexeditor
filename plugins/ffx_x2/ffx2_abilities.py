@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.bounded import whole_number
+from core.numeric_values import integer_value
 
 from .ffx2_table import FFX2TableError, parse_table
 from .treasures import sha256_bytes
@@ -78,10 +79,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> bytes:
     for edit in edits:
         if not isinstance(edit, dict):
             raise FFX2AbilityError("Each FFX-2 ability edit must be an object")
-        try:
-            record_id = int(edit.get("id"))
-        except (TypeError, ValueError) as error:
-            raise FFX2AbilityError("Ability record ID must be an integer") from error
+        record_id = integer_value(edit.get("id"), "Ability record ID", FFX2AbilityError)
         if not table.min_index <= record_id <= table.max_index:
             raise FFX2AbilityError(
                 f"Ability record ID must be between {table.min_index} and {table.max_index}"

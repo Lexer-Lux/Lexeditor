@@ -105,10 +105,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> bytes:
             raise FFXAutoAbilityError(
                 "Each FFX auto-ability edit must contain only id, strike, absorb, immune, resist and weak"
             )
-        try:
-            record_id = int(edit["id"])
-        except (TypeError, ValueError) as error:
-            raise FFXAutoAbilityError("FFX auto-ability record ID must be an integer") from error
+        record_id = integer_value(edit["id"], "FFX auto-ability record ID", FFXAutoAbilityError)
         if not table.min_index <= record_id <= table.max_index:
             raise FFXAutoAbilityError(
                 f"FFX auto-ability record ID must be between {table.min_index} and {table.max_index}"
