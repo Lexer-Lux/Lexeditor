@@ -1,5 +1,6 @@
 """Steam localization text records."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from .project import OverlayStore, digest, validate_resource_path
 
@@ -29,10 +30,17 @@ def _decode(payload: bytes) -> tuple[str, bool]:
     return text, bom
 
 
-def load_messages(store: OverlayStore, path: str, source: str = "mine") -> dict:
+def _message_path(path: str) -> str:
+    if not isinstance(path, str):
+        raise ValueError("Localization path must be text")
     path = validate_resource_path(path)
     if not path.startswith("Localize/") or "/msg/" not in path or not path.endswith(".txt"):
         raise ValueError("Only Steam Localize/<lang>/msg/*.txt files use the text editor")
+    return path
+
+
+def load_messages(store: OverlayStore, path: str, source: str = "mine") -> dict:
+    path = _message_path(path)
     payload, origin = store.read(path, source)
     text, _ = _decode(payload)
     rows = []
@@ -51,6 +59,7 @@ def load_messages(store: OverlayStore, path: str, source: str = "mine") -> dict:
 
 
 def save_messages(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    path = _message_path(path)
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
@@ -58,9 +67,12 @@ def save_messages(store: OverlayStore, path: str, expected_sha256: str, edits: l
     lines = text.splitlines(keepends=True)
     seen: set[int] = set()
     for edit in edits:
-        line_number = int(edit["line"])
-        key = str(edit["key"])
-        value = str(edit["text"])
+        if not isinstance(edit, dict):
+            raise ValueError("Localization edit must be an object")
+        line_number = integer_value(edit["line"], "Localization line ID")
+        key, value = edit.get("key"), edit.get("text")
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise ValueError("Localization key and text must be strings")
         if line_number in seen:
             raise ValueError("Duplicate text edit")
         seen.add(line_number)
