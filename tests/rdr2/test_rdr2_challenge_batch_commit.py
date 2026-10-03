@@ -11,7 +11,7 @@ from test_rdr2_catalog_numeric_validation import fixture, snapshot
 
 GOAL = {'name': 'Goal', 'index': 0, 'value': '12', 'sources': []}
 LABEL = {'file': s.CHALLENGES_FILE, 'owner': 'Challenge', 'rank': 0,
-         'field': 'description', 'value': 'New label'}
+         'field': 'challengeDescLabel', 'value': 'New label'}
 SOURCE = {'index': 0, 'base': 'SECOND', 'permutation': ''}
 CONDITION = {'goal': 'Goal', 'index': 0, 'type': 'CAIConditionGoalContext',
              'field': 'ContextHash', 'value': 'CHAL_CTX_SCOPED_KIT'}
@@ -22,7 +22,7 @@ def challenges(fixture, monkeypatch):
     root, _ = fixture
     documents = {
         s.GOALS_FILE: '<Root><!--goals--><goals><Item><name>Goal</name><scoreParams><Item><desiredGoal value="10"/><statId><BaseId>BASE</BaseId><PermutationId>PERM</PermutationId></statId></Item></scoreParams><Item type="CAIConditionGoalContext"><ContextHash>CHAL_CTX_ON_MOVING_TRAIN</ContextHash></Item><Opaque>keep</Opaque></Item></goals></Root>',
-        s.CHALLENGES_FILE: '<Root><!--challenges--><challenges><Item><name>Challenge</name><uiInfo><description>Old label</description></uiInfo><Opaque>keep</Opaque></Item></challenges></Root>',
+        s.CHALLENGES_FILE: '<Root><!--challenges--><challenges><Item><name>Challenge</name><uiInfo><challengeDescLabel>Old label</challengeDescLabel></uiInfo><Opaque>keep</Opaque></Item></challenges></Root>',
     }
     for name, text in documents.items():
         path = s.data_file_path(name, 'mine')
@@ -103,7 +103,7 @@ def test_http_rejection_then_real_save_reload(challenges):
             assert json.load(response)['saved'] == 2
         s._files.clear()
         assert s.load_file(s.GOALS_FILE)['root'].find('.//desiredGoal').get('value') == '12'
-        assert s.load_file(s.CHALLENGES_FILE)['root'].find('.//description').text == 'New label'
+        assert s.load_file(s.CHALLENGES_FILE)['root'].find('.//challengeDescLabel').text == 'New label'
         for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
             assert s.load_file(name)['root'].find('.//Opaque').text == 'keep'
             assert b'<!--' in s.data_file_path(name, 'mine').read_bytes()
@@ -209,3 +209,84 @@ def test_exact_goal_source_and_condition_save_reload(challenges):
     assert root.find('.//ContextHash').text == 'CHAL_CTX_SCOPED_KIT'
     assert root.find('.//Opaque').text == 'keep'
     assert b'<!--goals-->' in s.data_file_path(s.GOALS_FILE, 'mine').read_bytes()
+
+
+BAD_LABELS = [{}, dict(LABEL, file='unknown.meta'), dict(LABEL, file=[]),
+              dict(LABEL, owner='Unknown'), dict(LABEL, owner=[]), dict(LABEL, extra=1),
+              dict(LABEL, field='../Opaque'), dict(LABEL, field='Unknown'),
+              dict(LABEL, rank=True), dict(LABEL, rank=0.5), dict(LABEL, rank=-1),
+              dict(LABEL, rank=1), dict(LABEL, rank='1.5')]
+BAD_LABELS += [dict(LABEL, value=value) for value in [None, True, [], {}, 12]]
+BAD_MODES = [{}, {'challenge': [], 'mode': 'series'}, {'challenge': 'Unknown', 'mode': 'series'},
+             {'challenge': 'Challenge', 'mode': 'series', 'extra': 1}]
+
+
+@pytest.mark.parametrize('family,bad', [('label', row) for row in BAD_LABELS] +
+                         [('mode', row) for row in BAD_MODES])
+@pytest.mark.parametrize('backups', [False, True])
+def test_bad_labels_or_modes_do_not_publish_valid_goal(challenges, family, bad, backups):
+    if backups:
+        for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+            path = s.data_file_path(name, 'mine')
+            path.with_suffix(path.suffix + '.bak').write_bytes(b'original')
+    before = snapshot(challenges)
+    roots = {name: s.load_file(name)['root'] for name in (s.GOALS_FILE, s.CHALLENGES_FILE)}
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([GOAL], ui_edits=[bad] if family == 'label' else [LABEL],
+                               mode_edits=[bad] if family == 'mode' else [])
+    assert snapshot(challenges) == before
+    assert all(s.load_file(name)['root'] is root for name, root in roots.items())
+
+
+@pytest.mark.parametrize('family', ['label', 'mode'])
+def test_duplicate_labels_and_modes_reject(challenges, family):
+    before = snapshot(challenges)
+    mode = {'challenge': 'Challenge', 'mode': 'series'}
+    with pytest.raises(ValueError, match='Duplicate'):
+        s.apply_challenge_edits([GOAL], ui_edits=[LABEL, LABEL] if family == 'label' else [LABEL],
+                               mode_edits=[mode, mode] if family == 'mode' else [])
+    assert snapshot(challenges) == before
+
+
+@pytest.mark.parametrize('change', ['owner', 'ui', 'field', 'nested'])
+def test_ambiguous_or_nested_label_source_is_protected(challenges, change):
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    record = root.find('challenges/Item')
+    if change == 'owner':
+        root.find('challenges').append(ET.fromstring(ET.tostring(record)))
+    elif change == 'ui':
+        record.append(ET.fromstring(ET.tostring(record.find('uiInfo'))))
+    elif change == 'field':
+        ET.SubElement(record.find('uiInfo'), LABEL['field']).text = 'Other'
+    else:
+        ET.SubElement(record.find('uiInfo/' + LABEL['field']), 'Opaque').text = 'keep'
+    s.save_file(s.CHALLENGES_FILE)
+    before = snapshot(challenges)
+    cached = ET.tostring(root)
+    with pytest.raises(ValueError):
+        s.apply_challenge_edits([GOAL], ui_edits=[LABEL])
+    assert snapshot(challenges) == before
+    assert s.load_file(s.CHALLENGES_FILE)['root'] is root
+    assert ET.tostring(root) == cached
+
+
+def test_goal_and_rank_labels_save_reload_without_touching_other_fields(challenges):
+    goal = s.load_file(s.GOALS_FILE)['root'].find('goals/Item')
+    ui = ET.SubElement(goal, 'uiInfo')
+    ET.SubElement(ui, 'pauseMenuDescriptionLabel').text = 'Old goal'
+    record = s.load_file(s.CHALLENGES_FILE)['root'].find('challenges/Item')
+    ranks = ET.SubElement(record, 'ranks')
+    rank = ET.SubElement(ranks, 'Item')
+    rank_ui = ET.SubElement(rank, 'uiInfo')
+    ET.SubElement(rank_ui, 'rankDescLabel').text = 'Old rank'
+    for name in (s.GOALS_FILE, s.CHALLENGES_FILE):
+        s.save_file(name)
+    assert s.apply_challenge_edits([], ui_edits=[
+        {'file': s.GOALS_FILE, 'owner': 'Goal', 'field': 'pauseMenuDescriptionLabel', 'value': 'New goal'},
+        dict(LABEL, rank='1', field='rankDescLabel', value='New rank'), LABEL]) == 3
+    s._files.clear()
+    assert s.load_file(s.GOALS_FILE)['root'].find('.//pauseMenuDescriptionLabel').text == 'New goal'
+    root = s.load_file(s.CHALLENGES_FILE)['root']
+    assert root.find('.//rankDescLabel').text == 'New rank'
+    assert root.find('.//challengeDescLabel').text == 'New label'
+    assert root.find('.//Opaque').text == 'keep'

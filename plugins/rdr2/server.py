@@ -4401,6 +4401,8 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
     if DATASETS['mine'].get('readonly'):
         raise ValueError("This dataset is read-only")
     for edit in mode_edits or []:
+        if set(edit) != {'challenge', 'mode'} or not isinstance(edit['challenge'], str) or not edit['challenge']:
+            raise ValueError('Challenge mode requires a text challenge identity and mode')
         requested = edit.get('mode')
         if not isinstance(requested, str) or requested not in {'series', 'parallel'}:
             raise ValueError(f"unknown challenge strand mode: {requested}")
@@ -4587,28 +4589,52 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 value.tail = "\n              "; item.tail = "\n              " if i < len(rows)-1 else "\n            "
             reward_changed += 1
     ui_changed = 0
+    seen_ui = set()
     for edit in ui_edits or []:
-        file_name, owner, field, value = edit.get("file"), edit.get("owner"), edit.get("field"), edit.get("value", "")
-        root = candidate(file_name) if file_name in {GOALS_FILE, CHALLENGES_FILE} else None
-        if root is None:
-            continue
-        collection = root.find("goals") if file_name == GOALS_FILE else root.find("challenges")
-        record = next((x for x in collection.findall("Item") if txt(x, "name") == owner), None)
-        if record is None:
-            continue
-        target = record.find("uiInfo")
-        rank = int(edit.get("rank", 0))
-        if rank and file_name == CHALLENGES_FILE:
-            ranks = record.findall("./ranks/Item")
-            target = ranks[rank - 1].find("uiInfo") if 0 < rank <= len(ranks) else None
-        node = target.find(field) if target is not None else None
-        if node is not None:
-            node.text = value
-            ui_changed += 1
+        shape(edit, {'file', 'owner', 'field', 'value'}, {'rank'})
+        file_name, owner, field, value = (edit[key] for key in ['file', 'owner', 'field', 'value'])
+        for label in ['file', 'owner', 'field']:
+            identity(edit[label], label)
+        if not isinstance(value, str):
+            raise ValueError('Challenge label value must be text')
+        if file_name not in {GOALS_FILE, CHALLENGES_FILE}:
+            raise ValueError('Unknown challenge label file')
+        rank = offset(edit.get('rank', 0), 'label rank')
+        fields = ({'pauseMenuDescriptionLabel', 'pauseMenuDescriptionFormatLabel', 'toastDescriptionLabel'}
+                  if file_name == GOALS_FILE else
+                  {'challengeNameLabel', 'rankDescLabel', 'toastRankCompleteDescriptionLabel'} if rank else
+                  {'challengeNameLabel', 'challengeDescLabel', 'toolTip'})
+        if field not in fields or (file_name == GOALS_FILE and rank):
+            raise ValueError('Unknown challenge label field or rank')
+        key = (file_name, owner, rank, field)
+        if key in seen_ui:
+            raise ValueError('Duplicate challenge label target')
+        seen_ui.add(key)
+        root = candidate(file_name)
+        if file_name == GOALS_FILE:
+            record = unique_goal(root, owner)
+        else:
+            collections = root.findall('challenges')
+            matches = [item for item in collections[0].findall('Item') if txt(item, 'name') == owner] if len(collections) == 1 else []
+            if len(matches) != 1 or len(matches[0].findall('name')) != 1:
+                raise ValueError('Challenge label owner is missing or ambiguous')
+            record = matches[0]
+        if rank:
+            ranks = record.findall('./ranks/Item') if len(record.findall('ranks')) == 1 else []
+            if rank > len(ranks):
+                raise ValueError('Unknown challenge label rank')
+            record = ranks[rank - 1]
+        targets = record.findall('uiInfo')
+        nodes = targets[0].findall(field) if len(targets) == 1 else []
+        if len(nodes) != 1 or len(nodes[0]):
+            raise ValueError('Challenge label field is missing or ambiguous')
+        nodes[0].text = value
+        ui_changed += 1
     mode_changed = 0
     if mode_edits:
         challenge_doc = candidate(CHALLENGES_FILE)
         challenges_el = challenge_doc.find("challenges")
+        seen_modes = set()
         for edit in mode_edits:
             logical = edit.get("challenge", "")
             requested = edit.get("mode", "")
@@ -4616,9 +4642,14 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 raise ValueError(f"unknown challenge strand mode: {requested}")
             if requested == "parallel":
                 raise ValueError("Parallel roots appear as duplicate challenge strands in game and are not supported")
+            if logical in seen_modes:
+                raise ValueError('Duplicate challenge mode target')
+            seen_modes.add(logical)
+            if len(challenge_doc.findall('challenges')) != 1:
+                raise ValueError('Challenge collection is missing or ambiguous')
             group = next((records for name, records in challenge_groups(challenges_el) if name == logical), None)
             if not group:
-                continue
+                raise ValueError('Unknown challenge mode target')
             is_parallel = all(number > 0 for number, _ in group)
             if requested == "parallel" and not is_parallel:
                 source = group[0][1]
