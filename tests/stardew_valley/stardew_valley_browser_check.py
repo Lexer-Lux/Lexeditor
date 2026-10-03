@@ -6,12 +6,13 @@ from __future__ import annotations
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from paged_detail import reveal  # noqa: E402
@@ -437,7 +438,33 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     divider.press("Shift+ArrowRight")
     page.wait_for_timeout(150)
     after = int(divider.get_attribute("aria-valuenow"))
-    assert after != before, (label, before, after)
+    if after == before:
+        # The detail can already be at its readable minimum. Move the
+        # divider toward the master instead, retaining the movement assertion.
+        divider.press("Shift+ArrowLeft")
+        page.wait_for_timeout(150)
+        after = int(divider.get_attribute("aria-valuenow"))
+    resize_geometry=divider.evaluate('''n=>{
+      const root=n.closest('.lex-panel-layout');
+      return {width:root.clientWidth,template:root.style.getPropertyValue('--lex-panel-layout-template'),
+        scrollWidth:root.scrollWidth,
+        panes:[...root.querySelectorAll(':scope > .lex-panel-layout-pane')].map(node=>node.getBoundingClientRect().width)};
+    }''')
+    if after == before:
+        # Both directions are clamped only when the panes exhaust the viewport.
+        minimums=[float(value) for value in re.findall(r'minmax\(([\d.]+)px',resize_geometry['template'])]
+        assert len(minimums)==len(resize_geometry['panes'])==2, resize_geometry
+        assert sum(minimums)>resize_geometry['width'], resize_geometry
+        assert all(abs(actual-minimum)<2 for actual,minimum in zip(resize_geometry['panes'],minimums)),resize_geometry
+        assert resize_geometry['scrollWidth']>resize_geometry['width'],resize_geometry
+        root=divider.locator('..')
+        root.evaluate('node=>node.scrollLeft=node.scrollWidth')
+        # The last detail-page control remains reachable through the scroller.
+        following=root.get_by_role('button',name='Next page',exact=True).last
+        expect(following).to_be_in_viewport()
+        root.evaluate('node=>node.scrollLeft=0')
+    else:
+        assert after != before, (label,before,after,resize_geometry)
     geometry(page, label + "-resized")
 
 

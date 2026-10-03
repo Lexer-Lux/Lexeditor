@@ -48,6 +48,22 @@ def test_chance_drafts_header_save_reopen_and_default_restore(service):
             reveal(page, control)
             return control
 
+        # Nested formation rows use the same percentage lane as record panes.
+        for width in (1600, 1000, 1600):
+            page.set_viewport_size({'width': width, 'height': 1000})
+            control = chance(0)
+            page.wait_for_timeout(250)
+            geometry = control.evaluate('''input => {
+              const field=input.closest('.lex-detail-field');
+              const label=field.querySelector('.lex-detail-field-label');
+              const range=document.createRange();range.selectNodeContents(label.firstElementChild);
+              return {field:field.getBoundingClientRect().toJSON(),
+                label:label.getBoundingClientRect().toJSON(),ink:range.getBoundingClientRect().toJSON()};
+            }''')
+            assert .07 <= geometry['label']['width']/geometry['field']['width'] <= .08, geometry
+            assert geometry['ink']['right'] <= geometry['label']['right']+1, geometry
+            assert geometry['ink']['bottom'] <= geometry['label']['bottom']+1, geometry
+
         save = page.locator('#global-save')
         initial = [value*100/256 for value in chances.DEFAULT_OUTCOMES]
         for index, expected in enumerate(initial):

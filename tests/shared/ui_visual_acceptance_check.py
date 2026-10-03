@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
+from paged_detail import reveal
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / "ui-visual-acceptance"
@@ -160,6 +161,7 @@ with sync_playwright() as p:
                 assert glyph['top'] == '-0.5px', (width, 'info bubble lost its optical punctuation adjustment', glyph)
 
             enabled = page.locator('.lex-boolean-field').first
+            reveal(page, enabled)
             bool_ref = enabled.evaluate("""e=>{
               const ref=e.querySelector('.lex-reference-values .lex-reference-value');
               const tag=ref?.querySelector('.lex-reference-tag');

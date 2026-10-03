@@ -3968,7 +3968,7 @@ body:has(.lex-data-map-table) #main {
 .lex-platform-config-section > summary { padding:10px 6px; cursor:pointer; font-weight:700; }
 .lex-platform-config-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:var(--lex-panel-gap); padding:0 0 var(--lex-panel-gap); }
 .lex-platform-config-field { min-width:0; }
-.lex-platform-config-field.lex-boolean-field { grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto; }
+.lex-platform-config-field.lex-boolean-field { grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr) auto; }
 .lex-platform-config-field :is(input[type=text],input[type=number],select) { width:100%; min-width:0; }
 @media (max-width:700px) {
   .lex-platform-config-head { align-items:stretch; flex-direction:column; }
@@ -7066,8 +7066,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
    column here packs on its own. */
-/* A settings card is narrow: its names take a real share of it. */
-.lex-tweak-card-grid { --lex-detail-label-width:clamp(min(6.5em, 40%), 38%, 12em); display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+/* Cards inherit the same percentage name lane as other detail panels. */
+.lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column > .lex-detail-panel {
   --lex-detail-title-size:1em;
@@ -7107,11 +7107,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    The leader and checkbox share one row. References occupy the space below
    that checkbox; the reserved space stays fixed when a reference changes. */
 .lex-boolean-field {
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto;
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr) auto;
   min-height:0;
 }
 .lex-boolean-field:where(:has(> .lex-detail-field-control > .lex-source-control)) {
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
 }
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) { padding-bottom:12px; }
 .lex-boolean-field > .lex-detail-field-label {
@@ -7249,7 +7249,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) {
   align-items:center;
   display:grid;
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
 }
 .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
   justify-self:stretch;
@@ -7692,13 +7692,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
- /* The name lane. A detail panel is wide, so a tenth of it holds a name; a
-    settings card is a few hundred pixels, where the same tenth was nineteen
-    and the fitter shrank every name in it to an unreadable few pixels. The
-    card says how much it gives its names instead. */
- /* --lex-detail-label-min is set by the label fitter when a name cannot be
-    read at the smallest size it allows; the lane never takes over half. */
- grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+ /* Every property uses the same percentage; columns fit readable names. */
+ grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
  border-bottom: var(--lex-field-border, 0);
 }
 .lex-detail-field-label {
@@ -8380,12 +8375,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
 
 /* Help follows the property name; the left type rail stays metadata. */
 .lex-detail-field-label:has(> .lex-field-help) > .lex-detail-field-label-text { min-width:min-content; }
+.lex-detail-field-label:has(> .lex-field-help) { gap:4px; }
 .lex-field-help {
   position:relative;
-  flex:0 0 22px;
+  flex:0 0 16px;
   display:grid;
   place-items:center;
-  width:22px;
+  width:16px;
   z-index:5;
 }
 .lex-field-help > .lex-info-help {

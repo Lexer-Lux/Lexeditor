@@ -4183,6 +4183,42 @@
     }, {passive:false});
   };
 
+  const labelMeasure = document.createElement('canvas').getContext('2d');
+  const labelWidths = new Map();
+  const readablePropertyWidth = (cards, fontSize=12) => {
+    let minimum=0;
+    for(const card of cards){
+      for(const label of card.querySelectorAll('.lex-detail-field:not(.lex-detail-field-stacked) > .lex-detail-field-label')){
+        const text=label.querySelector(':scope > .lex-detail-field-label-text');
+        if(!text?.textContent.trim())continue;
+        const css=getComputedStyle(label),lane=css.getPropertyValue('--lex-detail-label-width').trim();
+        if(!lane.endsWith('%'))continue;
+        const share=parseFloat(lane)/100;
+        if(!(share>0&&share<=1))continue;
+        // Give the percentage lane room for a readable word before fitting.
+        // Longer names can wrap between words without changing that percentage.
+        const font=`${css.fontStyle} ${css.fontWeight} ${fontSize}px ${css.fontFamily}`;
+        labelMeasure.font=font;
+        let wordWidth=0;
+        for(const original of text.textContent.trim().split(/\s+/)){
+          const word=css.textTransform==='uppercase'?original.toUpperCase():css.textTransform==='lowercase'?original.toLowerCase():original;
+          const spacing=parseFloat(css.letterSpacing)||0;
+          const key=font+'|'+spacing+'|'+word;
+          if(!labelWidths.has(key)){
+            if(labelWidths.size>=8192)labelWidths.delete(labelWidths.keys().next().value);
+            labelWidths.set(key,labelMeasure.measureText(word).width+Math.max(0,word.length-1)*spacing);
+          }
+          wordWidth=Math.max(wordWidth,labelWidths.get(key));
+        }
+        const help=label.querySelector(':scope > .lex-field-help');
+        const helpWidth=help?parseFloat(getComputedStyle(help).width)+(parseFloat(css.columnGap)||0):0;
+        const inset=(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0);
+        minimum=Math.max(minimum,(wordWidth+helpWidth+inset+2)/share+32);
+      }
+    }
+    return minimum;
+  };
+
   const pagedSectionMemory = new Map();
   const paginateSettings = (content, options = {}) => {
     content.classList.add("lex-tweak-card-grid");
@@ -4217,7 +4253,7 @@
       // Narrower cards clipped flag names and could abort strict pagination.
       // A caller can supply a measured minimum for a simpler card.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
-      const target=asked||400;
+      const target=Math.max(asked||400,readablePropertyWidth(cards));
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
@@ -4570,7 +4606,7 @@
         frame = requestAnimationFrame(() => {frame = 0; refit();});
       });
       observer.observe(scroll);
-      document.fonts?.ready.then(() => { if (root.isConnected) refit(); });
+      document.fonts?.ready.then(() => { labelWidths.clear(); if (root.isConnected) refit(); });
       root.lexPageObserver = observer;
     }
     requestAnimationFrame(refit);
@@ -8888,6 +8924,7 @@ ${contents.path}`});
         : [`minmax(${minSizes[index]}px, ${value}fr)`]).join(" ");
     const minSizes = Array.from({length: nodes.length}, (_, index) =>
       Math.max(80, Number(options.minSizes?.[index]) || 240));
+    const configuredMinSizes=[...minSizes];
     if (!vertical) root.style.setProperty('--lex-panel-stack-min', `${Math.max(0, ...minSizes)}px`);
     let belowMinimum = false, measuredGap = 14;
     // Every side-by-side layout keeps its panes at their minimum widths, from
@@ -8895,6 +8932,10 @@ ${contents.path}`});
     // three-pane page at 1100px squeezed its detail to 350px of a 430px
     // minimum while its other panes kept more than theirs (Enemies > Loot).
     const updateResponsive = () => {
+      if(!vertical&&root.isConnected){
+        nodes.forEach((node,index)=>minSizes[index]=Math.max(configuredMinSizes[index],readablePropertyWidth([node],9)));
+        root.style.setProperty('--lex-panel-stack-min',`${Math.max(...minSizes)}px`);
+      }
       const extent = vertical ? root.clientHeight : root.clientWidth;
       if (!extent) return 0;
       const css = getComputedStyle(root);
@@ -8936,13 +8977,16 @@ ${contents.path}`});
           const fitted = fitResponsiveSizes(updateResponsive());
           if (fitted) {
             sizes = sizesWithMinimums(fitted);
-            root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
           }
+          root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
         };
         const observer = new ResizeObserver(refresh);
         observer.observe(root);
         root.__lexPanelLayoutObserver = observer;
-        requestAnimationFrame(refresh);
+        requestAnimationFrame(() => {
+          refresh();
+          document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refresh();});
+        });
       }
       return root;
     }
@@ -9091,6 +9135,7 @@ ${contents.path}`});
     const refreshResponsive = () => {
       const fitted = fitResponsiveSizes(updateResponsive());
       if (fitted) setSizes(fitted);
+      else root.style.setProperty('--lex-panel-layout-template',template(sizes));
     };
     if (typeof ResizeObserver !== "undefined") {
       let pending = 0;
@@ -9111,6 +9156,7 @@ ${contents.path}`});
     requestAnimationFrame(() => {
       refreshResponsive();
       if (root.isConnected && nodes.length === 2) resizePair(0, 0);
+      document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refreshResponsive();});
     });
     return root;
   };
@@ -12253,19 +12299,19 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     return Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect())
       .filter(box=>box.width||box.height).map(box=>left-box.left));
   };
-  const widenLabelLane = label => {
-    const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
-    if (!lane) return;
-    const needed = Math.ceil(label.scrollWidth + labelLeftOverflow(label) + 2);
-    const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
-    if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
-  };
   const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
+  const labelTextOutside = label => {
+    const text=label.querySelector(':scope > .lex-detail-field-label-text');
+    if(!text)return false;
+    const range=document.createRange();range.selectNodeContents(text);
+    const ink=range.getBoundingClientRect(),room=text.getBoundingClientRect();
+    return ink.right>room.right+1||ink.left<room.left-1;
+  };
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
     // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
-    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1) return;
+    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1 && !labelTextOutside(label)) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
@@ -12310,36 +12356,23 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // pixel too wide pokes past the label edge every other name ends on.
     // A name is never shrunk past what can be read. The floor was one pixel,
     // and a long property name in a narrow lane came out as a smear. A name
-    // that still does not fit at the floor widens the lane instead - for its
-    // whole panel, so the names in it keep one edge.
+    // that still does not fit at the floor keeps the percentage lane.
     const overflows = () => {
       const box=label.getBoundingClientRect(),css=getComputedStyle(label);
       const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
+      if(labelTextOutside(label))return true;
       const outsidePadding=[...label.children].some(child=>{
         const bounds=child.getBoundingClientRect();
         return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
       });
       return outsidePadding || label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
     };
-    // A word wider than the lane widens the lane before anything shrinks, so
-    // one long name does not come out smaller than the names around it. The
-    // lane settles on the next pass, when the observer sees it resize.
-    // A name that only fits by wrapping asks for the room too: measured on one
-    // line, it widens the lane (the grid caps the lane at half the row) before
-    // it is broken over two lines and shrunk. "MDEF (RIGHT)" came out as two
-    // clipped 13px lines beside a value box six times wider than it needed.
-    if (label.classList.contains('lex-detail-field-label')) {
-      const wrap = label.style.whiteSpace;
-      label.style.whiteSpace = 'nowrap';
-      if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
-      label.style.whiteSpace = wrap;
-    }
     // A record's name stops shrinking at 14px while wrapping can still help;
     // one long word that fits nowhere keeps shrinking to the shared floor
     // rather than being clipped.
     for (const minimum of label.classList.contains('lex-detail-panel-name') ? [14, LABEL_MIN_PX] : [LABEL_MIN_PX]) {
       while (size > minimum && overflows()) {
-        size -= .5;
+        size = Math.max(minimum,size-.5);
         label.style.fontSize = `${size}px`;
       }
     }

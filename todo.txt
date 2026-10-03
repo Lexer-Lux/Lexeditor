@@ -249,6 +249,7 @@ Field
 
 GF
 - gfs -> Center panel -> attack: uhhh how is the entire left 1/3rd reserved for the property names????? i even told you to get rid of all the overrides and make it globally always the same % that i indicated. so how the fuck is this possible.
+    > status 2026-10-03: Removed the label fitter's panel-width override and the separate settings/Stardew label widths. Ordinary property labels now retain the shared 7.5% lane; settings columns and pane minima leave enough room for complete words, refitting after fonts load. Twelve focused shared layout/minimum cases, the original shared visual and 400-control performance checks, all three real-service Stardew browser sizes and the real World HTTP encounter controls check pass. Inspected actual GF Attack top/bottom and encounter controls renders; all 17 GF property labels retain 7.5% without text overflowing their lanes. Narrow layouts retain pane minima and horizontal access, and encounter labels pass at 1600/1000/1600 widths. Fresh CI and broader clipping coverage remain open; the percentage stays at the existing global value while the earlier preference question is pending.
     > status 2026-09-27: a label-fitter override widens the lane up to 50% for the longest name (252px here). The literal global 7.5% in this 463px panel is 35px and the names became unreadable. Need your call: a different % for narrow panels, a px minimum, or 7.5% of the window instead of the panel?
 
 Models
