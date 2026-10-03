@@ -84,6 +84,9 @@ PROBE = r"""
     for (const child of node.children) {
       const style = getComputedStyle(child);
       if (style.visibility === 'hidden' || style.display === 'none') continue;
+      // A shared tab wrapper may delegate its layout to its children. It has
+      // no box to paint, but its visible descendants still occupy the view.
+      if (style.display === 'contents') { walk(child); continue; }
       const box = child.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) continue;
       // A container that only holds its children tells us nothing; a
