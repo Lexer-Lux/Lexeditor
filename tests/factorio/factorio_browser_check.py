@@ -269,6 +269,23 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 prerequisites.select_option([])
                 page.wait_for_function("dirtyCount() === 4")
 
+                tech_search.fill("automation")
+                page.locator('.lex-column-list-row[data-key="automation"]').click()
+                before_invalid_save = (project / 'overrides.json').read_bytes()
+                for label, invalid, original in [
+                    ('Research unit count', '25.5', '25'),
+                    ('Research unit count', '0', '25'),
+                    ('Research unit count', '18446744073709551616', '25'),
+                    ('Research unit time', '', '10'),
+                ]:
+                    control = page.get_by_label(label, exact=True)
+                    control.fill(invalid)
+                    error = page.evaluate("async()=>{try{await save();return '';}catch(error){return error.message;}}")
+                    assert label in error, (label, error)
+                    assert control.input_value() == invalid
+                    assert page.evaluate('dirtyCount()') == 4
+                    assert (project / 'overrides.json').read_bytes() == before_invalid_save
+                    control.fill(original)
                 page.evaluate("save()")
                 page.wait_for_function("dirtyCount() === 0")
                 page.evaluate("reopen()")

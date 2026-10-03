@@ -93,45 +93,44 @@ function inputNumber(value, options, change) {
     type: "number",
     value: value ?? "",
     step: options.step ?? "any",
+    required: true,
+    "data-lex-validate-number": "true",
     "aria-label": options.label,
-    onchange: event => {
-      event.target.setCustomValidity("");
-      if (event.target.value === "") {
-        event.target.setCustomValidity("A numeric value is required.");
-        event.target.reportValidity();
-        return;
-      }
-      const number = Number(event.target.value);
-      if (!Number.isFinite(number)) {
-        event.target.setCustomValidity("Enter a finite number.");
-        event.target.reportValidity();
-        return;
-      }
-      // Shared thousands grouping uses a text face for large numeric ranges.
-      // Validate the declared bounds and integer step before committing even
-      // when native input validity no longer covers those attributes.
-      const validation = options.step === 1 && !Number.isSafeInteger(number)
-        ? "Enter a whole number within the exact integer range."
-        : options.min !== undefined && number < options.min
-          ? `Enter a number of at least ${options.min}.`
-          : options.max !== undefined && number > options.max
-            ? `Enter a number no greater than ${options.max}.`
-            : typeof options.validate === "function" ? options.validate(number) : "";
-      if (validation) {
-        event.target.setCustomValidity(validation);
-        event.target.reportValidity();
-        return;
-      }
-      event.target.setCustomValidity("");
-      if (!event.target.checkValidity()) {
-        event.target.reportValidity();
-        return;
-      }
-      void change(number);
-    },
   });
   if (options.min !== undefined) input.min = String(options.min);
   if (options.max !== undefined) input.max = String(options.max);
+  const validate = () => {
+    input.setCustomValidity("");
+    if (input.value === "") {
+      input.setCustomValidity("A numeric value is required.");
+      return null;
+    }
+    const number = Number(input.value);
+    if (!Number.isFinite(number)) {
+      input.setCustomValidity("Enter a finite number.");
+      return null;
+    }
+    const validation = options.step === 1 && !Number.isSafeInteger(number)
+      ? "Enter a whole number within the exact integer range."
+      : options.min !== undefined && number < options.min
+        ? `Enter a number of at least ${options.min}.`
+        : options.max !== undefined && number > options.max
+          ? `Enter a number no greater than ${options.max}.`
+          : typeof options.validate === "function" ? options.validate(number) : "";
+    if (validation) {
+      input.setCustomValidity(validation);
+      return null;
+    }
+    return input.checkValidity() ? number : null;
+  };
+  input.lexValidateNumber = () => validate() !== null;
+  input.oninput = validate;
+  input.onchange = () => {
+    const number = validate();
+    if (number === null) { input.reportValidity(); return; }
+    void change(number);
+  };
+  validate();
   return options.unit ? unitField(input, options.unit) : input;
 }
 
@@ -799,6 +798,15 @@ async function loadRows() {
 }
 
 async function save() {
+  for (const input of document.querySelectorAll('#main input[type="number"],#main input[data-lex-exact-integer]')) {
+    if (input.disabled || input.readOnly || !input.getClientRects().length) continue;
+    const valid = input.lexValidateNumber ? input.lexValidateNumber()
+      : input.closest('.lex-exact-integer')?.lexValidateInteger?.() ?? input.checkValidity();
+    if (!valid) {
+      input.reportValidity();
+      throw new Error(`Correct ${input.getAttribute('aria-label') || 'the numeric value'} before saving.`);
+    }
+  }
   await rowEditQueue;
   if (!sourceReady()) return;
   const result = await jsonPost("/api/save", {});
