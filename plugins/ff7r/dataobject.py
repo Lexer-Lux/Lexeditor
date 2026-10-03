@@ -417,6 +417,8 @@ class DataObjectPackage:
         This deliberately does not support insertion, entry-count changes, name
         map edits, FString arrays, or arbitrary package reconstruction.
         """
+        entry_index = integer_value(entry_index, "Entry index")
+        array_index = integer_value(array_index, "Array index")
         if entry_index < 0 or entry_index >= len(self.entries):
             raise IndexError(f"Entry index out of range: {entry_index}")
         prop = self._property(prop_name)
@@ -435,10 +437,18 @@ class DataObjectPackage:
         if element_end > len(self.uexp_bytes):
             raise FormatError(f"Deletion for {prop_name} is outside {self.uexp_path.name}")
 
-        del self.uexp_bytes[element_offset:element_end]
-        struct.pack_into("<i", self.uexp_bytes, field.offset, field.length - 1)
-        self._adjust_export_serial_size(-width)
-        self.properties, self.entries = self._parse_uexp()
+        old_uasset_bytes = bytearray(self.uasset_bytes)
+        old_uexp_bytes = bytearray(self.uexp_bytes)
+        old_uasset, old_properties, old_entries = self.uasset, self.properties, self.entries
+        try:
+            del self.uexp_bytes[element_offset:element_end]
+            struct.pack_into("<i", self.uexp_bytes, field.offset, field.length - 1)
+            self._adjust_export_serial_size(-width)
+            self.properties, self.entries = self._parse_uexp()
+        except Exception:
+            self.uasset_bytes, self.uexp_bytes = old_uasset_bytes, old_uexp_bytes
+            self.uasset, self.properties, self.entries = old_uasset, old_properties, old_entries
+            raise
 
     def _adjust_export_serial_size(self, delta: int) -> None:
         if delta == 0 or self.uasset.serial_size == 0:
