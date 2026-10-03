@@ -12,10 +12,16 @@ from core.numeric_values import integer_value
 
 
 RECORD_SIZE = 4
+# mitem.json documents magazines as dead flag data and these special types
+# as overriding the stored flags. Preserve their bytes instead of offering edits.
+IGNORED_USE_FLAG_TYPES = frozenset({9, 12, 13, 14, 15, 19})
 
 
 def _schema(schema_root: Path) -> dict:
-    return json.loads((schema_root / "mitem.json").read_text(encoding="utf-8"))
+    schema = json.loads((schema_root / "mitem.json").read_text(encoding="utf-8"))
+    for item_type in schema["item_type"]:
+        item_type["flagsReadonly"] = int(item_type["id"]) in IGNORED_USE_FLAG_TYPES
+    return schema
 
 
 def read_rows(data: bytes, item_names: dict[int, str], schema_root: Path) -> dict:
@@ -71,6 +77,8 @@ def apply_edits(data: bytes, edits: list[dict], schema_root: Path,
         if any(not 0 <= value <= 255 for value in (flags, param1, param2)):
             raise ValueError("Menu item flags and parameters must be 0 to 255")
         base = item_id * RECORD_SIZE
+        if types[type_id]["flagsReadonly"] and flags != data[base + 1]:
+            raise ValueError("Menu item use flags are read-only for this type")
         for key, value, offset in (("param1", param1, 2), ("param2", param2, 3)):
             kind = types[type_id].get(key)
             meta = parameters.get(kind)

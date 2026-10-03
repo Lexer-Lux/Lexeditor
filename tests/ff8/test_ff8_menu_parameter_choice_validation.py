@@ -38,12 +38,12 @@ def test_menu_unknown_choice_rejects_without_new_or_changed_outputs(files, index
     valid = int(choices[KINDS[index]][0]['id'])
     invalid = next(i for i in range(256) if i != 254 and i not in {int(c['id']) for c in choices[KINDS[index]]})
     with pytest.raises(ValueError, match='documented'):
-        formats.save_menu_items([edit((index + 1) % 3, 254) | dict(flags=0), edit(index, invalid)])
+        formats.save_menu_items([edit((index + 1) % 2, 254) | dict(flags=0), edit(index, invalid)])
     assert not destination.exists()
     formats.save_menu_items([edit(index, valid)])
     before = destination.read_bytes()
     with pytest.raises(ValueError, match='documented'):
-        formats.save_menu_items([edit((index + 1) % 3, 254) | dict(flags=0), edit(index, invalid)])
+        formats.save_menu_items([edit((index + 1) % 2, 254) | dict(flags=0), edit(index, invalid)])
     assert destination.read_bytes() == before
     assert source.read_bytes() == ORIGINAL
 
@@ -67,9 +67,11 @@ def test_menu_all_published_choices_save_and_reload(files, index):
 @pytest.mark.parametrize('index', range(3))
 def test_menu_untouched_unknown_parameter_is_preserved_when_other_fields_change(files, index):
     source, destination = files
-    formats.save_menu_items([edit(index, 254) | dict(flags=0)])
+    # Quistis flags are overridden; its unknown parameter can only be retained.
+    flags = ORIGINAL[index * 4 + 1] if index == 2 else 0
+    formats.save_menu_items([edit(index, 254) | dict(flags=flags)])
     expected = bytearray(ORIGINAL)
-    expected[index * 4 + 1] = 0
+    expected[index * 4 + 1] = flags
     assert destination.read_bytes() == expected
     assert source.read_bytes() == ORIGINAL
 
