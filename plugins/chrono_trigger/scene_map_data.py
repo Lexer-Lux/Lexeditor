@@ -295,15 +295,24 @@ def save_scene_properties(store: OverlayStore, path: str, expected_sha256: str, 
     }
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Scene property edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Scene property token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate scene property-run edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Scene property values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported scene property fields: {', '.join(sorted(unknown))}")
+        for field in allowed - {"collisionCode", "moveDirection", "moveSpeed", "zPlane"}:
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"Scene property {field} must be a boolean")
         collision = _bounded("Collision code", values.get("collisionCode", row["collisionCode"]), 0, 31)
         if "collisionCode" in values and collision >= len(COLLISION_NAMES):
             raise ValueError("Edited collision must use a documented code 0 through 30")
@@ -394,9 +403,14 @@ def save_scene_render_settings(
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
     allowed = {"scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode",
                *SCREEN_FIELDS.keys(), *EFFECT_FIELDS.keys()}
+    if not isinstance(values, dict):
+        raise ValueError("Scene render-setting values must be an object")
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported scene render-setting fields: {', '.join(sorted(unknown))}")
+    for field in (*SCREEN_FIELDS, *EFFECT_FIELDS):
+        if field in values and type(values[field]) is not bool:
+            raise ValueError(f"Scene render-setting {field} must be a boolean")
     codes = {}
     for key in ("scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode"):
         codes[key] = _bounded(key, values.get(key, current[key]), 0, 15)

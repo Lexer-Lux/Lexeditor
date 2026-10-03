@@ -165,7 +165,7 @@ class Handler(PluginRequestHandler):
             elif route == "/api/scene-properties/save":
                 result = save_scene_properties(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/scene-render-settings/save":
-                result = save_scene_render_settings(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_scene_render_settings(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/palette/save":
                 result = save_palette(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/exits/save":
