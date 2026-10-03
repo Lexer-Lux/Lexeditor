@@ -1738,12 +1738,17 @@ def _replace_quick_select_slots(item, rows):
         entry.tail = "\n            " if index < len(rows) - 1 else "\n          "
 
 
-def apply_quick_select_edits(edits):
-    """Replace complete slot lists while preserving all other item fields."""
-    if not edits:
-        return 0
+def _prepare_quick_select_edits(edits):
+    """Validate and build slot lists without modifying cached XML or files."""
     if not isinstance(edits, list):
         raise ValueError("quickSelect edits must be a list")
+    if not edits:
+        return None
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"item", "slots"}:
+            raise ValueError("quickSelect edits require item and slots only")
+        if not isinstance(edit["item"], str) or not edit["item"].strip():
+            raise ValueError("quickSelect item must be nonempty text")
     entry = load_file(QUICK_SELECT_FILE)
     original_root = entry["root"]
     root = copy.deepcopy(original_root)
@@ -1769,19 +1774,23 @@ def apply_quick_select_edits(edits):
         normalized = []
         seen = set()
         for row in incoming:
-            slot_id = str(row.get("id", "")).strip().upper()
+            if not isinstance(row, dict) or "id" not in row or set(row) - {"id", "sortOrder"}:
+                raise ValueError("quickSelect slot requires id and optional sortOrder")
+            if not isinstance(row["id"], str):
+                raise ValueError("quickSelect slot id must be text")
+            slot_id = row["id"].strip().upper()
             if slot_id not in allowed_by_group.get(group_key, set()):
                 raise ValueError(f"Unknown quick-select slot for {group_key}: {slot_id or '(blank)'}")
             if slot_id in seen:
                 raise ValueError(f"Duplicate quick-select slot for {item_key}: {slot_id}")
             seen.add(slot_id)
             raw_order = row.get("sortOrder")
-            if raw_order is None:
+            if "sortOrder" not in row:
                 sort_order = _next_quick_select_sort_order(root, group_key, slot_id)
             else:
                 sort_order = integer_value(raw_order, "Quick-select sort order")
-                if not 0 <= sort_order <= 1_000_000:
-                    raise ValueError("Quick-select sort order is outside the supported range")
+            if not 0 <= sort_order <= 1_000_000:
+                raise ValueError("Quick-select sort order is outside the supported range")
             normalized.append({"id": slot_id, "sortOrder": sort_order})
         current = _quick_select_slots(item)
         if item is not None and current == normalized:
@@ -1807,6 +1816,13 @@ def apply_quick_select_edits(edits):
             items.append(item)
         _replace_quick_select_slots(item, normalized)
         changed += 1
+    return entry, original_root, root, changed
+
+
+def _commit_quick_select_edits(prepared):
+    if prepared is None:
+        return 0
+    entry, original_root, root, changed = prepared
     if changed:
         entry["root"] = root
         try:
@@ -1815,6 +1831,11 @@ def apply_quick_select_edits(edits):
             entry["root"] = original_root
             raise
     return changed
+
+
+def apply_quick_select_edits(edits):
+    """Replace complete slot lists while preserving all other item fields."""
+    return _commit_quick_select_edits(_prepare_quick_select_edits(edits))
 
 
 def read_shop_requirement_groups(entry):
@@ -3225,6 +3246,7 @@ def apply_catalog_edits(edits):
     root = copy.deepcopy(original_root)
     changed = _prepare_cash_purchase_prices(root, edits.get("buyability", []))
     _validate_catalog_targets(root, edits)
+    quick_select = _prepare_quick_select_edits(edits.get("quickSelect", []))
     # Allowed tag pairs = observed tags from this mod + vanilla/kiddos references
     # + curated alcohol-strength options. New free-typed hashes are rejected.
     allowed_tag_pairs = set()
@@ -3334,7 +3356,7 @@ def apply_catalog_edits(edits):
     # Container purchase output is owned by its item-group loot entry, not by
     # the catalog purchase record. Save it from the same editor transaction so
     # the Items cell edits what it displays.
-    bundle_files = set()
+    bundle_files = {}
     for e in edits.get("bundles", []):
         try:
             name, table_key, item_key = e["key"].split("|", 2)
@@ -3343,7 +3365,10 @@ def apply_catalog_edits(edits):
             raise ValueError("invalid bundle-output edit")
         if name not in LOOT_FILES:
             raise ValueError(f"unknown bundle loot file: {name}")
-        loot_root = load_file(name)["root"]
+        if name not in bundle_files:
+            entry = load_file(name)
+            bundle_files[name] = (entry, entry["root"], copy.deepcopy(entry["root"]))
+        loot_root = bundle_files[name][2]
         found = False
         for table in loot_root.find("LootTables").findall("Item"):
             if table.get("key") != table_key:
@@ -3361,7 +3386,6 @@ def apply_catalog_edits(edits):
                 changed += 1
         if not found:
             raise ValueError(f"bundle entry not found: {table_key}/{item_key}")
-        bundle_files.add(name)
     for e in edits.get("craft", []):
         # full replace of an item's CRAFTING cost entries (shop prices untouched)
         it = find_catalog_item(root, e["item"])
@@ -3519,9 +3543,14 @@ def apply_catalog_edits(edits):
         except Exception:
             catalog_entry["root"] = original_root
             raise
-        for name in bundle_files:
-            save_file(name)
-    return changed + apply_quick_select_edits(edits.get("quickSelect", []))
+        for name, (entry, original, prepared) in bundle_files.items():
+            entry["root"] = prepared
+            try:
+                save_file(name)
+            except Exception:
+                entry["root"] = original
+                raise
+    return changed + _commit_quick_select_edits(quick_select)
 
 
 # ---------------- loot tables ----------------
