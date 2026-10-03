@@ -9,7 +9,7 @@ import csv
 import io
 from pathlib import Path
 import tempfile
-from core.numeric_values import integer_value
+from core.numeric_values import integer_value, finite_number
 
 from . import paths, runtime_layout
 from . import encounters as encounter_format
@@ -1199,18 +1199,22 @@ def save_enemies(edits: list[dict]) -> dict:
     scan_edits: dict[int, str] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         if edit.get("field") == "scan_description":
             if monster_id in scan_edits:
                 raise ValueError(f"Duplicate Scan description edit for enemy {monster_id}")
-            scan_edits[monster_id] = str(edit.get("value", ""))
+            description = edit.get("value", "")
+            if not isinstance(description, str):
+                raise ValueError("Scan description must be text")
+            scan_edits[monster_id] = description
         else:
             grouped.setdefault(monster_id, []).append(edit)
 
     changed = 0
     files = []
+    prepared = []
     for monster_id, monster_edits in grouped.items():
         filename = f"c0m{monster_id:03d}.dat"
         raw = bytearray(_enemy_source_path(filename).read_bytes())
@@ -1227,14 +1231,16 @@ def save_enemies(edits: list[dict]) -> dict:
             if definition.get("mask") is not None:
                 current = int.from_bytes(raw[absolute:absolute + size], definition["byteorder"])
                 mask = int(definition["mask"])
-                stored = (current | mask) if bool(edit["value"]) else (current & ~mask)
+                if not isinstance(edit["value"], bool):
+                    raise ValueError(f"{definition['label']} must be a boolean")
+                stored = (current | mask) if edit["value"] else (current & ~mask)
             elif definition.get("control") == "percent":
-                value = float(edit["value"])
+                value = finite_number(edit["value"], definition["label"])
                 if not 0 <= value <= 100:
                     raise ValueError(f"{definition['label']} must be 0% to 100%")
                 stored = round(value * 255 / 100)
             else:
-                value = int(edit["value"])
+                value = integer_value(edit["value"], definition["label"])
                 minimum, maximum = int(definition["minimum"]), int(definition["maximum"])
                 if not minimum <= value <= maximum:
                     raise ValueError(f"{definition['label']} must be {minimum} to {maximum}")
@@ -1242,7 +1248,7 @@ def save_enemies(edits: list[dict]) -> dict:
             raw[absolute:absolute + size] = int(stored).to_bytes(size, definition["byteorder"])
             changed += 1
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, bytes(raw))
+        prepared.append((destination, bytes(raw)))
         files.append(str(destination))
     if scan_edits:
         descriptions = _scan_descriptions("current")
@@ -1250,9 +1256,11 @@ def save_enemies(edits: list[dict]) -> dict:
         for monster_id, description in scan_edits.items():
             descriptions[int(monsters[monster_id]["entity_id"])] = description
         destination = paths.DIRECT_ROOT / "ff8" / "en" / "exe" / "battle_scans.msd"
-        _atomic_write(destination, scan_text.build_msd([str(value) for value in descriptions]))
+        prepared.append((destination, scan_text.build_msd([str(value) for value in descriptions])))
         files.append(str(destination))
         changed += len(scan_edits)
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
