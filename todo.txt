@@ -17,7 +17,7 @@
 ==================================================================== GITHUB
 
 - Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
-    > status 2026-10-03: Redundant Plugin containers were permanently deleted with Lexer's explicit approval after detaching their children. Standard-issue dependency repairs and exactly-one-workflow checks pass. Semantic audit continues: #824-827 now have game labels, unprefixed titles, and actionable status because research remains possible without a Lexer answer.
+    > status 2026-10-03: Redundant Plugin containers were permanently deleted with Lexer's explicit approval after detaching their children. Standard-issue dependency repairs and exactly-one-workflow checks pass. Semantic audit continues: #815-819 and #824-827 now have game labels, unprefixed titles, and actionable status because research remains possible without a Lexer answer.
 
 
 ==================================================================== FF8 - PAGES
@@ -57,7 +57,8 @@ World
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
     > status 2026-09-27: field name on top as a link and the field's picture with the landing point marked. Not done: the world-map side - this table stores no world point (all 72 entries are where you land inside the field). The world-side trigger is in the world map's own scripts, not found yet.
 - FF8 Field-to-World: recover the original requested behaviour and implement it.
-    > status 2026-09-27: not recoverable - it is in no saved session, GitHub issue or worklog.
+    > recovered 2026-10-03 from the 2026-09-27 archived todo read: "field->world: I FUCKING TOLD YOU THAT CLICKING THE FUCKING MAP SHOULD NOT FUCKING MOVE IT. IT SHOULD OPEN THE THING FINDER ESQUE BIG MAP SO YOU CAN THEN MOVE IT. AND WHY IS THIS COVERED IN GRAFFITI. AND WHY IS THE FUCKING X COLUMN IN THE TABLE FUCKING MASSIVE. WHY DO WE KEEP HAVING THESE ISSUES. FUCK, THE TABLE ON THE REGIONS SUBTAB DOES THE EXACT SAME FUCKING THING."
+    > status 2026-10-03: The recorded complaint is concrete. Field Returns and Cells now use shared compact numeric columns and the standard ID header. Rendered checks at 1600px and 900px confirm preview clicks preserve data, large-map placement saves coordinates, and the unused word remains intact. The recovered wording postdates the older deleted request; its complete original scope is still unproven, so this item remains open.
     > Lexer: I genuinely don't know and this is why I'm so fucking pissed at you/Codex for just fucking wiping my entire original todo.txt and replacing it with a horribly shitty new version "figure out what i'm supposed to do" bitch you fucking deleted the todo and replaced it with a message saying to find the thing you deleted holy fucking shit
 
 
@@ -89,6 +90,7 @@ World
     > status 2026-09-27: FF8 checks that need the installed game now skip on CI instead of failing (most of FF8's red). Not yet pushed or re-run.
     > status 2026-10-03: RDR2, DS1, FFX/X2 and Palworld workflows passed on the todo branch. Shared detail pagination now preserves focus, retains injected loader/credits sections and gives Information panes usable height. Terraria's focused add-key save/reload check and full browser check pass locally; remaining CI failures and visual layout findings are still open.
     > status 2026-10-03: RDR, DS3 and Terraria also passed CI. FF7R, Warband and Chrono Trigger browser checks now follow detail pages and pass locally, including their save assertions. Warband contrast measurement now handles CSS color-mix and checks Mods plus ordinary tabs. Pushed for CI; remaining workflow failures and the wider audit remain open.
+    > status 2026-10-03: FF7R, Warband, Chrono Trigger, Project Zomboid and Stardew Valley passed CI. New Palworld and Bannerlord failures were detail-page assumptions; their corrected browser checks pass locally. FF8's missing Formulae Rework notice is an actionable missing-mod state, now recognized by the page-note check. Other FF8 failures and shared/native workflows remain open.
 - Complete integration verification on local master, including native FF8 package validation and remaining CI checks.
 
 
