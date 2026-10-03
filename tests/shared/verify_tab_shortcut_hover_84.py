@@ -58,6 +58,8 @@ def main() -> int:
             """})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 15)
+            cdp.eval("document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))", True)
             if not cdp.eval("!!document.querySelector('.lex-shell-header')"):
                 snapshot = cdp.eval("""(()=>({title:document.title,body:document.body.innerText.slice(0,1000),
                   html:document.body.innerHTML.slice(0,1500),errors:window.__testErrors||[]}))()""")
@@ -80,7 +82,11 @@ def main() -> int:
             cdp.call("Input.dispatchMouseEvent", {
                 "type": "mouseMoved", "x": box["x"], "y": box["y"], "buttons": 0,
             })
-            if not cdp.eval("document.querySelector('nav button[data-tab]').matches(':hover')"):
+            try:
+                # Input delivery and :hover style updates complete on a frame;
+                # a CDP response alone does not prove that frame has painted.
+                wait_eval(cdp, "document.querySelector('nav button[data-tab]').matches(':hover')", 5)
+            except Exception:
                 hit = cdp.eval(f"document.elementFromPoint({box['x']},{box['y']})?.outerHTML")
                 raise AssertionError(f"Pointer did not reach the first tab at {box}: {hit}")
             assert cdp.eval("getComputedStyle(document.querySelector('nav button[data-tab] .lex-tab-shortcut')).visibility") == "hidden", "hover alone must not reveal keyboard shortcuts"
