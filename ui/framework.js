@@ -1464,8 +1464,11 @@
       reset();
       apply(measure());
     };
-    control.addEventListener("input", update);
-    control.addEventListener("change", update);
+    // An edit commonly emits both events. Fit once in the next frame so
+    // handlers do not repeatedly force layout across a large detail panel.
+    const queueUpdate = () => queueAutoFit(control);
+    control.addEventListener("input", queueUpdate);
+    control.addEventListener("change", queueUpdate);
     control.__lexAutoFitUpdate = update;
     control.__lexAutoFitMeasure = measure;
     control.__lexAutoFitReset = reset;
