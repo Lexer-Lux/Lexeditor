@@ -1,5 +1,6 @@
 """Bounty response/cooldown batches reject invalid drafts before either write."""
 import json
+import copy
 import threading
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -26,7 +27,7 @@ def files(fixture):
     dispatch = s.ds_dir('mine') / s.DISPATCH_FILE
     response.parent.mkdir(parents=True, exist_ok=True)
     dispatch.parent.mkdir(parents=True, exist_ok=True)
-    response.write_text('<Root><!--keep--><BountyResponses><BountyDispatch><MinBounty value="10"/><Opaque value="keep"/></BountyDispatch></BountyResponses></Root>')
+    response.write_text('<Root><!--keep--><BountyResponses><BountyDispatch><Name>LAW_BOUNTY_HUNTERS_CSI</Name><MinBounty value="10"/><Opaque value="keep"/></BountyDispatch></BountyResponses></Root>')
     dispatch.write_text('<Root><!--keep--><BountyResponseCooldowns><Item><Name>BountyHuntersGlobalCooldown</Name><DelayInGameHoursAfterBountyAcquired><Item><Min value="1"/><Max value="2"/></Item><Item><Min value="3"/><Max value="4"/></Item></DelayInGameHoursAfterBountyAcquired><Opaque><Item><Min value="7"/></Item></Opaque></Item></BountyResponseCooldowns></Root>')
     return root, response, dispatch
 
@@ -80,3 +81,91 @@ def test_empty_and_readonly_batches(files):
     with pytest.raises(ValueError, match='read-only'):
         s.apply_bounty_hunter_edits([FIRST])
     assert snapshot(root) == before
+
+
+@pytest.mark.parametrize('kind', ['owner', 'name', 'field', 'attributes', 'child', 'text', 'nonfinite', 'cooldown-owner', 'cooldown-name', 'cooldown-section', 'cooldown-field', 'cooldown-attributes', 'cooldown-child', 'cooldown-nonfinite'])
+@pytest.mark.parametrize('backups', [False, True])
+def test_unsupported_sources_are_locked_and_preserved(files, monkeypatch, kind, backups):
+    root, response, dispatch = files
+    doc = bounty._parse(dispatch if kind.startswith('cooldown') else response)
+    if kind.startswith('cooldown'):
+        owner = doc.find('./BountyResponseCooldowns/Item')
+        section = owner.find('DelayInGameHoursAfterBountyAcquired')
+        parent = section.findall('Item')[0]
+        node = parent.find('Min')
+        identity = COOLDOWN
+        if kind == 'cooldown-owner':doc.find('BountyResponseCooldowns').append(copy.deepcopy(owner))
+        elif kind == 'cooldown-name':owner.append(copy.deepcopy(owner.find('Name')))
+        elif kind == 'cooldown-section':owner.append(copy.deepcopy(section))
+        elif kind == 'cooldown-field':parent.append(copy.deepcopy(node))
+        elif kind == 'cooldown-attributes':node.set('opaque', 'keep')
+        elif kind == 'cooldown-child':node.append(bounty.ET.Element('Opaque'))
+        else:node.set('value', 'NaN')
+        dispatch.write_bytes(bounty.ET.tostring(doc))
+    else:
+        parent = doc.find('./BountyResponses/BountyDispatch')
+        node = parent.find('MinBounty')
+        identity = FIRST['id']
+        if kind == 'owner':doc.find('BountyResponses').append(copy.deepcopy(parent))
+        elif kind == 'name':parent.append(copy.deepcopy(parent.find('Name')))
+        elif kind == 'field':parent.append(copy.deepcopy(node))
+        elif kind == 'attributes':node.set('opaque', 'keep')
+        elif kind == 'child':node.append(bounty.ET.Element('Opaque'))
+        elif kind == 'text':node.text = 'opaque'
+        else:node.set('value', 'NaN')
+        response.write_bytes(bounty.ET.tostring(doc))
+    if backups:
+        for path in [response, dispatch]:path.with_suffix(path.suffix + '.bak').write_bytes(b'original backup')
+    monkeypatch.setattr(bounty, 'EXTRACT_ROOT', root / 'missing-extract')
+    view = bounty.read_bounty_hunters(response, dispatch)
+    if kind not in ['cooldown-owner', 'cooldown-name']:
+        assert identity in view['readonlyIds']
+    else:
+        assert not view['cooldowns']
+    before = snapshot(root)
+    with pytest.raises(ValueError):
+        s.apply_bounty_hunter_edits([{'id': identity, 'value': '1'}])
+    assert snapshot(root) == before
+
+
+@pytest.mark.parametrize('kind', ['phase', 'phase-name', 'groups', 'group', 'preset', 'conditions', 'condition', 'chance', 'unknown-chance', 'valid'])
+@pytest.mark.parametrize('backups', [False, True])
+def test_phase_source_lookup_requires_unique_owners(files, monkeypatch, kind, backups):
+    root, response, dispatch = files
+    doc = bounty._parse(response)
+    owner = doc.find('./BountyResponses/BountyDispatch')
+    phases = bounty.ET.SubElement(owner, 'DispatchPhases')
+    phase = bounty.ET.fromstring('<Phase><Name>InitialRiders</Name><GroupMultiplier value="1"/><DispatchPeds><RandomDispatchPedGroups><DispatchGroup><Preset>PoliceDog</Preset><MinNumPeds value="1"/><MaxNumPeds value="2"/><RandomWeight value="1"/><SelectionConditions><Condition type="CAIConditionRandom"><Chances value="0.2"/></Condition></SelectionConditions><Opaque value="keep"/></DispatchGroup></RandomDispatchPedGroups></DispatchPeds></Phase>')
+    phases.append(phase)
+    groups = phase.find('./DispatchPeds/RandomDispatchPedGroups')
+    group = groups.find('DispatchGroup')
+    conditions = group.find('SelectionConditions')
+    condition = conditions.find('Condition')
+    chance = condition.find('Chances')
+    if kind == 'phase':phases.append(copy.deepcopy(phase))
+    elif kind == 'phase-name':phase.append(copy.deepcopy(phase.find('Name')))
+    elif kind == 'groups':phase.find('DispatchPeds').append(copy.deepcopy(groups))
+    elif kind == 'group':groups.append(copy.deepcopy(group))
+    elif kind == 'preset':group.append(copy.deepcopy(group.find('Preset')))
+    elif kind == 'conditions':group.append(copy.deepcopy(conditions))
+    elif kind == 'condition':conditions.append(copy.deepcopy(condition))
+    elif kind == 'chance':condition.append(copy.deepcopy(chance))
+    elif kind == 'unknown-chance':chance.set('value', 'NaN')
+    response.write_bytes(bounty.ET.tostring(doc))
+    if backups:
+        for path in [response, dispatch]:path.with_suffix(path.suffix + '.bak').write_bytes(b'original backup')
+    monkeypatch.setattr(bounty, 'EXTRACT_ROOT', root / 'missing-extract')
+    identity = 'phase/InitialRiders/random/PoliceDog/Chances'
+    view = bounty.read_bounty_hunters(response, dispatch)
+    before = snapshot(root)
+    edits = [FIRST, {'id': identity, 'value': '0.75'}]
+    if kind != 'valid':
+        assert identity in view['readonlyIds']
+        with pytest.raises(ValueError):s.apply_bounty_hunter_edits(edits)
+        assert snapshot(root) == before
+    else:
+        assert identity not in view['readonlyIds']
+        assert s.apply_bounty_hunter_edits(edits) == 2
+        after = bounty.read_bounty_hunters(response, dispatch)
+        assert after['phases'][0]['groups'][0]['chance'] == '0.75'
+        assert bounty._parse(response).find('.//Opaque').get('value') == 'keep'

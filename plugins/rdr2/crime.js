@@ -88,14 +88,14 @@ function validateBountyHunterDrafts(){
   const rows=bountySettings(state.bountyHunters.mine);
   for(const [id,value] of Object.entries(state.bountyHunterEdits)){
     const matches=rows.filter(row=>row.id===id);
-    if(matches.length!==1||bountyValueError(id,String(matches[0].value).replace(/f$/i,"")))throw new Error(`${id} is read-only or unavailable.`);
+    if(matches.length!==1||state.bountyHunters.mine?.readonlyIds?.includes(id)||bountyValueError(id,String(matches[0].value).replace(/f$/i,"")))throw new Error(`${id} is read-only or unavailable.`);
     const error=bountyValueError(id,value);if(error)throw new Error(`${id}: ${error}`);
   }
 }
 function bountyNumber(setting,label,help,reference=null){
   if(!setting)return el("span",{},"—");
   const original=String(setting.value).replace(/f$/i,"");
-  const editable=!isRO()&&!bountyValueError(setting.id,original);
+  const editable=!isRO()&&!state.bountyHunters[state.ds]?.readonlyIds?.includes(setting.id)&&!bountyValueError(setting.id,original);
   const cur=editable?(state.bountyHunterEdits[setting.id]??original):original;
   const input=bountyValueError(setting.id,original)?LexeditorUI.readonlyField(original):el("input",{type:"number",min:"0",max:setting.id.endsWith("/Chances")?"1":undefined,step:"any",required:true,"data-lex-validate-number":"true",value:cur,disabled:!editable,class:setting.id in state.bountyHunterEdits?"edited":"",
     oninput:ev=>{if(!editable)return;const v=ev.target.value;if(v===original)delete state.bountyHunterEdits[setting.id];else state.bountyHunterEdits[setting.id]=v;ev.target.classList.toggle("edited",setting.id in state.bountyHunterEdits);ev.target.setCustomValidity(bountyValueError(setting.id,v));renderToolbarOnly();refreshGlobalSave();}});

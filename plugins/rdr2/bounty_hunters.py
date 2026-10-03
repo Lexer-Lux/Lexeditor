@@ -171,8 +171,23 @@ def _value(node: ET.Element | None) -> str | None:
 
 
 def _phase(root: ET.Element, name: str) -> ET.Element | None:
-    return next((p for p in root.findall("./BountyResponses/BountyDispatch/DispatchPhases/Phase")
-                 if (p.findtext("Name") or "").strip() == name), None)
+    response = _one(root, "BountyResponses/BountyDispatch")
+    return _find_named(_one(response, "DispatchPhases"), "Phase", name)
+
+
+def _one(parent: ET.Element | None, path: str) -> ET.Element | None:
+    for tag in path.split("/"):
+        if parent is None:
+            return None
+        nodes = parent.findall(tag)
+        if len(nodes) != 1:
+            return None
+        parent = nodes[0]
+    return parent
+
+
+def _scalar(node: ET.Element | None) -> ET.Element | None:
+    return node if node is not None and set(node.attrib) == {"value"} and not len(node) and not (node.text or "").strip() else None
 
 
 def _dispatch_group_rows(phase: ET.Element, phase_name: str) -> list[dict]:
@@ -207,8 +222,9 @@ def _dispatch_group_rows(phase: ET.Element, phase_name: str) -> list[dict]:
 def _find_named(parent: ET.Element | None, tag: str, name: str) -> ET.Element | None:
     if parent is None:
         return None
-    return next((item for item in parent.findall(tag)
-                 if (item.findtext("Name") or "").strip() == name), None)
+    items = [item for item in parent.findall(tag)
+             if any((node.text or "").strip() == name for node in item.findall("Name"))]
+    return items[0] if len(items) == 1 and _one(items[0], "Name") is not None else None
 
 
 def _attach_vanilla_values(data: dict) -> None:
@@ -334,6 +350,21 @@ def read_bounty_hunters(response_file: Path, dispatch_file: Path) -> dict:
             "presets": presets,
             "scopeNote": SCOPE_NOTE}
     _attach_vanilla_values(data)
+    values = [(row["id"], row["value"]) for row in settings]
+    values += [(identity, row.get(key)) for row in cooldown_rows for key, identity in row["ids"].items()]
+    for phase in phases:
+        if phase["multiplierId"]:
+            values.append((phase["multiplierId"], phase["multiplier"]))
+        values += [(identity, group.get(key)) for group in phase["groups"] for key, identity in group["ids"].items() if identity]
+    data["readonlyIds"] = []
+    for identity, value in values:
+        target = _response_target(response_root, identity) if not identity.startswith("cooldown/") else _cooldown_target(dispatch_root, identity)
+        try:
+            if target is None:
+                raise ValueError("Unsupported source")
+            _numeric(value, identity, maximum=1.0 if identity.endswith("/Chances") else None)
+        except ValueError:
+            data["readonlyIds"].append(identity)
     return ensure_bounty_hunter_metadata(data)
 
 
@@ -356,26 +387,30 @@ def _numeric(value: object, field: str, minimum: float = 0.0, maximum: float | N
 
 def _response_target(root: ET.Element, edit_id: str) -> ET.Element | None:
     parts = edit_id.split("/")
-    response = root.find("./BountyResponses/BountyDispatch")
-    if response is None:
+    response = _one(root, "BountyResponses/BountyDispatch")
+    name = _one(response, "Name")
+    if response is None or name is None or (name.text or "").strip() != "LAW_BOUNTY_HUNTERS_CSI":
         return None
     if len(parts) == 2 and parts[0] == "response" and parts[1] in RESPONSE_SCALARS:
-        return response.find(parts[1])
+        return _scalar(_one(response, parts[1]))
     if len(parts) == 3 and parts[0] == "phase" and parts[2] == "GroupMultiplier":
         phase = _phase(root, parts[1])
-        return phase.find("GroupMultiplier") if phase is not None else None
+        return _scalar(_one(phase, "GroupMultiplier"))
     if len(parts) == 5 and parts[0] == "phase" and parts[2] in {"fixed", "random"}:
         phase = _phase(root, parts[1])
         if phase is None:
             return None
-        xpath = "./DispatchPeds/DispatchPedGroups/DispatchGroup" if parts[2] == "fixed" else "./DispatchPeds/RandomDispatchPedGroups/DispatchGroup"
-        group = next((g for g in phase.findall(xpath) if (g.findtext("Preset") or "").strip() == parts[3]), None)
+        container = _one(phase, "DispatchPeds/DispatchPedGroups" if parts[2] == "fixed" else "DispatchPeds/RandomDispatchPedGroups")
+        groups = [g for g in container.findall("DispatchGroup") if any((node.text or "").strip() == parts[3] for node in g.findall("Preset"))] if container is not None else []
+        group = groups[0] if len(groups) == 1 and _one(groups[0], "Preset") is not None else None
         if group is None:
             return None
         if parts[4] == "Chances":
-            return group.find("./SelectionConditions/Condition[@type='CAIConditionRandom']/Chances")
+            conditions = _one(group, "SelectionConditions")
+            matches = conditions.findall("Condition[@type='CAIConditionRandom']") if conditions is not None else []
+            return _scalar(_one(matches[0], "Chances")) if len(matches) == 1 else None
         if parts[4] in {"MinNumPeds", "MaxNumPeds", "RandomWeight"}:
-            return group.find(parts[4])
+            return _scalar(_one(group, parts[4]))
     return None
 
 
@@ -385,17 +420,17 @@ def _cooldown_target(root: ET.Element, edit_id: str) -> ET.Element | None:
         return None
     if parts[1] not in (*COOLDOWN_SECTIONS, "DelayInGameHoursAfterMyIncidentTargetUndetected") or not re.fullmatch(r"0|[1-9][0-9]*", parts[2]):
         return None
-    cooldown = _find_named(root.find("BountyResponseCooldowns"), "Item", "BountyHuntersGlobalCooldown")
-    group = cooldown.find(parts[1]) if cooldown is not None else None
+    cooldown = _find_named(_one(root, "BountyResponseCooldowns"), "Item", "BountyHuntersGlobalCooldown")
+    group = _one(cooldown, parts[1])
     if group is None:
         return None
     if parts[1] == "DelayInGameHoursAfterMyIncidentTargetUndetected":
-        return group.find(parts[3]) if parts[2] == "0" else None
+        return _scalar(_one(group, parts[3])) if parts[2] == "0" else None
     try:
         item = group.findall("Item")[int(parts[2])]
     except (ValueError, IndexError):
         return None
-    return item.find(parts[3])
+    return _scalar(_one(item, parts[3]))
 
 
 def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> int:
@@ -419,9 +454,11 @@ def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: l
         is_chance = edit_id.endswith("/Chances")
         value = _numeric(edit.get("value", ""), edit_id, maximum=1.0 if is_chance else None)
         if target is not None:
+            _numeric(target.get("value"), edit_id, maximum=1.0 if is_chance else None)
             target.set("value", value); response_changed += 1; continue
         target = _cooldown_target(dispatch_root, edit_id)
         if target is not None:
+            _numeric(target.get("value"), edit_id)
             target.set("value", value); dispatch_changed += 1; continue
         raise ValueError(f"unknown or unavailable bounty-hunter setting: {edit_id}")
 

@@ -55,6 +55,15 @@ def test_bounty_drafts_hidden_save_exact_values_and_readonly(tmp_path):
             rows = page.evaluate("window.__requests.find(row=>row.path==='/api/bounty-hunters/save').body.edits")
             assert {row['id']: row['value'] for row in rows} == {'response/RandomWeight': '0.123456789123456789', chance_id: '1'}
             page.wait_for_function('Object.keys(state.bountyHunterEdits).length===0')
+            page.evaluate('''async id=>{
+              state.bountyHunters.mine.readonlyIds=[id];await renderCrime();
+            }''', chance_id)
+            expect(control(chance_id)).to_be_disabled()
+            before = page.evaluate('window.__requests.length')
+            page.evaluate('id=>state.bountyHunterEdits[id]="0.5"', chance_id)
+            assert page.evaluate("async()=>{try{await saveBountyHunters();return ''}catch(e){return e.message}}")
+            assert page.evaluate('window.__requests.length') == before
+            page.evaluate('state.bountyHunterEdits={}')
             page.evaluate("async()=>{state.bountyHunters.mine.settings[0].value='NaN';await renderCrime()}")
             expect(page.get_by_role('textbox', name='response/RandomWeight', exact=True)).to_have_value('NaN')
             expect(page.get_by_role('textbox', name='response/RandomWeight', exact=True)).to_be_disabled()
