@@ -21,6 +21,8 @@ from pathlib import Path, PurePosixPath
 import shutil
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .archive import extract_pair
 from .dataobject import DataObjectPackage
 
@@ -418,10 +420,14 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("Each ATB edit must be an object")
-        entry_index = int(edit.get("entry", -1))
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("ATB edit contains unsupported fields")
+        entry_index = integer_value(edit.get("entry", -1), "ATB entry index")
         if entry_index < 0 or entry_index >= len(entries) or "index" in edit:
             raise ValueError("ATB virtual resources accept scalar edits on existing records only")
-        prop = str(edit.get("property", ""))
+        prop = edit.get("property", "")
+        if not isinstance(prop, str):
+            raise TypeError("ATB property must be text")
         marker = (entry_index, prop)
         if marker in seen:
             raise ValueError("Duplicate ATB virtual property edit")
