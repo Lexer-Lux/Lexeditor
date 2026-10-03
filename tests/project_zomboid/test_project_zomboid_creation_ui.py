@@ -4,7 +4,7 @@ from pathlib import Path
 import threading
 import pytest
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as BrowserTimeout, sync_playwright
 from plugins.project_zomboid import server, zedscript
 from verify_project_zomboid_ui import write_fixture
 
@@ -34,8 +34,21 @@ def test_create_each_supported_family_through_shared_add(tmp_path,monkeypatch,ki
             browser=play.chromium.launch(headless=True)
             try:
                 page=browser.new_page(viewport={'width':1500,'height':950})
+                startup_errors=[]
+                page.on('pageerror',lambda error:startup_errors.append(f'JavaScript: {error}'))
+                page.on('requestfailed',lambda request:startup_errors.append(
+                    f'Network: {request.url}: {request.failure}'))
+                page.on('response',lambda response:startup_errors.append(
+                    f'HTTP: {response.status} {response.url}')
+                    if '/api/' in response.url and response.status>=400 else None)
                 page.goto(f'http://127.0.0.1:{service.server_port}')
-                page.wait_for_function('items.rows.length>0')
+                try:
+                    page.wait_for_function('items.rows.length>0 || !!document.querySelector(".pz-error-message")')
+                except BrowserTimeout:
+                    pytest.fail(f'Project Zomboid startup timed out: {startup_errors}; '
+                                f'page: {page.locator("body").inner_text()}')
+                assert page.evaluate('items.rows.length>0'), (
+                    startup_errors, page.locator('.pz-error-message').all_text_contents())
                 page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 name='Created'+kind
                 original=next(row for row in zedscript.inventory(project)['rows'] if row['kind']==kind)
