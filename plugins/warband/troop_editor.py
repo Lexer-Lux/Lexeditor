@@ -9,6 +9,7 @@ import re
 import subprocess
 import tempfile
 import threading
+from core.numeric_values import integer_value
 
 FIELDS = ('id','name','plural','flags','scene','reserved','faction','inventory','attributes','proficiencies','skills','face1','face2','image')
 _LOCK = threading.Lock()
@@ -258,7 +259,7 @@ def save_troops(root,expected,edits):
         records=_records(text);by_index={r['recordIndex']:r for r in records};patches=[];edited=set()
         for edit in edits:
             if 'recordIndex' in edit:
-                record_index=int(edit['recordIndex']);row=by_index.get(record_index)
+                record_index=integer_value(edit['recordIndex'], 'Troop record index');row=by_index.get(record_index)
                 if row is None:raise ValueError('Troop record no longer exists')
                 original=str(edit.get('originalId',edit.get('id','')))
                 if original and row['id']!=original:

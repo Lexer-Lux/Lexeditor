@@ -25,6 +25,7 @@ from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .sound_preview import sample_path
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
+from core.numeric_values import integer_value
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -497,7 +498,7 @@ def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> di
         replacements: list[tuple[int, int, str]] = []
         edited_records: set[int] = set()
         for edit in edits:
-            record_index = int(edit.get("recordIndex", -1))
+            record_index = integer_value(edit.get("recordIndex", -1), "Item record index")
             record = by_index.get(record_index)
             if record is None:
                 raise ValueError(f"Item record {record_index} no longer exists")

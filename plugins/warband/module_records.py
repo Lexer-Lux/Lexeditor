@@ -16,6 +16,7 @@ import re
 import subprocess
 import tempfile
 import threading
+from core.numeric_values import finite_number, integer_value
 from .sound_preview import sample_names
 
 _LOCK = threading.Lock()
@@ -767,26 +768,14 @@ def _encode(value, spec: dict):
     if kind == "identity":
         raise ValueError("Record IDs are fixed; edit references in source if an ID must change")
     if kind == "integer":
-        if isinstance(value, bool):
-            raise ValueError("Expected an integer")
-        try:
-            number = int(value)
-            if float(value) != number:
-                raise ValueError
-        except Exception as error:
-            raise ValueError("Expected an integer") from error
+        number = integer_value(value, spec["label"])
         if "min" in spec and number < spec["min"]:
             raise ValueError(f"{spec['label']} must be at least {spec['min']}")
         if "max" in spec and number > spec["max"]:
             raise ValueError(f"{spec['label']} must be at most {spec['max']}")
         return str(number)
     if kind == "number":
-        try:
-            number = float(value)
-        except Exception as error:
-            raise ValueError("Expected a number") from error
-        if not math.isfinite(number):
-            raise ValueError("Expected a finite number")
+        number = finite_number(value, spec["label"])
         if "min" in spec and number < spec["min"]:
             raise ValueError(f"{spec['label']} must be at least {spec['min']}")
         if "max" in spec and number > spec["max"]:
@@ -798,12 +787,7 @@ def _encode(value, spec: dict):
             raise ValueError(f"{spec['label']} needs {count} numbers")
         rendered = []
         for item in value:
-            try:
-                number = float(item)
-            except Exception as error:
-                raise ValueError(f"{spec['label']} needs {count} numbers") from error
-            if not math.isfinite(number):
-                raise ValueError(f"{spec['label']} needs finite numbers")
+            number = finite_number(item, spec["label"])
             rendered.append(str(int(number)) if number.is_integer() else format(number, ".15g"))
         opening, closing = ("(", ")") if spec.get("container") == "tuple" else ("[", "]")
         return opening + ", ".join(rendered) + closing
@@ -897,13 +881,13 @@ def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
             raise ValueError("Source contains records that require source repair before structured saving")
         if len(set(identities)) != len(identities):
             raise ValueError("Duplicate record IDs require source repair")
-        if len({int(edit["recordIndex"]) for edit in edits}) != len(edits):
+        indexes = [integer_value(edit["recordIndex"], "Record index") for edit in edits]
+        if len(set(indexes)) != len(edits):
             raise ValueError("Send each record only once")
         specs = {field["key"]: field for field in schema["fields"]}
         patches = []
         changed_records = 0
-        for edit in edits:
-            index = int(edit["recordIndex"])
+        for edit, index in zip(edits, indexes):
             if not 0 <= index < len(records):
                 raise ValueError("Record no longer exists")
             row = records[index]
