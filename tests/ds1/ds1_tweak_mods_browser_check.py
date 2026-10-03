@@ -9,6 +9,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal  # noqa: E402
 from ds1_fixture import make_archive  # noqa: E402
 from core import script_mods  # noqa: E402
 from plugins.ds1.store import RELATIVE, MARKER  # noqa: E402
@@ -57,16 +59,38 @@ def main():
                 try:
                     page = browser.new_page(viewport={'width': 1200, 'height': 800})
                     page.on('pageerror', lambda e: errors.append(str(e)))
+                    page.add_init_script("""(() => {
+                      const data={available:true,gameFound:true,installed:false,hasDefaults:true,
+                        effects:[{file:'Fixture.fx',label:'Fixture effect',enabled:true,
+                          values:{Mode:0},controls:[{name:'Mode',label:'Effect mode',widget:'combo',items:['Normal','Strong']}]}]};
+                      window.reshadeCalls=[];
+                      const reply=(method,args)=>{window.reshadeCalls.push([method,...args]);return structuredClone(data);};
+                      window.pywebview={api:{
+                        mod_reshade:async(...args)=>reply('mod_reshade',args),
+                        set_reshade_enabled:async(...args)=>{data.installed=args[1];return reply('set_reshade_enabled',args);},
+                        set_reshade_value:async(...args)=>{data.effects[0].values[args[2]]=args[3];return reply('set_reshade_value',args);}
+                      }};
+                    })();""")
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="tweaks"]').click()
                     page.wait_for_function('state.tab==="tweaks" && state.tweaks && !state.tweakBusy')
                     for title in ('INSTALLED GAME', 'EQUIP LOAD PERCENTAGE', 'LATER-GAME AMMUNITION'):
-                        page.get_by_text(title, exact=True).wait_for()
+                        reveal(page, page.get_by_text(title, exact=True))
+                    assert page.evaluate('reshadeCalls') == [['mod_reshade', 'ds1']]
+                    reveal(page, page.get_by_role('switch', name='ReShade on or off')).check()
+                    page.wait_for_function('state.reshade.installed===true')
+                    reveal(page, page.get_by_role('combobox', name='Effect mode')).select_option('1')
+                    page.wait_for_function('state.reshade.effects[0].values.Mode===1')
+                    assert page.evaluate('reshadeCalls') == [
+                        ['mod_reshade', 'ds1'], ['set_reshade_enabled', 'ds1', True],
+                        ['set_reshade_value', 'ds1', 'Fixture.fx', 'Mode', 1]]
+                    if output:
+                        page.screenshot(path=str(output / 'ds1-reshade.png'))
                     # No executable here: the problem is stated and Apply is off.
-                    page.get_by_text('DarkSoulsRemastered.exe is missing').wait_for()
+                    reveal(page, page.get_by_text('DarkSoulsRemastered.exe is missing'))
                     assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
-                    page.get_by_role('button', name='Trust this tweak').wait_for()
+                    reveal(page, page.get_by_role('button', name='Trust this tweak'))
                     if output:
                         page.screenshot(path=str(output / 'ds1-tweaks.png'))
                     # A tweak is a mod: the Tweaks tab has no switch, only
@@ -75,7 +99,7 @@ def main():
                     assert page.locator('.lex-tweak-off').count() == 2
                     data = json.loads((equip / 'mod.json').read_text(encoding='utf-8'))
                     (equip / 'mod.json').write_text(json.dumps({**data, 'enabled': True}), encoding='utf-8')
-                    page.get_by_role('button', name='Trust this tweak').click()
+                    reveal(page, page.get_by_role('button', name='Trust this tweak')).click()
                     page.wait_for_function('!state.tweakBusy && state.tweaks.tweaks.every(r=>r.trust==="trusted")')
                     assert script_mods.trust_state(ammo) == 'trusted'
                     page.reload()

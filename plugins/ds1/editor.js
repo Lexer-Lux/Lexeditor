@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false};
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,reshade:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -54,7 +54,15 @@ async function loadDetail(){
   if(state.selected!==key(row))return;
   state.row=result.row;state.monsterAttacks=attacks;
 }
-async function loadTweaks(){state.tweaks=await api("/api/tweaks");}
+async function loadTweaks(){
+  state.tweaks=await api("/api/tweaks");
+  try{state.reshade=await LexeditorUI.callWindow('mod_reshade','ds1')||{};}
+  catch(error){notify(error);}
+}
+async function reshadeAction(method,...args){
+  try{state.reshade=await LexeditorUI.callWindow(method,'ds1',...args)||state.reshade;render();}
+  catch(error){notify(error);}
+}
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
@@ -330,7 +338,8 @@ function renderTweaks(){
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
         el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
   if(!(status.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}));
-  const view=LexeditorUI.settingsColumns([installed,...panels]);
+  const view=LexeditorUI.settingsColumns([installed,...panels,
+    LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction})].filter(Boolean));
   requestAnimationFrame(()=>bind(view));
   return view;
 }

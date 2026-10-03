@@ -37,6 +37,8 @@ ALLOWED = {
     "`No other CARDGAME call in the game data names deck ${deck}.`)",
     "'No players match this search.')",
     "'No decks match this search.')",
+    "'No starting rare cards in this deck.')",  # Empty card pool; Add fills it.
+    "'No opponent script names this deck directly.')",  # Empty opponent table.
     "`Could not find card players: ${playerAreas.error}`)",
     '"Enable GF Spellbooks on the Tweaks page.")',
     '"GF Spellbooks needs Monogamy on and Shared Party Magic Inventory off.',
