@@ -10,14 +10,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from plugins.ff8 import formats, game_icons, paths  # noqa: E402
+from plugin_ui import plugin_ui  # noqa: E402
 
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2_editor = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-rdr_editor = (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
-ff7_editor = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
-blank_editor = (ROOT / "plugins" / "blank" / "editor.html").read_text(encoding="utf-8")
+editor = plugin_ui("ff8")
+rdr2_editor = plugin_ui("rdr2")
+rdr_editor = plugin_ui("rdr")
+ff7_editor = plugin_ui("ff7")
+blank_editor = plugin_ui("blank")
 extractor = (ROOT / "plugins" / "ff8" / "extractor.py").read_text(encoding="utf-8")
 
 assert "provenanceControl" in framework
