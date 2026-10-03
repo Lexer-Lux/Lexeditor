@@ -19,6 +19,8 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bannerlord_browser_check import inline_editor  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from paged_detail import reveal  # noqa: E402
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "bannerlord-ui-audit"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -210,7 +212,7 @@ def assert_outer_fit(page, label):
 
 
 def assert_pager_fit(page, label):
-    pager = page.locator(".lex-pager").first
+    pager = page.locator(".lex-pager:not(.lex-pager-inline)").first
     if not pager.count():
         return
     metrics = pager.evaluate("""node=>{
@@ -230,9 +232,10 @@ def settle_screen(page, label):
         page.locator("#main .lex-text-editor textarea").wait_for()
     elif label == "info":
         page.locator(".lex-information-panel").wait_for()
-        page.locator(".lex-plugin-mod-loading").wait_for()
-        page.locator(".lex-plugin-credits").wait_for()
-        page.get_by_text("Lexer / Lexers Mod for Bannerlord", exact=True).wait_for()
+        # Info's sections flow into pages, so these are present, not all on screen.
+        page.locator(".lex-plugin-mod-loading").wait_for(state="attached")
+        page.locator(".lex-plugin-credits").wait_for(state="attached")
+        page.get_by_text("Lexer / Lexers Mod for Bannerlord", exact=True).wait_for(state="attached")
         assert page.locator('.lex-information-panel [role="alert"]').count() == 0, "Bannerlord Info contains shared metadata error"
     else:
         page.wait_for_timeout(100)
@@ -266,7 +269,7 @@ def exercise_table(page, label):
         return
     rows = table.locator(".lex-column-list-row")
     assert rows.count() > 0, label
-    pager = page.locator(".lex-pager").first
+    pager = page.locator(".lex-pager:not(.lex-pager-inline)").first
     assert pager.count() == 1, (label, "record list missing shared pager")
     next_button = pager.get_by_role("button", name="Next page", exact=True)
     if next_button.count() and next_button.is_enabled():
@@ -275,7 +278,7 @@ def exercise_table(page, label):
         page.wait_for_timeout(120)
         second = page.locator(".lex-column-list").first.locator(".lex-column-list-row").first.inner_text()
         assert first != second, (label, "next page did not advance")
-        pager = page.locator(".lex-pager").first
+        pager = page.locator(".lex-pager:not(.lex-pager-inline)").first
         pager.get_by_role("button", name="Previous page", exact=True).click()
         page.wait_for_timeout(100)
 
@@ -291,7 +294,7 @@ def exercise_table(page, label):
         real_rows = table.locator(".lex-column-list-row:not(.lex-filler-row)")
         assert real_rows.count() == 0, (label, "search did not filter real records")
         assert "No " in page.locator(".lex-detail-panel").last.inner_text(), (label, "filtered table did not show shared empty detail")
-        search = page.locator(".lex-pager").first.locator('input[type="search"]').first
+        search = page.locator(".lex-pager:not(.lex-pager-inline)").first.locator('input[type="search"]').first
         # Clear with real keystrokes. The pager search re-renders on every
         # applied input, and a programmatic fill("") can straddle that node
         # replacement without delivering an input event, leaving the stale
@@ -466,7 +469,8 @@ def main() -> None:
             # The bottom of the unified Info panel, including shared Credits, must also be reachable.
             page.evaluate('document.body.style.zoom="1.5";navigate("info")')
             settle_screen(page, "info")
-            info_last = page.locator(".lex-plugin-credits").last
+            # Info's sections flow into pages; the last one is reached by paging.
+            info_last = reveal(page, page.locator(".lex-plugin-credits"))
             info_last.scroll_into_view_if_needed()
             info_box = info_last.bounding_box()
             assert info_box and info_box["y"] < 800 and info_box["y"] + info_box["height"] > 0, info_box

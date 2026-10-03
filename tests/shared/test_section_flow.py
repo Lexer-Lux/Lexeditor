@@ -42,3 +42,34 @@ def test_sections_inside_a_tabbed_panel_flow_too(page):
 
 def test_paginate_false_keeps_one_column(page):
     assert columns(page, "single") == 1
+
+
+REBUILD = """() => {
+  const U = LexeditorUI;
+  const section = title => U.detailSection({title, body: Array.from({length: 8}, (_, n) =>
+    U.detailField({label: `${title} ${n}`, control: U.el('input', {type: 'number', value: n})}))});
+  const main = document.querySelector('#main') || document.body.appendChild(U.el('main', {id: 'main'}));
+  main.style.cssText = 'display:flex;height:420px;width:520px';
+  main.replaceChildren(U.detailPanel({title: 'Record', body: ['Alpha', 'Beta', 'Gamma', 'Delta'].map(section)}));
+}"""
+
+
+def visible_titles(page):
+    return page.evaluate("""() => [...document.querySelectorAll('.lex-detail-section-title')]
+      .filter(node => node.offsetParent).map(node => node.textContent.trim())""")
+
+
+def test_a_rebuilt_panel_stays_on_its_page(page):
+    """Editing a property on page 2 re-renders the pane; it stays on page 2."""
+    page.set_viewport_size({"width": 700, "height": 600})
+    framework(page)
+    page.evaluate(REBUILD)
+    page.wait_for_timeout(300)
+    first = visible_titles(page)
+    page.locator(".lex-tweaks-pages").get_by_role("button", name="Next page", exact=True).click()
+    page.wait_for_timeout(200)
+    second = visible_titles(page)
+    assert second and second != first, (first, second)
+    page.evaluate(REBUILD)
+    page.wait_for_timeout(300)
+    assert visible_titles(page) == second

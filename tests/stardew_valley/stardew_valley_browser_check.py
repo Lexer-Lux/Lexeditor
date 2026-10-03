@@ -13,6 +13,9 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from paged_detail import reveal  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "stardew-valley-browser"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -307,7 +310,8 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     assert page.locator("#plugin-info").count() == 1
     assert page.locator("link[href='editor.css']").count() == 1
     assert page.locator("script[src='editor.js']").count() == 1
-    assert page.locator(".lex-pager").count() == 1
+    # One record-list pager; a detail panel's sections page with their own.
+    assert page.locator(".lex-pager:not(.lex-pager-inline)").count() == 1
     geometry(page, label + "-objects")
     take(page, f"objects-{label}.png")
 
@@ -319,7 +323,9 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     page.wait_for_timeout(180)
 
     first_before = page.locator(".lex-column-list-row").first.inner_text()
-    next_page = page.get_by_role("button", name="Next page", exact=True)
+    # The record list's pager, not a detail panel's own.
+    list_pager = page.locator(".lex-pager:not(.lex-pager-inline)")
+    next_page = list_pager.get_by_role("button", name="Next page", exact=True)
     assert next_page.is_enabled()
     next_page.click()
     page.wait_for_timeout(220)
@@ -327,7 +333,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     assert first_after != first_before, (label, "next page did not advance")
     page.wait_for_timeout(220)
     assert page.locator(".lex-column-list-row").first.inner_text() == first_after
-    page.get_by_role("button", name="Previous page", exact=True).click()
+    list_pager.get_by_role("button", name="Previous page", exact=True).click()
 
     page.locator('.lex-column-list-head-cell[data-column-key="Price"] .lex-column-sort').click()
     page.wait_for_timeout(180)
@@ -342,7 +348,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     stone.click()
     assert "Stone" in page.locator(".lex-detail-panel-heading").inner_text()
 
-    help_marker = page.locator('[data-lex-property="Edibility"] .lex-info-help').first
+    help_marker = reveal(page, page.locator('[data-lex-property="Edibility"] .lex-info-help'))
     help_marker.focus()
     tooltip = page.get_by_role("tooltip")
     tooltip.wait_for()
@@ -496,7 +502,8 @@ def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None
     geometry(page, label + "-crops")
     take(page, f"crops-{label}.png")
 
-    override = page.get_by_role("checkbox", name="Override Regrow days", exact=True)
+    # The record's sections flow into pages; turn to the one that has it.
+    override = reveal(page, page.get_by_role("checkbox", name="Override Regrow days", exact=True))
     if not override.is_checked():
         override.click()
     value = page.locator('input[aria-label="Regrow days"]')
@@ -550,7 +557,8 @@ def exercise_info(page, label: str, height: int) -> None:
     page.wait_for_selector(".lex-information-panel")
     body = page.locator(".lex-information-panel .lex-detail-panel-body")
     body.evaluate("node => { node.scrollTop = node.scrollHeight; }")
-    final = page.get_by_role("button", name="Verify Acceptance Evidence", exact=True)
+    # Info's sections flow into pages; the last action is reached by paging.
+    final = reveal(page, page.get_by_role("button", name="Verify Acceptance Evidence", exact=True))
     final.scroll_into_view_if_needed()
     box = final.bounding_box()
     assert box and box["y"] < height and box["y"] + box["height"] > 0, (label, box)

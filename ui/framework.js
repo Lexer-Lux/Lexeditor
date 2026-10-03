@@ -4060,11 +4060,19 @@
     }, {passive:false});
   };
 
+  const pagedSectionMemory = new Map();
   const paginateSettings = (content, options = {}) => {
     content.classList.add("lex-tweak-card-grid");
     const cards = [...content.children];
     if(options.columnMajor)cards.sort((a,b)=>(a.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||a.textContent).localeCompare(b.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||b.textContent,undefined,{sensitivity:"base"}));
     const size = options.pageSize || 0;
+    // A record pane's sections remember their page: editing a property on
+    // page 2 re-renders the pane, and it came back on page 1. The page is
+    // kept per screen and set of sections, so the next record of the same
+    // kind opens on it too.
+    const titleOf = card => (card.querySelector(".lex-detail-section-title,.lex-detail-panel-title")?.textContent || "").trim();
+    const memoryKey = options.inline ? `${shellPluginId()}-${activePageTab()}:${cards.map(titleOf).join("|")}` : null;
+    let restore = memoryKey ? pagedSectionMemory.get(memoryKey) || null : null;
     let page = 0;
     // Where each page starts, as an index into the visible cards. Cards differ
     // in height, so one count per page was only ever right for the page it was
@@ -4369,6 +4377,7 @@
       // again afterwards.
       if (visible.length !== pagedCount) { paginate(visible); visible = cards.filter(card => !card.hidden); }
       const pages = starts.length;
+      if (restore !== null && pages > 1) { page = restore; restore = null; }
       page = Math.max(0, Math.min(page, pages - 1));
       const from = starts[page], to = starts[page + 1] ?? visible.length;
       deal(visible.slice(from, to));
@@ -4386,7 +4395,11 @@
       scroll.style.overflowY = overflows() ? "auto" : "hidden";
     });
 
-    const turn = value => {page = value; render(); scroll.scrollTop = 0;};
+    const turn = value => {
+      page = value; restore = null;
+      if (memoryKey) pagedSectionMemory.set(memoryKey, value);
+      render(); scroll.scrollTop = 0;
+    };
     // Re-break the pages for the box as it is now, keeping the first card on
     // screen on screen.
     const refit = () => retainContentFocus(() => {
@@ -4396,6 +4409,8 @@
       visible = cards.filter(card => !card.hidden);
       const at = anchor ? Math.max(0, visible.indexOf(anchor)) : 0;
       page = Math.max(0, starts.findLastIndex(start => start <= at));
+      // The first fit, once there are pages, opens the remembered one.
+      if (restore !== null && starts.length > 1) { page = restore; restore = null; }
       render();
     });
     wheelPages(scroll, direction => {
@@ -8177,23 +8192,26 @@ ${contents.path}`});
   let lastCellClick = null;
   document.addEventListener("click", event => {
     const cell = event.target.closest?.(".lex-column-list-cell");
-    const row = cell?.closest(".lex-list-row[data-key], [data-key]");
-    if (!cell || !row) { lastCellClick = null; return; }
-    const identity = `${row.dataset.key}|${cell.dataset.columnKey}`;
+    if (!cell) { lastCellClick = null; return; }
+    const row = cell.closest("[data-key]");
+    const identity = row ? `${row.dataset.key}|${cell.dataset.columnKey}` : null;
     const now = performance.now();
-    if (lastCellClick?.identity === identity && now - lastCellClick.at < 500) {
+    const again = lastCellClick && now - lastCellClick.at < 500;
+    // The same cell still on the page gets the browser's own double-click.
+    if (again && lastCellClick.cell !== cell && identity && lastCellClick.identity === identity) {
       lastCellClick = null;
       // This click may re-render the list too, so the editor opens after it,
       // in whichever cell is there by then.
       const rowKey = row.dataset.key, columnKey = cell.dataset.columnKey;
       setTimeout(() => {
+        if (document.querySelector(".lex-cell-editing")) return;
         const current = [...document.querySelectorAll(`[data-key="${CSS.escape(rowKey)}"] .lex-column-list-cell[data-column-key="${CSS.escape(columnKey)}"]`)]
           .find(node => node.isConnected && node.lexBeginEdit);
         current?.lexBeginEdit();
       }, 0);
       return;
     }
-    lastCellClick = {identity, at: now};
+    lastCellClick = {identity, cell, at: now};
   }, true);
   const beginCellEdit = (cell, column, row, refresh) => {
     if (!column?.edit || cell.classList.contains("lex-cell-editing") || cell.classList.contains("lex-cell-fixed")) return;
@@ -8576,8 +8594,11 @@ ${contents.path}`});
         if (column.edit) {
           cell.lexBeginEdit = () => beginCellEdit(cell, column, row, options.refresh);
           // A table that stays put between clicks gets the browser's own
-          // double-click; the counted one above covers a re-rendering table.
-          cell.addEventListener("dblclick", event => { event.preventDefault(); cell.lexBeginEdit(); });
+          // double-click; the counted one covers a table that re-rendered.
+          cell.addEventListener("dblclick", event => {
+            event.preventDefault();
+            if (!document.querySelector(".lex-cell-editing")) cell.lexBeginEdit();
+          });
         }
         return cell;
       }),
