@@ -9,6 +9,7 @@ import csv
 import io
 from pathlib import Path
 import tempfile
+from core.numeric_values import integer_value
 
 from . import paths, runtime_layout
 from . import encounters as encounter_format
@@ -234,12 +235,12 @@ def save_items(edits: list[dict]) -> dict:
     changed = 0
     seen: set[int] = set()
     for edit in edits:
-        item_id = int(edit["id"])
+        item_id = integer_value(edit["id"], "Item id")
         if item_id in seen or not 0 <= item_id < len(raw) // 4:
             raise ValueError(f"Invalid or duplicate item id: {item_id}")
         seen.add(item_id)
-        buy = int(edit["buyPrice"])
-        multiplier = int(edit["sellMultiplier"])
+        buy = integer_value(edit["buyPrice"], "Buy price")
+        multiplier = integer_value(edit["sellMultiplier"], "Sell multiplier")
         if buy < 0 or buy > 655350 or buy % 10:
             raise ValueError("Buy price must be 0 to 655350 in steps of 10")
         if not 0 <= multiplier <= 255:
@@ -361,17 +362,20 @@ def save_shops(edits: list[dict]) -> dict:
     changed = 0
     seen: set[tuple[int, int]] = set()
     for edit in edits:
-        shop_id, slot = int(edit["shopId"]), int(edit["slot"])
-        item_id = int(edit["itemId"])
+        shop_id = integer_value(edit["shopId"], "Shop id")
+        slot = integer_value(edit["slot"], "Shop slot")
+        item_id = integer_value(edit["itemId"], "Shop item id")
         key = (shop_id, slot)
         if key in seen or not 0 <= shop_id < 20 or not 0 <= slot < 16:
             raise ValueError("Invalid or duplicate shop slot")
         if item_id not in ITEM_NAMES:
             raise ValueError(f"Unknown item id: {item_id}")
+        if not isinstance(edit["rare"], bool):
+            raise ValueError("Shop rarity must be a boolean")
         seen.add(key)
         offset = (shop_id * 16 + slot) * 2
         raw[offset] = item_id
-        raw[offset + 1] = 0 if bool(edit["rare"]) else 255
+        raw[offset + 1] = 0 if edit["rare"] else 255
         changed += 1
     _atomic_write(output_path("shop.bin"), bytes(raw))
     return {"saved": changed, "file": str(output_path("shop.bin"))}
