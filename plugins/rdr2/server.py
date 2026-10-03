@@ -6044,9 +6044,7 @@ MOB_FILES = {
 # The model -> archetype binding exists in no extracted file and in no script,
 # so it cannot be read statically. MobProbe spawns each model and reports the
 # max health the running game gave it; that observation is the only evidence we
-# have, and the editor presents it as an observation rather than a fact about
-# the data. Assignments are written as a runtime override list, the same shape
-# as merchant_buy_overrides.csv.
+# have, and the editor presents it as an observation rather than a binding.
 MOB_ROSTER_FILE = PROJECT_ROOT / "MobProbe" / "ped_models.csv"
 MOB_PROBE_FILE = PROJECT_ROOT / "MobProbe" / "mob_stats.csv"
 MOB_DISCOVERED_FILE = PROJECT_ROOT / "MobProbe" / "mob_stats_discovered.csv"
@@ -6062,6 +6060,16 @@ def _read_csv_rows(path):
     return rows
 
 
+def _mob_health_value(value):
+    if not isinstance(value, str) or not re.fullmatch(r'[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?', value.strip(), re.IGNORECASE):
+        return None
+    try:
+        number = Decimal(value.strip())
+        return number if number.is_finite() and number > 0 else None
+    except InvalidOperation:
+        return None
+
+
 def _health_by_hp(ds):
     """Max-health value -> the archetypes that declare it.
 
@@ -6074,9 +6082,8 @@ def _health_by_hp(ds):
         energy = next((f["value"] for f in record["fields"] if f["field"] == "DefaultEnergy"), None)
         if energy is None:
             continue
-        try:
-            key = int(round(float(energy)))
-        except ValueError:
+        key = _mob_health_value(energy)
+        if key is None:
             continue
         out.setdefault(key, []).append(record["name"])
     return out
@@ -6096,11 +6103,11 @@ def get_mob_models(ds="mine"):
         status = "not probed"
         if probe:
             status = probe.get("status", "")
-            try:
-                observed = int(float(probe.get("max_health") or 0)) or None
-            except ValueError:
-                observed = None
-        candidates = by_hp.get(observed, []) if observed else []
+            observed = _mob_health_value(probe.get("max_health"))
+        candidates = by_hp.get(observed, []) if observed is not None else []
+        # Keep nonintegral or large observations exact in the JSON response.
+        if observed is not None:
+            observed = int(observed) if observed == observed.to_integral_value() and observed <= 9007199254740991 else str(observed)
         models.append({
             "model": name,
             "hash": row.get("hash", ""),

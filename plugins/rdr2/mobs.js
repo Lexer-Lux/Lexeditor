@@ -77,6 +77,7 @@ const MOB_MODEL_STATS=[
   ["InjuredHealthThreshold","Injured at"],["CriticallyInjuredHealthThreshold","Critical at"],
   ["FireVulnerability","Fire vuln"],["MeleeProperties/KnockedOutHealthThreshold","KO at"],
 ];
+const MOB_MODEL_HELP="MobProbe reads these observations from the running game. This view is read-only. Possible profiles have the same HP, but that does not prove which profile the model uses. Candidate values belong to those profiles.";
 async function renderMobModels(){
   const current=renderScope("renderMobModels");
   const f=state.filters;
@@ -89,30 +90,29 @@ async function renderMobModels(){
     mobGroupFilter(groups,"mobModelGroup",renderMobModels),
     el("input",{type:"text",placeholder:"Filter observed model…",value:f.mobModelQ||"",oninput:ev=>{f.mobModelQ=ev.target.value;filterRerender(ev,renderMobModels);}}));
   const m=$("#main");m.innerHTML="";
-  if(!data.probeAvailable){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"No model observations are available. "),
-    "MobProbe writes this read-only evidence after it sees models in the running game. Use Archetypes to edit the real combat and health data."));return;}
-  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},`MobProbe observed ${data.probedCount} models. `),
-    "Possible health profiles are shown only as candidates. Equal HP does not prove a model-to-profile binding."));
+  if(!data.probeAvailable){m.append(LexeditorUI.detailNote("No model observations are available. Run MobProbe in the game to collect them."));return;}
   const archetypes=state.mobs?.health?.records?.filter(r=>r.section==="HealthConfig")||[];
   const statOf=(name,field)=>{const rec=archetypes.find(r=>r.name===name);if(!rec)return "";
     const hit=rec.fields.find(x=>x.field===field);return hit?hit.value:"";};
   const q=(f.mobModelQ||"").toUpperCase();
   const rows=data.models.filter(r=>r.observedHealth!==null&&r.group===f.mobModelGroup&&(!q||r.model.includes(q)));
-  tb.append(el("span",{class:"count"},`${rows.length} observed`));
   if(!rows.length){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"No observed models match this group and filter."));return;}
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
-  m.append(columnList({class:"mob-model-table",align:"start",headerAlign:"start","aria-label":"Mob models",
-    rows:sortedRows("mob-models",rows,getters),key:r=>r.model,localSort:false,
-    template:`minmax(180px,1fr) 130px minmax(0,1.4fr) repeat(${MOB_MODEL_STATS.length},minmax(0,.7fr))`,
-    columns:[{key:"model",label:"Model",cellClass:"key"},
-      {key:"hp",label:()=>el("span",{},"Observed HP",fieldHelp("What the running game actually gave this model. Blank means MobProbe has not seen it.")),
-        render:r=>r.observedHealth??el("span",{class:"subtle"},r.probeStatus||"not probed")},
-      {key:"candidates",label:"Possible health profiles",cellClass:"requirements",
-        render:r=>r.candidates.length
-          ?el("span",{},...r.candidates.flatMap((name,index)=>[index?", ":"",mobArchetypeLink("health",name)]))
-          :"No exact HP match"},
-      ...MOB_MODEL_STATS.map(c=>({key:c[0],label:c[1],
-        render:r=>{const chosen=r.candidates.length===1?r.candidates[0]:"";return chosen?statOf(chosen,c[0]):"—";}}))]}));
+  const ordered=sortedRows("mob-models",rows,getters);
+  // names: Observed model identities are fixed game names, not editable labels.
+  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:row=>row.model,selected:f.mobModelSelected||ordered[0].model,renamable:false,pageSize:15,noun:"observed models",slots:false,splitKey:"rdr2-mobs",
+    sync:view=>{f.mobModelSelected=view.selected},
+    master:view=>columnList({class:"mob-model-table",rows:view.rows,key:row=>row.model,selected:view.selected,select:view.select,"aria-label":"Mob models",columns:[{key:"model",label:"Model"},{key:"group",label:"Group"}]}),
+    detail:row=>LexeditorUI.detailPanel({title:row.model,help:fieldHelp(`MobProbe lists ${data.probedCount} models. ${MOB_MODEL_HELP}`),body:[
+      LexeditorUI.detailField({label:"Observed HP",control:LexeditorUI.readonlyField(row.observedHealth)}),
+      LexeditorUI.detailField({label:"Possible health profiles",control:row.candidates.length
+        ?LexeditorUI.stack({fill:false},...row.candidates.map(name=>mobArchetypeLink("health",name)))
+        :LexeditorUI.readonlyField("No exact HP match")}),
+      ...row.candidates.map(name=>LexeditorUI.detailSection({title:`Candidate: ${name}`,body:MOB_MODEL_STATS.map(([field,label])=>{
+        const definition=MOB_HEALTH_COLUMNS.find(column=>column[0]===field);
+        return LexeditorUI.detailField({label,help:definition?.[2]?fieldHelp(definition[2]):null,control:LexeditorUI.readonlyField(statOf(name,field)||"—")});
+      })}))
+    ]})}));
 }
 
 async function renderMobArchetypes(){
