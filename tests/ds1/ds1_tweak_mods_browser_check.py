@@ -109,6 +109,20 @@ def main():
                     page.wait_for_function('!state.tweakBusy')
                     assert page.locator('.lex-tweak-off').count() == 1
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
+                    # With no tweak mods or ReShade, the installed-game status
+                    # owns the page instead of becoming one short settings card.
+                    page.evaluate('state.tweaks.tweaks=[];state.reshade={};render()')
+                    page.wait_for_timeout(250)
+                    assert page.locator('#main > .lex-detail-panel').count() == 1
+                    assert page.locator('.lex-settings-columns').count() == 0
+                    assert page.get_by_text('No tweak mods are installed.', exact=False).is_visible()
+                    assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
+                    geometry=page.locator('#main').evaluate('''main=>({
+                      main:main.getBoundingClientRect().toJSON(),
+                      panel:main.firstElementChild.getBoundingClientRect().toJSON()})''')
+                    assert geometry['main']['bottom']-geometry['panel']['bottom'] < 20, geometry
+                    if output:
+                        page.screenshot(path=str(output / 'ds1-empty-tweaks.png'))
                     assert not errors, errors
                 finally:
                     browser.close()

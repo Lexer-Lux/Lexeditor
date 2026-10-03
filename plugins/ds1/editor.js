@@ -332,16 +332,20 @@ function renderTweaks(){
     change:()=>{const changed=(status.tweaks||[]).find(row=>row.enabled!==row._saved?.enabled||JSON.stringify(row.values)!==JSON.stringify(row._saved?.values));if(changed)save(changed)},
     trust:row=>tweakRequest("/api/tweaks/trust",{id:row.id,trusted:true},"Could not trust the tweak")});
   for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
+  const empty=!(status.tweaks||[]).length;
+  const reshade=LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction});
+  const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original executable":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
     help:"Apply builds every enabled tweak into one executable. The first Apply keeps one copy of the original; Restore original puts it back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      empty&&!reshade?missingMods:null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
         el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
-  if(!(status.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}));
-  const view=LexeditorUI.settingsColumns([installed,...panels,
-    LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction})].filter(Boolean));
+  if(empty&&!reshade)return installed;
+  if(empty)panels.unshift(missingMods);
+  const view=LexeditorUI.settingsColumns([installed,...panels,reshade].filter(Boolean));
   requestAnimationFrame(()=>bind(view));
   return view;
 }
