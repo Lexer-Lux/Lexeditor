@@ -10710,11 +10710,21 @@ ${contents.path}`});
       refresh();
       return true;
     };
+    let lastReferenceState;
     const refresh = () => {
-      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !(options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b)))(currentValue(),options.vanilla));
+      const value = currentValue(), locked = readOnly();
+      const same = options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b));
+      const referenceState = JSON.stringify([value, locked, sources,
+        sources.map(source => [painted(source), same(value, source.value)])]);
+      // Shell refreshes visit every control. Preserve unchanged strips so one
+      // edit does not replace hundreds of nodes and invalidate their layout.
+      if (referenceState === lastReferenceState && root.querySelector(
+          ":scope > :is(.lex-reference-values,.lex-reference-placeholder)")) return;
+      lastReferenceState = referenceState;
+      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !same(value,options.vanilla));
       root.querySelector(":scope > :is(.lex-reference-values,.lex-reference-placeholder)")?.remove();
       const reference = referenceDisplay({
-        current: currentValue(), sources, format: options.format, same: options.same, readOnly: readOnly(),
+        current: value, sources, format: options.format, same: options.same, readOnly: locked,
         apply: (value, event, source) => {
           if (readOnly()) return;
           const selector = "main,.lex-shell-main,.lex-panel-layout-pane,.lex-detail,.lex-barrelled-master,.lex-column-list,.lex-data-map-view";
