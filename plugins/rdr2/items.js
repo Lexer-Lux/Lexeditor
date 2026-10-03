@@ -122,22 +122,33 @@ function renderItems() {
 }
 
 async function createNewItem(){
-  const key=(prompt("New internal item ID (for example LEX_SULFUR):","")||"").trim().toUpperCase();
-  if(!key)return;
-  const name=(prompt("In-game name:",key.replace(/^LEX_/,"").replaceAll("_"," "))||"").trim();
-  if(!name)return;
-  const description=prompt("In-game description:","")??"";
-  const category=(prompt("Catalog category:","CI_CATEGORY_MATERIALS")||"CI_CATEGORY_MATERIALS").trim().toUpperCase();
-  const group=(prompt("Catalog group:","PROVISION")||"PROVISION").trim().toUpperCase();
-  try{
-    await api("/api/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,name,description,category,group,capacity:20})});
+  if(isRO())return;
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
+  const key=el("input",{placeholder:"LEX_SULFUR",required:true}),name=el("input",{required:true}),description=el("textarea",{});
+  const choices=(field,preferred)=>{
+    const values=[...new Set(state.catalog.items.map(item=>item[field]).filter(Boolean))].sort();
+    const control=el("select",{},...values.map(value=>el("option",{value},value)));
+    if(values.includes(preferred))control.value=preferred;
+    return control;
+  };
+  const category=choices("category","CI_CATEGORY_MATERIALS"),group=choices("group","PROVISION");
+  const close=()=>{backdrop.hidden=true;backdrop.innerHTML="";};
+  const create=async()=>{try{
+    if(!key.value.trim()||!name.value.trim())throw new Error("Enter an item ID and in-game name.");
+    await api("/api/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key.value.trim().toUpperCase(),name:name.value.trim(),description:description.value,category:category.value,group:group.value,capacity:20})});
     const store=refStore("mine"); store.catalog=await api("/api/catalog",undefined,"mine"); store.effectByKey={};
     for(const effect of store.catalog.effects)store.effectByKey[effect.key]=effect;
     state.localization=await api("/api/localization",undefined,"mine");
     state.catalog=store.catalog; state.effectByKey=store.effectByKey;
-    state.filters.q=key; state.filters.category=""; state.filters.group=""; renderItems();
-    toast(`Created ${key}`);
-  }catch(ex){toast("Create item failed: "+ex.message,true);}
+    state.filters.q=key.value.trim().toUpperCase(); state.filters.category=""; state.filters.group="";close();renderItems();
+    toast(`Created ${state.filters.q}`);
+  }catch(ex){toast("Create item failed: "+ex.message,true);}};
+  backdrop.append(LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}},
+    el("b",{},"Create item record"),
+    LexeditorUI.tileGrid([{label:"Internal item ID",control:key},{label:"In-game name",control:name},
+      {label:"In-game description",control:description},{label:"Category",control:category},{label:"Group",control:group}].map(LexeditorUI.detailField)),
+    LexeditorUI.actionRow(el("button",{onclick:close},"Cancel"),el("button",{class:"save",onclick:create},"Create item"))));
+  key.focus();
 }
 
 // "!" badge inside the first price input of a cell (right-aligned, hover text)

@@ -2467,7 +2467,16 @@ def find_catalog_item(root, key):
 def create_catalog_item(data):
     """Create an ordinary custom crafting/material item from our minimal
     known-working Gunpowder record, without inheriting its recipes or prices."""
-    key = str(data.get("key", "")).strip().upper()
+    allowed = {"key", "name", "description", "category", "group", "capacity"}
+    if not isinstance(data, dict) or "key" not in data or set(data) - allowed:
+        raise ValueError("Item creation requires key and supported fields only")
+    for field in ("key", "name", "description", "category", "group"):
+        if field in data and not isinstance(data[field], str):
+            raise ValueError(f"Item {field} must be text")
+    capacity = integer_value(data.get("capacity", 20), "Item capacity")
+    if capacity < 1:
+        raise ValueError("Item capacity must be at least 1")
+    key = data["key"].strip().upper()
     if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", key):
         raise ValueError("Item ID must be 3-64 uppercase letters, numbers, or underscores")
     root = load_file(CATALOG_FILE)["root"]
@@ -2476,11 +2485,26 @@ def create_catalog_item(data):
     template = find_catalog_item(root, "LEX_GUNPOWDER")
     if template is None:
         raise ValueError("LEX_GUNPOWDER template is missing")
+    definitions = root.findall("./catalog/items/item")
+    category = data.get("category", "CI_CATEGORY_MATERIALS").strip()
+    group = data.get("group", "PROVISION").strip()
+    for field, choice in (("category", category), ("group", group)):
+        if not choice or choice not in {txt(entry, field) for entry in definitions}:
+            raise ValueError(f"Item {field} must be selected from an existing catalog choice")
+    name = data.get("name", key) or key
+    description = data.get("description", "")
+    for field, text_value in (("name", name), ("description", description)):
+        if "\x00" in text_value:
+            raise ValueError(f"Item {field} cannot contain NUL")
+        try:
+            text_value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError(f"Item {field} must be valid Unicode") from error
     item = copy.deepcopy(template)
     item.set("key", key)
     item.find("key").text = key
-    item.find("category").text = str(data.get("category") or "CI_CATEGORY_MATERIALS")
-    item.find("group").text = str(data.get("group") or "PROVISION")
+    item.find("category").text = category
+    item.find("group").text = group
     for tag in ("acquirecosts", "sellprices", "effectids"):
         node = item.find(tag)
         if node is not None:
@@ -2490,7 +2514,7 @@ def create_catalog_item(data):
         for child in list(mult):
             mult.remove(child)
         rule = ET.SubElement(mult, "item")
-        ET.SubElement(rule, "quantity", {"value": str(max(1, int(data.get("capacity", 20))))})
+        ET.SubElement(rule, "quantity", {"value": str(capacity)})
         ET.SubElement(rule, "slotid").text = "SLOTID_ANY"
     ui = item.find("ui")
     if ui is None:
@@ -2508,8 +2532,8 @@ def create_catalog_item(data):
     save_file(CATALOG_FILE)
     record_custom_catalog_origin("items", key)
     save_localization([
-        {"key": name_key, "value": str(data.get("name") or key)},
-        {"key": description_key, "value": str(data.get("description") or "")},
+        {"key": name_key, "value": name},
+        {"key": description_key, "value": description},
     ])
     return {"key": key}
 
@@ -5565,7 +5589,10 @@ class Handler(PluginRequestHandler):
                         return
                     self._json({"saved": n})
                 elif path == "/api/catalog/create":
-                    self._json(create_catalog_item(body))
+                    try:
+                        self._json(create_catalog_item(body))
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/catalog/effects/create":
                     try:
                         self._json(create_catalog_effect(body))
