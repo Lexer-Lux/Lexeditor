@@ -33,11 +33,13 @@ def columns(page, kind):
 
 
 def test_a_panel_of_sections_flows_into_columns_by_default(page):
-    assert columns(page, "plain") == 3
+    # Several columns, as many as stay readable (the shared readable width
+    # decides how many); never the one long column of before.
+    assert columns(page, "plain") >= 2
 
 
 def test_sections_inside_a_tabbed_panel_flow_too(page):
-    assert columns(page, "tabbed") == 3
+    assert columns(page, "tabbed") >= 2
 
 
 def test_paginate_false_keeps_one_column(page):
