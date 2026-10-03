@@ -20,26 +20,45 @@ def test_failed_and_malformed_inventory_response_then_real_reload(tmp_path, monk
             browser = play.chromium.launch(headless=True)
             try:
                 page = browser.new_page(viewport={'width': 1500, 'height': 950})
+                failed_requests = []
+                page.on('requestfailed', lambda request: failed_requests.append(
+                    {'url': request.url, 'failure': request.failure}))
+
+                def expect_error(text, *, contains=False):
+                    try:
+                        message = expect(page.locator('.pz-error-message'))
+                        if contains:
+                            message.to_contain_text(text)
+                        else:
+                            message.to_have_text(text)
+                    except AssertionError as error:
+                        raise AssertionError(
+                            f'{error}\nFailed requests in this load: {failed_requests!r}'
+                        ) from error
+
                 url = f'http://127.0.0.1:{http.server_port}'
                 page.route(url + '/api/zedscript', lambda route: route.fulfill(status=500,
                            body='{"error":"Inventory temporarily unavailable"}', content_type='application/json'))
                 page.goto(url)
-                expect(page.locator('.pz-error-message')).to_have_text('/api/zedscript: Inventory temporarily unavailable')
+                expect_error('/api/zedscript: Inventory temporarily unavailable')
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 page.unroute(url + '/api/zedscript')
+                failed_requests.clear()
                 page.reload()
                 page.wait_for_function('items.rows.length>0&&scripts.rows.length>0')
                 assert page.locator('.pz-error-message').count() == 0
                 page.route(url + '/api/zedscript', lambda route: route.fulfill(status=200,
                            body='not JSON', content_type='application/json'))
+                failed_requests.clear()
                 page.reload()
-                expect(page.locator('.pz-error-message')).to_have_text('/api/zedscript: Invalid JSON response')
+                expect_error('/api/zedscript: Invalid JSON response')
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.unroute(url + '/api/zedscript')
                 page.route(url + '/api/zedscript', lambda route: route.abort('failed'))
+                failed_requests.clear()
                 page.reload()
-                expect(page.locator('.pz-error-message')).to_contain_text('/api/zedscript:')
+                expect_error('/api/zedscript:', contains=True)
                 assert page.evaluate('items.rows.length+scripts.rows.length') == 0
                 page.unroute(url + '/api/zedscript')
                 page.reload()
