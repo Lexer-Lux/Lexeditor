@@ -375,7 +375,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/weapons/save":
                 self.json_response(formats.save_weapons(body.get("edits", [])))
             elif path == "/api/kernel/save":
-                self.json_response(formats.save_kernel(int(body["section"]), body.get("edits", [])))
+                self.json_response(formats.save_kernel(body["section"], body.get("edits", [])))
             elif path == "/api/cards/save":
                 self.json_response(cards.save(body.get("edits", [])))
             elif path == "/api/text/save":
@@ -396,7 +396,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/encounters/save":
                 self.json_response(formats.save_encounters(body.get("edits", [])))
             elif path == "/api/world-map/save":
-                self.json_response(world_map.save(body.get("edits", [])))
+                self.json_response(world_map.save(body.get("edits", []), body.get('sha256')))
             elif path == "/api/field/save":
                 self.json_response(field_data.save(body.get("edits", [])))
             elif path == "/api/field/background-preview":

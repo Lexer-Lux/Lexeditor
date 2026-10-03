@@ -47,7 +47,7 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     monsters()
-                    assert page.locator('.ds1-items > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['monsters']
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['monsters']
                     # The detail pane opens on Resistances; Attacks is its other tab.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['attacks', 'resistances']
                     assert page.evaluate('state.monsterTab') == 'resistances'
@@ -85,7 +85,7 @@ def main():
                     for key, value in changes.items(): assert reopened.value('NpcParam', 120000, key) == value
                     page.locator('[data-tab="items"]').click()
                     page.wait_for_function('state.tab==="items" && state.row?.table==="EquipParamGoods"')
-                    assert page.locator('.ds1-items > .lex-subtab-bar [data-subtab]').count() == 8
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 8
                     monsters()
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     search = page.get_by_role('searchbox', name='Search monsters')

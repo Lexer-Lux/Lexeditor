@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 RECORD_SIZE = 40
 LEGACY_SIZE = 38
 _AXIS_OFFSETS = (0, 6, 12)
@@ -85,7 +87,7 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
     units = _units(count)
     seen = set()
     for edit in edits:
-        camera = int(edit.get("camera", -1))
+        camera = integer_value(edit.get("camera", -1), "Field camera ID")
         field = str(edit.get("field", ""))
         if field == "zoom":
             identity = ("camera", camera, "zoom")
@@ -95,7 +97,7 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
             raise ValueError("Invalid or duplicate field camera edit")
         seen.add(identity)
         offset, fmt, minimum, maximum = units[identity]
-        value = int(edit.get("value"))
+        value = integer_value(edit.get("value"), "Field camera value")
         if not minimum <= value <= maximum:
             raise ValueError(f"Field camera value must be {minimum} to {maximum}")
         struct.pack_into("<" + fmt, result, offset, value)

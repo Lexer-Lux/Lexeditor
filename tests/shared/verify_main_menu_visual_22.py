@@ -14,7 +14,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
@@ -121,7 +121,7 @@ def main() -> int:
           actionSize:broken.querySelector('.game-action-icon').getBoundingClientRect().width,
           actionIcons:cards.map(card=>card.querySelector('.game-action-icon').textContent.trim()),
           coverFilters:cards.map(card=>getComputedStyle(card.querySelector('.game-cover')).filter),
-          absentSymbol:(()=>{const node=document.querySelector('[data-plugin="rdr"] .state-symbol'),box=node.getBoundingClientRect();return{text:node.textContent,width:box.width,fontSize:getComputedStyle(node).fontSize}})(),
+          absentSymbol:(()=>{const node=document.querySelector('[data-plugin="rdr"] .state-symbol'),box=node.getBoundingClientRect(),stamp=node.closest('.state-indicator').getBoundingClientRect(),style=getComputedStyle(node);return{text:node.textContent,width:parseFloat(style.width),height:parseFloat(style.height),fontSize:style.fontSize,contained:box.left>=stamp.left&&box.right<=stamp.right&&box.top>=stamp.top&&box.bottom<=stamp.bottom,centerOffset:Math.hypot((box.left+box.right-stamp.left-stamp.right)/2,(box.top+box.bottom-stamp.top-stamp.bottom)/2)}})(),
           folderVisible:getComputedStyle(broken.querySelector('.game-folder-button')).visibility,
           folderTop:folderBox.top-hoveredCard.top,
           versionTop:versionBox.top-hoveredCard.top,
@@ -182,7 +182,12 @@ def main() -> int:
         # Only a game that is not installed is desaturated.
         expected_filters = ["grayscale(0.75)" if row[2] == "not-added" else "none" for row in rows]
         assert result["coverFilters"] == expected_filters, (expected_filters, result["coverFilters"])
-        assert result["absentSymbol"] == {"text": "✕", "width": 18, "fontSize": "21px"}, result
+        # The stamp rotates, so its screen-axis bounding box is wider than
+        # the symbol's layout box. Check the layout size and actual placement.
+        symbol = result["absentSymbol"]
+        assert symbol["text"] == "✕" and symbol["fontSize"] == "21px", symbol
+        assert symbol["width"] == symbol["height"] == 20, symbol
+        assert symbol["contained"] and symbol["centerOffset"] <= .5, symbol
         assert result["version"] == "v1.2.3.4" and result["borderWidth"] == "3px", result
         assert result["overlay"] == "rgba(0, 0, 0, 0.47)" and result["stateOrder"], result
         assert result["resident"] and result["residentHeight"] == result["viewportHeight"] and result["residentTop"] == 0, result
@@ -237,7 +242,7 @@ def main() -> int:
         assert settings_layout["defaults"] >= 8 and settings_layout["copied"] == "weekly" and settings_layout["paired"], settings_layout
         assert settings_layout["rarity"] == "3", settings_layout
         assert settings_layout["transitionMinimum"] == "1.5", settings_layout
-        assert cdp.eval("document.querySelector('#lex-absentGameDesaturationPercent')===null&&document.querySelector('#lex-default-absentGameDesaturationPercent').value==='40'"), settings_layout
+        assert cdp.eval("document.querySelector('#lex-absentGameDesaturationPercent')===null&&Number(document.querySelector('#lex-default-absentGameDesaturationPercent').value)===window.__testSettings.defaultValues.absentGameDesaturationPercent"), settings_layout
         assert settings_layout["authorized"] and settings_layout["userBg"] != settings_layout["developerBg"], settings_layout
         assert settings_layout["defaultLabel"] == "DEFAULT" and settings_layout["defaultBorder"] == "0px", settings_layout
         assert settings_layout["defaultBackground"] == "rgba(0, 0, 0, 0)", settings_layout
@@ -272,8 +277,11 @@ def main() -> int:
         assert paired_default == {"current": 10, "fallback": 12, "menuHeight": 90}, paired_default
         cdp.eval("LexeditorUI.openSettings()")
         wait_eval(cdp, "!!document.querySelector('.lex-global-settings')", 5)
-        fit = cdp.eval("""(()=>{const dialog=document.querySelector('.lex-global-settings');return{scrolling:dialog.classList.contains('lex-settings-must-scroll'),scrollHeight:dialog.scrollHeight,viewport:innerHeight}})()""")
-        assert not fit["scrolling"] and fit["scrollHeight"] <= fit["viewport"] - 24, fit
+        fit = cdp.eval("""(()=>{const dialog=document.querySelector('.lex-global-settings');return{scrolling:dialog.classList.contains('lex-settings-must-scroll'),clientHeight:dialog.clientHeight,scrollHeight:dialog.scrollHeight,viewport:innerHeight}})()""")
+        # The developer catalogue grows. Its dialog must fit the viewport and
+        # enable scrolling when the actual contents need it.
+        assert fit["clientHeight"] <= fit["viewport"] - 24, fit
+        assert fit["scrolling"] == (fit["scrollHeight"] > fit["clientHeight"] + 1), fit
         cdp.call("Emulation.setDeviceMetricsOverride", {
             "width": 1440, "height": 600, "deviceScaleFactor": 1, "mobile": False,
         })
@@ -284,7 +292,7 @@ def main() -> int:
         cdp.call("Emulation.setDeviceMetricsOverride", {
             "width": 1440, "height": 900, "deviceScaleFactor": 1, "mobile": False,
         })
-        wait_eval(cdp, "!document.querySelector('.lex-global-settings').classList.contains('lex-settings-must-scroll')", 5)
+        wait_eval(cdp, "document.querySelector('.lex-global-settings').classList.contains('lex-settings-must-scroll')===" + str(fit["scrolling"]).lower(), 5)
         cdp.eval("""(()=>{const input=document.querySelector('#lex-selectionHoldMs');input.value='725';input.dispatchEvent(new Event('input',{bubbles:true}));const backdrop=document.querySelector('.lex-global-settings-backdrop'),box=backdrop.getBoundingClientRect();backdrop.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:box.left+2,clientY:box.top+2}))})()""")
         assert cdp.eval("!!document.querySelector('.lex-global-settings')&&document.querySelector('#lex-selectionHoldMs').value==='725'"), "Backdrop click closed or discarded dirty settings"
         cdp.eval("document.querySelector('.lex-global-settings .lex-close-button').click()")
@@ -297,12 +305,12 @@ def main() -> int:
         wait_eval(cdp, "!document.querySelector('.lex-global-settings')", 5)
         cdp.eval("delete window.__testSettings.defaultValues.loadingTransitionMinimumSeconds;LexeditorUI.openSettings()")
         wait_eval(cdp, "!!document.querySelector('.lex-global-settings')", 5)
-        stale_host = cdp.eval("""(()=>{const transition=document.querySelector('#lex-default-loadingTransitionMinimumSeconds'),description=transition.closest('.lex-global-setting').textContent;const input=document.querySelector('#lex-selectionHoldMs');input.value='710';input.dispatchEvent(new Event('input',{bubbles:true}));return{transitionDisabled:transition.disabled,description}})()""")
+        stale_host = cdp.eval("""(()=>{const transition=document.querySelector('#lex-default-loadingTransitionMinimumSeconds'),restartNotice=transition.title;const input=document.querySelector('#lex-selectionHoldMs');input.value='710';input.dispatchEvent(new Event('input',{bubbles:true}));return{transitionDisabled:transition.disabled,restartNotice}})()""")
         wait_eval(cdp, "!document.querySelector('.lex-global-settings .lex-settings-save-control').disabled", 5)
         cdp.eval("document.querySelector('.lex-global-settings .lex-settings-save-control').click()")
         wait_eval(cdp, "window.__savedSettingsCalls===3&&!document.querySelector('.lex-global-settings')", 5)
         stale_host.update(cdp.eval("""(()=>({sentUnsupported:Object.prototype.hasOwnProperty.call(window.__savedDefaults.at(-1),'loadingTransitionMinimumSeconds'),saved:window.__testSettings.selectionHoldMs,closed:!document.querySelector('.lex-global-settings')}))()"""))
-        assert stale_host["transitionDisabled"] and "Restart LEXEDITOR" in stale_host["description"], stale_host
+        assert stale_host["transitionDisabled"] and "Restart Lexeditor" in stale_host["restartNotice"], stale_host
         assert not stale_host["sentUnsupported"] and stale_host["saved"] == 710 and stale_host["closed"], stale_host
         cdp.eval("LexeditorUI.openSettings()")
         wait_eval(cdp, "!!document.querySelector('.lex-global-settings')", 5)

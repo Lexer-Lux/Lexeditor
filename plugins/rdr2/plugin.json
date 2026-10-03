@@ -2,6 +2,7 @@
   "id": "rdr2",
   "name": "Red Dead Redemption II",
   "accent": "#a92b20",
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-RDR2",
   "installation": {
     "rootEnv": "RDR2_GAME_ROOT",
     "requiredPaths": [

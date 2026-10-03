@@ -15,21 +15,27 @@ execution remains available for development checks.
 import copy
 import csv
 import gzip
+import hashlib
 import json
+import math
 import mimetypes
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import xml.etree.ElementTree as ET
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from decimal import Decimal, InvalidOperation
 
 # keep the game's xi: prefix on XInclude tags (ET would rename to ns0:)
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+from core.numeric_values import finite_number, integer_value
+from core.plugin_http import PluginRequestHandler
 
 try:
     from .paths import EDITABLE_MOD_ROOT, EXTRACT_ROOT, GAME_ROOT, LEXEDITOR_ROOT, PLUGIN_ROOT, PROJECT_ROOT
@@ -71,11 +77,11 @@ except ImportError:
 
 try:
     from .bounty_hunters import (read_bounty_hunters as _read_bounty_hunters,
-                                 apply_bounty_hunter_edits as _apply_bounty_hunter_edits,
+                                 prepare_bounty_hunter_edits as _prepare_bounty_hunter_edits,
                                  ensure_bounty_hunter_metadata as _ensure_bounty_hunter_metadata)
 except ImportError:
     from bounty_hunters import (read_bounty_hunters as _read_bounty_hunters,
-                                apply_bounty_hunter_edits as _apply_bounty_hunter_edits,
+                                prepare_bounty_hunter_edits as _prepare_bounty_hunter_edits,
                                 ensure_bounty_hunter_metadata as _ensure_bounty_hunter_metadata)
 
 try:
@@ -84,9 +90,9 @@ except ImportError:
     from projectile_speed import cartridge_mapping as _cartridge_mapping, load_multipliers as _load_speed_multipliers, serialize_multipliers as _serialize_speed_multipliers
 
 try:
-    from .honor_actions import read_honor_actions as _read_honor_actions, save_honor_actions as _save_honor_actions
+    from .honor_actions import read_honor_actions as _read_honor_actions, prepare_honor_actions as _prepare_honor_actions
 except ImportError:
-    from honor_actions import read_honor_actions as _read_honor_actions, save_honor_actions as _save_honor_actions
+    from honor_actions import read_honor_actions as _read_honor_actions, prepare_honor_actions as _prepare_honor_actions
 
 try:
     from .data_map import build_data_map as _build_data_map
@@ -219,13 +225,22 @@ HONOR_ACTIONS_FILE = Path(os.environ.get(
 
 
 def get_honor_actions():
-    return _read_honor_actions(HONOR_ACTIONS_FILE)
+    data = _read_honor_actions(HONOR_ACTIONS_FILE)
+    for tier in data['tiers']:tier['amount'] = str(tier['amount'])
+    return data
 
 
 def save_honor_actions(edits):
     if not isinstance(edits, list):
         raise ValueError("edits must be a list")
-    return _save_honor_actions(HONOR_ACTIONS_FILE, edits)
+    if not edits:return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        original = HONOR_ACTIONS_FILE.read_bytes() if HONOR_ACTIONS_FILE.exists() else None
+        count, payload = _prepare_honor_actions(HONOR_ACTIONS_FILE, edits)
+        _commit_file_outputs([(HONOR_ACTIONS_FILE, payload)], 'Honor controls', expected_originals={HONOR_ACTIONS_FILE: original})
+        return count
 # The game LAYERS weapon data: the base weapons.ymt plus per-weapon override
 # files in pack_patch/ plus weaponcomponents.meta layers. Replacing only the
 # base file reverts Rockstar's own weapon patches (repeater double-fire,
@@ -324,7 +339,9 @@ MOB_HUMAN_HINTS = ("PLAYER", "GANG", "LAW", "COMPANION", "BOUNTY", "GUARD",
 
 # (ds, name) -> {"root": Element, "bom": bool, "decl": str}
 _files = {}
-_lock = threading.Lock()
+# HTTP mutations and their metadata helpers share this lock; helpers also
+# acquire it when called directly, so nested acquisition must be supported.
+_lock = threading.RLock()
 
 
 def ds_dir(ds):
@@ -338,7 +355,10 @@ def install_replacements():
     path = ds_dir("mine") / "install.xml"
     if not path.exists():
         return {}
-    root = ET.parse(path).getroot()
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     return {
         (node.findtext("GamePath") or "").strip().casefold():
         (node.findtext("FilePath") or "").strip().replace("\\", "/")
@@ -587,22 +607,35 @@ def _craft_recipe_json(recipe):
 def _craft_recipe_from_json(row):
     if not isinstance(row, dict):
         raise ValueError("every custom recipe must be an object")
+    text_fields = {"recipe_id", "category", "title", "description", "station", "output_item", "unlock"}
+    if set(row) - (text_fields | {"output_quantity", "ingredients"}):
+        raise ValueError("custom recipe contains unsupported fields")
+    for key in text_fields:
+        if key in row and not isinstance(row[key], str):
+            raise ValueError(f"{key} must be text")
     ingredients = row.get("ingredients", [])
     if not isinstance(ingredients, list):
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: ingredients must be a list")
+    if any(not isinstance(part, dict) for part in ingredients):
+        raise ValueError(f"{row.get('recipe_id', 'recipe')}: every ingredient must be an object")
+    for part in ingredients:
+        if set(part) - {"item", "quantity"}:
+            raise ValueError("ingredient contains unsupported fields")
+        if "item" in part and not isinstance(part["item"], str):
+            raise ValueError("ingredient item must be text")
     try:
         return _CraftRecipe(
-            recipe_id=str(row.get("recipe_id", "")).strip(),
-            category=str(row.get("category", "")).strip(),
-            title=str(row.get("title", "")).strip(),
-            description=str(row.get("description", "")).strip(),
-            station=str(row.get("station", "")).strip(),
-            output_item=str(row.get("output_item", "")).strip(),
-            output_quantity=int(row.get("output_quantity", 1)),
-            ingredients=[_CraftIngredient(str(part.get("item", "")).strip(),
-                                          int(part.get("quantity", 1)))
-                         for part in ingredients if isinstance(part, dict)],
-            unlock=str(row.get("unlock", "")).strip(),
+            recipe_id=row.get("recipe_id", "").strip(),
+            category=row.get("category", "").strip(),
+            title=row.get("title", "").strip(),
+            description=row.get("description", "").strip(),
+            station=row.get("station", "").strip(),
+            output_item=row.get("output_item", "").strip(),
+            output_quantity=integer_value(row.get("output_quantity", 1), "Output quantity"),
+            ingredients=[_CraftIngredient(part.get("item", "").strip(),
+                                          integer_value(part.get("quantity", 1), "Ingredient quantity"))
+                         for part in ingredients],
+            unlock=row.get("unlock", "").strip(),
         )
     except (TypeError, ValueError) as ex:
         raise ValueError(f"{row.get('recipe_id', 'recipe')}: quantities must be whole numbers") from ex
@@ -758,36 +791,56 @@ def get_localization(ds="mine"):
             "alternateAliases": len(aliases)}
 
 
-def ensure_localization_install():
-    """Ensure LML actually loads the localization file edited by LEXEDITOR."""
+def _localization_install_bytes():
+    """Prepare the LML mapping before any localization output is changed."""
     install_path = ds_dir("mine") / "install.xml"
     if not install_path.exists():
-        return
-    tree = ET.parse(install_path)
+        return None
+    try:
+        tree = ET.parse(install_path)
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     resources = tree.getroot().find("Resources")
     if resources is None:
         raise ValueError(f"Missing Resources element in {install_path}")
     if any((node.text or "").strip().lower() == LOCALIZATION_FILE.lower()
            for node in resources.findall("./Resource/DataFile")):
-        return
+        return None
     resource = ET.Element("Resource")
     ET.SubElement(resource, "DataFile").text = LOCALIZATION_FILE
     resources.insert(0, resource)
     ET.indent(tree, space="    ")
-    tree.write(install_path, encoding="utf-8", xml_declaration=False)
+    return ET.tostring(tree.getroot(), encoding="utf-8")
 
 
-def ensure_file_replacement(game_path, file_path, install_path=None):
-    """Add one LML replacement mapping without disturbing existing mappings."""
+def ensure_localization_install():
+    """Ensure LML actually loads the localization file edited by LEXEDITOR."""
+    payload = _localization_install_bytes()
+    if payload is not None:
+        (ds_dir("mine") / "install.xml").write_bytes(payload)
+
+
+def _prepare_file_replacement(game_path, file_path, install_path=None):
+    """Prepare one LML mapping without changing the player's files."""
+    return _prepare_file_replacements([(game_path, file_path)], install_path)
+
+
+def _prepare_file_replacements(replacements, install_path=None):
+    """Prepare a complete replacement batch in one copied install document."""
     install_path = install_path or ds_dir("mine") / "install.xml"
     if not install_path.exists():
         raise ValueError(f"Missing install.xml in {ds_dir('mine')}")
-    tree = ET.parse(install_path, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    try:
+        tree = ET.parse(install_path, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid install.xml: {error}") from error
     root = tree.getroot()
-    if any((node.findtext("GamePath") or "").strip() == game_path
-           and (node.findtext("FilePath") or "").strip() == file_path
-           for node in root.findall(".//FileReplacement")):
-        return False
+    missing = [(game_path, file_path) for game_path, file_path in replacements
+               if not any((node.findtext("GamePath") or "").strip() == game_path
+                          and (node.findtext("FilePath") or "").strip() == file_path
+                          for node in root.findall(".//FileReplacement"))]
+    if not missing:
+        return None
     resources = root.find("Resources")
     if resources is None:
         raise ValueError(f"Missing Resources element in {install_path}")
@@ -795,11 +848,20 @@ def ensure_file_replacement(game_path, file_path, install_path=None):
                      if node.find("FileReplacement") is not None), None)
     if resource is None:
         resource = ET.SubElement(resources, "Resource")
-    replacement = ET.SubElement(resource, "FileReplacement")
-    ET.SubElement(replacement, "GamePath").text = game_path
-    ET.SubElement(replacement, "FilePath").text = file_path
+    for game_path, file_path in missing:
+        replacement = ET.SubElement(resource, "FileReplacement")
+        ET.SubElement(replacement, "GamePath").text = game_path
+        ET.SubElement(replacement, "FilePath").text = file_path
     ET.indent(tree, space="    ")
-    tree.write(install_path, encoding="utf-8", xml_declaration=False)
+    return ET.tostring(root, encoding="utf-8")
+
+
+def ensure_file_replacement(game_path, file_path, install_path=None):
+    """Add one LML replacement mapping without disturbing existing mappings."""
+    payload = _prepare_file_replacement(game_path, file_path, install_path)
+    if payload is None:
+        return False
+    (install_path or ds_dir("mine") / "install.xml").write_bytes(payload)
     return True
 
 
@@ -823,28 +885,200 @@ def remove_file_replacement(game_path, file_path):
     return changed
 
 
-def save_localization(edits):
+def _validated_localization_edits(edits):
+    if not isinstance(edits, list):
+        raise ValueError("Localization edits must be a list")
+    result, seen = [], set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"key", "value"}:
+            raise ValueError("Localization edits require key and value only")
+        key, value = edit["key"], edit["value"]
+        if not isinstance(key, str) or not valid_gxt_key(key):
+            raise ValueError("Invalid localization key for LML")
+        if not isinstance(value, str) or "\x00" in value:
+            raise ValueError("Localization value must be text without NUL")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("Localization value must be valid Unicode") from error
+        key = key.strip()
+        identity = canonical_localization_key(key)
+        if identity in seen:
+            raise ValueError(f"Duplicate localization key: {key}")
+        seen.add(identity)
+        result.append({"key": key, "value": value.replace("\r", " ").replace("\n", " ")})
+    return result
+
+
+def _prepare_localization_save(edits):
+    edits = _validated_localization_edits(edits)
+    if not edits:
+        return None
     path = ds_dir("mine") / LOCALIZATION_FILE
+    if path.exists():
+        try:
+            path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise ValueError("Existing localization must be valid UTF-8") from error
     values = parse_gxt2(path)
     vanilla, _, _, _ = _localization_baseline("mine")
     for edit in edits:
-        key, value = edit.get("key", "").strip(), edit.get("value", "")
-        if key:
-            if not valid_gxt_key(key):
-                raise ValueError(f"Invalid localization key for LML: {key}")
-            value = value.replace("\r", " ").replace("\n", " ")
-            if value == vanilla.get(key, ""):
-                values.pop(key, None)
-            else:
-                values[key] = value
+        key, value = edit["key"], edit["value"]
+        if value == vanilla.get(key, ""):
+            values.pop(key, None)
+        else:
+            values[key] = value
     invalid = [key for key in values if not valid_gxt_key(key)]
     if invalid:
         raise ValueError("Invalid localization keys already on disk: " + ", ".join(invalid))
     lines = ["[LEXEDITOR OVERRIDES]", ""]
     lines.extend(f"{key} = {values[key]}" for key in sorted(values))
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    ensure_localization_install()
-    return len(edits)
+    payload = ("\n".join(lines) + "\n").encode("utf-8")
+    if b"\x00" in payload:
+        raise ValueError("Existing localization cannot contain NUL")
+    return path, payload, _localization_install_bytes(), len(edits)
+
+
+def _localization_outputs(prepared):
+    if prepared is None:
+        return []
+    path, payload, install_payload, _ = prepared
+    outputs = [(path, payload)]
+    if install_payload is not None:
+        outputs.append((ds_dir("mine") / "install.xml", install_payload))
+    return outputs
+
+
+def _commit_localization_save(prepared):
+    if prepared is None:
+        return 0
+    _commit_file_outputs(_localization_outputs(prepared), "Localization")
+    return prepared[3]
+
+
+def _commit_file_outputs(outputs, label, *, expected_originals=None):
+    """Stage all bytes, then replace them with rollback on an I/O failure."""
+    if len({target.resolve() for target, _ in outputs}) != len(outputs):
+        raise ValueError(f"{label} outputs must have distinct paths")
+    for parent in {target.parent for target, _ in outputs}:
+        pending = next(parent.glob('.lexeditor-save-recovery-*'), None)
+        if pending is not None:
+            raise OSError(f"{label} save is blocked by unresolved recovery at {pending}. Restore the recorded original state before saving again")
+    original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
+    for target, expected in (expected_originals or {}).items():
+        if original[target] != expected:
+            raise ValueError(f"{label} file changed since preparation: {target}. Reload before saving again")
+    timestamps = {target: (target.stat().st_atime_ns, target.stat().st_mtime_ns)
+                  for target, data in original.items() if data is not None}
+    temporary, committed, created_dirs = [], [], []
+    recovery, retained = {}, set()
+    candidates = dict(outputs)
+    succeeded = False
+    def stage(target, data):
+        missing, parent = [], target.parent
+        while not parent.exists():
+            missing.append(parent)
+            parent = parent.parent
+        for parent in reversed(missing):
+            parent.mkdir()
+            created_dirs.append(parent)
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
+            temp_path = Path(stream.name)
+            temporary.append(temp_path)
+            stream.write(data)
+        return temp_path
+    def current_bytes(target):
+        return target.read_bytes() if target.exists() else None
+    def unchanged(target):
+        if current_bytes(target) != original[target]:
+            raise ValueError(f"{label} file changed during save: {target}. Reload before saving again")
+    try:
+        staged = [(target, stage(target, data)) for target, data in outputs]
+        # Originals must already be on disk before any live file is replaced.
+        # One fixed folder per target bounds recovery storage and blocks retries.
+        for target, _ in outputs:
+            folder = target.parent / ('.lexeditor-save-recovery-' + target.name)
+            folder.mkdir()
+            recovery[target] = folder
+            (folder / 'state.json').write_text(json.dumps({
+                'target': str(target.resolve()), 'existed': original[target] is not None,
+                'timestamps': timestamps.get(target),
+            }), encoding='utf-8')
+            if original[target] is not None:
+                (folder / 'original').write_bytes(original[target])
+        for target, temp_path in staged:
+            unchanged(target)
+            temp_path.replace(target)
+            committed.append(target)
+        succeeded = True
+    except Exception as error:
+        failures = []
+        for target in reversed(committed):
+            try:
+                if current_bytes(target) != candidates[target]:
+                    raise OSError("File changed externally after publication; rollback cannot overwrite it")
+                if original[target] is None:
+                    target.unlink()
+                else:
+                    stage(target, original[target]).replace(target)
+                    os.utime(target, ns=timestamps[target])
+            except Exception as rollback_error:
+                retained.add(target)
+                failures.append(f"{target.name}: {rollback_error}; original state retained at {recovery[target]}")
+        if failures:
+            raise RuntimeError(f"{label} save failed: {error}; rollback failed: {'; '.join(failures)}") from error
+        raise
+    finally:
+        for target, folder in recovery.items():
+            if target not in retained:
+                (folder / 'original').unlink(missing_ok=True)
+                (folder / 'state.json').unlink(missing_ok=True)
+                folder.rmdir()
+        for temp_path in temporary:
+            temp_path.unlink(missing_ok=True)
+        if not succeeded:
+            for parent in reversed(created_dirs):
+                try:
+                    parent.rmdir()
+                except OSError:
+                    pass  # Do not remove directories populated by another writer.
+
+
+def _commit_xml_roots(prepared, additional_outputs=(), additional_expected=None):
+    """Publish prepared mine XML and first backups only after the batch saves."""
+    if not prepared:
+        return
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    outputs = []
+    expected = dict(additional_expected or {})
+    published = []
+    for name, entry, root in prepared:
+        path = entry.get("path") or data_file_path(name, "mine")
+        raw = path.read_bytes()
+        if path.stat().st_mtime_ns != entry["mtime"] or (entry.get("source_digest") is not None and hashlib.sha256(raw).hexdigest() != entry["source_digest"]):
+            raise ValueError(f"{name} changed since preparation. Reload before saving again")
+        body = ET.tostring(root, encoding="unicode")
+        payload = (entry["decl"] + "\n" + body).encode("utf-8")
+        if entry["bom"]:
+            payload = b"\xef\xbb\xbf" + payload
+        backup = path.with_suffix(path.suffix + ".bak")
+        if not backup.exists():
+            outputs.append((backup, raw))
+            expected[backup] = None
+        outputs.append((path, payload))
+        expected[path] = raw
+        published.append((entry, root, path, payload))
+    outputs.extend(additional_outputs)
+    _commit_file_outputs(outputs, "XML batch", expected_originals=expected)
+    for entry, root, path, payload in published:
+        entry["root"] = root
+        entry["mtime"] = path.stat().st_mtime_ns
+        entry["source_digest"] = hashlib.sha256(payload).hexdigest()
+
+
+def save_localization(edits):
+    return _commit_localization_save(_prepare_localization_save(edits))
 
 
 def load_file(name, ds="mine"):
@@ -874,7 +1108,7 @@ def load_file(name, ds="mine"):
     if ds in {"prices1899", "kiddos"} and name == CATALOG_FILE:
         normalize_reference_catalog(root)
     _files[key] = {"root": root, "bom": bom, "decl": decl,
-                   "mtime": disk_mtime, "path": path}
+                   "mtime": disk_mtime, "path": path, "source_digest": hashlib.sha256(raw).hexdigest()}
     return _files[key]
 
 
@@ -923,6 +1157,7 @@ def save_file(name, ds="mine"):
         data = b"\xef\xbb\xbf" + data
     path.write_bytes(data)
     entry["mtime"] = path.stat().st_mtime_ns
+    entry["source_digest"] = hashlib.sha256(data).hexdigest()
 
 
 def joaat(s):
@@ -1379,6 +1614,38 @@ def record_custom_catalog_origin(section, key):
         _write_origin_provenance(data)
 
 
+def _prepare_custom_catalog_origin(section, key):
+    """Validate existing metadata and build creation provenance without writes."""
+    data = json.loads(ORIGIN_PROVENANCE_FILE.read_text(encoding="utf-8")) if ORIGIN_PROVENANCE_FILE.exists() else {"schema": 2}
+    if not isinstance(data, dict) or data.get("schema") not in {1, 2}:
+        raise ValueError("Creation provenance requires a supported schema object")
+    for field in ("catalogItems", "catalogEffects", "customCatalogItems", "customCatalogEffects",
+                  "weapons", "ammo", "weaponHashes", "ammoHashes"):
+        values = data.get(field, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"Creation provenance {field} must be a list of text keys")
+        data[field] = sorted(set(values))
+    field = {"items": "customCatalogItems", "effects": "customCatalogEffects"}[section]
+    data[field] = sorted(set(data[field]) | {key})
+    data["schema"] = 2
+    return ORIGIN_PROVENANCE_FILE, (json.dumps(data, indent=2) + "\n").encode("utf-8")
+
+
+def _prepare_effect_creation_labels(key, symbol, label):
+    labels = _raw_labels()
+    if not isinstance(labels, dict):
+        raise ValueError("Effect labels must be an object")
+    for scope in ("effects", "effectSymbols"):
+        values = labels.get(scope, {})
+        if not isinstance(values, dict) or any(not isinstance(value, str) for value in values.values()):
+            raise ValueError(f"Effect labels {scope} must contain text values")
+    if symbol:
+        labels.setdefault("effectSymbols", {})[key] = symbol
+    if label:
+        labels.setdefault("effects", {})[key] = label
+    return LABELS_FILE, (json.dumps(labels, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
 def catalog_origin_marker_sets(ds="mine"):
     """Return Online and local origins from the authoritative root catalog.
 
@@ -1419,6 +1686,18 @@ def catalog_origin_marker_sets(ds="mine"):
     _ORIGIN_MARKER_CACHE[cache_key] = result
     return result
 
+def _catalog_quantity(raw):
+    """Read integral XML quantities without float or JSON-number rounding."""
+    try:
+        value = Decimal(raw)
+        if not value.is_finite() or value != value.to_integral_value():
+            raise ValueError("Catalog quantity must be a finite whole number")
+        integer = int(value)
+    except (InvalidOperation, TypeError, OverflowError) as error:
+        raise ValueError("Catalog quantity must be a finite whole number") from error
+    return integer if abs(integer) <= 9007199254740991 else str(integer)
+
+
 def cost_list(container):
     """Parse an <acquirecosts>/<sellprices> element into a list of costs."""
     out = []
@@ -1431,7 +1710,7 @@ def cost_list(container):
             for part in items_el.findall("item"):
                 parts.append({
                     "item": txt(part, "item"),
-                    "qty": int(float(part.find("quantity").get("value", "0"))) if part.find("quantity") is not None else 0,
+                    "qty": _catalog_quantity(part.find("quantity").get("value", "0")) if part.find("quantity") is not None else 0,
                 })
         q = cost.find("quantity")
         unlocks = []
@@ -1441,7 +1720,7 @@ def cost_list(container):
         out.append({
             "key": txt(cost, "key"),
             "costtype": txt(cost, "costtype"),
-            "yield": int(float(q.get("value", "1"))) if q is not None else 1,
+            "yield": _catalog_quantity(q.get("value", "1")) if q is not None else 1,
             "parts": parts,
             "unlocks": unlocks,
         })
@@ -1489,9 +1768,9 @@ def _build_catalog(ds="mine"):
             for group in groups.findall("item") if groups is not None else []:
                 count = attr_value(group, "count")
                 if count is not None:
-                    counts.append(int(float(count)))
+                    counts.append(_catalog_quantity(count))
             shop_listings.setdefault(txt(entry, "item"), []).append({
-                "shop": shop_type, "quantities": sorted(set(counts)) or [1]
+                "shop": shop_type, "quantities": sorted(set(counts), key=int) or [1]
             })
     items = []
     for it in root.find("catalog").find("items").findall("item"):
@@ -1722,12 +2001,17 @@ def _replace_quick_select_slots(item, rows):
         entry.tail = "\n            " if index < len(rows) - 1 else "\n          "
 
 
-def apply_quick_select_edits(edits):
-    """Replace complete slot lists while preserving all other item fields."""
-    if not edits:
-        return 0
+def _prepare_quick_select_edits(edits):
+    """Validate and build slot lists without modifying cached XML or files."""
     if not isinstance(edits, list):
         raise ValueError("quickSelect edits must be a list")
+    if not edits:
+        return None
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"item", "slots"}:
+            raise ValueError("quickSelect edits require item and slots only")
+        if not isinstance(edit["item"], str) or not edit["item"].strip():
+            raise ValueError("quickSelect item must be nonempty text")
     entry = load_file(QUICK_SELECT_FILE)
     original_root = entry["root"]
     root = copy.deepcopy(original_root)
@@ -1753,22 +2037,23 @@ def apply_quick_select_edits(edits):
         normalized = []
         seen = set()
         for row in incoming:
-            slot_id = str(row.get("id", "")).strip().upper()
+            if not isinstance(row, dict) or "id" not in row or set(row) - {"id", "sortOrder"}:
+                raise ValueError("quickSelect slot requires id and optional sortOrder")
+            if not isinstance(row["id"], str):
+                raise ValueError("quickSelect slot id must be text")
+            slot_id = row["id"].strip().upper()
             if slot_id not in allowed_by_group.get(group_key, set()):
                 raise ValueError(f"Unknown quick-select slot for {group_key}: {slot_id or '(blank)'}")
             if slot_id in seen:
                 raise ValueError(f"Duplicate quick-select slot for {item_key}: {slot_id}")
             seen.add(slot_id)
             raw_order = row.get("sortOrder")
-            if raw_order is None:
+            if "sortOrder" not in row:
                 sort_order = _next_quick_select_sort_order(root, group_key, slot_id)
             else:
-                try:
-                    sort_order = int(raw_order)
-                except (TypeError, ValueError) as error:
-                    raise ValueError("Quick-select sort order must be a whole number") from error
-                if not 0 <= sort_order <= 1_000_000:
-                    raise ValueError("Quick-select sort order is outside the supported range")
+                sort_order = integer_value(raw_order, "Quick-select sort order")
+            if not 0 <= sort_order <= 1_000_000:
+                raise ValueError("Quick-select sort order is outside the supported range")
             normalized.append({"id": slot_id, "sortOrder": sort_order})
         current = _quick_select_slots(item)
         if item is not None and current == normalized:
@@ -1794,14 +2079,21 @@ def apply_quick_select_edits(edits):
             items.append(item)
         _replace_quick_select_slots(item, normalized)
         changed += 1
+    return entry, original_root, root, changed
+
+
+def _commit_quick_select_edits(prepared):
+    if prepared is None:
+        return 0
+    entry, original_root, root, changed = prepared
     if changed:
-        entry["root"] = root
-        try:
-            save_file(QUICK_SELECT_FILE)
-        except Exception:
-            entry["root"] = original_root
-            raise
+        _commit_xml_roots([(QUICK_SELECT_FILE, entry, root)])
     return changed
+
+
+def apply_quick_select_edits(edits):
+    """Replace complete slot lists while preserving all other item fields."""
+    return _commit_quick_select_edits(_prepare_quick_select_edits(edits))
 
 
 def read_shop_requirement_groups(entry):
@@ -2301,17 +2593,55 @@ def _buyer_node(parent, name, parent_i, child_i, sibling_i, previous_i, attr_sta
     ET.SubElement(node, "isEnabled", {"value": "true"})
 
 
+def _normalized_buyer_map(data, label, modes=False):
+    if not isinstance(data, dict) or set(data) - set(BUYER_SHOPS):
+        raise ValueError(f"{label} must map supported shops only")
+    result = {}
+    for shop in BUYER_SHOPS:
+        values = data.get(shop, {} if modes else [])
+        if not isinstance(values, dict if modes else list):
+            raise ValueError(f"{label} shop entries must be {'objects' if modes else 'lists'}")
+        normalized = {} if modes else []
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError(f"{label} item IDs must be text")
+            item = value.strip().upper()
+            if not re.fullmatch(r"(?:0X[0-9A-F]{8}|[A-Z][A-Z0-9_]{0,127})", item):
+                raise ValueError(f"{label} has an invalid item ID")
+            if modes:
+                mode = values[value]
+                if not isinstance(mode, str) or mode not in {"accept", "reject"}:
+                    raise ValueError("Merchant overrides must be accept or reject")
+                if item in normalized:
+                    raise ValueError(f"Duplicate normalized merchant override: {shop}/{item}")
+                normalized[item] = mode
+            else:
+                normalized.append(item)
+        result[shop] = normalized if modes else sorted(set(normalized))
+    return result
+
+
 def write_shop_buyer_data(buyers, vanilla_buyers=None, overrides=None):
     """Write explicit PDATA buyer lists without inventing empty shop overrides."""
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    normalized = _normalized_buyer_map(buyers, "Merchant buyers")
+    old = json.loads(BUYER_STATE_FILE.read_text(encoding="utf-8")) if BUYER_STATE_FILE.exists() else {}
+    if not isinstance(old, dict):
+        raise ValueError("Merchant state must be an object")
+    if vanilla_buyers is None:
+        vanilla_buyers = old.get("vanillaBuyers", old.get("buyers", normalized))
+    if overrides is None:
+        overrides = old.get("overrides", {})
+    vanilla_normalized = _normalized_buyer_map(vanilla_buyers, "Vanilla merchant buyers")
+    override_normalized = _normalized_buyer_map(overrides, "Merchant overrides", modes=True)
     root = ET.Element("UNK_MEMBER_0xDE396FE2")
     attrs = ET.SubElement(root, "attributes")
     _buyer_attr(attrs, "RELEASE", "1", 1, "0x2339EEB0")
     strings = []
     attr_index = 1
-    normalized = {}
     for shop in BUYER_SHOPS:
-        values = sorted(set(str(v).strip().upper() for v in buyers.get(shop, []) if str(v).strip()))
-        normalized[shop] = values
+        values = normalized[shop]
         if not values:
             continue
         strings.extend(values)
@@ -2348,61 +2678,93 @@ def write_shop_buyer_data(buyers, vanilla_buyers=None, overrides=None):
             _buyer_node(nodes, "INVITEM", shop_node, 65535,
                         current + 1 if i + 1 < item_count else 65535,
                         current - 1 if i else 65535, start + 1 + i, 1)
-    BUYER_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(root, space="  ")
-    BUYER_DATA_FILE.write_text('<?xml version="1.0" encoding="utf-8" standalone="no"?>\n' +
-                               ET.tostring(root, encoding="unicode") + "\n", encoding="utf-8")
-    if vanilla_buyers is None or overrides is None:
-        old = json.loads(BUYER_STATE_FILE.read_text(encoding="utf-8")) if BUYER_STATE_FILE.exists() else {}
-        vanilla_buyers = old.get("vanillaBuyers", old.get("buyers", normalized))
-        overrides = old.get("overrides", {})
-    vanilla_normalized = {
-        shop: sorted(set(str(v).strip().upper() for v in vanilla_buyers.get(shop, []) if str(v).strip()))
-        for shop in BUYER_SHOPS
-    }
-    override_normalized = {
-        shop: {str(item).strip().upper(): mode for item, mode in overrides.get(shop, {}).items()
-               if str(item).strip() and mode in ("accept", "reject")}
-        for shop in BUYER_SHOPS
-    }
-    BUYER_STATE_FILE.write_text(json.dumps({"source": "runtime vanilla dump",
-        "vanillaBuyers": vanilla_normalized, "buyers": normalized,
-        "overrides": override_normalized}, indent=2) + "\n", encoding="utf-8")
-    BUYER_OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    pdata = ('<?xml version="1.0" encoding="utf-8" standalone="no"?>\n' +
+             ET.tostring(root, encoding="unicode") + "\n").encode("utf-8")
+    state_data = {**old, "source": old.get("source", "runtime vanilla dump"),
+                  "vanillaBuyers": vanilla_normalized, "buyers": normalized,
+                  "overrides": override_normalized}
+    outputs = [(BUYER_DATA_FILE, pdata),
+               (BUYER_STATE_FILE, (json.dumps(state_data, indent=2) + "\n").encode("utf-8"))]
     lines = ["shop,item,mode"]
     for shop in BUYER_SHOPS:
         for item, mode in sorted(override_normalized[shop].items()):
             lines.append(f"{shop},{item},{mode}")
-    BUYER_OVERRIDE_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    outputs.append((BUYER_OVERRIDE_FILE, ("\n".join(lines) + "\n").encode("utf-8")))
     install = EDITABLE_MOD_ROOT / "install.xml"
     if install.exists():
-        tree = ET.parse(install); install_root = tree.getroot()
+        try:
+            tree = ET.parse(install)
+        except ET.ParseError as error:
+            raise ValueError(f"Invalid merchant install.xml: {error}") from error
+        install_root = tree.getroot()
         game_path = "update:/x64/levels/rdr3/script/parseddata/0x0BA63B3D.ymt"
-        if not any((node.findtext("GamePath") or "") == game_path for node in install_root.findall(".//FileReplacement")):
+        try:
+            file_path = BUYER_DATA_FILE.resolve().relative_to(EDITABLE_MOD_ROOT.resolve()).as_posix()
+        except ValueError as error:
+            raise ValueError("Merchant PDATA must be inside the editable mod") from error
+        replacement = next((node for node in install_root.findall(".//FileReplacement")
+                            if (node.findtext("GamePath") or "") == game_path), None)
+        changed = False
+        if replacement is None:
+            resources = install_root.find("Resources")
+            if resources is None:
+                raise ValueError("Missing Resources element in merchant install.xml")
             resource = install_root.find("./Resources/Resource")
+            if resource is None:
+                resource = ET.SubElement(resources, "Resource")
             replacement = ET.SubElement(resource, "FileReplacement")
             ET.SubElement(replacement, "GamePath").text = game_path
-            ET.SubElement(replacement, "FilePath").text = "parseddata/0x0BA63B3D.ymt"
+            changed = True
+        mapped = replacement.find("FilePath")
+        if mapped is None:
+            mapped = ET.SubElement(replacement, "FilePath")
+        if mapped.text != file_path:
+            mapped.text = file_path
+            changed = True
+        if changed:
             ET.indent(install_root, space="    ")
-            install.write_text('<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(install_root, encoding="unicode") + "\n", encoding="utf-8")
+            outputs.append((install, ('<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(install_root, encoding="unicode") + "\n").encode("utf-8")))
+    _commit_file_outputs(outputs, "Merchant")
 
 
 def apply_shop_buyer_edits(edits):
-    current = get_shop_buyers()
+    if not isinstance(edits, list):
+        raise ValueError("Merchant edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    prepared, seen = [], set()
+    catalog_ids = set(_catalog_ids())
+    for edit in edits:
+        if not isinstance(edit, dict) or {"shop", "item"} - set(edit) or set(edit) - {"shop", "item", "mode"}:
+            raise ValueError("Merchant edits require shop, item and optional mode only")
+        if any(not isinstance(edit.get(field, "default"), str) for field in ("shop", "item", "mode")):
+            raise ValueError("Merchant shop, item and mode must be text")
+        shop = edit["shop"]
+        item = edit["item"].strip().upper()
+        mode = edit.get("mode", "default").strip().lower()
+        if shop not in BUYER_SHOPS:
+            raise ValueError("Merchant shop must be selected from the supported shops")
+        if item not in catalog_ids:
+            raise ValueError(f"Unknown merchant catalog item: {item or '(blank)'}")
+        if mode not in ("default", "accept", "reject"):
+            raise ValueError(f"Invalid merchant override mode: {mode}")
+        identity = shop, item
+        if identity in seen:
+            raise ValueError(f"Duplicate merchant target: {shop}/{item}")
+        seen.add(identity)
+        prepared.append({"shop": shop, "item": item, "mode": mode})
+    current = copy.deepcopy(get_shop_buyers())
     if not current["available"]:
         raise ValueError(current["reason"])
     buyers = current["buyers"]
     vanilla = current["vanillaBuyers"]
     overrides = current["overrides"]
     changed = 0
-    for edit in edits:
-        shop = edit.get("shop")
-        item = str(edit.get("item", "")).strip().upper()
-        mode = str(edit.get("mode", "default")).strip().lower()
-        if shop not in buyers or not item:
-            continue
-        if mode not in ("default", "accept", "reject"):
-            raise ValueError(f"Invalid merchant override mode: {mode}")
+    for edit in prepared:
+        shop, item, mode = edit["shop"], edit["item"], edit["mode"]
         present = item in buyers[shop]
         desired = item in vanilla[shop] if mode == "default" else mode == "accept"
         prior_mode = overrides[shop].get(item, "default")
@@ -2431,20 +2793,45 @@ def find_catalog_item(root, key):
 def create_catalog_item(data):
     """Create an ordinary custom crafting/material item from our minimal
     known-working Gunpowder record, without inheriting its recipes or prices."""
-    key = str(data.get("key", "")).strip().upper()
+    allowed = {"key", "name", "description", "category", "group", "capacity"}
+    if not isinstance(data, dict) or "key" not in data or set(data) - allowed:
+        raise ValueError("Item creation requires key and supported fields only")
+    for field in ("key", "name", "description", "category", "group"):
+        if field in data and not isinstance(data[field], str):
+            raise ValueError(f"Item {field} must be text")
+    capacity = integer_value(data.get("capacity", 20), "Item capacity")
+    if capacity < 1:
+        raise ValueError("Item capacity must be at least 1")
+    key = data["key"].strip().upper()
     if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", key):
         raise ValueError("Item ID must be 3-64 uppercase letters, numbers, or underscores")
-    root = load_file(CATALOG_FILE)["root"]
+    catalog_entry = load_file(CATALOG_FILE)
+    root = copy.deepcopy(catalog_entry["root"])
     if find_catalog_item(root, key) is not None:
         raise ValueError(f"Item already exists: {key}")
     template = find_catalog_item(root, "LEX_GUNPOWDER")
     if template is None:
         raise ValueError("LEX_GUNPOWDER template is missing")
+    definitions = root.findall("./catalog/items/item")
+    category = data.get("category", "CI_CATEGORY_MATERIALS").strip()
+    group = data.get("group", "PROVISION").strip()
+    for field, choice in (("category", category), ("group", group)):
+        if not choice or choice not in {txt(entry, field) for entry in definitions}:
+            raise ValueError(f"Item {field} must be selected from an existing catalog choice")
+    name = data.get("name", key) or key
+    description = data.get("description", "")
+    for field, text_value in (("name", name), ("description", description)):
+        if "\x00" in text_value:
+            raise ValueError(f"Item {field} cannot contain NUL")
+        try:
+            text_value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError(f"Item {field} must be valid Unicode") from error
     item = copy.deepcopy(template)
     item.set("key", key)
     item.find("key").text = key
-    item.find("category").text = str(data.get("category") or "CI_CATEGORY_MATERIALS")
-    item.find("group").text = str(data.get("group") or "PROVISION")
+    item.find("category").text = category
+    item.find("group").text = group
     for tag in ("acquirecosts", "sellprices", "effectids"):
         node = item.find(tag)
         if node is not None:
@@ -2454,7 +2841,7 @@ def create_catalog_item(data):
         for child in list(mult):
             mult.remove(child)
         rule = ET.SubElement(mult, "item")
-        ET.SubElement(rule, "quantity", {"value": str(max(1, int(data.get("capacity", 20))))})
+        ET.SubElement(rule, "quantity", {"value": str(capacity)})
         ET.SubElement(rule, "slotid").text = "SLOTID_ANY"
     ui = item.find("ui")
     if ui is None:
@@ -2468,45 +2855,59 @@ def create_catalog_item(data):
     if desc_node is None:
         desc_node = ET.SubElement(ui, "description")
     desc_node.text = description_key
-    root.find("catalog").find("items").append(item)
-    save_file(CATALOG_FILE)
-    record_custom_catalog_origin("items", key)
-    save_localization([
-        {"key": name_key, "value": str(data.get("name") or key)},
-        {"key": description_key, "value": str(data.get("description") or "")},
+    localization = _prepare_localization_save([
+        {"key": name_key, "value": name},
+        {"key": description_key, "value": description},
     ])
+    root.find("catalog").find("items").append(item)
+    metadata = [_prepare_custom_catalog_origin("items", key), *_localization_outputs(localization)]
+    _commit_xml_roots([(CATALOG_FILE, catalog_entry, root)], metadata)
+    _ORIGIN_MARKER_CACHE.clear()
     return {"key": key}
 
 
 def create_catalog_effect(data):
     """Create a new catalog effect using an engine behavior already present
     in the catalog. New effect records are data; new behaviors require code."""
-    requested_key = str(data.get("key", "")).strip().upper()
+    allowed = {"key", "label", "behavior", "value", "percent", "time", "timeunits", "durationcategory"}
+    if not isinstance(data, dict) or {"key", "behavior"} - set(data) or set(data) - allowed:
+        raise ValueError("Effect creation requires key, behavior and supported fields only")
+    for field in ("key", "label", "behavior", "durationcategory"):
+        if field in data and not isinstance(data[field], str):
+            raise ValueError(f"Effect {field} must be text")
+    value = integer_value(data.get("value", 0), "Effect value")
+    time_value = integer_value(data.get("time", 0), "Effect time")
+    time_units = integer_value(data.get("timeunits", 0), "Effect time units")
+    if time_units not in {0, 1, 2, 3}:
+        raise ValueError("Effect time units must be 0, 1, 2 or 3")
+    percent = finite_number(data.get("percent", 0), "Effect percent")
+    requested_key = data["key"].strip().upper()
     if not re.fullmatch(r"(?:0X[0-9A-F]{8}|[A-Z][A-Z0-9_]{2,63})", requested_key):
         raise ValueError("Effect ID must be a symbolic name or an 8-digit 0x hash")
     key = canonical_effect_key(requested_key)
-    root = load_file(CATALOG_FILE)["root"]
+    catalog_entry = load_file(CATALOG_FILE)
+    root = copy.deepcopy(catalog_entry["root"])
     effects_root = root.find("effectsids")
     if effects_root is None:
         raise ValueError("catalog_sp.ymt has no effectsids section")
     definitions = effects_root.findall("item")
     if any(canonical_effect_key(txt(effect, "key")) == key for effect in definitions):
         raise ValueError(f"Effect already exists: {key}")
-    behavior = str(data.get("behavior", "")).strip()
+    behavior = data["behavior"].strip()
     known_behaviors = {txt(effect, "id") for effect in definitions if txt(effect, "id")}
     if behavior not in known_behaviors:
         raise ValueError("Behavior ID must be selected from an existing engine behavior")
-    duration = str(data.get("durationcategory") or "EFFECT_DURATION_CATEGORY_NONE").strip()
+    duration = data.get("durationcategory", "EFFECT_DURATION_CATEGORY_NONE").strip()
     known_durations = {txt(effect, "durationcategory") for effect in definitions}
     if duration not in known_durations:
         raise ValueError("Duration category must be selected from an existing category")
     effect = ET.Element("item")
     ET.SubElement(effect, "key").text = key
     ET.SubElement(effect, "id").text = behavior
-    ET.SubElement(effect, "value", {"value": str(int(float(data.get("value", 0))))})
-    ET.SubElement(effect, "percent", {"value": f'{float(data.get("percent", 0)):.8f}'})
-    ET.SubElement(effect, "time", {"value": str(int(float(data.get("time", 0))))})
-    ET.SubElement(effect, "timeunits", {"value": str(int(float(data.get("timeunits", 0))))})
+    ET.SubElement(effect, "value", {"value": str(value)})
+    ET.SubElement(effect, "percent", {"value": str(percent)})
+    ET.SubElement(effect, "time", {"value": str(time_value)})
+    ET.SubElement(effect, "timeunits", {"value": str(time_units)})
     ET.SubElement(effect, "durationcategory").text = duration
     effects_root.append(effect)
     ordered = sorted(effects_root.findall("item"),
@@ -2515,14 +2916,14 @@ def create_catalog_effect(data):
         effects_root.remove(item)
     for item in ordered:
         effects_root.append(item)
-    save_file(CATALOG_FILE)
-    record_custom_catalog_origin("effects", key)
-    label = str(data.get("label", "")).strip()
-    if not requested_key.startswith("0X"):
-        save_label("effectSymbols", key, requested_key)
-    if label:
-        save_label("effects", key, label)
-    return {"key": key, "label": label, "symbol": requested_key if not requested_key.startswith("0X") else ""}
+    label = data.get("label", "").strip()
+    symbol = requested_key if not requested_key.startswith("0X") else ""
+    metadata = [_prepare_custom_catalog_origin("effects", key)]
+    if symbol or label:
+        metadata.append(_prepare_effect_creation_labels(key, symbol, label))
+    _commit_xml_roots([(CATALOG_FILE, catalog_entry, root)], metadata)
+    _ORIGIN_MARKER_CACHE.clear()
+    return {"key": key, "label": label, "symbol": symbol}
 
 
 def shop_stock_types(root, item_key):
@@ -3049,6 +3450,175 @@ def set_item_shop_presence(root, item_key, shop_type, present, destination_categ
     return {"stock": stock_changed, "catalogue": page_changed}
 
 
+def _catalog_numeric_edits(edits):
+    """Prepare numeric values for the whole batch before touching cached XML."""
+    if not isinstance(edits, dict):
+        raise ValueError("catalog edits must be an object")
+    schemas = {
+        "prices": ({"item", "section", "costKey", "partItem", "qty"}, set()),
+        "yields": ({"item", "section", "costKey", "qty"}, set()),
+        "bundles": ({"key", "qty"}, set()), "carry": ({"item", "slot", "qty"}, set()),
+        "buyability": ({"item", "buyable"}, {"cents"}),
+        "sellability": ({"item", "sellable"}, {"cents"}),
+        "effects": ({"key", "field", "value"}, set()),
+        "itemEffects": ({"item", "effects"}, set()), "itemTags": ({"item", "tags"}, set()),
+        "descriptions": ({"item", "key"}, set()), "quickSelect": ({"item", "slots"}, set()),
+        "craft": ({"item", "entries"}, set()),
+    }
+    if set(edits) - set(schemas):
+        raise ValueError("unsupported catalog edit family")
+    prepared = copy.deepcopy(edits)
+    for family, rows in prepared.items():
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError(f"{family}: edits must be a list of objects")
+        required, optional = schemas[family]
+        for row in rows:
+            if required - set(row) or set(row) - (required | optional):
+                raise ValueError(f"{family}: missing or unsupported fields")
+            for field in (required | optional) & {"item", "key", "section", "costKey", "partItem", "slot", "field"}:
+                if not isinstance(row.get(field), str) or not row[field].strip():
+                    raise ValueError(f"{family} {field} must be nonempty text")
+    def whole(row, key, label, minimum=None, default=None):
+        value = integer_value(row.get(key, default), label)
+        if minimum is not None and value < minimum:
+            raise ValueError(f"{label} must be at least {minimum}")
+        row[key] = value
+    for family, key, minimum, default in (
+        ("prices", "qty", 0, None), ("yields", "qty", 1, None),
+        ("bundles", "qty", 1, None), ("carry", "qty", None, None),
+        ("sellability", "cents", 0, 100), ("buyability", "cents", 0, 100),
+    ):
+        for row in prepared.get(family, []):
+            whole(row, key, f"{family} {key}", minimum, default)
+    for family, key in (("buyability", "buyable"), ("sellability", "sellable")):
+        for row in prepared.get(family, []):
+            if not isinstance(row.get(key), bool):
+                raise ValueError(f"{key} must be true or false")
+    for row in prepared.get("effects", []):
+        field = row.get("field")
+        if not isinstance(field, str):
+            raise ValueError("effect field must be text")
+        if field in {"value", "time", "timeunits"}:
+            whole(row, "value", f"effect {field}")
+        elif field == "percent":
+            row["value"] = finite_number(row.get("value"), "Effect percent")
+    for row in prepared.get("craft", []):
+        entries = row.get("entries", [])
+        if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+            raise ValueError("craft entries must be a list of objects")
+        for entry in entries:
+            if set(entry) - {"key", "yield", "parts", "unlocks"}:
+                raise ValueError("craft entry contains unsupported fields")
+            if "key" in entry and (not isinstance(entry["key"], str) or not entry["key"].strip()):
+                raise ValueError("craft key must be nonempty text")
+            unlocks = entry.get("unlocks", [])
+            if not isinstance(unlocks, list) or any(not isinstance(key, str) or not key.strip() for key in unlocks):
+                raise ValueError("craft unlocks must be a list of nonempty text keys")
+            whole(entry, "yield", "Craft yield", 1, 1)
+            parts = entry.get("parts", [])
+            if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
+                raise ValueError("craft parts must be a list of objects")
+            for part in parts:
+                if "item" not in part or set(part) - {"item", "qty"}:
+                    raise ValueError("craft ingredient requires item and optional qty only")
+                if not isinstance(part["item"], str) or not part["item"].strip():
+                    raise ValueError("craft ingredient item must be nonempty text")
+                whole(part, "qty", "Craft ingredient quantity", 1, 1)
+    for row in prepared.get("itemTags", []):
+        tags = row["tags"]
+        if not isinstance(tags, list):
+            raise ValueError("item tags must be a list")
+        for tag in tags:
+            if not isinstance(tag, dict) or set(tag) != {"key", "type"}:
+                raise ValueError("item tags require key and type only")
+            if any(not isinstance(tag[field], str) or not tag[field].strip() for field in ("key", "type")):
+                raise ValueError("item tag key and type must be nonempty text")
+    return prepared
+
+
+def _validate_catalog_targets(root, edits):
+    items = {item.get("key") or txt(item, "key"): item
+             for item in root.findall("./catalog/items/item")}
+    effects = {txt(effect, "key"): effect for effect in root.findall("./effectsids/item")}
+    behaviors = {txt(effect, "id") for effect in effects.values()}
+    durations = {txt(effect, "durationcategory") for effect in effects.values()}
+    for family, rows in edits.items():
+        for row in rows:
+            if "item" in row and row["item"] not in items:
+                raise ValueError(f"Unknown catalog item: {row['item']}")
+            if family in {"prices", "yields"}:
+                if row["section"] not in {"buy", "sell"}:
+                    raise ValueError("Unknown catalog price section")
+                section = "acquirecosts" if row["section"] == "buy" else "sellprices"
+                costs = [cost for cost in items[row["item"]].findall(f"./{section}/item")
+                         if txt(cost, "key") == row["costKey"]]
+                if not costs:
+                    raise ValueError("Unknown catalog cost")
+                if family == "yields" and not any(cost.find("quantity") is not None for cost in costs):
+                    raise ValueError("Catalog cost has no quantity")
+                if family == "prices" and not any(txt(part, "item") == row["partItem"] and part.find("quantity") is not None
+                        for cost in costs for part in cost.findall("./items/item")):
+                    raise ValueError("Unknown catalog price ingredient")
+            if family == "effects":
+                effect = effects.get(row["key"])
+                field = row["field"]
+                if effect is None:
+                    raise ValueError("Unknown catalog effect")
+                if field not in {"value", "percent", "time", "timeunits", "durationcategory", "id"} or effect.find(field) is None:
+                    raise ValueError("Unsupported effect field")
+                if field in {"id", "durationcategory"}:
+                    value = row["value"]
+                    if not isinstance(value, str) or value not in (behaviors if field == "id" else durations):
+                        raise ValueError("Effect choice must match an existing engine value")
+            if family == "itemEffects":
+                values = row["effects"]
+                if not isinstance(values, list) or any(not isinstance(value, str) or value not in effects for value in values):
+                    raise ValueError("Item effects must be a list of existing catalog effect keys")
+
+
+def _prepare_cash_purchase_prices(root, rows):
+    changed = 0
+    for row in rows:
+        item = find_catalog_item(root, row["item"])
+        if item is None:
+            raise ValueError(f"Unknown catalog item: {row['item']}")
+        section = item.find("acquirecosts")
+        if section is None:
+            if not row["buyable"]:
+                continue
+            section = ET.SubElement(item, "acquirecosts")
+        costs = [cost for cost in section.findall("item") if txt(cost, "costtype") == "COST_TYPE_PRICE"
+                 and any(txt(part, "item") == "CURRENCY_CASH" for part in cost.findall("./items/item"))]
+        if not row["buyable"]:
+            for cost in costs:
+                section.remove(cost)
+                changed += 1
+            continue
+        if not costs:
+            cost = ET.SubElement(section, "item")
+            ET.SubElement(cost, "key").text = "COST_SHOP_DEFAULT"
+            ET.SubElement(cost, "quantity", {"value": "1"})
+            ET.SubElement(cost, "costtype").text = "COST_TYPE_PRICE"
+            parts = ET.SubElement(cost, "items")
+            part = ET.SubElement(parts, "item")
+            ET.SubElement(part, "item").text = "CURRENCY_CASH"
+            ET.SubElement(part, "quantity", {"value": str(row["cents"])})
+            ET.SubElement(cost, "unlocks")
+            changed += 1
+        else:
+            for cost in costs:
+                for part in cost.findall("./items/item"):
+                    if txt(part, "item") != "CURRENCY_CASH":
+                        continue
+                    quantity = part.find("quantity")
+                    if quantity is None:
+                        quantity = ET.SubElement(part, "quantity")
+                    if quantity.get("value") != str(row["cents"]):
+                        quantity.set("value", str(row["cents"]))
+                        changed += 1
+    return changed
+
+
 def apply_catalog_edits(edits):
     """edits: {prices: [{item, section, costKey, partItem, qty}],
               yields: [{item, section, costKey, qty}],
@@ -3057,7 +3627,13 @@ def apply_catalog_edits(edits):
               itemTags: [{item, tags: [{key, type}]}],
               descriptions: [{item, key}],
               quickSelect: [{item, slots: [{id, sortOrder}]}]}"""
-    root = load_file(CATALOG_FILE)["root"]
+    edits = _catalog_numeric_edits(edits)
+    catalog_entry = load_file(CATALOG_FILE)
+    original_root = catalog_entry["root"]
+    root = copy.deepcopy(original_root)
+    changed = _prepare_cash_purchase_prices(root, edits.get("buyability", []))
+    _validate_catalog_targets(root, edits)
+    quick_select = _prepare_quick_select_edits(edits.get("quickSelect", []))
     # Allowed tag pairs = observed tags from this mod + vanilla/kiddos references
     # + curated alcohol-strength options. New free-typed hashes are rejected.
     allowed_tag_pairs = set()
@@ -3073,18 +3649,6 @@ def apply_catalog_edits(edits):
                 allowed_tag_pairs.add((tag["key"], tag["type"]))
     for row in ALCOHOL_STRENGTH_TAGS:
         allowed_tag_pairs.add((_normalize_tag_token(row["key"]), _normalize_tag_token(row["type"])))
-    changed = 0
-    for e in edits.get("buyability", []):
-        present = bool(e.get("buyable"))
-        shop_types = set(shop_stock_types(root, e["item"]))
-        shop_types.update(catalog_page_shops(root, e["item"]))
-        if present:
-            vanilla_root = load_file(CATALOG_FILE, "vanilla")["root"]
-            shop_types.update(shop_stock_types(vanilla_root, e["item"]))
-            shop_types.update(catalog_page_shops(vanilla_root, e["item"]))
-        for shop_type in shop_types:
-            result = set_item_shop_presence(root, e["item"], shop_type, present)
-            changed += result["stock"] + result["catalogue"]
     for e in edits.get("sellability", []):
         it = find_catalog_item(root, e["item"])
         if it is None:
@@ -3147,7 +3711,7 @@ def apply_catalog_edits(edits):
                     if el is not None:
                         raw = e["value"]
                         if field in ("value", "time", "timeunits"):
-                            raw = str(int(float(raw)))
+                            raw = str(raw)
                         else:
                             raw = str(float(raw))
                         el.set("value", raw)
@@ -3179,7 +3743,7 @@ def apply_catalog_edits(edits):
     # Container purchase output is owned by its item-group loot entry, not by
     # the catalog purchase record. Save it from the same editor transaction so
     # the Items cell edits what it displays.
-    bundle_files = set()
+    bundle_files = {}
     for e in edits.get("bundles", []):
         try:
             name, table_key, item_key = e["key"].split("|", 2)
@@ -3188,7 +3752,10 @@ def apply_catalog_edits(edits):
             raise ValueError("invalid bundle-output edit")
         if name not in LOOT_FILES:
             raise ValueError(f"unknown bundle loot file: {name}")
-        loot_root = load_file(name)["root"]
+        if name not in bundle_files:
+            entry = load_file(name)
+            bundle_files[name] = (entry, entry["root"], copy.deepcopy(entry["root"]))
+        loot_root = bundle_files[name][2]
         found = False
         for table in loot_root.find("LootTables").findall("Item"):
             if table.get("key") != table_key:
@@ -3206,7 +3773,6 @@ def apply_catalog_edits(edits):
                 changed += 1
         if not found:
             raise ValueError(f"bundle entry not found: {table_key}/{item_key}")
-        bundle_files.add(name)
     for e in edits.get("craft", []):
         # full replace of an item's CRAFTING cost entries (shop prices untouched)
         it = find_catalog_item(root, e["item"])
@@ -3292,7 +3858,7 @@ def apply_catalog_edits(edits):
             continue
         eff_el = it.find("effectids")
         if eff_el is None:
-            continue
+            eff_el = ET.SubElement(it, "effectids")
         for child in list(eff_el):
             eff_el.remove(child)
         if e["effects"]:
@@ -3357,17 +3923,45 @@ def apply_catalog_edits(edits):
         if (description.text or "").strip() != key:
             description.text = key
             changed += 1
+    prepared_files = []
     if changed:
-        save_file(CATALOG_FILE)
-        for name in bundle_files:
-            save_file(name)
-    return changed + apply_quick_select_edits(edits.get("quickSelect", []))
+        prepared_files.append((CATALOG_FILE, catalog_entry, root))
+        prepared_files.extend((name, entry, prepared)
+                              for name, (entry, original, prepared) in bundle_files.items())
+    quick_changed = quick_select[3] if quick_select is not None else 0
+    if quick_changed:
+        prepared_files.append((QUICK_SELECT_FILE, quick_select[0], quick_select[2]))
+    _commit_xml_roots(prepared_files)
+    return changed + quick_changed
 
 
 # ---------------- loot tables ----------------
 
 ENTRY_FIELDS = ["Name", "Rate", "Type", "Min", "Max", "RewardCondition"]
 VALUE_FIELDS = {"Rate", "Min", "Max"}  # stored as value="" attributes
+
+
+def _loot_table_readonly(table):
+    if txt(table, "Type") not in {"AggregateDrop", "ContinuousLinearDrop"} or len(table.findall("Type")) != 1:
+        return True
+    for old in table.findall('./Entries/Item'):
+        if old.attrib or any(child.tag not in ENTRY_FIELDS or list(child)
+            or set(child.attrib) - ({"value"} if child.tag in VALUE_FIELDS else {"ref"} if child.tag == "RewardCondition" else set())
+            for child in old if isinstance(child.tag, str)):
+            return True
+        if any(len(old.findall(field)) > 1 for field in ENTRY_FIELDS):
+            return True
+        try:
+            for field in ("Min", "Max"):
+                value = attr_value(old, field)
+                if value not in (None, ""):
+                    _catalog_quantity(value)
+            rate = attr_value(old, "Rate")
+            if rate not in (None, "") and finite_number(rate, "Loot rate") < 0:
+                return True
+        except ValueError:
+            return True
+    return False
 
 
 def get_loot(name, ds="mine"):
@@ -3383,6 +3977,11 @@ def get_loot(name, ds="mine"):
                     if f in VALUE_FIELDS:
                         v = attr_value(en, f)
                         if v is not None:
+                            if f in {"Min", "Max"} and v != "":
+                                try:
+                                    v = str(_catalog_quantity(v))
+                                except ValueError:
+                                    pass  # Unsupported source values remain visible, read-only.
                             row[f.lower()] = v
                     elif f == "RewardCondition":
                         condition = en.find(f)
@@ -3399,6 +3998,7 @@ def get_loot(name, ds="mine"):
             "name": t.get("name", ""),
             "type": txt(t, "Type"),
             "entries": entries,
+            "readonly": _loot_table_readonly(t),
         })
     return {"tables": tables}
 
@@ -3406,7 +4006,52 @@ def get_loot(name, ds="mine"):
 def apply_loot_edits(name, edits):
     """edits: [{tableKey, entries: [{name, rate, type, min, max, rewardcondition}]}]
     Rebuilds the <Entries> block of each edited table."""
-    valid_items = {item["key"] for item in get_catalog()["items"]}
+    if name not in LOOT_FILES:
+        raise ValueError(f"unknown loot file: {name}")
+    if not isinstance(edits, list):
+        raise ValueError("Loot edits must be a list")
+    if not edits:
+        return 0
+    entry = load_file(name)
+    root = copy.deepcopy(entry["root"])
+    tables = {table.get("key"): table for table in root.findall('./LootTables/Item')}
+    prepared, seen = [], set()
+    allowed_fields = {field.lower() for field in ENTRY_FIELDS}
+    for edit in edits:
+        if not isinstance(edit, dict) or {"tableKey", "entries"} - set(edit) or set(edit) - {"tableKey", "entries", "type"}:
+            raise ValueError("Loot edits require tableKey, entries and optional type only")
+        key = edit["tableKey"]
+        if not isinstance(key, str) or key not in tables:
+            raise ValueError("Unknown loot table")
+        if key in seen:
+            raise ValueError(f"Duplicate loot table target: {key}")
+        seen.add(key)
+        if not isinstance(edit["entries"], list):
+            raise ValueError("Loot entries must be a list")
+        if _loot_table_readonly(tables[key]):
+            raise ValueError(f"Loot table {key} has unsupported data and is read-only")
+        if "type" in edit and (not isinstance(edit["type"], str) or edit["type"] not in {"AggregateDrop", "ContinuousLinearDrop"}):
+            raise ValueError("Loot drop type must be selected from the supported choices")
+        rows = []
+        for incoming in edit["entries"]:
+            if not isinstance(incoming, dict) or "name" not in incoming or set(incoming) - allowed_fields:
+                raise ValueError("Loot entries require name and supported fields only")
+            row = dict(incoming)
+            for field in ("name", "type", "rewardcondition"):
+                if field in row and not isinstance(row[field], str):
+                    raise ValueError(f"Loot {field} must be text")
+            for field in ("min", "max", "rate"):
+                if field not in row or row[field] == "":
+                    continue
+                row[field] = finite_number(row[field], "Loot rate") if field == "rate" else integer_value(row[field], f"Loot {field}")
+                if field == "rate" and row[field] < 0:
+                    raise ValueError("Loot rate must be nonnegative")
+            if row.get("min") not in (None, "") and row.get("max") not in (None, "") and row["min"] > row["max"]:
+                raise ValueError("Loot minimum cannot exceed maximum")
+            rows.append(row)
+        prepared.append({"tableKey": key, "entries": rows, **({"type": edit["type"]} if "type" in edit else {})})
+    edits = prepared
+    valid_items = set(_catalog_ids())
     valid_tables = {table["key"] for file in LOOT_FILES if (ds_dir("mine") / file).exists()
                     for table in get_loot(file)["tables"]}
     valid_conditions = {entry.get("rewardcondition") for file in LOOT_FILES if (ds_dir("mine") / file).exists()
@@ -3426,17 +4071,19 @@ def apply_loot_edits(name, edits):
                 raise ValueError(f"unknown loot {row_type.lower()} identifier: {row.get('name')}")
             if row.get("rewardcondition") and row["rewardcondition"] not in valid_conditions:
                 raise ValueError(f"unknown loot condition: {row['rewardcondition']}")
-    root = load_file(name)["root"]
     changed = 0
     for e in edits:
         for t in root.find("LootTables").findall("Item"):
             if t.get("key") != e["tableKey"]:
                 continue
+            if "type" in e:
+                t.find("Type").text = e["type"]
             entries_el = t.find("Entries")
             if entries_el is None:
                 entries_el = ET.SubElement(t, "Entries")
             for child in list(entries_el):
-                entries_el.remove(child)
+                if child.tag == "Item":
+                    entries_el.remove(child)
             entries_el.text = "\n        "
             rows = e["entries"]
             for i, row in enumerate(rows):
@@ -3462,7 +4109,7 @@ def apply_loot_edits(name, edits):
             entries_el.tail = "\n    "
             changed += 1
     if changed:
-        save_file(name)
+        _commit_xml_roots([(name, entry, root)])
     return changed
 
 
@@ -3546,6 +4193,29 @@ def delete_loot_table(name, key):
 
 # ---------------- loot matrix ----------------
 
+MATRIX_DAMAGE_QUALITIES = {"Poor", "Good", "Perfect"}
+MATRIX_SKIN_QUALITIES = MATRIX_DAMAGE_QUALITIES | {"Rare", "Legendary"}
+
+
+def _matrix_animal_readonly(animal):
+    fields = {"DamageQuality", "SkinQuality", "SatchelItem", "Quantity"}
+    for row in animal.findall('./Items/Item'):
+        if row.attrib or any(child.tag not in fields or list(child)
+            or set(child.attrib) - ({"value"} if child.tag == "Quantity" else set())
+            for child in row if isinstance(child.tag, str)):
+            return True
+        if any(len(row.findall(field)) > 1 for field in fields):
+            return True
+        if txt(row, "DamageQuality") not in MATRIX_DAMAGE_QUALITIES or txt(row, "SkinQuality") not in MATRIX_SKIN_QUALITIES:
+            return True
+        try:
+            if int(_catalog_quantity(attr_value(row, "Quantity", "1"))) < 1:
+                return True
+        except ValueError:
+            return True
+    return False
+
+
 def get_matrix(ds="mine"):
     root = load_file(MATRIX_FILE, ds)["root"]
     animals = []
@@ -3554,19 +4224,63 @@ def get_matrix(ds="mine"):
         items_el = a.find("Items")
         if items_el is not None:
             for r in items_el.findall("Item"):
+                quantity = attr_value(r, "Quantity", "1")
+                try:
+                    quantity = str(_catalog_quantity(quantity))
+                except ValueError:
+                    pass
                 rows.append({
                     "damage": txt(r, "DamageQuality"),
                     "skin": txt(r, "SkinQuality"),
                     "item": txt(r, "SatchelItem"),
-                    "qty": attr_value(r, "Quantity"),
+                    "qty": quantity,
                 })
-        animals.append({"key": a.get("key", ""), "rows": rows})
+        animals.append({"key": a.get("key", ""), "rows": rows, "readonly": _matrix_animal_readonly(a)})
     return {"animals": animals}
 
 
 def apply_matrix_edits(edits):
     """edits: [{animalKey, rows: [{damage, skin, item, qty}]}]"""
-    root = load_file(MATRIX_FILE)["root"]
+    if not isinstance(edits, list):
+        raise ValueError("Skinning edits must be a list")
+    if not edits:
+        return 0
+    entry = load_file(MATRIX_FILE)
+    root = copy.deepcopy(entry["root"])
+    animals = {animal.get("key"): animal for animal in root.findall('./Entries/Item')}
+    items = set(_catalog_ids())
+    prepared, seen = [], set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"animalKey", "rows"}:
+            raise ValueError("Skinning edits require animalKey and rows only")
+        key = edit["animalKey"]
+        if not isinstance(key, str) or key not in animals:
+            raise ValueError("Unknown skinning animal")
+        if key in seen:
+            raise ValueError("Duplicate skinning animal target")
+        seen.add(key)
+        if _matrix_animal_readonly(animals[key]):
+            raise ValueError("Skinning animal contains unsupported data and is read-only")
+        if not isinstance(edit["rows"], list):
+            raise ValueError("Skinning rows must be a list")
+        rows = []
+        for incoming in edit["rows"]:
+            if not isinstance(incoming, dict) or {"damage", "skin", "item"} - set(incoming) or set(incoming) - {"damage", "skin", "item", "qty"}:
+                raise ValueError("Skinning rows require damage, skin, item and optional qty only")
+            if any(not isinstance(incoming[field], str) for field in ("damage", "skin", "item")):
+                raise ValueError("Skinning identities and quality choices must be text")
+            if incoming["damage"] not in MATRIX_DAMAGE_QUALITIES or incoming["skin"] not in MATRIX_SKIN_QUALITIES:
+                raise ValueError("Skinning quality must be selected from the supported choices")
+            if incoming["item"] not in items:
+                raise ValueError("Unknown skinning catalog item")
+            row = dict(incoming)
+            if "qty" in row:
+                row["qty"] = integer_value(row["qty"], "Skinning quantity")
+                if row["qty"] < 1:
+                    raise ValueError("Skinning quantity must be positive")
+            rows.append(row)
+        prepared.append({"animalKey": key, "rows": rows})
+    edits = prepared
     changed = 0
     for e in edits:
         for a in root.find("Entries").findall("Item"):
@@ -3576,7 +4290,8 @@ def apply_matrix_edits(edits):
             if items_el is None:
                 items_el = ET.SubElement(a, "Items")
             for child in list(items_el):
-                items_el.remove(child)
+                if child.tag == "Item":
+                    items_el.remove(child)
             items_el.text = "\n        "
             rows = e["rows"]
             for i, row in enumerate(rows):
@@ -3603,7 +4318,7 @@ def apply_matrix_edits(edits):
             items_el.tail = "\n    "
             changed += 1
     if changed:
-        save_file(MATRIX_FILE)
+        _commit_xml_roots([(MATRIX_FILE, entry, root)])
     return changed
 
 
@@ -3625,6 +4340,39 @@ def challenge_groups(challenges_el):
             order.append(logical)
         groups[logical].append((int(match.group(2)) if match else 0, challenge))
     return [(logical, sorted(groups[logical], key=lambda row: row[0])) for logical in order]
+
+def challenge_source_branch(parent, stat):
+    """Locate the scoreParams Item removed by a source-removal action."""
+    parents = {child: node for node in parent.iter() for child in node}
+    branch = stat
+    while branch in parents and parents[branch].tag != 'scoreParams':
+        branch = parents[branch]
+    container = parents.get(branch)
+    if container is None or container.tag != 'scoreParams' or branch.tag != 'Item':
+        raise ValueError('Cannot remove the final or unmodeled challenge score branch')
+    return container, branch
+
+
+def challenge_reward_collection(rank, allowed=None):
+    """Resolve only the reward shape that the replacement writer preserves."""
+    containers = rank.findall('reward')
+    rewards = containers[0].findall('rewards') if len(containers) == 1 else []
+    if len(rewards) != 1:
+        raise ValueError('Challenge reward collection is missing or ambiguous')
+    rewards_el = rewards[0]
+    if (rewards_el.text or '').strip():
+        raise ValueError('Source challenge rewards contain unsupported text')
+    for item in rewards_el.findall('Item'):
+        reward_type = item.get('type')
+        tag = 'unlock' if reward_type == 'CUnlockReward' else 'rewardType'
+        values = item.findall(tag)
+        if ((item.text or '').strip() or (item.tail or '').strip() or
+                set(item.attrib) != {'type'} or len(values) != 1 or
+                len(item) != 1 or len(values[0]) or values[0].attrib or
+                (allowed is not None and (reward_type, (values[0].text or '').strip()) not in allowed)):
+            raise ValueError('Source challenge reward has unsupported data')
+    return rewards_el
+
 
 def get_challenges(ds="mine"):
     """Expose editable goal mechanics without pretending the schema is flat.
@@ -3650,16 +4398,24 @@ def get_challenges(ds="mine"):
             for local_rank, rank in enumerate(record_ranks, 1):
                 rank_records.append((split_rank or local_rank, record, local_rank, rank))
         for rank_index, record, local_rank, rank in sorted(rank_records, key=lambda row: row[0]):
+            try:
+                challenge_reward_collection(rank)
+                rewards_readonly = (len(challenge_root.findall('challenges')) != 1 or
+                                    len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1 or
+                                    sum(row[0] == rank_index for row in rank_records) != 1)
+            except ValueError:
+                rewards_readonly = True
             goal_names = [((x.text or "").strip()) for x in rank.findall("./goalHashes/Item") if (x.text or "").strip()]
             rewards = []
             for reward in rank.findall("./reward/rewards/Item"):
                 reward_type = reward.get("type", "")
                 value = txt(reward, "unlock") or txt(reward, "rewardType")
+                rewards.append({"type": reward_type, "value": value})
                 if value:
-                    rewards.append({"type": reward_type, "value": value})
                     allowed_rewards.add((reward_type, value))
             rank_ui = rank.find("uiInfo")
             rank_info = {"rank": rank_index, "goals": goal_names, "rewards": rewards,
+                         "rewardsReadonly": rewards_readonly,
                          "owner": txt(record, "name"), "ownerRank": local_rank,
                          "nameLabel": txt(rank_ui, "challengeNameLabel") if rank_ui is not None else "",
                          "descriptionLabel": txt(rank_ui, "rankDescLabel") if rank_ui is not None else "",
@@ -3687,11 +4443,24 @@ def get_challenges(ds="mine"):
                 role = "reset"
             sources = []
             if parent is not None:
-                for stat in parent.iter("statId"):
+                for source_index, stat in enumerate(parent.iter("statId")):
                     base = txt(stat, "BaseId")
                     permutation = txt(stat, "PermutationId")
-                    if base or permutation:
-                        sources.append({"base": base, "permutation": permutation})
+                    try:
+                        container, branch = challenge_source_branch(parent, stat)
+                        removal = {'group': list(parent.iter('scoreParams')).index(container),
+                                   'branch': container.findall('Item').index(branch),
+                                   'count': len(container.findall('Item'))}
+                    except ValueError:
+                        removal = None
+                    sources.append({"index": source_index, "base": base, "permutation": permutation,
+                                    "removal": removal,
+                                    "readonly": len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or not (base or permutation)})
+            try:
+                finite_number(desired.get('value'), 'Challenge target')
+                readonly = len(root.findall('goals')) != 1 or sum(txt(item, 'name') == txt(goal, 'name') for item in root.find('goals').findall('Item')) != 1 or len(goal.findall('name')) != 1
+            except ValueError:
+                readonly = True
             requirements.append({
                 "index": index,
                 "value": desired.get("value", ""),
@@ -3699,6 +4468,7 @@ def get_challenges(ds="mine"):
                 "role": role,
                 "behavior": behavior,
                 "sources": sources,
+                "readonly": readonly,
             })
         ui = goal.find("uiInfo")
         goal_name = txt(goal, "name")
@@ -3710,7 +4480,7 @@ def get_challenges(ds="mine"):
                 continue
             fields = {}
             for child in list(node):
-                if len(child) == 0:
+                if isinstance(child.tag, str) and len(child) == 0:
                     value = (child.text or "").strip() or child.get("value", "")
                     if value:
                         fields[child.tag] = value
@@ -3748,7 +4518,54 @@ def get_challenges(ds="mine"):
             "allowedConditionValues": allowed_condition_values}
 
 
-def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edits=None, mode_edits=None):
+def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edits=None, mode_edits=None, *, validate_only=False):
+    batches = (edits, reward_edits, ui_edits, condition_edits, mode_edits)
+    if not isinstance(edits, list) or any(batch is not None and (not isinstance(batch, list) or
+           any(not isinstance(edit, dict) for edit in batch)) for batch in batches):
+        raise ValueError("Challenge edits must be lists of objects")
+    if not any(batches):
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    for edit in mode_edits or []:
+        if set(edit) != {'challenge', 'mode'} or not isinstance(edit['challenge'], str) or not edit['challenge']:
+            raise ValueError('Challenge mode requires a text challenge identity and mode')
+        requested = edit.get('mode')
+        if not isinstance(requested, str) or requested not in {'series', 'parallel'}:
+            raise ValueError(f"unknown challenge strand mode: {requested}")
+        if requested == 'parallel':
+            raise ValueError("Parallel roots appear as duplicate challenge strands in game and are not supported")
+    prepared = {}
+
+    def candidate(name):
+        if name not in prepared:
+            entry = load_file(name)
+            prepared[name] = (entry, copy.deepcopy(entry['root']))
+        return prepared[name][1]
+
+    def shape(edit, required, optional=()):
+        if not required <= set(edit) or set(edit) - required - set(optional):
+            raise ValueError("Unsupported or missing challenge edit fields")
+
+    def identity(value, label):
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"Challenge {label} must be text")
+        return value
+
+    def offset(value, label):
+        value = integer_value(value, f"Challenge {label}")
+        if value < 0:
+            raise ValueError(f"Challenge {label} must be nonnegative")
+        return value
+
+    def unique_goal(root, name):
+        collections = root.findall('goals')
+        matches = [goal for goal in collections[0].findall('Item')
+                   if len(goal.findall('name')) == 1 and txt(goal, 'name') == name] if len(collections) == 1 else []
+        if len(matches) != 1:
+            raise ValueError("Challenge goal is missing or ambiguous")
+        return matches[0]
+
     vanilla = get_challenges("vanilla")
     allowed_sources = {(s.get("base", ""), s.get("permutation", ""))
                        for s in vanilla["allowedSourcePairs"]}
@@ -3756,41 +4573,86 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
     allowed_conditions = {(row["type"], row["field"]): set(row["values"])
                           for row in vanilla["allowedConditionValues"]}
     for edit in edits:
+        shape(edit, {'name', 'index', 'value'}, {'sources'})
+        identity(edit['name'], 'goal name')
+        offset(edit['index'], 'goal index')
+        finite_number(edit['value'], 'Challenge target')
+        if not isinstance(edit.get('sources', []), list):
+            raise ValueError('Challenge sources must be a list')
         for source in edit.get("sources", []):
-            if source.get("remove"):
+            if not isinstance(source, dict):
+                raise ValueError('Challenge source must be an object')
+            if source.get('remove') is True:
+                shape(source, {'index', 'remove'})
+                offset(source['index'], 'source index')
                 continue
+            shape(source, {'index', 'base', 'permutation'})
+            offset(source['index'], 'source index')
+            if not isinstance(source['base'], str) or not isinstance(source['permutation'], str):
+                raise ValueError('Challenge score source values must be text')
             value = (source.get("base", ""), source.get("permutation", ""))
             if value not in allowed_sources:
                 raise ValueError(f"unknown challenge score source: {value[0]} + {value[1]}")
     for edit in reward_edits or []:
-        for reward in edit.get("rewards", []):
+        shape(edit, {'challenge', 'rank', 'rewards'}, {'owner', 'ownerRank'})
+        identity(edit['challenge'], 'reward challenge')
+        if offset(edit['rank'], 'reward rank') == 0:
+            raise ValueError('Challenge reward rank must be positive')
+        if 'owner' in edit:
+            identity(edit['owner'], 'reward owner')
+        if 'ownerRank' in edit and offset(edit['ownerRank'], 'reward owner rank') == 0:
+            raise ValueError('Challenge reward owner rank must be positive')
+        if not isinstance(edit['rewards'], list):
+            raise ValueError('Challenge rewards must be a list')
+        for reward in edit['rewards']:
+            if not isinstance(reward, dict):
+                raise ValueError('Challenge reward must be an object')
+            shape(reward, {'type', 'value'})
+            identity(reward['type'], 'reward type')
+            identity(reward['value'], 'reward value')
             if "CHALLENGE_REWARD_TYPE_MONEY_" in reward.get("value", ""):
                 raise ValueError("MyOverhaul challenge money rewards are disabled")
             if (reward.get("type"), reward.get("value")) not in allowed_rewards:
                 raise ValueError(f"unknown challenge reward: {reward.get('value')}")
     for edit in condition_edits or []:
+        shape(edit, {'goal', 'index', 'type', 'field', 'value'})
+        for field in ['goal', 'type', 'field', 'value']:
+            identity(edit[field], field)
+        offset(edit['index'], 'condition index')
         key = (edit.get("type", ""), edit.get("field", ""))
         if edit.get("value", "") not in allowed_conditions.get(key, set()):
             raise ValueError(f"unknown challenge condition value: {key[0]}.{key[1]}={edit.get('value')}")
-    root = load_file(GOALS_FILE)["root"]
-    by_name = {txt(g, "name"): g for g in root.find("goals").findall("Item")}
+    root = candidate(GOALS_FILE)
     changed = 0
+    seen = set()
     for edit in edits:
-        goal = by_name.get(edit.get("name"))
-        if goal is None:
-            continue
+        goal = unique_goal(root, edit['name'])
         desired = list(goal.iter("desiredGoal"))
-        index = int(edit.get("index", -1))
+        index = offset(edit['index'], 'goal index')
+        key = (edit['name'], index)
+        if key in seen:
+            raise ValueError('Duplicate challenge target')
+        seen.add(key)
+        if index >= len(desired):
+            raise ValueError('Unknown challenge goal index')
+        finite_number(desired[index].get('value'), 'Source challenge target')
         if 0 <= index < len(desired):
             desired[index].set("value", str(edit.get("value", "")))
             changed += 1
             parent = next((p for p in goal.iter() if desired[index] in list(p)), None)
             stat_ids = list(parent.iter("statId")) if parent is not None else []
             remove_indices = []
+            seen_sources = set()
             for source_edit in edit.get("sources", []):
-                source_index = int(source_edit.get("index", -1))
+                source_index = offset(source_edit['index'], 'source index')
                 if not (0 <= source_index < len(stat_ids)):
-                    continue
+                    raise ValueError('Unknown challenge source index')
+                if source_index in seen_sources:
+                    raise ValueError('Duplicate challenge source target')
+                seen_sources.add(source_index)
+                stat = stat_ids[source_index]
+                if len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or (txt(stat, 'BaseId'), txt(stat, 'PermutationId')) not in allowed_sources:
+                    raise ValueError('Challenge score source is unsupported or ambiguous')
                 if source_edit.get("remove"):
                     remove_indices.append(source_index)
                     continue
@@ -3808,53 +4670,82 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
             if remove_indices:
                 # A summed requirement stores each counter in an Item directly
                 # beneath scoreParams. Remove that whole branch, not just statId.
-                parent_map = {child: node for node in parent.iter() for child in node}
-                for source_index in sorted(set(remove_indices), reverse=True):
-                    node = stat_ids[source_index]
-                    while node in parent_map and parent_map[node].tag != "scoreParams":
-                        node = parent_map[node]
-                    container = parent_map.get(node)
-                    if container is not None and container.tag == "scoreParams" and len(container) > 1:
-                        container.remove(node)
-                        changed += 1
-    if changed:
-        save_file(GOALS_FILE)
+                removals = []
+                for source_index in remove_indices:
+                    container, node = challenge_source_branch(parent, stat_ids[source_index])
+                    if any(node is other for _, other in removals):
+                        raise ValueError('Duplicate challenge score branch removal')
+                    members = list(node.iter('statId'))
+                    if any(len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or
+                           (txt(stat, 'BaseId'), txt(stat, 'PermutationId')) not in allowed_sources for stat in members):
+                        raise ValueError('Challenge score branch contains unsupported sources')
+                    if any(stat_ids[offset(row['index'], 'source index')] in members
+                           for row in edit.get('sources', []) if not row.get('remove')):
+                        raise ValueError('Cannot edit a removed challenge score branch')
+                    removals.append((container, node))
+                for container, node in removals:
+                    if sum(owner is container for owner, _ in removals) >= len(container.findall('Item')):
+                        raise ValueError('Cannot remove the final or unmodeled challenge score branch')
+                for container, node in removals:
+                    container.remove(node)
+                    changed += 1
     condition_changed = 0
+    seen_conditions = set()
     for edit in condition_edits or []:
-        goal = by_name.get(edit.get("goal"))
-        if goal is None:
-            continue
+        goal = unique_goal(root, edit['goal'])
         nodes = [node for node in goal.iter()
                  if node.get("type", "").startswith("CAICondition")]
-        index = int(edit.get("index", -1))
+        index = offset(edit['index'], 'condition index')
         if not (0 <= index < len(nodes)) or nodes[index].get("type") != edit.get("type"):
-            continue
-        field = nodes[index].find(edit.get("field", ""))
-        if field is None:
-            continue
+            raise ValueError('Unknown challenge condition target')
+        key = (edit['goal'], index, edit['field'])
+        if key in seen_conditions:
+            raise ValueError('Duplicate challenge condition target')
+        seen_conditions.add(key)
+        fields = nodes[index].findall(edit['field'])
+        if len(fields) != 1 or len(fields[0]):
+            raise ValueError('Challenge condition field is missing or ambiguous')
+        field = fields[0]
+        current = field.get('value') if 'value' in field.attrib else (field.text or '').strip()
+        if current not in allowed_conditions[(edit['type'], edit['field'])]:
+            raise ValueError('Unsupported source challenge condition value')
         if "value" in field.attrib:
             field.set("value", str(edit.get("value", "")))
         else:
             field.text = str(edit.get("value", ""))
         condition_changed += 1
-    if condition_changed:
-        save_file(GOALS_FILE)
     reward_changed = 0
     if reward_edits:
-        challenges = load_file(CHALLENGES_FILE)["root"]
-        by_name = {txt(c, "name"): c for c in challenges.find("challenges").findall("Item")}
+        challenges = candidate(CHALLENGES_FILE)
+        collections = challenges.findall('challenges')
+        if len(collections) != 1:
+            raise ValueError('Challenge collection is missing or ambiguous')
+        seen_rewards = set()
         for edit in reward_edits:
-            challenge = by_name.get(edit.get("owner") or edit.get("challenge"))
-            ranks_el = challenge.find("ranks") if challenge is not None else None
-            ranks = ranks_el.findall("Item") if ranks_el is not None else []
-            rank_index = int(edit.get("ownerRank") or edit.get("rank", 0)) - 1
-            if not (0 <= rank_index < len(ranks)):
-                continue
-            rewards_el = ranks[rank_index].find("./reward/rewards")
-            if rewards_el is None:
-                continue
+            logical = edit['challenge']
+            rank_number = offset(edit['rank'], 'reward rank')
+            group = next((records for name, records in challenge_groups(collections[0]) if name == logical), [])
+            matches = []
+            for split_rank, record in group:
+                if len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1:
+                    raise ValueError('Challenge reward owner is ambiguous')
+                for local_rank, rank in enumerate(record.findall('./ranks/Item'), 1):
+                    if (split_rank or local_rank) == rank_number:
+                        matches.append((record, local_rank, rank))
+            if len(matches) != 1:
+                raise ValueError('Challenge reward rank is missing or ambiguous')
+            record, local_rank, rank = matches[0]
+            owner = txt(record, 'name')
+            if ('owner' in edit and edit['owner'] != owner) or ('ownerRank' in edit and offset(edit['ownerRank'], 'reward owner rank') != local_rank):
+                raise ValueError('Challenge reward owner does not match its logical rank')
+            key = (owner, local_rank)
+            if key in seen_rewards:
+                raise ValueError('Duplicate challenge reward target')
+            seen_rewards.add(key)
+            rewards_el = challenge_reward_collection(rank, allowed_rewards)
             for child in list(rewards_el):
-                rewards_el.remove(child)
+                if child.tag == 'Item':
+                    rewards_el.remove(child)
             rewards_el.text = "\n              "
             rows = edit.get("rewards", [])
             for i, row in enumerate(rows):
@@ -3864,34 +4755,53 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 value = ET.SubElement(item, tag); value.text = row["value"]
                 value.tail = "\n              "; item.tail = "\n              " if i < len(rows)-1 else "\n            "
             reward_changed += 1
-        if reward_changed:
-            save_file(CHALLENGES_FILE)
     ui_changed = 0
+    seen_ui = set()
     for edit in ui_edits or []:
-        file_name, owner, field, value = edit.get("file"), edit.get("owner"), edit.get("field"), edit.get("value", "")
-        root = load_file(file_name)["root"] if file_name in {GOALS_FILE, CHALLENGES_FILE} else None
-        if root is None:
-            continue
-        collection = root.find("goals") if file_name == GOALS_FILE else root.find("challenges")
-        record = next((x for x in collection.findall("Item") if txt(x, "name") == owner), None)
-        if record is None:
-            continue
-        target = record.find("uiInfo")
-        rank = int(edit.get("rank", 0))
-        if rank and file_name == CHALLENGES_FILE:
-            ranks = record.findall("./ranks/Item")
-            target = ranks[rank - 1].find("uiInfo") if 0 < rank <= len(ranks) else None
-        node = target.find(field) if target is not None else None
-        if node is not None:
-            node.text = value
-            ui_changed += 1
-    if ui_changed:
-        if any(e.get("file") == GOALS_FILE for e in ui_edits or []): save_file(GOALS_FILE)
-        if any(e.get("file") == CHALLENGES_FILE for e in ui_edits or []): save_file(CHALLENGES_FILE)
+        shape(edit, {'file', 'owner', 'field', 'value'}, {'rank'})
+        file_name, owner, field, value = (edit[key] for key in ['file', 'owner', 'field', 'value'])
+        for label in ['file', 'owner', 'field']:
+            identity(edit[label], label)
+        if not isinstance(value, str):
+            raise ValueError('Challenge label value must be text')
+        if file_name not in {GOALS_FILE, CHALLENGES_FILE}:
+            raise ValueError('Unknown challenge label file')
+        rank = offset(edit.get('rank', 0), 'label rank')
+        fields = ({'pauseMenuDescriptionLabel', 'pauseMenuDescriptionFormatLabel', 'toastDescriptionLabel'}
+                  if file_name == GOALS_FILE else
+                  {'challengeNameLabel', 'rankDescLabel', 'toastRankCompleteDescriptionLabel'} if rank else
+                  {'challengeNameLabel', 'challengeDescLabel', 'toolTip'})
+        if field not in fields or (file_name == GOALS_FILE and rank):
+            raise ValueError('Unknown challenge label field or rank')
+        key = (file_name, owner, rank, field)
+        if key in seen_ui:
+            raise ValueError('Duplicate challenge label target')
+        seen_ui.add(key)
+        root = candidate(file_name)
+        if file_name == GOALS_FILE:
+            record = unique_goal(root, owner)
+        else:
+            collections = root.findall('challenges')
+            matches = [item for item in collections[0].findall('Item') if txt(item, 'name') == owner] if len(collections) == 1 else []
+            if len(matches) != 1 or len(matches[0].findall('name')) != 1:
+                raise ValueError('Challenge label owner is missing or ambiguous')
+            record = matches[0]
+        if rank:
+            ranks = record.findall('./ranks/Item') if len(record.findall('ranks')) == 1 else []
+            if rank > len(ranks):
+                raise ValueError('Unknown challenge label rank')
+            record = ranks[rank - 1]
+        targets = record.findall('uiInfo')
+        nodes = targets[0].findall(field) if len(targets) == 1 else []
+        if len(nodes) != 1 or len(nodes[0]):
+            raise ValueError('Challenge label field is missing or ambiguous')
+        nodes[0].text = value
+        ui_changed += 1
     mode_changed = 0
     if mode_edits:
-        challenge_doc = load_file(CHALLENGES_FILE)["root"]
+        challenge_doc = candidate(CHALLENGES_FILE)
         challenges_el = challenge_doc.find("challenges")
+        seen_modes = set()
         for edit in mode_edits:
             logical = edit.get("challenge", "")
             requested = edit.get("mode", "")
@@ -3899,27 +4809,42 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 raise ValueError(f"unknown challenge strand mode: {requested}")
             if requested == "parallel":
                 raise ValueError("Parallel roots appear as duplicate challenge strands in game and are not supported")
+            if logical in seen_modes:
+                raise ValueError('Duplicate challenge mode target')
+            seen_modes.add(logical)
+            if len(challenge_doc.findall('challenges')) != 1:
+                raise ValueError('Challenge collection is missing or ambiguous')
             group = next((records for name, records in challenge_groups(challenges_el) if name == logical), None)
             if not group:
-                continue
-            is_parallel = all(number > 0 for number, _ in group)
-            if requested == "parallel" and not is_parallel:
-                source = group[0][1]
-                source_ranks = source.findall("./ranks/Item")
-                if len(source_ranks) < 2:
-                    continue
-                insert_at = list(challenges_el).index(source)
-                challenges_el.remove(source)
-                for rank_number, source_rank in enumerate(source_ranks, 1):
-                    clone = copy.deepcopy(source)
-                    clone.find("name").text = f"{logical}_{rank_number}"
-                    clone_ranks = clone.find("ranks")
-                    for child in list(clone_ranks):
-                        clone_ranks.remove(child)
-                    clone_ranks.append(copy.deepcopy(source_rank))
-                    challenges_el.insert(insert_at + rank_number - 1, clone)
-                mode_changed += 1
-            elif requested == "series" and is_parallel:
+                raise ValueError('Unknown challenge mode target')
+            numbers = [number for number, _ in group]
+            if len(numbers) != len(set(numbers)) or (0 in numbers and len(numbers) > 1):
+                raise ValueError('Challenge strand identity is ambiguous')
+            for _, record in group:
+                if len(record.findall('name')) != 1 or len(record.findall('ranks')) != 1:
+                    raise ValueError('Challenge strand structure is missing or ambiguous')
+            is_parallel = all(number > 0 for number in numbers)
+            if is_parallel:
+                def signature(node):
+                    return (node.tag, tuple(sorted(node.attrib.items())),
+                            (node.text or '').strip(), (node.tail or '').strip(),
+                            tuple(signature(child) for child in node))
+
+                def root_metadata(record):
+                    return (tuple(sorted(record.attrib.items())), (record.text or '').strip(),
+                            tuple(signature(child) for child in record if child.tag not in {'name', 'ranks'}))
+
+                first_record = group[0][1]
+                first_ranks = first_record.find('ranks')
+                for _, record in group:
+                    ranks = record.find('ranks')
+                    name = record.find('name')
+                    if (root_metadata(record) != root_metadata(first_record) or
+                            (record.tail or '').strip() or len(name) or
+                            name.attrib != first_record.find('name').attrib or (name.tail or '').strip() or
+                            ranks.attrib != first_ranks.attrib or (ranks.text or '').strip() or (ranks.tail or '').strip() or
+                            not ranks.findall('Item') or any(child.tag not in {'Item', ET.Comment} for child in ranks)):
+                        raise ValueError('Challenge strands contain incompatible or unsupported metadata')
                 insert_at = min(list(challenges_el).index(record) for _, record in group)
                 merged = copy.deepcopy(group[0][1])
                 merged.find("name").text = logical
@@ -3927,13 +4852,22 @@ def apply_challenge_edits(edits, reward_edits=None, ui_edits=None, condition_edi
                 for child in list(merged_ranks):
                     merged_ranks.remove(child)
                 for _, record in group:
-                    for rank in record.findall("./ranks/Item"):
+                    for rank in record.find('ranks'):
                         merged_ranks.append(copy.deepcopy(rank))
                     challenges_el.remove(record)
                 challenges_el.insert(insert_at, merged)
                 mode_changed += 1
-        if mode_changed:
-            save_file(CHALLENGES_FILE)
+    modified = set()
+    if changed or condition_changed:
+        modified.add(GOALS_FILE)
+    if reward_changed or mode_changed:
+        modified.add(CHALLENGES_FILE)
+    if ui_changed:
+        modified.update(edit.get('file') for edit in ui_edits or []
+                        if edit.get('file') in prepared)
+    if not validate_only:
+        _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()
+                           if name in modified])
     return changed + condition_changed + reward_changed + ui_changed + mode_changed
 
 
@@ -3945,6 +4879,47 @@ CRIME_CI_FIELDS = ["CrimeValue", "PunishingCrimeValue", "ImmediateDetectionRange
                    "MinWantedLevelSP", "ForcedWantedLevelIncreaseSP", "Disabled"]
 CRIME_WIT_FIELDS = ["NumWitnesses", "NumInvestigators", "NumLawInvestigators"]
 CRIME_SEVERITIES = {"None", "Low", "Medium", "High"}
+CRIME_INTEGER_FIELDS = {'CrimeValue', 'PunishingCrimeValue', 'MinWantedLevelSP',
+                        'ForcedWantedLevelIncreaseSP', *CRIME_WIT_FIELDS}
+
+
+def _crime_value(field, value):
+    if field == 'severity':
+        if not isinstance(value, str) or value not in CRIME_SEVERITIES:
+            raise ValueError('Choose a supported crime severity')
+        return value
+    if field == 'Disabled':
+        if isinstance(value, bool):
+            return 'true' if value else 'false'
+        if not isinstance(value, str) or value not in {'true', 'false'}:
+            raise ValueError('Crime Disabled must be true or false')
+        return value
+    if field in CRIME_INTEGER_FIELDS:
+        number = integer_value(value, f'Crime {field}')
+    else:
+        number = finite_number(value, f'Crime {field}')
+    if number < 0:
+        raise ValueError(f'Crime {field} must be nonnegative')
+    return str(number) if field in CRIME_INTEGER_FIELDS else str(value).strip()
+
+
+def _crime_edit_node(crime, field):
+    variations = crime.findall('Variations')
+    matches = [v for v in variations[0].findall('Item')
+               if len(v.findall('FilterFlags')) == 1 and re.search(r'\bSP\b', v.findtext('FilterFlags') or '')] if len(variations) == 1 else []
+    infos = matches[0].findall('CrimeInformation') if len(matches) == 1 else []
+    if len(infos) != 1:
+        raise ValueError('Crime SP variation is missing or ambiguous')
+    parent = infos[0]
+    if field in CRIME_WIT_FIELDS or field == 'ConfrontChance':
+        parents = parent.findall('WitnessInformation' if field in CRIME_WIT_FIELDS else 'Confrontation')
+        if len(parents) != 1:
+            raise ValueError('Crime field is missing or ambiguous')
+        parent = parents[0]
+    nodes = parent.findall('Severity' if field == 'severity' else 'Chances' if field == 'ConfrontChance' else field)
+    if len(nodes) != 1 or (field != 'severity' and nodes[0].get('value') is None):
+        raise ValueError('Crime field is missing or ambiguous')
+    return nodes[0]
 
 
 def _sp_variation(crime):
@@ -3975,51 +4950,54 @@ def get_crime(ds="mine"):
             row[f] = attr_value(wit, f) if wit is not None else None
         conf = ci.find("Confrontation")
         row["ConfrontChance"] = attr_value(conf, "Chances") if conf is not None else None
+        row['readonlyFields'] = []
+        for field in [*CRIME_CI_FIELDS, *CRIME_WIT_FIELDS, 'ConfrontChance', 'severity']:
+            try:
+                if len(root.findall('CrimeInformations')) != 1 or sum(item.get('key') == row['key'] for item in root.find('CrimeInformations').findall('Item')) != 1:
+                    raise ValueError('Ambiguous crime identity')
+                _crime_edit_node(crime, field)
+                row[field] = _crime_value(field, row[field])
+            except ValueError:
+                row['readonlyFields'].append(field)
         out.append(row)
     return {"crimes": out, "fields": CRIME_CI_FIELDS + CRIME_WIT_FIELDS + ["ConfrontChance", "severity"]}
 
 
 def apply_crime_edits(edits):
     """edits: [{key, field, value}] — applied to the SP variation."""
-    root = load_file(CRIME_FILE)["root"]
-    changed = 0
-    for crime in root.find("CrimeInformations").findall("Item"):
-        my = [e for e in edits if e["key"] == crime.get("key")]
-        if not my:
-            continue
-        var = _sp_variation(crime)
-        ci = var.find("CrimeInformation") if var is not None else None
-        if ci is None:
-            continue
-        for e in my:
-            f, v = e["field"], str(e["value"])
-            if f == "severity":
-                if v not in CRIME_SEVERITIES:
-                    raise ValueError(f"invalid crime severity: {v}")
-                el = ci.find("Severity")
-                if el is not None:
-                    el.text = v
-                    changed += 1
-            elif f == "ConfrontChance":
-                conf = ci.find("Confrontation")
-                el = conf.find("Chances") if conf is not None else None
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-            elif f in CRIME_WIT_FIELDS:
-                wit = ci.find("WitnessInformation")
-                el = wit.find(f) if wit is not None else None
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-            elif f in CRIME_CI_FIELDS:
-                el = ci.find(f)
-                if el is not None:
-                    el.set("value", v)
-                    changed += 1
-    if changed:
-        save_file(CRIME_FILE)
-    return changed
+    if not isinstance(edits, list):
+        raise ValueError('Crime edits must be a list')
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError('This dataset is read-only')
+    entry = load_file(CRIME_FILE)
+    root = copy.deepcopy(entry['root'])
+    collections = root.findall('CrimeInformations')
+    if len(collections) != 1:
+        raise ValueError('Crime collection is missing or ambiguous')
+    seen = set()
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {'key', 'field', 'value'}:
+            raise ValueError('Crime edits require only key, field and value')
+        key, field = edit['key'], edit['field']
+        if not isinstance(key, str) or not isinstance(field, str) or field not in {*CRIME_CI_FIELDS, *CRIME_WIT_FIELDS, 'ConfrontChance', 'severity'}:
+            raise ValueError('Unknown crime identity or field')
+        if (key, field) in seen:
+            raise ValueError('Duplicate crime edit')
+        seen.add((key, field))
+        records = [crime for crime in collections[0].findall('Item') if crime.get('key') == key]
+        if len(records) != 1:
+            raise ValueError('Crime identity is missing or ambiguous')
+        node = _crime_edit_node(records[0], field)
+        _crime_value(field, (node.text or '').strip() if field == 'severity' else node.get('value'))
+        value = _crime_value(field, edit['value'])
+        if field == 'severity':
+            node.text = value
+        else:
+            node.set('value', value)
+    _commit_xml_roots([(CRIME_FILE, entry, root)])
+    return len(edits)
 
 
 # ---------------- dispatch (law response tuning) ----------------
@@ -4037,6 +5015,15 @@ def _bounty_incident_evasion(root):
         if (item.findtext("Name") or "").strip() == "CBountyIncident":
             return item.find("Evasion")
     return None
+
+
+def _dispatch_source_nodes(root, group, field):
+    if group == WANTED_INCIDENT_GROUP:
+        incidents = [item for item in root.findall('./Tunables/Item') if (item.findtext('Name') or '').strip() == 'CBountyIncident']
+        parents = incidents[0].findall('Evasion') if len(incidents) == 1 else []
+    else:
+        parents = [root] if not group else root.findall(group)
+    return parents[0].findall(field) if len(parents) == 1 else []
 
 
 def get_dispatch(ds="mine"):
@@ -4064,6 +5051,13 @@ def get_dispatch(ds="mine"):
             rows.append({"group": WANTED_INCIDENT_GROUP,
                          "field": "TimeEvadingForEscape",
                          "value": escape.get("value")})
+    for row in rows:
+        source = load_file(INCIDENTS_FILE, ds)['root'] if row['group'] == WANTED_INCIDENT_GROUP else root
+        row['readonly'] = len(_dispatch_source_nodes(source, row['group'], row['field'])) != 1
+        try:
+            finite_number(row['value'], 'Source dispatch value')
+        except ValueError:
+            row['readonly'] = True
     return {"rows": rows}
 
 
@@ -4089,7 +5083,9 @@ def get_loot_sounds(ds="mine"):
 
 def save_loot_sounds(edits):
     import shutil
+    if not isinstance(edits,list): raise ValueError('Pickup sound edits must be a list')
     if not edits: return 0
+    if DATASETS['mine'].get('readonly'): raise ValueError('This dataset is read-only')
     target = loot_sounds_path("mine")
     # Preserve unresolved recovery from this or an earlier version. No retry may
     # create another copy or report success from partially installed data.
@@ -4157,37 +5153,60 @@ def get_bounty_hunters(ds="mine"):
 
 
 def apply_bounty_hunter_edits(edits):
-    return _apply_bounty_hunter_edits(ds_dir("mine") / BOUNTY_HUNTERS_FILE,
-                                      ds_dir("mine") / DISPATCH_FILE, edits)
+    if not isinstance(edits, list):
+        raise ValueError("Bounty-hunter edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        count, prepared = _prepare_bounty_hunter_edits(ds_dir("mine") / BOUNTY_HUNTERS_FILE,
+                                                      ds_dir("mine") / DISPATCH_FILE, edits)
+        names = {ds_dir("mine") / name: name for name in [BOUNTY_HUNTERS_FILE, DISPATCH_FILE]}
+        _commit_xml_roots([(names[path], load_file(names[path]), root) for path, root in prepared])
+        return count
 
 
 def apply_dispatch_edits(edits):
     """edits: [{group, field, value}] (group '' = top-level scalar)"""
-    root = load_file(DISPATCH_FILE)["root"]
-    changed = dispatch_changed = incident_changed = 0
+    if not isinstance(edits, list):
+        raise ValueError("Dispatch edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    prepared = {}
+    seen = set()
     for e in edits:
-        if e["group"] == WANTED_INCIDENT_GROUP:
-            if e["field"] != "TimeEvadingForEscape":
-                continue
-            incident_root = load_file(INCIDENTS_FILE)["root"]
-            evasion = _bounty_incident_evasion(incident_root)
-            el = evasion.find(e["field"]) if evasion is not None else None
-            if el is not None and el.get("value") is not None:
-                el.set("value", str(e["value"]))
-                changed += 1
-                incident_changed += 1
-            continue
-        parent = root if not e["group"] else root.find(e["group"])
-        el = parent.find(e["field"]) if parent is not None else None
-        if el is not None and el.get("value") is not None:
-            el.set("value", str(e["value"]))
-            changed += 1
-            dispatch_changed += 1
-    if dispatch_changed:
-        save_file(DISPATCH_FILE)
-    if incident_changed:
-        save_file(INCIDENTS_FILE)
-    return changed
+        if not isinstance(e, dict) or set(e) != {'group', 'field', 'value'}:
+            raise ValueError("Dispatch edits require only group, field and value")
+        group, field = e['group'], e['field']
+        if not isinstance(group, str) or not isinstance(field, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', field):
+            raise ValueError("Invalid dispatch identity")
+        if (group, field) in seen:
+            raise ValueError("Duplicate dispatch edit")
+        seen.add((group, field))
+        if group == WANTED_INCIDENT_GROUP:
+            if field != 'TimeEvadingForEscape':
+                raise ValueError("Unknown incident dispatch field")
+            name = INCIDENTS_FILE
+        else:
+            if group not in DISPATCH_GROUPS and (group != '' or field not in DISPATCH_SCALARS):
+                raise ValueError("Unknown dispatch field or group")
+            name = DISPATCH_FILE
+        if name not in prepared:
+            entry = load_file(name)
+            prepared[name] = (entry, copy.deepcopy(entry['root']))
+        _, root = prepared[name]
+        nodes = _dispatch_source_nodes(root, group, field)
+        if len(nodes) != 1 or nodes[0].get('value') is None:
+            raise ValueError("Dispatch field is missing or ambiguous")
+        node = nodes[0]
+        finite_number(node.get('value'), 'Source dispatch value')
+        finite_number(e['value'], 'Dispatch value')
+        node.set('value', str(e['value']).strip())
+    _commit_xml_roots([(name, entry, root) for name, (entry, root) in prepared.items()])
+    return len(edits)
 
 
 # ---------------- researched data map ----------------
@@ -4223,6 +5242,11 @@ def _scalar_descendants(node, prefix=""):
     return out
 
 
+def _weapon_path_unknown(tags):
+    return any(re.fullmatch(r"(?:UNK_MEMBER_)?0x[0-9a-f]{8}", str(tag), re.IGNORECASE)
+               for tag in tags)
+
+
 def _weapon_rows(item):
     """Flatten a weapon record to editable rows.
 
@@ -4233,6 +5257,8 @@ def _weapon_rows(item):
     wound arrow. Label each list element with its own Name instead.
     """
     rows = []
+    names = item.findall('Name')
+    owner_supported = not _weapon_path_unknown([item.get('type')]) and len(names) <= 1 and not any(node.attrib or len(node) for node in names)
     def label_of(child, index, siblings):
         if child.tag != "Item":
             return child.tag
@@ -4243,23 +5269,26 @@ def _weapon_rows(item):
             return name
         return f"Item {index + 1}" if sum(
             1 for s in siblings if s.tag == "Item") > 1 else "Item"
-    def walk(node, path, tags):
+    def walk(node, path, tags, raw_tags):
         siblings = list(node)
         for index, child in enumerate(siblings):
             if not isinstance(child.tag, str):
                 continue
             child_path = path + [index]
             child_tags = tags + [label_of(child, index, siblings)]
+            child_raw_tags = raw_tags + [child.tag] + ([child.get('type')] if child.get('type') else [])
             value = child.get("value")
             kind = "attr"
             if value is None and len(child) == 0 and child.text and child.text.strip():
                 value = child.text.strip(); kind = "text"
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
-                             "value": value, "kind": kind})
+                             "value": value, "kind": kind,
+                             "writable": owner_supported and not _weapon_path_unknown(child_raw_tags) and child.tag != 'Name' and not len(child) and
+                             (set(child.attrib) == {'value'} and not (child.text or '').strip() if kind == 'attr' else not child.attrib)})
             elif len(child):
-                walk(child, child_path, child_tags)
-    walk(item, [], [])
+                walk(child, child_path, child_tags, child_raw_tags)
+    walk(item, [], [], [])
     return rows
 
 
@@ -4548,23 +5577,17 @@ def get_projectile_speeds(ds="mine"):
     root = load_file(WEAPONS_FILE, ds)["root"]
     mappings = _cartridge_mapping(root)
     ammo_names = sorted({row["ammo"] for row in mappings})
-    # Reference datasets show coherent defaults; only mine reads editable CSV.
-    values = _load_speed_multipliers(PROJECTILE_SPEED_FILE, ammo_names) if ds == "mine" else _load_speed_multipliers(Path("__missing__"), ammo_names)
-    base = _projectile_speed_base() if ds == "mine" else None
     by_ammo = {ammo: [] for ammo in ammo_names}
     for row in mappings:
         by_ammo[row["ammo"]].append({key: row[key] for key in ("weapon", "damageMode", "fireType")})
     return {
         "available": True,
         "file": str(PROJECTILE_SPEED_FILE),
-        "baseSpeed": base,
         "runtimeSwitching": False,
-        "runtimeStatus": "RDR2 stores Speed once per weapon. The editor persists real cartridge mappings and multipliers, but the ASI runtime switch is not installed yet.",
+        "runtimeStatus": "Per-cartridge speed changes are unavailable. This view lists the weapon and ammunition links in the game data.",
         "mappings": mappings,
         "cartridges": [
-            {"ammo": ammo, "multiplier": values[ammo],
-             "effectiveSpeed": base * values[ammo] if base is not None else None,
-             "uses": by_ammo[ammo]}
+            {"ammo": ammo, "uses": by_ammo[ammo]}
             for ammo in ammo_names
         ],
     }
@@ -4605,47 +5628,123 @@ def _save_projectile_speed_rows(entries):
     return len(supplied)
 
 
-def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
+def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE, *, validate_only=False):
     types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
-    if section not in types:
+    if not isinstance(section, str) or section not in types:
         raise ValueError("unknown weapon section")
-    if source_file not in weapon_layer_files("mine"):
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Weapon name must be text")
+    if not isinstance(edits, list):
+        raise ValueError("Weapon edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    if not isinstance(source_file, str) or source_file not in weapon_layer_files("mine"):
         raise ValueError("weapon source is not an active install.xml layer")
-    root = load_file(source_file)["root"]
-    record = next((item for item in root.iter("Item")
-                   if item.get("type") == types[section] and txt(item, "Name") == name), None)
-    if record is None:
-        raise ValueError("unknown weapon/ammo record")
-    changed = 0
+    with _lock:
+        return _apply_weapon_batch(section, name, edits, source_file, validate_only=validate_only)
+
+
+def _apply_weapon_batch(section, name, edits, source_file, *, validate_only=False):
+    types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
+    entry = load_file(source_file)
+    root = copy.deepcopy(entry["root"])
+    def find_record(record_type, record_name):
+        records = [item for item in root.iter('Item')
+                   if item.get('type') == record_type and txt(item, 'Name') == record_name]
+        if len(records) != 1 or len(records[0].findall('Name')) != 1:
+            raise ValueError("Weapon record is missing or ambiguous")
+        return records[0]
+    record = find_record(types[section], name)
+    exposed = _weapon_rows(record)
+    if section == 'ammo':
+        exposed += _linked_ammo_rows(root, name)
+    seen = set()
     for edit in edits:
-        target_type = edit.get("targetType") or types[section]
-        target_name = edit.get("targetName") or name
-        target = record if target_type == types[section] and target_name == name else next(
-            (item for item in root.iter("Item")
-             if item.get("type") == target_type and txt(item, "Name") == target_name), None)
-        if target is None:
-            continue
+        if not isinstance(edit, dict) or not {'path', 'kind', 'value'} <= set(edit) or set(edit) - {'path', 'kind', 'value', 'targetType', 'targetName'}:
+            raise ValueError("Weapon edits require path, kind and value with optional target identities")
+        if ('targetType' in edit) != ('targetName' in edit):
+            raise ValueError("Linked weapon identities require both type and name")
+        if not isinstance(edit.get("path"), list) or not edit["path"]:
+            raise ValueError("Weapon edit needs a field path")
+        if any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in edit["path"]):
+            raise ValueError("Weapon field path needs nonnegative integer indices")
+        target_type = edit.get("targetType", types[section])
+        target_name = edit.get("targetName", name)
+        if not isinstance(target_type, str) or not target_type or not isinstance(target_name, str) or not target_name:
+            raise ValueError("Weapon target identities must be text")
+        identity = (target_type, target_name, tuple(edit['path']))
+        if identity in seen:
+            raise ValueError("Duplicate weapon target")
+        seen.add(identity)
+        matches = [row for row in exposed if row['path'] == edit['path'] and row['kind'] == edit['kind'] and
+                   row.get('targetType', types[section]) == target_type and row.get('targetName', name) == target_name]
+        if not matches or any(not row['writable'] for row in matches):
+            raise ValueError("Weapon target is not an exposed editable scalar")
+        target = record if target_type == types[section] and target_name == name else find_record(target_type, target_name)
+        if _weapon_path_unknown([target_type]):
+            raise ValueError("Unknown weapon record types are read-only")
         node = target
+        tags = []
         try:
             for index in edit["path"]:
                 node = list(node)[int(index)]
+                tags.append(node.tag)
         except (IndexError, TypeError, ValueError):
-            continue
-        if edit.get("kind") == "attr" and node.get("value") is not None:
-            node.set("value", str(edit["value"])); changed += 1
-        elif edit.get("kind") == "text" and len(node) == 0:
-            node.text = str(edit["value"]); changed += 1
-    if changed:
-        save_file(source_file)
-        if source_file == WEAPONS_FILE:
-            ensure_file_replacement(WEAPONS_GAME_PATH, WEAPONS_FILE)
-    return changed
+            raise ValueError("Unknown weapon field path") from None
+        if _weapon_path_unknown(tags):
+            raise ValueError("Unknown weapon fields are read-only")
+        kind = edit.get("kind")
+        original = node.get("value") if kind == "attr" else node.text if kind == "text" and len(node) == 0 else None
+        if original is None:
+            raise ValueError("Weapon field is not a supported scalar")
+        value = edit.get("value")
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError("Weapon field needs a scalar value")
+        replacement = str(value)
+        if str(original).lower() in {"true", "false"}:
+            if replacement.lower() not in {"true", "false"}:
+                raise ValueError("Weapon boolean field needs true or false")
+            replacement = replacement.upper() if str(original).isupper() else replacement.lower()
+        elif re.fullmatch(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", str(original).strip(), re.IGNORECASE):
+            if (not re.fullmatch(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", replacement.strip(), re.IGNORECASE)
+                    or not math.isfinite(float(original)) or not math.isfinite(float(replacement))):
+                raise ValueError("Weapon numeric field needs a finite number")
+            replacement = replacement.strip()
+        elif str(original).strip().lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+            raise ValueError("Unsupported nonfinite weapon source")
+        elif not isinstance(value, str):
+            raise ValueError("Weapon text field needs a string")
+        if kind == "attr":
+            node.set("value", replacement)
+        else:
+            node.text = replacement
+    outputs, expected = [], {}
+    if source_file == WEAPONS_FILE:
+        _assert_weapon_projectile_flags(root, load_file(WEAPONS_FILE, 'vanilla')['root'])
+        install = ds_dir('mine') / 'install.xml'
+        original = install.read_bytes() if install.exists() else None
+        payload = _prepare_file_replacement(WEAPONS_GAME_PATH, WEAPONS_FILE)
+        if payload is not None:
+            outputs.append((install, payload))
+            expected[install] = original
+    if not validate_only:
+        _commit_xml_roots([(source_file, entry, root)], outputs, expected)
+    return len(edits)
 
 
-def apply_weapon_shell_vfx(blanked):
+def apply_weapon_shell_vfx(blanked, *, validate_only=False):
     """Restore/blank all seven shell layers; never publish a partial reference."""
     if not isinstance(blanked, bool):
         raise ValueError("blanked must be a boolean")
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        return _apply_weapon_shell_vfx(blanked, validate_only=validate_only)
+
+
+def _apply_weapon_shell_vfx(blanked, *, validate_only=False):
     replacements = install_replacements()
     stack = [(game_path, replacements.get(game_path.casefold(), relative))
              for game_path, relative in WEAPON_STACK]
@@ -4669,27 +5768,16 @@ def apply_weapon_shell_vfx(blanked):
             _assert_weapon_projectile_flags(root, vanilla_root)
             prepared.append((current_file, entry, root, count))
     install_path = ds_dir("mine") / "install.xml"
-    paths = [entry["path"] for _, entry, _, _ in prepared] + [install_path]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    original_roots = {name: entry["root"] for name, entry, _, _ in prepared}
-    try:
-        for name, entry, root, _ in prepared:
-            entry["root"] = root
-            save_file(name)
-        for game_path, relative in stack:
-            ensure_file_replacement(game_path, relative)
-    except Exception:
-        # A late filesystem/serialization failure must not leave some weapons
-        # restored and others blank. Existing one-time .bak files remain intact.
-        for path, data in originals.items():
-            if data is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(data)
-        for name, entry, _, _ in prepared:
-            entry["root"] = original_roots[name]
-            entry["mtime"] = entry["path"].stat().st_mtime_ns
-        raise
+    original = install_path.read_bytes() if install_path.exists() else None
+    payload = _prepare_file_replacements(stack)
+    outputs = [(install_path, payload)] if payload is not None else []
+    expected = {install_path: original} if outputs else {}
+    if validate_only:
+        return sum(count for _, _, _, count in prepared)
+    if prepared:
+        _commit_xml_roots([(name, entry, root) for name, entry, root, _ in prepared], outputs, expected)
+    elif outputs:
+        _commit_file_outputs(outputs, "Weapon shell mappings", expected_originals=expected)
     return sum(count for _, _, _, count in prepared)
 
 
@@ -4713,7 +5801,8 @@ def _ai_scalar_rows(root):
                 value = child.text.strip(); kind = "text"
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
-                             "context": next_context, "value": value, "kind": kind})
+                             "context": next_context, "value": value, "kind": kind,
+                             "readonly": child.tag == 'Name' or bool(len(child) or (kind == "attr" and (set(child.attrib) != {'value'} or (child.text or '').strip())) or (kind == "text" and child.attrib))})
             elif len(child):
                 walk(child, child_path, child_tags, next_context)
     walk(root, [], [], "GLOBAL")
@@ -4728,7 +5817,7 @@ def get_ai_file(name, ds="mine"):
     if name == PED_PERCEPTION_FILE and not path.exists():
         if not VANILLA_PED_PERCEPTION_FILE.exists():
             return {"file": name, "fields": [], "available": False}
-        root = ET.parse(VANILLA_PED_PERCEPTION_FILE).getroot()
+        root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
         return {"file": name, "fields": _ai_scalar_rows(root),
                 "available": True, "source": "vanilla extract"}
     return {"file": name, "fields": _ai_scalar_rows(load_file(name, ds)["root"]),
@@ -4737,7 +5826,7 @@ def get_ai_file(name, ds="mine"):
 
 def get_ai_reference(name):
     if name == PED_PERCEPTION_FILE and VANILLA_PED_PERCEPTION_FILE.exists():
-        root = ET.parse(VANILLA_PED_PERCEPTION_FILE).getroot()
+        root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
         return {"file": name, "fields": _ai_scalar_rows(root), "available": True,
                 "reference": "Vanilla"}
     path = UCO_REF_DIR / Path(name).name
@@ -4748,34 +5837,91 @@ def get_ai_reference(name):
             "reference": "Ultimate Combat Overhaul 1.0.7"}
 
 
-def apply_ai_edits(name, edits):
+def apply_ai_edits(name, edits, *, validate_only=False):
     allowed = {f for files in AI_FILES.values() for f in files}
-    if name not in allowed:
+    if not isinstance(name, str) or name not in allowed:
         raise ValueError("unknown AI file")
-    path = ds_dir("mine") / name
-    if name == PED_PERCEPTION_FILE and not path.exists():
-        if not VANILLA_PED_PERCEPTION_FILE.exists():
-            raise ValueError("vanilla pedperception.meta extract is missing")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(VANILLA_PED_PERCEPTION_FILE, path)
-    root = load_file(name)["root"]
-    changed = 0
-    for edit in edits:
-        node = root
-        try:
-            for index in edit["path"]:
-                node = list(node)[int(index)]
-        except (IndexError, TypeError, ValueError):
-            continue
-        if edit.get("kind") == "attr" and node.get("value") is not None:
-            node.set("value", str(edit["value"])); changed += 1
-        elif edit.get("kind") == "text" and len(node) == 0:
-            node.text = str(edit["value"]); changed += 1
-    if changed:
-        save_file(name)
+    if not isinstance(edits, list):
+        raise ValueError("AI edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        path = data_file_path(name, "mine")
+        missing = not path.exists()
+        if missing:
+            if name != PED_PERCEPTION_FILE or not VANILLA_PED_PERCEPTION_FILE.exists():
+                raise ValueError("AI source file is missing")
+            raw = VANILLA_PED_PERCEPTION_FILE.read_bytes()
+            root = parse_with_comments(VANILLA_PED_PERCEPTION_FILE)
+            entry = None
+        else:
+            entry = load_file(name)
+            root = copy.deepcopy(entry["root"])
+        rows = {tuple(row['path']): row for row in _ai_scalar_rows(root)}
+        source_choices = {}
+        for node in root.iter():
+            if isinstance(node.tag, str):
+                for kind in ('attr', 'text'):
+                    source_choices.setdefault((node.tag, kind), set()).add(str(node.get('value') if kind == 'attr' else node.text).strip())
+        seen = set()
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {'path', 'kind', 'value'}:
+                raise ValueError("AI edits require path, kind and value")
+            indices = edit['path']
+            if not isinstance(indices, list) or not indices:
+                raise ValueError("AI path must be a nonempty list of indices")
+            if any(type(index) is not int or index < 0 for index in indices):
+                raise ValueError("AI indices must be nonnegative integers")
+            identity = tuple(indices)
+            row = rows.get(identity)
+            if row is None or row.get('readonly') or identity in seen or edit['kind'] != row['kind']:
+                raise ValueError("AI target is unknown, duplicate or has the wrong kind")
+            seen.add(identity)
+            node = root
+            for index in indices:
+                node = list(node)[index]
+            if len(node) or (row['kind'] == 'attr' and (set(node.attrib) != {'value'} or (node.text or '').strip())) or (row['kind'] == 'text' and node.attrib):
+                raise ValueError("AI target has unsupported scalar metadata")
+            if not isinstance(edit['value'], (str, int, float)) or isinstance(edit['value'], bool):
+                raise ValueError("AI scalar values must be text or numbers")
+            choices = source_choices[(node.tag, row['kind'])]
+            numeric = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
+            if re.fullmatch(numeric, row['value'].strip()):
+                finite_number(row['value'], 'AI source')
+                if not re.fullmatch(numeric, str(edit['value']).strip()):
+                    raise ValueError('AI value must be a finite number')
+            elif row['value'].strip().lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+                raise ValueError('AI source is nonfinite')
+            value = _validate_mob_value(row['value'], edit['value'], choices)
+            if row['kind'] == 'attr':
+                node.set('value', value)
+            else:
+                node.text = value
+        outputs = []
+        expected = {}
         if name == PED_PERCEPTION_FILE:
-            ensure_file_replacement(PED_PERCEPTION_GAME_PATH, name)
-    return changed
+            install = ds_dir('mine') / 'install.xml'
+            original = install.read_bytes() if install.exists() else None
+            payload = _prepare_file_replacement(PED_PERCEPTION_GAME_PATH, name)
+            if payload is not None:
+                outputs.append((install, payload))
+                expected[install] = original
+        if validate_only:
+            return len(edits)
+        if entry is not None:
+            _commit_xml_roots([(name, entry, root)], outputs, expected)
+        else:
+            text = raw.decode('utf-8-sig')
+            decl = text.split('\n', 1)[0].strip() if text.lstrip().startswith('<?xml') else '<?xml version="1.0" encoding="UTF-8"?>'
+            payload = (decl + '\n' + ET.tostring(root, encoding='unicode')).encode('utf-8')
+            if raw.startswith(b'\xef\xbb\xbf'):
+                payload = b'\xef\xbb\xbf' + payload
+            outputs.append((path, payload))
+            expected[path] = None
+            _commit_file_outputs(outputs, 'AI batch', expected_originals=expected)
+        return len(edits)
 
 
 # ---------------- mobs (#190) ----------------
@@ -4812,15 +5958,18 @@ def _record_fields(item, base_path):
             name = "/".join(tags + [child.tag])
             if child.get("value") is not None:
                 fields.append({"path": child_path, "kind": "attr",
-                               "field": name, "value": child.get("value")})
+                               "field": name, "value": child.get("value"),
+                               "readonly": bool(len(child) or set(child.attrib) != {'value'} or (child.text or '').strip())})
             elif child.get("ref") is not None:
                 fields.append({"path": child_path, "kind": "ref",
-                               "field": name, "value": child.get("ref")})
+                               "field": name, "value": child.get("ref"),
+                               "readonly": bool(len(child) or set(child.attrib) != {'ref'} or (child.text or '').strip())})
             elif len(child):
                 walk(child, child_path, tags + [child.tag])
             else:
                 fields.append({"path": child_path, "kind": "text",
-                               "field": name, "value": (child.text or "").strip()})
+                               "field": name, "value": (child.text or "").strip(),
+                               "readonly": bool(child.attrib) or name == 'Name'})
 
     walk(item, base_path, [])
     return fields
@@ -4884,9 +6033,7 @@ MOB_FILES = {
 # The model -> archetype binding exists in no extracted file and in no script,
 # so it cannot be read statically. MobProbe spawns each model and reports the
 # max health the running game gave it; that observation is the only evidence we
-# have, and the editor presents it as an observation rather than a fact about
-# the data. Assignments are written as a runtime override list, the same shape
-# as merchant_buy_overrides.csv.
+# have, and the editor presents it as an observation rather than a binding.
 MOB_ROSTER_FILE = PROJECT_ROOT / "MobProbe" / "ped_models.csv"
 MOB_PROBE_FILE = PROJECT_ROOT / "MobProbe" / "mob_stats.csv"
 MOB_DISCOVERED_FILE = PROJECT_ROOT / "MobProbe" / "mob_stats_discovered.csv"
@@ -4902,6 +6049,16 @@ def _read_csv_rows(path):
     return rows
 
 
+def _mob_health_value(value):
+    if not isinstance(value, str) or not re.fullmatch(r'[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?', value.strip(), re.IGNORECASE):
+        return None
+    try:
+        number = Decimal(value.strip())
+        return number if number.is_finite() and number > 0 else None
+    except InvalidOperation:
+        return None
+
+
 def _health_by_hp(ds):
     """Max-health value -> the archetypes that declare it.
 
@@ -4914,9 +6071,8 @@ def _health_by_hp(ds):
         energy = next((f["value"] for f in record["fields"] if f["field"] == "DefaultEnergy"), None)
         if energy is None:
             continue
-        try:
-            key = int(round(float(energy)))
-        except ValueError:
+        key = _mob_health_value(energy)
+        if key is None:
             continue
         out.setdefault(key, []).append(record["name"])
     return out
@@ -4936,11 +6092,11 @@ def get_mob_models(ds="mine"):
         status = "not probed"
         if probe:
             status = probe.get("status", "")
-            try:
-                observed = int(float(probe.get("max_health") or 0)) or None
-            except ValueError:
-                observed = None
-        candidates = by_hp.get(observed, []) if observed else []
+            observed = _mob_health_value(probe.get("max_health"))
+        candidates = by_hp.get(observed, []) if observed is not None else []
+        # Keep nonintegral or large observations exact in the JSON response.
+        if observed is not None:
+            observed = int(observed) if observed == observed.to_integral_value() and observed <= 9007199254740991 else str(observed)
         models.append({
             "model": name,
             "hash": row.get("hash", ""),
@@ -4966,6 +6122,8 @@ def get_mob_models(ds="mine"):
 def _validate_mob_value(previous, value, choices):
     """Keep source scalar types and source enum choices."""
     import math
+    if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+        raise ValueError("Expected a text or numeric scalar")
     original = str(previous).strip()
     candidate = str(value).strip()
     if original.lower() in ("true", "false"):
@@ -4973,62 +6131,105 @@ def _validate_mob_value(previous, value, choices):
             raise ValueError("Expected true or false")
     elif re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", original):
         try:
-            valid = bool(candidate) and math.isfinite(float(candidate))
-        except ValueError:
+            valid = bool(re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", candidate)) and math.isfinite(float(original)) and math.isfinite(float(candidate))
+        except (ValueError, OverflowError):
             valid = False
         if not valid:
             raise ValueError("Expected a finite number")
+    elif original.lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+        raise ValueError("Unsupported nonfinite source")
     elif candidate != original and candidate not in choices:
         raise ValueError("Choose a value present in the source data")
     return candidate
 
 
-def apply_mob_edits(edits):
-    changed = 0
-    touched = set()
-    for edit in edits:
-        target = MOB_FILES.get(edit.get("file"))
-        if target is None:
-            raise ValueError(f"unknown mobs file: {edit.get('file')}")
-        name, game_path, vanilla_path = target
-        path = ds_dir("mine") / name
-        if not path.exists():
-            if not vanilla_path.exists():
-                raise ValueError(f"vanilla {name} extract is missing")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(vanilla_path, path)
-        root = load_file(name)["root"]
-        node = root
-        try:
-            for index in edit["path"]:
-                node = list(node)[int(index)]
-        except (IndexError, TypeError, ValueError, KeyError):
-            continue
-        kind = edit.get("kind")
-        attr = "value" if kind == "attr" else "ref" if kind == "ref" else None
-        previous = node.get(attr) if attr else node.text
-        choices = {str(sibling.get(attr) if attr else sibling.text).strip()
-                   for sibling in root.iter(node.tag)}
-        value = _validate_mob_value(previous, edit["value"], choices)
-        if kind == "attr" and node.get("value") is not None:
-            node.set("value", value)
-        elif kind == "ref" and node.get("ref") is not None:
-            node.set("ref", value)
-        elif kind == "text" and len(node) == 0:
-            node.text = value
+def apply_mob_edits(edits, *, validate_only=False):
+    if not isinstance(edits, list):
+        raise ValueError("Mobs edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    with _lock:
+        prepared, seen = {}, set()
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) != {'file', 'path', 'kind', 'value'}:
+                raise ValueError("Mobs edits require file, path, kind and value")
+            family = edit['file']
+            if not isinstance(family, str) or family not in MOB_FILES:
+                raise ValueError("Unknown mobs file")
+            indices = edit['path']
+            if not isinstance(indices, list) or not indices or any(type(i) is not int or i < 0 for i in indices):
+                raise ValueError("Mobs path requires nonnegative integer indices")
+            identity = (family, tuple(indices))
+            if identity in seen:
+                raise ValueError("Duplicate mobs target")
+            seen.add(identity)
+            if family not in prepared:
+                name, game_path, vanilla_path = MOB_FILES[family]
+                path = data_file_path(name, 'mine')
+                entry, raw = None, None
+                if path.exists():
+                    entry = load_file(name)
+                    root = copy.deepcopy(entry['root'])
+                else:
+                    if not vanilla_path.exists():
+                        raise ValueError(f"Vanilla {name} extract is missing")
+                    raw = vanilla_path.read_bytes()
+                    root = ET.fromstring(raw.decode('utf-8-sig'), parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+                records = (_combat_records if family == 'combat' else _pedhealth_records)(root)
+                rows = {tuple(row['path']): row for record in records for row in record['fields']}
+                choices = {}
+                for node in root.iter():
+                    if isinstance(node.tag, str):
+                        for kind, attr in [('attr', 'value'), ('ref', 'ref'), ('text', None)]:
+                            choices.setdefault((node.tag, kind), set()).add(str(node.get(attr) if attr else node.text).strip())
+                prepared[family] = (name, game_path, path, entry, raw, root, rows, choices)
+            name, game_path, path, entry, raw, root, rows, choices = prepared[family]
+            row = rows.get(tuple(indices))
+            if row is None or row.get('readonly') or edit['kind'] != row['kind']:
+                raise ValueError("Unknown mobs target or wrong scalar kind")
+            node = root
+            for index in indices:
+                node = list(node)[index]
+            attr = {'attr': 'value', 'ref': 'ref'}.get(row['kind'])
+            if len(node) or (attr and (set(node.attrib) != {attr} or (node.text or '').strip())) or (not attr and node.attrib):
+                raise ValueError("Mobs target has unsupported scalar metadata")
+            value = _validate_mob_value(row['value'], edit['value'], choices[(node.tag, row['kind'])])
+            if attr:
+                node.set(attr, value)
+            else:
+                node.text = value
+        install = ds_dir('mine') / 'install.xml'
+        original_install = install.read_bytes() if install.exists() else None
+        mapping = _prepare_file_replacements([(p[1], p[0]) for p in prepared.values()])
+        if validate_only:
+            return len(edits)
+        outputs, expected, existing = [], {}, []
+        if mapping is not None:
+            outputs.append((install, mapping))
+            expected[install] = original_install
+        for name, game_path, path, entry, raw, root, rows, choices in prepared.values():
+            if entry is not None:
+                existing.append((name, entry, root))
+            else:
+                text = raw.decode('utf-8-sig')
+                decl = text.split('\n', 1)[0].strip() if text.lstrip().startswith('<?xml') else '<?xml version="1.0" encoding="UTF-8"?>'
+                payload = (decl + '\n' + ET.tostring(root, encoding='unicode')).encode('utf-8')
+                if raw.startswith(b'\xef\xbb\xbf'):
+                    payload = b'\xef\xbb\xbf' + payload
+                outputs.append((path, payload))
+                expected[path] = None
+        if existing:
+            _commit_xml_roots(existing, outputs, expected)
         else:
-            continue
-        changed += 1
-        touched.add((name, game_path))
-    for name, game_path in touched:
-        save_file(name)
-        ensure_file_replacement(game_path, name)
-    return changed
+            _commit_file_outputs(outputs, 'Mobs batch', expected_originals=expected)
+        return len(edits)
 
 
 # ---------------- HTTP ----------------
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
@@ -5292,12 +6493,22 @@ class Handler(BaseHTTPRequestHandler):
             ds = parse_qs(url.query).get("ds", ["mine"])[0]
             with _lock:
                 if path == "/api/catalog/save":
-                    n = apply_catalog_edits(body)
+                    try:
+                        n = apply_catalog_edits(body)
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
+                        return
                     self._json({"saved": n})
                 elif path == "/api/catalog/create":
-                    self._json(create_catalog_item(body))
+                    try:
+                        self._json(create_catalog_item(body))
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/catalog/effects/create":
-                    self._json(create_catalog_effect(body))
+                    try:
+                        self._json(create_catalog_effect(body))
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/settings/save":
                     self._json({"saved": save_gameplay_settings(body.get("edits", []))})
                 elif path == "/api/model-preview":
@@ -5335,11 +6546,17 @@ class Handler(BaseHTTPRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/shop-buyers/save":
-                    self._json({"saved": apply_shop_buyer_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_shop_buyer_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/labels/save":
                     self._json({"saved": save_label(body.get("scope", ""), body.get("key", ""), body.get("value", ""))})
                 elif path == "/api/localization/save":
-                    self._json({"saved": save_localization(body.get("edits", []))})
+                    try:
+                        self._json({"saved": save_localization(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path.startswith("/api/loot/") and path.endswith("/save"):
                     name = path[len("/api/loot/"):-len("/save")]
                     if name not in LOOT_FILES:
@@ -5368,38 +6585,72 @@ class Handler(BaseHTTPRequestHandler):
                         except ValueError as e:
                             self._json({"error": str(e)}, 400)
                 elif path == "/api/matrix/save":
-                    self._json({"saved": apply_matrix_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_matrix_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/crime/save":
-                    self._json({"saved": apply_crime_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_crime_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/dispatch/save":
-                    self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/loot-sounds/save":
                     self._json({"saved": save_loot_sounds(body.get("edits", []))})
                 elif path == "/api/bounty-hunters/save":
-                    self._json({"saved": apply_bounty_hunter_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_bounty_hunter_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/honor-actions/save":
                     try:
                         self._json({"saved": save_honor_actions(body.get("edits", []))})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/challenges/save":
-                    self._json({"saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []))})
-                elif path == "/api/weapons/save":
-                    self._json({"saved": apply_weapon_edits(
-                        body.get("section", ""), body.get("name", ""),
-                        body.get("edits", []), body.get("sourceFile", WEAPONS_FILE))})
-                elif path == "/api/weapons/shell-vfx/save":
-                    self._json({"saved": apply_weapon_shell_vfx(body.get("blanked", False))})
+                elif path in {"/api/challenges/save", "/api/challenges/validate"}:
+                    try:
+                        validate_only = path == "/api/challenges/validate"
+                        self._json({"validated" if validate_only else "saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []), validate_only=validate_only)})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
+                elif path in {"/api/weapons/save", "/api/weapons/validate"}:
+                    try:
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_weapon_edits(
+                            body.get("section", ""), body.get("name", ""),
+                            body.get("edits", []), body.get("sourceFile", WEAPONS_FILE), validate_only=validate_only)})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
+                elif path in {"/api/weapons/shell-vfx/save", "/api/weapons/shell-vfx/validate"}:
+                    try:
+                        if not isinstance(body, dict) or set(body) != {'blanked'}:
+                            raise ValueError("Shell VFX settings require only blanked")
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_weapon_shell_vfx(body.get("blanked"), validate_only=validate_only)})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/projectile-speeds/save":
                     try:
                         self._json({"saved": save_projectile_speeds(body.get("entries", []))})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/mobs/save":
-                    self._json({"saved": apply_mob_edits(body.get("edits", []))})
-                elif path.startswith("/api/ai/") and path.endswith("/save"):
-                    name = path[len("/api/ai/"):-len("/save")]
-                    self._json({"saved": apply_ai_edits(name, body.get("edits", []))})
+                elif path in {"/api/mobs/save", "/api/mobs/validate"}:
+                    try:
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_mob_edits(body.get("edits", []), validate_only=validate_only)})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
+                elif path.startswith("/api/ai/") and path.endswith(("/save", "/validate")):
+                    validate_only = path.endswith('/validate')
+                    name = path[len("/api/ai/"):-len("/validate" if validate_only else "/save")]
+                    try:
+                        self._json({"validated" if validate_only else "saved": apply_ai_edits(name, body.get("edits", []), validate_only=validate_only)})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 else:
                     self._json({"error": "not found"}, 404)
         except Exception as ex:
@@ -5407,6 +6658,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         try:
+            path = urlparse(self.path).path
+            if path == "/api/custom-crafting" and self.refuse_write_when_read_only(path + "/save"):
+                return
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length) or b"{}")
             path = urlparse(self.path).path

@@ -1,5 +1,6 @@
 """Structured editing for Final Fantasy X ``prepare.bin`` Mix result table."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 
@@ -55,12 +56,7 @@ def parse_mix_table(data: bytes) -> tuple[MixRecord, ...]:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise MixTableError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise MixTableError(f"{label} must be an integer") from error
+    parsed = integer_value(value, label, MixTableError)
     if not minimum <= parsed <= maximum:
         raise MixTableError(f"{label} must be between {minimum} and {maximum}")
     return parsed

@@ -43,7 +43,7 @@
       changed:row=>changed(editableDatasets.find(name=>state.data[name]?.rows?.includes(row))||view,row)||itemEffectsChanged(row)||(view==="enemies"&&["enemyTables","enemyAi","enemyBattleText"].some(name=>{const linked=state.data[name]?.rows?.find(entry=>entry.id===row.id);return linked&&changed(name,linked)})),
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
-  function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length+(window.ff8SpellbookDrafts?.size||0);for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}
+  function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length+(window.ff8SpellbookDrafts?.size||0)+encounterChanceDraftCount();for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}
   // Undo snapshots hold only rows that differ from the last saved state. A
   // full clone of every dataset costs ~20MB and ~224ms per keystroke, and the
   // 50-deep stack held before+after pairs past 2GB until the tab died. Each
@@ -69,7 +69,7 @@
   function historyFullCapture(){return {...Object.fromEntries(editableDatasets.map(name=>[name,clone(state.data[name]?.rows||[])])),init:clone(state.data.init||{}),settings:clone(state.data.settings||{})}}
   function historyCapture(){
     if(!historyBaseSigs)resetHistoryBaseSigs();
-    const snap={gen:historyBaseGen};
+    const snap={gen:historyBaseGen,encounterChanceDrafts:captureEncounterChanceDrafts()};
     for(const name of editableDatasets){
       const rows=state.data[name]?.rows||[],base=state.base[name]||[],sigs=historyBaseSigs[name];
       if(!(sigs instanceof Map)||rows.length!==base.length){snap[name]={full:clone(rows)};continue}
@@ -99,6 +99,7 @@
       }
       state.data[name].rows=rows;
     }
+    restoreEncounterChanceDrafts(snapshot.encounterChanceDrafts);
   }
   function setStatus(text){state.status=text}
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}
@@ -155,17 +156,38 @@
   // `panelIcon` is the record's own picture in the panel's heading slot. It is
   // separate from `icon`, which decorates the name in the title line.
   function sharedDetail(row,prefs,body,className="",note="",icon=null,actions=null,modelPreview=null,panelIcon=null){const named=row.titleContent??(icon?LexeditorUI.inlineLabel(icon,el("span",{},row.name)):row.name);icon=null;return detailPanel({className:`lex-detail detail ${className}`.trim(),title:named,identity:el("span",{class:"lex-pinnable-property"},prefs?.pinButton("id","ID"),recordId(row.id)),meta:note||null,icon:panelIcon,actions,body,modelPreview})}
-  function numberControl(value,min,max,step,onchange,attrs={}){const digits=String(step).includes(".")?String(step).split(".")[1].length:0,display=number=>formatNumber(number,{minimumFractionDigits:0,maximumFractionDigits:digits}),control=el("input",{type:"number",min,max,step,value:Number(value),"data-min":min,"data-max":max,"data-step":step,/* The bounds were enforced on input but never stated, so a field like Status Defence looked like it capped at an arbitrary 155. It is a ubyte shown as stored-100, so -100 to 155 is the whole byte - obvious once the range is visible, baffling when it is not. */title:`Range ${display(min)} to ${display(max)}`,...attrs,oninput:event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))onchange(Math.max(min,Math.min(max,next)));if(!event.target.lexValueSliderDragging)shell.refresh();},onchange:event=>{if(!event.target.lexValueSliderDragging)shell.refresh()},onblur:event=>{const next=Number(String(event.target.value).replaceAll(",",""));event.target.value=String(Number.isFinite(next)?Math.max(min,Math.min(max,next)):value)},onkeydown:event=>{if(event.key!=="ArrowUp"&&event.key!=="ArrowDown")return;event.preventDefault();const current=Number(String(event.target.value).replaceAll(",",""))||0,next=Math.max(min,Math.min(max,current+(event.key==="ArrowUp"?step:-step)));event.target.value=String(next);event.target.dispatchEvent(new Event("input",{bubbles:true}))}});return control}
+  function numberControl(value,min,max,step,onchange,attrs={}){
+    const digits=String(step).includes(".")?String(step).split(".")[1].length:0;
+    const display=number=>formatNumber(number,{minimumFractionDigits:0,maximumFractionDigits:digits});
+    const valid=control=>control.value!==""&&Number.isFinite(control.valueAsNumber)&&control.checkValidity();
+    const control=el("input",{type:"number",min,max,step,value:Number(value),
+      "data-min":min,"data-max":max,"data-step":step,title:`Range ${display(min)} to ${display(max)}`,
+      ...attrs,"data-lex-validate-number":"true",required:true,
+      oninput:event=>{
+        const input=event.target;
+        if(input.disabled||input.readOnly||!valid(input))return;
+        onchange(input.valueAsNumber);
+        if(!input.lexValueSliderDragging)shell.refresh();
+      },
+      onkeydown:event=>{
+        if(event.key!=="ArrowUp"&&event.key!=="ArrowDown")return;
+        event.preventDefault();
+        const input=event.target;
+        if(input.disabled||input.readOnly)return;
+        if(!valid(input)){input.reportValidity();return;}
+        const before=input.value;
+        if(event.key==="ArrowUp")input.stepUp();else input.stepDown();
+        if(input.value!==before)input.dispatchEvent(new Event("input",{bubbles:true}));
+      }});
+    return control;
+  }
   function ratio255Control(value,onchange,label="Hit rate"){
     let raw=Math.max(0,Math.min(255,Math.round(Number(value)||0)));
     const percentage=()=>formatNumber(raw/255*100,{maximumFractionDigits:2});
-    const percent=el("input",{type:"number",min:0,max:100,step:.01,value:percentage(),"aria-label":`${label} percentage`});
-    const exact=el("input",{type:"number",min:0,max:255,step:1,value:String(raw),"aria-label":`${label} out of 255`});
-    const setRaw=next=>{raw=Math.max(0,Math.min(255,Math.round(next)));exact.value=String(raw);percent.value=percentage();onchange(raw);shell.refresh()};
-    percent.addEventListener("input",event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))setRaw(next/100*255)});
-    exact.addEventListener("input",event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(Number.isFinite(next))setRaw(next)});
-    percent.addEventListener("blur",()=>{percent.value=percentage()});
-    exact.addEventListener("blur",()=>{exact.value=String(raw)});
+    const percent=numberControl(Number(percentage()),0,100,.01,value=>setRaw(value/100*255),
+      {"aria-label":`${label} percentage`});
+    const exact=numberControl(raw,0,255,1,setRaw,{"aria-label":`${label} out of 255`});
+    function setRaw(next){raw=Math.round(next);exact.value=String(raw);percent.value=percentage();onchange(raw)}
     return LexeditorUI.controlGroup([unitField(percent,"%"),unitField(exact,"/255")]);
   }
   // A long list holds only its current choice until the select is used.
@@ -211,13 +233,18 @@
   function referenceValues(view,id,read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(rowOf(state.referenceData[reference.id],view,id))})).filter(entry=>entry.value!==undefined)}
   function auxiliaryReferences(view,id,read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(rowOf(state.referenceData[reference.id],view,id))})).filter(entry=>entry.value!==undefined)}
 
-  function bitFlagsControl(value,definitions,onchange,label){return toggleRow({label,toggles:definitions.map(entry=>{const bit=1<<Number(entry.bit);return{key:String(entry.bit),label:entry.name,help:entry.description||null,checked:(Number(value)&bit)===bit,change:next=>{value=next?(Number(value)|bit):(Number(value)&~bit);onchange(value);shell.refresh()}}})})}
-  function menuParameterControl(menuRow,key){const typeName=menuRow[key==="param1"?"param1Type":"param2Type"],meta=state.data.menuItems.parameterTypes.find(entry=>entry.name===typeName),value=menuRow[key],apply=next=>menuRow[key]=Number(next);if(meta?.widget==="flags")return bitFlagsControl(value,meta.values,apply,meta.description);if(meta?.widget==="list")return selectControl(value,state.data.menuItems.parameterChoices[typeName]||[],apply);return autoFitControlText(numberControl(value,0,255,1,apply,{"aria-label":meta?.widget==="none"?`${key}; stored but unused by this item type`:meta?.description||key}))}
+  function bitFlagsControl(value,definitions,onchange,label){return toggleRow({label,toggles:definitions.map(entry=>{const bit=1<<Number(entry.bit);return{key:String(entry.bit),label:entry.name,help:entry.description||null,disabled:!!entry.readonly,checked:(Number(value)&bit)===bit,change:next=>{if(entry.readonly)return;value=next?(Number(value)|bit):(Number(value)&~bit);onchange(value);shell.refresh()}}})})}
+  function menuParameterMeta(menuRow,key){return state.data.menuItems.parameterTypes.find(entry=>entry.name===menuRow[key==="param1"?"param1Type":"param2Type"])}
+  function menuFlagsReadonly(menuRow){return !!state.data.menuItems.types.find(entry=>Number(entry.id)===Number(menuRow.typeId))?.flagsReadonly}
+  function applyMenuFlags(menuRow,next){if(!menuFlagsReadonly(menuRow))menuRow.flags=Number(next)}
+  function menuFlagsControl(menuRow){const readonly=menuFlagsReadonly(menuRow),definitions=state.data.menuItems.flagDefinitions.map(entry=>readonly?{...entry,readonly:true}:entry);return bitFlagsControl(menuRow.flags,definitions,value=>applyMenuFlags(menuRow,value),"Item use flags")}
+  function applyMenuParameter(menuRow,key,next){const meta=menuParameterMeta(menuRow,key);if(!meta||meta.widget==="none")return;if(meta.widget==="flags"){const writable=meta.values.filter(entry=>!entry.readonly).reduce((mask,entry)=>mask|(1<<Number(entry.bit)),0);menuRow[key]=(Number(menuRow[key])&~writable)|(Number(next)&writable)}else menuRow[key]=Number(next)}
+  function menuParameterControl(menuRow,key){const typeName=menuRow[key==="param1"?"param1Type":"param2Type"],meta=menuParameterMeta(menuRow,key),value=menuRow[key],apply=next=>applyMenuParameter(menuRow,key,next);if(meta?.widget==="flags")return bitFlagsControl(value,meta.values,apply,meta.description);if(meta?.widget==="list")return selectControl(value,state.data.menuItems.parameterChoices[typeName]||[],apply);return autoFitControlText(numberControl(value,0,255,1,apply,{disabled:!meta||meta.widget==="none","aria-label":meta?.widget==="none"?`${key}; stored but unused by this item type`:meta?.description||key}))}
   function menuItemSection(itemId){const row=rowOf(state.data,"menuItems",itemId),vanilla=rowOf(state.vanilla,"menuItems",itemId);if(!row||!vanilla)return null;const typeEntries=state.data.menuItems.types.map(entry=>({value:entry.id,name:entry.name})),setType=value=>{const type=state.data.menuItems.types.find(entry=>Number(entry.id)===Number(value));row.typeId=Number(value);row.typeName=type.name;row.description=type.description;row.param1Type=type.param1;row.param2Type=type.param2;renderItems();shell.refresh()};const refs=read=>auxiliaryReferences("menuItems",itemId,read);return detailSection({className:"item-menu-section",title:"MENU BEHAVIOR",body:[
     detailField({label:"TYPE",help:row.description?infoHelp(row.description):null,control:sourceControl(selectControl(row.typeId,typeEntries,setType),()=>row.typeId,vanilla.typeId,refs(value=>value?.typeId),setType,value=>typeEntries.find(entry=>entry.value===Number(value))?.name||value)}),
-    detailField({label:"USE FLAGS",control:sourceControl(bitFlagsControl(row.flags,state.data.menuItems.flagDefinitions,value=>row.flags=value,"Item use flags"),()=>row.flags,vanilla.flags,refs(value=>value?.flags),value=>row.flags=Number(value),value=>`0x${Number(value).toString(16).padStart(2,"0").toLocaleUpperCase()}`)}),
-    detailField({className:"item-parameter-field",label:"Param 1",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param1Type)?.description||""),control:sourceControl(menuParameterControl(row,"param1"),()=>row.param1,vanilla.param1,refs(value=>value?.param1),value=>row.param1=Number(value))}),
-    detailField({className:"item-parameter-field",label:"Param 2",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param2Type)?.description||""),control:sourceControl(menuParameterControl(row,"param2"),()=>row.param2,vanilla.param2,refs(value=>value?.param2),value=>row.param2=Number(value))})]})}
+    detailField({label:"USE FLAGS",control:sourceControl(menuFlagsControl(row),()=>row.flags,vanilla.flags,refs(value=>value?.flags),value=>applyMenuFlags(row,value),value=>`0x${Number(value).toString(16).padStart(2,"0").toLocaleUpperCase()}`)}),
+    detailField({className:"item-parameter-field",label:"Param 1",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param1Type)?.description||""),control:sourceControl(menuParameterControl(row,"param1"),()=>row.param1,vanilla.param1,refs(value=>value?.param1),value=>applyMenuParameter(row,"param1",value))}),
+    detailField({className:"item-parameter-field",label:"Param 2",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param2Type)?.description||""),control:sourceControl(menuParameterControl(row,"param2"),()=>row.param2,vanilla.param2,refs(value=>value?.param2),value=>applyMenuParameter(row,"param2",value))})]})}
 
   function gilValue(value){return unitField(numberValue(value),"G",{unitClass:"ff8-gil-unit"})}
 

@@ -26,12 +26,18 @@ made a mod and left it empty", then found every tab empty as well.
 
 ## Editing the game's own data
 
-An edit attempt - a click or a keystroke in a property row, or in a bare
-control - opens one dialog: **Create a mod?** with `Create a mod` and `Cancel`.
+An edit attempt - typing into a text box, or clicking a control whose value
+a click changes (a checkbox, a list, a number's spin arrows) - opens one
+dialog: **Create a mod?** with `Create a mod` and `Cancel`.
 Creating runs the same flow as **Add a Mod**: name it, the host creates it from
 the plugin's starter, and the host restarts the plugin on the new project.
 `LexeditorUI.createModProject(pluginId, {pluginName})` is the one call a page
 needs for its own button.
+
+Reading is never an edit: clicking into a text box, selecting, copying and
+dragging its resize grip all stay live. Neither is managing the mod library:
+the Mods tab, the first-run screen and tweak settings work on Vanilla, because
+switching or configuring a mod changes the library, not the game's data.
 
 A mod that is a read-only library reference keeps its own separate prompt,
 which offers to make an editable copy instead. `current.vanilla` rows never get

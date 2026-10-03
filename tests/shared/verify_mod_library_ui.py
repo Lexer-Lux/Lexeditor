@@ -15,10 +15,11 @@ from plugins.ff7r.tooling import pack_directory, get_file
 from core.mod_library import metadata
 from core.settings_manager import SettingsStore
 from playwright.sync_api import sync_playwright
+from verify_mod_library import repak_fixture
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="lexeditor-library-ui-") as temp:
+    with tempfile.TemporaryDirectory(prefix="lexeditor-library-ui-") as temp, repak_fixture(Path(temp)):
         root = Path(temp)
         content = root / "content/End/Content"
         content.mkdir(parents=True)
@@ -57,7 +58,9 @@ def main():
                 page.add_style_tag(path=str(ROOT / "plugins/ff7r/game-appearance.css"))
                 page.expose_binding("hostCall", bridge)
                 page.evaluate("""() => { window.pywebview = {api:new Proxy({}, {
-                    get:(_,name)=>(...args)=>window.hostCall(name,args)})}; }""")
+                    get:(_,name)=>(...args)=>window.hostCall(name,args).then(result=>{
+                        (window.__completedHostCalls ||= []).push(name);return result;
+                    })})}; }""")
                 source = (ROOT / "ui/framework.js").read_text(encoding="utf-8")
                 page.add_script_tag(content=source.replace("window.LexeditorUI = {", "window.LexeditorUI = {openModLibrary,"))
                 page.evaluate("LexeditorUI.openModLibrary('ff7r')")
@@ -104,11 +107,12 @@ def main():
                 page.get_by_label("New mod name").fill("Independent copy")
                 page.get_by_role("button", name="Create copy", exact=True).click()
                 page.wait_for_function("() => !document.querySelector('[aria-label=\"New mod name\"]')")
-                # Flush the pending bridge callback before inspecting output.
-                page.wait_for_function("() => document.querySelector('[aria-label=\"Mod library\"] button:disabled') !== null")
+                # The button disables before the host copies and selects the
+                # project. Wait for that actual bridge response, not its start.
+                page.wait_for_function("() => window.__completedHostCalls.includes('copy_library_mod')")
                 independent = library / "ff7r/Independent copy"
                 assert (independent / "content/End/Content/Probe.txt").read_text() == "import probe"
-                assert selections == [str(independent)]
+                assert [Path(value).resolve() for value in selections] == [independent.resolve()], selections
                 assert metadata(independent)["editableContent"] is True
                 page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).click()
                 del host.mod_library_location
@@ -127,7 +131,7 @@ def main():
                 page.get_by_role("button", name="Remove recovery copy…").wait_for(state="visible")
                 moved = destination / "ff7r/Imported test/probe_P.pak"
                 assert moved.read_bytes() == copied.read_bytes()
-                assert host._settings.snapshot()["modLibraryPath"] == str(destination)
+                assert Path(host._settings.snapshot()["modLibraryPath"]).resolve() == destination.resolve()
                 page.get_by_role("button", name="Remove recovery copy…").click()
                 page.get_by_role("button", name="Remove recovery copy", exact=True).click()
                 page.get_by_role("button", name="Remove recovery copy…").wait_for(state="hidden")

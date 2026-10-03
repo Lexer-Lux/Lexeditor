@@ -24,6 +24,27 @@ from plugins.palworld.package import default_info
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "palworld-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 
+
+def reveal_detail_control(page, control):
+    """Follow the shared detail pager to a control rather than editing a hidden page."""
+    pane = page.locator(".pal-detail .lex-tweaks-paged").first
+    if control.is_visible():
+        return
+    first_page = pane.get_by_role("button", name="First page", exact=True)
+    if first_page.count() and first_page.is_enabled():
+        first_page.click()
+        page.wait_for_timeout(100)
+    for _ in range(20):
+        if control.is_visible():
+            return
+        next_page = pane.get_by_role("button", name="Next page", exact=True)
+        if not next_page.count() or next_page.is_disabled():
+            break
+        next_page.click()
+        page.wait_for_timeout(100)
+    assert control.is_visible(), "Detail pager did not expose the requested control"
+
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_name:
     temp = Path(temp_name)
     game = temp / "Palworld"
@@ -161,11 +182,15 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.wait_for_function("palFieldChoices.some(field => field.name === 'AddedCount') && document.querySelector('.lex-list-row.selected')?.textContent.includes('WorkSuitability_EmitFlame')")
                     add_select = page.locator(".pal-add-field-select")
                     assert "AddedCount" in add_select.locator("option").all_text_contents()
+                    reveal_detail_control(page, add_select)
                     add_select.select_option("AddedCount")
                     add_value = page.locator('.pal-detail input.pal-add-value:is([type="number"],[inputmode="decimal"])')
                     assert add_value.count() == 1
+                    reveal_detail_control(page, add_value)
                     add_value.fill("11")
-                    page.get_by_role("button", name="Add property", exact=True).click()
+                    add_button = page.get_by_role("button", name="Add property", exact=True)
+                    reveal_detail_control(page, add_button)
+                    add_button.click()
                     page.wait_for_function("patchDirty()")
                     assert "AddedCount" not in json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]
                     page.evaluate("save()")
@@ -203,7 +228,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert (built / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
                     assert not (built / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
 
-                    page.get_by_role("button", name="Deploy local test", exact=True).click()
+                    deploy_button = page.get_by_role("button", name="Deploy local test", exact=True)
+                    reveal_detail_control(page, deploy_button)
+                    deploy_button.click()
                     page.wait_for_function("palWorkshopState?.current === true && palWorkshopState?.deployed === true && !palBuildLoading")
                     local_folder = page.evaluate("palWorkshopState.folder")
                     assert len(local_folder) == 10 and local_folder.isdigit()
@@ -216,11 +243,15 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert loader_after_deploy["readOnly"] is True
                     assert loader_after_deploy["active"] is True
                     assert loader_after_deploy["listed"] is True
-                    page.get_by_role("button", name="Remove local deployment", exact=True).click()
+                    remove_button = page.get_by_role("button", name="Remove local deployment", exact=True)
+                    reveal_detail_control(page, remove_button)
+                    remove_button.click()
                     page.wait_for_function("palWorkshopState?.deployed === false && !palBuildLoading")
                     assert not local_target.exists()
 
-                    page.get_by_role("button", name="Revert build", exact=True).click()
+                    revert_button = page.get_by_role("button", name="Revert build", exact=True)
+                    reveal_detail_control(page, revert_button)
+                    revert_button.click()
                     page.wait_for_function("palBuildState?.built === false && !palBuildLoading")
                     assert not built.exists()
 

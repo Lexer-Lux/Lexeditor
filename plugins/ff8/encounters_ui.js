@@ -219,7 +219,7 @@
     const vanilla=worldRow(state.vanilla,"group",row.id)?.encounters?.[index];
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
-    return sourceControl(LexeditorUI.choiceField(link,finder),()=>row.encounters[index],vanilla,references,accept,
+    return sourceControl(LexeditorUI.choiceField(link,finder,{fillValue:true,hoverAction:true}),()=>row.encounters[index],vanilla,references,accept,
       next=>`Formation #${next}`);
   }
   function encounterGroupUsage(row){
@@ -237,22 +237,110 @@
             targetId:rule.id,targetLabel:`encounter rule ${rule.id}`,
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
+  // Native initial selection, before the previous-scene retry. These are
+  // outcome counts, not the executable's subtly different threshold bytes.
+  // See codex/ff8/world-encounter-selection.md and the native execution check.
+  const encounterInitialOutcomes=Object.freeze([38,37,37,37,36,36,24,11]);
+  const encounterChanceDrafts=new WeakMap();
+  function encounterChanceDraftCount(){return encounterGroupRows().reduce((count,row)=>count+(encounterChanceDrafts.get(row)?.size||0),0)}
+  function captureEncounterChanceDrafts(){return encounterGroupRows().filter(row=>encounterChanceDrafts.get(row)?.size)
+    .map(row=>[row.id,[...encounterChanceDrafts.get(row)]])}
+  function restoreEncounterChanceDrafts(snapshot){
+    for(const row of encounterGroupRows())encounterChanceDrafts.delete(row);
+    for(const [id,entries] of snapshot||[]){const row=encounterGroupById(id);
+      if(row&&entries.length)encounterChanceDrafts.set(row,new Map(entries));
+    }
+  }
+  function encounterChanceError(row){
+    if(encounterChanceDrafts.get(row)?.size)return `Correct the invalid chance in encounter group ${row.id}.`;
+    const weights=row.initialOutcomes||encounterInitialOutcomes;
+    if(weights.length!==8||weights.some(value=>!Number.isInteger(value)||value<0||value>256)
+      ||weights.reduce((sum,value)=>sum+value,0)!==256)
+      return `Initial chances for encounter group ${row.id} must total 100%.`;
+    return '';
+  }
+  function validateEncounterChances(){
+    for(const row of encounterGroupRows()){
+      const error=encounterChanceError(row);if(error)throw new Error(error);
+    }
+  }
+  function syncEncounterChanceSummary(row){
+    for(const panel of document.querySelectorAll(`[data-encounter-chance-group="${row.id}"]`)){
+      const table=panel.querySelector('.ff8-encounter-initial-chances');
+      if(table)table.replaceWith(encounterGroupInitialChances(row));
+      const error=panel.querySelector('[data-encounter-chance-error]');
+      const message=encounterChanceError(row);error.hidden=!message;
+      error.replaceChildren(...(message?[LexeditorUI.notice({message})]:[]));
+    }
+  }
+  function encounterSlotChanceControl(row,index){
+    const read=dataset=>{const source=worldRow(dataset,'group',row.id);return source
+      ?(source.initialOutcomes||encounterInitialOutcomes)[index]*100/256:undefined};
+    const update=percent=>{
+      if(state.activeSource!=='mine')return;
+      const weight=percent*256/100;
+      if(!Number.isInteger(weight)||weight<0||weight>256)return;
+      row.initialOutcomes=[...(row.initialOutcomes||encounterInitialOutcomes)];
+      row.initialOutcomes[index]=weight;encounterChanceDrafts.get(row)?.delete(index);
+      syncEncounterChanceSummary(row);
+    };
+    const input=numberControl((row.initialOutcomes||encounterInitialOutcomes)[index]*100/256,
+      0,100,100/256,update,{'aria-label':`Group ${row.id} slot ${index+1} initial chance`});
+    input.disabled=state.activeSource!=='mine';
+    const draft=encounterChanceDrafts.get(row)?.get(index);if(draft!==undefined)input.value=draft;
+    input.addEventListener('input',()=>{
+      if(input.disabled||input.readOnly)return;
+      input.setCustomValidity('');
+      if(input.value!==''&&Number.isFinite(input.valueAsNumber)&&!Number.isInteger(input.valueAsNumber*256/100))
+        input.setCustomValidity('Use steps of 0.390625%.');
+      if(!encounterChanceDrafts.has(row))encounterChanceDrafts.set(row,new Map());
+      const drafts=encounterChanceDrafts.get(row);
+      const valid=input.checkValidity();
+      if(valid)drafts.delete(index);else drafts.set(index,input.value);
+      syncEncounterChanceSummary(row);
+      if(!valid)shell.refresh();
+    },{capture:true});
+    return sourceControl(unitField(input,'%'),()=> (row.initialOutcomes||encounterInitialOutcomes)[index]*100/256,
+      read(state.vanilla),state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
+        value:read(state.referenceData[reference.id])})).filter(reference=>reference.value!==undefined),update,value=>`${value}%`);
+  }
+  function encounterGroupInitialChances(row){
+    const formations=new Map();
+    row.encounters.forEach((value,index)=>{
+      const id=Number(value);
+      if(!formations.has(id))formations.set(id,{id,slots:[],outcomes:0});
+      const formation=formations.get(id);
+      formation.slots.push(index+1);
+      formation.outcomes+=(row.initialOutcomes||encounterInitialOutcomes)[index];
+    });
+    return columnList({rows:[...formations.values()],key:formation=>formation.id,fill:false,localSort:false,
+      class:'ff8-encounter-initial-chances',"aria-label":`Initial formation chances for encounter group ${row.id}`,
+      columns:[{key:'id',label:'FORMATION',numberedId:true,sortable:false,
+        render:formation=>hoverable({content:String(formation.id),targetType:'encounters',targetId:formation.id,
+          targetLabel:`battle formation ${formation.id}`,
+          activate:()=>showEncounterSubtab('formations','encounters',formation.id)})},
+        {key:'chance',label:'CHANCE',sortable:false,render:formation=>`${formation.outcomes*100/256}%`},
+        {key:'slots',label:'SLOTS',sortable:false,render:formation=>formation.slots.join(', ')}]});
+  }
   function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail',heading={}){
-    // A formation can fill several of the eight slots, so the group does not
-    // give every formation the same share (Lexer: "encounter chances aren't
-    // actually equal ... the editor doesn't say that at all").
-    const share=value=>row.encounters.filter(entry=>Number(entry)===Number(value)).length;
     const formations=row.encounters.map((value,index)=>{
-      const strip=el('div',{class:'ff8-encounter-formation-row',
-        'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`},
-        el('div',{class:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
-          el('span',{class:'ff8-encounter-formation-share','data-formation-share':share(value)},`${share(value)} of ${row.encounters.length}`)),
+      const strip=LexeditorUI.stack({fill:false,className:'ff8-encounter-formation-row',attrs:{
+        'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`}},
+        LexeditorUI.actionRow({fillFirst:true,className:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
+          el('span',{class:'ff8-encounter-formation-position lex-action-meta'},`Slot ${index+1}`)),
+        detailField({label:'Initial chance',showType:false,control:encounterSlotChanceControl(row,index)}),
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });
+    const error=encounterChanceError(row);
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
-      help:'The game chooses one of these eight slots when this group starts a battle. A formation can fill several slots; the count beside it says how many. If the game picks a slot evenly, a formation in three slots comes up three times as often as one in a single slot; how it picks is not yet proven. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
-      body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
+      attrs:{'data-encounter-chance-group':row.id},
+      help:'All eight slots can use different formations. A repeated formation combines its slots\' chances. The game retries once if it chooses the previous battle. Hover a formation ID to replace that slot. Enemy edits affect every use of that formation. Special level uses a rule we do not yet understand.',
+      body:[detailSection({title:'INITIAL CHANCES',
+          help:infoHelp('Set each slot\'s initial chance below in steps of 0.390625%. All eight must total 100%. Zero prevents that slot from being chosen. Repeated formations combine their slots\' chances. These assume equally likely random values, before the previous-battle retry. Other executable patches can change these chances.'),
+          body:[encounterGroupInitialChances(row),el('div',{'data-encounter-chance-error':'',hidden:!error},
+            ...(error?[LexeditorUI.notice({message:error})]:[]))]}),
+        detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),
           body:[encounterGroupUsage(row)]})]});

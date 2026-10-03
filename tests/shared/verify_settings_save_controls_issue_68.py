@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -59,7 +60,7 @@ def main() -> int:
         raise AssertionError("The global settings payload must not collect game helper status")
 
     ff8_path = ROOT / "plugins" / "ff8" / "editor.html"
-    ff8 = ff8_path.read_text(encoding="utf-8")
+    ff8 = plugin_ui("ff8")
     for token in ('lex-information-panel ff8-information', "runtime.version"):
         require(ff8, token, ff8_path)
 
@@ -68,13 +69,13 @@ def main() -> int:
     # with every other editable surface, so a second button would present two
     # different Save controls for the same pending changes.
     rdr_path = ROOT / "plugins" / "rdr" / "editor.html"
-    rdr = rdr_path.read_text(encoding="utf-8")
+    rdr = plugin_ui("rdr")
     require(rdr, "LexeditorUI.settingsSaveControl({", rdr_path)
     for token in ("Object.keys(state.settingEdits).length", "save:saveSettings", "discard:discardSettings"):
         require(rdr, token, rdr_path)
 
     warband_path = ROOT / "plugins" / "warband" / "editor.html"
-    warband = warband_path.read_text(encoding="utf-8")
+    warband = plugin_ui("warband")
     if "LexeditorUI.settingsSaveControl({" in warband:
         raise AssertionError("Warband Tweaks must use the plugin-wide Save control, not a second settings save control")
     for token in (

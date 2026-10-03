@@ -9,6 +9,8 @@ images, text-box maps, and scripts stay opaque.
 
 from __future__ import annotations
 
+from core.numeric_values import integer_value
+
 from dataclasses import dataclass
 
 from .kernel_text import decode, encode
@@ -105,12 +107,18 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
     for edit in edits:
         if str(edit.get("source", "mngrp")) != "mngrp":
             raise ValueError("A menu-text edit has the wrong source")
-        section_id, slot = int(edit["sectionId"]), int(edit["recordId"])
+        section_id = integer_value(edit["sectionId"], "Menu text section id")
+        slot = integer_value(edit["recordId"], "Menu text record id")
+        if integer_value(edit.get("slot", 0), "Menu text slot") != 0:
+            raise ValueError("Menu text slot must be zero")
         key = (section_id, slot)
         if key in seen or section_id not in BY_ID:
             raise ValueError("Invalid or duplicate mngrp.bin text edit")
         seen.add(key)
-        grouped.setdefault(section_id, {})[slot] = str(edit.get("value", ""))
+        value = edit.get("value", "")
+        if not isinstance(value, str):
+            raise ValueError("Menu text value must be text")
+        grouped.setdefault(section_id, {})[slot] = value
 
     output = bytearray(data)
     changed = 0

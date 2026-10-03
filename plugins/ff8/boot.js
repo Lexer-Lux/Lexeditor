@@ -53,8 +53,10 @@
     return input;
   }
   // Each gameplay tweak is a tweak mod in the mod library; this page shows
-  // every one from its own settings schema. Only changed switches and values
-  // are sent, so saving never rewrites a tweak the reader did not touch.
+  // every one from its own settings schema. A value edited on another screen
+  // (GF HP Casting's costs on Magic) waits for Save with that screen's data;
+  // only changed switches and values are sent, so saving never rewrites a
+  // tweak the reader did not touch.
   const settingsPayload=()=>{
     const settings=state.data.settings,before=state.base.settings||{},tweaks={};
     for(const row of settings.tweaks||[]){
@@ -64,8 +66,30 @@
       if(signature(row.values)!==signature(old.values))change.values=row.values;
       if(Object.keys(change).length)tweaks[row.id]=change;
     }
-    return {gfSpellbooksEnabled:settings.gfSpellbooksEnabled,sharedMagicInventory:settings.sharedMagicInventory,tweaks};
+    return {tweaks};
   };
+  // A tweak's settings belong to its mod, not to the open project, so the
+  // Tweaks page saves them at once, to both copies, like trust - on Vanilla
+  // too. The number boxes report every keystroke; the save waits for a pause.
+  const tweakSaves=new Map();
+  function saveTweakValues(row){
+    clearTimeout(tweakSaves.get(row.id));
+    tweakSaves.set(row.id,setTimeout(async()=>{
+      tweakSaves.delete(row.id);
+      const values=clone(row.values);
+      try{
+        const result=await api("/api/settings/save",post({tweaks:{[row.id]:{values}}}));
+        const fresh=result.tweaks.find(item=>item.id===row.id);
+        for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id);if(match&&fresh)match.values=clone(fresh.values)}
+      }catch(error){
+        const saved=(state.base.settings?.tweaks||[]).find(item=>item.id===row.id);
+        if(saved)row.values=clone(saved.values);
+        showAlert({title:"Could not save the tweak",message:error.message||String(error)});
+        renderSettings();
+      }
+      shell.refresh();
+    },400));
+  }
   const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
   const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
   async function trustTweak(row,trusted){
@@ -77,15 +101,9 @@
     }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
   }
   function renderGameplaySettings(){
-    if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
     const settings=state.data.settings;
-    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:()=>shell.refresh(),trust:trustTweak,
+    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,trust:trustTweak,
       sounds:soundEntries,number:numberControl,select:selectControl});
-    const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
-    const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
-    panels.push(
-      LexeditorUI.tweakPanel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
-      LexeditorUI.tweakPanel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic));
     if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
     const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
     $("#main").replaceChildren(settingsView);
@@ -197,9 +215,13 @@
 
   async function saveAll(){
     try{
+      const invalid=[...document.querySelectorAll('input[data-lex-validate-number]:invalid')]
+        .find(input=>!input.disabled&&!input.readOnly&&input.getClientRects().length);
+      if(invalid){invalid.reportValidity();throw new Error(`Correct ${invalid.getAttribute("aria-label")||"the invalid numeric field"} before saving.`)}
+      validateEncounterChances();
       syncEnemyScanDetails();
       const jobs=[],kernelEdits=[];let textEdits=[],enemyAiDocuments=[],enemyBattleTextEdits=[];
-      const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});
+      const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power","startingOwner"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});
       if(cardEdits.length)jobs.push(api("/api/cards/save",post({edits:cardEdits})));
       if(signature(state.data.items.rows)!==signature(state.base.items)){
         const edits=state.data.items.rows.filter((row,index)=>
@@ -287,7 +309,7 @@
       }
       if(signature(state.data.world.rows)!==signature(state.base.world)){
         const edits=state.data.world.rows.filter((row,index)=>signature(row)!==signature(state.base.world[index]));
-        jobs.push(api("/api/world-map/save",post({edits})));
+        jobs.push(api("/api/world-map/save",post({edits,sha256:state.data.world.sha256})));
       }
       if(signature(state.data.fields.rows)!==signature(state.base.fields)){
         const edits=[];for(const row of state.data.fields.rows){if(!row._loaded)continue;const base=state.base.fields.find(value=>value.key===row.key),fieldEncounters=row.randomEncounters,oldEncounters=base?.randomEncounters;if(fieldEncounters?.formations?.length&&oldEncounters){for(let slot=0;slot<fieldEncounters.formations.length;slot++)if(Number(fieldEncounters.formations[slot])!==Number(oldEncounters.formations?.[slot]))edits.push({type:"fieldEncounter",map:row.key,kind:"formation",slot,value:fieldEncounters.formations[slot]});if(Number(fieldEncounters.rate)!==Number(oldEncounters.rate))edits.push({type:"fieldEncounter",map:row.key,kind:"rate",value:fieldEncounters.rate})}for(const tile of row.background?.tiles||[]){const before=base?.background?.tiles?.[tile.id];if(!before)continue;const edit={type:"background",map:row.key,tile:tile.id};for(const field of row.background.editableFields||[])if(tile[field]!==before[field])edit[field]=tile[field];if(Object.keys(edit).length>3)edits.push(edit)}for(const line of row.dialogue||[]){const before=base?.dialogue?.[line.id];if(before&&line.text!==before.text)edits.push({type:"dialogue",map:row.key,line:line.id,text:line.text})}for(const method of row.scripts?.methods||[]){const before=base?.scripts?.methods?.find(value=>value.id===method.id);if(before&&method.source!==before.source)edits.push({type:"script",map:row.key,method:method.id,source:method.source})}for(const triangle of row.walkmesh?.triangles||[])for(const vertex of triangle.vertices){const before=base?.walkmesh?.triangles?.[triangle.id]?.vertices?.[vertex.id];if(!before)continue;const edit={type:"walkmesh",map:row.key,triangle:triangle.id,vertex:vertex.id};for(const field of ["x","y","z","adjacent"])if(Number(vertex[field])!==Number(before[field]))edit[field]=vertex[field];if(Object.keys(edit).length>4)edits.push(edit)}for(const player of row.players||[])for(const param of player.params||[]){const before=base?.players?.[player.id]?.params?.[param.id];if(before&&Number(param.value)!==Number(before.value))edits.push({map:row.key,player:player.id,param:param.id,value:param.value})}for(const kind of ["gateway","trigger"]){const collection=kind==="gateway"?"gateways":"triggers",entries=row.entrances?.[collection]||[],oldEntries=base?.entrances?.[collection]||[];for(const entry of entries){const old=oldEntries[entry.id],idField=kind==="gateway"?"fieldId":"doorId";if(old&&Number(entry[idField])!==Number(old[idField]))edits.push({type:"entrance",map:row.key,kind,slot:entry.id,field:idField,value:entry[idField]});for(const point of (kind==="gateway"?["exitA","exitB","destination"]:["lineA","lineB"]))for(const axis of ["x","y","z"])if(old&&Number(entry[point][axis])!==Number(old[point][axis]))edits.push({type:"entrance",map:row.key,kind,slot:entry.id,field:point,axis,value:entry[point][axis]})}}for(const headerField of ["control","pvp","focus"]){const header=row.entrances?.header,oldHeader=base?.entrances?.header;if(header&&oldHeader&&Number(header[headerField])!==Number(oldHeader[headerField]))edits.push({type:"entrance",map:row.key,kind:"misc",field:headerField,value:header[headerField]})}for(const collection of ["cameraRanges","screenRanges"]){const rangeKind=collection==="cameraRanges"?"cameraRange":"screenRange";for(const entry of row.entrances?.[collection]||[]){const old=base?.entrances?.[collection]?.[entry.id];if(!old||!entry.present)continue;for(const edge of ["top","bottom","right","left"])if(Number(entry[edge])!==Number(old[edge]))edits.push({type:"entrance",map:row.key,kind:rangeKind,slot:entry.id,field:edge,value:entry[edge]})}}for(const camera of row.camera?.cameras||[]){const old=base?.camera?.cameras?.[camera.id];if(!old)continue;if(Number(camera.zoom)!==Number(old.zoom))edits.push({type:"camera",map:row.key,camera:camera.id,field:"zoom",value:camera.zoom});for(let vector=0;vector<3;vector++)for(const axis of ["x","y","z"])if(Number(camera.axis[vector][axis])!==Number(old.axis[vector][axis]))edits.push({type:"camera",map:row.key,camera:camera.id,field:"axis"+vector,axis,value:camera.axis[vector][axis]});for(const axis of ["x","y","z"])if(Number(camera.position[axis])!==Number(old.position[axis]))edits.push({type:"camera",map:row.key,camera:camera.id,field:"position",axis,value:camera.position[axis]})}for(const frame of row.movie?.frames||[]){const old=base?.movie?.frames?.[frame.id];if(!old)continue;for(let point=0;point<frame.points.length;point++)for(const axis of ["x","y","z"])if(Number(frame.points[point][axis])!==Number(old.points[point][axis]))edits.push({type:"movie",map:row.key,frame:frame.id,point,axis,value:frame.points[point][axis]})}}

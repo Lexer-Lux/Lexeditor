@@ -10,13 +10,14 @@ import ast
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 import threading
+from core.numeric_values import finite_number, integer_value
 from .sound_preview import sample_names
+from .source_save import publish_source
 
 _LOCK = threading.Lock()
 
@@ -752,7 +753,8 @@ def dataset_data(root, dataset: str):
 
 
 def _expression(value):
-    text = str(value).strip()
+    if not isinstance(value,str):raise ValueError("Source expressions must be text")
+    text = value.strip()
     if not text:
         raise ValueError("Expression cannot be empty")
     modern = re.sub(r"(?<=[0-9a-fA-F])L\b", "", text)
@@ -760,51 +762,41 @@ def _expression(value):
     return text
 
 
+def _number_source(number: float) -> str:
+    if number.is_integer() and not (number == 0 and math.copysign(1, number) < 0):
+        return str(int(number))
+    return repr(number)
+
+
 def _encode(value, spec: dict):
     kind = spec["kind"]
     if kind in {"string", "text"}:
-        return json.dumps(str(value), ensure_ascii=False)
+        if not isinstance(value,str):raise ValueError(f"{spec['label']} must be text")
+        return json.dumps(value, ensure_ascii=False)
     if kind == "identity":
         raise ValueError("Record IDs are fixed; edit references in source if an ID must change")
     if kind == "integer":
-        if isinstance(value, bool):
-            raise ValueError("Expected an integer")
-        try:
-            number = int(value)
-            if float(value) != number:
-                raise ValueError
-        except Exception as error:
-            raise ValueError("Expected an integer") from error
+        number = integer_value(value, spec["label"])
         if "min" in spec and number < spec["min"]:
             raise ValueError(f"{spec['label']} must be at least {spec['min']}")
         if "max" in spec and number > spec["max"]:
             raise ValueError(f"{spec['label']} must be at most {spec['max']}")
         return str(number)
     if kind == "number":
-        try:
-            number = float(value)
-        except Exception as error:
-            raise ValueError("Expected a number") from error
-        if not math.isfinite(number):
-            raise ValueError("Expected a finite number")
+        number = finite_number(value, spec["label"])
         if "min" in spec and number < spec["min"]:
             raise ValueError(f"{spec['label']} must be at least {spec['min']}")
         if "max" in spec and number > spec["max"]:
             raise ValueError(f"{spec['label']} must be at most {spec['max']}")
-        return str(int(number)) if number.is_integer() else format(number, ".15g")
+        return _number_source(number)
     if kind in {"vec2", "vec3", "vec4"}:
         count = int(kind[-1])
         if not isinstance(value, (list, tuple)) or len(value) != count:
             raise ValueError(f"{spec['label']} needs {count} numbers")
         rendered = []
         for item in value:
-            try:
-                number = float(item)
-            except Exception as error:
-                raise ValueError(f"{spec['label']} needs {count} numbers") from error
-            if not math.isfinite(number):
-                raise ValueError(f"{spec['label']} needs finite numbers")
-            rendered.append(str(int(number)) if number.is_integer() else format(number, ".15g"))
+            number = finite_number(item, spec["label"])
+            rendered.append(_number_source(number))
         opening, closing = ("(", ")") if spec.get("container") == "tuple" else ("[", "]")
         return opening + ", ".join(rendered) + closing
     return _expression(value)
@@ -827,47 +819,44 @@ def _validate_python(encoded: bytes):
         temporary_path.unlink(missing_ok=True)
 
 
-def _write_candidate(path, candidate, encoding, raw):
+def _write_candidate(path, candidate, encoding, raw, *, additional_outputs=()):
     if encoding != 'utf-8-sig' and any(ord(char) > 127 for char in candidate) and not re.search(
             r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = candidate.encode(encoding)
     _validate_python(encoded)
-    if path.read_bytes() != raw:
-        raise ValueError(f"{path.name} changed while validating; reload before saving")
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(encoded)
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    backup = publish_source(path, encoded, raw, additional_outputs=additional_outputs)
     return {"sha256": hashlib.sha256(encoded).hexdigest(), "backup": str(backup)}
 
 
-def create_sound(root, expected_sha256, record_index, original_id, new_id):
+def create_sound(root, expected_sha256, record_index, original_id, new_id, *, additional_outputs=()):
     """Append a sound template; process_sounds numbers existing entries unchanged."""
+    return create_dataset_record(root, 'sounds', expected_sha256, record_index, original_id, new_id,
+                                 additional_outputs=additional_outputs)
+
+
+def create_dataset_record(root, dataset, expected_sha256, record_index, original_id, new_id, *, additional_outputs=()):
+    """Append a structured template without importing source or renumbering records."""
+    if dataset not in SCHEMAS:
+        raise ValueError("Unknown Warband Module System dataset")
     if type(record_index) is not int:
-        raise ValueError("Choose an existing sound")
+        raise ValueError("Choose an existing record")
     if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", new_id):
         raise ValueError("ID must start with a lowercase letter and use letters, digits or underscores")
-    schema = SCHEMAS['sounds']
+    schema = SCHEMAS[dataset]
     path = Path(root) / schema['filename']
     with _LOCK:
         text, encoding, raw = _source(path)
         if hashlib.sha256(raw).hexdigest() != expected_sha256:
-            raise ValueError("Sound source changed; reload before creating")
+            raise ValueError("Record source changed; reload before creating")
         records = _records(text, schema)
         ids = [row['id'] for row in records]
         if any(row.get('problem') for row in records) or len(set(ids)) != len(ids):
             raise ValueError("Repair unsupported or duplicate source records before creating")
         if new_id in ids:
-            raise ValueError("A sound with that ID already exists")
+            raise ValueError("A record with that ID already exists")
         if not 0 <= record_index < len(records) or records[record_index]['id'] != original_id:
-            raise ValueError("Template sound changed; reload before creating")
+            raise ValueError("Template record changed; reload before creating")
         spans = _record_spans(text, schema['variable'])
         start, end = spans[record_index]
         left, right = records[record_index]['_spans'][0]
@@ -876,14 +865,23 @@ def create_sound(root, expected_sha256, record_index, original_id, new_id):
         newline = '\r\n' if '\r\n' in text else '\n'
         candidate = text[:insertion] + ',' + newline + '  ' + copied + text[insertion:]
         if [row['id'] for row in _records(candidate, schema)] != ids + [new_id]:
-            raise ValueError("Creation changed existing sound identities")
-        return {**_write_candidate(path, candidate, encoding, raw),
+            raise ValueError("Creation changed existing record identities")
+        return {**_write_candidate(path, candidate, encoding, raw, additional_outputs=additional_outputs),
                 'created':new_id, 'recordIndex':len(records)}
 
 
 def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
-    if dataset not in SCHEMAS:
+    if not isinstance(dataset,str) or dataset not in SCHEMAS:
         raise ValueError("Unknown Warband Module System dataset")
+    if not isinstance(expected_sha256,str):raise ValueError("Record source checksum must be text")
+    if not isinstance(edits,list):raise ValueError("Record edits must be a list")
+    for edit in edits:
+        if not isinstance(edit,dict) or set(edit)!={"recordIndex","originalId","fields"}:
+            raise ValueError("Record edits require recordIndex, originalId and fields only")
+        if not isinstance(edit['originalId'],str) or not edit['originalId']:
+            raise ValueError("Original record ID must be nonempty text")
+        if not isinstance(edit['fields'],dict):raise ValueError("Record fields must be an object")
+        if any(not isinstance(key,str) for key in edit['fields']):raise ValueError("Record field names must be text")
     schema = SCHEMAS[dataset]
     path = Path(root) / schema["filename"]
     with _LOCK:
@@ -897,23 +895,25 @@ def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
             raise ValueError("Source contains records that require source repair before structured saving")
         if len(set(identities)) != len(identities):
             raise ValueError("Duplicate record IDs require source repair")
-        if len({int(edit["recordIndex"]) for edit in edits}) != len(edits):
+        indexes = [integer_value(edit["recordIndex"], "Record index") for edit in edits]
+        if len(set(indexes)) != len(edits):
             raise ValueError("Send each record only once")
         specs = {field["key"]: field for field in schema["fields"]}
         patches = []
         changed_records = 0
-        for edit in edits:
-            index = int(edit["recordIndex"])
+        for edit, index in zip(edits, indexes):
             if not 0 <= index < len(records):
                 raise ValueError("Record no longer exists")
             row = records[index]
             if row["id"] != edit.get("originalId"):
                 raise ValueError("Record identity changed; reload before saving")
             row_changed = False
-            for key, value in (edit.get("fields") or {}).items():
+            for key, value in edit["fields"].items():
                 spec = specs.get(key)
                 if spec is None or key == "id":
                     raise ValueError("Unknown or fixed Module System field")
+                if key in row.get("fieldProblems", {}):
+                    raise ValueError(f"{spec['label']} is not a supported literal; edit it in source")
                 field_index = schema["fields"].index(spec)
                 if field_index >= len(row["_spans"]):
                     raise ValueError(f"{spec['label']} is not present in this source record")

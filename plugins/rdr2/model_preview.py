@@ -17,6 +17,7 @@ import tempfile
 import time
 import zlib
 from pathlib import Path
+from core.numeric_values import integer_value
 
 try:
     from .paths import GAME_ROOT, LEXEDITOR_ROOT, PLUGIN_ROOT
@@ -180,8 +181,8 @@ def _read_json(path: Path, fallback: dict) -> dict:
 def _settings() -> dict:
     raw = _read_json(SETTINGS_FILE, {})
     try:
-        cache_size = int(raw.get("cacheSizeMb", DEFAULT_CACHE_SIZE_MB))
-    except (TypeError, ValueError):
+        cache_size = integer_value(raw.get("cacheSizeMb", DEFAULT_CACHE_SIZE_MB), "Cache size")
+    except ValueError:
         cache_size = DEFAULT_CACHE_SIZE_MB
     return {
         "cacheSizeMb": min(MAX_CACHE_SIZE_MB, max(MIN_CACHE_SIZE_MB, cache_size)),
@@ -326,10 +327,9 @@ def get_preview_settings() -> dict:
 
 
 def save_preview_settings(payload: dict) -> dict:
-    try:
-        cache_size = int(payload.get("cacheSizeMb"))
-    except (TypeError, ValueError) as error:
-        raise ValueError("Cache size must be a whole number of MB") from error
+    if not isinstance(payload, dict) or set(payload) != {"cacheSizeMb"}:
+        raise ValueError("Preview settings require cacheSizeMb only")
+    cache_size = integer_value(payload["cacheSizeMb"], "Cache size in MB")
     if not MIN_CACHE_SIZE_MB <= cache_size <= MAX_CACHE_SIZE_MB:
         raise ValueError(
             f"Cache size must be between {MIN_CACHE_SIZE_MB} and {MAX_CACHE_SIZE_MB} MB"

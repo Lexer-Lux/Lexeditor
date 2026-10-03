@@ -9,16 +9,15 @@ caller's, so those are the parameters and the rest lives here once.
 """
 
 from __future__ import annotations
+from .numeric_values import integer_value
 
 
 def whole_number(value, label: str, low: int, high: int,
                  error: type[Exception] = ValueError) -> int:
     """`value` as a whole number from low through high, or `error`."""
-    if isinstance(value, bool):
-        raise error(f"{label} must be a whole number")
     try:
-        parsed = int(value)
-    except (TypeError, ValueError) as cause:
+        parsed = integer_value(value, label)
+    except ValueError as cause:
         raise error(f"{label} must be a whole number") from cause
     if not low <= parsed <= high:
         raise error(f"{label} must be between {low} and {high}")

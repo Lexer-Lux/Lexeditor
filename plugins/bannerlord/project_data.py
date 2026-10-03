@@ -442,6 +442,7 @@ def run_build(
             text=True,
             timeout=timeout,
             check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except FileNotFoundError as error:
         raise RuntimeError("dotnet was not found on PATH") from error

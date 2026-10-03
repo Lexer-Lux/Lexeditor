@@ -55,30 +55,40 @@ def main():
   fn=ff8[ff8.index('  function magicDetail('):ff8.index('  function abilityIcon(')]
   p.add_script_tag(content="""const {el,detailField,detailSection,tabbedPanel,multiNumberRow,infoHelp}=LexeditorUI;
    const state={data:{settings:{}}};const row={id:11,name:'Aero',fields:[]};
+   const tweakOn=()=>false;
    function compactMagicFields(){return el('div',{},'Attack data')}
    function fieldSourceControl(){return el('input',{type:'number',value:0})}
    function magicComposite(){return el('div',{},'Composite values')}
    function magicLabel(){return 'Aero'}
    function sharedDetail(row,prefs,body,cls){return LexeditorUI.detailPanel({title:'Aero',className:cls,body})}
    function renderKernel(){document.querySelector('#magic').replaceChildren(magicDetail(row,null))}
+   function renderAbilities(){renderKernel()}
    document.body.insertAdjacentHTML('beforeend','<div id=magic></div>');
   """+fn+"renderKernel();")
   p.wait_for_timeout(100)
   assert not errors,errors
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='TARGET INFO').count()==1
   p.locator('#magic [role=tab]').filter(has_text='Junction').click()
+  assert not errors,errors
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='TARGET INFO').count()==0
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='JUNCTION (STATS)').count()==1
-  assert p.locator('#magic .lex-subtab-bar').bounding_box()['width']>650
-  # Tabs stay at the top. Their panel fills the detail body's content box.
-  edges=p.evaluate("""()=>{const bar=document.querySelector('#magic .lex-subtab-bar').getBoundingClientRect();
-    const panel=document.querySelector('#magic .lex-tabbed-panel');const body=panel.parentElement;
+  assert p.locator('#magic .lex-subtab-bar:visible').bounding_box()['width']>650
+  # The contents wrappers have no box: tabs, heading and content are detail rows.
+  edges=p.locator('#magic .lex-tabbed-panel:visible').evaluate("""panel=>{const bar=panel.querySelector('.lex-subtab-bar').getBoundingClientRect();
+    const body=panel.closest('.lex-detail-panel');
     const b=body.getBoundingClientRect(),s=getComputedStyle(body);
-    return {bar:bar.top,panelTop:panel.getBoundingClientRect().top,panel:panel.getBoundingClientRect().bottom,
+    const heading=body.querySelector('.lex-detail-panel-heading').getBoundingClientRect();
+    const content=panel.querySelector('.lex-tabbed-panel-content').getBoundingClientRect();
+    return {bar:bar.top,panelTop:b.top+parseFloat(s.borderTopWidth),panel:content.bottom,
+            barBottom:bar.bottom,headingTop:heading.top,headingBottom:heading.bottom,contentTop:content.top,
             content:b.bottom-parseFloat(s.paddingBottom)-parseFloat(s.borderBottomWidth)}}""")
   assert abs(edges['bar']-edges['panelTop'])<1,edges
+  assert edges['barBottom']<=edges['headingTop']+1,edges
+  assert edges['headingBottom']<=edges['contentTop']+1,edges
   assert abs(edges['panel']-edges['content'])<2,edges
-  p.locator('#magic').screenshot(path='C:/Users/Lexer/AppData/Local/Temp/lexeditor-magic-tabs.png')
+  shot=Path(tempfile.gettempdir())/'lexeditor-dev'/'lexeditor-magic-tabs.png'
+  shot.parent.mkdir(parents=True,exist_ok=True)
+  p.locator('#magic').screenshot(path=str(shot))
   b.close()
  print('Top panel tabs, full-height content, hovered/focused routing, forward/reverse wrap, redraw focus, dialog navigation and setting persistence passed.')
 if __name__=='__main__':main()

@@ -268,24 +268,9 @@ function weaponFieldDomain(data,section,row,current){
 }
 
 function weaponValueControl(data,section,row,current,edited,onChange){
-  const values=weaponFieldDomain(data,section,row,current);
-  const numeric=values.every(value=>/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value));
-  // No title on any of these: a hover that only restates the widget you are
-  // already looking at is noise. Field meaning lives on the "?" instead.
-  const attrs={class:`weapon-value${edited?" edited":""}`};
-  if(numeric){
-    Object.assign(attrs,{type:"number",step:"any",value:current,onchange:ev=>onChange(ev.target.value)});
-    if(isRO())attrs.readonly="readonly";
-    return el("input",attrs);
-  }
-  if(values.length<=100){
-    attrs.onchange=ev=>onChange(ev.target.value);
-    if(isRO())attrs.disabled="disabled";
-    return el("select",attrs,...values.map(value=>{const option=el("option",{value},value);if(value===String(current))option.selected=true;return option;}));
-  }
-  Object.assign(attrs,{type:"text",value:current,onchange:ev=>onChange(ev.target.value)});
-  if(isRO())attrs.readonly="readonly";
-  return el("input",attrs);
+  const scalar={...row,readonly:row.writable===false};
+  const choices=weaponFieldDomain(data,section,row,row.value).map(value=>({field:row.field,value}));
+  return xmlScalarControl(scalar,choices,{value:current,edited,change:onChange,wrapReferences:false,className:"weapon-value"});
 }
 
 async function renderWeapons() {
@@ -307,11 +292,10 @@ async function renderWeapons() {
   }
   const records=d[section],names=records.map(x=>x.name).sort();if(!f.weapon||!names.includes(f.weapon))f.weapon=names[0];
   const sv=d.shellVfx;
-  const shellBox=sv&&sv.available?el("label",{style:"display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer",
-    title:`Blank every weapon's shell-eject VFX so vanilla shells stop duplicating the physical collectible casings. Currently ${sv.blank}/${sv.total} fields blank across ${(sv.files||[]).length} weapon files${sv.mixed?" (mixed)":""}.`},
-    el("input",{type:"checkbox",checked:(state.weaponShellVfxEdit??sv.blanked)===true,
-      onchange:ev=>{state.weaponShellVfxEdit=ev.target.checked;renderToolbarOnly();}}),
-    "Blank vanilla shell VFX (collectible casings)"):sv?el("span",{class:"hint"},"Shell comparison unavailable: a weapon layer or its vanilla reference is missing."):null;
+  const shellBox=sv&&sv.available?LexeditorUI.toggleRow({toggles:[{label:"Blank vanilla shell VFX (collectible casings)",
+    help:`Hides vanilla shell effects when collectible casings supply their own. ${sv.blank} of ${sv.total} fields are blank across ${(sv.files||[]).length} weapon files.${sv.mixed?" The layers currently have mixed values.":""}`,
+    disabled:isRO(),checked:(state.weaponShellVfxEdit??sv.blanked)===true,
+    change:checked=>{if(isRO())return;state.weaponShellVfxEdit=!sv.mixed&&checked===sv.blanked?null:checked;renderToolbarOnly();}}]}):sv?el("span",{class:"hint"},"Shell comparison unavailable: a weapon layer or its vanilla reference is missing."):null;
   tb.append(sectionTabs);
   const weaponFilters=[...(shellBox?[shellBox]:[]),savebar(saveWeapons)];
   const m=$("#main");m.innerHTML="";
@@ -334,49 +318,19 @@ async function renderWeapons() {
 function renderProjectileSpeeds(data,sectionTabs){
   const tb=$("#toolbar"),m=$("#main");tb.innerHTML="";m.innerHTML="";
   if(!data.available){tb.append(sectionTabs);return noData("Projectile-speed data is unavailable.");}
-  const edits=state.projectileSpeedEdits;
-  const toolbar=LexeditorUI.toolbar(
-    el("input",{type:"text",placeholder:"Filter cartridges or weapons…",value:state.filters.velocityQ||"",oninput:ev=>{state.filters.velocityQ=ev.target.value;filterRerender(ev,renderWeapons);}}),
-    el("span",{class:"count"},`${data.cartridges.length} cartridges`));
-  // The issue explicitly forbids editable/displayed per-cartridge values when
-  // there is no real runtime switch. Keep the proven mapping visible, but do
-  // not offer a save action for settings the game would ignore.
-  if(data.runtimeSwitching)toolbar.append(savebar(saveProjectileSpeeds));
-  tb.append(sectionTabs,toolbar);
-  const status=LexeditorUI.stack({fill:false,className:"lex-notice"},
-    el("b",{},`Global base: ${data.baseSpeed} game-speed units. `),
-    data.runtimeSwitching?"The ASI applies the selected cartridge multiplier at runtime.":data.runtimeStatus);
+  tb.append(sectionTabs);
   const q=(state.filters.velocityQ||"").toUpperCase();
   const rows=data.cartridges.filter(row=>!q||row.ammo.includes(q)||row.uses.some(use=>use.weapon.includes(q)||use.damageMode.includes(q)));
-  const speedOf=row=>{
-    const value=edits[row.ammo]??row.multiplier;
-    return data.runtimeSwitching?Number(data.baseSpeed)*Number(value):Number(data.baseSpeed);
-  };
-  const table=columnList({class:"velocity-table",align:"start",headerAlign:"start","aria-label":"Cartridge speeds",
-    rows,key:row=>row.ammo,editable:true,
-    template:"minmax(160px,1fr) 120px 150px minmax(0,2fr)",
-    columns:[{key:"ammo",label:"Cartridge",cellClass:"key",render:row=>weaponRecordLink("ammo",row.ammo)},
-      {key:"multiplier",label:data.runtimeSwitching?"Multiplier":"Multiplier (inactive)",
-        sortValue:row=>Number(edits[row.ammo]??row.multiplier),
-        render:row=>el("input",{class:`weapon-value${row.ammo in edits?" edited":""}`,type:"number",min:"0.05",max:"10",step:"0.01",
-          value:edits[row.ammo]??row.multiplier,"aria-label":`Speed multiplier for ${row.ammo}`,
-          disabled:(!data.runtimeSwitching||isRO())?true:undefined,
-          onchange:ev=>{const n=Number(ev.target.value);if(Number.isFinite(n)&&n>=0.05&&n<=10)edits[row.ammo]=n;renderToolbarOnly();}})},
-      {key:"speed",label:data.runtimeSwitching?"Effective speed":"Current runtime speed",
-        sortValue:row=>speedOf(row),
-        render:row=>Number.isFinite(speedOf(row))?speedOf(row).toFixed(2):"—"},
-      {key:"uses",label:"Real weapon / damage-mode mappings",
-        sortValue:row=>row.uses.map(use=>use.weapon).join("|"),
-        render:row=>el("span",{},...row.uses.map(use=>el("div",{class:"n"},weaponRecordLink("weapons",use.weapon),` / ${use.damageMode}`)))}]});
-  m.append(status,el("div",{class:"weapon-fieldscroll"},table));
-}
-
-async function saveProjectileSpeeds(){
-  const data=state.projectileSpeeds.mine;
-  if(!data?.runtimeSwitching)throw new Error("Per-cartridge projectile speed is not active in the runtime");
-  const entries=data.cartridges.map(row=>({ammo:row.ammo,multiplier:state.projectileSpeedEdits[row.ammo]??row.multiplier}));
-  const r=await api("/api/weapons/projectile-speeds/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({entries})});
-  state.projectileSpeedEdits={};delete state.projectileSpeeds.mine;toast(`Saved ${r.saved} cartridge multipliers`);renderWeapons();
+  // names: Cartridge identities are fixed ammunition names in the game data.
+  m.append(LexeditorUI.pagedListDetail({rows,key:row=>row.ammo,selected:state.filters.velocitySelected||rows[0]?.ammo,renamable:false,pageSize:15,noun:"cartridges",slots:false,splitKey:"rdr2-weapons-ammo",
+    emptyDetail:()=>LexeditorUI.detailPanel({title:"Cartridge mappings",body:LexeditorUI.detailNote("No cartridge mappings match the filter.")}),
+    search:{key:"rdr2-cartridge-mappings",value:state.filters.velocityQ||"",placeholder:"Search cartridges or weapons…",change:value=>{state.filters.velocityQ=value;renderWeapons();}},
+    sync:view=>{state.filters.velocitySelected=view.selected},
+    master:view=>columnList({class:"velocity-table",rows:view.rows,key:row=>row.ammo,selected:view.selected,select:view.select,"aria-label":"Cartridge mappings",columns:[{key:"ammo",label:"Cartridge",render:row=>weaponRecordLink("ammo",row.ammo)}]}),
+    detail:row=>LexeditorUI.detailPanel({title:row.ammo,help:fieldHelp(`Weapon mappings cover ${data.cartridges.length} cartridge${data.cartridges.length===1?"":"s"}. ${data.runtimeStatus}`),body:row.uses.map(use=>LexeditorUI.detailSection({title:weaponRecordLink("weapons",use.weapon),body:[
+      LexeditorUI.detailField({label:"Damage mode",control:LexeditorUI.readonlyField(use.damageMode)}),
+      LexeditorUI.detailField({label:"Fire type",control:LexeditorUI.readonlyField(use.fireType)})
+    ]}))})}));
 }
 
 // The six stats the game shows in-game. Only Damage and Fire Rate exist as
@@ -479,11 +433,11 @@ function weaponDetail(d,section,record,f){
             return LexeditorUI.inlineLabel(el("span",{},row.field),help?fieldHelp(help):null);}},
         {key:"value",label:()=>el("span",{},"My value",fieldHelp("Value with V / WR references beside the control (shared refField layout).")),
           render:row=>{const key=editKey(row),cur=edits[key]?.value??row.value;
-            const setValue=value=>{edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
-            const control=weaponValueControl(d,section,row,cur,key in edits,setValue);
+            const setValue=value=>{if(isRO()||row.writable===false)return;if(value===row.value||(/^(true|false)$/i.test(row.value)&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
+            const control=weaponValueControl(d,section,row,cur,()=>key in edits,setValue);
             return refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
               (value,ev)=>{const target=ev.currentTarget.closest('[role="row"]').querySelector(".weapon-value");
-                if(target){target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
+                if(target){if(target.type==="checkbox")target.checked=String(value).toLowerCase()==="true";else target.value=value;target.dispatchEvent(new Event(target.type==="number"?"input":"change",{bubbles:true}));}},String);}}]});
     const details=LexeditorUI.detailSection({title:`${group.label} (${group.rows.length})`,
       collapsible:true,open:!!q,attrs:{"data-group":group.key},
       help:fieldHelp(group.description),body:table});
@@ -494,15 +448,47 @@ function weaponDetail(d,section,record,f){
   return pane;
 }
 
+function weaponSaveBody(key){
+  const cut=key.indexOf("|"),section=key.slice(0,cut),name=key.slice(cut+1);
+  const records=state.weaponData.mine?.[section]?.filter(row=>row.name===name)||[];
+  if(cut<0||!["weapons","ammo"].includes(section)||!name||records.length!==1)throw new Error("Weapon record is missing or ambiguous.");
+  const edits=Object.values(state.weaponEdits[key]||{}),record=records[0],seen=new Set(),type=section==="weapons"?"CWeaponInfo":"CAmmoInfo";
+  for(const edit of edits){
+    if(!edit||!Array.isArray(edit.path)||!edit.path.length||edit.path.some(i=>!Number.isSafeInteger(i)||i<0))throw new Error("Invalid weapon field path.");
+    const targetType=edit.targetType??type,targetName=edit.targetName??name,identity=JSON.stringify([targetType,targetName,edit.path]);
+    const matches=(record.fields||[]).filter(row=>row.path.join(".")===edit.path.join(".")&&(row.targetType||type)===targetType&&(row.targetName||name)===targetName&&row.kind===edit.kind);
+    if(!matches.length||seen.has(identity))throw new Error("Unknown or duplicate weapon target.");
+    seen.add(identity);
+    for(const row of matches){
+      const choices=weaponFieldDomain(state.weaponData.mine,section,row,row.value).map(value=>({field:row.field,value}));
+      const error=aiDraftError({...row,readonly:row.writable===false},edit.value,choices);if(error)throw new Error(error);
+    }
+  }
+  return {section,name,sourceFile:record.sourceFile,edits};
+}
+async function preflightWeaponShellVfx(){
+  if(state.weaponShellVfxEdit===null)return;
+  if(typeof state.weaponShellVfxEdit!=="boolean")throw new Error("Shell VFX requires a boolean.");
+  await api("/api/weapons/shell-vfx/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blanked:state.weaponShellVfxEdit})});
+}
+async function preflightWeaponSave(){
+  const bodies=Object.entries(state.weaponEdits).filter(([,map])=>Object.keys(map).length).map(([key])=>[key,weaponSaveBody(key)]);
+  for(const [,body] of bodies)await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await preflightWeaponShellVfx();
+  return bodies;
+}
 async function saveWeapons(){
-  const section=state.filters.weaponSection||"weapons",name=state.filters.weapon,key=`${section}|${name}`,edits=Object.values(state.weaponEdits[key]||{});
-  const record=state.weaponData.mine?.[section]?.find(row=>row.name===name);
-  const localizedSaved=await saveLocalization();const r=await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({section,name,sourceFile:record?.sourceFile,edits})});
-  delete state.weaponEdits[key];delete state.weaponData.mine;toast(`Saved ${r.saved} weapon + ${localizedSaved} in-game text field(s)`);renderWeapons();
+  if(isRO())return;
+  const section=state.filters.weaponSection||"weapons",name=state.filters.weapon,key=`${section}|${name}`,body=weaponSaveBody(key);
+  await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await preflightWeaponShellVfx();
+  const localizedSaved=await saveLocalization();const r=await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  delete state.weaponEdits[key];const shellSaved=await saveWeaponShellVfx();delete state.weaponData.mine;toast(`Saved ${r.saved+shellSaved} weapon + ${localizedSaved} in-game text field(s)`);renderWeapons();
 }
 
 async function saveWeaponShellVfx(){
-  if(state.weaponShellVfxEdit===null)return 0;
+  if(isRO()||state.weaponShellVfxEdit===null)return 0;
+  await preflightWeaponShellVfx();
   const r=await api("/api/weapons/shell-vfx/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blanked:state.weaponShellVfxEdit})});
   state.weaponShellVfxEdit=null;delete state.weaponData.mine;return r.saved;
 }

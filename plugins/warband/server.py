@@ -4,27 +4,32 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
+import math
 import os
 import re
 import subprocess
 import tempfile
 import threading
+import tokenize
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
+from .source_save import publish_source
 from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .troop_editor import create_troop, troop_data, save_troops
 from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
-                             _single_bits, create_sound, dataset_data, header_constants, mesh_choices, save_dataset)
+                             _single_bits, create_dataset_record, create_sound, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .sound_preview import sample_path
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
+from core.numeric_values import integer_value
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -40,13 +45,15 @@ WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
 CATALOG_LOCK = threading.Lock()
 
 
-def settings_rows() -> list[dict]:
+def settings_rows(payload: bytes | None = None) -> list[dict]:
     rows = []
-    if not SETTINGS.is_file():
+    if payload is None and not SETTINGS.is_file():
         return rows
+    if payload is None:
+        payload = SETTINGS.read_bytes()
     section = ""
     pending_comments: list[str] = []
-    for line_number, raw in enumerate(SETTINGS.read_text(encoding="utf-8", errors="replace").splitlines()):
+    for line_number, raw in enumerate(payload.decode("utf-8-sig", errors="replace").splitlines()):
         stripped = raw.strip()
         if stripped.startswith((";", "#")):
             pending_comments.append(stripped.lstrip(";# "))
@@ -70,24 +77,62 @@ def settings_rows() -> list[dict]:
     return rows
 
 
-def save_settings(edits: list[dict]) -> dict:
-    lines = SETTINGS.read_text(encoding="utf-8", errors="replace").splitlines(True)
-    by_line = {int(edit["line"]): str(edit["value"]) for edit in edits}
+def settings_data() -> dict:
+    if not SETTINGS.is_file():
+        return {"file": str(SETTINGS), "rows": [], "sha256": None}
+    payload = SETTINGS.read_bytes()
+    return {"file": str(SETTINGS), "rows": settings_rows(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+
+
+def save_settings(edits: list[dict], expected_sha256: str) -> dict:
+    if not isinstance(edits, list):
+        raise ValueError("Settings edits must be an array")
+    original = SETTINGS.read_bytes()
+    if not isinstance(expected_sha256, str):
+        raise ValueError("Settings checksum is required")
+    if hashlib.sha256(original).hexdigest() != expected_sha256:
+        raise RuntimeError("Settings changed since they were opened; reload before saving")
+    lines = original.decode("utf-8").splitlines(True)
+    by_line = {}
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise ValueError("Settings edit must be an object")
+        if set(edit) - {"line", "value"}:
+            raise ValueError("Only the settings value is editable")
+        line_number = integer_value(edit.get("line"), "Settings line")
+        if line_number in by_line or not 0 <= line_number < len(lines):
+            raise ValueError("Invalid or duplicate settings line")
+        value = edit.get("value")
+        if not isinstance(value, str):
+            raise ValueError("Settings value must be text")
+        if any(character in value for character in "\r\n\x00;#"):
+            raise ValueError("Settings value cannot contain line breaks, NUL or comment delimiters")
+        by_line[line_number] = value
     saved = 0
     for line_number, value in by_line.items():
-        if not 0 <= line_number < len(lines):
-            continue
         line = lines[line_number]
-        match = re.match(r"^([^=]+?=\s*)([^;#\r\n]*)(.*)$", line)
-        if not match:
-            continue
-        newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
-        tail = match.group(3).rstrip("\r\n")
-        lines[line_number] = match.group(1) + value + tail + newline
+        newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else "\r" if line.endswith("\r") else ""
+        body = line[:-len(newline)] if newline else line
+        stripped = body.lstrip("\ufeff").strip()
+        match = re.fullmatch(r"([^=\r\n]+?=[ \t]*)([^;#\r\n]*)([;#][^\r\n]*)?", body)
+        if not match or stripped.startswith((";", "#", "[")) or not body.split("=", 1)[0].lstrip("\ufeff").strip():
+            raise ValueError("Settings line is not an editable value")
+        spacing = re.search(r"[ \t]*$", match.group(2)).group()
+        lines[line_number] = match.group(1) + value + spacing + (match.group(3) or "") + newline
         saved += 1
     backup = SETTINGS.with_suffix(".ini.lexeditor.bak")
-    backup.write_bytes(SETTINGS.read_bytes())
-    SETTINGS.write_text("".join(lines), encoding="utf-8")
+    if not saved:
+        return {"saved": 0, "backup": str(backup) if backup.exists() else None}
+    if not backup.exists():
+        backup.write_bytes(original)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=SETTINGS.name + ".", suffix=".tmp", dir=SETTINGS.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write("".join(lines).encode("utf-8"))
+        os.replace(temporary_name, SETTINGS)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
     return {"saved": saved, "backup": str(backup)}
 
 
@@ -98,6 +143,7 @@ ITEM_FIELD_NAMES = ("id", "name", "meshes", "flags", "capabilities", "value", "s
 # trace of where a record came from, so the create actions note each new id
 # here and the lists mark those records with the created-in-mod pen.
 CREATED_LEDGER = Path(PROJECT) / ".lexeditor-created.json"
+CREATION_LOCK = threading.Lock()
 
 
 def created_ids(kind: str) -> set[str]:
@@ -109,21 +155,36 @@ def created_ids(kind: str) -> set[str]:
     return {str(item) for item in ids} if isinstance(ids, list) else set()
 
 
-def note_created(kind: str, result: dict) -> dict:
-    record_id = result.get("created") if isinstance(result, dict) else None
-    if not record_id:
-        return result
+def create_with_origin(kind, record_id, create, *args):
+    """Publish a template copy and its origin ledger in the same transaction."""
+    if not isinstance(kind, str) or kind not in {"items", "troops", *MODULE_RECORD_SCHEMAS}:
+        raise ValueError("Unknown record kind")
+    if not isinstance(record_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", record_id):
+        raise ValueError("ID must start with a lowercase letter and use letters, digits or underscores")
+    with CREATION_LOCK:
+        output = _created_output(kind, record_id)
+        return create(*args, additional_outputs=[output])
+
+
+def _created_output(kind, record_id):
     try:
-        value = json.loads(CREATED_LEDGER.read_text(encoding="utf-8"))
-        value = value if isinstance(value, dict) else {}
-    except (OSError, ValueError, TypeError):
-        value = {}
-    ids = [str(item) for item in value.get(kind, []) if isinstance(item, str)]
-    if str(record_id) not in ids:
-        ids.append(str(record_id))
+        raw = CREATED_LEDGER.read_bytes()
+    except FileNotFoundError:
+        raw = None
+    try:
+        value = json.loads(raw.decode("utf-8")) if raw is not None else {}
+    except (UnicodeError, ValueError) as error:
+        raise ValueError("Created-record ledger is invalid; repair it before creating a record") from error
+    if not isinstance(value, dict):
+        raise ValueError("Created-record ledger must be an object")
+    ids = value.get(kind, [])
+    if not isinstance(ids, list) or any(not isinstance(item, str) or not item for item in ids):
+        raise ValueError("Created-record ledger IDs must be a list of nonempty text")
+    ids = list(dict.fromkeys(ids))
+    if record_id not in ids:
+        ids.append(record_id)
     value[kind] = ids
-    CREATED_LEDGER.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    return result
+    return CREATED_LEDGER, (json.dumps(value, indent=2) + "\n").encode("utf-8"), raw
 
 
 def mark_created(kind: str, payload: dict) -> dict:
@@ -326,12 +387,11 @@ def item_choices(rows: list[dict]) -> dict:
     for record in rows:
         stats_field = record["fields"].get("stats", "")
         used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", stats_field))
-        # A stat argument that is not a number is a name the Module System reads,
-        # such as swing_damage(16, blunt). The names this project uses in that
-        # position are the finite choices for it.
+        # Only resolved header constants are named choices. Other source
+        # expressions must not become enums merely because they contain text.
         for macro, arguments in re.findall(r"([A-Za-z_]\w*)\s*\(([^()]*)\)", stats_field):
             for position, argument in enumerate(part.strip() for part in arguments.split(",")):
-                if not argument or re.fullmatch(r"-?\d+(\.\d+)?", argument):
+                if not re.fullmatch(r"[A-Za-z_]\w*", argument) or argument not in symbols:
                     continue
                 slots = stat_arguments.setdefault(macro, [])
                 while len(slots) <= position:
@@ -397,6 +457,16 @@ def _validate_item_expression(expression: str) -> str:
         cursor += 1
     if stack:
         raise ValueError("Unbalanced item expression")
+    # Tokenize without executing source, including Python 2 long integers.
+    # Comments and quoted text are not numeric expressions.
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(expression).readline):
+            number = token.string.replace("_", "").rstrip("jJ")
+            if (token.type == tokenize.NUMBER and re.fullmatch(r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", number)
+                    and ("." in number or "e" in number.lower()) and not math.isfinite(float(number))):
+                raise ValueError("Source expressions require finite numeric literals")
+    except tokenize.TokenError:
+        pass  # The existing source/candidate syntax checks handle other errors.
     return expression
 
 
@@ -425,29 +495,18 @@ def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
     return encoded
 
 
-def _write_items_candidate(candidate: str, encoding: str, raw: bytes) -> dict:
+def _write_items_candidate(candidate: str, encoding: str, raw: bytes, *, additional_outputs=()) -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if any(ord(char) > 127 for char in candidate) and not re.search(
             r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
         candidate = f"# coding: {encoding}\n" + candidate
     encoded = _validate_module_items_candidate(candidate, encoding)
-    if source.read_bytes() != raw:
-        raise ValueError("module_items.py changed while validating; reload before saving")
-    backup = source.with_name(source.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(encoded)
-        os.replace(temporary_name, source)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    backup = publish_source(source, encoded, raw, additional_outputs=additional_outputs)
     return {"backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 def create_item(record_index: int, original_id: str, item_id: str, name: str,
-                expected_sha256: str) -> dict:
+                expected_sha256: str, *, additional_outputs=()) -> dict:
     """Append a template copy without renumbering existing item records."""
     if not isinstance(item_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", item_id):
         raise ValueError("Item ID must start with a lowercase letter and use letters, digits or underscores")
@@ -476,11 +535,15 @@ def create_item(record_index: int, original_id: str, item_id: str, name: str,
         expected_ids = [record["id"] for record in records] + [item_id]
         if [record["id"] for record in _item_records(candidate)] != expected_ids:
             raise ValueError("Creation changed existing item identities; refusing the write")
-        result = _write_items_candidate(candidate, encoding, raw)
+        result = _write_items_candidate(candidate, encoding, raw, additional_outputs=additional_outputs)
         return {**result, "created": item_id, "recordIndex": len(records)}
 
 
 def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> dict:
+    if not isinstance(edits, list):
+        raise ValueError("Item edits must be a list")
+    if expected_sha256 is not None and not isinstance(expected_sha256, str):
+        raise ValueError("Item source checksum must be text")
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
         raise FileNotFoundError(source)
@@ -496,29 +559,39 @@ def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> di
         by_index = {record["recordIndex"]: record for record in records}
         replacements: list[tuple[int, int, str]] = []
         edited_records: set[int] = set()
+        seen_records: set[int] = set()
         for edit in edits:
-            record_index = int(edit.get("recordIndex", -1))
+            if not isinstance(edit, dict) or set(edit) != {"recordIndex", "originalId", "fields"}:
+                raise ValueError("Item edits require recordIndex, originalId and fields only")
+            if not isinstance(edit["originalId"], str) or not edit["originalId"]:
+                raise ValueError("Original item ID must be nonempty text")
+            if not isinstance(edit["fields"], dict):
+                raise ValueError("Item fields must be an object")
+            record_index = integer_value(edit.get("recordIndex", -1), "Item record index")
             record = by_index.get(record_index)
             if record is None:
                 raise ValueError(f"Item record {record_index} no longer exists")
-            original_id = str(edit.get("originalId", ""))
+            original_id = edit["originalId"]
             if original_id and original_id != record["id"]:
                 raise ValueError(
                     f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving"
                 )
-            if record_index in edited_records:
+            if record_index in seen_records:
                 raise ValueError("Send each item record only once")
+            seen_records.add(record_index)
             row_changed = False
             field_order = record["fieldOrder"]
-            for field, value in dict(edit.get("fields") or {}).items():
+            for field, value in edit["fields"].items():
+                if not isinstance(field, str) or not isinstance(value, str):
+                    raise ValueError("Item field names and values must be text")
                 if field not in field_order:
                     raise ValueError(f"Item {record['id']} has no field named {field}")
                 if field == "id":
                     raise ValueError("Item IDs are fixed because other Module System records reference them")
                 replacement = (
-                    _python_string(str(value))
+                    _python_string(value)
                     if field == "name"
-                    else _validate_item_expression(str(value))
+                    else _validate_item_expression(value)
                 )
                 field_index = field_order.index(field)
                 left, right = record["_fieldSpans"][field_index]
@@ -804,7 +877,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/dashboard":
                 self.json_response({"paths": {"Project": str(PROJECT), "Module System": str(MODULE_SYSTEM), "Game": paths.WARBAND_ROOT, "Installed modules": str(MODULES)}, "problems": paths.check()})
             elif path == "/api/settings":
-                self.json_response({"file": str(SETTINGS), "rows": settings_rows()})
+                self.json_response(settings_data())
             elif path == "/api/troops":
                 self.json_response(mark_created("troops", troop_data(MODULE_SYSTEM)))
             elif path == "/api/items":
@@ -870,21 +943,35 @@ class Handler(PluginRequestHandler):
         try:
             body = self.body()
             if path == "/api/settings/save":
-                self.json_response(save_settings(body.get("edits", [])))
+                self.json_response(save_settings(body.get("edits", []), body.get("sha256")))
             elif path == "/api/troops/save":
-                self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
+                if not isinstance(body, dict) or set(body) != {"edits", "sha256"} or not isinstance(body["sha256"], str):
+                    raise ValueError("Expected troop edits and text sha256 only")
+                self.json_response(save_troops(MODULE_SYSTEM, body["sha256"], body["edits"]))
             elif path == "/api/troops/create":
-                self.json_response(note_created("troops", create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
-                                                body.get("originalId"), body.get("id"), body.get("name"), body.get("plural"))))
+                self.json_response(create_with_origin("troops", body.get("id"), create_troop, MODULE_SYSTEM,
+                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"),
+                    body.get("id"), body.get("name"), body.get("plural")))
             elif path == "/api/items/save":
-                self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
+                if not isinstance(body, dict) or set(body) != {"edits", "sha256"} or not isinstance(body["sha256"], str):
+                    raise ValueError("Expected item edits and text sha256 only")
+                self.json_response(save_item_edits(body["edits"], body["sha256"]))
             elif path == "/api/items/create":
-                self.json_response(note_created("items", create_item(body.get("recordIndex"), body.get("originalId"),
-                                               body.get("id"), body.get("name"), body.get("sha256", ""))))
+                self.json_response(create_with_origin("items", body.get("id"), create_item,
+                    body.get("recordIndex"), body.get("originalId"), body.get("id"),
+                    body.get("name"), body.get("sha256", "")))
             elif path == "/api/module-records/save":
-                self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
+                if not isinstance(body,dict) or set(body)!={"dataset","sha256","edits"}:
+                    raise ValueError("Expected dataset, sha256 and edits only")
+                self.json_response(save_dataset(MODULE_SYSTEM, body["dataset"], body["sha256"], body["edits"]))
             elif path == "/api/sounds/create":
-                self.json_response(note_created("sounds", create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
+                self.json_response(create_with_origin("sounds", body.get("id"), create_sound, MODULE_SYSTEM,
+                    body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id")))
+            elif path == "/api/module-records/create":
+                dataset = body.get("dataset", "")
+                self.json_response(create_with_origin(dataset, body.get("id"), create_dataset_record,
+                    MODULE_SYSTEM, dataset, body.get("sha256", ""), body.get("recordIndex"),
+                    body.get("originalId"), body.get("id")))
             elif path == "/api/catalog/file/save":
                 self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":

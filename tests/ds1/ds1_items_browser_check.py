@@ -8,7 +8,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from ds1_fixture import make_archive
+from ds1_fixture import make_archive, make_text_archive
+from plugins.ds1 import texts
 from plugins.ds1.formats import ItemDocument, SUBTABS
 from plugins.ds1.store import RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
@@ -28,6 +29,9 @@ def main():
         game, mod = temp / 'game', temp / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
         (game / RELATIVE).write_bytes(raw)
+        # Item names live in the game's text archive, beside the parameters.
+        (game / texts.RELATIVE).parent.mkdir(parents=True)
+        (game / texts.RELATIVE).write_bytes((Path(real_root) / texts.RELATIVE).read_bytes() if real_root else make_text_archive())
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
@@ -75,10 +79,27 @@ def main():
                     reopened = ItemDocument((mod / RELATIVE).read_bytes())
                     for table, row_id, field, value in changes:
                         assert reopened.value(table, row_id, field) == value
+                    # An item is renamed in the table's Name cell, by double-click.
+                    page.locator('[data-subtab="consumables"]').click()
+                    page.wait_for_function('state.sub==="consumables" && state.row && !state.pending')
+                    renamed = page.evaluate('state.row.id')
+                    cell = page.locator(f'.lex-list-row[data-key$="{renamed}"] [data-column-key="name"]').first
+                    cell.click()
+                    page.wait_for_timeout(150)
+                    cell = page.locator(f'.lex-list-row[data-key$="{renamed}"] [data-column-key="name"]').first
+                    cell.dblclick()
+                    editor = page.locator('.lex-cell-editing input')
+                    editor.fill('Soul Safety Stone')
+                    editor.press('Enter')
+                    page.wait_for_function('!state.pending && state.row.name==="Soul Safety Stone"')
+                    assert page.locator('.lex-detail-panel-name').first.inner_text() == 'Soul Safety Stone'
+                    page.locator('#global-save').click()
+                    page.wait_for_function('state.dirty===0 && state.pending===0')
+                    assert texts.TextDocument((mod / texts.RELATIVE).read_bytes()).name('EquipParamGoods', renamed) == 'Soul Safety Stone'
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     page.locator('[data-subtab="weapons"]').click()
                     page.wait_for_timeout(500)
-                    assert page.locator('.ds1-records').is_visible()
+                    assert page.locator('#main > .lex-stack .lex-column-list').first.is_visible()
                     expected = set(page.evaluate('state.row.fields.filter(f=>f.editable).map(f=>f.key)'))
                     seen = set()
                     for _ in range(30):

@@ -3,20 +3,20 @@
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `7e44d00acd81483b82fafdfe407aef2e76aa2821`
-- Actions build run: `36279512314`
+- Editor build revision: `6272b416ed40f4c2b56df222cabd69d127eedff3`
+- Actions build run: `37093173008`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `544f68d96947d8eeb677c4c9ea55740aee17acdda82c80d53985dedaf3b40094`
-- Driver size: 38863360 bytes; PE32 x86 DLL
-- PDB SHA-256: `1b8100aa8c860d752a9320fa7644b4cc49aaf1ea1f269aa70e66143ef85d4fbc` (build artifact, not installed)
-- Complete source patch SHA-256: `e42ad5db8ceeaeb8124bb49266b993806ac8cd4420aa7bc31b6705a4b3969b86`
+- Driver SHA-256: `a451ed58fed0354bb7528443123c009a3bfa8e7556c8fd8b94370311d44dc1ef`
+- Driver size: 38863872 bytes; PE32 x86 DLL
+- PDB SHA-256: `b0a998ce8589ce740a14141532fd3521e7022d87d1e8e8bd8413ae883c84aaf0` (build artifact, not installed)
+- Complete source patch SHA-256: `cf41186d0c5bd646524bb578cfcb988e3748e8ed36e8af8a9dd642ea2231dfad`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
   sorted filename/hash-list SHA-256 `abeb91fc580c5270fb566992e4b16c77e601ea350de46928a8476b1a0e94cd1e`.
 
-
+This run compiled and linked the driver and passed the pinned linked-runtime verifier with all eleven negative controls. Its next step failed because the workflow referenced the retired verify_ff8_no_magic_consumption.py. The archived DLL was recovered unchanged. The replacement linked cast-debit check, the 180-case vehicle clamp check, Modern Controls and Reptile ATB artifact checks, source-patch comparison, and full shipping-package verification passed before packaging. The workflow repair awaits a new CI run.
 
 ## Changes
 
@@ -36,6 +36,10 @@ suppresses native camera-left/right input and the overhead-view toggle at their
 consumers. Battle camera elevation uses FF8's downward-positive Y axis, so
 the floor blocks underground movement and the upper limit allows elevation.
 In-game Time uses the native TIME label instead of PLAY.
+Modern Controls forwards the right-stick press to Enhanced Scan and maps
+the right trigger to Shot's fire input only while Shot is open. Timed Hits
+keeps its Square input. These are compiled input mappings; actual controller
+and in-game behavior still require acceptance.
 Better HP Colors adds optional smooth HP-number colour in battle, shared
 character panels and active/reserve main-menu rows. Native KO and status
 palettes take priority. Interaction Indicators observes the native field target

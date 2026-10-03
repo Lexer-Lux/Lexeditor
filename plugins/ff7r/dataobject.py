@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import math
 from pathlib import Path
 import re
 import struct
 from typing import Any
+
+from core.numeric_values import finite_number, integer_value
 
 
 PACKAGE_TAG = 0x9E2A83C1
@@ -361,13 +362,21 @@ class DataObjectPackage:
         raise ValueError(f"Unknown property: {name}")
 
     def apply_edits(self, edits: list[dict[str, Any]]) -> None:
+        if not isinstance(edits, list):
+            raise ValueError("Edits must be an array")
+        pending = []
+        seen = set()
         for edit in edits:
             if not isinstance(edit, dict):
                 raise TypeError("Each edit must be an object")
-            entry_index = int(edit.get("entry", -1))
+            if set(edit) - {"entry", "property", "index", "value"}:
+                raise ValueError("Edit contains unsupported fields")
+            entry_index = integer_value(edit.get("entry", -1), "Entry index")
             if entry_index < 0 or entry_index >= len(self.entries):
                 raise IndexError(f"Entry index out of range: {entry_index}")
-            prop_name = str(edit.get("property", ""))
+            prop_name = edit.get("property", "")
+            if not isinstance(prop_name, str):
+                raise ValueError("Property must be text")
             prop = self._property(prop_name)
             if not prop.editable:
                 raise ValueError(f"{prop_name} is read-only because changing FString size is unsupported")
@@ -377,17 +386,30 @@ class DataObjectPackage:
             if prop.is_array:
                 if "index" not in edit:
                     raise ValueError(f"{prop_name} requires an array index")
-                array_index = int(edit["index"])
+                array_index = integer_value(edit["index"], "Array index")
                 if field.length is None or array_index < 0 or array_index >= field.length:
                     raise IndexError(f"Array index out of range for {prop_name}: {array_index}")
                 offset = field.offset + 4 + array_index * self._width(prop.type_code, array=True)
-                self._write_value(offset, prop.type_code, value, array=True)
-                entry.values[prop_name][array_index] = self._normalize(prop.type_code, value)
             else:
                 if "index" in edit and edit["index"] is not None:
                     raise ValueError(f"{prop_name} is not an array")
-                self._write_value(field.offset, prop.type_code, value, array=False)
-                entry.values[prop_name] = self._normalize(prop.type_code, value)
+                array_index = None
+                offset = field.offset
+            identity = (entry_index, prop_name, array_index)
+            if identity in seen:
+                raise ValueError("Duplicate field edit")
+            seen.add(identity)
+            normalized, encoded = self._encode_value(prop.type_code, value, array=prop.is_array)
+            if offset < 0 or offset + len(encoded) > len(self.uexp_bytes):
+                raise FormatError(f"Edit for {prop_name} writes outside {self.uexp_path.name}")
+            pending.append((entry, prop_name, array_index, offset, normalized, encoded))
+
+        for entry, prop_name, array_index, offset, value, encoded in pending:
+            self.uexp_bytes[offset:offset + len(encoded)] = encoded
+            if array_index is None:
+                entry.values[prop_name] = value
+            else:
+                entry.values[prop_name][array_index] = value
 
     def delete_array_element(self, entry_index: int, prop_name: str, array_index: int) -> None:
         """Delete one existing element from a fixed-width array and reparse.
@@ -395,6 +417,8 @@ class DataObjectPackage:
         This deliberately does not support insertion, entry-count changes, name
         map edits, FString arrays, or arbitrary package reconstruction.
         """
+        entry_index = integer_value(entry_index, "Entry index")
+        array_index = integer_value(array_index, "Array index")
         if entry_index < 0 or entry_index >= len(self.entries):
             raise IndexError(f"Entry index out of range: {entry_index}")
         prop = self._property(prop_name)
@@ -413,10 +437,18 @@ class DataObjectPackage:
         if element_end > len(self.uexp_bytes):
             raise FormatError(f"Deletion for {prop_name} is outside {self.uexp_path.name}")
 
-        del self.uexp_bytes[element_offset:element_end]
-        struct.pack_into("<i", self.uexp_bytes, field.offset, field.length - 1)
-        self._adjust_export_serial_size(-width)
-        self.properties, self.entries = self._parse_uexp()
+        old_uasset_bytes = bytearray(self.uasset_bytes)
+        old_uexp_bytes = bytearray(self.uexp_bytes)
+        old_uasset, old_properties, old_entries = self.uasset, self.properties, self.entries
+        try:
+            del self.uexp_bytes[element_offset:element_end]
+            struct.pack_into("<i", self.uexp_bytes, field.offset, field.length - 1)
+            self._adjust_export_serial_size(-width)
+            self.properties, self.entries = self._parse_uexp()
+        except Exception:
+            self.uasset_bytes, self.uexp_bytes = old_uasset_bytes, old_uexp_bytes
+            self.uasset, self.properties, self.entries = old_uasset, old_properties, old_entries
+            raise
 
     def _adjust_export_serial_size(self, delta: int) -> None:
         if delta == 0 or self.uasset.serial_size == 0:
@@ -446,34 +478,17 @@ class DataObjectPackage:
 
     def _normalize(self, type_code: int, value: Any):
         if type_code in (BOOLEAN, BOOLEAN_BYTE):
-            if isinstance(value, str):
-                folded = value.strip().casefold()
-                if folded in {"true", "1"}:
-                    return True
-                if folded in {"false", "0"}:
-                    return False
-                raise ValueError(f"Expected a boolean, got {value!r}")
-            if value in (0, 1, False, True):
-                return bool(value)
-            raise ValueError(f"Expected a boolean, got {value!r}")
+            if not isinstance(value, bool):
+                raise ValueError("Expected true or false")
+            return value
         if type_code in BOUNDS:
-            if isinstance(value, bool):
-                raise ValueError("Expected an integer, got a boolean")
-            number = int(value)
-            if str(number) != str(value).strip() and not isinstance(value, int):
-                try:
-                    if float(value) != number:
-                        raise ValueError
-                except (TypeError, ValueError):
-                    raise ValueError(f"Expected an integer, got {value!r}") from None
+            number = integer_value(value, "Value")
             minimum, maximum = BOUNDS[type_code]
             if number < minimum or number > maximum:
                 raise ValueError(f"Value {number} is outside {minimum}..{maximum}")
             return number
         if type_code == FLOAT:
-            number = float(value)
-            if not math.isfinite(number):
-                raise ValueError("Float must be finite")
+            number = finite_number(value, "Float")
             try:
                 packed = struct.pack("<f", number)
             except (OverflowError, struct.error) as error:
@@ -485,28 +500,29 @@ class DataObjectPackage:
             return value
         raise ValueError(f"Property type {type_code} cannot be edited")
 
-    def _write_value(self, offset: int, type_code: int, value: Any, *, array: bool) -> None:
+    def _encode_value(self, type_code: int, value: Any, *, array: bool) -> tuple[Any, bytes]:
         value = self._normalize(type_code, value)
         try:
             if type_code == BOOLEAN:
-                struct.pack_into("<B" if array else "<i", self.uexp_bytes, offset, int(value))
+                encoded = struct.pack("<B" if array else "<i", int(value))
             elif type_code == BOOLEAN_BYTE:
-                struct.pack_into("<B", self.uexp_bytes, offset, int(value))
+                encoded = struct.pack("<B", int(value))
             elif type_code == BYTE:
-                struct.pack_into("<B", self.uexp_bytes, offset, value)
+                encoded = struct.pack("<B", value)
             elif type_code == INT16:
-                struct.pack_into("<h", self.uexp_bytes, offset, value)
+                encoded = struct.pack("<h", value)
             elif type_code == INT32:
-                struct.pack_into("<i", self.uexp_bytes, offset, value)
+                encoded = struct.pack("<i", value)
             elif type_code == FLOAT:
-                struct.pack_into("<f", self.uexp_bytes, offset, value)
+                encoded = struct.pack("<f", value)
             elif type_code == NAME:
                 index = self.uasset.names.index(value)
-                struct.pack_into("<iI", self.uexp_bytes, offset, index, 0)
+                encoded = struct.pack("<iI", index, 0)
             else:
                 raise ValueError(f"Property type {type_code} cannot be edited")
         except struct.error as error:
-            raise FormatError(f"Edit for type {type_code} writes outside {self.uexp_path.name}") from error
+            raise ValueError(f"Value for type {type_code} is outside its storage range") from error
+        return value, encoded
 
     @staticmethod
     def _atomic_write(target: Path, data: bytes) -> Path:

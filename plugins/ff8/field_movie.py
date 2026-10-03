@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 FRAME_SIZE = 24
 POINTS_PER_FRAME = 4
 _AXES = ("x", "y", "z")
@@ -58,13 +60,13 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
     units = _units(count)
     seen = set()
     for edit in edits:
-        identity = ("movie", int(edit.get("frame", -1)),
-                    int(edit.get("point", -1)), str(edit.get("axis", "")))
+        identity = ("movie", integer_value(edit.get("frame", -1), "Field movie frame"),
+                    integer_value(edit.get("point", -1), "Field movie point"), str(edit.get("axis", "")))
         if identity in seen or identity not in units:
             raise ValueError("Invalid or duplicate field movie camera edit")
         seen.add(identity)
         offset, minimum, maximum = units[identity]
-        value = int(edit.get("value"))
+        value = integer_value(edit.get("value"), "Field movie coordinate")
         if not minimum <= value <= maximum:
             raise ValueError(f"Field movie camera value must be {minimum} to {maximum}")
         struct.pack_into("<h", result, offset, value)

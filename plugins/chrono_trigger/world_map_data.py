@@ -10,11 +10,12 @@ Lexeditor never resizes these resources and preserves trailing bytes and color
 bit 15.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 MAP_RE = re.compile(r"^Game/world/Map/Map_(\d+)\.dat$", re.IGNORECASE)
@@ -96,6 +97,7 @@ def load_world_tiles(store: OverlayStore, path: str, source: str = "mine") -> di
 
 
 def save_world_tiles(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_tiles(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -104,15 +106,21 @@ def save_world_tiles(store: OverlayStore, path: str, expected_sha256: str, edits
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world-map tile edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the world-map tile index is editable")
         row = by_token[token]
-        value = int(values.get("tileIndex", row["tileIndex"]))
+        value = integer_value(values.get("tileIndex", row["tileIndex"]), "Tile index")
         low, high = ((0, 255) if row["layer"] == 1 else (256, 511))
         if not low <= value <= high:
             raise ValueError(f"Layer {row['layer']} tile index must be between {low} and {high}")
@@ -148,6 +156,7 @@ def load_world_properties(store: OverlayStore, path: str, source: str = "mine") 
 
 
 def save_world_properties(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_properties(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -157,16 +166,22 @@ def save_world_properties(store: OverlayStore, path: str, expected_sha256: str, 
     allowed = {"topLeft", "topRight", "bottomLeft", "bottomRight"}
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world property edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported world property fields: {', '.join(sorted(unknown))}")
         row = by_token[token]
-        merged = {key: int(values.get(key, row[key])) for key in allowed}
+        merged = {key: integer_value(values.get(key, row[key]), key) for key in allowed}
         for key, value in merged.items():
             if key in values and value not in PROPERTY_NAMES:
                 raise ValueError("Edited world property values must be documented codes 0 through 4")
@@ -204,6 +219,7 @@ def load_world_music(store: OverlayStore, path: str, source: str = "mine") -> di
 
 
 def save_world_music(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_music(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -212,16 +228,22 @@ def save_world_music(store: OverlayStore, path: str, expected_sha256: str, edits
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world music edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World data values must be an object")
         if set(values) - {"leftMusic", "rightMusic"}:
             raise ValueError("Only the two stored world music indexes are editable")
         row = by_token[token]
-        left = int(values.get("leftMusic", row["leftMusic"]))
-        right = int(values.get("rightMusic", row["rightMusic"]))
+        left = integer_value(values.get("leftMusic", row["leftMusic"]), "Left music")
+        right = integer_value(values.get("rightMusic", row["rightMusic"]), "Right music")
         if not 0 <= left <= 15 or not 0 <= right <= 15:
             raise ValueError("World music index must be between 0 and 15")
         output[row["index"]] = (left << 4) | right
@@ -264,6 +286,7 @@ def load_world_colors(store: OverlayStore, path: str, source: str = "mine") -> d
 
 
 def save_world_colors(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_world_colors(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -272,12 +295,21 @@ def save_world_colors(store: OverlayStore, path: str, expected_sha256: str, edit
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World data edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World data token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world color edit")
         seen.add(token)
-        value = str(edit.get("hex", "")).strip()
-        if len(value) != 7 or not value.startswith("#"):
+        if set(edit) - {"token", "hex"}:
+            raise ValueError("Only the world color value is editable")
+        value = edit.get("hex", "")
+        if not isinstance(value, str):
+            raise ValueError("World animation color must be text")
+        value = value.strip()
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
             raise ValueError("World animation color must be #RRGGBB")
         try:
             red, green, blue = (int(value[offset:offset + 2], 16) for offset in (1, 3, 5))

@@ -91,9 +91,9 @@ def run():
         finally:
             if previous is None:os.environ.pop(script_mods.TRUST_ENV,None)
             else:os.environ[script_mods.TRUST_ENV]=previous
-    # The page and the modules it loads: every tweak mod's switch is named after it.
+    # The page uses the shared schema renderer; Mods owns enable/disable.
     ui=chr(10).join(path.read_text(encoding='utf-8') for path in [ROOT/'plugins/ff8/editor.html',*sorted((ROOT/'plugins/ff8').glob('*.js'))])
-    assert '"aria-label":row.name' in ui
+    assert 'LexeditorUI.tweakModPanels({rows:settings.tweaks||[]' in ui
     assert 'platformConfigView({config:state.platformConfig,showHeader:false,' in ui
     print('PASS: GF-bar switch, strict values, Monogamy requirement, per-mod reset, independent TOML toggles, and UI wiring.')
 

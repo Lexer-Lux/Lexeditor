@@ -217,9 +217,15 @@ def test_external_setting_or_deployment_change_is_not_silently_accepted(tmp_path
     assert manager.snapshot()['inconsistent']
 
 
-def test_real_pak_adapter_deploys_and_removes_linked_component(tmp_path):
+def test_real_pak_adapter_deploys_and_removes_linked_component(tmp_path, monkeypatch):
     from plugins.ff7r.mod_support import PakModAdapter
+    from plugins.ff7r import tooling
     from plugins.ff7r.tooling import pack_directory, get_file
+    # Use the hash-pinned bundled helper in this test's own cache. A fresh CI
+    # runner must not depend on an installation in the developer's user folder.
+    monkeypatch.delenv('LEXEDITOR_REPAK', raising=False)
+    monkeypatch.setattr(tooling, 'user_data_dir', lambda: tmp_path / 'helper-cache')
+    assert tooling.helper_install()['installed']
     manager = fixture(tmp_path)
     exe = manager.game / 'End/Binaries/Win64/ff7remake_.exe'
     exe.parent.mkdir(parents=True)

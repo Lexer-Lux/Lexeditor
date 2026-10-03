@@ -9,6 +9,7 @@ import csv
 import io
 from pathlib import Path
 import tempfile
+from core.numeric_values import integer_value, finite_number
 
 from . import paths, runtime_layout
 from . import encounters as encounter_format
@@ -234,12 +235,12 @@ def save_items(edits: list[dict]) -> dict:
     changed = 0
     seen: set[int] = set()
     for edit in edits:
-        item_id = int(edit["id"])
+        item_id = integer_value(edit["id"], "Item id")
         if item_id in seen or not 0 <= item_id < len(raw) // 4:
             raise ValueError(f"Invalid or duplicate item id: {item_id}")
         seen.add(item_id)
-        buy = int(edit["buyPrice"])
-        multiplier = int(edit["sellMultiplier"])
+        buy = integer_value(edit["buyPrice"], "Buy price")
+        multiplier = integer_value(edit["sellMultiplier"], "Sell multiplier")
         if buy < 0 or buy > 655350 or buy % 10:
             raise ValueError("Buy price must be 0 to 655350 in steps of 10")
         if not 0 <= multiplier <= 255:
@@ -252,9 +253,8 @@ def save_items(edits: list[dict]) -> dict:
     return {"saved": changed, "file": str(output_path("price.bin"))}
 
 
-def menu_item_rows(dataset: str = "current") -> dict:
-    payload = menu_item_format.read_rows(source_path("mitem.bin", dataset).read_bytes(), ITEM_NAMES, SCHEMA_ROOT)
-    payload["parameterChoices"] = {
+def _menu_parameter_choices() -> dict:
+    return {
         "gf_target": [*GFORCES, {"id": 255, "name": "All GFs"}],
         "gf_ability": [
             {"id": int(row["value"]), "name": row["name"]}
@@ -263,13 +263,18 @@ def menu_item_rows(dataset: str = "current") -> dict:
             {"id": int(row["bit"]), "name": row["name"]}
             for row in _json("limit_break.json")["quistis_blue_magic"]],
     }
+
+
+def menu_item_rows(dataset: str = "current") -> dict:
+    payload = menu_item_format.read_rows(source_path("mitem.bin", dataset).read_bytes(), ITEM_NAMES, SCHEMA_ROOT)
+    payload["parameterChoices"] = _menu_parameter_choices()
     payload["source"] = source_label("mitem.bin")
     return payload
 
 
 def save_menu_items(edits: list[dict]) -> dict:
     data, changed = menu_item_format.apply_edits(
-        source_path("mitem.bin").read_bytes(), edits, SCHEMA_ROOT)
+        source_path("mitem.bin").read_bytes(), edits, SCHEMA_ROOT, _menu_parameter_choices())
     destination = output_path("mitem.bin")
     _atomic_write(destination, data)
     return {"saved": changed, "file": str(destination)}
@@ -361,17 +366,20 @@ def save_shops(edits: list[dict]) -> dict:
     changed = 0
     seen: set[tuple[int, int]] = set()
     for edit in edits:
-        shop_id, slot = int(edit["shopId"]), int(edit["slot"])
-        item_id = int(edit["itemId"])
+        shop_id = integer_value(edit["shopId"], "Shop id")
+        slot = integer_value(edit["slot"], "Shop slot")
+        item_id = integer_value(edit["itemId"], "Shop item id")
         key = (shop_id, slot)
         if key in seen or not 0 <= shop_id < 20 or not 0 <= slot < 16:
             raise ValueError("Invalid or duplicate shop slot")
         if item_id not in ITEM_NAMES:
             raise ValueError(f"Unknown item id: {item_id}")
+        if not isinstance(edit["rare"], bool):
+            raise ValueError("Shop rarity must be a boolean")
         seen.add(key)
         offset = (shop_id * 16 + slot) * 2
         raw[offset] = item_id
-        raw[offset + 1] = 0 if bool(edit["rare"]) else 255
+        raw[offset + 1] = 0 if edit["rare"] else 255
         changed += 1
     _atomic_write(output_path("shop.bin"), bytes(raw))
     return {"saved": changed, "file": str(output_path("shop.bin"))}
@@ -406,10 +414,10 @@ def save_weapons(edits: list[dict]) -> dict:
     changed = 0
     kernel_edits = []
     for edit in edits:
-        weapon_id = int(edit["id"])
+        weapon_id = integer_value(edit["id"], "Weapon id")
         if not 0 <= weapon_id < len(raw) // 12:
             raise ValueError(f"Invalid weapon id: {weapon_id}")
-        price = int(edit["upgradePrice"])
+        price = integer_value(edit["upgradePrice"], "Upgrade price")
         if not 0 <= price <= 2550 or price % 10:
             raise ValueError("Upgrade price must be 0 to 2550 in steps of 10")
         offset = weapon_id * 12
@@ -418,7 +426,8 @@ def save_weapons(edits: list[dict]) -> dict:
         if len(ingredients) != 4:
             raise ValueError("A weapon recipe must have four slots")
         for slot, ingredient in enumerate(ingredients):
-            item_id, quantity = int(ingredient["itemId"]), int(ingredient["quantity"])
+            item_id = integer_value(ingredient["itemId"], "Weapon ingredient item id")
+            quantity = integer_value(ingredient["quantity"], "Weapon ingredient quantity")
             if (item_id not in ITEM_NAMES or
                     (item_id == 0 and quantity != 0) or
                     (item_id != 0 and not 1 <= quantity <= 255)):
@@ -428,9 +437,13 @@ def save_weapons(edits: list[dict]) -> dict:
         for field in edit.get("fields", []):
             kernel_edits.append({"id": weapon_id, "field": field["field"], "value": field["value"]})
         changed += 1
-    _atomic_write(output_path("mwepon.bin"), bytes(raw))
+    # Both formats must validate before either destination is written.
+    kernel_data = None
     if kernel_edits:
-        save_kernel(5, kernel_edits)
+        kernel_data, _ = _apply_kernel_edits(source_path("kernel.bin").read_bytes(), 5, kernel_edits)
+    _atomic_write(output_path("mwepon.bin"), bytes(raw))
+    if kernel_data is not None:
+        _atomic_write(output_path("kernel.bin"), kernel_data)
     return {"saved": changed, "file": str(output_path("mwepon.bin"))}
 
 
@@ -610,24 +623,26 @@ def kernel_rows(section_id: int, dataset: str = "current") -> dict:
     return {"section": section["section_name"], "rows": rows, "source": source_label("kernel.bin")}
 
 
-def save_kernel(section_id: int, edits: list[dict]) -> dict:
+def _apply_kernel_edits(data: bytes, section_id: int, edits: list[dict]) -> tuple[bytes, int]:
+    section_id = integer_value(section_id, "Kernel section id")
     section = SECTIONS.get(section_id)
     if not section:
         raise ValueError(f"Unsupported kernel section: {section_id}")
     definitions = {field["name"]: field for field in _public_fields(section_id)}
-    raw = bytearray(source_path("kernel.bin").read_bytes())
+    raw = bytearray(data)
     section_start = int.from_bytes(raw[section_id * 4:section_id * 4 + 4], "little")
     changed = 0
     seen: set[tuple[int, str]] = set()
     for edit in edits:
-        record_id, field_name = int(edit["id"]), str(edit["field"])
+        record_id = integer_value(edit["id"], "Kernel record id")
+        field_name = str(edit["field"])
         definition = definitions.get(field_name)
         key = (record_id, field_name)
         if key in seen or not definition or not 0 <= record_id < section["number_sub_section"]:
             raise ValueError("Invalid or duplicate kernel field edit")
         seen.add(key)
         size, relative = int(definition["size"]), int(definition["offset"])
-        value = int(edit["value"])
+        value = integer_value(edit["value"], f"Kernel {field_name}")
         minimum = int(definition.get("minimum", 0))
         maximum = int(definition.get("maximum", (1 << (size * 8)) - 1))
         if not minimum <= value <= maximum:
@@ -657,7 +672,12 @@ def save_kernel(section_id: int, edits: list[dict]) -> dict:
                 raise ValueError(f"{field_name}: choose a documented option")
         raw[absolute:absolute + size] = value.to_bytes(size, "little")
         changed += 1
-    _atomic_write(output_path("kernel.bin"), bytes(raw))
+    return bytes(raw), changed
+
+
+def save_kernel(section_id: int, edits: list[dict]) -> dict:
+    data, changed = _apply_kernel_edits(source_path("kernel.bin").read_bytes(), section_id, edits)
+    _atomic_write(output_path("kernel.bin"), data)
     return {"saved": changed, "file": str(output_path("kernel.bin"))}
 
 
@@ -728,12 +748,16 @@ def save_text(edits: list[dict]) -> dict:
         source = executable_text.BY_ID[source_id]
         replacements: dict[int, str] = {}
         for edit in source_edits:
-            if int(edit.get("sectionId", -1)) != source.section_id or int(edit.get("slot", -1)) != 0:
+            if (integer_value(edit.get("sectionId", -1), "Executable text section id") != source.section_id
+                    or integer_value(edit.get("slot", -1), "Executable text slot") != 0):
                 raise ValueError(f"A {source.label} edit has the wrong source identity")
-            record_id = int(edit["recordId"])
+            record_id = integer_value(edit["recordId"], "Executable text record id")
             if record_id in replacements:
                 raise ValueError(f"Duplicate {source.label} text edit")
-            replacements[record_id] = str(edit.get("value", ""))
+            value = edit.get("value", "")
+            if not isinstance(value, str):
+                raise ValueError("Executable text value must be text")
+            replacements[record_id] = value
         current = _executable_text_msd(source, "current")
         rebuilt, changed = executable_text.apply_edits(current, source, replacements)
         if changed:
@@ -1021,7 +1045,7 @@ def save_enemy_battle_text(edits: list[dict]) -> dict:
     grouped: dict[int, list[dict]] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy dialogue record id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append({
@@ -1030,15 +1054,18 @@ def save_enemy_battle_text(edits: list[dict]) -> dict:
         })
     changed = 0
     files = []
+    prepared = []
     for monster_id in sorted(grouped):
         filename = f"c0m{monster_id:03d}.dat"
         source = _enemy_source_path(filename)
         rebuilt, count = enemy_battle_text_format.apply_edits(
             source.read_bytes(), grouped[monster_id])
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, rebuilt)
+        prepared.append((destination, rebuilt))
         changed += count
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
@@ -1047,23 +1074,26 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     document_map: dict[int, list[dict]] = {}
     for document in documents or []:
-        monster_id = int(document["id"])
+        monster_id = integer_value(document["id"], "Enemy AI document id")
         if monster_id not in valid_ids or monster_id in document_map:
             raise ValueError(f"Invalid or duplicate enemy AI document: {monster_id}")
         has_scripts = "scripts" in document
         has_sources = "sources" in document
         if has_scripts == has_sources:
             raise ValueError("Enemy AI document must contain scripts or sources, but not both")
+        if has_scripts and not isinstance(document["scripts"], list):
+            raise ValueError("Enemy AI scripts must be a list")
         document_map[monster_id] = (
             enemy_ai_format.compile_sources(document["sources"])
-            if has_sources else list(document["scripts"]))
+            if has_sources else document["scripts"])
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy AI record id")
         if monster_id not in valid_ids or monster_id in document_map:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append(edit)
     changed = 0
     files = []
+    prepared = []
     for monster_id in sorted(set(grouped) | set(document_map)):
         monster_edits = grouped.get(monster_id, [])
         filename = f"c0m{monster_id:03d}.dat"
@@ -1074,9 +1104,11 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
         else:
             rebuilt, count = enemy_ai_format.apply_edits(source.read_bytes(), monster_edits)
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, rebuilt)
+        prepared.append((destination, rebuilt))
         changed += count
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
@@ -1120,12 +1152,13 @@ def save_enemy_tables(edits: list[dict]) -> dict:
     grouped: dict[int, list[dict]] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy table record id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         grouped.setdefault(monster_id, []).append(edit)
     changed = 0
     files = []
+    prepared = []
     for monster_id, monster_edits in grouped.items():
         filename = f"c0m{monster_id:03d}.dat"
         raw = bytearray(_enemy_source_path(filename).read_bytes())
@@ -1133,8 +1166,10 @@ def save_enemy_tables(edits: list[dict]) -> dict:
             raw, _enemy_info_start(raw), monster_edits, SCHEMA_ROOT,
             {int(row["id"]) for row in MAGIC}, set(ITEM_NAMES))
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, bytes(raw))
+        prepared.append((destination, bytes(raw)))
         files.append(str(destination))
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
@@ -1183,18 +1218,22 @@ def save_enemies(edits: list[dict]) -> dict:
     scan_edits: dict[int, str] = {}
     valid_ids = {int(row["com_id"]) for row in MONSTERS}
     for edit in edits:
-        monster_id = int(edit["id"])
+        monster_id = integer_value(edit["id"], "Enemy id")
         if monster_id not in valid_ids:
             raise ValueError(f"Invalid enemy id: {monster_id}")
         if edit.get("field") == "scan_description":
             if monster_id in scan_edits:
                 raise ValueError(f"Duplicate Scan description edit for enemy {monster_id}")
-            scan_edits[monster_id] = str(edit.get("value", ""))
+            description = edit.get("value", "")
+            if not isinstance(description, str):
+                raise ValueError("Scan description must be text")
+            scan_edits[monster_id] = description
         else:
             grouped.setdefault(monster_id, []).append(edit)
 
     changed = 0
     files = []
+    prepared = []
     for monster_id, monster_edits in grouped.items():
         filename = f"c0m{monster_id:03d}.dat"
         raw = bytearray(_enemy_source_path(filename).read_bytes())
@@ -1211,14 +1250,16 @@ def save_enemies(edits: list[dict]) -> dict:
             if definition.get("mask") is not None:
                 current = int.from_bytes(raw[absolute:absolute + size], definition["byteorder"])
                 mask = int(definition["mask"])
-                stored = (current | mask) if bool(edit["value"]) else (current & ~mask)
+                if not isinstance(edit["value"], bool):
+                    raise ValueError(f"{definition['label']} must be a boolean")
+                stored = (current | mask) if edit["value"] else (current & ~mask)
             elif definition.get("control") == "percent":
-                value = float(edit["value"])
+                value = finite_number(edit["value"], definition["label"])
                 if not 0 <= value <= 100:
                     raise ValueError(f"{definition['label']} must be 0% to 100%")
                 stored = round(value * 255 / 100)
             else:
-                value = int(edit["value"])
+                value = integer_value(edit["value"], definition["label"])
                 minimum, maximum = int(definition["minimum"]), int(definition["maximum"])
                 if not minimum <= value <= maximum:
                     raise ValueError(f"{definition['label']} must be {minimum} to {maximum}")
@@ -1226,7 +1267,7 @@ def save_enemies(edits: list[dict]) -> dict:
             raw[absolute:absolute + size] = int(stored).to_bytes(size, definition["byteorder"])
             changed += 1
         destination = _enemy_output_path(filename)
-        _atomic_write(destination, bytes(raw))
+        prepared.append((destination, bytes(raw)))
         files.append(str(destination))
     if scan_edits:
         descriptions = _scan_descriptions("current")
@@ -1234,9 +1275,11 @@ def save_enemies(edits: list[dict]) -> dict:
         for monster_id, description in scan_edits.items():
             descriptions[int(monsters[monster_id]["entity_id"])] = description
         destination = paths.DIRECT_ROOT / "ff8" / "en" / "exe" / "battle_scans.msd"
-        _atomic_write(destination, scan_text.build_msd([str(value) for value in descriptions]))
+        prepared.append((destination, scan_text.build_msd([str(value) for value in descriptions])))
         files.append(str(destination))
         changed += len(scan_edits)
+    for destination, data in prepared:
+        _atomic_write(destination, data)
     return {"saved": changed, "file": files[0] if files else "", "files": files}
 
 
@@ -1260,7 +1303,7 @@ def data_map_rows() -> dict:
         {"filename": "ff8/en/exe/card_names.msd", "controls": "All 110 card names", "notes": "Editable: all entries.", "status": "integrated"},
         {"filename": "ff8/en/exe/draw_point.msd", "controls": "All 9 draw-point and disc messages", "notes": "Editable: all entries.", "status": "integrated"},
         {"filename": "ff8/en/exe/card_texts.msd", "controls": "All 29 card-menu messages", "notes": "Editable: all entries.", "status": "integrated"},
-        {"filename": "hext/ff8/en_nv/<tweak>.txt (tweak mods)", "controls": "Gameplay tweaks: each one a tweak mod in the mod library that builds its own Hext patch", "notes": "Editable: each tweak's switch and settings on Tweaks.", "status": "integrated"},
+        {"filename": "hext/ff8/en_nv/<tweak>.txt (tweak mods)", "controls": "Gameplay tweaks: each one a tweak mod in the mod library that builds its own Hext patch", "notes": "Editable: each tweak's settings on Tweaks; the Mods tab switches it.", "status": "integrated"},
         {"filename": "FFNx.toml", "controls": "FFNx display, audio, rendering and runtime settings", "notes": "Editable: typed values in place. Comments and order preserved.", "status": "integrated" if (paths.GAME_ROOT / "FFNx.toml").is_file() else "partial"},
         {"filename": "Data/Sound/audio.dat + audio.fmt", "controls": "All 2,791 sound effects: preview, battle usage, per-sound replacement", "notes": "Editable: replacement sounds (needs FFNx external SFX on). Locked: placeholder entries.", "status": "partial"},
         {"filename": "textures/ (FFNx external texture overrides)", "controls": "World and battle-model texture previews with mod-file attribution", "notes": "Preview only; replace world textures in Maps > World and models in Models. Unmapped mod files stay listed.", "status": "partial"},

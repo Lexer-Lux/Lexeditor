@@ -2,6 +2,7 @@
   "id": "warband",
   "name": "Mount & Blade: Warband",
   "accent": "#7a2020",
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-Warband",
   "installation": {
     "rootEnv": "LEXEDITOR_WARBAND_ROOT",
     "requiredPaths": [

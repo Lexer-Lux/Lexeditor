@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from core.settings_manager import SettingsStore  # noqa: E402
+from plugin_ui import plugin_ui
 
 
 def require(condition: bool, message: str) -> None:
@@ -23,7 +24,7 @@ def main() -> int:
     css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
     desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
     settings_source = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
-    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    ff8 = plugin_ui('ff8')
     require("const hoverable = options =>" in framework and "hoverable," in framework,
             "the shared framework must own and export hoverables")
     require('class: ["lex-hoverable"' in framework,

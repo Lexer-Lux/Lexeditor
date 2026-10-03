@@ -18,6 +18,13 @@ function customCraftingStationSelect(recipe,onSet,readonly=false){
   return select;
 }
 function customCraftingCategory(recipe){return catalogItem(recipe.output_item)?.category||recipe.category||"";}
+function validCraftingQuantity(value){return (typeof value==="number"||typeof value==="string"&&/^[+]?[0-9]+$/.test(value))&&Number.isInteger(Number(value))&&Number(value)>=1;}
+function craftingQuantityControl(value,label,onSet){
+  const control=el("input",{type:"number",min:1,step:1,value:value??1,"aria-label":label,"data-lex-validate-number":"true"});
+  const change=()=>{const raw=control.value,valid=validCraftingQuantity(raw);control.setCustomValidity(valid?"":"Enter a positive whole number");onSet(valid?Number(raw):raw);};
+  control.addEventListener("input",change);control.addEventListener("change",change);
+  return control;
+}
 function customCraftingValidation(){
   const errors=[],byRow={},seen=new Map(),keys=new Set((refStore("mine").catalog?.items||[]).map(item=>item.key));
   const stations=new Set(customCraftingStationValues()),unlocks=new Set(recipeUnlockKeys());
@@ -31,12 +38,12 @@ function customCraftingValidation(){
     else if(recipe.category!==customCraftingCategory(recipe))add(index,`${prefix}: Category must follow the output item`);
     if(!recipe.station||!stations.has(recipe.station))add(index,`${prefix}: Context must be selected from the controlled list`);
     if(recipe.unlock&&!unlocks.has(recipe.unlock))add(index,`${prefix}: Unlock must be selected from an existing recipe unlock`);
-    if(!Number.isInteger(+recipe.output_quantity)||+recipe.output_quantity<1)add(index,`${prefix}: Output quantity must be a positive whole number`);
+    if(!validCraftingQuantity(recipe.output_quantity))add(index,`${prefix}: Output quantity must be a positive whole number`);
     if(!recipe.ingredients?.length)add(index,`${prefix}: Add at least one ingredient`);
     (recipe.ingredients||[]).forEach((part,partIndex)=>{
       if(!String(part.item||"").trim())add(index,`${prefix}: Ingredient ${partIndex+1} needs an item`);
       else if(keys.size&&!keys.has(part.item))add(index,`${prefix}: Unknown ingredient ${part.item}`);
-      if(!Number.isInteger(+part.quantity)||+part.quantity<1)add(index,`${prefix}: Ingredient ${partIndex+1} quantity must be a positive whole number`);
+      if(!validCraftingQuantity(part.quantity))add(index,`${prefix}: Ingredient ${partIndex+1} quantity must be a positive whole number`);
     });
   });
   return {errors,byRow};
@@ -122,10 +129,10 @@ function customCraftingRecipe(entry,group,position,validation){
   const {recipe,index}=entry,update=(field,value)=>{recipe[field]=value;customCraftingTouch();};
   const ingredients=columnList({rows:(recipe.ingredients||[]).map((part,partIndex)=>({part,partIndex})),key:row=>row.partIndex,editable:true,
     columns:[{key:"item",label:"Ingredient",grow:1,render:({part})=>linkedCatalogKeyEditor(part.item,value=>{part.item=value;customCraftingTouch();renderCrafting()})},
-      {key:"quantity",label:"Quantity",width:"100px",render:({part})=>el("input",{type:"number",min:1,step:1,value:part.quantity??1,onchange:ev=>{part.quantity=Math.max(1,Math.round(+ev.target.value||1));customCraftingTouch()}})},
+      {key:"quantity",label:"Quantity",width:"100px",render:({part})=>craftingQuantityControl(part.quantity,`Ingredient quantity for ${part.item}`,value=>{part.quantity=value;customCraftingTouch()})},
       {key:"remove",label:"",width:"45px",render:({partIndex})=>closeButton({title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting()}})}]});
   const name=el("input",{value:recipe.title||"",onchange:ev=>{update("title",ev.target.value.trim());renderCrafting()}});
-  const quantity=el("input",{type:"number",min:1,step:1,value:recipe.output_quantity??1,onchange:ev=>update("output_quantity",Math.max(1,Math.round(+ev.target.value||1)))});
+  const quantity=craftingQuantityControl(recipe.output_quantity,`Output quantity for ${recipe.recipe_id}`,value=>update("output_quantity",value));
   const unlock=validatedKeyEditor("Recipe unlock",recipe.unlock||"ALWAYS KNOWN",recipeUnlockKeys(),value=>{update("unlock",value==="ALWAYS KNOWN"?"":value);renderCrafting()});
   const description=LexeditorUI.textArea({onchange:ev=>update("description",ev.target.value)});description.value=recipe.description||"";
   return LexeditorUI.detailSection({title:`Recipe ${position+1}`,body:[LexeditorUI.actionRow(LexeditorUI.recordId(recipe.recipe_id),
@@ -591,11 +598,23 @@ function showCreateEffect(){
   const durations=[...new Set(state.catalog.effects.map(e=>e.durationcategory))].sort();
   const key=el("input",{placeholder:"LEX_EFFECT_SALTED_BEEF"}),label=el("input",{placeholder:"Salty snack"});
   const behavior=el("select",{},...behaviors.map(id=>el("option",{value:id},`${humanName("behaviors",id)||effectBehaviorName({id})||id}${humanName("behaviors",id)||effectBehaviorName({id})?` — ${id}`:""}`)));
-  const value=el("input",{type:"number",value:"0"}),percent=el("input",{type:"number",step:"any",value:"0"});
-  const time=el("input",{type:"number",value:"0"}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
+  const value=el("input",{type:"number",step:"1",value:"0",required:true}),percent=el("input",{type:"number",step:"any",value:"0",required:true});
+  const time=el("input",{type:"number",step:"1",value:"0",required:true}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
+  for(const input of [value,time,percent])input.setAttribute("data-lex-validate-number","true");
+  for(const input of [value,time]){
+    input.setAttribute("value","0");
+    input.addEventListener("input",()=>input.setCustomValidity(catalogQuantityIsValid(input.value)?"":"Enter a whole number."));
+  }
   const duration=el("select",{},...durations.map(id=>el("option",{value:id},id.replace("EFFECT_DURATION_CATEGORY_",""))));
   const close=()=>{backdrop.hidden=true;backdrop.innerHTML="";};
   const create=async()=>{try{
+    for(const input of [value,time]){
+      input.setCustomValidity(catalogQuantityIsValid(input.value)?"":"Enter a whole number.");
+      if(!input.checkValidity()){input.reportValidity();throw new Error("Value and time must be whole numbers.");}
+    }
+    if(!percent.value.trim()||!Number.isFinite(Number(percent.value))||!percent.checkValidity()){
+      percent.reportValidity();throw new Error("Percent must be a finite number.");
+    }
     const result=await api("/api/catalog/effects/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key.value,label:label.value,behavior:behavior.value,value:value.value,percent:percent.value,time:time.value,timeunits:units.value,durationcategory:duration.value})});
     if(result.label){state.labels.effects=state.labels.effects||{};state.labels.effects[result.key]=result.label;}
     if(result.symbol){state.labels.effectSymbols=state.labels.effectSymbols||{};state.labels.effectSymbols[result.key]=result.symbol;}
@@ -611,6 +630,7 @@ function showCreateEffect(){
 
 async function saveCatalog() {
   if (isRO()) return;
+  validateCatalogQuantityDrafts();
   const prices = Object.entries(state.priceEdits).map(([k, qty]) => {
     const [item, section, costKey, partItem] = k.split("|");
     return { item, section, costKey, partItem, qty };
@@ -632,7 +652,7 @@ async function saveCatalog() {
   });
   const itemEffects = Object.entries(state.itemEffectEdits).map(([item, effs]) => ({ item, effects: effs }));
   const itemTags = Object.entries(state.itemTagEdits).map(([item, tags]) => ({ item, tags }));
-  const quickSelect=Object.entries(state.quickSelectEdits).map(([item,value])=>({item,slots:value.slots}));
+  const quickSelect=Object.entries(state.quickSelectEdits).map(([item,value])=>({item,slots:value.slots.map(row=>row.sortOrder===null?{id:row.id}:row)}));
   const descriptions=Object.entries(state.descriptionKeyEdits).map(([item,key])=>({item,key}));
   try {
     if(Object.keys(state.alcoholEdits).length){
@@ -647,6 +667,13 @@ async function saveCatalog() {
     const r = await api("/api/catalog/save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prices, buyability, sellability, yields, bundles:Object.entries(state.bundleEdits).map(([key,qty])=>({key,qty})), effects, itemEffects, itemTags, quickSelect: quickSelect, descriptions, carry, craft }) });
     // fold edits into local model so UI stays consistent
+    for(const e of buyability){
+      const it=state.catalog.items.find(i=>i.key===e.item);if(!it)continue;
+      const cash=it.buy.filter(c=>c.costtype==="COST_TYPE_PRICE"&&c.parts.some(p=>p.item==="CURRENCY_CASH"));
+      if(!e.buyable)it.buy=it.buy.filter(c=>!cash.includes(c));
+      else if(cash.length){for(const cost of cash)for(const part of cost.parts)if(part.item==="CURRENCY_CASH")part.qty=e.cents??100;}
+      else it.buy.push({key:"COST_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]});
+    }
     for (const e of prices) {
       const it = state.catalog.items.find(i => i.key === e.item);
       const list = e.section === "buy" ? it.buy : it.sell;
@@ -654,7 +681,6 @@ async function saveCatalog() {
         for (const p of c.parts) if (p.item === e.partItem) p.qty = e.qty;
     }
     for(const e of yields){const it=state.catalog.items.find(i=>i.key===e.item);const cost=it&&it[e.section].find(c=>c.key===e.costKey);if(cost)cost.yield=e.qty;}
-    for(const e of buyability){const it=state.catalog.items.find(i=>i.key===e.item);if(it){const other=it.buy.filter(c=>c.costtype!=="COST_TYPE_PRICE"||!c.parts.some(p=>p.item==="CURRENCY_CASH"));it.buy=e.buyable?other.concat([{key:"COST_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]}]):other;}}
     for(const e of sellability){const it=state.catalog.items.find(i=>i.key===e.item);if(it)it.sell=e.sellable?[{key:"SELL_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]}]:[];}
     for (const e of effects) {
       const eff = state.effectByKey[e.key];

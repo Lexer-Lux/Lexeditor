@@ -131,22 +131,22 @@ class ShellStackTests(ProjectFixture):
         self.assertEqual(self.snapshot(), before)
 
     def test_late_write_failure_restores_disk_and_cached_trees(self):
-        self.stack(); before = self.snapshot(); actual_save = s.save_file
-        def fail_late(name, *args):
-            actual_save(name, *args)
-            if name == s.WEAPON_STACK[4][1]: raise OSError('simulated full disk')
-        with patch.object(s, 'save_file', side_effect=fail_late):
+        self.stack(); before = self.snapshot(); actual_replace = s.os.replace
+        def fail_late(source, target):
+            if Path(target) == self.files[4]: raise OSError('simulated full disk')
+            return actual_replace(source,target)
+        with patch.object(s.os, 'replace', side_effect=fail_late):
             with self.assertRaisesRegex(OSError, 'simulated full disk'):
                 s.apply_weapon_shell_vfx(False)
         self.assertEqual(self.snapshot(), before)
         self.assertTrue(s.get_weapon_shell_vfx_status()['blanked'])
 
     def test_install_failure_restores_all_layers_and_install_map(self):
-        self.stack(); before = self.snapshot(); actual_ensure = s.ensure_file_replacement
-        def fail_late(game_path, relative):
-            actual_ensure(game_path, relative)
-            if relative == s.WEAPON_STACK[3][1]: raise OSError('simulated install failure')
-        with patch.object(s, 'ensure_file_replacement', side_effect=fail_late):
+        self.stack(); before = self.snapshot(); actual_replace = s.os.replace
+        def fail_late(source, target):
+            if Path(target) == self.mine/'install.xml': raise OSError('simulated install failure')
+            return actual_replace(source,target)
+        with patch.object(s.os, 'replace', side_effect=fail_late):
             with self.assertRaises(OSError): s.apply_weapon_shell_vfx(False)
         self.assertEqual(self.snapshot(), before)
         self.assertTrue(s.get_weapon_shell_vfx_status()['blanked'])

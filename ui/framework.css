@@ -837,7 +837,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-project-source-status.enabled { color:#59d66f; }
 .lex-project-source-status.disabled { color:#ef5d61; }
 .lex-project-menu-action:hover { background: var(--lex-panel-2); }
-.lex-project-dialog input { width: 100%; box-sizing: border-box; }
+/* Every box in the dialog spans it; the description is several lines tall,
+   because it holds a paragraph, and only grows downward. */
+.lex-project-dialog :is(input,textarea) { width: 100%; box-sizing: border-box; }
+.lex-project-dialog textarea { min-height: 7em; resize: vertical; }
 
 @media (max-width: 1100px) {
   .lex-project-select {
@@ -1043,7 +1046,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    content did and the tabs floated partway down a tall window. */
 .lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; padding:0; }
 .lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
-.lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); }
+.lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); --lex-map-side-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px); }
 /* The overlay heading is shorter than what it holds once the panel is short, so
    its own clip cut the bottom of the record's identity away. The picture box
    below it is still a hard bound, so the heading can show its content. */
@@ -1104,7 +1107,18 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 
 /* The lock sits inside the value box, right-aligned and the normal way up.
    It used to live in the vertical type rail, which is why it was rotated. */
+/* A property the developer hid is gone for every reader, unless they asked to
+   see hidden properties; then it stays, dimmed. Holding the right button on
+   one fills it with the accent while the hold counts. */
+.lex-property-hidden:is(:root:not([data-lex-show-hidden="true"]) *) { display:none; }
+:root[data-lex-show-hidden="true"] .lex-property-hidden { opacity:.45; }
+.lex-property-holding { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent));
+  background-repeat:no-repeat; animation:lex-property-hold .7s linear forwards; }
+@keyframes lex-property-hold { from { background-size:0 100%; } to { background-size:100% 100%; } }
 .lex-has-readonly-lock { position:relative; }
+/* A locked list cannot open, so its arrow would only promise a menu - and it
+   sat under the lock. The lock takes its place. */
+.lex-has-readonly-lock select:disabled { appearance:none; -webkit-appearance:none; }
 .lex-detail-field-control.lex-has-readonly-lock { --lex-readonly-lock-inset:10px; }
 /* A nameless field gives its name lane to the control - unless the lane holds
    the field's help, which would otherwise vanish with it. */
@@ -1298,6 +1312,7 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-detail-field-control > .lex-column-pin { position:absolute;z-index:3;top:4px;right:4px; }
 .lex-tabbed-panel { display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden; }
 .lex-tabbed-panel > .lex-tabbed-panel-tabs { flex:0 0 auto; }
+.lex-tabbed-panel-content.lex-tabbed-panel-empty { display:grid; align-content:center; }
 /* A detail panel whose body is one tabbed panel carries that tab bar along its
    own top edge, like every other tabbed panel, with the record's heading
    under it: "if a details panel is made tabbed, then the tab bar should run
@@ -2387,9 +2402,8 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 /* Named axes share the table grid so labels and values scroll together. */
 .lex-matrix-table { grid-template-rows:auto auto repeat(var(--lex-table-row-count),max-content); }
 .lex-matrix-table.lex-table-fill { grid-template-rows:auto auto repeat(var(--lex-table-row-count),minmax(32px,1fr)); }
-.lex-matrix-table > .lex-column-list-row,
-.lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; }
-.lex-matrix-table > .lex-column-list-header { grid-row:2; position:static; }
+.lex-matrix-table > .lex-column-list-row { grid-column:2 / -1; }
+.lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; grid-row:2; position:static; }
 /* The row axis runs the table's full height and a header-coloured corner
    fills the square above the id column, so no bare panel square shows in
    the top-left. The column axis starts over the first data column, its
@@ -3113,9 +3127,10 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
 .lex-source-control {
   --lex-reference-rail-width:var(--lex-reference-requested-width,5em);
   position:relative;
-  display:grid;
+  display:var(--lex-source-display, grid);
   grid-template-columns:minmax(0,1fr) var(--lex-reference-rail-width);
-  align-items:center;
+  align-items:var(--lex-source-align, center);
+  flex:var(--lex-source-flex, 0 1 auto);
   gap:8px;
   min-width:0;
 }
@@ -3158,6 +3173,11 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
    see provenanceControl. It sits on the box's edge and shows while the box is
    pointed at or being edited. */
 .lex-source-control-internal.lex-has-stepper { --lex-stepper-width:1.15em; }
+.lex-exact-integer { --lex-stepper-width:1.15em; width:100%; }
+.lex-exact-integer > input { padding-right:calc(var(--lex-stepper-width) + .5em); }
+.lex-unit-field-boxed > .lex-source-control > input {
+  padding-inline-end:calc(var(--lex-unit-reserve) + var(--lex-stepper-width, 0px));
+}
 .lex-has-stepper input[type="number"] { appearance:textfield; -moz-appearance:textfield; }
 .lex-has-stepper input[type="number"]::-webkit-inner-spin-button,
 .lex-has-stepper input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
@@ -3631,6 +3651,8 @@ body:has(.lex-data-map-table) #main {
 .lex-global-settings > :is(.lex-global-settings-head,.lex-settings-columns,.lex-dialog-status,.lex-dialog-actions) {
   grid-column: 1 / -1;
 }
+.lex-global-settings > .lex-dialog-status:empty { display:none; }
+.lex-global-settings > .lex-dialog-actions { margin-top:0; }
 
   .settings-section { width:100%;
                       margin:0; min-width:0; border:1px solid var(--lex-border); background:var(--lex-panel); }
@@ -3946,7 +3968,7 @@ body:has(.lex-data-map-table) #main {
 .lex-platform-config-section > summary { padding:10px 6px; cursor:pointer; font-weight:700; }
 .lex-platform-config-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:var(--lex-panel-gap); padding:0 0 var(--lex-panel-gap); }
 .lex-platform-config-field { min-width:0; }
-.lex-platform-config-field.lex-boolean-field { grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto; }
+.lex-platform-config-field.lex-boolean-field { grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr) auto; }
 .lex-platform-config-field :is(input[type=text],input[type=number],select) { width:100%; min-width:0; }
 @media (max-width:700px) {
   .lex-platform-config-head { align-items:stretch; flex-direction:column; }
@@ -4120,12 +4142,15 @@ body:has(.lex-data-map-table) #main {
 }
 
 /* ---- Action rows ----------------------------------------------------- */
-.lex-action-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.lex-action-row { display:flex; flex-wrap:var(--lex-action-wrap,wrap); align-items:var(--lex-action-align,center); gap:var(--lex-action-gap,8px); min-width:0; }
+.lex-action-row-fill-first > :first-child { flex:1 1 auto; min-width:0; }
+.lex-action-meta { display:flex; align-items:center; flex:0 0 auto; padding:0 10px; white-space:nowrap; color:var(--lex-text); opacity:var(--lex-action-meta-opacity,1); }
 .lex-detail-field-control > .lex-action-row { width:100%; }
 .lex-detail-field-control > .lex-action-row > :is(.lex-unit-field,input:not([type=checkbox])) { flex:1 1 0; width:100%; }
 /* The row's buttons wear the dialog buttons' theme, the first-choice one in
    the accent. No specificity, so a game's own button styling still wins. */
 :where(.lex-action-row) > :where(button) {
+  flex:0 0 auto;
   padding:9px 14px;
   color:var(--lex-text);
   border:1px solid var(--lex-border);
@@ -4314,6 +4339,9 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
 .lex-paged-pane-content > .lex-curve-editor .lex-curve-svg { height:100%; aspect-ratio:auto; }
 .lex-choice-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; width:100%; min-width:0; }
+.lex-choice-field-fill > :first-child { width:100%; }
+.lex-choice-field-hover > button:last-child { opacity:0; }
+.lex-choice-field-hover:where(:hover,:focus-within) > button:last-child { opacity:1; }
 .lex-choice-field > button:last-child,
 .lex-record-card-action > button { display:grid; place-items:center; width:1.8em; min-width:1.8em; min-height:1.6em; padding:2px; font:inherit; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel-2)); border:var(--lex-input-border,1px solid var(--lex-border)); border-color:var(--lex-input-border-color,var(--lex-border)); }
 .lex-choice-field > button svg,
@@ -4329,8 +4357,13 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane-content:has(> .lex-source-control > .lex-code-field) { display:flex; overflow:hidden; }
 .lex-paged-pane-content > .lex-source-control:has(> .lex-code-field) { flex:1 1 auto; align-items:stretch; }
 .lex-paged-pane-content > .lex-source-control > .lex-code-field { height:100%; resize:none; }
-.lex-instruction-list { min-width:0; width:100%; min-height:100%; display:flex; flex-direction:column; }
-.lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:96px; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
+/* A narrow pane has no room for the controls and the description side by
+   side. The operands wrap, the description moves under them, and the step
+   grows to hold both, rather than the operands spilling under the
+   description's text (Enemies AI at 1100px: "If Battle variable 96..."
+   printed over "Otherwise"); the list is the container that measures it. */
+.lex-instruction-list { min-width:0; width:100%; min-height:100%; display:flex; flex-direction:column; container-type:inline-size; }
+.lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:auto; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
 .lex-instruction-row[draggable="true"], .lex-project-reference[draggable="true"] { cursor:grab; }
 .lex-instruction-index { flex:0 0 22px; font-size:.8em; color:var(--lex-muted); }
 .lex-instruction-controls { display:flex; align-items:flex-end; gap:6px; flex:1 1 75%; min-width:0; }
@@ -4346,13 +4379,6 @@ body:has(.lex-data-map-table) #main {
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
 .lex-instruction-operand :is(input,select) { width:100%; min-width:0; }
 .lex-instruction-description { flex:1 1 180px; min-width:120px; max-width:300px; max-height:84px; overflow:auto; white-space:normal; font-size:.9em; }
-/* A narrow pane has no room for the controls and the description side by
-   side. The operands wrap, the description moves under them, and the step
-   grows to hold both, rather than the operands spilling under the
-   description's text (Enemies AI at 1100px: "If Battle variable 96..."
-   printed over "Otherwise"). */
-.lex-instruction-list { container-type:inline-size; }
-.lex-instruction-row { min-height:auto; }
 @container (max-width: 620px) {
   .lex-instruction-row { flex-wrap:wrap; row-gap:4px; }
   .lex-instruction-controls { flex-wrap:wrap; row-gap:4px; }
@@ -4446,9 +4472,12 @@ body:has(.lex-data-map-table) #main {
 .lex-overlay-stack { position:relative; display:inline-block; max-width:100%; }
 .lex-overlay-stack > .lex-overlay-base { display:block; max-width:100%; height:auto; }
 .lex-overlay-stack > .lex-overlay-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.lex-overlay-stack.lex-overlay-fill { display:block; width:100%; align-self:start; }
+.lex-overlay-stack.lex-overlay-fill > .lex-overlay-base { width:100%; }
+.lex-image-pending { visibility:hidden; }
 .lex-image-map-stage > .lex-overlay-stack { display:block; width:100%; height:100%; }
 .lex-image-map-stage > .lex-overlay-stack > .lex-overlay-base { width:100%; height:100%; }
-.lex-stack { display:flex; flex-direction:column; gap:var(--lex-panel-gap); height:100%; min-height:0; }
+.lex-stack { display:flex; flex-direction:column; gap:var(--lex-stack-gap,var(--lex-panel-gap)); height:100%; min-height:0; min-width:0; }
 .lex-stack > * { flex:0 0 auto; min-height:0; }
 .lex-stack > :last-child { flex:1 1 auto; }
 .lex-stack-natural { height:auto; }
@@ -4557,8 +4586,8 @@ body:has(.lex-data-map-table) #main {
 .lex-map-magnifier-dialog > .lex-searcher-bar { position:relative; inset:auto; height:auto; flex:0 0 auto; }
 .lex-map-magnifier-dialog > .lex-searcher-bar .lex-searcher-prompt { white-space:normal; }
 .lex-map-magnifier-body { display:grid; flex:1 1 auto; min-height:0; }
-.lex-map-magnifier-map,.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; }
-.lex-map-magnifier-details { overflow:auto; }
+.lex-map-magnifier-map { display:grid; min-width:0; min-height:0; }
+.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; overflow:auto; }
 /* The crosshair: two hairlines and a ring, at the pixel under the pointer. */
 .lex-map-crosshair { position:absolute; z-index:3; width:0; height:0; pointer-events:none; }
 .lex-map-crosshair::before { position:absolute; top:-100vh; left:-.5px; width:1px; height:200vh; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
@@ -4592,6 +4621,9 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-cells > button:hover { outline:1px solid var(--lex-text); outline-offset:-1px; }
 .lex-image-map-cells > button.lex-map-cell-filled { background:var(--lex-map-cell-fill); }
 .lex-image-map-tools { position:absolute; z-index:5; top:6px; left:6px; display:flex; gap:6px; }
+.lex-image-map-side-controls { position:absolute; z-index:2; top:var(--lex-map-side-top,6px); max-width:36%; min-height:0; max-height:calc(100% - var(--lex-map-side-top,6px)); overflow:auto; }
+.lex-image-map-side-controls.left { left:0; }
+.lex-image-map-side-controls.right { right:0; }
 .lex-image-map-tools > button { min-height:30px; padding:0 10px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
 .lex-image-map-tools > button:hover,.lex-image-map-tools > button:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
 .lex-image-map-tools > button[aria-pressed="true"] { color:var(--lex-text); border-color:var(--lex-highlight); background:color-mix(in srgb,var(--lex-accent) 55%,var(--lex-panel)); }
@@ -4841,7 +4873,7 @@ body:has(.lex-data-map-table) #main {
   width:min(760px, 50%);
   min-width:min(100%, 420px);
   margin-inline:auto;
-  align-self:start;
+  align-self:stretch;
 }
 @media (max-width:1100px) { .lex-information-panel { width:min(100%, 760px); } }
 .lex-detail-panel-icon > svg { width:78%;height:78%;display:block; }
@@ -5379,7 +5411,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
  min-height:0;
 }
 .lex-paged-list-detail:not(.lex-full-table-page) .lex-barrelled-master,
-.lex-paged-list-detail:not(.lex-full-table-page) .lex-detail-panel { align-self:stretch; height:auto; }
+.lex-paged-list-detail:not(.lex-full-table-page) .lex-detail { align-self:stretch; height:auto; }
 
 @keyframes lex-model-preview-open {
   from { opacity:0; transform:translateY(-10px); }
@@ -6068,6 +6100,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part { flex:0 1 auto; min-width:0; margin-right:0; }
 /* The last box takes every pixel that is left: "the edit boxes use up all space as needed". */
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part:last-child { flex:1 1 auto; }
+.lex-column-list-cell .lex-detail-parts-fixed-first > .lex-detail-part:first-child { flex:none; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
 .lex-detail-parts-bare :is(.lex-detail-part-label,.lex-detail-part-spare) { display:none; }
 .lex-detail-parts-stacked { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
@@ -6685,7 +6718,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
  position:relative; align-self:stretch;
  opacity:0; cursor:help;
  overflow:visible;
- flex:0 0 14px; width:14px; min-width:14px;
+ flex:0 0 11px; width:11px; min-width:11px;
 }
 /* The name takes the rest of its box, so the space after it is the box's
    own padding rather than whatever the grid track had left over. That is
@@ -7033,8 +7066,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
    column here packs on its own. */
-/* A settings card is narrow: its names take a real share of it. */
-.lex-tweak-card-grid { --lex-detail-label-width:clamp(min(6.5em, 40%), 38%, 12em); display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+/* Cards inherit the same percentage name lane as other detail panels. */
+.lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column > .lex-detail-panel {
   --lex-detail-title-size:1em;
@@ -7042,6 +7075,18 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   grid-template-rows:auto auto;
 }
 .lex-tweak-column > .lex-detail-panel > .lex-detail-panel-body:empty { display:none; }
+/* A card with its own section pager needs the height of its containing page.
+   Measuring it at content height leaves its scroll area collapsed underneath
+   the footer. Ordinary settings cards still pack at their natural height. */
+.lex-tweak-card-grid:has(> .lex-tweak-column > .lex-detail-panel > .lex-tweaks-paged) {
+  height:100%;
+  align-items:stretch;
+}
+.lex-tweak-column:has(> .lex-detail-panel > .lex-tweaks-paged) { min-height:0; }
+.lex-tweak-column > .lex-detail-panel:has(> .lex-tweaks-paged) {
+  flex:1 1 0;
+  grid-template-rows:auto minmax(0,1fr);
+}
 .lex-tweak-off-page {
   display:none;
 }
@@ -7062,11 +7107,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    The leader and checkbox share one row. References occupy the space below
    that checkbox; the reserved space stays fixed when a reference changes. */
 .lex-boolean-field {
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto;
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr) auto;
   min-height:0;
 }
 .lex-boolean-field:where(:has(> .lex-detail-field-control > .lex-source-control)) {
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
 }
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) { padding-bottom:12px; }
 .lex-boolean-field > .lex-detail-field-label {
@@ -7204,7 +7249,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) {
   align-items:center;
   display:grid;
-  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+  grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
 }
 .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
   justify-self:stretch;
@@ -7286,7 +7331,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  transition: translate .16s ease, rotate .16s ease;
  width: 1.1em; height: 1.1em;
 }
-.lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: .35em; }
+.lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: calc(var(--lex-stepper-width, 0px) + .35em); }
 .lex-reference-tag {
 
   /* V, R1 and R2 mark a control, and they sit inside the value box beside the
@@ -7647,13 +7692,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
- /* The name lane. A detail panel is wide, so a tenth of it holds a name; a
-    settings card is a few hundred pixels, where the same tenth was nineteen
-    and the fitter shrank every name in it to an unreadable few pixels. The
-    card says how much it gives its names instead. */
- /* --lex-detail-label-min is set by the label fitter when a name cannot be
-    read at the smallest size it allows; the lane never takes over half. */
- grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
+ /* Every property uses the same percentage; columns fit readable names. */
+ grid-template-columns:var(--lex-detail-label-width, 7.5%) minmax(0,1fr);
  border-bottom: var(--lex-field-border, 0);
 }
 .lex-detail-field-label {
@@ -8335,12 +8375,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
 
 /* Help follows the property name; the left type rail stays metadata. */
 .lex-detail-field-label:has(> .lex-field-help) > .lex-detail-field-label-text { min-width:min-content; }
+.lex-detail-field-label:has(> .lex-field-help) { gap:4px; }
 .lex-field-help {
   position:relative;
-  flex:0 0 22px;
+  flex:0 0 16px;
   display:grid;
   place-items:center;
-  width:22px;
+  width:16px;
   z-index:5;
 }
 .lex-field-help > .lex-info-help {
@@ -8446,3 +8487,14 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 
 /* A linked record's hover card holds a few short values, not a paragraph. */
 .lex-help-popover.lex-hover-preview { width:max-content; max-width:min(360px,calc(100vw - 24px)); }
+
+/* Mods tab: Lexer's Mod modules not downloaded yet sit greyed at the end. */
+.lex-mods-remote { opacity: .55; }
+.lex-mods-download { padding: 2px 10px; }
+.lex-first-run { max-width: 560px; }
+.lex-first-run progress { width: 100%; height: 14px; }
+.lex-first-run-features { display: table; margin: .4em auto 0; padding-left: 1.3em; text-align: left; }
+.lex-first-run-features li { margin: .2em 0; }
+.lex-inline-link { display: inline; margin: 0; }
+/* A tweak whose mod is off: its settings wait, readable but not live. */
+.lex-tweak-off .lex-detail-panel-body { opacity: .6; }

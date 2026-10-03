@@ -76,6 +76,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
     raw["tile"] = {
         "fixture-tile": {"type": "tile", "name": "fixture-tile"},
     }
+    raw['technology']['automation-huge'] = json.loads(json.dumps(raw['technology']['automation']))
+    raw['technology']['automation-huge']['name'] = 'automation-huge'
+    raw['technology']['automation-huge']['unit']['count'] = 18446744073709551615
     for index in range(40):
         item = f"fixture-item-{index:02d}"
         recipe = f"fixture-recipe-{index:02d}"
@@ -188,6 +191,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.locator('.lex-column-list-row[data-key="iron-plate"]').click()
                 page.wait_for_timeout(120)
                 stack = page.get_by_label("Stack size", exact=True)
+                for invalid in ("250.5", "0", "4294967296", ""):
+                    stack.fill(invalid)
+                    stack.blur()
+                    assert page.evaluate("dirtyCount()") == 0
+                    assert page.evaluate("state.data.items.find(row=>row.name==='iron-plate').stackSize") == 100
                 stack.fill("250")
                 stack.blur()
                 page.wait_for_function("dirtyCount() === 1")
@@ -207,12 +215,51 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 tech_search.fill("automation")
                 page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(120)
+                # Keep the count response pending until the reader has begun
+                # typing in the next field. It must not unmount that draft.
+                page.evaluate('''()=>{
+                  window.factorioOriginalFetch=window.fetch;
+                  window.fetch=async(...args)=>{
+                    const response=await factorioOriginalFetch(...args);
+                    if(String(args[0])==='/api/edit'&&!window.factorioHeldOnce){
+                      window.factorioHeldOnce=true;
+                      await new Promise(resolve=>window.releaseFactorioEdit=resolve);
+                    }
+                    return response;
+                  };
+                }''')
                 count = page.get_by_label("Research unit count", exact=True)
                 count.fill("25")
                 count.blur()
+                page.wait_for_function("typeof window.releaseFactorioEdit==='function'")
                 unit_time = page.get_by_label("Research unit time", exact=True)
+                time_control = unit_time.element_handle()
                 unit_time.fill("10")
-                unit_time.blur()
+                page.evaluate("()=>{window.fetch=factorioOriginalFetch;releaseFactorioEdit();}")
+                page.evaluate("rowEditQueue")
+                assert time_control.evaluate("input=>input.isConnected&&document.activeElement===input&&input.value==='10'"), "Count response discarded the active unit-time draft"
+                page.screenshot(path=str(OUT / 'factorio-active-research-draft.png'))
+                count.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 10
+                # Retained controls must compare with current state, so going
+                # back to their initial value still submits a real reversal.
+                unit_time.fill("15")
+                count.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 15
+                count.fill("10")
+                unit_time.focus()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitCount") == 10
+                unit_time.fill("10")
+                count.focus()
+                count.fill("25")
+                count.blur()
+                page.evaluate("rowEditQueue")
+                assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitTime") == 10
+                page.wait_for_function("rowRenderPending===false")
+                assert not time_control.evaluate("input=>input.isConnected"), "Completed edits were never redrawn after leaving the control"
                 page.wait_for_function("dirtyCount() === 3")
 
                 tech_search.fill("automation-2")
@@ -222,6 +269,33 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 prerequisites.select_option([])
                 page.wait_for_function("dirtyCount() === 4")
 
+                tech_search.fill("automation")
+                page.locator('.lex-column-list-row[data-key="automation"]').click()
+                before_invalid_save = (project / 'overrides.json').read_bytes()
+                for label, invalid, original in [
+                    ('Research unit count', '25.5', '25'),
+                    ('Research unit count', '0', '25'),
+                    ('Research unit count', '18446744073709551616', '25'),
+                    ('Research unit time', '', '10'),
+                ]:
+                    control = page.get_by_label(label, exact=True)
+                    control.fill(invalid)
+                    error = page.evaluate("async()=>{try{await save();return '';}catch(error){return error.message;}}")
+                    assert label in error, (label, error)
+                    if invalid == '18446744073709551616':
+                        page.get_by_role('button', name='Save changes', exact=True).click()
+                        warning = page.get_by_text('Correct Research unit count before saving.', exact=True)
+                        warning.wait_for(timeout=3000)
+                        page.wait_for_function('document.body.inert===false')
+                        assert not errors, errors
+                        page.wait_for_function('node=>Number(getComputedStyle(node).opacity)>=.99', arg=warning.element_handle())
+                        page.screenshot(path=str(OUT / 'factorio-invalid-save.png'))
+                        warning.click()
+                        warning.wait_for(state='detached')
+                    assert control.input_value() == invalid
+                    assert page.evaluate('dirtyCount()') == 4
+                    assert (project / 'overrides.json').read_bytes() == before_invalid_save
+                    control.fill(original)
                 page.evaluate("save()")
                 page.wait_for_function("dirtyCount() === 0")
                 page.evaluate("reopen()")
@@ -247,13 +321,65 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Research unit count", exact=True).input_value() == "25"
-                assert page.get_by_label("Research unit time", exact=True).input_value() == "10"
+                count = page.get_by_label("Research unit count", exact=True)
+                for invalid in ("25.5", "0", "18446744073709551616"):
+                    count.fill(invalid)
+                    count.blur()
+                    assert page.evaluate("dirtyCount()") == 0
+                    assert page.evaluate("state.data.technologies.find(row=>row.name==='automation').unitCount") == 25
+                count.fill("25")
+                count.blur()
+                assert count.evaluate("input=>input.checkValidity()")
+                assert page.evaluate("dirtyCount()") == 0
+                assert page.get_by_label("Research unit time", exact=True).input_value() == "10", page.evaluate("({data:state.data.technologies.find(row=>row.name==='automation'),toasts:[...document.querySelectorAll('.lex-toast')].map(node=>node.textContent)})")
                 tech_search.fill("automation-2")
                 page.locator('.lex-column-list-row[data-key="automation-2"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label(
                     "Technology prerequisites", exact=True
                 ).locator("option:checked").count() == 0
+
+                tech_search.fill('automation-huge')
+                page.locator('.lex-column-list-row[data-key="automation-huge"]').click()
+                wide = page.get_by_label('Research unit count', exact=True)
+                assert wide.get_attribute('type') == 'number'
+                assert wide.input_value() == '18446744073709551615'
+                # Two edits captured from the same rendered row must compose;
+                # Save waits for both rather than persisting only the first.
+                page.evaluate("""async()=>{
+                  const row=state.data.technologies.find(row=>row.name==='automation-huge');
+                  commitRow('technologies',changedCopy(row,'unitTime',11));
+                  commitRow('technologies',changedCopy(row,'enabled',false));
+                  await save();
+                }""")
+                stored = json.loads((project/'overrides.json').read_text())
+                assert 'unit_count' not in stored['edits']['technologies']['automation-huge']
+                assert stored['edits']['technologies']['automation-huge']['unit_time'] == 11
+                assert stored['edits']['technologies']['automation-huge']['enabled'] is False
+                before_rejection = (project/'overrides.json').read_bytes()
+                try:
+                    post_json(base_url+'api/edit', {'kind':'technologies','name':'automation-huge',
+                        'changes':{'unit_count':'9007199254740993'}})
+                except urllib.error.HTTPError as error:
+                    assert error.code == 400
+                    assert 'cannot represent' in error.read().decode()
+                else:
+                    raise AssertionError('Nonrepresentable Lua count was accepted')
+                assert (project/'overrides.json').read_bytes() == before_rejection
+                wide = page.get_by_label('Research unit count', exact=True)
+                wide.fill('18446744073709551614')
+                wide.blur()
+                assert not wide.evaluate('input=>input.checkValidity()')
+                assert page.evaluate('dirtyCount()') == 0
+                wide.fill('9007199254740994')
+                wide.blur()
+                page.wait_for_function("state.data.technologies.find(row=>row.name==='automation-huge').unitCount==='9007199254740994'")
+                page.evaluate('save()')
+                page.wait_for_function('dirtyCount()===0')
+                page.evaluate('reopen()')
+                page.wait_for_timeout(150)
+                assert page.get_by_label('Research unit count', exact=True).input_value() == '9007199254740994'
+                page.screenshot(path=str(OUT/'factorio-exact-count.png'))
 
                 # Info/version/DLC and deterministic export action.
                 page.evaluate('navigate("info")')
@@ -315,7 +441,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert narrow["body"] <= narrow["viewport"] + 2, narrow
                 assert narrow["identities"], narrow
                 assert all(row["scroll"] <= row["client"] + 1 for row in narrow["identities"]), narrow
-                assert page.locator(".lex-toast").count() == 0
+                assert page.locator(".lex-toast").count() == 0, page.locator(".lex-toast").all_text_contents()
                 page.screenshot(
                     path=str(OUT / "factorio-recipes-900.png"), full_page=True)
 
@@ -333,7 +459,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                         "pageerror", lambda error: scaled_errors.append(str(error)))
                     scaled_page.goto(base_url, wait_until="domcontentloaded")
                     scaled_page.wait_for_selector(".lex-column-list-row")
-                    scaled_page.get_by_role(
+                    scaled_page.locator('.lex-paged-list-detail > .lex-pager').get_by_role(
                         "button", name="Last page", exact=True).click()
                     scaled_page.wait_for_timeout(200)
                     scale_control = scaled_page.get_by_label("UI scale", exact=True)
@@ -417,6 +543,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
         assert "p.stack_size = 250" in patch
         assert "p.crafting_speed = 1.25" in patch
         assert "p.unit.count = 25" in patch
+        assert "p.unit.count = 9007199254740994" in patch
         assert "p.unit.time = 10" in patch
         assert "p.prerequisites = {}" in patch
         assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash

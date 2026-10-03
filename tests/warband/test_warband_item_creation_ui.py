@@ -31,12 +31,14 @@ def test_item_creation_from_shared_add(page, tmp_path, monkeypatch,kind):
         try:
             if path == "/api/items/create":
                 body = route.request.post_data_json
-                result = server.note_created("items", server.create_item(body["recordIndex"], body["originalId"], body["id"], body["name"], body["sha256"]))
+                result = server.create_with_origin("items", body["id"], server.create_item,
+                    body["recordIndex"], body["originalId"], body["id"], body["name"], body["sha256"])
             elif path == "/api/items":
                 result = server.mark_created("items", server.item_data())
             elif path == '/api/troops/create':
                 body=route.request.post_data_json
-                result=server.note_created('troops',server.create_troop(tmp_path,body['sha256'],body['recordIndex'],body['originalId'],body['id'],body['name'],body['plural']))
+                result=server.create_with_origin('troops',body['id'],server.create_troop,tmp_path,
+                    body['sha256'],body['recordIndex'],body['originalId'],body['id'],body['name'],body['plural'])
             elif path == '/api/troops':
                 result=server.mark_created('troops',server.troop_data(tmp_path))
             elif path == "/api/build/start":

@@ -27,12 +27,14 @@ def require(condition: bool, message: str) -> None:
 require('id: "plugin-github", class: "lex-developer-button lex-github-tab"' in FRAMEWORK_JS,
         "GitHub must use the shared developer control")
 require('class: "lex-developer-actions"' in FRAMEWORK_JS and
-        'brandSlot, leftActions, centerActions, rightActions, developerActions, windowControls.root' in FRAMEWORK_JS,
+        'class: "lex-shell-end"}, rightActions, developerActions, windowControls.root' in FRAMEWORK_JS and
+        'startSide, centerActions, endSide' in FRAMEWORK_JS,
         "the owner-only GitHub control must sit before the window controls")
 require("nav.append(github)" not in FRAMEWORK_JS,
         "GitHub must not consume primary game-tab space")
-require('const workflows = ["actionable", "waiting", "unfeasible"]' in FRAMEWORK_JS,
-        "the GitHub workspace must use the three requested workflow subtabs")
+# The current project rules add Needs Testing to the three original states.
+require('const workflows = ["actionable", "untested", "waiting", "unfeasible"]' in FRAMEWORK_JS,
+        "the GitHub workspace must expose all four project workflow states")
 require('panelLayout([issueList, editor, commentsPanel], "lex-github-layout"' in FRAMEWORK_JS,
         "GitHub must use the shared three-panel composer")
 require('class: "lex-detail lex-github-comments-panel"' in FRAMEWORK_JS,

@@ -17,6 +17,8 @@ from pathlib import Path
 import shutil
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .cheat_probe import TARGETS, scan_installed_menu_candidates
 from .cheat_probe_safety import assess_menu_candidate_removals
 from .dataobject import DataObjectPackage, Entry
@@ -246,9 +248,11 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("each No More Cheats edit must be an object")
-        if int(edit.get("entry", -1)) != 0 or "index" in edit:
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("No More Cheats edit contains unsupported fields")
+        if integer_value(edit.get("entry", -1), "No More Cheats entry index") != 0 or "index" in edit:
             raise ValueError("No More Cheats accepts scalar edits on its single record only")
-        if str(edit.get("property", "")) != "Enabled":
+        if edit.get("property", "") != "Enabled":
             raise ValueError("No More Cheats property is read-only or unknown")
         if seen:
             raise ValueError("duplicate No More Cheats enable edit")

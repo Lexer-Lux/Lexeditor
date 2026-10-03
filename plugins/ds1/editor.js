@@ -3,7 +3,8 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false};
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,reshade:null,
+  dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -22,6 +23,7 @@ const shell=LexeditorUI.mountShell({
     {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
+  help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Dark Souls Data Map",
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:state.tabs;
@@ -54,7 +56,15 @@ async function loadDetail(){
   if(state.selected!==key(row))return;
   state.row=result.row;state.monsterAttacks=attacks;
 }
-async function loadTweaks(){state.tweaks=await api("/api/tweaks");}
+async function loadTweaks(){
+  state.tweaks=await api("/api/tweaks");
+  try{state.reshade=await LexeditorUI.callWindow('mod_reshade','ds1')||{};}
+  catch(error){notify(error);}
+}
+async function reshadeAction(method,...args){
+  try{state.reshade=await LexeditorUI.callWindow(method,'ds1',...args)||state.reshade;render();}
+  catch(error){notify(error);}
+}
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
@@ -66,7 +76,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
+    if(tab==="items"||tab==="enemies"||tab==="attacks")await loadItems();else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();else if(tab==="datamap")state.dataMap=await api("/api/data-map");
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
@@ -97,6 +107,21 @@ async function save(){
 async function discard(){
   await edits;
   try{await api("/api/discard",{});attackPreviews.clear();await refreshState();await loadItems();render();}catch(error){notify(error);}
+}
+// An item's in-game name lives in the game's text, which the mod carries
+// beside its parameters; the server renames it there.
+function renameRecord(row,name){
+  if(state.readOnly)return;
+  state.pending++;shell.refresh();
+  edits=edits.then(async()=>{
+    try{
+      const result=await api("/api/rename",{table:row.table,id:row.id,name});
+      state.dirty=result.dirtyCount;
+      if(state.row&&key(state.row)===key(row))state.row=result.row;
+      for(const listed of state.rows||[])if(key(listed)===key(row))listed.name=result.row.name;
+    }catch(error){notify(error);}
+    finally{state.pending--;render();}
+  });
 }
 function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
@@ -171,10 +196,11 @@ async function attackPreview(id){
     error=>{attackPreviews.delete(id);throw error;}));
   const row=await attackPreviews.get(id);
   const users=row.impact.variants.length;
-  return el("div",{class:"ds1-attack-preview"},el("strong",{},`${row.name} #${row.id}`),
-    el("dl",{},...row.fields.flatMap(field=>[el("dt",{},field.label),
-      el("dd",{},field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))])),
-    el("p",{},users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
+  // The shared label-and-value rows, read-only: a preview is a small panel.
+  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},`${row.name} #${row.id}`),
+    ...row.fields.map(field=>detailField({label:field.label,control:readonlyField(
+      field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))})),
+    LexeditorUI.detailText(users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
 }
 function monsterAttacksSection(){
   const links=state.monsterAttacks;
@@ -197,9 +223,13 @@ function monsterDetail(groups){
 }
 function detail(){
   const impact=state.row?.impact;
-  const title=state.tab==="attacks"?(impact?.variants.length>1?"Shared attack damage":impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Monster":"Properties";
-  if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
-  if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  // A record's heading is its name, on every tab. An attack's sharing is
+  // said under it, never in its place.
+  const noun=state.tab==="attacks"?"Attack":state.tab==="enemies"?"Monster":"Item";
+  if(!state.row)return detailPanel({title:noun,body:[LexeditorUI.detailNote("Select a record.")]});
+  if(key(state.row)!==state.selected)return detailPanel({title:noun,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  const title=state.row.name;
+  const meta=state.tab==="attacks"&&impact?(impact.variants.length>1?"Shared attack damage":impact.variants.length===0?"Unresolved attack ownership":"Attack damage"):"";
   const groups=fieldSections(state.row);
   if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,body:[monsterDetail(groups)]});
   let help;
@@ -212,13 +242,13 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  return detailPanel({title,help,paginate:{inline:true},
+  return detailPanel({title,meta,help,
     body:[...groups].map(([title,body])=>detailSection({title,body}))});
 }
 function renderItems(){
   const noun=state.tab==="attacks"?"attacks":state.tab==="enemies"?"monsters":"items";
   const label=state.tab==="attacks"?"Attacks":state.tab==="enemies"?"Enemies":"Items";
-  const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,noun,
+  const view=pagedListDetail({rows:sortedRows(),key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     sync:next=>{
@@ -230,11 +260,14 @@ function renderItems(){
       sort:column=>{state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
       columns:[{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]}),
+    rename:renameRecord,
+    // Items have in-game names; monsters and attacks have only reference names.
+    renamable:row=>state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
-  return el("div",{class:"ds1-items"},subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
+  return LexeditorUI.stack(subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";
@@ -307,12 +340,21 @@ function renderTweaks(){
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
         el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
   if(!(status.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}));
-  const view=LexeditorUI.settingsColumns([installed,...panels]);
+  const view=LexeditorUI.settingsColumns([installed,...panels,
+    LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction})].filter(Boolean));
   requestAnimationFrame(()=>bind(view));
   return view;
 }
+function renderDataMap(){
+  const view=LexeditorUI.dataMap({plugin:"ds1",rows:state.dataMap.rows,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,
+    open:row=>row.target&&navigate(row.target,row.sub),
+    changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},
+    changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},
+    changeSort:key=>{state.mapSort=[key,state.mapSort[0]===key?-state.mapSort[1]:1];render()}});
+  state.mapPage=view.page;return view.content;
+}
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="datamap"?renderDataMap():state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():renderItems());
   shell.refresh();
 }
 async function boot(){

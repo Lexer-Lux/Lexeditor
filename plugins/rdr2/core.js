@@ -9,6 +9,7 @@ function showSaveFailure(error){const message=error?.message||String(error);toas
 const state = {
   booting: true,
   loadError: null,
+  pageError: false,
   tab: "items",
   ds: "mine",           // current dataset (mine | kiddos | vanilla)
   store: {},            // ds -> {catalog, quickSelect, effectByKey, loot, matrix}
@@ -22,6 +23,7 @@ const state = {
   config: null,
   // dirty edit stores
   priceEdits: {},       // "itemKey|section|costKey|partItem" -> qty(cents)
+  moneyDrafts: {},      // invalid dollar text, owned by its price/availability field
   buyabilityEdits: {},  // itemKey -> {buyable, cents}
   sellabilityEdits: {}, // itemKey -> {sellable, cents}
   yieldEdits: {},       // "itemKey|section|costKey" -> quantity received
@@ -169,7 +171,12 @@ function humanName(scope,key){return state.labels?.[scope]?.[key]||"";}
 function effectDisplayName(key){
   return humanName("effects",key) || (state.effectByKey[key]?.label ? state.effectByKey[key].label + "*" : key);
 }
-function humanNameInput(scope,key,placeholder="Add display name…"){return el("input",{class:"human-name",type:"text",value:humanName(scope,key),placeholder,title:"Editor-only human-readable label; stored in this RDR2 plugin's labels.json and never written to the mod.",onchange:async ev=>{const value=ev.target.value;state.labels[scope]=state.labels[scope]||{};if(value.trim())state.labels[scope][key]=value.trim();else delete state.labels[scope][key];await api("/api/labels/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope,key,value})});}});}
+async function saveHumanName(scope,key,value){
+  await api("/api/labels/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope,key,value})});
+  state.labels[scope]=state.labels[scope]||{};
+  if(value.trim())state.labels[scope][key]=value.trim();else delete state.labels[scope][key];
+}
+function humanNameInput(scope,key,placeholder="Add display name…",onSaved){return el("input",{class:"human-name",type:"text",value:humanName(scope,key),placeholder,title:"Editor-only human-readable label; stored in this RDR2 plugin's labels.json and never written to the mod.",onchange:async ev=>{try{await saveHumanName(scope,key,ev.target.value);await onSaved?.();}catch(error){ev.target.value=humanName(scope,key);showSaveFailure(error);}}});}
 function localizedValue(key){return state.localizationEdits[key]??state.localization?.values?.[key]??"";}
 // A localisation entry that holds only whitespace is not a name. Several
 // catalogue headings and their base-game rows both resolve to a non-breaking
@@ -231,7 +238,7 @@ function modOnlySpec(touched, resetPage, redraw) {
     change: value => { state.modOnly = value; resetPage(); redraw(); },
   };
 }
-const ITEM_EDIT_MAPS = () => [state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,
+const ITEM_EDIT_MAPS = () => [state.moneyDrafts,state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,
   state.yieldEdits, state.bundleEdits, state.itemEffectEdits, state.itemTagEdits,
   state.quickSelectEdits, state.descriptionKeyEdits, state.carryEdits, state.craftEdits,
   state.localizationEdits];
@@ -239,7 +246,11 @@ function dirtyCount() {
   const catalog = ["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
     "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits"]
     .reduce((n,key)=>n+Object.keys(state[key]).length,0);
-  return catalog + (state.customCraftingDirty?1:0) + Object.keys(state.alcoholEdits).length + Object.keys(state.settingEdits).length + state.shopDirty.size + Object.keys(state.shopBuyerDirty).length + state.matrixDirty.size +
+  const money=Object.keys(state.moneyDrafts).filter(key=>{
+    const [item,family]=key.split("|");return !(key in state.priceEdits)&&
+      !(family==="buyability"&&item in state.buyabilityEdits)&&!(family==="sellability"&&item in state.sellabilityEdits);
+  }).length;
+  return catalog + money + (state.customCraftingDirty?1:0) + Object.keys(state.alcoholEdits).length + Object.keys(state.settingEdits).length + state.shopDirty.size + Object.keys(state.shopBuyerDirty).length + state.matrixDirty.size +
     Object.values(state.lootDirty).reduce((n,s)=>n+s.size,0) +
     Object.keys(state.crimeEdits).length + Object.keys(state.dispatchEdits).length + Object.keys(state.bountyHunterEdits).length + Object.keys(state.honorActionEdits).length + Object.keys(state.lootSoundEdits).length +
     Object.keys(state.challengeEdits).length + Object.keys(state.challengeSourceEdits).length + Object.keys(state.challengeConditionEdits).length +
@@ -255,6 +266,7 @@ function dirtyCount() {
 // reference datasets stay outside each snapshot; the three views that edit
 // loaded rows in place supply their small mutable working sets explicitly.
 const RDR2_HISTORY_KEYS = [
+  "moneyDrafts",
   "priceEdits", "buyabilityEdits", "sellabilityEdits", "yieldEdits", "bundleEdits",
   "craftEdits", "customCraftingDraft", "customCraftingDirty", "crimeEdits",
   "dispatchEdits", "bountyHunterEdits", "honorActionEdits", "lootSoundEdits", "effectEdits",
@@ -284,7 +296,10 @@ async function rdr2HistoryRestore(snapshot){
   }
 }
 
-function fmtMoney(cents) { return (cents / 100).toFixed(2); }
+function fmtMoney(cents) {
+  if(/^[+-]?\d+$/.test(String(cents))){const n=BigInt(cents),a=n<0n?-n:n;return `${n<0n?"-":""}${a/100n}.${String(a%100n).padStart(2,"0")}`;}
+  return (cents / 100).toFixed(2);
+}
 function fmtCompactNumber(value){const n=Number(value);return Number.isFinite(n)?String(n):String(value??"");}
 
 // ---------- data loading ----------
@@ -767,10 +782,10 @@ function weaponRecordLink(section,name,content=null){
 }
 
 function mobArchetypeLink(layer,name,content=null){
-  const record=state.mobs?.[layer]?.records?.find(row=>row.name===name);
+  const record=state.mobs?.[layer]?.records?.find(row=>row.name===name&&(layer!=="health"||row.section==="HealthConfig"));
   if(!record)return content??name;
   return rdrHoverable({content:content??name,targetType:"rdr2-mob-archetype",targetId:`${layer}|${record.group}|${name}`,
-    targetLabel:`${name} in Mobs`,activate:()=>navigate("mobs",{mobView:"archetypes",mobLayer:layer,mobGroup:record.group,mobQ:name})});
+    targetLabel:`${name} in Mobs`,activate:()=>navigate("mobs",{mobView:"archetypes",mobLayer:layer,mobGroup:record.group,mobQ:name,...(layer==="health"?{mobHealthSection:"HealthConfig"}:{})})});
 }
 
 async function fillItemSources(it,list){
@@ -867,7 +882,8 @@ function renderScope(page){
 }
 
 function render() {
-  renderRevision++;
+  const revision=++renderRevision;
+  const tab=state.tab;
   document.querySelectorAll("nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === state.tab));
   if (state.booting) {
@@ -885,12 +901,20 @@ function render() {
   document.body.classList.toggle("weapon-detail-view",state.tab==="weapons");
   document.body.classList.toggle("shop-workspace-view",
     state.tab==="shops" && state.filters.shopMode!=="report");
-  if(state.renderedTab!==state.tab){
+  if(state.renderedTab!==state.tab||state.pageError){
     const main=$("#main");
     if(main){main.scrollLeft=0;main.replaceChildren(LexeditorUI.loadingPanel());}
     state.renderedTab=state.tab;
+    state.pageError=false;
   }
-  const rendered=Promise.resolve(TABS[state.tab]()).finally(()=>installTabContext());
+  const rendered=Promise.resolve().then(()=>{if(revision===renderRevision)return TABS[tab]();}).catch(error=>{
+    if(revision!==renderRevision)return;
+    state.pageError=true;
+    $("#toolbar").replaceChildren();
+    $("#main").replaceChildren(LexeditorUI.notice({title:"Could not load editor data",
+      message:error?.message||String(error),tone:"warning",
+      action:el("button",{type:"button",onclick:()=>render()},"Retry")}));
+  }).finally(()=>{if(revision===renderRevision)installTabContext();});
   refreshGlobalSave();
   return rendered;
 }
@@ -907,6 +931,17 @@ async function saveAllChanges() {
   if(isRO()||!dirtyCount())return;
   const originalLootFile=state.lootFile;
   try {
+    validateCatalogQuantityDrafts();
+    validateLootDrafts();
+    validateMatrixDrafts();
+    validateDispatchDrafts();
+    validateCrimeDrafts();
+    validateBountyHunterDrafts();
+    validateHonorActionDrafts();
+    await preflightAISave();
+    await preflightMobsSave();
+    await preflightChallengeSave();
+    const weaponBodies=await preflightWeaponSave();
     if(Object.keys(state.settingEdits).length)await saveSettings();
     if(state.customCraftingDirty)await saveCustomCrafting();
     if(state.shopDirty.size)await saveShops();
@@ -920,11 +955,9 @@ async function saveAllChanges() {
     if(state.matrixDirty.size)await saveMatrix();
     if(Object.keys(state.challengeEdits).length||Object.keys(state.challengeSourceEdits).length||Object.keys(state.challengeConditionEdits).length||
        Object.keys(state.challengeRewardEdits).length||Object.keys(state.challengeUiEdits).length||Object.keys(state.challengeModeEdits).length)await saveChallenges();
-    for(const [key,map] of Object.entries(state.weaponEdits))if(Object.keys(map).length){
-      const cut=key.indexOf("|"),section=key.slice(0,cut),name=key.slice(cut+1);
-      const record=state.weaponData.mine?.[section]?.find(row=>row.name===name);
+    for(const [key,body] of weaponBodies){
       await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({section,name,sourceFile:record?.sourceFile,edits:Object.values(map)})});
+        body:JSON.stringify(body)});
       delete state.weaponEdits[key];
     }
     if(state.weaponShellVfxEdit!==null)await saveWeaponShellVfx();

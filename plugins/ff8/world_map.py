@@ -19,8 +19,10 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+import threading
+from core.numeric_values import integer_value
 
-from . import kernel_text, paths, runtime_layout, world_geometry, world_textures
+from . import encounter_chances, kernel_text, paths, project_files, runtime_layout, world_geometry, world_textures
 from .fs_archive import FsArchive
 
 
@@ -28,6 +30,7 @@ WORLD_PREFIX = "world"
 WORLD_ENTRY = "wmsetus.obj"
 DIRECT_RELATIVE = Path("world/dat/wmsetus.obj")
 BASELINE_RELATIVE = Path("world/wmsetus.obj")
+_SAVE_LOCK = threading.RLock()
 RAIL_ENTRY = "rail.obj"
 RAIL_DIRECT_RELATIVE = Path("world/dat/rail.obj")
 RAIL_BASELINE_RELATIVE = Path("world/rail.obj")
@@ -527,7 +530,12 @@ def parse_rail(data: bytes) -> dict:
 def rows(dataset: str = "current") -> dict:
     from . import world_names
     ground_names = world_names.load(dataset)
-    parsed = parse(source_path(dataset).read_bytes())
+    wmset_raw = source_path(dataset).read_bytes()
+    parsed = parse(wmset_raw)
+    if parsed['groups']:
+        _, weights = encounter_chances.read_extension(wmset_raw, len(parsed['groups']))
+        for row, outcomes in zip(parsed['groups'], weights):
+            row['initialOutcomes'] = list(outcomes)
     rail = parse_rail(rail_source_path(dataset).read_bytes())
     texture_data = world_textures.rows(dataset)
     geometry_data = world_geometry.rows(dataset)
@@ -550,17 +558,14 @@ def rows(dataset: str = "current") -> dict:
             "railSource": str(rail_source_path(dataset)),
             "textureSource": texture_data["source"],
             "geometrySource": geometry_data["source"],
-            "sha256": hashlib.sha256(source_path(dataset).read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(wmset_raw).hexdigest(),
             "railSha256": hashlib.sha256(rail_source_path(dataset).read_bytes()).hexdigest(),
             "textureSha256": texture_data["sha256"],
             "geometrySha256": geometry_data["sha256"]}
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    try:
-        value = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{label} must be an integer") from error
+    value = integer_value(value, label)
     if not minimum <= value <= maximum:
         raise ValueError(f"{label} must be {minimum} to {maximum}")
     return value
@@ -584,7 +589,7 @@ def apply_rail_edits(data: bytes | bytearray, edits: list[dict]) -> bytearray:
         offset = track_id * RAIL_BLOCK_SIZE
         struct.pack_into("<II", raw, offset + 4, stop1, stop2)
         for point_id, point in enumerate(points):
-            if not isinstance(point, dict) or int(point.get("id", -1)) != point_id:
+            if not isinstance(point, dict) or integer_value(point.get("id", -1), "Rail keypoint ID") != point_id:
                 raise ValueError(f"Rail track {track_id} keypoints must stay in order")
             point_offset = offset + RAIL_HEADER_SIZE + point_id * RAIL_POINT_SIZE
             for component_offset, key, label in (
@@ -681,17 +686,47 @@ def _atomic_write(destination: Path, raw: bytes | bytearray) -> None:
         Path(temp_name).unlink(missing_ok=True)
 
 
-def save(edits: list[dict]) -> dict:
+def save(edits: list[dict], expected_sha256: str | None = None) -> dict:
+    with _SAVE_LOCK:
+        recovery = paths.DIRECT_ROOT.parent / '.world-recovery'
+        if recovery.exists():
+            raise OSError(f'World save has pending recovery at {recovery}; resolve it before saving again')
+        return _save(edits, expected_sha256)
+
+
+def _save(edits: list[dict], expected_sha256: str | None) -> dict:
     from . import world_names
     name_edits = [edit for edit in edits if edit.get("kind") == "groundName"]
+    name_destination = paths.PROJECT_ROOT / world_names.FILENAME
+    name_before = (name_destination.read_bytes() if name_destination.exists() else None) if name_edits else None
     names = world_names.prepare(name_edits) if name_edits else None
     if name_edits and len(name_edits) == len(edits):
         destination = world_names.write(names)
         return {"saved": len(name_edits), "file": str(destination), "files": [str(destination)]}
     source = source_path("current")
-    raw = bytearray(source.read_bytes())
+    source_bytes = source.read_bytes()
+    if expected_sha256 is not None and expected_sha256 != hashlib.sha256(source_bytes).hexdigest():
+        raise ValueError('World source changed; reload before saving')
+    raw = bytearray(source_bytes)
     parsed = parse(raw)
     pointers = _pointers(raw)
+    weight_edits = {}
+    wmset_destination = paths.DIRECT_ROOT / DIRECT_RELATIVE
+    hext_destination = paths.DIRECT_ROOT.parent / encounter_chances.HEXT_RELATIVE
+    original_files = {}
+    if name_edits:
+        original_files[name_destination] = name_before
+    source_guards = [(source, source_bytes)]
+
+    def snapshot(path):
+        if path not in original_files:
+            original_files[path] = path.read_bytes() if path.exists() else None
+        return original_files[path]
+
+    snapshot(wmset_destination)
+    old_hext = snapshot(hext_destination)
+    if old_hext is not None and len(old_hext) > 4096:
+        raise ValueError('Encounter chance patch exceeds its bounded generated size')
     draw_edits = [edit for edit in edits if str(edit.get("kind", "")) == "drawPoint"]
     if draw_edits:
         raw = apply_draw_point_edits(raw, draw_edits)
@@ -735,42 +770,86 @@ def save(edits: list[dict]) -> dict:
                 raise ValueError("Encounter groups must contain eight scene IDs")
             values = [_bounded(value, 0, 1023, "Encounter ID") for value in encounters]
             struct.pack_into("<8H", raw, pointers[3] + index * 16, *values)
+            if 'initialOutcomes' in edit:
+                if index in weight_edits:
+                    raise ValueError('Encounter group weights are edited twice')
+                encounter_chances.encode_weights(edit['initialOutcomes'])
+                weight_edits[index] = edit['initialOutcomes']
         else:
             raise ValueError(f"Unknown world-map record kind: {kind}")
         changed += 1
 
-    # Validate every complete result before replacing either project override.
+    chance_patch = None
+    if parsed['groups']:
+        group_count = len(parsed['groups'])
+        old_offset = encounter_chances.extension_offset(source_bytes, group_count, pointers[3])
+        _, previous_weights = encounter_chances.read_extension(source_bytes, group_count)
+        weights_changed = any(tuple(values) != previous_weights[group] for group, values in weight_edits.items())
+        if weights_changed and expected_sha256 is None:
+            raise ValueError('Encounter probability edits require the loaded world source hash')
+        if old_offset is not None or old_hext or weights_changed:
+            exe_path = paths.GAME_ROOT / 'FF8_EN.exe'
+            exe = exe_path.read_bytes()
+            source_guards.append((exe_path, exe))
+            expected_hext = (encounter_chances.build_hext(exe, old_offset).encode()
+                             if old_offset is not None else b'')
+            if (old_hext or b'') != expected_hext:
+                raise ValueError('Encounter weight data and generated Hext disagree; reload or restore the pair before saving')
+            raw = bytearray(encounter_chances.with_weights(raw, group_count, weight_edits))
+            new_offset = encounter_chances.extension_offset(raw, group_count, pointers[3])
+            chance_patch = (encounter_chances.build_hext(exe, new_offset).encode()
+                            if new_offset is not None else b'')
+
+    # Validate every complete result before publishing the related mod files.
     parse(raw)
-    rail_raw = (apply_rail_edits(rail_source_path("current").read_bytes(), rail_edits)
+    def prepared_source(path):
+        data = path.read_bytes()
+        source_guards.append((path, data))
+        return data
+
+    rail_raw = (apply_rail_edits(prepared_source(rail_source_path("current")), rail_edits)
                 if rail_edits else None)
     texture_raw = (world_textures.apply_edits(
-        world_textures.source_path("current").read_bytes(), texture_edits)
+        prepared_source(world_textures.source_path("current")), texture_edits)
         if texture_edits else None)
     geometry_raw = (world_geometry.apply_edits(
-        world_geometry.source_path("current").read_bytes(), geometry_edits)
+        prepared_source(world_geometry.source_path("current")), geometry_edits)
         if geometry_edits else None)
-    destinations = []
+    destinations, pending = [], []
     if wmset_edits or draw_edits or field_return_edits or sky_color_edits:
-        destination = paths.DIRECT_ROOT / DIRECT_RELATIVE
-        _atomic_write(destination, raw)
+        destination = wmset_destination
+        pending.append((destination, bytes(raw)))
         destinations.append(str(destination))
+    if chance_patch is not None:
+        pending.append((hext_destination, chance_patch))
+        destinations.append(str(hext_destination))
     if rail_edits:
         rail_destination = paths.DIRECT_ROOT / RAIL_DIRECT_RELATIVE
-        _atomic_write(rail_destination, rail_raw)
+        snapshot(rail_destination)
+        pending.append((rail_destination, bytes(rail_raw)))
         destinations.append(str(rail_destination))
         changed += len(rail_edits)
     if texture_edits:
         texture_destination = paths.DIRECT_ROOT / world_textures.DIRECT_RELATIVE
-        _atomic_write(texture_destination, texture_raw)
+        snapshot(texture_destination)
+        pending.append((texture_destination, bytes(texture_raw)))
         destinations.append(str(texture_destination))
         changed += len(texture_edits)
     if geometry_edits:
         geometry_destination = paths.DIRECT_ROOT / world_geometry.DIRECT_RELATIVE
-        _atomic_write(geometry_destination, geometry_raw)
+        snapshot(geometry_destination)
+        pending.append((geometry_destination, bytes(geometry_raw)))
         destinations.append(str(geometry_destination))
         changed += len(geometry_edits)
     if name_edits:
-        destinations.append(str(world_names.write(names)))
+        name_destination = paths.PROJECT_ROOT / world_names.FILENAME
+        snapshot(name_destination)
+        pending.append((name_destination, world_names.encoded(names)))
+        destinations.append(str(name_destination))
         changed += len(name_edits)
+    if pending:
+        project_files.commit_files(paths.DIRECT_ROOT.parent, pending,
+            [(path, original_files[path]) for path, _ in pending], label='World',
+            recovery_name='.world-recovery', source_guards=source_guards)
     return {"saved": changed, "file": destinations[0] if destinations else "",
             "files": destinations}

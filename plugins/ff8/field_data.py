@@ -19,6 +19,8 @@ import struct
 import tempfile
 import threading
 
+from core.numeric_values import integer_value
+
 from . import (field_background, field_camera, field_dialogue, field_encounters,
                field_movie, field_scripts, field_walkmesh, paths, runtime_layout)
 from .fs_archive import FsArchive
@@ -1045,7 +1047,7 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
     scalar_offsets = _inf_scalar_offsets(parsed)
     for edit in edits:
         kind = str(edit.get("kind", ""))
-        slot = int(edit.get("slot", -1))
+        slot = integer_value(edit.get("slot", -1), "Field entrance slot")
         field = str(edit.get("field", ""))
         if kind == "misc":
             identity = (kind, field)
@@ -1059,7 +1061,7 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
             raise ValueError("Invalid or duplicate field entrance edit")
         seen.add(identity)
         offset, fmt, minimum, maximum = scalar_offsets[identity]
-        value = int(edit.get("value"))
+        value = integer_value(edit.get("value"), "Field entrance value")
         if not minimum <= value <= maximum:
             raise ValueError(f"Field entrance value must be {minimum} to {maximum}")
         struct.pack_into("<" + fmt, raw, offset, value)
@@ -1085,8 +1087,10 @@ def _prepare_dialogue_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, i
     source = _dialogue_source_path(key, "current")
     if source is None:
         raise ValueError(f"Field map {key} has no dialogue MSD")
+    if any(set(edit) - {"type", "map", "line", "text"} for edit in edits):
+        raise ValueError("Field dialogue edit contains an unsupported field")
     raw, changed = field_dialogue.apply_edits(source.read_bytes(), [
-        {"id": int(edit.get("line", -1)), "text": str(edit.get("text", ""))}
+        {"id": edit.get("line", -1), "text": edit.get("text", "")}
         for edit in edits
     ], map_name=row["name"])
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
@@ -1150,8 +1154,8 @@ def _prepare_encounter_edits(key: str, edits: list[dict]
         kind = str(edit.get("kind", ""))
         if kind == "formation":
             formation_edits.append({
-                "slot": int(edit.get("slot", -1)),
-                "formation": int(edit.get("value", -1)),
+                "slot": edit.get("slot", -1),
+                "formation": edit.get("value", -1),
             })
         elif kind == "rate":
             rate_edits.append(edit)
@@ -1167,7 +1171,7 @@ def _prepare_encounter_edits(key: str, edits: list[dict]
         prepared.append((directory / f"{row['name']}.mrt", raw, changed))
     if rate_edits:
         raw, changed = field_encounters.apply_rat_edit(
-            rat_source.read_bytes(), int(rate_edits[0].get("value", -1)))
+            rat_source.read_bytes(), rate_edits[0].get("value", -1))
         prepared.append((directory / f"{row['name']}.rat", raw, changed))
     return prepared
 
@@ -1179,10 +1183,10 @@ def _prepare_camera_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int
         raise ValueError(f"Field map {key} has no camera setups")
     normalized = []
     for edit in edits:
-        normalized.append({"camera": int(edit.get("camera", -1)),
+        normalized.append({"camera": edit.get("camera", -1),
                            "field": str(edit.get("field", "")),
                            "axis": str(edit.get("axis", "")),
-                           "value": int(edit.get("value"))})
+                           "value": edit.get("value")})
     raw, changed = field_camera.apply_edits(source.read_bytes(), normalized)
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.ca")
@@ -1196,10 +1200,10 @@ def _prepare_movie_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int]
         raise ValueError(f"Field map {key} has no movie camera frames")
     normalized = []
     for edit in edits:
-        normalized.append({"frame": int(edit.get("frame", -1)),
-                           "point": int(edit.get("point", -1)),
+        normalized.append({"frame": edit.get("frame", -1),
+                           "point": edit.get("point", -1),
                            "axis": str(edit.get("axis", "")),
-                           "value": int(edit.get("value"))})
+                           "value": edit.get("value")})
     raw, changed = field_movie.apply_edits(source.read_bytes(), normalized)
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.msk")
@@ -1236,10 +1240,13 @@ def save(edits: list[dict]) -> dict:
             prepared_dialogue = _prepare_dialogue_edits(key, dialogue_edits)
         prepared_walkmesh = None
         if walkmesh_edits:
+            if any(set(edit) - {"type", "map", "triangle", "vertex", "x", "y", "z", "adjacent"}
+                   for edit in walkmesh_edits):
+                raise ValueError("Field walkmesh edit has unsupported fields")
             prepared_walkmesh = _prepare_walkmesh_edits(key, [{
-                "triangle": int(edit.get("triangle", -1)),
-                "vertex": int(edit.get("vertex", -1)),
-                **{field: int(edit[field]) for field in ("x", "y", "z", "adjacent")
+                "triangle": edit.get("triangle", -1),
+                "vertex": edit.get("vertex", -1),
+                **{field: edit[field] for field in ("x", "y", "z", "adjacent")
                    if field in edit},
             } for edit in walkmesh_edits])
         prepared_background = (_prepare_background_edits(key, background_edits)
@@ -1252,11 +1259,15 @@ def save(edits: list[dict]) -> dict:
                           if movie_edits else None)
         prepared_scripts = None
         if script_documents:
+            if any(set(edit) - {"type", "map", "method", "source"} for edit in script_documents):
+                raise ValueError("Field JSM document contains an unsupported field")
             prepared_scripts = _prepare_script_documents(key, [
-                {"id": int(edit.get("method", -1)), "source": str(edit.get("source", ""))}
+                {"id": edit.get("method", -1), "source": edit.get("source", "")}
                 for edit in script_documents
             ])
         if script_edits:
+            if any(set(edit) - {"type", "map", "player", "param", "value"} for edit in script_edits):
+                raise ValueError("Field card-player edit contains an unsupported field")
             row = _map_row(key)
             source, sym = _source_paths(key, "current")
             if source is None:
@@ -1273,7 +1284,8 @@ def save(edits: list[dict]) -> dict:
                 raise ValueError("General script edits changed the CARDGAME call order")
             seen = set()
             for edit in script_edits:
-                player_id, param_id = int(edit.get("player", -1)), int(edit.get("param", -1))
+                player_id = integer_value(edit.get("player", -1), "Field card player ID")
+                param_id = integer_value(edit.get("param", -1), "Field card parameter ID")
                 identity = (player_id, param_id)
                 if identity in seen or not 0 <= player_id < len(players) or not 0 <= param_id < 7:
                     raise ValueError("Invalid or duplicate field card-player edit")
@@ -1283,7 +1295,7 @@ def save(edits: list[dict]) -> dict:
                 param = players[player_id]["params"][param_id]
                 if not param["editable"]:
                     raise ValueError("This field script expression is not a supported literal or variable push")
-                value = int(edit.get("value"))
+                value = integer_value(edit.get("value"), "Field card parameter value")
                 if not 0 <= value <= 0xFFFFFF:
                     raise ValueError("Field script values must be 0 to 16777215")
                 struct.pack_into("<I", raw, param["offset"], (param["opcode"] << 24) | value)

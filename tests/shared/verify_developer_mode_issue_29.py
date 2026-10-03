@@ -49,7 +49,10 @@ assert 'id="chooser-restart"' in chooser and "restart_lexeditor()" in chooser
 # chooser dropped its own cached settings - failed a check it still satisfied.
 assert re.search(r"restartButton\.hidden\s*=\s*!\w+(\?)?\.developerMode", chooser), (
     "the chooser restart button is no longer hidden outside developer mode")
-assert 'lexerButton.textContent="DEV"' in chooser
+assert re.search(r'<button\b[^>]*id="lexer-handle"[^>]*>.*?<span\b[^>]*class="lexer-handle-name"[^>]*>DEV</span>', chooser, re.S), (
+    "the developer helper handle must retain its DEV label")
+assert re.search(r"lexerHandle\.hidden\s*=\s*!\w+(\?)?\.developerMode", chooser), (
+    "the developer helper handle must remain hidden without developer identity")
 assert "const restartIcon = () =>" in framework and "M16.59 5.45" in framework
 assert "M16.59 5.45" in chooser and "M20 11a8" not in chooser
 assert 'plugin.plugin_id == "blank" and not developer_mode' in desktop

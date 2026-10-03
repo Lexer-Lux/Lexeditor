@@ -8,6 +8,11 @@ import verify_ff7_rendered as target
 from plugins.ff7 import deployment
 
 
+def visible_group(self, name):
+    return target.reveal(self.page, self.page.get_by_role(
+        "group", name=name, exact=True, include_hidden=True))
+
+
 def open_with_neutral(self, edition="ff7"):
     self.page.goto("about:blank")
     html = (target.ROOT / "plugins/ff7/editor.html").read_text(encoding="utf-8")
@@ -60,7 +65,7 @@ def test_materia_uses_human_semantic_controls(self):
     equip = self.page.get_by_label("Stats while equipped for Record0", exact=True)
     behavior = self.page.get_by_label("Materia behavior for Record0", exact=True)
     element = self.page.get_by_label("Element for Record0", exact=True)
-    statuses = self.page.get_by_role("group", name="Status effects for Record0", exact=True)
+    statuses = visible_group(self, "Status effects for Record0")
     self.assertEqual(equip.evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(behavior.evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(element.evaluate("e=>e.tagName"), "SELECT")
@@ -68,10 +73,10 @@ def test_materia_uses_human_semantic_controls(self):
     self.assertEqual(self.page.get_by_label("Status flags for Record0", exact=True).count(), 0)
     self.assertEqual(self.page.get_by_label("Materia type byte for Record0", exact=True).count(), 0)
 
-    equip.select_option("6")
-    behavior.select_option(str(0x19))
-    element.select_option("2")
-    self.page.get_by_label("Poison", exact=True).check()
+    target.reveal(self.page, equip).select_option("6")
+    target.reveal(self.page, behavior).select_option(str(0x19))
+    target.reveal(self.page, element).select_option("2")
+    target.reveal(self.page, self.page.get_by_label("Poison", exact=True)).check()
     self.save()
 
     status, data = self.backend.request("/api/data")
@@ -90,30 +95,30 @@ def test_full_ff7_surface_uses_human_controls(self):
 
     # Items: bitmask/formula/status bytes are semantic controls.
     self.navigate("items")
-    self.assertEqual(self.page.get_by_role("group", name="Targeting for Record0", exact=True).locator('input[type="checkbox"]').count(), 8)
+    self.assertEqual(visible_group(self, "Targeting for Record0").locator('input[type="checkbox"]').count(), 8)
     self.assertEqual(self.page.get_by_label("DMG/Heal Formula for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(self.page.get_by_label("Status change mode for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
     self.assertEqual(self.page.get_by_label("Target flags for Record0", exact=True).count(), 0)
 
     # Equipment: equipability/elements/status/growth are names, not masks/codes.
     self.navigate("weapons")
-    self.assertEqual(self.page.get_by_role("group", name="Usable by for Record0", exact=True).locator('input[type="checkbox"]').count(), 11)
+    self.assertEqual(visible_group(self, "Usable by for Record0").locator('input[type="checkbox"]').count(), 11)
     self.assertEqual(self.page.get_by_label("Materia AP growth for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
     self.navigate("accessories")
     self.assertEqual(self.page.get_by_label("Automatic / special effect for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
-    self.assertEqual(self.page.get_by_role("group", name="Protected statuses for Record0", exact=True).locator('input[type="checkbox"]').count(), 32)
+    self.assertEqual(visible_group(self, "Protected statuses for Record0").locator('input[type="checkbox"]').count(), 32)
 
     # Characters: cross-dataset IDs are actual named selectors.
     self.navigate("characters")
     weapon=self.page.get_by_label("Starting weapon for Slot0", exact=True)
     row=self.page.get_by_label("Starting row for Slot0", exact=True)
-    limits=self.page.get_by_role("group", name="Limits already learned for Slot0", exact=True)
+    limits=self.page.get_by_role("group", name="Limits already learned for Slot0", exact=True, include_hidden=True)
     self.assertEqual(weapon.evaluate("e=>e.tagName"),"SELECT")
     self.assertIn("Record0", weapon.locator("option").all_inner_texts())
     weapon_search=self.page.get_by_label("Search Starting weapon for Slot0", exact=True)
     self.assertEqual(weapon_search.get_attribute("type"),"search")
     before=weapon.locator("option").count()
-    weapon_search.fill("Record1")
+    target.reveal(self.page, weapon_search).fill("Record1")
     self.assertLess(weapon.locator("option").count(),before)
     self.assertTrue(any("Record1" in option for option in weapon.locator("option").all_inner_texts()))
     weapon.select_option("1")
@@ -123,7 +128,7 @@ def test_full_ff7_surface_uses_human_controls(self):
     self.navigate("characters")
     weapon=self.page.get_by_label("Starting weapon for Slot0", exact=True)
     row=self.page.get_by_label("Starting row for Slot0", exact=True)
-    limits=self.page.get_by_role("group", name="Limits already learned for Slot0", exact=True)
+    limits=visible_group(self, "Limits already learned for Slot0")
     self.assertIn("Front row", row.locator("option").all_inner_texts())
     self.assertEqual(limits.locator('input[type="checkbox"]').count(),7)
     self.assertEqual(self.page.get_by_label("Weapon ID for Slot0", exact=True).count(),0)
@@ -134,11 +139,11 @@ def test_full_ff7_surface_uses_human_controls(self):
     action=self.page.get_by_label("Action 1 attack for Enemy0", exact=True)
     self.assertEqual(action.evaluate("e=>e.tagName"),"SELECT")
     self.assertIn("Action0", action.locator("option").all_inner_texts())
-    self.assertEqual(self.page.get_by_role("group", name="Status immunities for Enemy0", exact=True).locator('input[type="checkbox"]').count(),32)
+    self.assertEqual(visible_group(self, "Status immunities for Enemy0").locator('input[type="checkbox"]').count(),32)
 
     self.navigate("enemyAttacks")
     self.assertEqual(self.page.get_by_label("DMG/Heal Formula for Action0", exact=True).evaluate("e=>e.tagName"),"SELECT")
-    specials=self.page.get_by_role("group", name="Special attack properties for Action0", exact=True)
+    specials=visible_group(self, "Special attack properties for Action0")
     self.assertGreaterEqual(specials.locator('input[type="checkbox"]').count(),10)
 
     # Field/world and shops no longer ask for anonymous battle/product IDs.
@@ -155,13 +160,13 @@ def test_full_ff7_surface_uses_human_controls(self):
     self.assertEqual(product.evaluate("e=>e.tagName"),"SELECT")
     self.assertTrue(any("Record" in value for value in product.locator("option").all_inner_texts()))
     product_search=self.page.get_by_label("Search Slot 1 product for Shop 0", exact=True)
-    product_search.fill("Record1")
+    target.reveal(self.page, product_search).fill("Record1")
     self.assertTrue(any("Record1" in value for value in product.locator("option").all_inner_texts()))
 
     # Save representative semantic edits from different binary families.
     self.navigate("weapons")
     weapon_id=self.page.evaluate("state.selected.weapons")
-    self.page.get_by_label(f"Materia AP growth for Record{weapon_id}", exact=True).select_option("2")
+    target.reveal(self.page, self.page.get_by_label(f"Materia AP growth for Record{weapon_id}", exact=True)).select_option("2")
     self.save()
     status,data=self.backend.request('/api/data');self.assertEqual(status,200)
     self.assertEqual(data['records']['weapons'][weapon_id]['values']['growthRate'],2)
@@ -170,7 +175,7 @@ def test_full_ff7_surface_uses_human_controls(self):
     critical=self.page.get_by_label("Always critical", exact=True)
     # The fixture stores the special mask as zero; logical flags are inverted,
     # so unchecking sets the stored inverse bit while the UI remains semantic.
-    critical.uncheck()
+    target.reveal(self.page, critical).uncheck()
     self.save()
     status,data=self.backend.request('/api/data');self.assertEqual(status,200)
     self.assertTrue(data['records']['enemyAttacks'][0]['values']['specialFlags'] & 0x2000)
@@ -230,9 +235,22 @@ def test_refined_master_and_detail_ux(self):
 
     self.navigate("encounters")
     self.assertEqual(self.page.evaluate("state.sort.encounters || null"), None)
-    main_text = self.page.locator("main").inner_text()
-    self.assertIn("Battle 2", main_text)
-    self.assertLess(main_text.find("Battle 2"), main_text.find("Battle 10"))
+    # The fitted master may put ID 10 on a later page. Check the displayed
+    # order across actual page transitions instead of requiring both on one.
+    seen = []
+    for _ in range(4):
+        seen.extend(self.page.locator('.ff7-table .lex-list-row[data-key]').evaluate_all(
+            'rows=>rows.map(row=>Number(row.dataset.key))'))
+        if 10 in seen:
+            break
+        following = self.page.locator('.ff7-layout > .lex-pager').get_by_role(
+            "button", name="Next page", exact=True)
+        self.assertTrue(following.is_enabled())
+        following.click()
+    self.assertIn(2, seen)
+    self.assertIn(10, seen)
+    self.assertEqual(seen, sorted(set(seen)))
+    self.assertLess(seen.index(2), seen.index(10))
     self.originals_unchanged()
 
 def test_finished_high_value_detail_views(self):
@@ -291,7 +309,7 @@ def test_dense_custom_views_fit_narrow_detail_pane(self):
             if group == 'characters':
                 output=Path(__import__('tempfile').gettempdir())/'lexeditor-dev'/'ff7-narrow-character.png'
                 output.parent.mkdir(exist_ok=True)
-                self.page.get_by_label('Character Limit attacks and gauge divisors',exact=True).scroll_into_view_if_needed()
+                target.reveal(self.page, self.page.get_by_label('Character Limit attacks and gauge divisors',exact=True)).scroll_into_view_if_needed()
                 self.page.screenshot(path=str(output))
     self.originals_unchanged()
 

@@ -10,10 +10,6 @@
   };
 
   let moduleRecords=null;
-  // A record this mod's create action made carries the shared created-in-mod
-  // pen; the server keeps the ledger of those ids (todo: "created records
-  // ... still get no created-in-mod pen").
-  function createdName(row,name){return row?.created?LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:true}),name):name}
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
   // "Mod contents only" keeps the records this project has actually changed.
   // Warband records edits against the record itself, so the filter is the set
@@ -25,8 +21,8 @@
       unavailableTitle:"This view has no editable records to filter by.",
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
-  function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
-  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Object.keys(r.fields).length,0)+(moduleRecords?.dirtyCount()||0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Math.max(Object.keys(row.fields||{}).length,(Object.prototype.hasOwnProperty.call(row,"weightDraft")?1:0)+Object.keys(row.argDrafts||{}).length),0);}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Math.max(Object.keys(r.fields).length,Object.keys(r.rawStats||{}).length),0)+(moduleRecords?.dirtyCount()||0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
   function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),moduleRecords:moduleRecords?.snapshot(),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
   async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});moduleRecords?.restore(snapshot.moduleRecords);state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
@@ -81,7 +77,7 @@
   // The cells read the edited values, so a change in the detail pane shows in
   // the row it belongs to instead of waiting for a save.
   function itemColumns(){return [
-    {key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>createdName(row,el("span",{title:effectiveItemField(row,"name")},effectiveItemField(row,"name"))),
+    {key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:effectiveItemField(row,"name")},effectiveItemField(row,"name")),
       sortValue:row=>effectiveItemField(row,"name")},
     {key:"id",label:"ID",width:"minmax(6em,.8fr)"},
     {key:"type",label:"Type",width:"minmax(6em,.7fr)",render:row=>el("span",{title:itemTypeFromFlags(effectiveItemField(row,"flags"))},itemTypeFromFlags(effectiveItemField(row,"flags"))),
@@ -154,7 +150,7 @@
   function effectiveItemField(item,key){return state.itemEdits[itemEditKey(item)]?.fields?.[key]??item.fields?.[key]??"";}
   function setItemField(item,key,value){
     const recordKey=itemEditKey(item),base=String(item.fields?.[key]??""),next=String(value);
-    if(next===base){const existing=state.itemEdits[recordKey];if(existing?.fields)delete existing.fields[key];if(existing&&!Object.keys(existing.fields).length)delete state.itemEdits[recordKey];}
+    if(next===base){const existing=state.itemEdits[recordKey];if(existing?.fields)delete existing.fields[key];if(existing&&!Object.keys(existing.fields).length&&!Object.prototype.hasOwnProperty.call(existing,"weightDraft")&&!Object.keys(existing.argDrafts||{}).length)delete state.itemEdits[recordKey];}
     else{const existing=state.itemEdits[recordKey]||(state.itemEdits[recordKey]={recordIndex:item.recordIndex,originalId:item.id,fields:{}});existing.fields[key]=next;}
     shell.refresh();
   }
@@ -202,10 +198,57 @@
     return el("div",{class:"lex-action-row"},select,show);
   }
   function itemWeightFromStats(stats){return (String(stats).match(/\bweight\(([^)]+)\)/)||[])[1]?.trim()||"";}
+  function itemWeightIssue(raw){
+    return typeof raw!=="string"||!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(raw.trim())||!Number.isFinite(Number(raw))?"Enter a finite weight.":"";
+  }
+  function setItemWeightDraft(item,raw){
+    const key=itemEditKey(item),draft=state.itemEdits[key] ||= {recordIndex:item.recordIndex,originalId:item.id,fields:{}};
+    if(raw===itemWeightFromStats(item.fields.stats))delete draft.weightDraft;else draft.weightDraft=raw;
+    const issue=itemWeightIssue(raw);
+    if(!issue)setItemWeight(item,raw);else shell.refresh();
+    return issue;
+  }
+  function preflightItemNumbers(){
+    for(const draft of Object.values(state.itemEdits))if(Object.prototype.hasOwnProperty.call(draft,"weightDraft")){
+      const issue=itemWeightIssue(draft.weightDraft);if(issue)throw new Error(`${draft.originalId} / Weight: ${issue}`);
+    }
+    for(const draft of Object.values(state.itemEdits))for(const [key,raw] of Object.entries(draft.argDrafts||{})){
+      if(itemWeightIssue(raw))throw new Error(`${draft.originalId} / Stat argument ${key}: Enter a finite number.`);
+    }
+  }
   function setItemWeight(item,value){
     const clean=String(value).trim();if(!clean)return;const stats=String(effectiveItemField(item,"stats"));
     const next=/\bweight\([^)]+\)/.test(stats)?stats.replace(/\bweight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
     setItemField(item,"stats",next);const control=document.querySelector('[data-lex-property="stats"] textarea');if(control)control.value=next;
+  }
+  const itemOtherStatCalls=item=>(WarbandFieldControls.parseCalls(String(effectiveItemField(item,"stats")))||[]).filter(call=>call.name!=="weight");
+  function setItemStatDraft(item,index,position,raw){
+    const recordKey=itemEditKey(item),draft=state.itemEdits[recordKey] ||= {recordIndex:item.recordIndex,originalId:item.id,fields:{}};
+    const key=`${index}:${position}`,calls=itemOtherStatCalls(item);
+    const original=(WarbandFieldControls.parseCalls(String(item.fields.stats))||[]).filter(call=>call.name!=="weight");
+    draft.argDrafts ||= {};
+    if(original[index]?.name===calls[index]?.name&&original[index]?.args[position]===raw)delete draft.argDrafts[key];else draft.argDrafts[key]=raw;
+    const issue=itemWeightIssue(raw)?"Enter a finite number.":"";
+    if(!issue&&calls[index]){calls[index].args[position]=raw;setItemOtherStats(item,WarbandFieldControls.callExpression(calls),false);}else shell.refresh();
+    return issue;
+  }
+  function removeItemStat(item,index){
+    const draft=state.itemEdits[itemEditKey(item)];
+    if(draft?.argDrafts){
+      const shifted={};
+      for(const [key,raw] of Object.entries(draft.argDrafts)){
+        const [record,position]=key.split(':').map(Number);
+        if(record!==index)shifted[`${record>index?record-1:record}:${position}`]=raw;
+      }
+      draft.argDrafts=shifted;
+    }
+    setItemOtherStats(item,WarbandFieldControls.callExpression(itemOtherStatCalls(item).filter((_,other)=>other!==index)));
+  }
+  function setItemOtherStats(item,value,redraw=true){
+    const calls=WarbandFieldControls.parseCalls(String(effectiveItemField(item,"stats")))||[];
+    const weights=WarbandFieldControls.callExpression(calls.filter(call=>call.name==="weight"));
+    setItemField(item,"stats",[weights,value].filter(part=>part&&part!=="0").join("|")||"0");
+    if(redraw)render();
   }
   const ITEM_HELP={
     id:"Stable Module System identifier referenced by troops, shops, scripts, and other records. It is read-only because Lexeditor does not rewrite every reference when an item ID changes.",
@@ -233,7 +276,14 @@
     const entries=itemMeshEntries(item),meshNames=itemMeshNames();
     const valueControl=el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)});
     const nameControl=el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)});
-    const weightControl=()=>el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)});
+    const weightControl=()=>{
+      const source=itemWeightFromStats(item.fields.stats);
+      if(itemWeightIssue(source))return LexeditorUI.readonlyField(source||"No weight macro",{format:false});
+      const value=state.itemEdits[itemEditKey(item)]?.weightDraft??itemWeightFromStats(effectiveItemField(item,"stats"));
+      const input=el("input",{type:"number",required:true,step:"any",value,disabled:readOnly,"data-lex-validate-number":"true",
+        oninput:event=>{if(!event.target.disabled)event.target.setCustomValidity(setItemWeightDraft(item,event.target.value));}});
+      input.setCustomValidity(itemWeightIssue(value));return input;
+    };
     const core=detailGroup({title:"Item",body:[
       detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:item.id,disabled:true})}),
       detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:sized(nameControl)}),
@@ -266,7 +316,11 @@
       body.push(detailGroup({title:"Stats",help:LexeditorUI.infoHelp("One row per stat macro in this item's stats field. Weight has its own row above, so it is not repeated here."),
         body:WarbandFieldControls.statRows({calls:named,macros:(state.items?.choices?.stats||[]).filter(name=>name!=="weight"),readOnly,
           arguments:state.items?.choices?.statArguments||{},
-          apply:value=>{setItemField(item,"stats",value||"0");render();}})}));
+          readCalls:()=>itemOtherStatCalls(item),
+          numericValue:(index,position,arg)=>state.itemEdits[itemEditKey(item)]?.argDrafts?.[`${index}:${position}`]??arg,
+          numericChange:(index,position,raw)=>setItemStatDraft(item,index,position,raw),
+          remove:index=>removeItemStat(item,index),
+          apply:value=>setItemOtherStats(item,value)})}));
     }else{
       handled.push("stats");
       body.push(detailGroup({title:"Stats",body:[detailField({label:"Stat macros",property:"stats",dataType:"EXPR",description:ITEM_HELP.stats,
@@ -370,7 +424,7 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name",render:row=>createdName(row,el("span",{},row.name))},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{
       add:beginTroopCreation,addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!base.some(row=>row.status!=='CUT'&&!row.problem),
       addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating a troop.":state.build.running?"Wait for the current build to finish.":"An active troop is needed as a template.",
       key:troopRowKey,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
@@ -464,7 +518,7 @@
   }
   async function saveSettings(){
     const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));if(!edits.length)return;
-    const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
+    const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,sha256:state.settings.sha256})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
@@ -544,18 +598,21 @@
 
   async function saveAll(){
     try{
+      moduleRecords.preflight();
+      preflightTroopStats();
+      preflightItemNumbers();
       const itemSourceDirty=state.catalogFile?.filename==="module_items.py"&&state.catalogFile.editable&&state.catalogDraft!==state.catalogFile.text;
       if(itemDirtyCount()&&itemSourceDirty)throw new Error("Items has structured edits while module_items.py also has unsaved source edits. Save or discard one editing path before using the other.");
-      if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
+      if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,sha256:state.settings.sha256})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
       const troopEdits=Object.values(state.troopEdits).filter(row=>Object.keys(row.fields).length);
       if(troopEdits.length){
         if(state.catalogFile?.filename==="module_troops.py"&&state.catalogDraft!==state.catalogFile.text)throw new Error("Save or discard the troop source draft first.");
-        await api("/api/troops/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.troops.sha256,edits:troopEdits})});
+        await api("/api/troops/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.troops.sha256,edits:troopEdits.map(({recordIndex,originalId,fields})=>({recordIndex,originalId,fields}))})});
         state.troops=await api("/api/troops");state.troopEdits={};
         if(state.catalogFile?.filename==="module_troops.py"){state.catalogFile=await api("/api/catalog/file?name=module_troops.py");state.catalogDraft=state.catalogFile.text;}
       }
       if(itemDirtyCount()){
-        const selectedRecord=state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
+        const selectedRecord=state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits).filter(row=>Object.keys(row.fields).length).map(({recordIndex,originalId,fields})=>({recordIndex,originalId,fields}));
         const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.items.sha256,edits})});state.items=await api("/api/items");state.itemEdits={};
         if(selectedRecord!==undefined){const selected=state.items.rows.find(row=>row.recordIndex===selectedRecord);state.selectedItem=selected?itemRowKey(selected):"";}
         if(state.catalogFile?.filename==="module_items.py"){state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;}

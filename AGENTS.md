@@ -23,6 +23,13 @@ work, even if your tool does not load skills on its own.
 - Keep list and detail views consistent with the RDR2 plugin: record identity
   stays in the master list, and all editable fields stay in the selected
   record's detail pane.
+- Whatever the game lets a mod change is editable, names included. A record
+  whose name the game stores is renamed through `pagedListDetail`'s `rename`
+  (the table's Name cell and the detail heading, by double-click); a page
+  that cannot says why in a `// names:` comment above the call
+  (`tests/shared/test_list_names_decided.py`). Every property of a
+  list-and-detail page can be pinned as a table column; the framework adds
+  the pins, and rows carry the values (`row.values` / `row.display`).
 - Give a field, section or tab a question-mark bubble only when its label and
   control do not already say everything. Write it per the help-text skill.
 - Necessary information belongs in the question-mark help, not in a paragraph
@@ -33,6 +40,10 @@ work, even if your tool does not load skills on its own.
   game's own data, read-only, and the mod selector names that source Vanilla;
   creating or copying a mod is an explicit action. An edit attempt in that
   state offers to create one. See `codex/shared/no-mod-state.md`.
+- Every mod, for every game, is one folder with a root `mod.json` holding at
+  least a name (author, description and credits optional); every game gets
+  the shared Mods tab and first-run screen from the shell. Lexer's Mod for a
+  game is `lexmod` in its plugin.json. See `codex/shared/mod-format.md`.
 - Every game plugin exposes a Data Map screen. A generic Files tab is not the
   player-facing editor for data that needs a format-specific view.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the

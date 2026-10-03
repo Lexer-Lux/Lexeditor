@@ -1,5 +1,6 @@
 """Structured Terraria content generators/editors with preservation-bounded C# regions."""
 from __future__ import annotations
+from core.numeric_values import integer_value, finite_number
 
 from dataclasses import dataclass
 import json
@@ -157,9 +158,7 @@ def default_values(kind: str) -> dict[str, Any]:
 
 def _num(value: object, field: Field, integer: bool):
     if isinstance(value, bool): raise ValueError(f"{field.label} must be numeric")
-    try: out = int(value) if integer else float(value)
-    except (TypeError,ValueError) as e: raise ValueError(f"{field.label} must be numeric") from e
-    if integer and isinstance(value,float) and not value.is_integer(): raise ValueError(f"{field.label} must be an integer")
+    out = integer_value(value, field.label) if integer else finite_number(value, field.label)
     if field.minimum is not None and out < field.minimum: raise ValueError(f"{field.label} must be at least {field.minimum}")
     if field.maximum is not None and out > field.maximum: raise ValueError(f"{field.label} must be at most {field.maximum}")
     return out

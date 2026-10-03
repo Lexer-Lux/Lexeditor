@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import os
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,11 +50,40 @@ def main() -> int:
                 high = page.get_by_label("Draw Point 129 high yield", exact=True)
                 refill = page.get_by_label("Draw Point 129 refill", exact=True)
                 assert high.is_checked() == first["highYield"] and refill.is_checked() == first["refill"]
+                amount = page.get_by_label("Draw Point 129 vanilla amount", exact=True)
+                assert amount.input_value() == ("2–5 spells" if first["highYield"] else "1–2 spells")
+                assert amount.is_disabled()
                 high.click()
+                assert amount.input_value() == ("1–2 spells" if first["highYield"] else "2–5 spells")
                 refill.click()
                 page.wait_for_function("()=>dirtyCount()>0", timeout=20000)
                 page.evaluate("()=>document.querySelector('#global-save').click()")
                 page.wait_for_function("()=>dirtyCount()===0", timeout=120000)
+                page.reload()
+                page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
+                page.evaluate("()=>{state.worldTab='drawPoints';state.selected.world=0;navigate('world')}")
+                section.wait_for(timeout=60000)
+                assert amount.input_value() == ("1–2 spells" if first["highYield"] else "2–5 spells")
+                page.get_by_role('button', name='Pin Vanilla amount column', exact=True).click()
+                page.locator('.lex-column-list-head-cell[data-column-key="vanillaAmount"]').wait_for()
+                assert page.evaluate("""()=>{
+                  const row=document.querySelector('.ff8-record-list .lex-column-list-row');
+                  const cells=[...row.querySelectorAll(':scope > .lex-column-list-cell')];
+                  return cells.length===5 && Math.max(...cells.map(cell=>cell.getBoundingClientRect().top))-
+                    Math.min(...cells.map(cell=>cell.getBoundingClientRect().top))<1;
+                }"""), "Pinned amount must remain on the same row as the coordinates"
+                page.locator('.lex-column-list-head-cell[data-column-key="vanillaAmount"]').click()
+                page.wait_for_function("state.sorts.world[0]==='vanillaAmount'")
+                assert page.evaluate("""()=>{
+                  const ranges=[...document.querySelectorAll('.ff8-record-list .lex-column-list-row [data-column-key="vanillaAmount"]')]
+                    .map(cell=>cell.textContent.trim());
+                  return ranges.length>0 && ranges.every((value,index)=>!index||ranges[index-1]<=value);
+                }""")
+                assert page.evaluate("dirtyCount()") == 0
+                screenshot = Path(tempfile.gettempdir()) / "lexeditor-dev" / "todo-world-draw-amount.png"
+                if not os.environ.get("CI"):
+                    screenshot.parent.mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=str(screenshot))
                 assert not errors, errors
                 browser.close()
             patch = Path(project.name) / "hext" / "ff8" / "en_nv" / draw_point_data.PATCH_NAME

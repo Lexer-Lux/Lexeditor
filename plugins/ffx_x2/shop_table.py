@@ -1,5 +1,6 @@
 """Shared fixed-record logic for FFX 16-slot shop tables."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 
@@ -55,12 +56,7 @@ def parse_shops(data: bytes, filename: str) -> tuple[SlotShopRecord, ...]:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise ShopTableError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise ShopTableError(f"{label} must be an integer") from error
+    parsed = integer_value(value, label, ShopTableError)
     if not minimum <= parsed <= maximum:
         raise ShopTableError(f"{label} must be between {minimum} and {maximum}")
     return parsed

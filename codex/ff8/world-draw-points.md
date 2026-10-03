@@ -50,13 +50,29 @@ Two consequences a reader of the editor needs:
 | --- | --- |
 | 0-5 | Magic ID |
 | 6 | Refill (the point fills again after being drawn) |
-| 7 | High yield (draws more than ten) |
+| 7 | High yield |
 
 `DrawPointStatus` holds two bits per draw point in memory for its current state
 (0 fully stocked, 1 partly, 2 empty but refills, 3 empty forever).
 
 There is no per-draw-point **quantity** in either table: the only amount the
 game stores is the high-yield flag.
+
+## Vanilla world draw quantity
+
+The supported executable calculates the world-map quantity at `0x54EAED`.
+It uses the low byte of the world RNG and the high-yield flag:
+`floor((rngByte + 128) * (highYield ? 6 : 2) / 512) + 1`.
+The normal range is 1–2 spells; high yield gives 2–5. Spell and refill bits do
+not change this quantity. The selected character's remaining stock space
+caps it at `0x54F07D`; this is separate from whether the character can draw.
+
+`tests/ff8/verify_ff8_world_draw_quantity.py` executes the native calculation
+for every point byte and all 256 RNG inputs, replacing only the RNG call. It
+also executes the stock-space cap for all remaining spaces 1–100. No field
+draw-point range or other mod's quantity change is inferred from this world
+routine. The editor labels this read-only value **Vanilla amount** and updates
+it when the high-yield setting changes.
 
 ## Where the table is, and how Lexeditor edits it
 

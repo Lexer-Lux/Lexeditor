@@ -95,8 +95,15 @@ def test_a_reader_who_is_not_the_developer_still_gets_the_mod_prompt(page):
     framework(page)
     mount_vanilla_shell(page, developer=False)
     mount_vanilla_field(page)
+    # Clicking the name edits nothing and asks nothing; reaching for the
+    # value is what offers a mod.
     name = page.locator(".lex-detail-field-label-text").first
     box = name.bounding_box()
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(200)
+    assert page.get_by_role("button", name="Create a mod", exact=True).count() == 0
+    value = page.locator(".lex-detail-field-control").first
+    box = value.bounding_box()
     page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     page.get_by_role("button", name="Create a mod", exact=True).wait_for()
     page.get_by_role("button", name="Cancel", exact=True).click()

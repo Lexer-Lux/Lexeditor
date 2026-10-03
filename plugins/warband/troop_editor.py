@@ -3,12 +3,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 import threading
+from core.numeric_values import integer_value
+from .source_save import publish_source
 
 FIELDS = ('id','name','plural','flags','scene','reserved','faction','inventory','attributes','proficiencies','skills','face1','face2','image')
 _LOCK = threading.Lock()
@@ -208,7 +209,7 @@ def troop_data(root):
             'types':{k:v for k,v in symbols.items() if k.startswith('tf_') and 0<=v<16}}
 
 
-def create_troop(root, expected, record_index, original_id, new_id, name, plural):
+def create_troop(root, expected, record_index, original_id, new_id, name, plural, *, additional_outputs=()):
     from .module_records import _source as read_source, _record_spans, _write_candidate
     if type(record_index) is not int:
         raise ValueError('Choose an existing troop')
@@ -245,38 +246,48 @@ def create_troop(root, expected, record_index, original_id, new_id, name, plural
         active=lambda rows:[r['id'] for r in rows if r['status']!='CUT']
         if active(reparsed)!=active(records)+[new_id]:
             raise ValueError('Creation changed existing troop IDs')
-        result=_write_candidate(path,candidate,encoding,raw)
+        result=_write_candidate(path,candidate,encoding,raw,additional_outputs=additional_outputs)
         created=next(r for r in reparsed if r['id']==new_id)
         return {**result,'created':new_id,'recordIndex':created['recordIndex']}
 
 
 def save_troops(root,expected,edits):
+    from .server import _validate_item_expression
+    if not isinstance(edits,list):raise ValueError('Troop edits must be a list')
+    if not isinstance(expected,str):raise ValueError('Troop source checksum must be text')
     root=Path(root);path=root/'module_troops.py'
     with _LOCK:
         text,encoding,raw=_source(path)
         if hashlib.sha256(raw).hexdigest()!=expected:raise ValueError('Troop source changed; reload before saving')
         records=_records(text);by_index={r['recordIndex']:r for r in records};patches=[];edited=set()
         for edit in edits:
+            if not isinstance(edit,dict) or set(edit) not in ({'recordIndex','originalId','fields'},{'id','fields'}):
+                raise ValueError('Troop edits require indexed identity or legacy id, and fields only')
+            identity=edit.get('originalId',edit.get('id'))
+            if not isinstance(identity,str) or not identity:raise ValueError('Original troop ID must be nonempty text')
+            if not isinstance(edit['fields'],dict):raise ValueError('Troop fields must be an object')
             if 'recordIndex' in edit:
-                record_index=int(edit['recordIndex']);row=by_index.get(record_index)
+                record_index=integer_value(edit['recordIndex'], 'Troop record index');row=by_index.get(record_index)
                 if row is None:raise ValueError('Troop record no longer exists')
-                original=str(edit.get('originalId',edit.get('id','')))
+                original=identity
                 if original and row['id']!=original:
                     raise ValueError(f"Troop record {record_index} changed from {original} to {row['id']}; reload before saving")
             else:
-                troop_id=str(edit.get('id',''));matches=[r for r in records if r['id']==troop_id]
+                troop_id=identity;matches=[r for r in records if r['id']==troop_id]
                 if len(matches)!=1:
                     raise ValueError(f"Troop ID {troop_id!r} is missing or ambiguous; reload and use record identity")
                 row=matches[0];record_index=row['recordIndex']
             if record_index in edited:raise ValueError('Send each troop record only once')
             edited.add(record_index)
             for field,val in edit['fields'].items():
+                if not isinstance(field,str) or not isinstance(val,str):raise ValueError('Troop field names and values must be text')
                 if field=='id' or field not in row['fields']:raise ValueError('Unknown or fixed troop field')
-                if field in ('name','plural'):replacement=json.dumps(str(val),ensure_ascii=False)
+                if field in ('name','plural'):replacement=json.dumps(val,ensure_ascii=False)
                 else:
-                    replacement=str(val).strip()
+                    replacement=val.strip()
                     if '\n' in replacement or '\r' in replacement or '#' in replacement:raise ValueError('Use a single source expression')
                     ast.parse(replacement,mode='eval')
+                    _validate_item_expression(replacement)
                 a,b=row['_spans'][FIELDS.index(field)];patches.append((a,b,replacement))
         candidate=text
         for a,b,value in sorted(patches,reverse=True):candidate=candidate[:a]+value+candidate[b:]
@@ -291,12 +302,5 @@ def save_troops(root,expected,edits):
                 result=subprocess.run([str(python27),'-c',"import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')",str(probe)],capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 if result.returncode:raise ValueError(result.stderr.decode('utf-8',errors='replace'))
         if not patches:return {'saved':0}
-        if path.read_bytes()!=raw:raise ValueError('Troop source changed while validating; reload before saving')
-        backup=path.with_suffix('.py.lexeditor.bak');backup.write_bytes(raw)
-        fd,tmp=tempfile.mkstemp(prefix='.troops-',dir=root)
-        try:
-            with os.fdopen(fd,'wb') as stream:stream.write(encoded)
-            os.replace(tmp,path)
-        finally:
-            if os.path.exists(tmp):os.unlink(tmp)
+        backup=publish_source(path,encoded,raw)
         return {'saved':len(edited),'sha256':hashlib.sha256(encoded).hexdigest(),'backup':str(backup)}

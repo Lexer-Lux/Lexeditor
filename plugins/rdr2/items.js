@@ -122,38 +122,75 @@ function renderItems() {
 }
 
 async function createNewItem(){
-  const key=(prompt("New internal item ID (for example LEX_SULFUR):","")||"").trim().toUpperCase();
-  if(!key)return;
-  const name=(prompt("In-game name:",key.replace(/^LEX_/,"").replaceAll("_"," "))||"").trim();
-  if(!name)return;
-  const description=prompt("In-game description:","")??"";
-  const category=(prompt("Catalog category:","CI_CATEGORY_MATERIALS")||"CI_CATEGORY_MATERIALS").trim().toUpperCase();
-  const group=(prompt("Catalog group:","PROVISION")||"PROVISION").trim().toUpperCase();
-  try{
-    await api("/api/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,name,description,category,group,capacity:20})});
+  if(isRO())return;
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
+  const key=el("input",{placeholder:"LEX_SULFUR",required:true}),name=el("input",{required:true}),description=el("textarea",{});
+  const choices=(field,preferred)=>{
+    const values=[...new Set(state.catalog.items.map(item=>item[field]).filter(Boolean))].sort();
+    const control=el("select",{},...values.map(value=>el("option",{value},value)));
+    if(values.includes(preferred))control.value=preferred;
+    return control;
+  };
+  const category=choices("category","CI_CATEGORY_MATERIALS"),group=choices("group","PROVISION");
+  const close=()=>{backdrop.hidden=true;backdrop.innerHTML="";};
+  const create=async()=>{try{
+    if(!key.value.trim()||!name.value.trim())throw new Error("Enter an item ID and in-game name.");
+    await api("/api/catalog/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key.value.trim().toUpperCase(),name:name.value.trim(),description:description.value,category:category.value,group:group.value,capacity:20})});
     const store=refStore("mine"); store.catalog=await api("/api/catalog",undefined,"mine"); store.effectByKey={};
     for(const effect of store.catalog.effects)store.effectByKey[effect.key]=effect;
     state.localization=await api("/api/localization",undefined,"mine");
     state.catalog=store.catalog; state.effectByKey=store.effectByKey;
-    state.filters.q=key; state.filters.category=""; state.filters.group=""; renderItems();
-    toast(`Created ${key}`);
-  }catch(ex){toast("Create item failed: "+ex.message,true);}
+    state.filters.q=key.value.trim().toUpperCase(); state.filters.category=""; state.filters.group="";close();renderItems();
+    toast(`Created ${state.filters.q}`);
+  }catch(ex){toast("Create item failed: "+ex.message,true);}};
+  backdrop.append(LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}},
+    el("b",{},"Create item record"),
+    LexeditorUI.tileGrid([{label:"Internal item ID",control:key},{label:"In-game name",control:name},
+      {label:"In-game description",control:description},{label:"Category",control:category},{label:"Group",control:group}].map(LexeditorUI.detailField)),
+    LexeditorUI.actionRow(el("button",{onclick:close},"Cancel"),el("button",{class:"save",onclick:create},"Create item"))));
+  key.focus();
 }
 
 // "!" badge inside the first price input of a cell (right-aligned, hover text)
 function addInputWarn(container,text){container.append(fieldHelp(text));}
 
+function catalogDollarCents(raw){
+  if(!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(raw))return null;
+  const [whole,fraction=""]=raw.split(".");return String(BigInt(whole||"0")*100n+BigInt(fraction.padEnd(2,"0")));
+}
+function catalogMoneyInput({key,cents,change,...attrs}){
+  const input=el("input",{...attrs,type:"number",step:"0.01",min:"0",required:true,
+    value:!isRO()&&key in state.moneyDrafts?state.moneyDrafts[key]:fmtMoney(cents),"data-lex-validate-number":"true"});
+  const validate=()=>{input.setCustomValidity(catalogDollarCents(input.value)===null?"Enter a nonnegative price with at most two decimal places.":"");return input.checkValidity()};
+  input.lexValidateNumber=validate;validate();
+  if(key in state.moneyDrafts)input.classList.add("edited");
+  if(isRO())input.readOnly=true;
+  else input.addEventListener("input",()=>{
+    if(validate()){delete state.moneyDrafts[key];change(catalogDollarCents(input.value));}
+    else state.moneyDrafts[key]=input.value;
+    input.classList.toggle("edited",key in state.moneyDrafts||key in state.priceEdits);renderToolbarOnly();
+  });
+  return input;
+}
+function clearCatalogMoneyDrafts(item,section){
+  for(const key of Object.keys(state.moneyDrafts))if(key.startsWith(`${item}|${section}|`)||key===`${item}|${section}ability`)delete state.moneyDrafts[key];
+}
+function clearCatalogCashPriceEdits(it,section){
+  clearCatalogMoneyDrafts(it.key,section);
+  const costs=new Set(it[section].filter(cost=>cost.costtype==="COST_TYPE_PRICE"&&cost.parts.some(part=>part.item==="CURRENCY_CASH")).map(cost=>cost.key));
+  costs.add(section==="buy"?"COST_SHOP_DEFAULT":"SELL_SHOP_DEFAULT");
+  for(const store of [state.priceEdits,state.yieldEdits])for(const key of Object.keys(store)){
+    const [item,side,cost]=key.split("|");if(item===it.key&&side===section&&costs.has(cost))delete store[key];
+  }
+}
 function priceInput(it, section, cost, part) {
   const editKey = [it.key, section, cost.key, part.item].join("|");
   const cur = isRO() ? part.qty : (state.priceEdits[editKey] ?? part.qty);
-  const inp = el("input", { type: "number", step: "0.01", min: "0", value: fmtMoney(cur),
+  const inp = catalogMoneyInput({key:editKey,cents:cur,"aria-label":`${section} price for ${it.key} ${cost.key}`,
     class: editKey in state.priceEdits ? "edited" : "",
-    onchange: ev => {
-      const cents = Math.round(parseFloat(ev.target.value || "0") * 100);
-      if (cents === part.qty) delete state.priceEdits[editKey];
+    change: cents => {
+      if (cents === String(part.qty)) delete state.priceEdits[editKey];
       else state.priceEdits[editKey] = cents;
-      ev.target.classList.toggle("edited", editKey in state.priceEdits);
-      renderToolbarOnly();
     } });
   return LexeditorUI.unitField(inp,"$");
 }
@@ -163,9 +200,9 @@ function sellPriceCell(it,sellCash,sellRef){
   const cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(sellable){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|sellability`,cents:p.qty,"aria-label":`sell price for ${it.key}`,change:cents=>{state.sellabilityEdits[it.key]={sellable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{clearCatalogCashPriceEdits(it,"sell");state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash sell price is defined."}),!isRO()?newButton({title:"Add a generic SELL_SHOP_DEFAULT payout. This does not choose which merchants accept the item.",onclick:()=>{state.sellabilityEdits[it.key]={sellable:true,cents:100};render();}}):el("span"),el("span"));
   }
@@ -178,15 +215,46 @@ function buyPriceCell(it,buyCash,buyRef){
   const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(buyable){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|buyability`,cents:part.qty,"aria-label":`buy price for ${it.key}`,change:cents=>{state.buyabilityEdits[it.key]={buyable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{clearCatalogCashPriceEdits(it,"buy");state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:(it.shopListings||[]).length?"No cash cost; commonly a free/default option already present in a shop inventory":"No generic cash purchase cost is defined"}),!isRO()?newButton({title:"Add COST_SHOP_DEFAULT cash price; also list it in Shops if it is not already present",onclick:()=>{state.buyabilityEdits[it.key]={buyable:true,cents:100};renderItems();}}):el("span"),el("span"));
   }
   cell.append(controls);
   if(buyable&&!currentShopTypesForItem(it.key).length)addInputWarn(controls,"Priced, but not listed in any standard shop inventory — the price exists in the catalog, but no merchant currently stocks it.");
   cell.append(buyRef);return cell;
+}
+
+function catalogQuantityIsValid(raw, minimum=null){
+  return /^[+-]?\d+$/.test(String(raw))&&(minimum===null||BigInt(raw)>=BigInt(minimum));
+}
+function catalogQuantityInput({store,key,base,value,minimum=null,...attrs}){
+  const input=el("input",{type:"number",step:"1",required:true,...attrs,value,
+    ...(minimum===null?{}:{min:String(minimum)}),"data-lex-validate-number":"true"});
+  // With no minimum, HTML otherwise uses the rendered value attribute as
+  // the step base. A fractional draft must not offset all valid integers.
+  input.setAttribute("value","0");input.value=String(value);
+  const validate=()=>{input.setCustomValidity(catalogQuantityIsValid(input.value,minimum)?"":"Enter a whole quantity"+(minimum===null?".":` of at least ${minimum}.`));return input.checkValidity()};
+  input.lexValidateNumber=validate;validate();
+  if(isRO())input.readOnly=true;
+  else if(!input.readOnly)input.addEventListener("input",()=>{
+    const raw=input.value,valid=validate();
+    if(valid&&BigInt(raw)===BigInt(base))delete store[key];else store[key]=raw;
+    input.classList.toggle("edited",key in store);renderToolbarOnly();
+  });
+  return input;
+}
+function validateCatalogQuantityDrafts(){
+  if(Object.keys(state.moneyDrafts).length)throw new Error("Price: enter a nonnegative amount with at most two decimal places.");
+  for(const [label,store,minimum] of [["Purchase quantity",state.yieldEdits,1],["Bundle output",state.bundleEdits,1],["Carry quantity",state.carryEdits,null]]){
+    for(const raw of Object.values(store))if(!catalogQuantityIsValid(raw,minimum))throw new Error(`${label}: enter a whole quantity${minimum===null?".":` of at least ${minimum}.`}`);
+  }
+  for(const [key,raw] of Object.entries(state.effectEdits)){
+    const field=key.slice(key.lastIndexOf("|")+1);
+    if(["value","time","timeunits"].includes(field)&&!catalogQuantityIsValid(raw))throw new Error(`Effect ${field}: enter a whole number.`);
+    if(field==="percent"&&(String(raw).trim()===""||!Number.isFinite(Number(raw))))throw new Error("Effect percent: enter a finite number.");
+  }
 }
 
 function purchaseQuantityCell(it) {
@@ -196,13 +264,11 @@ function purchaseQuantityCell(it) {
   if(!cost)return el("div",{},el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash purchase record defines a purchase quantity."}));
   const editKey=`${it.key}|buy|${cost.key}`,base=cost.yield||1,cur=isRO()?base:(state.yieldEdits[editKey]??base);
   const bundle=purchaseBundleOf(it);
-  const attrs={type:"number",min:"1",step:"1",value:cur,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
-  if(isRO())attrs.readonly="";else attrs.oninput=ev=>{const value=Math.max(1,Math.round(+ev.target.value||1));if(value===base)delete state.yieldEdits[editKey];else state.yieldEdits[editKey]=value;ev.target.classList.toggle("edited",editKey in state.yieldEdits);renderToolbarOnly();};
-  const fields=LexeditorUI.stack({fill:false},el("input",attrs));
+  const attrs={type:"number",min:"1",step:"1",value:cur,"aria-label":`Purchase quantity for ${it.key}`,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
+  const fields=LexeditorUI.stack({fill:false},catalogQuantityInput({...attrs,store:state.yieldEdits,key:editKey,base,value:cur,minimum:1}));
   if(bundle){
-    const outAttrs={type:"number",min:"1",step:"1",value:bundle.min,class:bundle.editKey in state.bundleEdits?"edited":"",title:`Usable ${localizedValue(bundle.targetItem?.nameKey)||bundle.target} produced when this ${bundle.container} opens`};
-    if(isRO())outAttrs.readonly="";else outAttrs.onchange=ev=>{const value=String(Math.max(1,Math.round(+ev.target.value||1)));const base=String(bundle.source.min||bundle.source.max||"1");if(value===base)delete state.bundleEdits[bundle.editKey];else state.bundleEdits[bundle.editKey]=value;renderToolbarOnly();};
-    fields.append(LexeditorUI.actionRow(el("input",outAttrs),
+    const outAttrs={type:"number",min:"1",step:"1",value:bundle.min,"aria-label":`Bundle output quantity for ${it.key}`,class:bundle.editKey in state.bundleEdits?"edited":"",title:`Usable ${localizedValue(bundle.targetItem?.nameKey)||bundle.target} produced when this ${bundle.container} opens`};
+    fields.append(LexeditorUI.actionRow(catalogQuantityInput({...outAttrs,store:state.bundleEdits,key:bundle.editKey,base:bundle.source.min||bundle.source.max||"1",value:bundle.min,minimum:1}),
       itemLink(bundle.target,true,localizedValue(bundle.targetItem?.nameKey)||bundle.target)));
   }
   return LexeditorUI.stack({fill:false},refField(fields, [
@@ -525,15 +591,9 @@ function itemRow(it) {
     const displaySlot=permanentFoodBait&&c.slot==="SLOTID_ANY"&&String(cur)==="-1"?"permanent / unlimited":slotLabel(c.slot);
     const row = LexeditorUI.actionRow(
       el("span", { class: "cat slot-label", title: `${c.slot}\n${slotInfo(c.slot,String(cur))}` }, displaySlot),
-      el("input", { type: "number", step: "1", value: cur,
+      catalogQuantityInput({store:state.carryEdits,key:ek,base:c.qty,value:cur,"aria-label":`Carry quantity for ${it.key} ${c.slot}`,
         class: ek in state.carryEdits ? "edited" : "", title:`Capacity contribution from ${slotLabel(c.slot)} (${c.slot})`,
-        onchange: ev => {
-          const v = String(Math.round(parseFloat(ev.target.value || "0")));
-          if (v === c.qty) delete state.carryEdits[ek];
-          else state.carryEdits[ek] = v;
-          ev.target.classList.toggle("edited", ek in state.carryEdits);
-          renderToolbarOnly();
-        } }));
+      }));
     if (!isRO() && (vSlot || kSlot)) {
       const ref = carryRefLine([["V","vtag",vSlot?.qty],["K","ktag",kSlot?.qty]],value=>permanentFoodBait&&String(value)==="-1"?"unlimited":String(value));
       row.append(ref);
@@ -844,19 +904,21 @@ async function showLexeditorSettings(){
   try{
     let settings=await api("/api/model-preview/settings");
     let savedCacheSize=Number(settings.cacheSizeMb);
-    const size=el("input",{type:"number",min:String(settings.minCacheSizeMb),max:String(settings.maxCacheSizeMb),step:"1",value:String(settings.cacheSizeMb),"aria-label":"Model preview cache size in MB"});
+    const size=el("input",{type:"number",min:String(settings.minCacheSizeMb),max:String(settings.maxCacheSizeMb),step:"1",required:true,value:String(settings.cacheSizeMb),"data-lex-validate-number":"true","aria-label":"Model preview cache size in MB"});
+    const validate=()=>{size.setCustomValidity("");if(size.value===""||!Number.isSafeInteger(Number(size.value)))size.setCustomValidity("Enter a whole number of MB.");return size.checkValidity()};
+    size.lexValidateNumber=validate;size.addEventListener("input",validate);
     const usage=el("div");
     const path=LexeditorUI.detailNote("");
     const update=next=>{
-      settings=next;size.value=String(next.cacheSizeMb);
+      settings=next;size.value=String(next.cacheSizeMb);validate();
       usage.textContent=`${formatFileSize(next.cacheBytes)} used by ${next.cacheEntries} cached preview${next.cacheEntries===1?"":"s"}.`;
       path.textContent=next.cacheRoot;
     };
     const save=LexeditorUI.settingsSaveControl({
-      dirtyCount:()=>Number(size.value)!==savedCacheSize?1:0,
-      pendingChanges:()=>Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:Number(size.value)}],
-      save:async()=>{status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
-      discard:()=>{size.value=String(savedCacheSize);status.textContent="Restored the last saved cache setting.";}
+      dirtyCount:()=>!size.checkValidity()||Number(size.value)!==savedCacheSize?1:0,
+      pendingChanges:()=>size.checkValidity()&&Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:size.value}],
+      save:async()=>{if(!validate()){status.textContent="Correct the model preview cache size before saving.";size.reportValidity();throw new Error(status.textContent)}status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
+      discard:()=>{size.value=String(savedCacheSize);validate();status.textContent="Restored the last saved cache setting.";}
     });
     const clear=el("button",{class:"lex-dialog-action danger-action",onclick:async()=>{
       if(clear.dataset.armed!=="true"){

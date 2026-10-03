@@ -1,7 +1,7 @@
   "use strict";
   const {el,columnList,columnPreferences,detailPanel,detailSection,detailNote,detailField,readonlyField,infoHelp,infoIcon,panelLayout,clone,EditHistory}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
-  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload;try{payload=await response.json()}catch(_error){throw new Error(`${path}: Invalid JSON response`)}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
   const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"tag",dir:1},
     tab:"misc",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
@@ -90,7 +90,7 @@
     }
     return out;
   }
-  const dirtyCount=()=>dataEdits().length+textEdits().length+tweakEditGroups().reduce((total,group)=>total+group.edits.length,0);
+  const dirtyCount=()=>dataEdits().length+numericDraftCount(state.data,state.dataBaseline)+textEdits().length+tweakEditGroups().reduce((total,group)=>total+group.edits.length,0)+Object.values(state.tweaks||{}).reduce((total,entry)=>total+numericDraftCount(entry.data,entry.baseline),0);
 
   function flattenStrings(value,out=[]){if(typeof value==="string")out.push(value);else if(Array.isArray(value))for(const child of value)flattenStrings(child,out);else if(value&&typeof value==="object")for(const child of Object.values(value))flattenStrings(child,out);return out}
   function resolvedText(value){return typeof value==="string"?state.data?.textLookup?.[value]||"":""}
@@ -113,7 +113,7 @@
   }
 
   async function confirmReplace(kind){
-    const count=kind==="text"?textEdits().length:dataEdits().length;
+    const count=kind==="text"?textEdits().length:dataEdits().length+numericDraftCount(state.data,state.dataBaseline);
     if(!count)return true;
     return LexeditorUI.confirmAction({
       title:"Discard unsaved changes?",
@@ -217,8 +217,52 @@
 
   function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
   function setArrayValue(row,prop,index,value){if(!Array.isArray(row.values[prop.name]))return;row.values[prop.name][index]=value;refreshShell()}
-  function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};const low=semanticMin(prop),high=semanticMax(prop);if(low!==null&&low!==undefined)attrs.min=low;if(high!==null&&high!==undefined)attrs.max=high;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
-  function percentInput(row,prop,index){const current=row.values[prop.name]?.[index]??0;return el("input",{type:"number",min:0,max:100,step:1,value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=Number.parseInt(event.target.value,10);if(Number.isFinite(value)&&value>=0&&value<=100)setArrayValue(row,prop,index,value)},onchange:event=>{let value=Number.parseInt(event.target.value,10);if(!Number.isFinite(value))value=current;value=Math.max(0,Math.min(100,value));event.target.value=String(value);setArrayValue(row,prop,index,value)}})}
+  let numericDrafts=new WeakMap();
+  function numericDraftEntries(data){return (data?.records||[]).flatMap(row=>[...(numericDrafts.get(row)?.values()||[])].map(draft=>({...draft,row})))}
+  function numericDraftCount(data,baseline){
+    if(state.activeSource!=="mine")return 0;
+    return numericDraftEntries(data).filter(draft=>{
+      const before=baseline?.records?.find(row=>row.id===draft.row.id)?.values?.[draft.prop];
+      const after=draft.row.values?.[draft.prop];
+      return comparable(draft.index===null?before:before?.[draft.index])===comparable(draft.index===null?after:after?.[draft.index]);
+    }).length;
+  }
+  function numericInput(row,prop,index=null){
+    const draftKey=JSON.stringify([prop.name,index]);
+    const current=numericDrafts.get(row)?.get(draftKey)?.text??(index===null?row.values[prop.name]:row.values[prop.name][index]);
+    const disabled=state.activeSource!=="mine"||!prop.editable;
+    const change=value=>{numericDrafts.get(row)?.delete(draftKey);index===null?setScalar(row,prop,value):setArrayValue(row,prop,index,value)};
+    const remember=(input,valid)=>{
+      if(valid){change(Number(input.value));return}
+      if(!numericDrafts.has(row))numericDrafts.set(row,new Map());
+      numericDrafts.get(row).set(draftKey,{prop:prop.name,index,text:input.value,label:displayLabel(prop)});
+      refreshShell();
+    };
+    const bounds={BYTE:[0,255],INT16:[-32768,32767],UINT16:[0,65535],INT32:[-2147483648,2147483647]}[prop.type];
+    const declaredLow=semanticMin(prop),declaredHigh=semanticMax(prop);
+    const low=bounds?Math.max(declaredLow??bounds[0],bounds[0]):declaredLow;
+    const high=bounds?Math.min(declaredHigh??bounds[1],bounds[1]):declaredHigh;
+    if(prop.type!=="FLOAT"&&bounds&&!disabled){
+      const control=LexeditorUI.exactIntegerInput({value:current,min:low,max:high,label:displayLabel(prop),change:text=>change(Number(text))});
+      const input=control.querySelector("input");
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
+      return control;
+    }
+    const input=el("input",{type:"number",value:current,disabled,required:true,
+      step:prop.type==="FLOAT"?"any":1,"data-lex-validate-number":"true","aria-label":displayLabel(prop)});
+    if(low!==null&&low!==undefined)input.min=low;
+    if(high!==null&&high!==undefined)input.max=high;
+    const validate=()=>{
+      input.setCustomValidity("");
+      const value=Number(input.value);
+      if(input.value===""||!Number.isFinite(value))input.setCustomValidity("Enter a finite number.");
+      return input.checkValidity();
+    };
+    input.lexValidateNumber=validate;
+    input.oninput=()=>remember(input,validate());
+    return input;
+  }
+  function percentInput(row,prop,index){return numericInput(row,{...prop,type:"BYTE",min:0,max:100},index)}
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
   function nameInput(row,prop,index=null,source=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of (source||state.data).names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
@@ -322,6 +366,7 @@
   // fifteen-pixel sliver with a name beside it and no control, which reads as
   // a broken property rather than an empty one. It says it is empty instead.
   function propertyControl(row,prop,source=null){
+    prop=recordProperty(row,prop);
     if(!prop.array)return scalarControl(row,prop,null,source);
     const values=row.values[prop.name]||[];
     if(!values.length)return readonlyField("None");
@@ -336,11 +381,13 @@
     return null;
   }
 
+  function recordProperty(row,prop){return {...prop,...(row.propertyOverrides?.[prop.name]||{}),name:prop.name,label:prop.label}}
+
   function recordPanel(row=selectedRecord()){
     if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailNote("This DataObject has no rows.")]})]});
     const spec=curatedSpec(state.tab);
     const prefs=spec?curatedPrefs(spec):dataPreferences();
-    const fields=state.data.properties.map(prop=>detailField({label:displayLabel(prop),control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),displayLabel(prop))}));
+    const fields=state.data.properties.map(base=>{const prop=recordProperty(row,base);return detailField({label:displayLabel(prop),control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),displayLabel(prop))})});
     // The subtitle used to repeat the loaded table's name on every record ("EnemyParameter"
     // for every enemy), which told a reader nothing about the record they had selected. The
     // record's own data id is specific to it, honest about what it is, and matches how the
@@ -365,11 +412,12 @@
     // Engine Config edits Engine.ini directly and needs no catalog entry, so
     // it stays usable even when the catalog yields no tweak groups.
     if(!list.length)return LexeditorUI.stack(
-      loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
+      emptyPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
       enginePanel.element());
-    if(!state.tweaks||(!Object.keys(state.tweaks).length&&state.tweaksPending))
+    if(!Object.keys(state.tweaks||{}).length&&state.tweaksPending>0)
       return loadingPanel("Loading tweaks",`Reading ${state.tweaksPending} tweak group${state.tweaksPending===1?"":"s"}…`);
-    if(state.tweaksError&&!Object.keys(state.tweaks).length)return errorPanel(state.tweaksError);
+    if(state.tweaksError&&!Object.keys(state.tweaks||{}).length)return errorPanel(state.tweaksError);
+    if(!state.tweaks)return emptyPanel("Tweaks","No tweak data has been loaded.");
     const cards=list.map(item=>tweakCard(state.tweaks[item.asset])).filter(Boolean);
     if(state.tweaksPending)cards.push(el("section",{class:"ff7r-card ff7r-tweaks-pending"},
       el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
@@ -387,11 +435,11 @@
     const title=String(item.name||item.asset.split("/").pop()).toLocaleUpperCase();
     if(!data?.records?.length)return detailSection({title,body:[detailField({
       label:"STATE",control:readonlyField("This tweak group exposes no settings.")})]});
-    const fieldsOf=row=>data.properties.map(prop=>detailField({
+    const fieldsOf=row=>data.properties.map(base=>{const prop=recordProperty(row,base);return detailField({
       label:prop.label,
       control:propertyControl(row,prop,data),
       dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
-      min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+      min:prop.min,max:prop.max,help:propertyHelp(prop)})});
     // A group with several records nests one titled block per record. Naming
     // the record inside each property label instead produced a compound name
     // no property lane could hold, and the label fitter shrank it to a smudge.
@@ -553,9 +601,9 @@
   function curatedPanel(spec){
     if(state.busy)return loadingPanel(spec.label,`Reading ${spec.basename}…`);
     if(state.error&&!state.data)return errorPanel(state.error);
-    if(!curatedAsset(spec))return loadingPanel(spec.label,
+    if(!curatedAsset(spec))return emptyPanel(spec.label,
       `The installed FF7R archives do not contain a ${spec.basename} table.`);
-    if(!state.data)return loadingPanel(spec.label,"Open this tab to read the table.");
+    if(!state.data)return emptyPanel(spec.label,"No table has been loaded.");
     // Say which of the game's tables this is when there is more than one. The
     // reader was seeing one field map's enemies with nothing on screen to say
     // that seven more tables of the same name exist.
@@ -620,7 +668,7 @@
   function economyViewRows(){const q=state.economyQuery.toLocaleLowerCase(),buy=property("BuyValue"),sale=property("SaleValue"),maxCount=property("MaxCount");return records().map(record=>{const semantic=economySemanticRow(record.tag);return{record,tag:record.tag,name:semantic?.name||record.tag,buy:buy?record.values[buy.name]:"—",sale:sale?record.values[sale.name]:"—",maxCount:maxCount?record.values[maxCount.name]:"—"}}).filter(row=>!q||`${row.tag} ${row.name} ${row.buy} ${row.sale} ${row.maxCount}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.economySort.key],b[state.economySort.key])*state.economySort.dir)}
   function economyTablePanel(){const rows=economyViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.economySort,sort:key=>{state.economySort=state.economySort.key===key?{key,dir:-state.economySort.dir}:{key,dir:1};render()},columnPreferences:economyPrefs,columns:economyColumns,class:"ff7r-table","aria-label":"FF7 Remake item prices and carry capacity"})}
   function economyRecordPanel(row=selectedRecord()){
-    const table=currentEconomyTable();if(!row||!table)return loadingPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:economyPrefs.pinButton("tag","ID")})];
+    const table=currentEconomyTable();if(!row||!table)return emptyPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:economyPrefs.pinButton("tag","ID")})];
     const specs=[["BuyValue","BUY PRICE"],["SaleValue","SELL PRICE"],["CanSale","CAN SELL"],["MaxCount","MAX CARRY"]];for(const[name,label]of specs){const prop=property(name);if(prop){let help=null;if(name==="BuyValue")help=infoHelp("The installed FF7R table exposes BuyValue directly; this control writes that same DataObject field.");else if(name==="MaxCount")help=infoHelp("FF7R's Item/Equipment schema exposes MaxCount as the inventory carry/stack cap; this control writes that authoritative DataObject field.");fields.push(detailField({label,control:propertyControl(row,prop),dataType:semanticType(prop),min:name==="CanSale"?undefined:semanticMin(prop),max:name==="CanSale"?undefined:semanticMax(prop),help}))}}
     if(semantic?.textId)fields.splice(1,0,detailField({label:"TEXT ID",control:readonlyField(semantic.textId)}));
     // The description is the same text resource the name comes from, so it is
@@ -687,7 +735,7 @@
     if(match)state.textSelected=match.id;
     render();
   }
-  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return LexeditorUI.stack(pagedTable({id:`economy-${state.tab}`,noun:"items",
+  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return emptyPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return emptyPanel("Item settings","No item tables have been loaded.");if(state.data?.asset!==table.asset)return state.error?errorPanel(state.error):emptyPanel("Item table unavailable","The selected item table has not been loaded.");return LexeditorUI.stack(pagedTable({id:`economy-${state.tab}`,noun:"items",
       modOnly:modOnlySpec(row=>row.record),
       rows:economyViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -723,11 +771,11 @@
     return infoHelp("The installed table exposes this array without a matching percent array, so Lexeditor cannot tell whether the number is a count or a steal rate. It is shown and written as the raw "+spec.quantityProperty+" value.");
   }
   function lootRecordPanel(row=selectedRecord()){
-    if(!row)return loadingPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",help:infoHelp("These drops live in the game's BattleItemPossession table, one row per battle. The Data ID is that row's key."),body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
+    if(!row)return emptyPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",help:infoHelp("These drops live in the game's BattleItemPossession table, one row per battle. The Data ID is that row's key."),body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
     const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailNote("This drop array is empty on this record, so there are no slots to edit.")];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
     return detailPanel({className:"ff7r-detail",title:row.tag||"Battle",body:sections});
   }
-  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return LexeditorUI.stack(pagedTable({id:"loot",noun:"enemies",
+  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return emptyPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return emptyPanel("Enemy loot","No loot table has been loaded.");if(state.data?.asset!==state.loot.asset)return state.error?errorPanel(state.error):emptyPanel("Enemy loot unavailable","The selected loot table has not been loaded.");return LexeditorUI.stack(pagedTable({id:"loot",noun:"enemies",
       modOnly:modOnlySpec(row=>row.record),
       rows:lootViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -782,7 +830,7 @@
     return detailPanel({className:"ff7r-detail",title:row.key||"Unnamed text entry",meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
-  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
+  function textPanel(){if(!textAssets().length)return emptyPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);if(!state.textPacks)return emptyPanel("Text resources","No localized text resources have been loaded.");return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
       filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},
@@ -794,6 +842,7 @@
 
   // The shared, themed loading state; the title says what is being read.
   function loadingPanel(title,message){return LexeditorUI.loadingPanel({className:"ff7r-detail",label:`${title}: ${message}`})}
+  function emptyPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[LexeditorUI.notice({message})]})}
   function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:LexeditorUI.notice({tone:"warning",message})})]})]})}
   function openMapRow(row){
     const asset=row.target||row.view;if(!asset)return;
@@ -864,6 +913,16 @@
 
   async function save(){
     if(state.activeSource!=="mine")return;
+    for(const input of document.querySelectorAll('#main input[type="number"],#main input[data-lex-exact-integer],#main input[data-lex-validate-number]')){
+      if(input.disabled||input.readOnly||!input.getClientRects().length)continue;
+      const valid=input.lexValidateNumber?input.lexValidateNumber():input.lexValidateInteger?.()??input.checkValidity();
+      if(!valid){
+        requestAnimationFrame(()=>{if(input.isConnected)input.reportValidity()});
+        throw new Error(`Correct ${input.getAttribute("aria-label")||"the numeric value"} before saving.`);
+      }
+    }
+    const draft=[...numericDraftEntries(state.data),...Object.values(state.tweaks||{}).flatMap(entry=>numericDraftEntries(entry.data))][0];
+    if(draft)throw new Error(`Correct ${draft.label} in ${draft.row.tag||draft.row.id} before saving.`);
     const gameplay=dataEdits(),text=textEdits(),tweaks=tweakEditGroups();
     if(!gameplay.length&&!text.length&&!tweaks.length)return;
     state.busy=true;state.error="";render();
@@ -887,7 +946,7 @@
     }catch(error){state.error=error.message;throw error}
     finally{state.busy=false;render();refreshShell()}
   }
-  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const pack of textPacks())pack.data.records=clone(pack.baseline.records);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  async function discard(){numericDrafts=new WeakMap();if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const pack of textPacks())pack.data.records=clone(pack.baseline.records);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
   const editHistory=new EditHistory({
     capture:()=>({
       data:state.data?clone(state.data.records):null,
@@ -895,6 +954,7 @@
       tweaks:Object.fromEntries(Object.entries(state.tweaks||{}).map(([asset,entry])=>[asset,clone(entry.data.records)])),
     }),
     restore:snapshot=>{
+      numericDrafts=new WeakMap();
       if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);
       for(const [asset,records] of Object.entries(snapshot?.text||{})){const pack=state.textPacks?.[asset];if(pack)pack.data.records=clone(records)}
       for(const [asset,records] of Object.entries(snapshot?.tweaks||{})){const entry=state.tweaks?.[asset];if(entry)entry.data.records=clone(records)}

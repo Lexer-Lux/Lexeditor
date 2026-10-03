@@ -42,9 +42,9 @@ VISIBLE = {
     "flatStatAbilities": ("flat-stat-abilities", None), "maxSpellEnabled": ("max-spell", None),
     "gfHpBars": ("gf-mp-bars", None), "noMagicConsumption": ("no-magic-consumption", None),
     "dropsAfterMug": ("drops-after-mug", None),
+    "gfSpellbooksEnabled": ("gf-spellbooks", None),
+    "sharedMagicInventory": ("shared-party-magic-inventory", None),
 }
-# Project features that stay on the page beside the tweak mods.
-PAGE_PANELS = ("GF SPELLBOOKS", "SHARED PARTY MAGIC INVENTORY")
 TWEAK = '''
 def build(settings, context):
     return {context.HEXT + "/%s.txt": "".join(f"# {k}={v}\\n" for k, v in sorted(settings.items())) or "# on\\n"}
@@ -79,18 +79,22 @@ def check_persistence() -> None:
             make(library, "formulae-rework", "Formulae Rework", {"title": "FORMULAE REWORK", "fields": []})
             make(library, "max-spell", "Max Spell", {"title": "MAX SPELL", "fields": [
                 {"key": "limit", "label": "Maximum stock", "type": "int", "default": 100, "min": 1, "max": 255}]})
+            make(library, "gf-spellbooks", "GF Spellbooks", {"title": "GF SPELLBOOKS", "fields": []})
+            make(library, "shared-party-magic-inventory", "Shared Party Magic Inventory",
+                 {"title": "SHARED PARTY MAGIC INVENTORY", "fields": []})
 
             loaded = gameplay_settings.load(project, game)
             listed = {row["id"]: row for row in loaded["tweaks"]}
-            assert set(listed) == {"monogamy", "battle-shortcuts", "formulae-rework", "max-spell"}, listed
+            assert set(listed) == {"monogamy", "battle-shortcuts", "formulae-rework", "max-spell",
+                                   "gf-spellbooks", "shared-party-magic-inventory"}, listed
+            assert loaded["gfSpellbooksEnabled"] is False and loaded["sharedMagicInventory"] is False
             assert all(row["enabled"] is False for row in listed.values())
             assert listed["battle-shortcuts"]["values"] == {"universalItem": True, "partySwitch": False}
 
             everything = {mod_id: {"enabled": True} for mod_id in listed}
             everything["battle-shortcuts"]["values"] = {"partySwitch": True}
             everything["max-spell"]["values"] = {"limit": 200}
-            gameplay_settings.save({"tweaks": everything, "gfSpellbooksEnabled": True,
-                                    "sharedMagicInventory": True}, game_root=game, project_root=project)
+            gameplay_settings.save({"tweaks": everything}, game_root=game, project_root=project)
             loaded = gameplay_settings.load(project, game)
             for row in loaded["tweaks"]:
                 assert row["enabled"] is True, row["id"]
@@ -113,7 +117,8 @@ def check_persistence() -> None:
             assert not composed.exists()
 
             # Nothing outside the listed tweaks and their schemas is accepted.
-            for bad in ({"tweaks": {"not-listed": {"enabled": True}}},
+            for bad in ({"tweaks": {}, "gfSpellbooksEnabled": True},
+                        {"tweaks": {"not-listed": {"enabled": True}}},
                         {"tweaks": {"monogamy": {"enabled": True, "hidden": 1}}},
                         {"tweaks": {"max-spell": {"values": {"unknownKey": 1}}}},
                         {"tweaks": {"max-spell": {"values": {"limit": 999}}}},
@@ -136,20 +141,13 @@ def check_editor() -> str:
     editor = plugin_ui('ff8')
     rendered = editor[editor.index("function renderGameplaySettings(){"):
                       editor.index('const settingsView=LexeditorUI.settingsColumns(panels')]
-    # One panel per listed tweak mod, titled from its schema, switch named after it.
-    assert "const panels=rows.map(row=>{" in rendered
-    assert '"aria-label":row.name' in rendered
-    assert "panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker)" in rendered
-    # Every setting a mod does not hand to another screen gets a control here.
-    assert "schema.fields.filter(field=>!field.hidden).map(field=>tweakField(row,field))" in rendered
-    # Availability diagnostics remain attached to the visible tweak control.
-    assert 'LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",title:blocker})' in rendered
-    assert "disabled:Boolean(blocker)&&!row.enabled" in rendered
-    for title in PAGE_PANELS:
-        assert f'panel("{title}"' in rendered, title
-    # The save payload carries exactly what the page edits.
-    assert ("return {gfSpellbooksEnabled:settings.gfSpellbooksEnabled,"
-            "sharedMagicInventory:settings.sharedMagicInventory,tweaks};") in editor
+    # Every tweak is drawn by the one shared component; nothing on the page
+    # is a hand-made switch beside it, and Vanilla does not hide the page.
+    assert "LexeditorUI.tweakModPanels(" in rendered
+    assert "LexeditorUI.tweakPanel(" not in rendered
+    assert 'state.activeSource!=="mine"' not in rendered
+    # The save payload carries tweak changes only.
+    assert "return {tweaks};" in editor
     return editor
 
 

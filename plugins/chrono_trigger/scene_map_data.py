@@ -7,10 +7,11 @@ to determine the existing layer-1/layer-2 upper tile-bank flags; it never
 rewrites that stream, dimensions, layer-enable bits, or map header.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 MAP_RE = re.compile(r"^Game/field/MapTable/MapTable_(\d+)\.dat$", re.IGNORECASE)
@@ -137,6 +138,7 @@ def load_scene_map(store: OverlayStore, path: str, source: str = "mine") -> dict
 
 
 def save_scene_map(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_scene_map(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -151,15 +153,21 @@ def save_scene_map(store: OverlayStore, path: str, expected_sha256: str, edits: 
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Scene-map edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Scene-map token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate scene-map tile edit")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Scene-map values must be an object")
         if set(values) - {"tileIndex"}:
             raise ValueError("Only the scene-map tile index is editable")
         row = by_token[token]
-        tile = int(values.get("tileIndex", row["tileIndex"]))
+        tile = integer_value(values.get("tileIndex", row["tileIndex"]), "Tile index")
         low = 256 if row["upperBank"] else 0
         high = low + 255
         if row["layer"] == 3:
@@ -274,13 +282,14 @@ def load_scene_properties(store: OverlayStore, path: str, source: str = "mine") 
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number
 
 
 def save_scene_properties(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_scene_properties(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -294,15 +303,24 @@ def save_scene_properties(store: OverlayStore, path: str, expected_sha256: str, 
     }
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Scene property edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Scene property token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate scene property-run edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Scene property values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported scene property fields: {', '.join(sorted(unknown))}")
+        for field in allowed - {"collisionCode", "moveDirection", "moveSpeed", "zPlane"}:
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"Scene property {field} must be a boolean")
         collision = _bounded("Collision code", values.get("collisionCode", row["collisionCode"]), 0, 31)
         if "collisionCode" in values and collision >= len(COLLISION_NAMES):
             raise ValueError("Edited collision must use a documented code 0 through 30")
@@ -393,9 +411,14 @@ def save_scene_render_settings(
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
     allowed = {"scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode",
                *SCREEN_FIELDS.keys(), *EFFECT_FIELDS.keys()}
+    if not isinstance(values, dict):
+        raise ValueError("Scene render-setting values must be an object")
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported scene render-setting fields: {', '.join(sorted(unknown))}")
+    for field in (*SCREEN_FIELDS, *EFFECT_FIELDS):
+        if field in values and type(values[field]) is not bool:
+            raise ValueError(f"Scene render-setting {field} must be a boolean")
     codes = {}
     for key in ("scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode"):
         codes[key] = _bounded(key, values.get(key, current[key]), 0, 15)

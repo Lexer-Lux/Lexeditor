@@ -2,8 +2,8 @@
 
 Lexeditor helpers are pinned forks with self-updating disabled, so this panel
 is the only update path there is: it reports what upstream published and never
-installs anything. It belongs to Lexer Mode alone, and slides in from the right
-of the main menu.
+installs anything. It belongs to Lexer Mode alone, and opens from the main
+menu's left edge.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
@@ -37,7 +36,7 @@ HELPERS = [
 
 PLUGINS = [{
     "id": "ff8", "name": "Final Fantasy VIII", "status": "added", "canOpen": True,
-    "scanInProgress": False, "root": "C:\Games\FF8", "problems": [], "statusText": "Ready",
+    "scanInProgress": False, "root": r"C:\Games\FF8", "problems": [], "statusText": "Ready",
     "resident": False, "dirtyCount": 0, "coverArt": {"state": "missing"},
     "fonts": {"total": 0, "installed": 0, "items": []},
 }]
@@ -56,13 +55,15 @@ STUB = """
     lexeditor_settings:async()=>structuredClone(window.__testSettings),
     save_lexeditor_settings:async values=>{Object.assign(window.__testSettings,values);return structuredClone(window.__testSettings)},
     helper_versions:async refresh=>{window.__helperCalls.push(!!refresh);return{helpers:HELPERS,cached:!refresh}},
+    developer_overview:async()=>({table:{rows:[],sharedUi:{files:[]}}}),
+    developer_issue_board:async()=>({games:{}}),
     cover_art_data_uri:async id=>({uri:''})
   }};
   window.dispatchEvent(new Event('pywebviewready'));
 """
 
 SETTINGS = {
-    "developerMode": False, "developerMode": True, "developerAuthorized": True, "developerLogin": "Lexer-Lux",
+    "developerMode": True, "developerAuthorized": True, "developerLogin": "Lexer-Lux",
     "hoverableAltClick": False, "selectionHoldMs": 650, "tableRowsPerPage": 15,
     "panelGapPercent": 1, "residentHandleWidthPercent": 5, "mainMenuHeightPercent": 9,
     "soundEnabled": False, "soundVolumePercent": 50, "absentGameDesaturationPercent": 75,
@@ -76,6 +77,7 @@ def main() -> int:
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-helpers-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
+    cdp = None
     port = free_port()
     try:
         browser = subprocess.Popen([
@@ -109,6 +111,8 @@ def main() -> int:
         assert button["left"] <= 1, f"the handle is not on the left edge: {button}"
         assert button["fullHeight"], f"the handle does not span the window height: {button}"
         cdp.eval("document.querySelector('#lexer-handle').click()")
+        assert cdp.eval("window.__helperCalls.length") == 0, "opening the drawer must not read collapsed Helpers"
+        cdp.eval("document.querySelector('#lexer-helpers-toggle').click()")
         wait_eval(cdp, "document.querySelectorAll('#lexer-panel-list .lexer-helper').length===2", 20)
         time.sleep(.4)
         opened = json.loads(cdp.eval("""JSON.stringify((()=>{const panel=document.querySelector('#lexer-panel'),
@@ -128,6 +132,7 @@ def main() -> int:
         assert "1.24.3" in opened["text"][0] and "1.25.0" in opened["text"][0], opened["text"]
         assert opened["calls"] == [False], f"opening must not force a refresh: {opened['calls']}"
         assert opened["removedTables"] == 0, opened
+        assert cdp.eval("document.querySelectorAll('#lexer-dev-table .lexer-dev-error').length") == 0
         # Capture it open, which is the state worth looking at.
         shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
         target = DEV_CACHE / "rendered" / "helper-versions-panel.png"
@@ -148,6 +153,8 @@ def main() -> int:
         print(json.dumps(opened))
         print("Helper versions panel: Lexer Mode only, left-hand slide-out, report-only.")
     finally:
+        if cdp:
+            cdp.close()
         if browser:
             browser.terminate()
             browser.wait(timeout=10)

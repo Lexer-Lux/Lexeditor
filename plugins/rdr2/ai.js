@@ -1,4 +1,57 @@
 // ----- AI architecture -----
+const AI_PANEL_HELP="Perception profiles control sight, hearing, smell and movement thresholds. Combat profiles group gangs, law, animals and companions. Global settings affect accuracy, damage, distraction and noise. Numeric limits are not yet established. Unsupported values are read-only.";
+const AI_PROGRAM_HELP="Programs and styles control combat decisions. These graphs are read-only here.";
+function aiFieldType(row){
+  if(row.readonly||typeof row.value!=="string")return "readonly";
+  if(/^(true|false)$/i.test(row.value))return "boolean";
+  if(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(row.value))return Number.isFinite(Number(row.value))?"number":"readonly";
+  if(/^[+-]?(?:nan|inf|infinity)$/i.test(row.value))return "readonly";
+  return "choice";
+}
+function aiChoices(rows,row){return [...new Set(rows.filter(r=>r.field===row.field&&!r.readonly&&typeof r.value==="string").map(r=>r.value))];}
+function aiDraftError(row,value,rows){
+  const type=aiFieldType(row);
+  if(type==="readonly")return "This field is read-only.";
+  if(typeof value!=="string")return "Field values must be text.";
+  if(type==="number")return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)&&Number.isFinite(Number(value))?"":"Enter a finite number.";
+  if(type==="boolean")return /^(true|false)$/i.test(value)?"":"Choose true or false.";
+  return aiChoices(rows,row).includes(value)?"":"Choose a value present in the source data.";
+}
+function aiSaveBody(file){
+  const rows=state.aiData?.[file]?.fields||[],edits=Object.values(state.aiEdits[file]||{}),seen=new Set();
+  for(const edit of edits){
+    if(!edit||Object.keys(edit).sort().join(",")!=="kind,path,value"||!Array.isArray(edit.path)||!edit.path.length||edit.path.some(i=>!Number.isSafeInteger(i)||i<0))throw new Error("Invalid AI target.");
+    const key=edit.path.join("."),matches=rows.filter(r=>r.path.join(".")===key),row=matches[0];
+    if(matches.length!==1||seen.has(key)||row.kind!==edit.kind)throw new Error("Unknown or duplicate AI target.");
+    seen.add(key);const error=aiDraftError(row,edit.value,rows);if(error)throw new Error(error);
+  }
+  return {edits};
+}
+async function preflightAISave(){
+  const bodies=Object.entries(state.aiEdits).filter(([,map])=>Object.keys(map).length).map(([file])=>[file,aiSaveBody(file)]);
+  for(const [file,body] of bodies)await api("/api/ai/"+file+"/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+}
+function aiValueControl(file,row,rows,reference){
+  const key=row.path.join("."),edits=state.aiEdits[file],type=aiFieldType(row);
+  const changed=value=>{if(value===row.value||(type==="boolean"&&value.toLowerCase()===row.value.toLowerCase()))delete edits[key];else edits[key]={path:row.path,kind:row.kind,value};refreshGlobalSave();};
+  return xmlScalarControl(row,rows,{value:edits[key]?.value??row.value,edited:()=>key in edits,change:changed,reference});
+}
+function xmlScalarControl(row,rows,{value:cur,edited,change,label=row.field,reference,wrapReferences=true,className=""}){
+  const type=aiFieldType(row),editable=!isRO()&&type!=="readonly";
+  let control;
+  const changed=value=>{if(!editable)return;change(value);control.classList.toggle("edited",edited());};
+  if(type==="readonly")return LexeditorUI.readonlyField(String(cur),{class:className});
+  if(type==="boolean")control=el("input",{type:"checkbox",checked:cur.toLowerCase()==="true",disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.checked?"true":"false")});
+  else if(type==="number"){
+    control=el("input",{type:"number",step:"any",required:true,disabled:!editable,value:cur,"aria-label":label,"data-lex-validate-number":"true",oninput:e=>{changed(e.target.value);e.target.setCustomValidity(aiDraftError(row,e.target.value,rows));}});
+    control.setCustomValidity(aiDraftError(row,cur,rows));
+  }else control=el("select",{disabled:!editable,"aria-label":label,onchange:e=>changed(e.target.value)},...aiChoices(rows,row).map(value=>el("option",{value,selected:value===cur},value)));
+  control.classList.toggle("edited",edited());
+  if(className)control.classList.add(...className.split(/\s+/));
+  if(!wrapReferences)return control;
+  const validReference=reference!==undefined&&!aiDraftError(row,reference,rows);
+  return refField(control,validReference?[["UCO","ucotag",reference]]:null,cur,(value)=>{if(!editable)return;if(type==="boolean"){control.checked=value.toLowerCase()==="true";control.dispatchEvent(new Event("change",{bubbles:true}));}else{control.value=value;control.dispatchEvent(new Event(type==="number"?"input":"change",{bubbles:true}));}},String);
+}
 async function renderAI() {
   const current=renderScope("renderAI");
   if (!state.datamap) state.datamap=await api("/api/datamap");
@@ -18,8 +71,6 @@ async function renderAI() {
       el("input",{type:"text",placeholder:"Filter context or field…",value:f.aiQ||"",oninput:ev=>{f.aiQ=ev.target.value;filterRerender(ev,renderAI);}}),savebar(saveAI));
   }
   const m=$("#main");m.innerHTML="";
-  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"AI is layered, not one value set per enemy model. "),
-    "Perception profiles own sight, hearing, smell, fields of view, movement thresholds, and time/weather modifiers; combat profiles define gangs/law/animals/companions; global files modify aim distraction, contextual accuracy, damage and noise. Programs/styles are decision graphs. See docs/STEALTH_SYSTEM_AUDIT.md before changing crouch/prone perception."));
   if(layer.files){
     if(!state.aiData)state.aiData={};
     if(!state.aiData[f.aiFile])state.aiData[f.aiFile]=await api("/api/ai/"+f.aiFile);
@@ -27,21 +78,16 @@ async function renderAI() {
     if(!state.aiRefs)state.aiRefs={};
     if(!state.aiRefs[f.aiFile])state.aiRefs[f.aiFile]=await api("/api/ai-reference/"+f.aiFile);
     if(!current())return;
-    const data=state.aiData[f.aiFile],refData=state.aiRefs[f.aiFile],edits=state.aiEdits[f.aiFile]||(state.aiEdits[f.aiFile]={}),q=(f.aiQ||"").toUpperCase();
+    const data=state.aiData[f.aiFile],refData=state.aiRefs[f.aiFile],q=(f.aiQ||"").toUpperCase();
+    state.aiEdits[f.aiFile] ||= {};
+    if(data.available===false){m.append(LexeditorUI.detailNote("AI source file is missing."));return;}
     const refByPath={};refData.fields.forEach(x=>refByPath[x.path.join(".")]=x.value);
-    const rows=sortedRows("ai",data.fields.filter(x=>!q||x.context.toUpperCase().includes(q)||x.field.toUpperCase().includes(q)),{context:x=>x.context,field:x=>x.field,value:x=>x.value}).slice(0,1000);
-    tb.insertBefore(el("span",{class:"count"},`${rows.length}${data.fields.length>1000?` shown of ${data.fields.length}`:" fields"}`),tb.querySelector(".savebar"));
-    m.append(columnList({class:"ai-field-table",align:"start",headerAlign:"start","aria-label":"AI fields",
-      rows,key:row=>row.path.join("."),editable:true,localSort:false,
-      template:"minmax(180px,1fr) minmax(180px,1fr) minmax(0,1.4fr)",
-      columns:[{key:"context",label:"Profile / context",cellClass:"key"},
-        {key:"field",label:"Field",cellClass:"key"},
-        {key:"value",label:"Value",render:row=>{
-          const key=row.path.join("."),cur=edits[key]?.value??row.value,rv=refByPath[key];
-          const inp=el("input",{value:cur,class:key in edits?"edited":"",
-            "aria-label":`${row.context} ${row.field}`,
-            onchange:ev=>{edits[key]={path:row.path,kind:row.kind,value:ev.target.value};renderToolbarOnly();}});
-          return refField(inp, rv===undefined?null:[["UCO","ucotag",rv]], cur, (v,ev)=>applyToInput(ev,v), String);}}]}));
+    const rows=sortedRows("ai",data.fields.filter(x=>!q||x.context.toUpperCase().includes(q)||x.field.toUpperCase().includes(q)),{context:x=>x.context,field:x=>x.field,value:x=>x.value});
+    // names: These scalar identities belong to fixed game profiles and cannot be renamed.
+    m.append(LexeditorUI.pagedListDetail({rows,key:r=>r.path.join("."),selected:f.aiSelected?.[f.aiFile]||rows[0]?.path.join("."),renamable:false,pageSize:15,noun:"AI fields",slots:false,splitKey:"rdr2-ai",
+      sync:view=>{f.aiSelected ||= {};f.aiSelected[f.aiFile]=view.selected},
+      master:view=>columnList({class:"ai-field-table",rows:view.rows,key:r=>r.path.join("."),selected:view.selected,select:view.select,"aria-label":"AI fields",columns:[{key:"context",label:"Profile / context"},{key:"field",label:"Field"}]}),
+      detail:row=>LexeditorUI.detailPanel({title:row.field,help:fieldHelp(AI_PANEL_HELP),body:[LexeditorUI.detailField({label:"Value",control:aiValueControl(f.aiFile,row,data.fields,refByPath[row.path.join(".")])})]})}));
     return;
   }
   const text=state.datamap.sections.map(s=>s.lines.join("\n")).join("\n");
@@ -49,12 +95,13 @@ async function renderAI() {
     const lines=text.split("\n").filter(line=>line.toLowerCase().includes(term.toLowerCase())).slice(0,20);
     m.append(LexeditorUI.detailSection({title:term,body:LexeditorUI.stack({fill:false},...lines.map(line=>LexeditorUI.detailNote(line)))}));
   });
-  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Programs & Styles are read-only here: "),
-    "combat-director and melee-reasoner files are decision graphs. Flattening their transitions, conditions and tasks into generic value rows would make destructive edits too easy; they need a graph-aware editor."));
+  m.append(LexeditorUI.detailPanel({title:"Programs & styles",help:fieldHelp(AI_PROGRAM_HELP),body:[]}));
 }
 
 async function saveAI(){
-  const file=state.filters.aiFile,map=state.aiEdits[file]||{},edits=Object.values(map);if(!edits.length)return;
-  const r=await api("/api/ai/"+file+"/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});
+  if(isRO())return 0;
+  const file=state.filters.aiFile,body=aiSaveBody(file);if(!body.edits.length)return 0;
+  await api("/api/ai/"+file+"/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const r=await api("/api/ai/"+file+"/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   state.aiEdits[file]={};delete state.aiData[file];toast(`Saved ${r.saved} AI field(s) to ${file}`);renderAI();
 }

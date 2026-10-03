@@ -1,19 +1,16 @@
 """Shared blocking save-error modal contract for Lexeditor issue 37."""
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-FF8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-WARBAND = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
-RDR = (
-    (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
-    + "\n"
-    + (ROOT / "plugins" / "rdr" / "editor.js").read_text(encoding="utf-8")
-)
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+FF8 = plugin_ui("ff8")
+WARBAND = plugin_ui("warband")
+RDR = plugin_ui("rdr")
+RDR2 = plugin_ui("rdr2")
 
 
 def require(condition: bool, message: str) -> None:
@@ -33,8 +30,10 @@ require('class: "lex-important-list"' in alert_source and 'class: "lex-important
         "important messages need structured Item: issue rows with navigable items")
 require('dialog.closest(".lex-dialog-backdrop")?.remove(); entry.activate()' in alert_source,
         "record links must close the modal before navigation")
-require("event.target === backdrop" not in alert_source and 'event.key === "Escape"' not in alert_source,
-        "backdrop click or Escape can still dismiss an important message")
+require("event.target === backdrop" not in alert_source,
+        "a backdrop click can still dismiss an important message")
+require('if (event.key === "Escape") { event.preventDefault(); close.click(); }' in alert_source,
+        "important messages must retain the keyboard/controller close action")
 require(".lex-important-dialog" in CSS and ".lex-important-message" in CSS,
         "the large untruncated important-message presentation is missing")
 require("overflow-wrap: anywhere" in CSS,

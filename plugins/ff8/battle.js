@@ -170,68 +170,15 @@
   // One map, two sizes. `points` is asked for again after each placement, so the
   // marker in the panel and the marker in the magnifier both show where the
   // record is now.
-  // The world map art: the game's own minimap, or the terrain drawn from
-  // above out of wmx.obj with its textures (Lexer asked for a button to swap
-  // the brown map for the detailed map Deling draws). The terrain is drawn once
-  // per dataset in the browser and kept as an image.
-  const worldTerrainImages=new Map();
+  // Record placement previews keep the game's own minimap. The Map page
+  // switches to live terrain geometry with the same model viewer as Models.
   function worldMapImage(){
-    const dataset=worldTextureDataset(),terrain=state.worldMapTerrain&&worldTerrainImages.get(dataset);
-    return typeof terrain==="string"?terrain
-      :`/assets/world-map.png?dataset=${encodeURIComponent(dataset)}&v=${encodeURIComponent(state.data.world.sha256)}`;
-  }
-  async function worldTerrainRender(dataset){
-    const [mesh,atlas]=await Promise.all([
-      fetch(`/assets/world-mesh.bin?dataset=${encodeURIComponent(dataset)}`).then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.arrayBuffer()}),
-      new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("The world texture atlas did not load"));
-        image.src=`/assets/world-atlas.png?dataset=${encodeURIComponent(dataset)}`})]);
-    const canvas=document.createElement("canvas");canvas.width=3072;canvas.height=2304;
-    const gl=canvas.getContext("webgl2",{preserveDrawingBuffer:true,antialias:true});
-    if(!gl)throw new Error("This browser has no WebGL2");
-    const shader=(type,source)=>{const unit=gl.createShader(type);gl.shaderSource(unit,source);gl.compileShader(unit);
-      if(!gl.getShaderParameter(unit,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(unit));return unit};
-    const program=gl.createProgram();
-    // Block units: X 0-128 west to east, Z 0-96 north to south, Y the height.
-    // Higher ground is drawn over lower ground; the light comes from the
-    // north-west so slopes read as relief.
-    gl.attachShader(program,shader(gl.VERTEX_SHADER,`#version 300 es
-      in vec3 position;in vec2 uv;out vec2 vUv;out vec3 vWorld;
-      void main(){vUv=uv;vWorld=vec3(position.x,position.y*24.0,position.z);
-        gl_Position=vec4(position.x/64.0-1.0,1.0-position.z/48.0,0.5-position.y*0.4,1.0);}`));
-    gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`#version 300 es
-      precision highp float;in vec2 vUv;in vec3 vWorld;uniform sampler2D atlas;out vec4 color;
-      void main(){vec4 texel=texture(atlas,vUv);if(texel.a<0.5)discard;
-        vec3 normal=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
-        float light=0.72+0.28*abs(dot(normal,normalize(vec3(-0.5,1.0,-0.6))));
-        color=vec4(texel.rgb*light,1.0);}`));
-    gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
-    gl.useProgram(program);
-    const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,mesh,gl.STATIC_DRAW);
-    const attribute=(name,size,offset)=>{const at=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,24,offset)};
-    attribute("position",3,0);attribute("uv",2,12);
-    const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
-    gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(0,0,0,0);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
-    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,mesh.byteLength/24);
-    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
-    if(!blob)throw new Error("The terrain image could not be made");
-    return URL.createObjectURL(blob);
+    return `/assets/world-map.png?dataset=${encodeURIComponent(worldTextureDataset())}&v=${encodeURIComponent(state.data.world.sha256)}`;
   }
   function worldTerrainButton(){
-    const dataset=worldTextureDataset(),entry=worldTerrainImages.get(dataset),loading=state.worldMapTerrain&&entry instanceof Promise;
     return el("button",{type:"button",class:"world-terrain-toggle","aria-pressed":state.worldMapTerrain?"true":"false",
-      "aria-busy":loading?"true":null,title:"Draw the map from the terrain and its textures",
-      ondblclick:event=>event.stopPropagation(),
-      onclick:event=>{event.stopPropagation();state.worldMapTerrain=!state.worldMapTerrain;
-        if(state.worldMapTerrain&&!worldTerrainImages.has(dataset)){
-          const job=worldTerrainRender(dataset).then(url=>{worldTerrainImages.set(dataset,url);if(state.tab==="world")rerenderWorldMap()},
-            error=>{worldTerrainImages.delete(dataset);state.worldMapTerrain=false;showAlert({title:"The terrain map could not be drawn",message:error.message||String(error)});if(state.tab==="world")rerenderWorldMap()});
-          worldTerrainImages.set(dataset,job);
-        }
-        rerenderWorldMap()}},loading?"Terrain…":"Terrain");
+      title:"Switch between the minimap and 3D terrain",ondblclick:event=>event.stopPropagation(),
+      onclick:event=>{event.stopPropagation();state.worldMapTerrain=!state.worldMapTerrain;rerenderWorldMap()}},"Terrain");
   }
   function worldLocationOptions(options){
     return {fill:false,columns:32,rows:24,ratio:4/3,label:options.label,
@@ -250,7 +197,11 @@
     worldMapNavigation(map,map.lexStage);
     return map;
   }
-  function worldDrawPointGives(row){
+  const worldDrawAmountHelp="Vanilla chooses a random amount each time you draw. Available stock space can reduce it. Other mods can change this range.";
+  const worldDrawAmount=entry=>entry?(entry.highYield?'2–5 spells':'1–2 spells'):'Unavailable';
+  const worldDrawPointAmount=row=>worldDrawAmount(state.data.drawPointData?.rows?.find(entry=>entry.id===row.drawId));
+  const worldColumnValue=(row,key)=>key==='vanillaAmount'&&row.kind==='drawPoint'?worldDrawPointAmount(row):rowSortValue(row,key);
+  function worldDrawPointGives(row,prefs){
     const data=state.data.drawPointData;
     if(data?.error)return detailSection({title:"WHAT IT GIVES",body:[LexeditorUI.detailNote(data.error)]});
     const entry=data?.rows?.find(value=>value.id===row.drawId);
@@ -270,11 +221,14 @@
       return sourceControl(box,()=>entry[key],vanilla?.[key],refs(key),value=>{entry[key]=!!value;changed()},LexeditorUI.booleanMark);
     };
     return detailSection({title:"WHAT IT GIVES",
-      help:infoHelp("The magic this draw point gives, whether it fills again after it is drawn, and whether it gives a high yield. The game keeps these in FF8_EN.exe; Lexeditor changes them with a Hext patch in the mod and never writes the executable. A high yield gives about twice as much; the game stores no other amount."),
+      help:infoHelp("Choose the spell, refill and high yield. Lexeditor saves these as a Hext patch in your mod. It never writes the executable. The amount below shows vanilla's random range with the selected high-yield setting."),
       body:[detailField({label:"MAGIC",
           control:sourceControl(spell,()=>entry.magicId,vanilla?.magicId,refs("magicId"),value=>{entry.magicId=Number(value);changed()},magicName)}),
         detailField({label:"REFILL",help:infoHelp("On: the point stocks up again some time after it is drawn. Off: once drawn, it stays empty."),control:flag("refill","refill")}),
-        detailField({label:"HIGH YIELD",help:infoHelp("On: each draw gives more of the spell."),control:flag("highYield","high yield")})]});
+        detailField({label:"HIGH YIELD",help:infoHelp("On: each draw gives more of the spell."),control:flag("highYield","high yield")}),
+        detailField({label:"VANILLA AMOUNT",pin:prefs?.pinButton('vanillaAmount','Vanilla amount'),
+          help:infoHelp(worldDrawAmountHelp),control:LexeditorUI.readonlyField(worldDrawAmount(entry),
+            {'aria-label':`Draw Point ${row.drawId} vanilla amount`})})]});
   }
   function worldDrawPointDetail(row,prefs,titleContent=null){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
@@ -307,7 +261,7 @@
     // What it gives lives in the executable's draw point table, one byte per
     // draw ID, and is edited through the project's Hext patch (Lexer: "edit
     // the amount and spell on the draw points ... some hext editing").
-    const gives=worldDrawPointGives(row);
+    const gives=worldDrawPointGives(row,prefs);
     // The list shows the draw point's own draw ID, so the panel does too.
     return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`,...(titleContent?{titleContent}:{})},prefs,[...(gives?[gives]:[]),detailSection({className:"world-draw-position",help:infoHelp("Where the player finds this draw point on the world map. Moving it into another block changes which draw point the game finds there."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
@@ -408,7 +362,7 @@
       activate:()=>{state.worldTab=tab;state.selected.world=row.id;state.worldMapPoint=null;state.worldMapSky=null;
         state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
-  function worldLinkList(links){return links.length?el("span",{class:"world-cell-links"},...links):el("span",{},"None")}
+  function worldLinkList(links){if(!links.length)return el("span",{},"None");const list=LexeditorUI.toolbar(...links);list.classList.add("world-cell-links");return list;}
   function worldCellContents(cellId,region,segment){
     const rows=kind=>state.data.world.rows.filter(row=>row.kind===kind);
     const placed=row=>!(row.x===0&&row.z===0)&&worldCellOf(worldMapFraction(row.x,row.z))===cellId;
@@ -489,7 +443,16 @@
         label:`Select sky record ${record.id}`,
         activate:()=>{state.worldMapSky=record.id;state.worldMapPoint=null;rerenderWorldMap()}});
     }
-    const map=LexeditorUI.imageMap({columns:32,rows:24,ratio:4/3,label:"FF8 world map",cells,points,tools:[lens,worldTerrainButton()],
+    const dataset=worldTextureDataset();
+    const map=state.worldMapTerrain?LexeditorUI.stack(
+      LexeditorUI.toolbar(worldTerrainButton(),infoHelp("Drag to rotate the terrain. Scroll to zoom, or drag with the right button to pan. Home resets the camera.")),
+      FF8ModelViewer({file:"world",dataset,label:"FF8 world terrain",terrain:{
+        mesh:`/assets/world-mesh.bin?dataset=${encodeURIComponent(dataset)}`,
+        atlas:`/assets/world-atlas.png?dataset=${encodeURIComponent(dataset)}`},
+        initialView:state.worldTerrainView?.dataset===dataset?state.worldTerrainView:{},markers:points,
+        onViewChange:view=>{state.worldTerrainView={dataset,...view}},
+        onSelect:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}}))
+      :LexeditorUI.imageMap({columns:32,rows:24,ratio:4/3,label:"FF8 world map",cells,points,tools:[lens,worldTerrainButton()],
       image:worldMapImage(),
       readout:point=>{
         const cell=segments[point.row*32+point.column];
@@ -498,7 +461,7 @@
         // cell's region and geometry are on its panel.
         return `(${point.column}, ${point.row})`;},
       select:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}});
-    worldMapNavigation(map,map.lexStage);
+    if(!state.worldMapTerrain)worldMapNavigation(map,map.lexStage);
     return LexeditorUI.panelLayout([detailPanel({heading:false,className:"ff8-world-map-panel",body:map}),
       pickedSky?worldSkyDetail(pickedSky,null,worldSkyMapTitle(pickedSky),`World ${formatNumber(pickedSky.x)}, ${formatNumber(pickedSky.z)} · fade ${formatNumber(pickedSky.y)}`):picked?worldDrawPointDetail(picked,null,worldDrawPointMapTitle(picked)):worldSegmentDetail(row)],"world-map",
       {layoutKey:"ff8-world-map",defaultSizes:[1.6,1]});
@@ -580,7 +543,7 @@
     if(!field)return LexeditorUI.noImage();
     const image=el("img",{class:"field-background-image lex-overlay-base",alt:`${field.name} background`}),
       canvas=el("canvas",{class:"field-overlay-canvas lex-overlay-layer","aria-hidden":"true"}),
-      stack=el("div",{class:"field-preview-stack lex-overlay-stack world-to-field-picture",style:"visibility:hidden"},image,canvas);
+      stack=el("div",{class:"field-preview-stack lex-overlay-stack lex-overlay-fill world-to-field-picture",style:"visibility:hidden"},image,canvas);
     const dataset=state.activeSource==="mine"?"current":state.activeSource,cacheKey=`${dataset}:${field.key}`;
     const show=picture=>{image.onload=()=>{stack.style.visibility=""};image.src=picture.url;drawWorldToFieldPoint(row,field,canvas,picture.geometry)};
     (async()=>{
@@ -637,7 +600,7 @@
       {noun:"world to field entries",inlinePager:state.tab==='fields'},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the right mouse button to pan, and click the middle button to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Ground types used by the world map, their locations, and their encounter rules. Names are project labels and do not change terrain behavior. Default names come from Deling's notes."},{id:"fieldReturns",label:"Field Returns",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"drawPoints",label:"Draw Points",help:"Where each world draw point is, and what it gives: its magic, whether it refills and whether it gives a high yield. Click the map to move a point. What it gives is changed through a Hext patch in the mod; the executable is never written."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"Regions colours cells that share encounter rules. Terrain opens the textured 3D map. Scroll to zoom, right-drag to pan, and middle-click to fit the minimap. In Terrain, drag to rotate and press Home to reset the camera. Click a cell or marker to inspect its record. Each record title opens the page that owns it."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Ground types used by the world map, their locations, and their encounter rules. Names are project labels and do not change terrain behavior. Default names come from Deling's notes."},{id:"fieldReturns",label:"Field Returns",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"drawPoints",label:"Draw Points",help:"Where each world draw point is, and what it gives: its magic, whether it refills and whether it gives a high yield. Click the map to move a point. What it gives is changed through a Hext patch in the mod; the executable is never written."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField"){state.worldTab='map';state.fieldDetailTab='worldToField';state.tab='fields';return render()}
     if(state.worldTab==="groundTypes"){
@@ -651,10 +614,13 @@
         {key:"ruleCount",label:"RULES",help:"Encounter rules that start battles on this ground type.",sortValue:row=>row.rules.length,render:row=>row.rules.length}],
         worldDetail,"90px minmax(180px,2fr) minmax(70px,.5fr) minmax(70px,.5fr)",{noun:"ground types",defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:true},false));
     }
-    const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
-    const columns=kind==="region"?[{key:"id",label:"CELL",help:worldPropertyHelp.region.cell},{key:"x",label:"X",help:worldPropertyHelp.region.x},{key:"y",label:"Y",help:worldPropertyHelp.region.y},{key:"regionId",label:"REGION",help:worldPropertyHelp.region.regionId}]:kind==="fieldReturn"?[{key:"id",label:"INDEX",help:worldPropertyHelp.fieldReturn.index},{key:"x",label:"X",help:worldPropertyHelp.fieldReturn.x},{key:"y",label:"Y",help:worldPropertyHelp.fieldReturn.y},{key:"z",label:"Z",help:worldPropertyHelp.fieldReturn.z}]:kind==="drawPoint"?[{key:"drawId",label:"DRAW ID",help:worldPropertyHelp.drawPoint.drawId},{key:"x",label:"X",help:worldPropertyHelp.drawPoint.x},{key:"y",label:"Y",help:worldPropertyHelp.drawPoint.y},{key:"subId",label:"SUB-ID",help:worldPropertyHelp.drawPoint.subId}]:kind==="skyColor"?[{key:"id",label:"RECORD",help:"Identifier of this sky colour record."},{key:"skyTop",label:"SKY GRADIENT",grow:1,cellClass:"lex-cell-fill",help:"Preview of the top, centre, and bottom sky colours.",render:worldSkySwatch}]:kind==="railTrack"?[{key:"id",label:"TRACK",help:"Identifier of the train route."},{key:"pointCount",label:"POINTS",help:"Number of points forming the route."},{key:"trainStop1",label:"STOP 1",help:"First stop point in this route."},{key:"trainStop2",label:"STOP 2",help:"Second stop point in this route."}]:[{key:"id",label:"TEXTURE",help:"Identifier of the world texture."},{key:"name",label:"ASSET",help:"Name of the texture image record."},{key:"paletteCount",label:"PALETTES",help:"Number of colour tables in this indexed image."},{key:"depth",label:"BPP",help:"Bits per pixel, which determines how pixel indices refer to palette colours."}];
+    const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(worldColumnValue(left,sortKey)).localeCompare(String(worldColumnValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
+    const columns=kind==="region"?[{key:"id",label:"ID",help:worldPropertyHelp.region.cell},{key:"x",label:"X",help:worldPropertyHelp.region.x},{key:"y",label:"Y",help:worldPropertyHelp.region.y},{key:"regionId",label:"REGION",help:worldPropertyHelp.region.regionId}]:kind==="fieldReturn"?[{key:"id",label:"ID",help:worldPropertyHelp.fieldReturn.index},{key:"x",label:"X",help:worldPropertyHelp.fieldReturn.x},{key:"y",label:"Y",help:worldPropertyHelp.fieldReturn.y},{key:"z",label:"Z",help:worldPropertyHelp.fieldReturn.z}]:kind==="drawPoint"?[{key:"drawId",label:"DRAW ID",help:worldPropertyHelp.drawPoint.drawId},{key:"x",label:"X",help:worldPropertyHelp.drawPoint.x},{key:"y",label:"Y",help:worldPropertyHelp.drawPoint.y},{key:"subId",label:"SUB-ID",help:worldPropertyHelp.drawPoint.subId}]:kind==="skyColor"?[{key:"id",label:"RECORD",help:"Identifier of this sky colour record."},{key:"skyTop",label:"SKY GRADIENT",grow:1,cellClass:"lex-cell-fill",help:"Preview of the top, centre, and bottom sky colours.",render:worldSkySwatch}]:kind==="railTrack"?[{key:"id",label:"TRACK",help:"Identifier of the train route."},{key:"pointCount",label:"POINTS",help:"Number of points forming the route."},{key:"trainStop1",label:"STOP 1",help:"First stop point in this route."},{key:"trainStop2",label:"STOP 2",help:"Second stop point in this route."}]:[{key:"id",label:"TEXTURE",help:"Identifier of the world texture."},{key:"name",label:"ASSET",help:"Name of the texture image record."},{key:"paletteCount",label:"PALETTES",help:"Number of colour tables in this indexed image."},{key:"depth",label:"BPP",help:"Bits per pixel, which determines how pixel indices refer to palette colours."}];
+    if(kind==='drawPoint')columns.push({key:'vanillaAmount',label:'Vanilla amount',pinned:false,
+      help:worldDrawAmountHelp,render:worldDrawPointAmount});
     delete state.columnPrefs.world;
-    const content=showPaged("world",visible,columns,worldDetail,kind==="skyColor"?"90px minmax(180px,1fr)":"90px minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1fr)",{defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:kind!=="skyColor"},false);
+    const coordinateTable=kind==="region"||kind==="fieldReturn"||kind==="drawPoint";
+    const content=showPaged("world",visible,coordinateTable?columns.map(column=>({...column,numeric:column.key!=='vanillaAmount'})):columns,worldDetail,kind==="skyColor"?"90px minmax(180px,1fr)":"90px minmax(80px,1fr) minmax(80px,1fr) minmax(80px,1fr)",{defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:!coordinateTable&&kind!=="skyColor"},false);
     return wrap(content);
   }
   function renderWorldMap(){return renderWorldMapContent(true)}

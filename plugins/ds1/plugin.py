@@ -11,7 +11,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 
 def check() -> list[str]:
     problems = [f"Missing Dark Souls support file: {name}"
-            for name in ("editor.html", "editor.js", "editor.css", "server.py", "metadata/SOURCE.json", "project-template/.lexeditor-ds1-project")
+            for name in ("editor.html", "editor.js", "editor.css", "server.py", "data_map.py", "metadata/SOURCE.json", "project-template/.lexeditor-ds1-project")
             if not (PLUGIN_ROOT / name).is_file()]
     if not problems:
         from .formats import TABLES, schema

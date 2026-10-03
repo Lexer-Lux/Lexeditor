@@ -13,11 +13,25 @@ import threading
 import zipfile
 import urllib.request
 import urllib.error
+import os
+from contextlib import contextmanager
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core.mod_library import ModLibrary, documents_folder, package_root, relative_path
 from plugins.ff7r.mod_support import PakModAdapter
 from core.managed_mods import ManagedModSpec, update_mod, recover_update, refresh_active_mod, check_release
+
+
+@contextmanager
+def repak_fixture(root):
+    """Install the bundled, hash-pinned helper without depending on a user cache."""
+    from plugins.ff7r import tooling
+    with patch.dict(os.environ), patch.object(tooling, 'user_data_dir', lambda: root / 'helper-cache'):
+        os.environ.pop('LEXEDITOR_REPAK', None)
+        assert tooling.helper_install()['installed']
+        # The service runs in another process; give it this same isolated helper.
+        os.environ['LEXEDITOR_REPAK'] = str(tooling.repak_path())
+        yield
 
 
 class ImportTests(unittest.TestCase):
@@ -26,7 +40,7 @@ class ImportTests(unittest.TestCase):
         from plugins.ff7r.tooling import pack_directory, get_file
         from plugins.ff7r.dataobject import DataObjectPackage
         from urllib.parse import quote
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory() as temp, repak_fixture(Path(temp)):
             root = Path(temp)
             asset = "End/Content/GameContents/DataObject/Resident/Equipment.uasset"
             fixture = root / "fixture"
@@ -302,7 +316,8 @@ class ImportTests(unittest.TestCase):
             target = library.import_mod("ff7r", archive, adapter, "Copy", "Wrapper/Mods")
             self.assertEqual((target / "example_P.pak").read_bytes(), b"fixture")
             info = json.loads((target / "mod.json").read_text())
-            self.assertEqual(info, {"name": "Copy", "version": "1.2", "author": "Fixture"})
+            self.assertEqual(info, {"name": "Copy", "version": "1.2", "author": "Fixture",
+                                   "description": "", "credits": "", "missing": []})
             with self.assertRaises(FileExistsError):
                 library.import_mod("ff7r", archive, adapter, "Copy", "Wrapper/Mods")
 
@@ -321,10 +336,8 @@ class ImportTests(unittest.TestCase):
             self.assertTrue(documents_folder().is_absolute())
 
     def test_real_pak(self):
-        from plugins.ff7r.tooling import repak_path, pack_directory
-        if not repak_path().is_file():
-            self.skipTest("Pinned repak helper is unavailable")
-        with tempfile.TemporaryDirectory() as temp:
+        from plugins.ff7r.tooling import pack_directory
+        with tempfile.TemporaryDirectory() as temp, repak_fixture(Path(temp)):
             root = Path(temp)
             source = root / "source/End/Content/Fixture"
             source.mkdir(parents=True)
@@ -336,10 +349,8 @@ class ImportTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
 
     def test_real_editable_copy_activation(self):
-        from plugins.ff7r.tooling import repak_path, pack_directory, get_file
-        if not repak_path().is_file():
-            self.skipTest("Pinned repak helper is unavailable")
-        with tempfile.TemporaryDirectory() as temp:
+        from plugins.ff7r.tooling import pack_directory, get_file
+        with tempfile.TemporaryDirectory() as temp, repak_fixture(Path(temp)):
             root = Path(temp)
             original = root / "original/End/Content/Fixture"
             original.mkdir(parents=True)
@@ -366,7 +377,7 @@ class ImportTests(unittest.TestCase):
             (source / "mod.json").write_text('{"name":"Keep"}')
             committed = []
             result = ModLibrary(source).relocate(root / "new", committed.append)
-            self.assertEqual(committed, [root / "new"])
+            self.assertEqual(committed, [(root / "new").resolve()])
             self.assertTrue((source / "mod.json").exists())
             self.assertEqual((root / "new/mod.json").read_bytes(), (source / "mod.json").read_bytes())
             def fail(path):
@@ -389,7 +400,7 @@ class ImportTests(unittest.TestCase):
             self.assertEqual(records[-1]["phase"], "copied")
             commits = []
             recovered = ModLibrary.recover_move(records[-1], commits.append)
-            self.assertEqual(commits, [root / "new"])
+            self.assertEqual(commits, [(root / "new").resolve()])
             (source / "new-user-file.txt").write_text("keep this")
             with self.assertRaises(ValueError):
                 ModLibrary.remove_move_recovery(recovered, root / "new")
