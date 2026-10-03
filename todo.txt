@@ -1,12 +1,13 @@
 =================================================================== GLOBAL / ALL GAMES
 
 - Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
-    > status 2026-10-03: Bounds and read-only protection done for Palworld, RDR2 weapons, DS3, Factorio, Chrono Trigger, FF8 world/field writers and DS1. Open: the other plugins; RDR2 buy prices have no real writer yet (the cost record is only added in the page); Warband settings.ini shows every value as text because the mod declares no schema or ranges.
+    > status 2026-10-03: Bounds and read-only protection done for Palworld, RDR2 weapons, DS3, Factorio, Chrono Trigger, FF8 world/field writers and DS1. RDR2 buy prices now write the real COST_SHOP_DEFAULT record (265 tests). Warband settings.ini values are whole numbers typed from the mod's own DEFAULTS. Every plugin's number helpers apply bounds where the data declares them. Open: checking each remaining plugin's fields against its schema.
 - Audit remaining supported record-creation gaps in Warband, DS3, Factorio, Bannerlord, Project Zomboid, and Terraria localization; finish missing record families and verify save/reload.
-    > status 2026-10-03: Warband done (items, troops and all 20 Module System datasets). DS3, Factorio, Bannerlord, Project Zomboid and Terraria localization still to audit.
+    > status 2026-10-03: Warband done. DS3 (every table), Factorio, Project Zomboid and Terraria localization create from templates; their creation tests pass. Bannerlord: ModuleData records, module relations, submodules, XML registrations, and now Gauntlet prefabs and elements. Open: the browser creation checks, then this comes off.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
     > status 2026-10-03: Detector repaired; FF8 swept at 1600x900. Not done: other games, smaller windows, and an answer to your question below.
     > Lexer: okayy, umm. i do everything % based in my own code so it can work on every screen size. is that not normal? like idk why all text doesn't just auto size to fit whatever, too. is there some reason everyone doesn't do that? can we not do that? That way it would work at any resolution, we don't have to test it at all resolutions? what is SOP for other devs for checking for these issues, do they check at every posssible resolution or just certain ones or something else entirely? also yet, it shoudn't even be a game-specific thing but a more general script that just checks the wholeass app automatically, not needing to be scripted for every new thing we make or change. or is that not doable?
+    > Claude: % sizing is normal and Lexeditor uses it too, but it only scales boxes; text does not shrink to fit its box on its own, and shrinking it would make labels unreadably small in narrow panels. Standard practice is a few breakpoint sizes (a small laptop, a normal desktop, a large UI scale) plus an automatic checker that measures every text box for overflow, rather than testing every resolution. That checker exists and is general, not per game: tests/shared/verify_no_clipped_text.py opens every game with your installed data, walks every tab and subtab at 1600x950 and 1280x720, and reports any text cut off by its container. Its first full run (2026-10-03) found mostly one shared cause: tables wider than their panel.
 - (reopened) Reduce the heading-to-property-label offset further: cut from 26px to 18px on 2026-09-26, not confirmed enough.
     > status 2026-10-03: Now 15px (was really 22px); lower and the type rail touches the name. Tell me if 15 is enough.
 - (reopened) Boolean rows: only each tab's default view was checked for misplaced help buttons; subtabs were not swept.
@@ -24,7 +25,7 @@ GF
     > status 2026-10-03: Need your call: in this 463px panel the global 7.5% is 35px and names become unreadable (tried: removing every override wrapped names nearly one letter per line). Options: fewer, wider columns when names cannot fit; a different % for narrow panels; a px minimum; or 7.5% of the window instead of the panel?
 Models
 - models: 90% of things here have no preview, say "locked", and have basically nothing in their details panel. what gives?
-    > status 2026-10-03: 805 of 853 battle files decode now; 48 are still unidentified, and resources that are not 3D models have no 3D preview. The rest still to identify and check on screen.
+    > status 2026-10-03: 805 of 853 battle files decode now. Of the 48 undecoded, 32 now show the one number they hold and 2 list their parts; 14 hold nothing provable. Left: check it on screen.
 World
 - i asked for a button on the world->regions->left panel to swap between that brown map and the more detailed 3d map thing dollet has.
     > status 2026-10-03: World > Map has a Terrain button that draws the real terrain from above. Not done: zoom, camera movement, in-game look.
