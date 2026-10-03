@@ -77,11 +77,51 @@ def settings_rows(payload: bytes | None = None) -> list[dict]:
     return rows
 
 
+def settings_schema() -> dict[tuple[str, str], int]:
+    """The keys the mod's build reads from settings.ini, with their defaults.
+
+    module_settings.py reads every key in its DEFAULTS table with int() and
+    ignores any key that is not there. Its DEFAULTS literal is parsed as data,
+    never imported, so the mod's code does not run in the editor.
+    """
+    import ast
+    # The module system that reads this settings.ini: it reads ..\settings.ini.
+    source = SETTINGS.parent / "ModuleSystem" / "module_settings.py"
+    try:
+        tree = ast.parse(source.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError):
+        return {}
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "DEFAULTS" for t in node.targets)):
+            try:
+                table = ast.literal_eval(node.value)
+            except ValueError:
+                return {}
+            return {(str(section).lower(), str(key).lower()): default
+                    for section, keys in table.items() if isinstance(keys, dict)
+                    for key, default in keys.items() if type(default) is int}
+    return {}
+
+
+def _typed_settings(rows: list[dict]) -> list[dict]:
+    schema = settings_schema()
+    if not schema:
+        return rows
+    for row in rows:
+        identity = (row["section"].lower(), row["key"].lower())
+        if identity in schema:
+            row.update(kind="integer", default=schema[identity])
+        else:
+            row["kind"] = "unused"
+    return rows
+
+
 def settings_data() -> dict:
     if not SETTINGS.is_file():
         return {"file": str(SETTINGS), "rows": [], "sha256": None}
     payload = SETTINGS.read_bytes()
-    return {"file": str(SETTINGS), "rows": settings_rows(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+    return {"file": str(SETTINGS), "rows": _typed_settings(settings_rows(payload)),
+            "sha256": hashlib.sha256(payload).hexdigest()}
 
 
 def save_settings(edits: list[dict], expected_sha256: str) -> dict:
@@ -108,6 +148,14 @@ def save_settings(edits: list[dict], expected_sha256: str) -> dict:
         if any(character in value for character in "\r\n\x00;#"):
             raise ValueError("Settings value cannot contain line breaks, NUL or comment delimiters")
         by_line[line_number] = value
+    # The mod's build reads known keys as whole numbers and ignores the rest.
+    typed = {row["line"]: row for row in _typed_settings(settings_rows(original))}
+    for line_number, value in by_line.items():
+        row = typed.get(line_number)
+        if row and row.get("kind") == "integer" and not re.fullmatch(r"[+-]?\d+", value.strip()):
+            raise ValueError(f"[{row['section']}] {row['key']} must be a whole number")
+        if row and row.get("kind") == "unused":
+            raise ValueError(f"[{row['section']}] {row['key']} is not read by the mod's build")
     saved = 0
     for line_number, value in by_line.items():
         line = lines[line_number]

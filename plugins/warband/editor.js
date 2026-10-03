@@ -513,8 +513,15 @@
 
   function settingDetail(row){
     return detailPanel({title:el("h2",{class:"lex-detail-panel-title"},bitmapText(row.key,24)),meta:row.section,body:[LexeditorUI.detailSection({body:[
-      detailField({label:"Value",property:"value",control:el("input",{value:effectiveSetting(row),oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
-      LexeditorUI.detailNote(row.description||"No description.")]})]});
+      // The mod's build reads known keys as whole numbers and ignores the
+      // rest, so a known key gets a whole-number box and an unknown one is
+      // shown, not edited. What it does belongs in the help bubble.
+      detailField({label:"Value",property:"value",help:row.description?LexeditorUI.infoHelp(
+          row.kind==="integer"?`${row.description} Default ${row.default}.`:row.description):null,
+        control:row.kind==="unused"?LexeditorUI.readonlyField(effectiveSetting(row))
+          :el("input",{value:effectiveSetting(row),...(row.kind==="integer"?{type:"number",step:"1"}:{}),
+            oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
+      ...(row.kind==="unused"?[LexeditorUI.detailNote("The mod's build does not read this key, so changing it would do nothing. Add it to DEFAULTS in module_settings.py to use it.")]:[])]})]});
   }
   async function saveSettings(){
     const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));if(!edits.length)return;
