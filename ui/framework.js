@@ -12299,7 +12299,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     return Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect())
       .filter(box=>box.width||box.height).map(box=>left-box.left));
   };
-  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
+  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}|${label.classList.contains('lex-column-cell-text') ? label.closest('.lex-column-list-cell')?.clientWidth : ''}`;
   const labelTextOutside = label => {
     const text=label.querySelector(':scope > .lex-detail-field-label-text');
     if(!text)return false;
@@ -12384,9 +12384,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
     }
 
-    // `contain:size` keeps the font size out of the box's own measurements, so
-    // the key is the same one computed above and the label settles in one pass.
-    fitted.set(label, key);
+    // Property labels use contain:size. A plain cell instead hugs its text,
+    // so remember its dimensions after fitting to avoid resetting that font
+    // when its own resize notification arrives.
+    fitted.set(label, label.classList.contains('lex-column-cell-text') ? fitKey(label) : key);
   };
   // The room a sub-tab leaves its name once padding, help mark and badges are
   // out, and whether the name's text fits it.
@@ -12440,7 +12441,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitted.set(bar,barKey(bar));
     labels.forEach(label=>fitted.set(label,fitKey(label)));
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name,.lex-column-cell-text';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   // Within the page-tab strip every tab is at least its own name's width, so a
   // game with twenty tabs wants a strip wider than its window. Shrinking one
@@ -12522,7 +12523,15 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitNavStrip(nav, laneChanged);
   }));
   const fitAllLabels = (root, reset) => {
-    const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
+    const fit = label => {
+      labelSizeObserver.observe(label);
+      // Plain cell text hugs its glyphs; after shrinking, its own box does not
+      // grow when the column does. Observe the cell so its font can grow back.
+      if(label.classList.contains('lex-column-cell-text')){
+        const cell=label.closest('.lex-column-list-cell');if(cell)labelSizeObserver.observe(cell);
+      }
+      fitLabel(label);
+    };
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
     const strips = new Set();
