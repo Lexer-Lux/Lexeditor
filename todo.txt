@@ -17,6 +17,7 @@
 ==================================================================== GITHUB
 
 - Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
+    > status 2026-10-03: Redundant Plugin containers were permanently deleted with Lexer's explicit approval after detaching their children. Standard-issue dependency repairs and exactly-one-workflow checks pass. Semantic audit continues: #824-827 now have game labels, unprefixed titles, and actionable status because research remains possible without a Lexer answer.
 
 
 ==================================================================== FF8 - PAGES
@@ -87,6 +88,7 @@ World
 - Resolve outstanding CI failures, including RDR2 source/browser checks and RDR provenance fixtures; check the latest FF7 and shared-suite results.
     > status 2026-09-27: FF8 checks that need the installed game now skip on CI instead of failing (most of FF8's red). Not yet pushed or re-run.
     > status 2026-10-03: RDR2, DS1, FFX/X2 and Palworld workflows passed on the todo branch. Shared detail pagination now preserves focus, retains injected loader/credits sections and gives Information panes usable height. Terraria's focused add-key save/reload check and full browser check pass locally; remaining CI failures and visual layout findings are still open.
+    > status 2026-10-03: RDR, DS3 and Terraria also passed CI. FF7R, Warband and Chrono Trigger browser checks now follow detail pages and pass locally, including their save assertions. Warband contrast measurement now handles CSS color-mix and checks Mods plus ordinary tabs. Pushed for CI; remaining workflow failures and the wider audit remain open.
 - Complete integration verification on local master, including native FF8 package validation and remaining CI checks.
 
 
