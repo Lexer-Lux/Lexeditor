@@ -97,3 +97,32 @@ alternative-group fallback, and the two-draw bound when a previous formation
 has a 100% chance. The weight extension is an authored memory fixture in this
 check; this evidence does not establish loading a larger game data file or
 deploying a mod in the running game.
+
+## Appended weight storage and native loading
+
+The weight extension follows the original `wmsetus.obj` bytes, with one zero
+padding byte only if the original length is odd. It does not move sections or
+change any original byte. The records are the leading vanilla distribution
+and one distribution per normal group, as described above. A 48-byte footer
+uses `<8sII32s`: magic `LEXCHN01`, original file length, group count and the
+SHA-256 digest of the weight records. The reader rejects invalid bounds,
+counts, checksums, distributions and a modified alternative-group fallback.
+Updating the extension replaces it rather than appending another copy;
+restoring all defaults returns the exact original file.
+
+The original world-load table names `dat\\wmsetus.obj;1` with destination
+`0x1E9DC3C`. The file helper `0x52D400` seeks to EOF, reads that complete size
+into the destination, then closes the file. Section setup `0x542DA0` adds
+the fixed header offsets to that destination. Weight output is capped at
+1 MiB, before the next known world-data address `0x1F9DC40`; oversized
+extensions reject before publication.
+
+`verify_ff8_encounter_weight_storage.py` executes both original native helpers
+with archive open/seek/read/close emulated. It reads the installed vanilla file
+without changing it. For the surveyed 84-group file, the original load is
+1,016,368 bytes and the extended load is 1,017,776 bytes. The check proves
+complete reads, untouched bytes beyond each read, identical section-setup
+state, and actual selection from the loaded extension for the first and last
+normal groups across all random shifts. The unmodified game-data parser also
+returns exactly the same original records. This establishes the native loading
+path in emulation, separately from deployment and running-game acceptance.
