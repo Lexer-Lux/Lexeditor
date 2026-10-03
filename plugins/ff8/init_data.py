@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from core.numeric_values import integer_value
+
 
 GF_COUNT = 16
 GF_SIZE = 68
@@ -280,14 +282,15 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
     changed = 0
     for edit in edits:
         kind = str(edit.get("kind", ""))
-        row_id = int(edit.get("id", 0))
+        row_id = integer_value(edit.get("id", 0), "Starting-data record ID")
         if kind == "inventory":
-            slot = int(edit["slot"])
+            slot = integer_value(edit["slot"], "Starting inventory slot")
             key = (kind, slot)
             if key in seen or not 0 <= slot < ITEM_COUNT:
                 raise ValueError(f"Invalid or duplicate starting inventory slot: {slot}")
             seen.add(key)
-            item_id, quantity = int(edit["itemId"]), int(edit["quantity"])
+            item_id = integer_value(edit["itemId"], "Starting inventory item ID")
+            quantity = integer_value(edit["quantity"], "Starting inventory quantity")
             if item_id not in item_ids or not 0 <= quantity <= 100:
                 raise ValueError("Starting inventory needs a valid item and a quantity from 0 to 100")
             if item_id == 0:
@@ -297,12 +300,13 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
             changed += 1
             continue
         if kind == "magic":
-            slot = int(edit["slot"])
+            slot = integer_value(edit["slot"], "Starting Magic slot")
             key = (kind, row_id, slot)
             if key in seen or not 0 <= row_id < CHARACTER_COUNT or not 0 <= slot < 32:
                 raise ValueError("Invalid or duplicate starting Magic slot")
             seen.add(key)
-            magic_id, quantity = int(edit["magicId"]), int(edit["quantity"])
+            magic_id = integer_value(edit["magicId"], "Starting Magic ID")
+            quantity = integer_value(edit["quantity"], "Starting Magic quantity")
             if magic_id not in magic_ids | {0} or not 0 <= quantity <= 100:
                 raise ValueError("Starting Magic needs a valid spell and a quantity from 0 to 100")
             if magic_id == 0:
@@ -317,7 +321,12 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
         if definition is None or key in seen:
             raise ValueError(f"Invalid or duplicate init.out field: {kind} {row_id} {field_name}")
         seen.add(key)
-        value = 1 if definition.get("control") == "boolean" and bool(edit.get("value")) else int(edit.get("value", 0))
+        if definition.get("control") == "boolean":
+            if not isinstance(edit.get("value"), bool):
+                raise ValueError(f"{definition['label']} must be a boolean")
+            value = int(edit["value"])
+        else:
+            value = integer_value(edit.get("value", 0), definition["label"])
         if not int(definition["minimum"]) <= value <= int(definition["maximum"]):
             raise ValueError(f"{definition['label']} must be {definition['minimum']} to {definition['maximum']}")
         if field_name in {"weapon_id", "weapon_laguna", "weapon_kiros", "weapon_ward"} and value not in weapon_ids:
