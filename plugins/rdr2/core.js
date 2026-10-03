@@ -907,6 +907,7 @@ async function saveAllChanges() {
   if(isRO()||!dirtyCount())return;
   const originalLootFile=state.lootFile;
   try {
+    validateCatalogQuantityDrafts();
     if(Object.keys(state.settingEdits).length)await saveSettings();
     if(state.customCraftingDirty)await saveCustomCrafting();
     if(state.shopDirty.size)await saveShops();

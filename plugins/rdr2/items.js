@@ -189,6 +189,31 @@ function buyPriceCell(it,buyCash,buyRef){
   cell.append(buyRef);return cell;
 }
 
+function catalogQuantityIsValid(raw, minimum=null){
+  return /^[+-]?\d+$/.test(String(raw))&&(minimum===null||BigInt(raw)>=BigInt(minimum));
+}
+function catalogQuantityInput({store,key,base,value,minimum=null,...attrs}){
+  const input=el("input",{type:"number",step:"1",required:true,...attrs,value,
+    ...(minimum===null?{}:{min:String(minimum)}),"data-lex-validate-number":"true"});
+  // With no minimum, HTML otherwise uses the rendered value attribute as
+  // the step base. A fractional draft must not offset all valid integers.
+  input.setAttribute("value","0");input.value=String(value);
+  const validate=()=>{input.setCustomValidity(catalogQuantityIsValid(input.value,minimum)?"":"Enter a whole quantity"+(minimum===null?".":` of at least ${minimum}.`));return input.checkValidity()};
+  input.lexValidateNumber=validate;validate();
+  if(isRO())input.readOnly=true;
+  else input.addEventListener("input",()=>{
+    const raw=input.value,valid=validate();
+    if(valid&&BigInt(raw)===BigInt(base))delete store[key];else store[key]=raw;
+    input.classList.toggle("edited",key in store);renderToolbarOnly();
+  });
+  return input;
+}
+function validateCatalogQuantityDrafts(){
+  for(const [label,store,minimum] of [["Purchase quantity",state.yieldEdits,1],["Bundle output",state.bundleEdits,1],["Carry quantity",state.carryEdits,null]]){
+    for(const raw of Object.values(store))if(!catalogQuantityIsValid(raw,minimum))throw new Error(`${label}: enter a whole quantity${minimum===null?".":` of at least ${minimum}.`}`);
+  }
+}
+
 function purchaseQuantityCell(it) {
   const pending=state.buyabilityEdits[it.key];
   const cost=it.buy.find(c=>c.costtype==="COST_TYPE_PRICE"&&c.parts.some(p=>p.item==="CURRENCY_CASH"))||
@@ -196,13 +221,11 @@ function purchaseQuantityCell(it) {
   if(!cost)return el("div",{},el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash purchase record defines a purchase quantity."}));
   const editKey=`${it.key}|buy|${cost.key}`,base=cost.yield||1,cur=isRO()?base:(state.yieldEdits[editKey]??base);
   const bundle=purchaseBundleOf(it);
-  const attrs={type:"number",min:"1",step:"1",value:cur,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
-  if(isRO())attrs.readonly="";else attrs.oninput=ev=>{const value=Math.max(1,Math.round(+ev.target.value||1));if(value===base)delete state.yieldEdits[editKey];else state.yieldEdits[editKey]=value;ev.target.classList.toggle("edited",editKey in state.yieldEdits);renderToolbarOnly();};
-  const fields=LexeditorUI.stack({fill:false},el("input",attrs));
+  const attrs={type:"number",min:"1",step:"1",value:cur,"aria-label":`Purchase quantity for ${it.key}`,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
+  const fields=LexeditorUI.stack({fill:false},catalogQuantityInput({...attrs,store:state.yieldEdits,key:editKey,base,value:cur,minimum:1}));
   if(bundle){
-    const outAttrs={type:"number",min:"1",step:"1",value:bundle.min,class:bundle.editKey in state.bundleEdits?"edited":"",title:`Usable ${localizedValue(bundle.targetItem?.nameKey)||bundle.target} produced when this ${bundle.container} opens`};
-    if(isRO())outAttrs.readonly="";else outAttrs.onchange=ev=>{const value=String(Math.max(1,Math.round(+ev.target.value||1)));const base=String(bundle.source.min||bundle.source.max||"1");if(value===base)delete state.bundleEdits[bundle.editKey];else state.bundleEdits[bundle.editKey]=value;renderToolbarOnly();};
-    fields.append(LexeditorUI.actionRow(el("input",outAttrs),
+    const outAttrs={type:"number",min:"1",step:"1",value:bundle.min,"aria-label":`Bundle output quantity for ${it.key}`,class:bundle.editKey in state.bundleEdits?"edited":"",title:`Usable ${localizedValue(bundle.targetItem?.nameKey)||bundle.target} produced when this ${bundle.container} opens`};
+    fields.append(LexeditorUI.actionRow(catalogQuantityInput({...outAttrs,store:state.bundleEdits,key:bundle.editKey,base:bundle.source.min||bundle.source.max||"1",value:bundle.min,minimum:1}),
       itemLink(bundle.target,true,localizedValue(bundle.targetItem?.nameKey)||bundle.target)));
   }
   return LexeditorUI.stack({fill:false},refField(fields, [
@@ -525,15 +548,9 @@ function itemRow(it) {
     const displaySlot=permanentFoodBait&&c.slot==="SLOTID_ANY"&&String(cur)==="-1"?"permanent / unlimited":slotLabel(c.slot);
     const row = LexeditorUI.actionRow(
       el("span", { class: "cat slot-label", title: `${c.slot}\n${slotInfo(c.slot,String(cur))}` }, displaySlot),
-      el("input", { type: "number", step: "1", value: cur,
+      catalogQuantityInput({store:state.carryEdits,key:ek,base:c.qty,value:cur,"aria-label":`Carry quantity for ${it.key} ${c.slot}`,
         class: ek in state.carryEdits ? "edited" : "", title:`Capacity contribution from ${slotLabel(c.slot)} (${c.slot})`,
-        onchange: ev => {
-          const v = String(Math.round(parseFloat(ev.target.value || "0")));
-          if (v === c.qty) delete state.carryEdits[ek];
-          else state.carryEdits[ek] = v;
-          ev.target.classList.toggle("edited", ek in state.carryEdits);
-          renderToolbarOnly();
-        } }));
+      }));
     if (!isRO() && (vSlot || kSlot)) {
       const ref = carryRefLine([["V","vtag",vSlot?.qty],["K","ktag",kSlot?.qty]],value=>permanentFoodBait&&String(value)==="-1"?"unlimited":String(value));
       row.append(ref);

@@ -618,6 +618,7 @@ function showCreateEffect(){
 
 async function saveCatalog() {
   if (isRO()) return;
+  validateCatalogQuantityDrafts();
   const prices = Object.entries(state.priceEdits).map(([k, qty]) => {
     const [item, section, costKey, partItem] = k.split("|");
     return { item, section, costKey, partItem, qty };
