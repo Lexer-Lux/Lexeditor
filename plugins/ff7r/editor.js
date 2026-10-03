@@ -349,6 +349,7 @@
   // fifteen-pixel sliver with a name beside it and no control, which reads as
   // a broken property rather than an empty one. It says it is empty instead.
   function propertyControl(row,prop,source=null){
+    prop=recordProperty(row,prop);
     if(!prop.array)return scalarControl(row,prop,null,source);
     const values=row.values[prop.name]||[];
     if(!values.length)return readonlyField("None");
@@ -363,11 +364,13 @@
     return null;
   }
 
+  function recordProperty(row,prop){return {...prop,...(row.propertyOverrides?.[prop.name]||{}),name:prop.name,label:prop.label}}
+
   function recordPanel(row=selectedRecord()){
     if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailNote("This DataObject has no rows.")]})]});
     const spec=curatedSpec(state.tab);
     const prefs=spec?curatedPrefs(spec):dataPreferences();
-    const fields=state.data.properties.map(prop=>detailField({label:displayLabel(prop),control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),displayLabel(prop))}));
+    const fields=state.data.properties.map(base=>{const prop=recordProperty(row,base);return detailField({label:displayLabel(prop),control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),displayLabel(prop))})});
     // The subtitle used to repeat the loaded table's name on every record ("EnemyParameter"
     // for every enemy), which told a reader nothing about the record they had selected. The
     // record's own data id is specific to it, honest about what it is, and matches how the
@@ -414,11 +417,11 @@
     const title=String(item.name||item.asset.split("/").pop()).toLocaleUpperCase();
     if(!data?.records?.length)return detailSection({title,body:[detailField({
       label:"STATE",control:readonlyField("This tweak group exposes no settings.")})]});
-    const fieldsOf=row=>data.properties.map(prop=>detailField({
+    const fieldsOf=row=>data.properties.map(base=>{const prop=recordProperty(row,base);return detailField({
       label:prop.label,
       control:propertyControl(row,prop,data),
       dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
-      min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+      min:prop.min,max:prop.max,help:propertyHelp(prop)})});
     // A group with several records nests one titled block per record. Naming
     // the record inside each property label instead produced a compound name
     // no property lane could hold, and the label fitter shrank it to a smudge.

@@ -99,6 +99,15 @@ def _stored_override(value: Any, storage_type: str, label: str) -> int | float:
     raise ValueError(f"{label} uses unsupported storage type {storage_type}")
 
 
+def _source_property_overrides(storage_type: str) -> dict:
+    bounds = {"INT32": (-2147483648, 2147483647),
+              "FLOAT": (-3.4028234663852886e38, 3.4028234663852886e38)}.get(storage_type)
+    schema = {"type": storage_type, "min": bounds[0] if bounds else None,
+              "max": bounds[1] if bounds else None}
+    return {"VanillaValue": {**schema, "editable": False},
+            "OverrideValue": {**schema, "editable": bounds is not None}}
+
+
 def _numeric_map(value: Any, label: str, *, integers: bool = False) -> dict[str, int | float]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")
@@ -367,11 +376,12 @@ def resource_spec(asset: str, game_root: Path, data_root: Path, project_root: Pa
             ],
             "entries": [{
                 "tag": row["key"],
+                "propertyOverrides": _source_property_overrides(row["type"]),
                 "values": {
                     "SourceTag": row["tag"],
                     "SourceProperty": row["property"],
-                    "VanillaValue": float(row["vanilla"]),
-                    "OverrideValue": float(overrides.get(row["key"], row["vanilla"])),
+                    "VanillaValue": row["vanilla"],
+                    "OverrideValue": overrides.get(row["key"], row["vanilla"]),
                 },
             } for row in rows],
         }
@@ -395,9 +405,10 @@ def resource_spec(asset: str, game_root: Path, data_root: Path, project_root: Pa
                     "CharacterRow": row["tag"],
                     "Reaction": row["property"],
                     "Slot": row["index"],
-                    "VanillaValue": float(row["vanilla"]),
-                    "OverrideValue": float(overrides.get(row["key"], row["vanilla"])),
+                    "VanillaValue": row["vanilla"],
+                    "OverrideValue": overrides.get(row["key"], row["vanilla"]),
                 },
+                "propertyOverrides": _source_property_overrides(row["type"]),
             } for row in rows],
         }
 
