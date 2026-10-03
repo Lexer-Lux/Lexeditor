@@ -191,7 +191,7 @@ class Handler(PluginRequestHandler):
             elif route == "/api/tile-assemblies/save":
                 result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/sprite-headers/save":
-                result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/sprite-assemblies/save":
                 result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/sprite-image/save":

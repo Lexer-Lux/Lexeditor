@@ -88,9 +88,13 @@ def save_sprite_header(
     allowed = {"sizeGroupCode", "primaryEnemy", "animationIndex"}
     if enemy:
         allowed.update({"handX", "handY"})
+    if not isinstance(values, dict):
+        raise ValueError("Sprite descriptor values must be an object")
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported sprite descriptor fields: {', '.join(sorted(unknown))}")
+    if "primaryEnemy" in values and type(values["primaryEnemy"]) is not bool:
+        raise ValueError("Primary enemy must be a boolean")
     size_group = integer_value(values.get("sizeGroupCode", payload[3] & 0x03), "Size group")
     if not 0 <= size_group <= 3:
         raise ValueError("Sprite size-group code must be between 0 and 3")
@@ -101,7 +105,7 @@ def save_sprite_header(
     output = bytearray(payload)
     size_flags = payload[3] & 0xF4
     size_flags |= size_group
-    if bool(values.get("primaryEnemy", bool(payload[3] & 0x08))):
+    if values.get("primaryEnemy", bool(payload[3] & 0x08)):
         size_flags |= 0x08
     output[3] = size_flags
     output[4] = animation
