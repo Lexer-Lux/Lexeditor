@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+from core.numeric_values import integer_value
 
 try:
     from .paths import EDITABLE_MOD_ROOT, EXTRACT_ROOT, GAME_ROOT, LEXEDITOR_ROOT, PLUGIN_ROOT, PROJECT_ROOT
@@ -1764,10 +1765,7 @@ def apply_quick_select_edits(edits):
             if raw_order is None:
                 sort_order = _next_quick_select_sort_order(root, group_key, slot_id)
             else:
-                try:
-                    sort_order = int(raw_order)
-                except (TypeError, ValueError) as error:
-                    raise ValueError("Quick-select sort order must be a whole number") from error
+                sort_order = integer_value(raw_order, "Quick-select sort order")
                 if not 0 <= sort_order <= 1_000_000:
                     raise ValueError("Quick-select sort order is outside the supported range")
             normalized.append({"id": slot_id, "sortOrder": sort_order})
