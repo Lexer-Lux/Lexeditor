@@ -235,3 +235,46 @@ def test_preparation_is_pure_and_success_publishes_both_cached_roots(files):
         assert path.with_suffix(path.suffix + '.bak').read_bytes() == before[str(path.relative_to(root))]
     assert entries[0]['root'].find('.//MinBounty').get('value') == FIRST['value']
     assert entries[1]['root'].find('.//DelayInGameHoursAfterBountyAcquired/Item/Min').get('value') == '0.125'
+
+
+def test_prepared_xml_rejects_external_change_even_with_unchanged_timestamp(files):
+    root, response, _ = files
+    entry = s.load_file(s.BOUNTY_HUNTERS_FILE)
+    _, prepared = bounty.prepare_bounty_hunter_edits(response, s.ds_dir('mine') / s.DISPATCH_FILE, [FIRST])
+    timestamp = response.stat().st_mtime_ns
+    response.write_bytes(response.read_bytes().replace(b'value="10"', b'value="20"'))
+    s.os.utime(response, ns=(timestamp, timestamp))
+    before = snapshot(root)
+    cached = entry['root']
+    with pytest.raises(ValueError, match='changed since preparation'):
+        s._commit_xml_roots([(s.BOUNTY_HUNTERS_FILE, entry, prepared[0][1])])
+    assert snapshot(root) == before
+    assert entry['root'] is cached
+
+
+@pytest.mark.parametrize('target_kind', ['source', 'backup'])
+def test_external_change_during_serialization_is_not_published_over(files, monkeypatch, target_kind):
+    root, response, dispatch = files
+    entry = s.load_file(s.BOUNTY_HUNTERS_FILE)
+    _, prepared = bounty.prepare_bounty_hunter_edits(response, dispatch, [FIRST])
+    target = response if target_kind == 'source' else response.with_suffix(response.suffix + '.bak')
+    stringify = bounty.ET.tostring
+    def changed(*args, **kwargs):
+        result = stringify(*args, **kwargs)
+        target.write_bytes(b'external file')
+        return result
+    if target_kind == 'source':
+        monkeypatch.setattr(bounty.ET, 'tostring', changed)
+    else:
+        commit = s._commit_file_outputs
+        def changed_backup(*args, **kwargs):
+            target.write_bytes(b'external file')
+            return commit(*args, **kwargs)
+        monkeypatch.setattr(s, '_commit_file_outputs', changed_backup)
+    cached = entry['root']
+    with pytest.raises(ValueError, match='changed since preparation'):
+        s._commit_xml_roots([(s.BOUNTY_HUNTERS_FILE, entry, prepared[0][1])])
+    assert target.read_bytes() == b'external file'
+    assert entry['root'] is cached
+    assert not list(root.rglob('*.tmp'))
+    assert not list(root.rglob('.lexeditor-save-recovery-*'))

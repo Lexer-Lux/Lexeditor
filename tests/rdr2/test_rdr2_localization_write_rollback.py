@@ -164,3 +164,42 @@ def test_rollback_staging_failure_has_an_existing_original_recovery_copy(isolate
     (folders[0] / 'original').unlink()
     (folders[0] / 'state.json').unlink()
     folders[0].rmdir()
+
+
+@pytest.mark.parametrize('change', ['replace', 'delete', 'create'])
+def test_output_changed_during_staging_is_not_overwritten(tmp_path, monkeypatch, change):
+    target = tmp_path / 'data'
+    if change != 'create':target.write_bytes(b'original')
+    write = Path.write_text
+    def change_source(path, *args, **kwargs):
+        result = write(path, *args, **kwargs)
+        if path.name == 'state.json':
+            if change == 'delete':target.unlink()
+            else:target.write_bytes(b'external')
+        return result
+    monkeypatch.setattr(Path, 'write_text', change_source)
+    with pytest.raises(ValueError, match='changed during save'):
+        s._commit_file_outputs([(target, b'candidate')], 'Probe')
+    assert target.read_bytes() == b'external' if change != 'delete' else not target.exists()
+    assert not list(tmp_path.glob('*.tmp'))
+    assert not list(tmp_path.glob('.lexeditor-save-recovery-*'))
+
+
+def test_external_edit_after_publication_is_preserved_during_failed_rollback(tmp_path, monkeypatch):
+    first, second = tmp_path / 'first', tmp_path / 'second'
+    first.write_bytes(b'original first');second.write_bytes(b'original second')
+    replace = Path.replace
+    def fail(path, target):
+        if Path(target) == second:
+            first.write_bytes(b'external edit')
+            raise OSError('Injected second publication failure')
+        return replace(path, target)
+    monkeypatch.setattr(Path, 'replace', fail)
+    with pytest.raises(RuntimeError, match='rollback cannot overwrite it'):
+        s._commit_file_outputs([(first, b'candidate first'), (second, b'candidate second')], 'Probe')
+    assert first.read_bytes() == b'external edit'
+    assert second.read_bytes() == b'original second'
+    folders = list(tmp_path.glob('.lexeditor-save-recovery-*'))
+    assert len(folders) == 1 and (folders[0] / 'original').read_bytes() == b'original first'
+    assert not list(tmp_path.glob('*.tmp'))
+    (folders[0] / 'original').unlink();(folders[0] / 'state.json').unlink();folders[0].rmdir()

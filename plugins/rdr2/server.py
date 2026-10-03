@@ -15,6 +15,7 @@ execution remains available for development checks.
 import copy
 import csv
 import gzip
+import hashlib
 import json
 import math
 import mimetypes
@@ -927,7 +928,7 @@ def _commit_localization_save(prepared):
     return prepared[3]
 
 
-def _commit_file_outputs(outputs, label):
+def _commit_file_outputs(outputs, label, *, expected_originals=None):
     """Stage all bytes, then replace them with rollback on an I/O failure."""
     if len({target.resolve() for target, _ in outputs}) != len(outputs):
         raise ValueError(f"{label} outputs must have distinct paths")
@@ -936,10 +937,14 @@ def _commit_file_outputs(outputs, label):
         if pending is not None:
             raise OSError(f"{label} save is blocked by unresolved recovery at {pending}. Restore the recorded original state before saving again")
     original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
+    for target, expected in (expected_originals or {}).items():
+        if original[target] != expected:
+            raise ValueError(f"{label} file changed since preparation: {target}. Reload before saving again")
     timestamps = {target: (target.stat().st_atime_ns, target.stat().st_mtime_ns)
                   for target, data in original.items() if data is not None}
     temporary, committed, created_dirs = [], [], []
     recovery, retained = {}, set()
+    candidates = dict(outputs)
     succeeded = False
     def stage(target, data):
         missing, parent = [], target.parent
@@ -954,6 +959,11 @@ def _commit_file_outputs(outputs, label):
             temporary.append(temp_path)
             stream.write(data)
         return temp_path
+    def current_bytes(target):
+        return target.read_bytes() if target.exists() else None
+    def unchanged(target):
+        if current_bytes(target) != original[target]:
+            raise ValueError(f"{label} file changed during save: {target}. Reload before saving again")
     try:
         staged = [(target, stage(target, data)) for target, data in outputs]
         # Originals must already be on disk before any live file is replaced.
@@ -969,6 +979,7 @@ def _commit_file_outputs(outputs, label):
             if original[target] is not None:
                 (folder / 'original').write_bytes(original[target])
         for target, temp_path in staged:
+            unchanged(target)
             temp_path.replace(target)
             committed.append(target)
         succeeded = True
@@ -976,6 +987,8 @@ def _commit_file_outputs(outputs, label):
         failures = []
         for target in reversed(committed):
             try:
+                if current_bytes(target) != candidates[target]:
+                    raise OSError("File changed externally after publication; rollback cannot overwrite it")
                 if original[target] is None:
                     target.unlink()
                 else:
@@ -1010,23 +1023,30 @@ def _commit_xml_roots(prepared, additional_outputs=()):
     if DATASETS["mine"]["readonly"]:
         raise PermissionError("dataset 'mine' is read-only")
     outputs = []
+    expected = {}
     published = []
     for name, entry, root in prepared:
         path = entry.get("path") or data_file_path(name, "mine")
+        raw = path.read_bytes()
+        if path.stat().st_mtime_ns != entry["mtime"] or (entry.get("source_digest") is not None and hashlib.sha256(raw).hexdigest() != entry["source_digest"]):
+            raise ValueError(f"{name} changed since preparation. Reload before saving again")
         body = ET.tostring(root, encoding="unicode")
         payload = (entry["decl"] + "\n" + body).encode("utf-8")
         if entry["bom"]:
             payload = b"\xef\xbb\xbf" + payload
         backup = path.with_suffix(path.suffix + ".bak")
         if not backup.exists():
-            outputs.append((backup, path.read_bytes()))
+            outputs.append((backup, raw))
+            expected[backup] = None
         outputs.append((path, payload))
-        published.append((entry, root, path))
+        expected[path] = raw
+        published.append((entry, root, path, payload))
     outputs.extend(additional_outputs)
-    _commit_file_outputs(outputs, "XML batch")
-    for entry, root, path in published:
+    _commit_file_outputs(outputs, "XML batch", expected_originals=expected)
+    for entry, root, path, payload in published:
         entry["root"] = root
         entry["mtime"] = path.stat().st_mtime_ns
+        entry["source_digest"] = hashlib.sha256(payload).hexdigest()
 
 
 def save_localization(edits):
@@ -1060,7 +1080,7 @@ def load_file(name, ds="mine"):
     if ds in {"prices1899", "kiddos"} and name == CATALOG_FILE:
         normalize_reference_catalog(root)
     _files[key] = {"root": root, "bom": bom, "decl": decl,
-                   "mtime": disk_mtime, "path": path}
+                   "mtime": disk_mtime, "path": path, "source_digest": hashlib.sha256(raw).hexdigest()}
     return _files[key]
 
 
@@ -1109,6 +1129,7 @@ def save_file(name, ds="mine"):
         data = b"\xef\xbb\xbf" + data
     path.write_bytes(data)
     entry["mtime"] = path.stat().st_mtime_ns
+    entry["source_digest"] = hashlib.sha256(data).hexdigest()
 
 
 def joaat(s):
@@ -5702,6 +5723,7 @@ def apply_weapon_shell_vfx(blanked):
         for name, entry, _, _ in prepared:
             entry["root"] = original_roots[name]
             entry["mtime"] = entry["path"].stat().st_mtime_ns
+            entry["source_digest"] = hashlib.sha256(entry["path"].read_bytes()).hexdigest()
         raise
     return sum(count for _, _, _, count in prepared)
 
