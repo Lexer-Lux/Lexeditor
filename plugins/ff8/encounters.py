@@ -6,6 +6,7 @@ FF8GameData.sceneout, including its MSB-first slot masks.
 
 from __future__ import annotations
 
+from core.numeric_values import integer_value
 
 RECORD_SIZE = 128
 SLOT_COUNT = 8
@@ -94,7 +95,7 @@ def apply_edits(data: bytes, edits: list[dict], enemy_ids: set[int]) -> tuple[by
     seen: set[tuple] = set()
     changed = 0
     for edit in edits:
-        encounter_id = int(edit["id"])
+        encounter_id = integer_value(edit["id"], "Encounter id")
         if not 0 <= encounter_id < len(raw) // RECORD_SIZE:
             raise ValueError(f"Invalid encounter id: {encounter_id}")
         base = encounter_id * RECORD_SIZE
@@ -103,7 +104,8 @@ def apply_edits(data: bytes, edits: list[dict], enemy_ids: set[int]) -> tuple[by
             if key in seen:
                 raise ValueError("Duplicate encounter header edit")
             seen.add(key)
-            values = [int(edit[name]) for name in ("stageId", "flags", "cameraMain", "cameraSecondary")]
+            values = [integer_value(edit[name], f"Encounter {name}")
+                      for name in ("stageId", "flags", "cameraMain", "cameraSecondary")]
             if any(not 0 <= value <= 255 for value in values):
                 raise ValueError("Encounter header values must be 0 to 255")
             if bytes(values[1:]) != data[base + 1:base + 4]:
@@ -112,23 +114,25 @@ def apply_edits(data: bytes, edits: list[dict], enemy_ids: set[int]) -> tuple[by
             changed += 1
             continue
 
-        slot = int(edit["slot"])
+        slot = integer_value(edit["slot"], "Encounter slot")
         key = (encounter_id, slot)
         if key in seen or not 0 <= slot < SLOT_COUNT:
             raise ValueError("Invalid or duplicate encounter slot edit")
         seen.add(key)
-        enemy_id = int(edit["enemyId"])
+        enemy_id = integer_value(edit["enemyId"], "Encounter enemy id")
         if enemy_id not in enemy_ids or not 0 <= enemy_id + ENEMY_ID_BASE <= 255:
             raise ValueError(f"Unknown encounter enemy id: {enemy_id}")
-        level = int(edit["level"])
-        coordinates = [int(edit[axis]) for axis in ("x", "y", "z")]
+        level = integer_value(edit["level"], "Encounter level")
+        coordinates = [integer_value(edit[axis], f"Encounter {axis}") for axis in ("x", "y", "z")]
         if not 0 <= level <= 255 or any(not -32768 <= value <= 32767 for value in coordinates):
             raise ValueError("Encounter level or position is outside its stored range")
         mask_locations = ((4, "visible", True), (5, "loaded", True),
                           (6, "targetable", True), (7, "enabled", False))
         bit = _bit(slot)
         for relative, name, inverted in mask_locations:
-            selected = bool(edit[name])
+            selected = edit[name]
+            if not isinstance(selected, bool):
+                raise ValueError(f"Encounter {name} must be a boolean")
             set_bit = not selected if inverted else selected
             raw[base + relative] = ((raw[base + relative] | bit) if set_bit
                                     else (raw[base + relative] & ~bit))
