@@ -19,9 +19,10 @@ async function renderDataMap() {
 
 async function saveMatrix() {
   if (isRO() || !state.matrixDirty.size) return;
+  validateMatrixDrafts();
   const edits = [...state.matrixDirty].map(key => {
     const a = state.matrix.animals.find(x => x.key === key);
-    return { animalKey: key, rows: a.rows.filter(r => r.item) };
+    return { animalKey: key, rows: a.rows };
   });
   try {
     const r = await api("/api/matrix/save", { method: "POST",

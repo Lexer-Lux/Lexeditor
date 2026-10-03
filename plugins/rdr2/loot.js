@@ -474,6 +474,20 @@ async function saveLoot() {
 }
 
 // ----- Skinning matrix -----
+function matrixQuantityError(raw){
+  return (typeof raw==="string"||typeof raw==="number")&&catalogQuantityIsValid(String(raw))&&BigInt(raw)>=1n?"":"Enter a positive whole quantity.";
+}
+function validateMatrixDrafts(){
+  for(const key of state.matrixDirty){
+    const animal=state.matrix?.animals.find(a=>a.key===key);
+    if(!animal||animal.readonly)throw new Error(`${key} is read-only or unavailable.`);
+    for(const row of animal.rows){
+      if(!["Poor","Good","Perfect"].includes(row.damage)||!["Poor","Good","Perfect","Rare","Legendary"].includes(row.skin))throw new Error(`${key}: Choose a supported quality.`);
+      if(!state.catalog.items.some(item=>item.key===row.item))throw new Error(`${key}: Choose a catalog item for every yield.`);
+      const error=matrixQuantityError(row.qty);if(error)throw new Error(`${key}: ${error}`);
+    }
+  }
+}
 async function renderMatrix() {
   const current=renderScope("renderMatrix");
   const f = state.filters;
@@ -511,6 +525,7 @@ async function renderMatrix() {
   }
   const a = animals.find(x => x.key === f.animal);
   if (!a) return;
+  const editable=!isRO()&&!a.readonly;
   const yieldSortLabel = (key,label) => { const cur=state.sorts.matrix, active=cur?.key===key;
     return el("span",{class:`header-label yield-sort${active?" sorted":""}`,
       onclick:()=>{state.sorts.matrix={key,dir:active?-cur.dir:1};renderMatrix();}},
@@ -534,7 +549,7 @@ async function renderMatrix() {
   groups=sortedRows("matrix",groups,{damage:x=>rank[x.damage]??0,skin:x=>rank[x.skin]??0,item:x=>x.rows.map(r=>localizedValue(state.catalog.items.find(i=>i.key===r.item)?.nameKey)||r.item).sort()[0]||"",qty:x=>x.rows.reduce((n,r)=>n+(+r.qty||0),0)});
   groups.forEach(group => {
     const row=group.rows[0];
-    const groupQualSel=field=>el("span",{},el("select",{onchange:ev=>{group.rows.forEach(r=>r[field]=ev.target.value);state.matrixDirty.add(a.key);renderMatrix();}},
+    const groupQualSel=field=>!editable?LexeditorUI.readonlyField(group[field]):el("span",{},el("select",{onchange:ev=>{if(!editable)return;group.rows.forEach(r=>r[field]=ev.target.value);state.matrixDirty.add(a.key);renderMatrix();}},
       ...["Poor","Good","Perfect",...(field==="skin"?["Rare","Legendary"]:[])].map(v=>{const o=el("option",{value:v},v);if(group[field]===v)o.selected=true;return o;})),stars(group[field]));
     const matrixRef = ds => {
       const animal = state.store[ds]?.matrix?.animals.find(x => x.key === a.key);
@@ -547,25 +562,26 @@ async function renderMatrix() {
       const vr=state.store.vanilla?.matrix?.animals.find(x=>x.key===a.key)?.rows.find(x=>x.damage===yieldRow.damage&&x.skin===yieldRow.skin&&x.item===referenceItem);
       const kr=state.store.kiddos?.matrix?.animals.find(x=>x.key===a.key)?.rows.find(x=>x.damage===yieldRow.damage&&x.skin===yieldRow.skin&&x.item===referenceItem);
       const applyYieldReference = ref => {
-        if (!ref) return;
+        if (!editable||!ref) return;
         yieldRow.item = ref.item;
         yieldRow.qty = ref.qty ?? 1;
         state.matrixDirty.add(a.key);
         renderMatrix();
       };
-      const quantity=el("input",{type:"number",step:1,min:1,value:yieldRow.qty??1,placeholder:"1",onchange:ev=>{yieldRow.qty=Math.max(1,Math.round(+ev.target.value||1));state.matrixDirty.add(a.key);renderToolbarOnly()}});
+      const quantity=!editable&&matrixQuantityError(yieldRow.qty)?LexeditorUI.readonlyField(yieldRow.qty??""):el("input",{type:"number",step:1,min:1,required:true,disabled:!editable,"data-lex-validate-number":"",value:yieldRow.qty??"",oninput:ev=>{if(!editable)return;yieldRow.qty=ev.target.value;state.matrixDirty.add(a.key);ev.target.setCustomValidity(matrixQuantityError(yieldRow.qty));renderToolbarOnly()}});
+      if(quantity.type==="number"){quantity.setAttribute("value","0");quantity.value=yieldRow.qty??"";quantity.setCustomValidity(matrixQuantityError(yieldRow.qty));}
       yields.append(LexeditorUI.stack({fill:false},LexeditorUI.controlGroup([
-        {label:"Item",control:linkedCatalogKeyEditor(yieldRow.item,value=>{yieldRow.item=value;state.matrixDirty.add(a.key);renderMatrix()})},
+        {label:"Item",control:editable?linkedCatalogKeyEditor(yieldRow.item,value=>{if(!editable)return;yieldRow.item=value;state.matrixDirty.add(a.key);renderMatrix()}):LexeditorUI.readonlyField(yieldRow.item)},
         {label:"Quantity",control:quantity},
-        closeButton({title:"Remove yield",onclick:()=>{a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix()}})]),
-        refLine([["V","vtag",vr?`${vr.item} ×${vr.qty??1}`:null],["K","ktag",kr?`${kr.item} ×${kr.qty??1}`:null]],v=>v,
-          value=>applyYieldReference(vr&&value===`${vr.item} ×${vr.qty??1}`?vr:kr))));
+        closeButton({title:"Remove yield",disabled:!editable,onclick:()=>{if(!editable)return;a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix()}})]),
+        lootReferenceControl(editable,refLine([["V","vtag",vr?`${vr.item} ×${vr.qty??1}`:null],["K","ktag",kr?`${kr.item} ×${kr.qty??1}`:null]],v=>v,
+          value=>applyYieldReference(vr&&value===`${vr.item} ×${vr.qty??1}`?vr:kr)))));
     });
-    yields.append(LexeditorUI.actionRow(newButton({title:"Add yield",onclick:()=>{a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
+    yields.append(LexeditorUI.actionRow(newButton({title:"Add yield",disabled:!editable,onclick:()=>{if(!editable)return;a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
     matrixRows.push({group,yields,qual:groupQualSel});
   });
   m.append(columnList({class:"matrix-table",align:"start",headerAlign:"start","aria-label":"Yields by quality",
-    rows:matrixRows,key:({group})=>`${group.damage}|${group.skin}`,editable:true,localSort:false,
+    rows:matrixRows,key:({group})=>`${group.damage}|${group.skin}`,editable,localSort:false,
     template:"minmax(140px,1fr) minmax(140px,1fr) minmax(0,3fr)",
     columns:[{key:"damage",label:()=>el("span",{},"Damage quality",fieldHelp("Kill cleanliness/appropriateness resolved using damagecleanlinessdata.meta; independent of the animal's starting star quality.")),
         render:row=>row.qual("damage")},
@@ -573,7 +589,8 @@ async function renderMatrix() {
         render:row=>row.qual("skin")},
       {key:"yields",label:yieldHead,sortable:false,render:row=>row.yields}]}));
   m.append(el("div", { class: "addrow", style: "margin-top:10px" },
-    newButton({title:"Add matrix row",onclick: () => {
+    newButton({title:"Add matrix row",disabled:!editable,onclick: () => {
+      if(!editable)return;
       a.rows.push({ damage: "Poor", skin: "Poor", item: "", qty: 1 });
       state.matrixDirty.add(a.key); renderMatrix();
     }})));
