@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from core.numeric_values import integer_value
 
 
 RECORD_SIZE = 4
@@ -54,14 +55,14 @@ def apply_edits(data: bytes, edits: list[dict], schema_root: Path) -> tuple[byte
     raw = bytearray(data)
     seen: set[int] = set()
     for edit in edits:
-        item_id = int(edit["id"])
+        item_id = integer_value(edit["id"], "Menu item ID")
         if item_id in seen or not 0 <= item_id < len(raw) // RECORD_SIZE:
             raise ValueError(f"Invalid or duplicate menu item id: {item_id}")
         seen.add(item_id)
-        type_id = int(edit["typeId"])
-        flags = int(edit["flags"])
-        param1 = int(edit["param1"])
-        param2 = int(edit["param2"])
+        type_id = integer_value(edit["typeId"], "Menu item type ID")
+        flags = integer_value(edit["flags"], "Menu item flags")
+        param1 = integer_value(edit["param1"], "Menu item parameter 1")
+        param2 = integer_value(edit["param2"], "Menu item parameter 2")
         if type_id not in valid_types:
             raise ValueError(f"Unknown menu item type: {type_id}")
         if any(not 0 <= value <= 255 for value in (flags, param1, param2)):
