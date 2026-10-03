@@ -66,10 +66,32 @@ def test_item_stat_edit_remove_add_preserves_weight_and_reloads(page, tmp_path, 
     assert page.evaluate("dirtyCount()") == 0
     weight.fill("3.25")
     speed = page.get_by_label("spd_rtng value 1", exact=True)
+    reach = page.get_by_label("weapon_length value 1", exact=True)
+    speed.fill("")
+    reach.fill("")
+    saved = page.evaluate("historyCapture()")
+    assert page.evaluate("dirtyCount()") == 3
+    page.evaluate("state.selectedItem='1';renderItems();state.settingEdits={2:'0'};saveAll()")
+    page.get_by_role("button", name="Confirm and Close", exact=True).click()
+    assert not writes
+    assert source.read_bytes() == before
+    assert page.evaluate("state.settingEdits[2]") == "0"
+    page.evaluate("async value=>{await historyRestore(value);state.selectedItem='0';renderItems()}", saved)
+    assert speed.input_value() == reach.input_value() == ""
+    # Removing one stat remaps the other draft instead of silently discarding it.
+    page.get_by_role("button", name="Remove the spd_rtng stat", exact=True).click()
+    assert reach.input_value() == ""
+    page.evaluate("saveAll()")
+    page.get_by_role("button", name="Confirm and Close", exact=True).click()
+    assert not writes
+    page.get_by_role("button", name="Remove the weapon_length stat", exact=True).click()
+    assert page.evaluate("Object.keys(state.itemEdits[0].argDrafts).length") == 0
+    assert page.evaluate("effectiveItemField(state.items.rows[0],'stats')") == "weight(3.25)"
+    page.evaluate("async value=>{await historyRestore(value);state.selectedItem='0';renderItems()}", saved)
     speed.fill("100")
-    speed.dispatch_event("change")
+    reach.fill("120")
     assert weight.input_value() == "3.25"
-    assert page.evaluate("effectiveItemField(state.items.rows[0],'stats')") == "weight(3.25)|spd_rtng(100)|weapon_length(90)"
+    assert page.evaluate("effectiveItemField(state.items.rows[0],'stats')") == "weight(3.25)|spd_rtng(100)|weapon_length(120)"
     page.get_by_role("button", name="Remove the spd_rtng stat", exact=True).click()
     page.get_by_role("button", name="Remove the weapon_length stat", exact=True).click()
     assert page.evaluate("effectiveItemField(state.items.rows[0],'stats')") == "weight(3.25)"

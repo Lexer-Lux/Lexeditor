@@ -213,7 +213,7 @@
         ...call.args.map((arg, position) => {
           const change = value => {
             if (value === "") return;
-            const next = options.calls.map(entry => ({...entry, args: [...entry.args]}));
+            const next = (options.readCalls?.()||options.calls).map(entry => ({...entry, args: [...entry.args]}));
             next[index].args[position] = String(value);
             options.apply(callExpression(next));
           };
@@ -228,26 +228,38 @@
             for (const name of names) select.append(el("option", {value: name, selected: name === arg}, name));
             return select;
           }
-          return el("input", {
-            type: "number", step: "any", value: arg, disabled: options.readOnly,
+          if(!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(arg.trim())||!Number.isFinite(Number(arg)))return LexeditorUI.readonlyField(arg,{format:false});
+          const value=options.numericValue?.(index,position,arg)??arg;
+          const input=el("input", {
+            type: "number", required:true, step: "any", value, disabled: options.readOnly,
+            "data-lex-validate-number":"true",
             // Keep the panel's own text size: a fitted number box beside it
             // would read as a different property from the one above.
             "data-lex-autofit": "false",
             "aria-label": `${call.name} value ${position + 1}`,
-            onchange: event => change(event.target.value),
+            oninput: event => {
+              if(event.target.disabled)return;
+              const raw=event.target.value;
+              const issue=options.numericChange?options.numericChange(index,position,raw):
+                (raw.trim()===""||!Number.isFinite(Number(raw))?"Enter a finite number.":"");
+              event.target.setCustomValidity(issue);
+              if(!options.numericChange&&!issue)change(raw);
+            },
           });
+          input.setCustomValidity(String(value).trim()===""||!Number.isFinite(Number(value))?"Enter a finite number.":"");
+          return input;
         }),
         el("button", {
           type: "button", disabled: options.readOnly,
           "aria-label": `Remove the ${call.name} stat`,
-          onclick: () => options.apply(callExpression(options.calls.filter((_, other) => other !== index))),
+          onclick: () => options.remove?options.remove(index):options.apply(callExpression((options.readCalls?.()||options.calls).filter((_, other) => other !== index))),
         }, "Remove")),
     }));
     const picker = el("select", {"aria-label": "Stat to add"});
     for (const macro of options.macros) picker.append(el("option", {value: macro}, macro));
     const add = el("button", {
       type: "button", disabled: options.readOnly || !options.macros.length,
-      onclick: () => options.apply(callExpression([...options.calls, {name: picker.value, args: ["1"]}])),
+      onclick: () => options.apply(callExpression([...(options.readCalls?.()||options.calls), {name: picker.value, args: ["1"]}])),
     }, "Add stat");
     rows.push(detailField({
       label: "", showType: false, dataType: "EXPR",
