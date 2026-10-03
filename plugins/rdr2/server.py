@@ -5257,6 +5257,8 @@ def _weapon_rows(item):
     wound arrow. Label each list element with its own Name instead.
     """
     rows = []
+    names = item.findall('Name')
+    owner_supported = not _weapon_path_unknown([item.get('type')]) and len(names) <= 1 and not any(node.attrib or len(node) for node in names)
     def label_of(child, index, siblings):
         if child.tag != "Item":
             return child.tag
@@ -5274,7 +5276,7 @@ def _weapon_rows(item):
                 continue
             child_path = path + [index]
             child_tags = tags + [label_of(child, index, siblings)]
-            child_raw_tags = raw_tags + [child.tag]
+            child_raw_tags = raw_tags + [child.tag] + ([child.get('type')] if child.get('type') else [])
             value = child.get("value")
             kind = "attr"
             if value is None and len(child) == 0 and child.text and child.text.strip():
@@ -5282,7 +5284,8 @@ def _weapon_rows(item):
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
                              "value": value, "kind": kind,
-                             "writable": not _weapon_path_unknown(child_raw_tags)})
+                             "writable": owner_supported and not _weapon_path_unknown(child_raw_tags) and child.tag != 'Name' and not len(child) and
+                             (set(child.attrib) == {'value'} and not (child.text or '').strip() if kind == 'attr' else not child.attrib)})
             elif len(child):
                 walk(child, child_path, child_tags, child_raw_tags)
     walk(item, [], [], [])
@@ -5633,29 +5636,59 @@ def _save_projectile_speed_rows(entries):
 
 def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
     types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
-    if section not in types:
+    if not isinstance(section, str) or section not in types:
         raise ValueError("unknown weapon section")
-    if source_file not in weapon_layer_files("mine"):
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Weapon name must be text")
+    if not isinstance(edits, list):
+        raise ValueError("Weapon edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS['mine'].get('readonly'):
+        raise ValueError("This dataset is read-only")
+    if not isinstance(source_file, str) or source_file not in weapon_layer_files("mine"):
         raise ValueError("weapon source is not an active install.xml layer")
+    with _lock:
+        return _apply_weapon_batch(section, name, edits, source_file)
+
+
+def _apply_weapon_batch(section, name, edits, source_file):
+    types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
     entry = load_file(source_file)
     root = copy.deepcopy(entry["root"])
-    record = next((item for item in root.iter("Item")
-                   if item.get("type") == types[section] and txt(item, "Name") == name), None)
-    if record is None:
-        raise ValueError("unknown weapon/ammo record")
-    changed = 0
+    def find_record(record_type, record_name):
+        records = [item for item in root.iter('Item')
+                   if item.get('type') == record_type and txt(item, 'Name') == record_name]
+        if len(records) != 1 or len(records[0].findall('Name')) != 1:
+            raise ValueError("Weapon record is missing or ambiguous")
+        return records[0]
+    record = find_record(types[section], name)
+    exposed = _weapon_rows(record)
+    if section == 'ammo':
+        exposed += _linked_ammo_rows(root, name)
+    seen = set()
     for edit in edits:
-        if not isinstance(edit, dict) or not isinstance(edit.get("path"), list) or not edit["path"]:
+        if not isinstance(edit, dict) or not {'path', 'kind', 'value'} <= set(edit) or set(edit) - {'path', 'kind', 'value', 'targetType', 'targetName'}:
+            raise ValueError("Weapon edits require path, kind and value with optional target identities")
+        if ('targetType' in edit) != ('targetName' in edit):
+            raise ValueError("Linked weapon identities require both type and name")
+        if not isinstance(edit.get("path"), list) or not edit["path"]:
             raise ValueError("Weapon edit needs a field path")
         if any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in edit["path"]):
             raise ValueError("Weapon field path needs nonnegative integer indices")
-        target_type = edit.get("targetType") or types[section]
-        target_name = edit.get("targetName") or name
-        target = record if target_type == types[section] and target_name == name else next(
-            (item for item in root.iter("Item")
-             if item.get("type") == target_type and txt(item, "Name") == target_name), None)
-        if target is None:
-            raise ValueError("Unknown weapon edit target")
+        target_type = edit.get("targetType", types[section])
+        target_name = edit.get("targetName", name)
+        if not isinstance(target_type, str) or not target_type or not isinstance(target_name, str) or not target_name:
+            raise ValueError("Weapon target identities must be text")
+        identity = (target_type, target_name, tuple(edit['path']))
+        if identity in seen:
+            raise ValueError("Duplicate weapon target")
+        seen.add(identity)
+        matches = [row for row in exposed if row['path'] == edit['path'] and row['kind'] == edit['kind'] and
+                   row.get('targetType', types[section]) == target_type and row.get('targetName', name) == target_name]
+        if not matches or any(not row['writable'] for row in matches):
+            raise ValueError("Weapon target is not an exposed editable scalar")
+        target = record if target_type == types[section] and target_name == name else find_record(target_type, target_name)
         if _weapon_path_unknown([target_type]):
             raise ValueError("Unknown weapon record types are read-only")
         node = target
@@ -5680,28 +5713,30 @@ def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
             if replacement.lower() not in {"true", "false"}:
                 raise ValueError("Weapon boolean field needs true or false")
             replacement = replacement.upper() if str(original).isupper() else replacement.lower()
-        elif re.fullmatch(r"-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", str(original), re.IGNORECASE):
-            if (not re.fullmatch(r"-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", replacement, re.IGNORECASE)
-                    or not math.isfinite(float(replacement))):
+        elif re.fullmatch(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", str(original).strip(), re.IGNORECASE):
+            if (not re.fullmatch(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", replacement.strip(), re.IGNORECASE)
+                    or not math.isfinite(float(original)) or not math.isfinite(float(replacement))):
                 raise ValueError("Weapon numeric field needs a finite number")
+            replacement = replacement.strip()
+        elif str(original).strip().lower() in {'nan', 'inf', '+inf', '-inf', 'infinity', '+infinity', '-infinity'}:
+            raise ValueError("Unsupported nonfinite weapon source")
         elif not isinstance(value, str):
             raise ValueError("Weapon text field needs a string")
         if kind == "attr":
             node.set("value", replacement)
         else:
             node.text = replacement
-        changed += 1
-    if changed:
-        original_root = entry["root"]
-        entry["root"] = root
-        try:
-            save_file(source_file)
-        except Exception:
-            entry["root"] = original_root
-            raise
-        if source_file == WEAPONS_FILE:
-            ensure_file_replacement(WEAPONS_GAME_PATH, WEAPONS_FILE)
-    return changed
+    outputs, expected = [], {}
+    if source_file == WEAPONS_FILE:
+        _assert_weapon_projectile_flags(root, load_file(WEAPONS_FILE, 'vanilla')['root'])
+        install = ds_dir('mine') / 'install.xml'
+        original = install.read_bytes() if install.exists() else None
+        payload = _prepare_file_replacement(WEAPONS_GAME_PATH, WEAPONS_FILE)
+        if payload is not None:
+            outputs.append((install, payload))
+            expected[install] = original
+    _commit_xml_roots([(source_file, entry, root)], outputs, expected)
+    return len(edits)
 
 
 def apply_weapon_shell_vfx(blanked):
@@ -6586,9 +6621,12 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/save":
-                    self._json({"saved": apply_weapon_edits(
-                        body.get("section", ""), body.get("name", ""),
-                        body.get("edits", []), body.get("sourceFile", WEAPONS_FILE))})
+                    try:
+                        self._json({"saved": apply_weapon_edits(
+                            body.get("section", ""), body.get("name", ""),
+                            body.get("edits", []), body.get("sourceFile", WEAPONS_FILE))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/shell-vfx/save":
                     self._json({"saved": apply_weapon_shell_vfx(body.get("blanked", False))})
                 elif path == "/api/weapons/projectile-speeds/save":
