@@ -1,24 +1,22 @@
 """Static contract for Lexeditor issue 3 list-detail pagination."""
 
-import re
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-RDR = (
-    (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
-    + "\n"
-    + (ROOT / "plugins" / "rdr" / "editor.js").read_text(encoding="utf-8")
-)
-WARBAND = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
+RDR2 = plugin_ui("rdr2")
+RDR = plugin_ui("rdr")
+WARBAND = plugin_ui("warband")
 ITEMS = RDR2[RDR2.index("function renderItems()") : RDR2.index("async function createNewItem")]
 CRAFTING = RDR2[RDR2.index("function renderCrafting()") : RDR2.index("function priceQtyInput")]
 LOOT = RDR2[RDR2.index("async function renderLoot()") : RDR2.index("function markLootDirty")]
 WEAPONS = RDR2[RDR2.index("async function renderWeapons()") : RDR2.index("function renderProjectileSpeeds")]
 PAGED_PRESET = FRAMEWORK[FRAMEWORK.index("const pagedListDetail") : FRAMEWORK.index("const integrationStatus")]
+WHEEL_PAGES = FRAMEWORK[FRAMEWORK.index("const wheelPages ="):FRAMEWORK.index("const pagedSectionMemory =")]
+WARBAND_ITEMS = WARBAND.split("function renderItems(){",1)[1].split("function warbandEyeIcon(){",1)[0]
 
 
 def require(condition: bool, message: str) -> None:
@@ -39,8 +37,8 @@ require("rows.slice(0, 8)" not in FRAMEWORK,
         "fitted page size still depends on the rows on the current page")
 require("lex-fitted-page" in FRAMEWORK_CSS, "fitted list overflow contract is missing")
 require("overflow-y: hidden" in FRAMEWORK_CSS, "fitted list can still show a vertical scrollbar")
-require("--lex-page-position-size: 20px;" in FRAMEWORK_CSS,
-        "the shared bottom-pager page-number size token is still too small")
+require("--lex-page-position-size: min(20px, calc(var(--lex-pager-bar-height, 6vh) * .5));" in FRAMEWORK_CSS,
+        "the shared page-number size must retain its 20px ceiling and fit the pager height")
 page_position_css = FRAMEWORK_CSS[FRAMEWORK_CSS.index(".lex-page-position {"):FRAMEWORK_CSS.index(".lex-page-number {")]
 require("font-size: var(--lex-page-position-size);" in page_position_css and "line-height: 1;" in page_position_css,
         "the enlarged page number must keep a compact stable line box")
@@ -65,15 +63,16 @@ require("fitListPage({" in PAGED_PRESET,
         "paged list-detail preset does not own fitted capacity")
 require('change("page"' in PAGED_PRESET and 'change("resize"' in PAGED_PRESET,
         "paged list-detail preset does not own navigation and resize state")
-require('masterNode.addEventListener("wheel"' in PAGED_PRESET and "{passive:false}" in PAGED_PRESET,
+require('wheelPages(masterNode, direction => changePage(page + direction))' in PAGED_PRESET
+        and 'node.addEventListener("wheel"' in WHEEL_PAGES and "{passive:false}" in WHEEL_PAGES,
         "paged list-detail does not own cancellable wheel paging")
-require("wheelLocked" in PAGED_PRESET and "wheelQuietTimer" in PAGED_PRESET,
+require("wheelLocked" in WHEEL_PAGES and "wheelQuietTimer" in WHEEL_PAGES,
         "one high-resolution wheel gesture can change several pages")
-require("Math.abs(wheelDelta) < 24" in PAGED_PRESET and "setTimeout" in PAGED_PRESET,
+require("Math.abs(wheelDelta) < 24" in WHEEL_PAGES and "setTimeout" in WHEEL_PAGES,
         "wheel paging does not accumulate small deltas and wait for a quiet boundary")
-require('event.target.closest?.("input,select,textarea,[contenteditable=true]")' in PAGED_PRESET,
+require('event.target.closest?.("input,select,textarea,[contenteditable=true]")' in WHEEL_PAGES,
         "wheel paging steals gestures from editable controls")
-require("changePage(page + (wheelDelta > 0 ? 1 : -1))" in PAGED_PRESET,
+require("step(wheelDelta > 0 ? 1 : -1)" in WHEEL_PAGES,
         "wheel direction is not routed through the shared clamped page change")
 require("change: changePage" in PAGED_PRESET,
         "pager buttons and wheel gestures do not use the same page-change path")
@@ -90,12 +89,15 @@ require("LexeditorUI.pagedListDetail" in CRAFTING, "RDR2 Crafting bypasses the s
 require("LexeditorUI.masterDetail" not in CRAFTING and "previousScroll" not in CRAFTING,
         "RDR2 Crafting still uses its old scrolling list-detail path")
 require("craftPageSize" in RDR2, "RDR2 Crafting does not retain its measured page size")
-require("--lex-fitted-row-height:30px" in RDR2,
-        "RDR2 list masters do not give every fitted row one stable rendered height")
-require("height:var(--lex-fitted-row-height)" in RDR2,
-        "RDR2 list masters do not apply their stable fitted-row height")
-require(".craft-output-list.lex-fitted-page" in RDR2,
-        "RDR2 Crafting does not have a stable fitted-row contract")
+require("Math.max(32, Number(options.fit?.minRowHeight) || 0)" in PAGED_PRESET
+        and "const pageSize = Math.min(requestedPageSize, fitCapacity?.capacity || requestedPageSize)" in PAGED_PRESET,
+        "shared list masters must bound capacity using a readable minimum row height")
+require(".lex-list.lex-fitted-page[data-lex-fixed-rows] > .lex-list-row" in FRAMEWORK_CSS
+        and "height:var(--lex-fitted-row-height)" in FRAMEWORK_CSS,
+        "all shared fitted list masters must apply their measured row height")
+require("master:({rows,selected,select})=>craftingOutputList(" in CRAFTING
+        and "return columnList({rows:groups,key:group=>group.key,selected,select," in RDR2,
+        "RDR2 Crafting must use the shared column-list sizing contract")
 require("LexeditorUI.pagedListDetail({" in WEAPONS and "weaponPageSize" in WEAPONS,
         "RDR2 Weapons still uses the scrolling master-detail path")
 require(RDR.count("pagedListDetail({") >= 3,
@@ -107,8 +109,9 @@ require("masterDetail(master,itemDetail" not in RDR
 # The option order inside the call is not the contract; passing the filtered
 # rows to the shared preset is. Matching "pagedListDetail({rows:" pinned the
 # first key, so adding any option ahead of it broke a check about paging.
-require(re.search(r"pagedListDetail\(\{[^}]*rows:filtered", WARBAND)
-        and "pageSizes:{items:20,troops:20,upgrades:20}" in WARBAND,
+require("pagedListDetail({" in WARBAND_ITEMS and "rows:filtered" in WARBAND_ITEMS
+        and "pageSize:state.pageSizes.items" in WARBAND_ITEMS
+        and "pageSizes:{items:20,troops:20,upgrades:20," in WARBAND,
         "Warband Items must inherit shared fitted paging")
 require('splitKey:`warband-${view}`' in WARBAND and "pageSize:200" not in WARBAND,
         "Warband Troops and Upgrades must not retain the old 200-row scrolling table")
