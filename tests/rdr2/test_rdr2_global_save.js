@@ -19,6 +19,64 @@ const crime = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/crime.js'
 const dispatchValidation = crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()'));
 const challenges = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/challenges.js'), 'utf8');
 const challengeValidation = challenges.slice(challenges.indexOf('function validateChallengeDrafts('), challenges.indexOf('function challengeUiInput('));
+const challengeSave = challenges.slice(challenges.indexOf('async function saveChallenges()'));
+
+async function challengeSaveGuards() {
+  const data={goals:[{name:'GOAL',requirements:[{index:0,value:'10',sources:[
+    {index:0,base:'BASE',permutation:'PERM'},{index:1,base:'SECOND',permutation:''}]}],
+    conditions:[{index:0,type:'CAIConditionGoalContext',fields:{ContextHash:'TRAIN'}}]}],
+    allowedSourcePairs:[{base:'BASE',permutation:'PERM'},{base:'SECOND',permutation:''}],
+    allowedConditionValues:[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']} ]};
+  const source={index:0,base:'SECOND',permutation:''};
+  const condition={goal:'GOAL',index:0,type:'CAIConditionGoalContext',field:'ContextHash',value:'WATER'};
+  const cases=[
+    ['unknown source pair',s=>s.challengeSourceEdits['GOAL|0|0']={...source,base:'UNKNOWN'}],
+    ['source index mismatch',s=>s.challengeSourceEdits['GOAL|0|0']={...source,index:1}],
+    ['source extra fields',s=>s.challengeSourceEdits['GOAL|0|0']={...source,extra:true}],
+    ['non-text source',s=>s.challengeSourceEdits['GOAL|0|0']={...source,permutation:null}],
+    ['unknown source index',s=>s.challengeSourceEdits['GOAL|0|2']={...source,index:2}],
+    ['noncanonical source key',s=>s.challengeSourceEdits['GOAL|0|00']=source],
+    ['readonly original source',s=>{s.store.mine.challenges.goals[0].requirements[0].sources[0].readonly=true;s.challengeSourceEdits['GOAL|0|0']=source;}],
+    ['unknown original source',s=>{s.store.mine.challenges.goals[0].requirements[0].sources[0].base='UNKNOWN';s.challengeSourceEdits['GOAL|0|0']=source;}],
+    ['readonly requirement',s=>{s.store.mine.challenges.goals[0].requirements[0].readonly=true;s.challengeSourceEdits['GOAL|0|0']=source;}],
+    ['ambiguous goal',s=>{s.store.mine.challenges.goals.push(structuredClone(s.store.mine.challenges.goals[0]));s.challengeSourceEdits['GOAL|0|0']=source;}],
+    ['remove every source',s=>{s.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true},'GOAL|0|1':{index:1,remove:true}};}],
+    ['condition key mismatch',s=>s.challengeConditionEdits['GOAL|0|WrongField']=condition],
+    ['condition fractional index',s=>s.challengeConditionEdits['GOAL|0.5|ContextHash']={...condition,index:0.5}],
+    ['condition unknown type',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,type:'Unknown'}],
+    ['condition unknown value',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,value:'UNKNOWN'}],
+    ['condition non-text value',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,value:1}],
+    ['condition extra fields',s=>s.challengeConditionEdits['GOAL|0|ContextHash']={...condition,extra:true}],
+    ['condition unknown original',s=>{s.store.mine.challenges.goals[0].conditions[0].fields.ContextHash='UNKNOWN';s.challengeConditionEdits['GOAL|0|ContextHash']=condition;}],
+    ['condition ambiguous index',s=>{s.store.mine.challenges.goals[0].conditions.push(structuredClone(s.store.mine.challenges.goals[0].conditions[0]));s.challengeConditionEdits['GOAL|0|ContextHash']=condition;}],
+  ];
+  for(const [label,mutate] of cases){
+    const calls=[],errors=[];
+    const context=vm.createContext({structuredClone,isRO:()=>false,dirtyCount:()=>1,
+      api:async()=>calls.push('api'),saveLocalization:async()=>calls.push('localization'),
+      saveLoot:async()=>calls.push('loot'),saveLootSounds:async()=>calls.push('sounds'),
+      showSaveFailure:error=>{errors.push(error.message);return error;},
+      render(){},refreshGlobalSave(){},toast(){},rdr2Shell:{history:{clear(){}}}});
+    vm.runInContext(stateSource+'\nfunction refStore(ds){return state.store[ds]||{}}\n'+integerValidation+'\n'+dollarValidation+'\n'+draftValidation+'\n'+lootValidation+'\n'+matrixValidation+'\n'+dispatchValidation+'\n'+challengeValidation+'\n'+globalSave+'\n'+catalogSave+'\n'+challengeSave,context);
+    const st=vm.runInContext('state',context);
+    st.ds='mine';st.catalog={items:[],effects:[]};st.store.mine={challenges:structuredClone(data)};st.store.vanilla={challenges:structuredClone(data)};
+    st.alcoholEdits={CONSUMABLE_RUM:0.23};st.localizationEdits={LABEL:'pending text'};
+    mutate(st);
+    const before=JSON.stringify([st.challengeSourceEdits,st.challengeConditionEdits,st.alcoholEdits,st.localizationEdits]);
+    await assert.rejects(context.saveChallenges(),undefined,label+' must reject direct Save');
+    await context.saveAllChanges();
+    assert.equal(calls.length,0,label+' must block localization and unrelated global writers');
+    assert.equal(errors.length,1,label+' must report the global failure');
+    assert.equal(JSON.stringify([st.challengeSourceEdits,st.challengeConditionEdits,st.alcoholEdits,st.localizationEdits]),before,label+' must retain every draft');
+    // Prove valid replacements and single-source removal still pass preflight.
+    st.store.mine={challenges:structuredClone(data)};
+    st.challengeSourceEdits={'GOAL|0|0':source};st.challengeConditionEdits={'GOAL|0|ContextHash':condition};
+    context.validateChallengeDrafts();
+    st.challengeSourceEdits={'GOAL|0|0':{index:0,remove:true}};
+    context.validateChallengeDrafts();
+  }
+  console.log('PASS: 19 invalid challenge source/condition drafts block direct and global Save without losing edits');
+}
 async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, invalidDispatch=false, invalidCrime=false, invalidChallenge=false) {
   const calls = [], messages = [], errors = [];
   let saved = { available: true, vanilla: {CONSUMABLE_RUM: 0.17, CONSUMABLE_MOONSHINE: 0.3}, overrides: {CONSUMABLE_MOONSHINE: 1} };
@@ -83,4 +141,5 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
   await run(false,false,false,false,true); console.log('PASS: invalid dispatch drafts block unrelated pending writers');
   await run(false,false,false,false,false,true); console.log('PASS: invalid crime drafts block unrelated pending writers');
   await run(false,false,false,false,false,false,true); console.log('PASS: invalid challenge drafts block unrelated pending writers');
+  await challengeSaveGuards();
 })().catch(error => {console.error(error);process.exitCode = 1;});

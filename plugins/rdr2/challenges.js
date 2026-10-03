@@ -1,11 +1,36 @@
 // ----- Challenges (goals_sp.meta) -----
 function validateChallengeDrafts(){
-  for(const [key,value] of Object.entries(state.challengeEdits)){
+  const data=refStore(state.ds).challenges,vanilla=refStore('vanilla').challenges||data;
+  const goalFor=name=>{const matches=(data?.goals||[]).filter(goal=>goal.name===name);return matches.length===1?matches[0]:null;};
+  const requirementFor=key=>{
     const cut=key.lastIndexOf('|'),name=key.slice(0,cut),rawIndex=key.slice(cut+1),index=Number(rawIndex);
-    const goals=refStore(state.ds).challenges?.goals.filter(goal=>goal.name===name)||[];
-    const requirements=goals.length===1?goals[0].requirements.filter(req=>req.index===index):[];
+    const requirements=(goalFor(name)?.requirements||[]).filter(req=>req.index===index);
     if(cut<1||!/^(?:0|[1-9]\d*)$/.test(rawIndex)||!Number.isSafeInteger(index)||requirements.length!==1||requirements[0].readonly||dispatchNumericError(requirements[0].value))throw new Error(`${key} is read-only or unavailable.`);
+    return requirements[0];
+  };
+  const exactShape=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+  const sourcePairs=vanilla?.allowedSourcePairs||[];
+  const knownSource=source=>sourcePairs.some(pair=>pair.base===(source.base||'')&&pair.permutation===(source.permutation||''));
+  const removedByRequirement=new Map();
+  for(const [key,value] of Object.entries(state.challengeEdits)){
+    requirementFor(key);
     const error=dispatchNumericError(value);if(error)throw new Error(`${key}: ${error}`);
+  }
+  for(const [key,edit] of Object.entries(state.challengeSourceEdits)){
+    const cut=key.lastIndexOf('|'),target=key.slice(0,cut),rawIndex=key.slice(cut+1),index=Number(rawIndex),req=requirementFor(target);
+    const source=req.sources?.[index],remove=edit?.remove===true;
+    if(cut<1||!/^(?:0|[1-9]\d*)$/.test(rawIndex)||!Number.isSafeInteger(index)||!source||source.readonly||!knownSource(source)||
+       !exactShape(edit,remove?['index','remove']:['index','base','permutation'])||edit.index!==index||
+       (!remove&&(typeof edit.base!=='string'||typeof edit.permutation!=='string'||!knownSource(edit))))throw new Error(`${key}: invalid or read-only challenge score source.`);
+    if(remove)removedByRequirement.set(target,(removedByRequirement.get(target)||0)+1);
+  }
+  for(const [target,count] of removedByRequirement)if(count>=requirementFor(target).sources.length)throw new Error(`${target}: cannot remove every challenge score source.`);
+  for(const [key,edit] of Object.entries(state.challengeConditionEdits)){
+    if(!exactShape(edit,['goal','index','type','field','value'])||typeof edit.goal!=='string'||!Number.isSafeInteger(edit.index)||edit.index<0||
+       typeof edit.type!=='string'||typeof edit.field!=='string'||typeof edit.value!=='string'||key!==`${edit.goal}|${edit.index}|${edit.field}`)throw new Error(`${key}: invalid challenge condition draft.`);
+    const conditions=(goalFor(edit.goal)?.conditions||[]).filter(condition=>condition.index===edit.index),condition=conditions.length===1?conditions[0]:null;
+    const known=vanilla?.allowedConditionValues?.find(row=>row.type===edit.type&&row.field===edit.field)?.values||[];
+    if(!condition||condition.type!==edit.type||!Object.hasOwn(condition.fields,edit.field)||!known.includes(condition.fields[edit.field])||!known.includes(edit.value))throw new Error(`${key}: invalid or read-only challenge condition.`);
   }
 }
 function challengeUiInput(key,base,meta){const cur=state.challengeUiEdits[key]?.value??base;return el("input",{class:"key",value:cur,title:"Localization key, not literal English text. The displayed wording lives in localization resources.",onchange:ev=>{if(ev.target.value===base)delete state.challengeUiEdits[key];else state.challengeUiEdits[key]={...meta,value:ev.target.value};renderToolbarOnly();}});}
@@ -93,6 +118,7 @@ async function renderChallenges() {
         for(const [field,base] of Object.entries(condition.fields)){const ck=`${goal.name}|${condition.index}|${field}`,cur=state.challengeConditionEdits[ck]?.value??base,known=conditionValues.find(x=>x.type===condition.type&&x.field===field)?.values||[],values=[...new Set([cur,...known])];
           const sel=el("select",{onchange:ev=>{if(ev.target.value===base)delete state.challengeConditionEdits[ck];else state.challengeConditionEdits[ck]={goal:goal.name,index:condition.index,type:condition.type,field,value:ev.target.value};renderToolbarOnly();}},...values.map(value=>{const o=el("option",{value},value);if(value===cur)o.selected=true;return o;}));
           sel.disabled=isRO()||!known.includes(base);
+          sel.setAttribute('aria-label',`${goal.name} condition ${condition.index} ${field}`);
           fields.append(LexeditorUI.detailField({label:field,control:LexeditorUI.stack({fill:false},sel,refLine([["V","vtag",vc?.fields?.[field]]],String))}));
         }
         conditionsBox.append(LexeditorUI.detailSection({title:challengeConditionLabel(condition),body:fields}));

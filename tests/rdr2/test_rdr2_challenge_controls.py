@@ -48,6 +48,35 @@ def test_challenge_target_drafts_source_slots_and_readonly(tmp_path):
             assert len(requests) == 1
             assert requests[0]['body']['edits'] == [{'name': 'GOAL', 'index': 0, 'value': '9007199254740993.125',
                                                    'sources': [{'index': 1, 'base': 'SECOND', 'permutation': ''}]}]
+            page.evaluate('''async()=>{
+              const data=state.store.mine.challenges;
+              data.goals[0].conditions[0].fields.ContextHash='TRAIN';
+              data.allowedConditionValues=[{type:'CAIConditionGoalContext',field:'ContextHash',values:['TRAIN','WATER']}];
+              state.store.vanilla.challenges=structuredClone(data);
+              state.store.vanilla.challenges.goals[0].requirements[0].value='5';
+              window.__responses['/api/challenges']=data;
+              await renderChallenges();
+            }''')
+            condition = page.get_by_role('combobox', name='GOAL condition 0 ContextHash', exact=True)
+            condition.select_option('WATER')
+            assert page.evaluate("state.challengeConditionEdits['GOAL|0|ContextHash'].value") == 'WATER'
+            page.evaluate("state.challengeSourceEdits={'GOAL|0|1':{index:1,base:'UNKNOWN',permutation:''}}")
+            result = page.evaluate('''async()=>{window.__requests=[];try{await saveChallenges();return 'saved'}catch(error){return error.message}}''')
+            assert 'challenge score source' in result
+            assert page.evaluate('window.__requests.length') == 0
+            assert page.evaluate("state.challengeConditionEdits['GOAL|0|ContextHash'].value") == 'WATER'
+            page.evaluate("state.challengeSourceEdits={};state.challengeConditionEdits['GOAL|0|ContextHash'].value='UNKNOWN'")
+            result = page.evaluate('''async()=>{window.__requests=[];try{await saveChallenges();return 'saved'}catch(error){return error.message}}''')
+            assert 'challenge condition' in result
+            assert page.evaluate('window.__requests.length') == 0
+            condition.select_option('TRAIN')
+            condition.select_option('WATER')
+            page.evaluate('''async()=>{window.__requests=[];await saveChallenges()}''')
+            requests = page.evaluate("window.__requests.filter(row=>row.path==='/api/challenges/save')")
+            assert len(requests) == 1
+            assert requests[0]['body']['conditions'] == [{'goal': 'GOAL', 'index': 0,
+                'type': 'CAIConditionGoalContext', 'field': 'ContextHash', 'value': 'WATER'}]
+            assert page.evaluate('Object.keys(state.challengeConditionEdits).length') == 0
             page.evaluate("async()=>{state.store.mine.challenges.goals[0].requirements[0].readonly=true;await renderChallenges()}")
             expect(control).to_be_disabled()
             before = page.evaluate('JSON.stringify(state.challengeEdits)')
