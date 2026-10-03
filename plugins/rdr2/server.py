@@ -2608,21 +2608,42 @@ def write_shop_buyer_data(buyers, vanilla_buyers=None, overrides=None):
 
 
 def apply_shop_buyer_edits(edits):
-    current = get_shop_buyers()
+    if not isinstance(edits, list):
+        raise ValueError("Merchant edits must be a list")
+    if not edits:
+        return 0
+    if DATASETS["mine"]["readonly"]:
+        raise PermissionError("dataset 'mine' is read-only")
+    prepared, seen = [], set()
+    catalog_ids = set(_catalog_ids())
+    for edit in edits:
+        if not isinstance(edit, dict) or {"shop", "item"} - set(edit) or set(edit) - {"shop", "item", "mode"}:
+            raise ValueError("Merchant edits require shop, item and optional mode only")
+        if any(not isinstance(edit.get(field, "default"), str) for field in ("shop", "item", "mode")):
+            raise ValueError("Merchant shop, item and mode must be text")
+        shop = edit["shop"]
+        item = edit["item"].strip().upper()
+        mode = edit.get("mode", "default").strip().lower()
+        if shop not in BUYER_SHOPS:
+            raise ValueError("Merchant shop must be selected from the supported shops")
+        if item not in catalog_ids:
+            raise ValueError(f"Unknown merchant catalog item: {item or '(blank)'}")
+        if mode not in ("default", "accept", "reject"):
+            raise ValueError(f"Invalid merchant override mode: {mode}")
+        identity = shop, item
+        if identity in seen:
+            raise ValueError(f"Duplicate merchant target: {shop}/{item}")
+        seen.add(identity)
+        prepared.append({"shop": shop, "item": item, "mode": mode})
+    current = copy.deepcopy(get_shop_buyers())
     if not current["available"]:
         raise ValueError(current["reason"])
     buyers = current["buyers"]
     vanilla = current["vanillaBuyers"]
     overrides = current["overrides"]
     changed = 0
-    for edit in edits:
-        shop = edit.get("shop")
-        item = str(edit.get("item", "")).strip().upper()
-        mode = str(edit.get("mode", "default")).strip().lower()
-        if shop not in buyers or not item:
-            continue
-        if mode not in ("default", "accept", "reject"):
-            raise ValueError(f"Invalid merchant override mode: {mode}")
+    for edit in prepared:
+        shop, item, mode = edit["shop"], edit["item"], edit["mode"]
         present = item in buyers[shop]
         desired = item in vanilla[shop] if mode == "default" else mode == "accept"
         prior_mode = overrides[shop].get(item, "default")
@@ -5817,7 +5838,10 @@ class Handler(PluginRequestHandler):
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/shop-buyers/save":
-                    self._json({"saved": apply_shop_buyer_edits(body.get("edits", []))})
+                    try:
+                        self._json({"saved": apply_shop_buyer_edits(body.get("edits", []))})
+                    except ValueError as error:
+                        self._json({"error": str(error)}, 400)
                 elif path == "/api/labels/save":
                     self._json({"saved": save_label(body.get("scope", ""), body.get("key", ""), body.get("value", ""))})
                 elif path == "/api/localization/save":
