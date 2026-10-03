@@ -8,11 +8,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from core.settings_manager import SettingsStore  # noqa: E402
+from plugin_ui import plugin_ui
 
 
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-FF8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+FF8 = plugin_ui("ff8")
 
 
 def main() -> int:
@@ -22,7 +23,12 @@ def main() -> int:
     assert ".lex-search-candidate > *" in CSS and "z-index:2" in CSS
     assert "lex-searcher-active" in CSS and "lex-searcher-cancel" in CSS
     assert 'type:"items",prompt,target:()=>navigate("items")' in FF8
-    assert "decorateSearchCandidate(node,{type:view,value:row.id,label:row.name})" in FF8
+    list_columns = FF8.split("function listColumns(", 1)[1].split("\n", 1)[0]
+    assert "decorateRow:(node,row)=>" in list_columns
+    assert "decorateSearchCandidate(node," in list_columns
+    assert "{type:view,value:row.id,label:row.name}" in list_columns
+    assert 'view==="fields"&&row.mapId==null?node:' in list_columns
+    assert 'row.abilityType?{type:"ability",value:row.abilityId,label:row.name}' in list_columns
     with tempfile.TemporaryDirectory(prefix="lexeditor-searcher-settings-", ignore_cleanup_errors=True) as name:
         path = Path(name) / "settings.json"
         store = SettingsStore(path)
