@@ -953,7 +953,9 @@ class Handler(PluginRequestHandler):
                 self.json_response(note_created("items", create_item(body.get("recordIndex"), body.get("originalId"),
                                                body.get("id"), body.get("name"), body.get("sha256", ""))))
             elif path == "/api/module-records/save":
-                self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
+                if not isinstance(body,dict) or set(body)!={"dataset","sha256","edits"}:
+                    raise ValueError("Expected dataset, sha256 and edits only")
+                self.json_response(save_dataset(MODULE_SYSTEM, body["dataset"], body["sha256"], body["edits"]))
             elif path == "/api/sounds/create":
                 self.json_response(note_created("sounds", create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
             elif path == "/api/module-records/create":

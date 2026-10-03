@@ -753,7 +753,8 @@ def dataset_data(root, dataset: str):
 
 
 def _expression(value):
-    text = str(value).strip()
+    if not isinstance(value,str):raise ValueError("Source expressions must be text")
+    text = value.strip()
     if not text:
         raise ValueError("Expression cannot be empty")
     modern = re.sub(r"(?<=[0-9a-fA-F])L\b", "", text)
@@ -764,7 +765,8 @@ def _expression(value):
 def _encode(value, spec: dict):
     kind = spec["kind"]
     if kind in {"string", "text"}:
-        return json.dumps(str(value), ensure_ascii=False)
+        if not isinstance(value,str):raise ValueError(f"{spec['label']} must be text")
+        return json.dumps(value, ensure_ascii=False)
     if kind == "identity":
         raise ValueError("Record IDs are fixed; edit references in source if an ID must change")
     if kind == "integer":
@@ -873,8 +875,17 @@ def create_dataset_record(root, dataset, expected_sha256, record_index, original
 
 
 def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
-    if dataset not in SCHEMAS:
+    if not isinstance(dataset,str) or dataset not in SCHEMAS:
         raise ValueError("Unknown Warband Module System dataset")
+    if not isinstance(expected_sha256,str):raise ValueError("Record source checksum must be text")
+    if not isinstance(edits,list):raise ValueError("Record edits must be a list")
+    for edit in edits:
+        if not isinstance(edit,dict) or set(edit)!={"recordIndex","originalId","fields"}:
+            raise ValueError("Record edits require recordIndex, originalId and fields only")
+        if not isinstance(edit['originalId'],str) or not edit['originalId']:
+            raise ValueError("Original record ID must be nonempty text")
+        if not isinstance(edit['fields'],dict):raise ValueError("Record fields must be an object")
+        if any(not isinstance(key,str) for key in edit['fields']):raise ValueError("Record field names must be text")
     schema = SCHEMAS[dataset]
     path = Path(root) / schema["filename"]
     with _LOCK:
@@ -901,7 +912,7 @@ def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
             if row["id"] != edit.get("originalId"):
                 raise ValueError("Record identity changed; reload before saving")
             row_changed = False
-            for key, value in (edit.get("fields") or {}).items():
+            for key, value in edit["fields"].items():
                 spec = specs.get(key)
                 if spec is None or key == "id":
                     raise ValueError("Unknown or fixed Module System field")
