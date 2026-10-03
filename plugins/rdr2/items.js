@@ -844,19 +844,21 @@ async function showLexeditorSettings(){
   try{
     let settings=await api("/api/model-preview/settings");
     let savedCacheSize=Number(settings.cacheSizeMb);
-    const size=el("input",{type:"number",min:String(settings.minCacheSizeMb),max:String(settings.maxCacheSizeMb),step:"1",value:String(settings.cacheSizeMb),"aria-label":"Model preview cache size in MB"});
+    const size=el("input",{type:"number",min:String(settings.minCacheSizeMb),max:String(settings.maxCacheSizeMb),step:"1",required:true,value:String(settings.cacheSizeMb),"data-lex-validate-number":"true","aria-label":"Model preview cache size in MB"});
+    const validate=()=>{size.setCustomValidity("");if(size.value===""||!Number.isSafeInteger(Number(size.value)))size.setCustomValidity("Enter a whole number of MB.");return size.checkValidity()};
+    size.lexValidateNumber=validate;size.addEventListener("input",validate);
     const usage=el("div");
     const path=LexeditorUI.detailNote("");
     const update=next=>{
-      settings=next;size.value=String(next.cacheSizeMb);
+      settings=next;size.value=String(next.cacheSizeMb);validate();
       usage.textContent=`${formatFileSize(next.cacheBytes)} used by ${next.cacheEntries} cached preview${next.cacheEntries===1?"":"s"}.`;
       path.textContent=next.cacheRoot;
     };
     const save=LexeditorUI.settingsSaveControl({
-      dirtyCount:()=>Number(size.value)!==savedCacheSize?1:0,
-      pendingChanges:()=>Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:Number(size.value)}],
-      save:async()=>{status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
-      discard:()=>{size.value=String(savedCacheSize);status.textContent="Restored the last saved cache setting.";}
+      dirtyCount:()=>!size.checkValidity()||Number(size.value)!==savedCacheSize?1:0,
+      pendingChanges:()=>size.checkValidity()&&Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:size.value}],
+      save:async()=>{if(!validate()){status.textContent="Correct the model preview cache size before saving.";size.reportValidity();throw new Error(status.textContent)}status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
+      discard:()=>{size.value=String(savedCacheSize);validate();status.textContent="Restored the last saved cache setting.";}
     });
     const clear=el("button",{class:"lex-dialog-action danger-action",onclick:async()=>{
       if(clear.dataset.armed!=="true"){

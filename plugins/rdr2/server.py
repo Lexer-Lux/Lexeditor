@@ -25,13 +25,14 @@ import subprocess
 import sys
 import threading
 import xml.etree.ElementTree as ET
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 
 # keep the game's xi: prefix on XInclude tags (ET would rename to ns0:)
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from core.numeric_values import integer_value
+from core.plugin_http import PluginRequestHandler
 
 try:
     from .paths import EDITABLE_MOD_ROOT, EXTRACT_ROOT, GAME_ROOT, LEXEDITOR_ROOT, PLUGIN_ROOT, PROJECT_ROOT
@@ -5072,7 +5073,7 @@ def apply_mob_edits(edits):
 
 # ---------------- HTTP ----------------
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
