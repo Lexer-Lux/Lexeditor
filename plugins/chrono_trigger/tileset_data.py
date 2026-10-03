@@ -165,28 +165,37 @@ def save_tile_assembly(
     seen = set()
     allowed = {"chipIndex", "flipHorizontal", "flipVertical", "paletteIndex", "priority"}
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Tile-assembly edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Tile-assembly token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate tile-assembly edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Tile-assembly values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported tile-assembly fields: {', '.join(sorted(unknown))}")
-        chip = int(values.get("chipIndex", row["chipIndex"]))
-        palette = int(values.get("paletteIndex", row["paletteIndex"]))
+        for field in ("flipHorizontal", "flipVertical", "priority"):
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"Tile-assembly {field} must be a boolean")
+        chip = integer_value(values.get("chipIndex", row["chipIndex"]), "Chip index")
+        palette = integer_value(values.get("paletteIndex", row["paletteIndex"]), "Palette index")
         if not 0 <= chip <= 0x03FF:
             raise ValueError("Chip index must be between 0 and 1023")
         if not 0 <= palette <= 0x0F:
             raise ValueError("Palette index must be between 0 and 15")
         data1 = chip | (palette << 12)
-        if bool(values.get("flipHorizontal", row["flipHorizontal"])):
+        if values.get("flipHorizontal", row["flipHorizontal"]):
             data1 |= 0x0400
-        if bool(values.get("flipVertical", row["flipVertical"])):
+        if values.get("flipVertical", row["flipVertical"]):
             data1 |= 0x0800
         data2 = row["unknownPriorityBits"] | (
-            0x01 if bool(values.get("priority", row["priority"])) else 0
+            0x01 if values.get("priority", row["priority"]) else 0
         )
         struct.pack_into("<HB", output, row["byteOffset"], data1, data2)
     store.write(path, expected_sha256, bytes(output))
