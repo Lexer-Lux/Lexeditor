@@ -72,23 +72,50 @@ def settings_rows() -> list[dict]:
 
 
 def save_settings(edits: list[dict]) -> dict:
-    lines = SETTINGS.read_text(encoding="utf-8", errors="replace").splitlines(True)
-    by_line = {int(edit["line"]): str(edit["value"]) for edit in edits}
+    if not isinstance(edits, list):
+        raise ValueError("Settings edits must be an array")
+    original = SETTINGS.read_bytes()
+    lines = original.decode("utf-8").splitlines(True)
+    by_line = {}
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise ValueError("Settings edit must be an object")
+        if set(edit) - {"line", "value"}:
+            raise ValueError("Only the settings value is editable")
+        line_number = integer_value(edit.get("line"), "Settings line")
+        if line_number in by_line or not 0 <= line_number < len(lines):
+            raise ValueError("Invalid or duplicate settings line")
+        value = edit.get("value")
+        if not isinstance(value, str):
+            raise ValueError("Settings value must be text")
+        if any(character in value for character in "\r\n\x00;#"):
+            raise ValueError("Settings value cannot contain line breaks, NUL or comment delimiters")
+        by_line[line_number] = value
     saved = 0
     for line_number, value in by_line.items():
-        if not 0 <= line_number < len(lines):
-            continue
         line = lines[line_number]
-        match = re.match(r"^([^=]+?=\s*)([^;#\r\n]*)(.*)$", line)
-        if not match:
-            continue
-        newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
-        tail = match.group(3).rstrip("\r\n")
-        lines[line_number] = match.group(1) + value + tail + newline
+        newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else "\r" if line.endswith("\r") else ""
+        body = line[:-len(newline)] if newline else line
+        stripped = body.lstrip("\ufeff").strip()
+        match = re.fullmatch(r"([^=\r\n]+?=[ \t]*)([^;#\r\n]*)([;#][^\r\n]*)?", body)
+        if not match or stripped.startswith((";", "#", "[")) or not body.split("=", 1)[0].lstrip("\ufeff").strip():
+            raise ValueError("Settings line is not an editable value")
+        spacing = re.search(r"[ \t]*$", match.group(2)).group()
+        lines[line_number] = match.group(1) + value + spacing + (match.group(3) or "") + newline
         saved += 1
     backup = SETTINGS.with_suffix(".ini.lexeditor.bak")
-    backup.write_bytes(SETTINGS.read_bytes())
-    SETTINGS.write_text("".join(lines), encoding="utf-8")
+    if not saved:
+        return {"saved": 0, "backup": str(backup) if backup.exists() else None}
+    if not backup.exists():
+        backup.write_bytes(original)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=SETTINGS.name + ".", suffix=".tmp", dir=SETTINGS.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write("".join(lines).encode("utf-8"))
+        os.replace(temporary_name, SETTINGS)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
     return {"saved": saved, "backup": str(backup)}
 
 
