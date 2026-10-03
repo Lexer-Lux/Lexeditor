@@ -43,11 +43,24 @@ function packagePanel(){
 function recordKey(row){return `${row.table}\0${row.row}\0${row.field}`}
 function selectedPatchRecord(){if(!palPatch?.records?.length)return null;return palPatch.records.find(row=>recordKey(row)===palSelected)||palPatch.records[0]}
 function setPatchValue(record,value){record.value=value;refreshShell()}
+function schemaEnumControl(values,current,change,attrs={}){
+  return el("select",{...attrs,onchange:event=>change(values.find(value=>String(value)===event.target.value))},...values.map(value=>el("option",{value:String(value),selected:value===current},String(value))))
+}
+function schemaNumberControl(current,spec,integer,change,attrs={}){
+  const minimum=spec.minimum==null?undefined:integer?Math.ceil(spec.minimum):spec.minimum;
+  const maximum=spec.maximum==null?undefined:integer?Math.floor(spec.maximum):spec.maximum;
+  return el("input",{...attrs,type:"number",min:minimum,max:maximum,step:integer?1:"any",value:current,oninput:event=>{
+    if(event.target.value==="")return;
+    const value=Number(event.target.value);
+    if(!Number.isFinite(value)||(integer&&!Number.isInteger(value))||(spec.minimum!=null&&value<spec.minimum)||(spec.maximum!=null&&value>spec.maximum))return;
+    change(value)
+  }})
+}
 function scalarControl(record){
   if(!record.writable)return readonlyField(typeof record.value==="object"?JSON.stringify(record.value):String(record.value??"null"));
-  if(Array.isArray(record.enumValues)&&record.enumValues.length){return el("select",{onchange:event=>setPatchValue(record,event.target.value)},...record.enumValues.map(value=>{const option=el("option",{value:String(value)},String(value));option.selected=value===record.value;return option}))}
+  if(Array.isArray(record.enumValues)&&record.enumValues.length)return schemaEnumControl(record.enumValues,record.value,value=>setPatchValue(record,value));
   if(record.kind==="bool")return el("input",{type:"checkbox",checked:!!record.value,onchange:event=>setPatchValue(record,event.target.checked)});
-  if(record.kind==="int"||record.kind==="float")return el("input",{type:"number",step:record.kind==="int"?1:"any",value:record.value,oninput:event=>{if(event.target.value==="")return;setPatchValue(record,record.kind==="int"?Number.parseInt(event.target.value,10):Number(event.target.value))}});
+  if(record.kind==="int"||record.kind==="float")return schemaNumberControl(record.value,record,record.kind==="int",value=>setPatchValue(record,value));
   return el("input",{type:"text",value:record.value??"",oninput:event=>setPatchValue(record,event.target.value)})
 }
 const patchPage={page:0,pageSize:12,query:""};
@@ -66,9 +79,9 @@ function currentAddChoice(){return palFieldChoices.find(field=>field.name===palA
 function setAddChoice(name){palAddField=name;const field=currentAddChoice();palAddValue=field?clone(field.default):null;render()}
 function addValueControl(field){
   if(!field)return readonlyField("No field selected");
-  if(field.enumValues?.length)return el("select",{class:"pal-add-value",onchange:event=>{palAddValue=event.target.value;refreshShell()}},...field.enumValues.map(value=>{const option=el("option",{value:String(value)},String(value));option.selected=value===palAddValue;return option}));
+  if(field.enumValues?.length)return schemaEnumControl(field.enumValues,palAddValue,value=>{palAddValue=value;refreshShell()},{class:"pal-add-value"});
   if(field.type==="boolean")return el("input",{class:"pal-add-value",type:"checkbox",checked:!!palAddValue,onchange:event=>{palAddValue=event.target.checked;refreshShell()}});
-  if(field.type==="integer"||field.type==="number")return el("input",{class:"pal-add-value",type:"number",step:field.type==="integer"?1:"any",value:palAddValue,oninput:event=>{if(event.target.value==="")return;palAddValue=field.type==="integer"?Number.parseInt(event.target.value,10):Number(event.target.value);refreshShell()}});
+  if(field.type==="integer"||field.type==="number")return schemaNumberControl(palAddValue,field,field.type==="integer",value=>{palAddValue=value;refreshShell()},{class:"pal-add-value"});
   return el("input",{class:"pal-add-value",type:"text",value:palAddValue??"",oninput:event=>{palAddValue=event.target.value;refreshShell()}})
 }
 async function refreshFieldChoices(){
@@ -82,7 +95,7 @@ async function refreshFieldChoices(){
 }
 async function addPropertyLocally(){
   const source=selectedPatchRecord(),field=currentAddChoice();if(!source||!field||!palPatch)return;
-  const record={table:source.table,row:source.row,field:field.name,value:clone(palAddValue),kind:addFieldKind(field),writable:true,reason:"Pending schema-backed property addition; saved atomically with the patch.",schemaState:"matched",schemaType:field.type,schemaDescription:field.description||"",enumValues:clone(field.enumValues||[])};
+  const record={table:source.table,row:source.row,field:field.name,value:clone(palAddValue),kind:addFieldKind(field),writable:true,reason:"Pending schema-backed property addition; saved atomically with the patch.",schemaState:"matched",schemaType:field.type,schemaDescription:field.description||"",enumValues:clone(field.enumValues||[]),minimum:field.minimum,maximum:field.maximum};
   const key=recordKey(record);palPatch.records.push(record);palPendingAdds.push(key);palSelected=key;await refreshFieldChoices();render();refreshShell()
 }
 function addPropertySection(record){

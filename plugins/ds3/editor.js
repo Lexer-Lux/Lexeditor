@@ -66,6 +66,7 @@
     }
   }
   function fieldControl(table,row,field){
+    if(field.editable===false)return LexeditorUI.readonlyField(field.value,{format:false});
     if(field.type==="bool")return el("input",{type:"checkbox",checked:!!field.value,"aria-label":field.label,
       "data-ds3-field":field.key,onchange:event=>editField(table,row,field,event.target.checked?1:0)});
     if(field.type==="enum"){

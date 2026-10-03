@@ -16,6 +16,7 @@ import copy
 import csv
 import gzip
 import json
+import math
 import mimetypes
 import os
 import re
@@ -4223,6 +4224,11 @@ def _scalar_descendants(node, prefix=""):
     return out
 
 
+def _weapon_path_unknown(tags):
+    return any(re.fullmatch(r"(?:UNK_MEMBER_)?0x[0-9a-f]{8}", str(tag), re.IGNORECASE)
+               for tag in tags)
+
+
 def _weapon_rows(item):
     """Flatten a weapon record to editable rows.
 
@@ -4243,23 +4249,25 @@ def _weapon_rows(item):
             return name
         return f"Item {index + 1}" if sum(
             1 for s in siblings if s.tag == "Item") > 1 else "Item"
-    def walk(node, path, tags):
+    def walk(node, path, tags, raw_tags):
         siblings = list(node)
         for index, child in enumerate(siblings):
             if not isinstance(child.tag, str):
                 continue
             child_path = path + [index]
             child_tags = tags + [label_of(child, index, siblings)]
+            child_raw_tags = raw_tags + [child.tag]
             value = child.get("value")
             kind = "attr"
             if value is None and len(child) == 0 and child.text and child.text.strip():
                 value = child.text.strip(); kind = "text"
             if value is not None:
                 rows.append({"path": child_path, "field": "/".join(child_tags),
-                             "value": value, "kind": kind})
+                             "value": value, "kind": kind,
+                             "writable": not _weapon_path_unknown(child_raw_tags)})
             elif len(child):
-                walk(child, child_path, child_tags)
-    walk(item, [], [])
+                walk(child, child_path, child_tags, child_raw_tags)
+    walk(item, [], [], [])
     return rows
 
 
@@ -4611,32 +4619,68 @@ def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
         raise ValueError("unknown weapon section")
     if source_file not in weapon_layer_files("mine"):
         raise ValueError("weapon source is not an active install.xml layer")
-    root = load_file(source_file)["root"]
+    entry = load_file(source_file)
+    root = copy.deepcopy(entry["root"])
     record = next((item for item in root.iter("Item")
                    if item.get("type") == types[section] and txt(item, "Name") == name), None)
     if record is None:
         raise ValueError("unknown weapon/ammo record")
     changed = 0
     for edit in edits:
+        if not isinstance(edit, dict) or not isinstance(edit.get("path"), list) or not edit["path"]:
+            raise ValueError("Weapon edit needs a field path")
+        if any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in edit["path"]):
+            raise ValueError("Weapon field path needs nonnegative integer indices")
         target_type = edit.get("targetType") or types[section]
         target_name = edit.get("targetName") or name
         target = record if target_type == types[section] and target_name == name else next(
             (item for item in root.iter("Item")
              if item.get("type") == target_type and txt(item, "Name") == target_name), None)
         if target is None:
-            continue
+            raise ValueError("Unknown weapon edit target")
+        if _weapon_path_unknown([target_type]):
+            raise ValueError("Unknown weapon record types are read-only")
         node = target
+        tags = []
         try:
             for index in edit["path"]:
                 node = list(node)[int(index)]
+                tags.append(node.tag)
         except (IndexError, TypeError, ValueError):
-            continue
-        if edit.get("kind") == "attr" and node.get("value") is not None:
-            node.set("value", str(edit["value"])); changed += 1
-        elif edit.get("kind") == "text" and len(node) == 0:
-            node.text = str(edit["value"]); changed += 1
+            raise ValueError("Unknown weapon field path") from None
+        if _weapon_path_unknown(tags):
+            raise ValueError("Unknown weapon fields are read-only")
+        kind = edit.get("kind")
+        original = node.get("value") if kind == "attr" else node.text if kind == "text" and len(node) == 0 else None
+        if original is None:
+            raise ValueError("Weapon field is not a supported scalar")
+        value = edit.get("value")
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError("Weapon field needs a scalar value")
+        replacement = str(value)
+        if str(original).lower() in {"true", "false"}:
+            if replacement.lower() not in {"true", "false"}:
+                raise ValueError("Weapon boolean field needs true or false")
+            replacement = replacement.upper() if str(original).isupper() else replacement.lower()
+        elif re.fullmatch(r"-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", str(original), re.IGNORECASE):
+            if (not re.fullmatch(r"-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?", replacement, re.IGNORECASE)
+                    or not math.isfinite(float(replacement))):
+                raise ValueError("Weapon numeric field needs a finite number")
+        elif not isinstance(value, str):
+            raise ValueError("Weapon text field needs a string")
+        if kind == "attr":
+            node.set("value", replacement)
+        else:
+            node.text = replacement
+        changed += 1
     if changed:
-        save_file(source_file)
+        original_root = entry["root"]
+        entry["root"] = root
+        try:
+            save_file(source_file)
+        except Exception:
+            entry["root"] = original_root
+            raise
         if source_file == WEAPONS_FILE:
             ensure_file_replacement(WEAPONS_GAME_PATH, WEAPONS_FILE)
     return changed

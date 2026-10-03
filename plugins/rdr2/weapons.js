@@ -268,6 +268,8 @@ function weaponFieldDomain(data,section,row,current){
 }
 
 function weaponValueControl(data,section,row,current,edited,onChange){
+  if(row.writable===false)return LexeditorUI.readonlyField(current,{class:"weapon-value",format:false});
+  if(/^(true|false)$/i.test(String(current)))return el("input",{class:`weapon-value${edited?" edited":""}`,type:"checkbox",checked:String(current).toLowerCase()==="true",disabled:isRO(),onchange:event=>onChange(event.target.checked?"true":"false")});
   const values=weaponFieldDomain(data,section,row,current);
   const numeric=values.every(value=>/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value));
   // No title on any of these: a hover that only restates the widget you are
@@ -479,11 +481,11 @@ function weaponDetail(d,section,record,f){
             return LexeditorUI.inlineLabel(el("span",{},row.field),help?fieldHelp(help):null);}},
         {key:"value",label:()=>el("span",{},"My value",fieldHelp("Value with V / WR references beside the control (shared refField layout).")),
           render:row=>{const key=editKey(row),cur=edits[key]?.value??row.value;
-            const setValue=value=>{edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
+            const setValue=value=>{if(isRO()||row.writable===false)return;edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
             const control=weaponValueControl(d,section,row,cur,key in edits,setValue);
             return refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
               (value,ev)=>{const target=ev.currentTarget.closest('[role="row"]').querySelector(".weapon-value");
-                if(target){target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
+                if(target){if(target.type==="checkbox")target.checked=String(value).toLowerCase()==="true";else target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
     const details=LexeditorUI.detailSection({title:`${group.label} (${group.rows.length})`,
       collapsible:true,open:!!q,attrs:{"data-group":group.key},
       help:fieldHelp(group.description),body:table});

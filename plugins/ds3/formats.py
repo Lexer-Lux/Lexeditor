@@ -465,6 +465,11 @@ _INT_LIMITS = {
     "s8":(-128,127), "u8":(0,255), "s16":(-32768,32767), "u16":(0,65535),
     "s32":(-2147483648,2147483647), "u32":(0,4294967295), "b32":(-2147483648,2147483647),
 }
+_FLOAT_LIMITS = {
+    "f32": (-3.4028234663852886e38, 3.4028234663852886e38),
+    "angle32": (-3.4028234663852886e38, 3.4028234663852886e38),
+    "f64": (-1.7976931348623157e308, 1.7976931348623157e308),
+}
 
 
 @dataclass(frozen=True)
@@ -484,12 +489,17 @@ class FieldSpec:
     padding: bool = False
 
     @property
+    def editable(self):
+        return (not self.padding and self.array_length == 1
+                and not re.match(r"^(?:unk(?:nown)?)(?:\d|[ _]|$)", self.key, re.IGNORECASE))
+
+    @property
     def minimum(self):
         if self.bit_size is not None:
             if self.dtype.startswith("s"):
                 return -(1 << (self.bit_size - 1))
             return 0
-        return _INT_LIMITS.get(self.dtype, (None, None))[0]
+        return _INT_LIMITS.get(self.dtype, _FLOAT_LIMITS.get(self.dtype, (None, None)))[0]
 
     @property
     def maximum(self):
@@ -497,7 +507,7 @@ class FieldSpec:
             if self.dtype.startswith("s"):
                 return (1 << (self.bit_size - 1)) - 1
             return (1 << self.bit_size) - 1
-        return _INT_LIMITS.get(self.dtype, (None, None))[1]
+        return _INT_LIMITS.get(self.dtype, _FLOAT_LIMITS.get(self.dtype, (None, None)))[1]
 
 
 @dataclass(frozen=True)
@@ -658,13 +668,24 @@ def read_field(row_bytes: bytes, field: FieldSpec, endian: str):
     raise DS3FormatError(f"Field {field.key} is not safely editable")
 
 
+def _field_integer(field: FieldSpec, value) -> int:
+    if isinstance(value, bool):
+        if not field.is_bool:
+            raise DS3FormatError(f"{field.key} requires an integer")
+    elif isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise DS3FormatError(f"{field.key} requires an integer")
+    elif not isinstance(value, int) and not (isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip())):
+        raise DS3FormatError(f"{field.key} requires an integer")
+    return int(value)
+
+
 def write_field(row_bytes: bytes, field: FieldSpec, value, endian: str) -> bytes:
-    if field.padding or field.array_length != 1:
+    if not field.editable:
         raise DS3FormatError(f"Field {field.key} is preserved but not editable")
     result=bytearray(row_bytes); size=_TYPE_SIZE[field.dtype]; byteorder="big" if endian==">" else "little"
     if field.bit_size is not None:
-        try: value=int(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires an integer")
+        value = _field_integer(field, value)
         if field.is_bool:
             if value not in (0,1): raise DS3FormatError(f"{field.key} is boolean")
         if not field.minimum <= value <= field.maximum:
@@ -675,16 +696,18 @@ def write_field(row_bytes: bytes, field: FieldSpec, value, endian: str) -> bytes
         result[field.offset:field.offset+size]=raw.to_bytes(size,byteorder,signed=False)
         return bytes(result)
     if field.dtype in _INT_LIMITS:
-        try: value=int(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires an integer")
+        value = _field_integer(field, value)
         if field.is_bool and value not in (0,1): raise DS3FormatError(f"{field.key} is boolean")
         if not field.minimum <= value <= field.maximum:
             raise DS3FormatError(f"{field.key} must be between {field.minimum} and {field.maximum}")
         result[field.offset:field.offset+size]=value.to_bytes(size,byteorder,signed=field.dtype.startswith("s") or field.dtype=="b32")
     elif field.dtype in ("f32","angle32","f64"):
+        if isinstance(value, bool): raise DS3FormatError(f"{field.key} requires a number")
         try: value=float(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires a number")
+        except (TypeError,ValueError,OverflowError): raise DS3FormatError(f"{field.key} requires a number")
         if not math.isfinite(value): raise DS3FormatError(f"{field.key} must be finite")
+        if not field.minimum <= value <= field.maximum:
+            raise DS3FormatError(f"{field.key} must be between {field.minimum} and {field.maximum}")
         struct.pack_into(endian+("d" if field.dtype=="f64" else "f"),result,field.offset,value)
     else:
         raise DS3FormatError(f"Field {field.key} is not safely editable")
@@ -769,6 +792,7 @@ class RegulationDocument:
                 "value":value,"type":"bool" if field.is_bool else "enum" if field.enum and schema.enums.get(field.enum) else "number",
                 "minimum":field.minimum,"maximum":field.maximum,"enum":schema.enums.get(field.enum,{}),"enumName":field.enum,
                 "reference":field.reference,"dtype":field.dtype,
+                "editable":field.editable,
             })
         return {
             "id": row.row_id,
