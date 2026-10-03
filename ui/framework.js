@@ -7852,6 +7852,64 @@ ${contents.path}`});
     return autoAdd ? [enabledColumn(change), ...columns] : columns;
   };
 
+  // One pin, two positions: an unpinned pin hovers up and to the right and
+  // drops into the page when it is stuck in. No crossed-out variant.
+  const pinIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(namespace, "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("aria-hidden", "true");
+    const pin = document.createElementNS(namespace, "path");
+    pin.classList.add("lex-column-pin-on");
+    pin.setAttribute("d", "M3.71 21.71L9 16.42l2.29 2.29c.2.2.45.29.71.29s.51-.1.71-.29l2-2a.996.996 0 0 0 0-1.41l-.79-.79l3.59-3.59l.79.79c.39.39 1.02.39 1.41 0l2-2a.996.996 0 0 0 0-1.41l-6-6a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41l.79.79l-3.59 3.59l-.79-.79a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41L7.59 15L2.3 20.29l1.41 1.41Z");
+    icon.append(pin);
+    return icon;
+  };
+
+  // Every property in a list-and-detail page can be pinned as a table column,
+  // in every game. Pins used to exist only where a plugin wired its own
+  // column preferences, so most games had none. The paged list now gives
+  // each property without a pin of its own one, and its table shows the
+  // pinned properties as columns. A row supplies a pinned value as
+  // row.values[key] (or row[key]), and may give row.display[key] to show.
+  let pagedPinOwner = null;
+  const autoPinStores = new Map();
+  const autoPins = viewKey => {
+    if (!autoPinStores.has(viewKey)) {
+      const key = `lexeditor:pins:${viewKey}`;
+      let pinned = [];
+      try { pinned = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_error) {}
+      autoPinStores.set(viewKey, {key, pinned: (Array.isArray(pinned) ? pinned : [])
+        .filter(entry => entry && typeof entry.key === "string")});
+    }
+    return autoPinStores.get(viewKey);
+  };
+  const pinnedValue = (row, key) => row?.values?.[key] ?? row?.[key];
+  const pinnedColumns = owner => owner.store.pinned.map(entry => ({
+    key: `pin:${entry.key}`, label: entry.label, sortable: true, pinnedProperty: entry.key,
+    sortValue: row => pinnedValue(row, entry.key) ?? "",
+    render: row => {
+      const shown = row?.display?.[entry.key] ?? pinnedValue(row, entry.key);
+      return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
+    }}));
+  const autoPinDetail = (node, owner) => {
+    for (const field of node.querySelectorAll(".lex-detail-field[data-lex-layout-field]")) {
+      if (field.querySelector(".lex-column-pin")) continue;
+      const box = field.querySelector(":scope > .lex-detail-field-control");
+      if (!box) continue;
+      const key = field.dataset.lexLayoutField;
+      const label = field.querySelector(".lex-detail-field-label-text")?.textContent?.trim() || key;
+      const pinned = owner.store.pinned.some(entry => entry.key === key);
+      box.append(element("button", {
+        type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`, "data-lex-control": "pin", "data-lex-auto-pin": "",
+        "data-lex-pin-column": key, "aria-pressed": String(pinned),
+        title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
+        "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
+        onclick: event => { event.preventDefault(); event.stopPropagation(); owner.toggle(key, label); },
+      }, pinIcon()));
+    }
+  };
+
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
     const declared = numberedIdColumns(definitions || [], []);
@@ -7895,16 +7953,7 @@ ${contents.path}`});
       reset: () => { order = [...defaults]; save(); },
       pinButton: (value, label = byKey.get(value)?.label || value) => {
         const pinned = order.includes(value);
-        const namespace = "http://www.w3.org/2000/svg";
-        const icon = document.createElementNS(namespace, "svg");
-        icon.setAttribute("viewBox", "0 0 24 24");
-        icon.setAttribute("aria-hidden", "true");
-        const pin = document.createElementNS(namespace, "path");
-        pin.classList.add("lex-column-pin-on");
-        pin.setAttribute("d", "M3.71 21.71L9 16.42l2.29 2.29c.2.2.45.29.71.29s.51-.1.71-.29l2-2a.996.996 0 0 0 0-1.41l-.79-.79l3.59-3.59l.79.79c.39.39 1.02.39 1.41 0l2-2a.996.996 0 0 0 0-1.41l-6-6a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41l.79.79l-3.59 3.59l-.79-.79a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41L7.59 15L2.3 20.29l1.41 1.41Z");
-        // One pin, two positions: an unpinned pin hovers up and to the right
-        // and drops into the page when it is stuck in. No crossed-out variant.
-        icon.append(pin);
+        const icon = pinIcon();
         return element("button", {
           type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`,
           "data-lex-control": "pin",
@@ -8194,10 +8243,16 @@ ${contents.path}`});
     const preferredColumns = options.columnPreferences?.active?.();
     // The generic enabled column is not a user-choosable column, so it is
     // added after saved preferences rather than being subject to them.
+    // A table with its own column preferences wires its own pins; the paged
+    // list then adds none, so no pin is ever dead.
+    if (options.columnPreferences && pagedPinOwner) pagedPinOwner.declined = true;
+    const pinOwner = options.columnPreferences ? null : pagedPinOwner;
+    const ownColumns = pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
+      .filter(column => !(options.columns || []).some(own => own.key === column.pinnedProperty))] : options.columns;
     const columns = preferredColumns
       ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
-          withEnabledColumn(options.columns, options.rows, options.enabledChange),
+          withEnabledColumn(ownColumns, options.rows, options.enabledChange),
           options.rows || []);
     if (columns.some(column => isNumberedIdColumn(column, options.rows || []))) {
       setRecordIdWidth(options.rows, {floor: options.idFloor});
@@ -9719,8 +9774,15 @@ ${contents.path}`});
     selection.keys=new Set([...selection.keys].filter(key=>records.some(row=>keyOf(row)===key)));
     if(!selection.keys.size)selection.keys.add(selected);
     tableSelections.set(selectionKey,selection);
+    const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),toggle:(key,label)=>{
+      const store=pinOwner.store;
+      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label}];
+      try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
+      change("pins",{});
+    }};
     const makeDetail=record=>{
       const node=options.detail(record);
+      if(typeof options.change==="function"&&!pinOwner.declined)autoPinDetail(node,pinOwner);
       const chosen=records.filter(row=>selection.keys.has(keyOf(row)));
       if(chosen.length>1){
         const banner=element('div',{class:'lex-multi-edit-notice'},`${chosen.length} records selected. Edits apply to all selected records. Values shown are from ${record.name||keyOf(record)}; other records may differ.`);
@@ -9802,7 +9864,8 @@ ${contents.path}`});
     // While the master builds its tables, tell them that this list owns the
     // order: a click on one of their headers re-sorts the list, then the list
     // re-renders through the plugin's own change callback.
-    const outerSortOwner = pagedSortOwner;
+    const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner;
+    pagedPinOwner = typeof options.change === "function" ? pinOwner : null;
     pagedSortOwner = typeof options.change === "function" ? {
       state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
       sort: (column, direction, compare) => {
@@ -9847,6 +9910,8 @@ ${contents.path}`});
       });
     } finally {
       pagedSortOwner = outerSortOwner;
+      pagedPinOwner = outerPinOwner;
+      if (pinOwner.declined) detailNode?.querySelectorAll?.("[data-lex-auto-pin]").forEach(node => node.remove());
     }
     // The floor belongs to THIS table's record set. Leaving it set made an
     // unrelated table rendered afterwards inherit the padding.

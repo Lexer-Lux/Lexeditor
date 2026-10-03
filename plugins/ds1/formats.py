@@ -231,6 +231,21 @@ class ItemDocument:
         start = self.members[table + '.param'].offset + row.data_offset
         return row, start, bytes(self.plain[start:start + TABLES[table][0]])
 
+    def row_values(self, table, row_id):
+        """A row's shown properties, for pinned table columns: the stored value,
+        and what a reader sees for it (an enum's name, Yes or No)."""
+        data = self._row(table, row_id)[2]
+        values, display = {}, {}
+        for item in self.schemas[table]['fields']:
+            field = item['spec']
+            if field.padding or field.array_length != 1: continue
+            value = read_field(data, field, '<')
+            if isinstance(value, float) and not math.isfinite(value): value = str(value)
+            values[field.key] = value
+            if field.is_bool: display[field.key] = 'Yes' if value else 'No'
+            elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
+        return values, display
+
     def value(self, table, row_id, key):
         field = next(f['spec'] for f in self.schemas[table]['fields'] if f['spec'].key == key)
         return read_field(self._row(table, row_id)[2], field, '<')
@@ -252,12 +267,16 @@ class ItemDocument:
             if table == 'EquipParamWeapon':
                 ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
                 if (tab == 'ammo') != ammo: continue
-            result.append({'id': row.row_id, 'name': self.schemas[table]['names'].get(row.row_id) or row.name or (f'Attack {row.row_id}' if table == 'AtkParam_Npc' else f'Item {row.row_id}'), 'table': table})
+            values, display = self.row_values(table, row.row_id)
+            result.append({'id': row.row_id, 'name': self.schemas[table]['names'].get(row.row_id) or row.name or (f'Attack {row.row_id}' if table == 'AtkParam_Npc' else f'Item {row.row_id}'), 'table': table,
+                           'values': values, 'display': display})
         if tab == 'spells':
             table = 'EquipParamGoods'
             for row in self.params[table].rows:
                 if self.value(table, row.row_id, 'goodsType') in (5, 6, 7):
-                    result.append({'id': row.row_id, 'name': 'Spell item: ' + (self.schemas[table]['names'].get(row.row_id) or row.name or str(row.row_id)), 'table': table})
+                    values, display = self.row_values(table, row.row_id)
+                    result.append({'id': row.row_id, 'name': 'Spell item: ' + (self.schemas[table]['names'].get(row.row_id) or row.name or str(row.row_id)), 'table': table,
+                                   'values': values, 'display': display})
         return result
 
     def is_monster(self, row_id):
