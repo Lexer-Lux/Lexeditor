@@ -4682,6 +4682,15 @@ def _bounty_incident_evasion(root):
     return None
 
 
+def _dispatch_source_nodes(root, group, field):
+    if group == WANTED_INCIDENT_GROUP:
+        incidents = [item for item in root.findall('./Tunables/Item') if (item.findtext('Name') or '').strip() == 'CBountyIncident']
+        parents = incidents[0].findall('Evasion') if len(incidents) == 1 else []
+    else:
+        parents = [root] if not group else root.findall(group)
+    return parents[0].findall(field) if len(parents) == 1 else []
+
+
 def get_dispatch(ds="mine"):
     root = load_file(DISPATCH_FILE, ds)["root"]
     rows = []
@@ -4707,6 +4716,13 @@ def get_dispatch(ds="mine"):
             rows.append({"group": WANTED_INCIDENT_GROUP,
                          "field": "TimeEvadingForEscape",
                          "value": escape.get("value")})
+    for row in rows:
+        source = load_file(INCIDENTS_FILE, ds)['root'] if row['group'] == WANTED_INCIDENT_GROUP else root
+        row['readonly'] = len(_dispatch_source_nodes(source, row['group'], row['field'])) != 1
+        try:
+            finite_number(row['value'], 'Source dispatch value')
+        except ValueError:
+            row['readonly'] = True
     return {"rows": rows}
 
 
@@ -4837,12 +4853,7 @@ def apply_dispatch_edits(edits):
             entry = load_file(name)
             prepared[name] = (entry, copy.deepcopy(entry['root']))
         _, root = prepared[name]
-        if group == WANTED_INCIDENT_GROUP:
-            incidents = [item for item in root.findall('./Tunables/Item') if (item.findtext('Name') or '').strip() == 'CBountyIncident']
-            parents = incidents[0].findall('Evasion') if len(incidents) == 1 else []
-        else:
-            parents = [root] if not group else root.findall(group)
-        nodes = parents[0].findall(field) if len(parents) == 1 else []
+        nodes = _dispatch_source_nodes(root, group, field)
         if len(nodes) != 1 or nodes[0].get('value') is None:
             raise ValueError("Dispatch field is missing or ambiguous")
         node = nodes[0]

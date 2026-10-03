@@ -221,6 +221,16 @@ function dispatchLabel(g) {
   return g;
 }
 
+function dispatchNumericError(raw){
+  return (typeof raw==="string"||typeof raw==="number")&&/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(String(raw).trim())&&Number.isFinite(Number(raw))?"":"Enter a finite number.";
+}
+function validateDispatchDrafts(){
+  for(const [key,value] of Object.entries(state.dispatchEdits)){
+    const rows=state.store.mine?.dispatch?.rows.filter(row=>`${row.group}|${row.field}`===key)||[];
+    if(rows.length!==1||rows[0].readonly||dispatchNumericError(rows[0].value))throw new Error(`${key} is read-only or unavailable.`);
+    const error=dispatchNumericError(value);if(error)throw new Error(`${key}: ${error}`);
+  }
+}
 function dispatchSection() {
   const st = refStore(state.ds);
   if (!st.dispatch || !st.dispatch.rows.length) return el("div");
@@ -235,22 +245,27 @@ function dispatchSection() {
   const dispatchRows=sortedRows("dispatch",st.dispatch.rows,{setting:r=>dispatchLabel(r.group),field:r=>r.field,value:r=>+r.value});
   const dispatchValue=r=>{
     const ek=r.group+"|"+r.field;
+    const editable=!isRO()&&!r.readonly&&!dispatchNumericError(r.value);
     const cur=isRO()?r.value:(state.dispatchEdits[ek]??r.value);
     const vRow=vd&&vd.rows.find(x=>x.group===r.group&&x.field===r.field);
-    const inp=el("input",{type:"number",step:"any",value:cur,
+    const inp=!editable&&dispatchNumericError(r.value)?LexeditorUI.readonlyField(r.value??""):el("input",{type:"number",step:"any",required:true,disabled:!editable,"data-lex-validate-number":"",value:cur,
       "aria-label":`${dispatchLabel(r.group)} ${r.field}`,
       class:ek in state.dispatchEdits?"edited":"",
-      onchange:ev=>{
+      oninput:ev=>{
+        if(!editable)return;
         const v=ev.target.value;
         if(v===r.value)delete state.dispatchEdits[ek];
         else state.dispatchEdits[ek]=v;
         ev.target.classList.toggle("edited",ek in state.dispatchEdits);
+        ev.target.setCustomValidity(dispatchNumericError(v));
         renderToolbarOnly();
       }});
-    return refField(inp, vRow?[["V","vtag",vRow.value]]:null, cur, (v,ev)=>applyToInput(ev,v), String);
+    inp.setAttribute("aria-label",`${dispatchLabel(r.group)} ${r.field}`);
+    if(inp.type==="number")inp.setCustomValidity(dispatchNumericError(cur));
+    return lootReferenceControl(editable,refField(inp, vRow?[["V","vtag",vRow.value]]:null, cur, (v)=>{if(editable){inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));}}, String));
   };
   wrap.append(columnList({class:"dispatch-table",align:"start",headerAlign:"start","aria-label":"Dispatch settings",
-    rows:dispatchRows,key:r=>r.group+"|"+r.field,editable:true,localSort:false,
+    rows:dispatchRows,key:r=>r.group+"|"+r.field,editable:!isRO(),localSort:false,
     template:"minmax(180px,1fr) minmax(200px,1.2fr) minmax(160px,1fr)",
     columns:[{key:"setting",label:"Setting",cellClass:"cat",render:r=>dispatchLabel(r.group)},
       {key:"field",label:"Field",cellClass:"key",
@@ -376,6 +391,7 @@ async function renderCrime() {
 
 async function saveCrime() {
   if (isRO()) return;
+  validateDispatchDrafts();
   const edits = Object.entries(state.crimeEdits).map(([k, value]) => {
     const [key, field] = k.split("|");
     return { key, field, value };

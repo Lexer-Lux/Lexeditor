@@ -83,6 +83,9 @@ def test_ambiguous_source_identity_rejects_before_other_edits(dispatch,fragment)
     import xml.etree.ElementTree as ET
     doc=s.load_file(s.DISPATCH_FILE)['root'];doc.append(ET.fromstring(fragment));s.save_file(s.DISPATCH_FILE)
     before=snapshot(dispatch)
+    target=FIRST if 'ParoleDuration' in fragment else THIRD
+    rows=[row for row in s.get_dispatch()['rows'] if (row['group'],row['field'])==(target['group'],target['field'])]
+    assert rows and all(row['readonly'] for row in rows)
     with pytest.raises(ValueError,match='ambiguous'):s.apply_dispatch_edits([SECOND,FIRST if 'ParoleDuration' in fragment else THIRD])
     assert snapshot(dispatch)==before
 
@@ -91,6 +94,7 @@ def test_unmodeled_target_and_nonfinite_source_are_protected(dispatch):
     doc=s.load_file(s.DISPATCH_FILE)['root']
     doc.find('ParoleDuration').set('value','NaN');s.save_file(s.DISPATCH_FILE)
     before=snapshot(dispatch)
+    assert next(row for row in s.get_dispatch()['rows'] if row['field']=='ParoleDuration')['readonly']
     for edit in [FIRST,dict(FIRST,field='Opaque')]:
         with pytest.raises(ValueError):s.apply_dispatch_edits([SECOND,edit])
         assert snapshot(dispatch)==before
