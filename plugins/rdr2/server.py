@@ -5634,7 +5634,7 @@ def _save_projectile_speed_rows(entries):
     return len(supplied)
 
 
-def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
+def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE, *, validate_only=False):
     types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
     if not isinstance(section, str) or section not in types:
         raise ValueError("unknown weapon section")
@@ -5649,10 +5649,10 @@ def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
     if not isinstance(source_file, str) or source_file not in weapon_layer_files("mine"):
         raise ValueError("weapon source is not an active install.xml layer")
     with _lock:
-        return _apply_weapon_batch(section, name, edits, source_file)
+        return _apply_weapon_batch(section, name, edits, source_file, validate_only=validate_only)
 
 
-def _apply_weapon_batch(section, name, edits, source_file):
+def _apply_weapon_batch(section, name, edits, source_file, *, validate_only=False):
     types = {"weapons": "CWeaponInfo", "ammo": "CAmmoInfo"}
     entry = load_file(source_file)
     root = copy.deepcopy(entry["root"])
@@ -5735,7 +5735,8 @@ def _apply_weapon_batch(section, name, edits, source_file):
         if payload is not None:
             outputs.append((install, payload))
             expected[install] = original
-    _commit_xml_roots([(source_file, entry, root)], outputs, expected)
+    if not validate_only:
+        _commit_xml_roots([(source_file, entry, root)], outputs, expected)
     return len(edits)
 
 
@@ -6620,11 +6621,12 @@ class Handler(PluginRequestHandler):
                         self._json({"validated" if validate_only else "saved": apply_challenge_edits(body.get("edits", []), body.get("rewards", []), body.get("uiEdits", []), body.get("conditions", []), body.get("modes", []), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/weapons/save":
+                elif path in {"/api/weapons/save", "/api/weapons/validate"}:
                     try:
-                        self._json({"saved": apply_weapon_edits(
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_weapon_edits(
                             body.get("section", ""), body.get("name", ""),
-                            body.get("edits", []), body.get("sourceFile", WEAPONS_FILE))})
+                            body.get("edits", []), body.get("sourceFile", WEAPONS_FILE), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/shell-vfx/save":

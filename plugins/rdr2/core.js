@@ -931,6 +931,7 @@ async function saveAllChanges() {
     await preflightAISave();
     await preflightMobsSave();
     await preflightChallengeSave();
+    const weaponBodies=await preflightWeaponSave();
     if(Object.keys(state.settingEdits).length)await saveSettings();
     if(state.customCraftingDirty)await saveCustomCrafting();
     if(state.shopDirty.size)await saveShops();
@@ -944,11 +945,9 @@ async function saveAllChanges() {
     if(state.matrixDirty.size)await saveMatrix();
     if(Object.keys(state.challengeEdits).length||Object.keys(state.challengeSourceEdits).length||Object.keys(state.challengeConditionEdits).length||
        Object.keys(state.challengeRewardEdits).length||Object.keys(state.challengeUiEdits).length||Object.keys(state.challengeModeEdits).length)await saveChallenges();
-    for(const [key,map] of Object.entries(state.weaponEdits))if(Object.keys(map).length){
-      const cut=key.indexOf("|"),section=key.slice(0,cut),name=key.slice(cut+1);
-      const record=state.weaponData.mine?.[section]?.find(row=>row.name===name);
+    for(const [key,body] of weaponBodies){
       await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({section,name,sourceFile:record?.sourceFile,edits:Object.values(map)})});
+        body:JSON.stringify(body)});
       delete state.weaponEdits[key];
     }
     if(state.weaponShellVfxEdit!==null)await saveWeaponShellVfx();

@@ -18,14 +18,54 @@ const matrixValidation = loot.slice(loot.indexOf('function matrixQuantityError('
 const crime = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/crime.js'), 'utf8');
 const ai = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/ai.js'), 'utf8');
 const mobs = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/mobs.js'), 'utf8');
+const weapons = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/weapons.js'), 'utf8');
 const dispatchValidation = crime.slice(crime.indexOf('function bountyCompareNumbers('), crime.indexOf('function bountyNumber(')) +
   crime.slice(crime.indexOf('function honorAmountValid('), crime.indexOf('function normalizeHonorActions(')) +
   crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()')) +
   ai.slice(ai.indexOf('function aiFieldType('), ai.indexOf('function aiValueControl(')) +
-  mobs.slice(0, mobs.indexOf('async function renderMobs()'));
+  mobs.slice(0, mobs.indexOf('async function renderMobs()')) +
+  weapons.slice(weapons.indexOf('function weaponSaveBody('), weapons.indexOf('async function saveWeapons('));
 const challenges = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/challenges.js'), 'utf8');
 const challengeValidation = challenges.slice(challenges.indexOf('function validateChallengeDrafts('), challenges.indexOf('function challengeUiInput('));
 const challengeSave = challenges.slice(challenges.indexOf('async function saveChallenges()'));
+
+async function weaponSaveGuards(){
+  const weaponFunctions=weapons.slice(weapons.indexOf('function weaponSaveBody('),weapons.indexOf('async function saveWeaponShellVfx('));
+  for(const global of [false,true])for(const reject of [false,true]){
+    const calls=[],errors=[];
+    const context=vm.createContext({isRO:()=>false,dirtyCount:()=>1,
+      api:async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body});if(reject&&url==='/api/weapons/validate')throw new Error('unsupported weapon batch');return {saved:body.edits?.length||0};},
+      saveLocalization:async()=>{calls.push({url:'localization'});return 1;},
+      saveSettings:async()=>calls.push({url:'settings'}),
+      saveLoot:async()=>{},saveLootSounds:async()=>{},
+      showSaveFailure:error=>errors.push(error.message),refreshGlobalSave(){},render(){},renderWeapons(){},toast(){},rdr2Shell:{history:{clear(){}}}});
+    vm.runInContext(stateSource+'\nfunction refStore(ds){return state.store[ds]||{}}\n'+integerValidation+'\n'+dollarValidation+'\n'+draftValidation+'\n'+lootValidation+'\n'+matrixValidation+'\n'+dispatchValidation+'\n'+challengeValidation+'\n'+globalSave+'\n'+catalogSave+'\n'+weaponFunctions,context);
+    const st=vm.runInContext('state',context);
+    st.filters.weaponSection='weapons';st.filters.weapon='A';
+    st.catalog={items:[],effects:[]};
+    st.weaponData.mine={weapons:[{name:'A',sourceFile:'weapons.ymt.xml'},{name:'HIDDEN',sourceFile:'layer.xml'}]};
+    st.weaponEdits={'weapons|A':{field:{path:[1],kind:'attr',value:'9007199254740993'}}};
+    if(global){st.weaponEdits['weapons|HIDDEN']={field:{path:[1],kind:'attr',value:'12.3456789'}};st.settingEdits={pending:true};}
+    st.localizationEdits={LABEL:'pending text'};
+    const before=JSON.stringify([st.weaponEdits,st.localizationEdits,st.settingEdits]);
+    if(global)await context.saveAllChanges();
+    else if(reject)await assert.rejects(context.saveWeapons(),/unsupported weapon batch/);
+    else await context.saveWeapons();
+    if(reject){
+      assert(calls.every(call=>call.url==='/api/weapons/validate'));
+      assert.equal(JSON.stringify([st.weaponEdits,st.localizationEdits,st.settingEdits]),before);
+      assert.equal(errors.length,global?1:0);
+    }else{
+      const validation=calls.filter(call=>call.url==='/api/weapons/validate');
+      const saves=calls.filter(call=>call.url==='/api/weapons/save');
+      assert.equal(validation.length,global?2:1);
+      assert.deepEqual(saves.map(call=>call.body),validation.map(call=>call.body));
+      assert(calls.findIndex(call=>call.url===(global?'settings':'localization'))>calls.findLastIndex(call=>call.url==='/api/weapons/validate'));
+      assert.equal(Object.keys(st.weaponEdits).length,0);
+    }
+  }
+  console.log('PASS: direct/global weapon validation precedes unrelated writers, preserves rejected drafts and uses identical payloads');
+}
 
 async function challengeSaveGuards() {
   const data={goals:[{name:'GOAL',requirements:[{index:0,value:'10',sources:[
@@ -181,6 +221,7 @@ async function run(fail, invalid=false, invalidLoot=false, invalidMatrix=false, 
   }
 }
 (async () => {
+  await weaponSaveGuards();
   await run(false); console.log('PASS: header Save dispatches an alcohol-only sparse edit');
   await run(true); console.log('PASS: rejected alcohol save preserves edits and cannot report success');
   await run(false,true); console.log('PASS: invalid catalog drafts block alcohol and all other writers');

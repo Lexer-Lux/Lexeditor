@@ -496,10 +496,22 @@ function weaponDetail(d,section,record,f){
   return pane;
 }
 
+function weaponSaveBody(key){
+  const cut=key.indexOf("|"),section=key.slice(0,cut),name=key.slice(cut+1);
+  const records=state.weaponData.mine?.[section]?.filter(row=>row.name===name)||[];
+  if(cut<0||!["weapons","ammo"].includes(section)||!name||records.length!==1)throw new Error("Weapon record is missing or ambiguous.");
+  return {section,name,sourceFile:records[0].sourceFile,edits:Object.values(state.weaponEdits[key]||{})};
+}
+async function preflightWeaponSave(){
+  const bodies=Object.entries(state.weaponEdits).filter(([,map])=>Object.keys(map).length).map(([key])=>[key,weaponSaveBody(key)]);
+  for(const [,body] of bodies)await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  return bodies;
+}
 async function saveWeapons(){
-  const section=state.filters.weaponSection||"weapons",name=state.filters.weapon,key=`${section}|${name}`,edits=Object.values(state.weaponEdits[key]||{});
-  const record=state.weaponData.mine?.[section]?.find(row=>row.name===name);
-  const localizedSaved=await saveLocalization();const r=await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({section,name,sourceFile:record?.sourceFile,edits})});
+  if(isRO())return;
+  const section=state.filters.weaponSection||"weapons",name=state.filters.weapon,key=`${section}|${name}`,body=weaponSaveBody(key);
+  await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const localizedSaved=await saveLocalization();const r=await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   delete state.weaponEdits[key];delete state.weaponData.mine;toast(`Saved ${r.saved} weapon + ${localizedSaved} in-game text field(s)`);renderWeapons();
 }
 

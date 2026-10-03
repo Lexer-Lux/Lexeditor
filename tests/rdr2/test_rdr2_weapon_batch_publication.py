@@ -33,6 +33,47 @@ def weapon(fixture):
 def apply(edits):return s.apply_weapon_edits('weapons','WEAPON_TEST',edits)
 
 
+@pytest.mark.parametrize('backup',[False,True])
+@pytest.mark.parametrize('section,name,edits',[
+    ('weapons','WEAPON_TEST',[FIRST,{'path':[2],'kind':'attr','value':True}]),
+    ('ammo','AMMO_TEST',[LINK,CURVE]),
+])
+def test_validation_prepares_primary_and_linked_batches_without_publication(weapon,monkeypatch,backup,section,name,edits):
+    root,path,_,entry=weapon
+    if backup:path.with_suffix(path.suffix+'.bak').write_bytes(b'old backup')
+    before=snapshot(root);old_root=entry['root'];old_xml=ET.tostring(old_root)
+    def forbidden(*args,**kwargs):raise AssertionError('validation attempted publication')
+    monkeypatch.setattr(s,'_commit_xml_roots',forbidden)
+    assert s.apply_weapon_edits(section,name,edits,validate_only=True)==len(edits)
+    assert snapshot(root)==before
+    assert entry['root'] is old_root and ET.tostring(old_root)==old_xml
+
+
+@pytest.mark.parametrize('loader',['<Install/>','<broken'])
+def test_validation_checks_loader_before_unrelated_writers(weapon,loader):
+    root,_,install,entry=weapon;install.write_text(loader)
+    before=snapshot(root);old_root=entry['root']
+    with pytest.raises(ValueError):s.apply_weapon_edits('weapons','WEAPON_TEST',[FIRST],validate_only=True)
+    assert snapshot(root)==before and entry['root'] is old_root
+
+
+def test_real_http_validation_is_readonly_and_matches_save(weapon):
+    root,_,_,entry=weapon
+    http=s.create_server(0);worker=threading.Thread(target=http.serve_forever,daemon=True);worker.start()
+    def post(action,edits):
+        request=Request(f'http://127.0.0.1:{http.server_port}/api/weapons/{action}',data=json.dumps({'section':'weapons','name':'WEAPON_TEST','edits':edits}).encode(),headers={'Content-Type':'application/json'})
+        return json.load(urlopen(request,timeout=5))
+    try:
+        before=snapshot(root);old_root=entry['root']
+        assert post('validate',[FIRST])=={'validated':1}
+        assert snapshot(root)==before and entry['root'] is old_root
+        with pytest.raises(HTTPError) as error:post('validate',[FIRST,FIRST])
+        assert error.value.code==400 and snapshot(root)==before
+        assert post('save',[FIRST])=={'saved':1}
+        assert entry['root'].findall('Item')[0].find('Damage').get('value')==FIRST['value']
+    finally:http.shutdown();http.server_close();worker.join()
+
+
 BAD=[None,{},False,'',[None],[{}],[dict(FIRST,extra=1)],[dict(FIRST,path=[])],
      [dict(FIRST,path={})],[dict(FIRST,path=[-1])],[dict(FIRST,path=[True])],
      [dict(FIRST,path=[1.5])],[dict(FIRST,path=['1'])],[dict(FIRST,path=[99])],
