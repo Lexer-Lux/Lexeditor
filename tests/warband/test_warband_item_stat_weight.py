@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import sys
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/shared"))
@@ -16,6 +17,8 @@ def test_item_stat_edit_remove_add_preserves_weight_and_reloads(page, tmp_path, 
     source.write_text(SOURCE, encoding="utf-8")
     original = server.item_data()
     sent = []
+    writes = []
+    page.on("request", lambda request: writes.append(request.url) if request.method == "POST" else None)
 
     def api(route):
         path = route.request.url.split("http://fixture", 1)[1]
@@ -41,11 +44,27 @@ def test_item_stat_edit_remove_add_preserves_weight_and_reloads(page, tmp_path, 
     page.add_script_tag(content="const shell={refresh(){},history:{clear(){}}};")
     page.evaluate("""data=>{
       state.items=data;state.activeSource='mine';state.tab='items';state.selectedItem='0';state.booting=false;
-      moduleRecords={preflight(){},dirtyCount:()=>0,saveAll:async()=>({saved:0,files:[]})};renderItems();
+      moduleRecords={preflight(){},dirtyCount:()=>0,saveAll:async()=>({saved:0,files:[]}),snapshot:()=>({}),restore(){}};renderItems();
     }""", original)
     weight = page.locator('[data-lex-property="weight"] input')
+    before = source.read_bytes()
+    for invalid in ("", "1e309"):
+        weight.fill(invalid)
+        raw = weight.input_value()
+        assert not weight.evaluate("n=>n.checkValidity()")
+        assert page.evaluate("dirtyCount()") == 1
+        saved = page.evaluate("historyCapture()")
+        page.evaluate("state.selectedItem='1';renderItems();state.settingEdits={2:'0'};saveAll()")
+        page.get_by_text("sword / Weight: Enter a finite weight.", exact=True).wait_for()
+        page.get_by_role("button", name="Confirm and Close", exact=True).click()
+        assert not writes
+        assert source.read_bytes() == before
+        assert page.evaluate("state.settingEdits[2]") == "0"
+        page.evaluate("async value=>{await historyRestore(value);state.selectedItem='0';renderItems()}", saved)
+        assert weight.input_value() == raw
+    weight.fill("1.5")
+    assert page.evaluate("dirtyCount()") == 0
     weight.fill("3.25")
-    weight.dispatch_event("change")
     speed = page.get_by_label("spd_rtng value 1", exact=True)
     speed.fill("100")
     speed.dispatch_event("change")
@@ -61,9 +80,21 @@ def test_item_stat_edit_remove_add_preserves_weight_and_reloads(page, tmp_path, 
     length.fill("125")
     length.dispatch_event("change")
     assert weight.input_value() == "3.25"
+    external = before + b"\n# external item source edit\n"
+    source.write_bytes(external)
+    page.evaluate("saveAll()")
+    page.get_by_role("button", name="Confirm and Close", exact=True).click()
+    assert page.evaluate("state.status") == "Save failed"
+    assert source.read_bytes() == external
+    assert weight.input_value() == "3.25"
+    assert page.evaluate("dirtyCount()") > 0
+    page.evaluate("async()=>{state.items=await api('/api/items');renderItems()}")
+    assert weight.input_value() == "3.25"
     page.evaluate("saveAll()")
     assert page.evaluate("state.status") == "Saved and build verified"
-    assert len(sent) == 1
+    assert len(sent) == 2
+    assert sent[0]["edits"] == sent[1]["edits"]
+    assert b"# external item source edit" in source.read_bytes()
     reopened = server.item_data()
     assert reopened["rows"][0]["fields"]["stats"] == "weight(3.25)|weapon_length(125)"
     assert reopened["rows"][0]["weight"] == "3.25"
@@ -78,3 +109,24 @@ def test_item_stat_edit_remove_add_preserves_weight_and_reloads(page, tmp_path, 
     if destination := os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR"):
         Path(destination).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(Path(destination) / "warband-item-stats.png"))
+
+
+@pytest.mark.parametrize("replacement", ["weight(unresolved_weight)", "weight(1e999)", "0"])
+def test_unresolved_or_missing_weight_is_read_only(page, tmp_path, monkeypatch, replacement):
+    monkeypatch.setattr(server, "MODULE_SYSTEM", tmp_path)
+    source = tmp_path / "module_items.py"
+    source.write_text(SOURCE.replace("weight(1.5)", replacement), encoding="utf-8")
+    original = source.read_bytes()
+    data = server.item_data()
+    framework(page)
+    for script in ("field_controls.js", "editor.js"):
+        page.add_script_tag(path=str(ROOT / "plugins/warband" / script))
+    page.add_script_tag(content="const shell={refresh(){}};")
+    page.evaluate("data=>{state.items=data;document.querySelector('main').replaceChildren(warbandItemDetail(data.rows[0]))}", data)
+    fields = page.locator('[data-lex-property="weight"], [data-lex-property="weight-from-stats"]')
+    assert fields.count() >= 1
+    assert fields.locator('input[type="number"]').count() == 0
+    for control in fields.locator("input").all():
+        assert control.evaluate("n=>n.readOnly||n.disabled")
+    assert page.evaluate("itemDirtyCount()") == 0
+    assert source.read_bytes() == original

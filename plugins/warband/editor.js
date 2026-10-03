@@ -21,7 +21,7 @@
       unavailableTitle:"This view has no editable records to filter by.",
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
-  function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
+  function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Math.max(Object.keys(row.fields||{}).length,Object.prototype.hasOwnProperty.call(row,"weightDraft")?1:0),0);}
   function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Math.max(Object.keys(r.fields).length,Object.keys(r.rawStats||{}).length),0)+(moduleRecords?.dirtyCount()||0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
   function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),moduleRecords:moduleRecords?.snapshot(),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
   async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});moduleRecords?.restore(snapshot.moduleRecords);state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
@@ -150,7 +150,7 @@
   function effectiveItemField(item,key){return state.itemEdits[itemEditKey(item)]?.fields?.[key]??item.fields?.[key]??"";}
   function setItemField(item,key,value){
     const recordKey=itemEditKey(item),base=String(item.fields?.[key]??""),next=String(value);
-    if(next===base){const existing=state.itemEdits[recordKey];if(existing?.fields)delete existing.fields[key];if(existing&&!Object.keys(existing.fields).length)delete state.itemEdits[recordKey];}
+    if(next===base){const existing=state.itemEdits[recordKey];if(existing?.fields)delete existing.fields[key];if(existing&&!Object.keys(existing.fields).length&&!Object.prototype.hasOwnProperty.call(existing,"weightDraft"))delete state.itemEdits[recordKey];}
     else{const existing=state.itemEdits[recordKey]||(state.itemEdits[recordKey]={recordIndex:item.recordIndex,originalId:item.id,fields:{}});existing.fields[key]=next;}
     shell.refresh();
   }
@@ -198,6 +198,21 @@
     return el("div",{class:"lex-action-row"},select,show);
   }
   function itemWeightFromStats(stats){return (String(stats).match(/\bweight\(([^)]+)\)/)||[])[1]?.trim()||"";}
+  function itemWeightIssue(raw){
+    return typeof raw!=="string"||!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(raw.trim())||!Number.isFinite(Number(raw))?"Enter a finite weight.":"";
+  }
+  function setItemWeightDraft(item,raw){
+    const key=itemEditKey(item),draft=state.itemEdits[key] ||= {recordIndex:item.recordIndex,originalId:item.id,fields:{}};
+    if(raw===itemWeightFromStats(item.fields.stats))delete draft.weightDraft;else draft.weightDraft=raw;
+    const issue=itemWeightIssue(raw);
+    if(!issue)setItemWeight(item,raw);else shell.refresh();
+    return issue;
+  }
+  function preflightItemWeights(){
+    for(const draft of Object.values(state.itemEdits))if(Object.prototype.hasOwnProperty.call(draft,"weightDraft")){
+      const issue=itemWeightIssue(draft.weightDraft);if(issue)throw new Error(`${draft.originalId} / Weight: ${issue}`);
+    }
+  }
   function setItemWeight(item,value){
     const clean=String(value).trim();if(!clean)return;const stats=String(effectiveItemField(item,"stats"));
     const next=/\bweight\([^)]+\)/.test(stats)?stats.replace(/\bweight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
@@ -235,7 +250,14 @@
     const entries=itemMeshEntries(item),meshNames=itemMeshNames();
     const valueControl=el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)});
     const nameControl=el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)});
-    const weightControl=()=>el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)});
+    const weightControl=()=>{
+      const source=itemWeightFromStats(item.fields.stats);
+      if(itemWeightIssue(source))return LexeditorUI.readonlyField(source||"No weight macro",{format:false});
+      const value=state.itemEdits[itemEditKey(item)]?.weightDraft??itemWeightFromStats(effectiveItemField(item,"stats"));
+      const input=el("input",{type:"number",required:true,step:"any",value,disabled:readOnly,"data-lex-validate-number":"true",
+        oninput:event=>{if(!event.target.disabled)event.target.setCustomValidity(setItemWeightDraft(item,event.target.value));}});
+      input.setCustomValidity(itemWeightIssue(value));return input;
+    };
     const core=detailGroup({title:"Item",body:[
       detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:item.id,disabled:true})}),
       detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:sized(nameControl)}),
@@ -548,6 +570,7 @@
     try{
       moduleRecords.preflight();
       preflightTroopStats();
+      preflightItemWeights();
       const itemSourceDirty=state.catalogFile?.filename==="module_items.py"&&state.catalogFile.editable&&state.catalogDraft!==state.catalogFile.text;
       if(itemDirtyCount()&&itemSourceDirty)throw new Error("Items has structured edits while module_items.py also has unsaved source edits. Save or discard one editing path before using the other.");
       if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,sha256:state.settings.sha256})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
@@ -559,7 +582,7 @@
         if(state.catalogFile?.filename==="module_troops.py"){state.catalogFile=await api("/api/catalog/file?name=module_troops.py");state.catalogDraft=state.catalogFile.text;}
       }
       if(itemDirtyCount()){
-        const selectedRecord=state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
+        const selectedRecord=state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits).filter(row=>Object.keys(row.fields).length).map(({recordIndex,originalId,fields})=>({recordIndex,originalId,fields}));
         const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.items.sha256,edits})});state.items=await api("/api/items");state.itemEdits={};
         if(selectedRecord!==undefined){const selected=state.items.rows.find(row=>row.recordIndex===selectedRecord);state.selectedItem=selected?itemRowKey(selected):"";}
         if(state.catalogFile?.filename==="module_items.py"){state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;}
