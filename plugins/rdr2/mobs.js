@@ -6,7 +6,7 @@ const MOB_LAYERS={
   combat:{label:"Combat profiles",file:"combat",
     hint:"Combat profiles control faction accuracy and combat behavior. A profile change affects every character assigned to it. Situational accuracy settings are on the AI tab."},
   health:{label:"Health archetypes",file:"health",
-    hint:"Health archetypes control health, armour and injury thresholds. A change affects every character assigned to that archetype."},
+    hint:"These profiles control health and related character resources. Choose a section to see its profiles. A change affects every character assigned to that profile."},
 };
 const MOB_COMBAT_COLUMNS=[
   ["WeaponAccuracy","Accuracy","Base hit chance for this faction before situational accuracy modifiers."],
@@ -126,10 +126,17 @@ async function renderMobArchetypes(){
     savebar(saveMobs));
   const m=$("#main");m.innerHTML="";
   if(!data||!data.available)return noData(`No ${layerKey==="health"?"pedhealth.meta":"combatbehaviour.meta"} in this dataset and no vanilla extract to fall back on.`);
+  if(layerKey==="health"){
+    const sections=[...new Set(data.records.map(record=>record.section))];
+    if(!sections.includes(f.mobHealthSection))f.mobHealthSection=sections.includes("HealthConfig")?"HealthConfig":sections[0];
+    const labels={HealthConfig:"Health",StaminaConfig:"Stamina",SpecialAbilityConfig:"Special ability",HealthRechargeConfig:"Health recharge",EnergyConfig:"Energy"};
+    tb.append(LexeditorUI.detailField({label:"Section",control:el("select",{"aria-label":"Section",onchange:event=>{f.mobHealthSection=event.target.value;renderMobs();}},
+      ...sections.map(section=>el("option",{value:section,selected:section===f.mobHealthSection},labels[section]||section)))}));
+  }
   const columns=layerKey==="health"?MOB_HEALTH_COLUMNS:MOB_COMBAT_COLUMNS;
   const q=(f.mobQ||"").toUpperCase();
   let rows=data.records.filter(r=>r.group===f.mobGroup&&(!q||r.name.toUpperCase().includes(q)));
-  if(layerKey==="health")rows=rows.filter(r=>r.section==="HealthConfig");
+  if(layerKey==="health")rows=rows.filter(r=>r.section===f.mobHealthSection);
   if(!rows.length)return m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"Nothing in this group matches the filter."));
   const fieldOf=(record,name)=>record.fields.find(x=>x.field===name);
   const getters={name:r=>r.name};

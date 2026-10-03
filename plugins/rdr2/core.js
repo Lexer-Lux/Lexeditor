@@ -781,10 +781,10 @@ function weaponRecordLink(section,name,content=null){
 }
 
 function mobArchetypeLink(layer,name,content=null){
-  const record=state.mobs?.[layer]?.records?.find(row=>row.name===name);
+  const record=state.mobs?.[layer]?.records?.find(row=>row.name===name&&(layer!=="health"||row.section==="HealthConfig"));
   if(!record)return content??name;
   return rdrHoverable({content:content??name,targetType:"rdr2-mob-archetype",targetId:`${layer}|${record.group}|${name}`,
-    targetLabel:`${name} in Mobs`,activate:()=>navigate("mobs",{mobView:"archetypes",mobLayer:layer,mobGroup:record.group,mobQ:name})});
+    targetLabel:`${name} in Mobs`,activate:()=>navigate("mobs",{mobView:"archetypes",mobLayer:layer,mobGroup:record.group,mobQ:name,...(layer==="health"?{mobHealthSection:"HealthConfig"}:{})})});
 }
 
 async function fillItemSources(it,list){

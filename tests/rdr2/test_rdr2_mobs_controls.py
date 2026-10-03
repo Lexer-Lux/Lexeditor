@@ -116,6 +116,45 @@ def test_mobs_controls_real_save_reload_failure_and_hidden_preflight(mobs,tmp_pa
                 page.locator('.mob-table').get_by_text('GANG_FIXTURE',exact=True).click()
                 expect(accuracy()).to_have_value('9007199254740993')
                 page.screenshot(path=str(tmp_path/'mobs-controls.png'),full_page=True)
+                # Reuse one identity in every supported section: index paths,
+                # not display names, must keep the five profiles independent.
+                source=paths[1].read_bytes()
+                extra=b''.join(f'<{section}><Item key="FIXTURE"><Energy value="{index+20}"/><Enabled>true</Enabled></Item></{section}>'.encode() for index,section in enumerate(s.PEDHEALTH_SECTIONS[1:]))
+                paths[1].write_bytes(source.replace(b'</Root>',extra+b'</Root>'))
+                s._files.clear()
+                page.evaluate("async()=>{state.mobs=null;state.filters.mobLayer='health';state.filters.mobGroup='other';await renderMobs()}")
+                selector=page.get_by_role('combobox',name='Section',exact=True)
+                assert selector.locator('option').count()==5
+                expect(selector).to_have_value('HealthConfig')
+                for index,section in enumerate(s.PEDHEALTH_SECTIONS[1:]):
+                    selector.select_option(section)
+                    field=page.get_by_role('spinbutton',name='FIXTURE Energy',exact=True)
+                    expect(field).to_have_value(str(index+20))
+                    field.fill(f'{index+30}.125')
+                selector.select_option('HealthConfig')
+                expect(page.get_by_role('spinbutton',name='FIXTURE Energy',exact=True)).to_have_value('12.3456789')
+                assert page.evaluate('Object.keys(state.mobEdits).length')==4
+                page.evaluate('saveMobs()')
+                page.wait_for_function('Object.keys(state.mobEdits).length===0')
+                page.evaluate("async()=>{state.mobs=null;await renderMobs()}")
+                for index,section in enumerate(s.PEDHEALTH_SECTIONS[1:]):
+                    selector.select_option(section)
+                    expect(page.get_by_role('spinbutton',name='FIXTURE Energy',exact=True)).to_have_value(f'{index+30}.125')
+                    assert s.parse_with_comments(paths[1]).find(f'{section}/Item/Energy').get('value')==f'{index+30}.125'
+                assert s.parse_with_comments(paths[1]).find('HealthConfig/Item/Energy').get('value')=='12.3456789'
+                page.screenshot(path=str(tmp_path/'mobs-health-sections.png'),full_page=True)
+                # Observed HP candidates always link to HealthConfig even if
+                # the reader was last editing a resource section of that name.
+                target=page.evaluate('''()=>{
+                  const original=rdrHoverable;let spec;
+                  rdrHoverable=value=>{spec=value;return document.createElement('span')};
+                  const previous=navigate;let destination;
+                  navigate=(tab,filters)=>destination={tab,filters};
+                  try{mobArchetypeLink('health','FIXTURE');spec.activate();return destination;}
+                  finally{rdrHoverable=original;navigate=previous;}
+                }''')
+                assert target['tab']=='mobs' and target['filters']['mobHealthSection']=='HealthConfig'
+                page.evaluate("async()=>{state.filters.mobLayer='combat';state.filters.mobGroup='humans';await renderMobs()}")
                 page.evaluate("async()=>{state.mobs.combat.records[0].fields.find(row=>row.field==='Accuracy').value='NaN';await renderMobs()}")
                 expect(page.get_by_role('textbox',name='Accuracy',exact=True)).to_be_disabled()
                 page.evaluate("async()=>{state.mobs=null;state.ds='vanilla';await renderMobs()}")
