@@ -74,3 +74,26 @@ Moving or repeating a scene among slots changes its initial chance using the
 global weights. A different weight table or retry rule changes executable
 behavior and requires a Hext patch in an explicitly created mod. It is not a
 plain `wmsetus.obj` probability edit.
+
+## An in-place per-group selector
+
+`encounter_chances.selector_patch` authors a replacement for exactly
+`0x541E2D..0x541EDF`, the existing 178-byte selection/retry block. It rejoins
+the original function at `0x541EDF`. No code cave, driver callback, or new
+allocation is needed by this block. The executable hash gates emission.
+
+The replacement reads a caller-supplied extension relative to the normal
+encounter-group pointer at `0x2036BE8`. The extension starts with one default
+record, then one record per normal group. Each record has eight unsigned
+16-bit outcome counts totalling 256. A group can assign zero to a slot or all
+256 outcomes to one slot. Alternative groups retain the leading default
+distribution. The builder validates every outcome record before encoding it.
+
+`verify_ff8_encounter_chance_patch.py` compares separate original and modified
+emulators across all 65,536 initial counter/shift states using the default
+distribution. It also verifies native retry parity, frame/register preservation
+at the rejoin, zero and 256 outcomes, isolation between normal groups, the
+alternative-group fallback, and the two-draw bound when a previous formation
+has a 100% chance. The weight extension is an authored memory fixture in this
+check; this evidence does not establish loading a larger game data file or
+deploying a mod in the running game.
