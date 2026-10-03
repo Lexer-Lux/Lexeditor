@@ -168,7 +168,7 @@ def test_dataset_add_reopens_created_record_and_sends_source_to_build(page, tmp_
             page.wait_for_timeout(50)
             assert level.input_value() == invalid
             assert not level.evaluate("n=>n.checkValidity()")
-            assert page.evaluate("moduleRecords.dirtyCount()") == 0
+            assert page.evaluate("moduleRecords.dirtyCount()") == 1
             assert source.read_bytes() == before
         level.fill("12")
         assert level.evaluate("n=>n.checkValidity()")

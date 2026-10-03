@@ -4,7 +4,7 @@
   const copy=value=>JSON.parse(JSON.stringify(value));
   function create(options){
     const {state,api,main,toolbar,refreshShell,renderApp,setStatus,dataMapRows,sourceDraft}=options;
-    const cache=new Map(),edits={},view={};let active="";
+    const cache=new Map(),edits={},drafts={},view={};let active="";
     const availableRows=()=> (dataMapRows()||[]).filter(row=>row.dataset);
     const rowFor=dataset=>availableRows().find(row=>row.dataset===dataset);
     const labelFor=dataset=>rowFor(dataset)?.recordLabel||dataset;
@@ -34,7 +34,24 @@
       }
       refreshDirtyChrome();
     }
-    const datasetDirtyCount=dataset=>Object.values(editBucket(dataset)).reduce((n,row)=>n+Object.keys(row.fields||{}).length,0);
+    const draftValue=(dataset,row,key)=>drafts[dataset]?.[editKey(row)]?.[key]??effective(dataset,row,key);
+    function numericDraft(dataset,row,spec,raw){
+      const bucket=drafts[dataset]||(drafts[dataset]={}),key=editKey(row);
+      const fields=bucket[key]||(bucket[key]={});
+      const vector=Array.isArray(raw),issue=vector?raw.map(value=>numericIssue({kind:'number'},value)).find(Boolean):numericIssue(spec,raw);
+      const value=vector?raw.map(Number):Number(raw);
+      if(!issue&&same(value,row.fields[spec.key]))delete fields[spec.key];
+      else fields[spec.key]=copy(raw);
+      if(!Object.keys(fields).length)delete bucket[key];
+      if(!issue)setField(dataset,row,spec.key,value);else refreshDirtyChrome();
+      return issue||"";
+    }
+    const datasetDirtyCount=dataset=>{
+      const keys=new Set();
+      for(const [row,record] of Object.entries(editBucket(dataset)))for(const field of Object.keys(record.fields||{}))keys.add(row+':'+field);
+      for(const [row,fields] of Object.entries(drafts[dataset]||{}))for(const field of Object.keys(fields))keys.add(row+':'+field);
+      return keys.size;
+    };
     function refreshDirtyChrome(){
       // The shell's own Save carries the unsaved count and the History pair
       // undoes an edit, so this view keeps no second Save or Discard of its
@@ -42,7 +59,7 @@
       // which of the two they meant.
       refreshShell();
     }
-    const dirtyCount=()=>Object.keys(edits).reduce((n,dataset)=>n+datasetDirtyCount(dataset),0);
+    const dirtyCount=()=>[...new Set([...Object.keys(edits),...Object.keys(drafts)])].reduce((n,dataset)=>n+datasetDirtyCount(dataset),0);
     const creationBlocked=()=>state.activeSource!=="mine"?"Open an editable mod first.":
       (options.hasPendingEdits?.()||dirtyCount())?"Save or discard pending edits before creating a record.":
       state.build?.running?"Wait for the current build to finish.":"";
@@ -78,10 +95,12 @@
         U.actionRow(U.el('button',{type:'button',onclick:renderApp},'Cancel'),create)]}));
       id.focus();
     }
-    const snapshot=()=>({edits:copy(edits),active,view:copy(view)});
+    const snapshot=()=>({edits:copy(edits),drafts:copy(drafts),active,view:copy(view)});
     function restore(value){
       for(const key of Object.keys(edits))delete edits[key];
       Object.assign(edits,copy(value?.edits||{}));active=value?.active||active;
+      for(const key of Object.keys(drafts))delete drafts[key];
+      Object.assign(drafts,copy(value?.drafts||{}));
       for(const key of Object.keys(view))delete view[key];
       Object.assign(view,copy(value?.view||{}));
     }
@@ -129,24 +148,25 @@
       return true;
     }
     function fieldControl(dataset,row,spec,readOnly){
-      const value=effective(dataset,row,spec.key),problem=row.fieldProblems?.[spec.key];
+      const value=draftValue(dataset,row,spec.key),problem=row.fieldProblems?.[spec.key];
       const disabled=readOnly||spec.kind==="identity"||!!problem;
       if(/^vec[234]$/.test(spec.kind)){
         const count=Number(spec.kind.slice(3));
         if(!Array.isArray(value)||value.length!==count)return LexeditorUI.readonlyField(String(value??""),{format:false});
         return LexeditorUI.multiNumberRow(value.map((component,index)=>({
           label:spec.components?.[index]||String(index+1),
-          control:LexeditorUI.el("input",{type:"number",step:"any",value:component,disabled,
-            oninput:event=>{if(event.target.disabled||numericIssue({kind:'number'},event.target.value))return;const next=[...effective(dataset,row,spec.key)];next[index]=Number(event.target.value);setField(dataset,row,spec.key,next);}})
+          control:LexeditorUI.el("input",{type:"number",step:"any",required:true,value:component,disabled,
+            "data-lex-validate-number":"true",
+            oninput:event=>{if(event.target.disabled)return;const next=[...draftValue(dataset,row,spec.key)];next[index]=event.target.value;numericDraft(dataset,row,spec,next);event.target.setCustomValidity(numericIssue({kind:'number'},event.target.value));}})
         })),{columns:Math.min(count,3)});
       }
       const attrs={value:value??"",disabled};
       if(spec.kind==="integer"||spec.kind==="number"){
-        if(typeof value!=="number")return LexeditorUI.el("input",{value:String(value??""),disabled:true,title:problem||"This source value is not a numeric literal; edit it in source."});
-        Object.assign(attrs,{type:"number",step:spec.kind==="integer"?1:"any","data-lex-validate-number":"true"});
+        if(typeof row.fields?.[spec.key]!=="number")return LexeditorUI.el("input",{value:String(value??""),disabled:true,title:problem||"This source value is not a numeric literal; edit it in source."});
+        Object.assign(attrs,{type:"number",required:true,step:spec.kind==="integer"?1:"any","data-lex-validate-number":"true"});
         if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;
-        attrs.oninput=event=>{const input=event.target;if(input.disabled)return;const issue=numericIssue(spec,input.value);input.setCustomValidity(issue);if(issue)return;setField(dataset,row,spec.key,Number(input.value));};
-        return LexeditorUI.el("input",attrs);
+        attrs.oninput=event=>{const input=event.target;if(input.disabled)return;input.setCustomValidity(numericDraft(dataset,row,spec,input.value));};
+        const input=LexeditorUI.el("input",attrs);input.setCustomValidity(numericIssue(spec,value));return input;
       }
       if(spec.kind==="expr"){
         const control=LexeditorUI.codeField({value:value??"",disabled,oninput:event=>setField(dataset,row,spec.key,event.target.value)});return control;
@@ -243,9 +263,9 @@
           column.edit=(row,value)=>{
             if(state.activeSource!=="mine"||row.problem||row.fieldProblems?.[key])return;
             const numeric=spec.kind==="integer"||spec.kind==="number";
-            if(numeric&&(typeof effective(active,row,key)!=="number"||numericIssue(spec,value)))return;
-            const parsed=numeric?Number(value):value;
-            setField(active,row,key,parsed);renderApp();
+            if(numeric&&typeof row.fields?.[key]!=="number")return;
+            if(numeric)numericDraft(active,row,spec,value);else setField(active,row,key,value);
+            renderApp();
           };
           if(spec.kind==="integer"||spec.kind==="number"){column.numeric=true;column.step=spec.kind==="integer"?1:"any";if(spec.min!==undefined)column.min=spec.min;if(spec.max!==undefined)column.max=spec.max;}
         }
@@ -265,7 +285,21 @@
         sync:next=>{local.page=next.page;local.pageSize=next.pageSize;local.selected=next.selected||"";},
         change:next=>{local.page=next.page;local.pageSize=next.pageSize;local.selected=next.selected||"";renderApp();}})));
     }
+    function preflight(){
+      for(const dataset of new Set([...Object.keys(edits),...Object.keys(drafts)])){
+        if(!datasetDirtyCount(dataset))continue;
+        const data=cache.get(dataset)?.data;if(!data?.available)throw new Error(labelFor(dataset)+" source is not loaded");
+        if(sourceDraft(data.filename))throw new Error(labelFor(dataset)+" has structured edits while "+data.filename+" also has an unsaved source edit. Save or discard one editing path before using the other.");
+        for(const [key,fields] of Object.entries(drafts[dataset]||{}))for(const [field,raw] of Object.entries(fields)){
+          const row=data.rows.find(row=>String(row.recordIndex)===key),spec=data.schema.fields.find(spec=>spec.key===field);
+          if(!row||!spec)throw new Error("The edited Module System field is no longer available.");
+          const issue=/^vec[234]$/.test(spec.kind)?(!Array.isArray(raw)||raw.length!==Number(spec.kind.slice(3))?"Enter every vector component.":raw.map(value=>numericIssue({kind:'number'},value)).find(Boolean)):numericIssue(spec,raw);
+          if(issue)throw new Error(`${labelFor(dataset)} / ${row.id} / ${spec.label}: ${issue}`);
+        }
+      }
+    }
     async function saveAll(){
+      preflight();
       let saved=0;const savedFiles=[];
       for(const dataset of Object.keys(edits)){
         const datasetEdits=Object.values(editBucket(dataset)).filter(record=>Object.keys(record.fields||{}).length);
@@ -273,12 +307,12 @@
         const data=cache.get(dataset)?.data;if(!data?.available)throw new Error(labelFor(dataset)+" source is not loaded");
         if(sourceDraft(data.filename))throw new Error(labelFor(dataset)+" has structured edits while "+data.filename+" also has an unsaved source edit. Save or discard one editing path before using the other.");
         const result=await api("/api/module-records/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataset,sha256:data.sha256,edits:datasetEdits})});
-        saved+=Number(result.saved||0);savedFiles.push(data.filename);edits[dataset]={};await load(dataset,true);
+        saved+=Number(result.saved||0);savedFiles.push(data.filename);edits[dataset]={};drafts[dataset]={};await load(dataset,true);
       }
       return {saved,files:savedFiles};
     }
     function fileHasEdits(filename){const row=availableRows().find(value=>value.filename===filename&&value.dataset);return row?datasetDirtyCount(row.dataset)>0:false;}
-    return {render,open,openRecord,activate,dirtyCount,snapshot,restore,saveAll,fileHasEdits,load,active:()=>active,datasetDirtyCount,tabFor};
+    return {render,open,openRecord,activate,dirtyCount,snapshot,restore,preflight,saveAll,fileHasEdits,load,active:()=>active,datasetDirtyCount,tabFor};
   }
   window.WarbandModuleRecords={create};
 })();
