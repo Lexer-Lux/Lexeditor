@@ -55,6 +55,27 @@ def test_chance_drafts_header_save_reopen_and_default_restore(service):
             assert chance(index).get_attribute('min') == '0'
             assert chance(index).get_attribute('max') == '100'
             assert chance(index).get_attribute('step') == '0.390625'
+        chance(0).fill('1')
+        page.wait_for_function('() => shell.history.canUndo')
+        page.locator('#global-undo').click()
+        assert float(chance(0).input_value()) == initial[0]
+        assert page.evaluate('dirtyCount()') == 0
+        page.locator('#global-redo').click()
+        assert chance(0).input_value() == '1'
+        assert page.evaluate('encounterChanceDraftCount()') == 1
+        # Undo of a different slot must retain the first slot's invalid draft
+        # even though history restoration replaces all world row objects.
+        chance(1).fill('50')
+        page.wait_for_function('() => shell.history.canUndo')
+        page.locator('#global-undo').click()
+        assert chance(0).input_value() == '1'
+        assert float(chance(1).input_value()) == initial[1]
+        page.locator('#global-redo').click()
+        assert chance(0).input_value() == '1'
+        assert float(chance(1).input_value()) == 50
+        page.evaluate('discardAll()')
+        assert float(chance(0).input_value()) == initial[0]
+        assert page.evaluate('encounterChanceDraftCount()') == 0
         for value in ('', '-0.390625', '100.390625', '1'):
             chance(0).fill(value)
             assert not chance(0).evaluate('(input) => input.checkValidity()')

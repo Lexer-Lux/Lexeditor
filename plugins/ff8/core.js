@@ -69,7 +69,7 @@
   function historyFullCapture(){return {...Object.fromEntries(editableDatasets.map(name=>[name,clone(state.data[name]?.rows||[])])),init:clone(state.data.init||{}),settings:clone(state.data.settings||{})}}
   function historyCapture(){
     if(!historyBaseSigs)resetHistoryBaseSigs();
-    const snap={gen:historyBaseGen};
+    const snap={gen:historyBaseGen,encounterChanceDrafts:captureEncounterChanceDrafts()};
     for(const name of editableDatasets){
       const rows=state.data[name]?.rows||[],base=state.base[name]||[],sigs=historyBaseSigs[name];
       if(!(sigs instanceof Map)||rows.length!==base.length){snap[name]={full:clone(rows)};continue}
@@ -99,6 +99,7 @@
       }
       state.data[name].rows=rows;
     }
+    restoreEncounterChanceDrafts(snapshot.encounterChanceDrafts);
   }
   function setStatus(text){state.status=text}
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}

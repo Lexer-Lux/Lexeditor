@@ -195,6 +195,10 @@ IDs. Zero excludes a slot; 100% leaves that slot as the only initial choice.
 The previous-scene retry still applies.
 
 Invalid numeric drafts survive tab navigation and remain pending changes.
+Sparse history snapshots include those drafts separately from game values and
+reattach them by group ID after restoring World rows. Undo/Redo restores both
+valid weights and invalid input; undoing another slot retains an existing
+invalid draft. Discard removes the drafts along with other pending changes.
 Header Save validates every group's complete distribution before starting any
 writer, including groups whose controls are hidden. Vanilla controls are
 disabled. Valid edits use the loaded world-source hash and the paired Save
@@ -204,7 +208,7 @@ and empties the generated Hext.
 `test_ff8_encounter_chance_controls.py` runs the production editor in a headless
 browser and sends World requests through the production HTTP handler using
 authored data and executable-signature fixtures. It covers bounds, invalid
-steps and drafts, hidden errors blocking unrelated formation writes, summary
+steps and drafts, Undo/Redo and Discard, hidden errors blocking unrelated formation writes, summary
 updates, zero/100% choices, header Save, reload, Rules/Groups parity, default
 restoration and disabled Vanilla controls. The existing Encounter browser
 verifier separately covers group/formation/enemy pickers and shared layouts.

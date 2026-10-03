@@ -243,6 +243,14 @@
   const encounterInitialOutcomes=Object.freeze([38,37,37,37,36,36,24,11]);
   const encounterChanceDrafts=new WeakMap();
   function encounterChanceDraftCount(){return encounterGroupRows().reduce((count,row)=>count+(encounterChanceDrafts.get(row)?.size||0),0)}
+  function captureEncounterChanceDrafts(){return encounterGroupRows().filter(row=>encounterChanceDrafts.get(row)?.size)
+    .map(row=>[row.id,[...encounterChanceDrafts.get(row)]])}
+  function restoreEncounterChanceDrafts(snapshot){
+    for(const row of encounterGroupRows())encounterChanceDrafts.delete(row);
+    for(const [id,entries] of snapshot||[]){const row=encounterGroupById(id);
+      if(row&&entries.length)encounterChanceDrafts.set(row,new Map(entries));
+    }
+  }
   function encounterChanceError(row){
     if(encounterChanceDrafts.get(row)?.size)return `Correct the invalid chance in encounter group ${row.id}.`;
     const weights=row.initialOutcomes||encounterInitialOutcomes;
