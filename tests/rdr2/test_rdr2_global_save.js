@@ -16,7 +16,8 @@ const loot = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/loot.js'),
 const lootValidation = loot.slice(loot.indexOf('function lootNumericError('), loot.indexOf('// Saves every dirty loot file.'));
 const matrixValidation = loot.slice(loot.indexOf('function matrixQuantityError('), loot.indexOf('async function renderMatrix()'));
 const crime = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/crime.js'), 'utf8');
-const dispatchValidation = crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()'));
+const dispatchValidation = crime.slice(crime.indexOf('function bountyValueError('), crime.indexOf('function bountyNumber(')) +
+  crime.slice(crime.indexOf('function dispatchNumericError('), crime.indexOf('function dispatchSection()'));
 const challenges = fs.readFileSync(path.join(__dirname, '../../plugins/rdr2/challenges.js'), 'utf8');
 const challengeValidation = challenges.slice(challenges.indexOf('function validateChallengeDrafts('), challenges.indexOf('function challengeUiInput('));
 const challengeSave = challenges.slice(challenges.indexOf('async function saveChallenges()'));

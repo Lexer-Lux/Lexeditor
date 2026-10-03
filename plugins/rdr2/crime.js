@@ -70,13 +70,39 @@ function normalizeBountyHunters(data){
 }
 function scrollableCrimeTable(table){return table;}
 
+function bountyValueError(id,raw){
+  const error=dispatchNumericError(raw);
+  if(error||Number(raw)<0)return "Enter a nonnegative finite number.";
+  return id.endsWith("/Chances")&&Number(raw)>1?"Enter a probability between 0 and 1.":"";
+}
+function bountySettings(data){
+  const rows=[...(data?.settings||[])];
+  for(const row of data?.cooldowns||[])for(const [key,id] of Object.entries(row.ids||{}))rows.push({id,value:row[key]});
+  for(const phase of data?.phases||[]){
+    if(phase.multiplierId)rows.push({id:phase.multiplierId,value:phase.multiplier});
+    for(const group of phase.groups||[])for(const [key,id] of Object.entries(group.ids||{}))rows.push({id,value:group[key]});
+  }
+  return rows;
+}
+function validateBountyHunterDrafts(){
+  const rows=bountySettings(state.bountyHunters.mine);
+  for(const [id,value] of Object.entries(state.bountyHunterEdits)){
+    const matches=rows.filter(row=>row.id===id);
+    if(matches.length!==1||bountyValueError(id,String(matches[0].value).replace(/f$/i,"")))throw new Error(`${id} is read-only or unavailable.`);
+    const error=bountyValueError(id,value);if(error)throw new Error(`${id}: ${error}`);
+  }
+}
 function bountyNumber(setting,label,help,reference=null){
   if(!setting)return el("span",{},"—");
-  const cur=state.bountyHunterEdits[setting.id]??setting.value;
-  const input=el("input",{type:"number",min:"0",step:"any",value:cur,disabled:isRO(),class:setting.id in state.bountyHunterEdits?"edited":"",
-    onchange:ev=>{const v=ev.target.value;if(v===setting.value)delete state.bountyHunterEdits[setting.id];else state.bountyHunterEdits[setting.id]=v;renderToolbarOnly();refreshGlobalSave();}});
+  const original=String(setting.value).replace(/f$/i,"");
+  const editable=!isRO()&&!bountyValueError(setting.id,original);
+  const cur=editable?(state.bountyHunterEdits[setting.id]??original):original;
+  const input=bountyValueError(setting.id,original)?LexeditorUI.readonlyField(original):el("input",{type:"number",min:"0",max:setting.id.endsWith("/Chances")?"1":undefined,step:"any",required:true,"data-lex-validate-number":"true",value:cur,disabled:!editable,class:setting.id in state.bountyHunterEdits?"edited":"",
+    oninput:ev=>{if(!editable)return;const v=ev.target.value;if(v===original)delete state.bountyHunterEdits[setting.id];else state.bountyHunterEdits[setting.id]=v;ev.target.classList.toggle("edited",setting.id in state.bountyHunterEdits);ev.target.setCustomValidity(bountyValueError(setting.id,v));renderToolbarOnly();refreshGlobalSave();}});
+  input.setAttribute("aria-label",setting.id);
+  if(input.type==="number")input.setCustomValidity(bountyValueError(setting.id,cur));
   const refs=state.ds==="mine"&&reference?[["V","vtag",String(reference.value).replace(/f$/i,"")]]:null;
-  const control=refField(input,refs,undefined,v=>applyToControl(input,v),String);
+  const control=lootReferenceControl(editable,refField(input,refs,undefined,v=>{if(editable){input.value=String(v).replace(/f$/i,"");input.dispatchEvent(new Event("input",{bubbles:true}));}},String));
   return label===""?control:LexeditorUI.detailField({label:safeDisplay(label,"Setting"),control,help:help?fieldHelp(help):null});
 }
 
@@ -142,6 +168,7 @@ async function renderBountyHunters(){
 }
 
 async function saveBountyHunters(){
+  validateBountyHunterDrafts();
   const edits=Object.entries(state.bountyHunterEdits).map(([id,value])=>({id,value}));if(!edits.length)return 0;
   const r=await api("/api/bounty-hunters/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});
   state.bountyHunterEdits={};state.bountyHunters.mine=null;toast(`Saved ${r.saved} bounty-hunter setting(s)`);renderCrime();return r.saved;
