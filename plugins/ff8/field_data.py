@@ -1087,8 +1087,10 @@ def _prepare_dialogue_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, i
     source = _dialogue_source_path(key, "current")
     if source is None:
         raise ValueError(f"Field map {key} has no dialogue MSD")
+    if any(set(edit) - {"type", "map", "line", "text"} for edit in edits):
+        raise ValueError("Field dialogue edit contains an unsupported field")
     raw, changed = field_dialogue.apply_edits(source.read_bytes(), [
-        {"id": int(edit.get("line", -1)), "text": str(edit.get("text", ""))}
+        {"id": edit.get("line", -1), "text": edit.get("text", "")}
         for edit in edits
     ], map_name=row["name"])
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
