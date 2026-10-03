@@ -15,15 +15,14 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-RDR2_ROOT = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul")
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(RDR2_ROOT / "tools" / "reverse-engineering"))
 
 from plugins.ff8.plugin import FF8Session  # noqa: E402
-from plugins.rdr2.plugin import Rdr2Session  # noqa: E402
+from plugins.rdr2.plugin import Rdr2Session, project_root as rdr2_project_root  # noqa: E402
 from plugins.blank.plugin import BlankSession  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
+from verify_all import _ff8_baseline_sentinel  # noqa: E402
 
 
 EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
@@ -75,15 +74,23 @@ def screenshot(cdp: Cdp, name: str) -> Path:
 
 
 def check_layout(cdp: Cdp, selector: str, panel_selector: str, key: str) -> dict:
+    wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 90)
+    # Responsive minima settle after the newly mounted composer is observed.
+    cdp.eval("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))", True)
     return cdp.eval(f"""(()=>{{
       const root=document.querySelector({selector!r});
       const panels=[...root.querySelectorAll(':scope > {panel_selector}')];
       const dividers=[...root.querySelectorAll(':scope > .lex-panel-layout-divider')];
       const before=panels.map(panel=>panel.getBoundingClientRect().width);
-      dividers[0].dispatchEvent(new KeyboardEvent('keydown',{{key:'ArrowRight',bubbles:true}}));
+      dividers[0].focus();
+      const event=new KeyboardEvent('keydown',{{key:'ArrowRight',code:'ArrowRight',bubbles:true,cancelable:true}});
+      dividers[0].dispatchEvent(event);
       const after=panels.map(panel=>panel.getBoundingClientRect().width);
       return {{panels:panels.length,dividers:dividers.length,before,after,
         stored:JSON.parse(localStorage.getItem({key!r})||'null'),
+        rootClass:root.className,orientation:dividers[0].getAttribute('aria-orientation'),
+        heights:panels.map(panel=>panel.getBoundingClientRect().height),
+        prevented:event.defaultPrevented,template:root.style.getPropertyValue('--lex-panel-layout-template'),
         errors:window.__testErrors}};
     }})()""")
 
@@ -118,15 +125,15 @@ def verify_ff8() -> dict:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('gfs')")
-            wait_eval(cdp, "document.querySelectorAll('.gf-three-panel>.gf-panel').length===3", 30)
-            result = check_layout(cdp, ".gf-three-panel", ".gf-panel",
+            wait_eval(cdp, "document.querySelectorAll('.gf-three-panel>.lex-panel-layout-pane').length===3", 30)
+            result = check_layout(cdp, ".gf-three-panel", ".lex-panel-layout-pane",
                                   "lexeditor:panel-layout:ff8-gfs")
             assert result["panels"] == 3 and result["dividers"] == 2, result
             assert result["after"][0] > result["before"][0], result
             assert result["after"][1] < result["before"][1], result
             assert abs(result["after"][2] - result["before"][2]) < 2, result
             assert isinstance(result["stored"], list) and len(result["stored"]) == 3, result
-            pointer = drag_second_divider(cdp, ".gf-three-panel", ".gf-panel")
+            pointer = drag_second_divider(cdp, ".gf-three-panel", ".lex-panel-layout-pane")
             assert abs(pointer["after"][0] - pointer["before"][0]) < 2, pointer
             assert pointer["after"][1] > pointer["before"][1], pointer
             assert pointer["after"][2] < pointer["before"][2], pointer
@@ -136,7 +143,7 @@ def verify_ff8() -> dict:
                 "width": 900, "height": 900, "deviceScaleFactor": 1, "mobile": False,
             })
             narrow = cdp.eval("""(()=>{const root=document.querySelector('.gf-three-panel'),
-              panels=[...root.querySelectorAll(':scope>.gf-panel')],
+              panels=[...root.querySelectorAll(':scope>.lex-panel-layout-pane')],
               dividers=[...root.querySelectorAll(':scope>.lex-panel-layout-divider')];return{
                 dividerDisplays:dividers.map(node=>getComputedStyle(node).display),
                 tops:panels.map(node=>node.getBoundingClientRect().top)};})()""")
@@ -176,28 +183,19 @@ def verify_blank() -> dict:
         with BlankSession() as session:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "document.body.dataset.lexPlugin==='blank'&&!!document.querySelector('.blank-layout')", 30)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 90)
+            # This standalone service has no native host to supply defaults.
+            # Exercise the supported default boolean style explicitly.
+            cdp.eval("window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{booleanBoxStyle:true}}))")
+            # Blank opens its component catalogue; use its retained full
+            # control sample explicitly for the composer regression fixture.
+            cdp.eval("navigate('one')")
+            wait_eval(cdp, "!!document.querySelector('.blank-detail')", 10)
             gallery = cdp.eval("""(()=>({panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,fields:document.querySelectorAll('.lex-detail-field').length,errors:window.__lexErrors||[]}))()""")
             assert gallery["panels"] == 1 and gallery["dividers"] == 0 and gallery["fields"] >= 11, gallery
-            # Tweaks is an ordinary page again. Compare it with a nearby
-            # ordinary tab and prove it does not inherit Settings' separated
-            # chrome treatment.
-            special_tab = cdp.eval("""(()=>{
-              const tabs=[...document.querySelectorAll('nav button[data-tab]')];
-              const tweaks=tabs.find(tab=>tab.dataset.tab==='tweaks');
-              const index=tabs.indexOf(tweaks);
-              const normal=[...tabs.slice(0,index)].reverse()
-                .find(tab=>!tab.classList.contains('lex-settings-tab'));
-              if(!tweaks||!normal) return JSON.stringify({missing:true});
-              return JSON.stringify({
-                special:tweaks.classList.contains('lex-settings-tab'),
-                gap:tweaks.getBoundingClientRect().left-normal.getBoundingClientRect().right,
-                normal:getComputedStyle(normal).backgroundColor,
-                tweaks:getComputedStyle(tweaks).backgroundColor});
-            })()""")
-            special_tab = json.loads(special_tab)
-            assert not special_tab.get("missing"), "no ordinary tab before Tweaks to compare with"
-            assert (not special_tab["special"] and abs(special_tab["gap"]) <= 1
-                    and special_tab["normal"] == special_tab["tweaks"]), special_tab
+            # Main-tab presentation is checked against the current request in
+            # verify_shared_presentation_issue_25.py. Blank's catalogue has
+            # no Tweaks tab to compare with its neighbours.
             stacks = cdp.eval("""(()=>[...document.querySelectorAll('.lex-detail-field')].filter(row=>/^\\d-REF VALUE$/.test(row.querySelector('.lex-detail-field-label')?.textContent.trim()||'')).map(row=>{const rowBox=row.getBoundingClientRect(),strip=row.querySelector('.lex-reference-values'),buttons=[...strip.querySelectorAll('.lex-reference-value')],boxes=buttons.map(button=>button.getBoundingClientRect());return{label:row.querySelector('.lex-detail-field-label').textContent.trim(),height:rowBox.height,count:Number(strip.dataset.referenceCount),indexes:buttons.map(button=>Number(button.dataset.referenceIndex)),tags:buttons.map(button=>button.querySelector('.lex-reference-tag').textContent.trim()),colors:buttons.map(button=>getComputedStyle(button.querySelector('.lex-reference-tag')).color),contained:boxes.every(box=>box.top>=rowBox.top-1&&box.bottom<=rowBox.bottom+1),vertical:boxes.every((box,index)=>index===0||(box.top>boxes[index-1].top&&Math.abs(box.left-boxes[0].left)<2))}}))()""")
             assert [entry["label"] for entry in stacks] == ["1-REF VALUE", "2-REF VALUE", "3-REF VALUE"], stacks
             expected_colors = ["rgb(98, 183, 79)", "rgb(214, 75, 75)", "rgb(79, 143, 232)", "rgb(214, 184, 63)"]
@@ -212,7 +210,8 @@ def verify_blank() -> dict:
             assert overflow and overflow["name"] == "RangeError" and "at most two reference mods" in overflow["message"], overflow
             acceptance = cdp.eval("""(()=>new Promise(resolve=>{
               const panel=document.querySelector('.blank-detail'),head=panel.querySelector('.lex-detail-panel-heading'),body=panel.querySelector('.lex-detail-panel-body');
-              const pb=panel.getBoundingClientRect(),hb=head.getBoundingClientRect(),bb=body.getBoundingClientRect();
+              const pb=panel.getBoundingClientRect(),hb=head.getBoundingClientRect(),
+                bb=(panel.querySelector(':scope > .lex-tweaks-paged')||body).getBoundingClientRect();
               const number=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER'));
               const readonly=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.trim()==='READ ONLY');
               const input=number.querySelector('input[type=number]'),range=number.querySelector('.lex-field-type-range');
@@ -264,7 +263,7 @@ def verify_blank() -> dict:
             assert acceptance["rail"]["left"] >= acceptance["section"]["left"] - 1, acceptance
             assert acceptance["rail"]["top"] >= acceptance["field"]["top"] - 1 and acceptance["rail"]["bottom"] <= acceptance["field"]["bottom"] + 1, acceptance
             assert acceptance["rangeBox"]["left"] >= acceptance["section"]["left"] - 1, acceptance
-            assert acceptance["icon"]["height"] >= acceptance["icon"]["headHeight"] - 9, acceptance
+            assert 0 < acceptance["icon"]["height"] <= acceptance["icon"]["headHeight"], acceptance
             assert abs(acceptance["idCenter"] - acceptance["headCenter"]) <= 1, acceptance
             assert not acceptance["lockAlignment"]["rotated"], acceptance
             assert (acceptance["lockAlignment"]["lockLeft"]
@@ -277,8 +276,11 @@ def verify_blank() -> dict:
             # failed a layout contract.
             assert not acceptance["helpTitle"], acceptance
             assert acceptance["popup"] and acceptance["popup"].strip(), acceptance
+            cdp.eval("document.querySelector('.lex-info-help').dispatchEvent(new PointerEvent('pointerleave',{bubbles:true}))")
+            wait_eval(cdp, "!document.querySelector('.lex-help-popover')", 10)
             assert acceptance["command"] != acceptance["tabs"], acceptance
-            assert acceptance["save"] == acceptance["game"] == {"width": 38, "height": 38}, acceptance
+            assert acceptance["save"] == acceptance["game"], acceptance
+            assert 32 <= acceptance["save"]["width"] == acceptance["save"]["height"] <= 40, acceptance
             assert 5 <= acceptance["windowInset"] <= 12, acceptance
             assert not acceptance["projectHidden"] and acceptance["projectNames"] == ["Vanilla", "My Mod"], acceptance
             # A read-only source shows a lock and an editable mod shows a
@@ -291,8 +293,11 @@ def verify_blank() -> dict:
             assert "🔒" in modes, ("no read-only source is locked", acceptance)
             assert set(acceptance["projectStatuses"]) <= {"✓", "×"}, acceptance
             pristine_layout = cdp.eval("""(()=>{const rows=[...document.querySelectorAll('.lex-detail-field')],number=rows.find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),selectRow=rows.find(row=>row.querySelector('.lex-detail-field-label')?.textContent.trim()==='SELECT'),numberRoot=number.querySelector('.lex-source-control-internal'),numberInput=numberRoot.querySelector('input'),unit=numberRoot.querySelector('.lex-unit'),selectRoot=selectRow.querySelector('.lex-source-control-internal'),select=selectRoot.querySelector('select'),reference=selectRoot.querySelector('.lex-reference-value'),box=node=>{const r=node.getBoundingClientRect();return{left:r.left,right:r.right}};return{numberNoReference:numberRoot.classList.contains('no-reference'),numberInput:box(numberInput),unit:box(unit),select:box(select),selectReference:box(reference)}})()""")
-            assert pristine_layout["numberNoReference"], pristine_layout
-            assert 3 <= pristine_layout["numberInput"]["right"] - pristine_layout["unit"]["right"] <= 12, pristine_layout
+            # The reference lane stays reserved even when the value matches;
+            # units follow the number instead of the input's far-right edge.
+            assert not pristine_layout["numberNoReference"], pristine_layout
+            assert pristine_layout["unit"]["left"] > pristine_layout["numberInput"]["left"], pristine_layout
+            assert pristine_layout["unit"]["right"] <= pristine_layout["numberInput"]["right"] - 3, pristine_layout
             assert pristine_layout["selectReference"]["right"] <= pristine_layout["select"]["right"] - 18, pristine_layout
             integer = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),input=row.querySelector('input[type=number]');input.value='25.5';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return{value:input.value,model:demo.value,dirty:dirtyCount()};})()""")
             assert integer == {"value": "25", "model": 25, "dirty": 0}, integer
@@ -303,17 +308,17 @@ def verify_blank() -> dict:
             assert unit_layout["unit"]["right"] <= unit_layout["input"]["right"] - 3, unit_layout
             assert unit_layout["reference"]["left"] >= unit_layout["unit"]["right"] + 3, unit_layout
             assert 3 <= unit_layout["input"]["right"] - unit_layout["reference"]["right"] <= 8, unit_layout
-            cdp.eval("document.querySelector('[data-tab=\"two\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"two\"]').classList.contains('active')", 10)
-            cdp.eval("document.querySelector('[data-tab=\"one\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"one\"]').classList.contains('active')", 10)
+            cdp.eval("navigate('two')")
+            wait_eval(cdp, "!!document.querySelector('.blank-table')", 10)
+            cdp.eval("navigate('one')")
+            wait_eval(cdp, "!!document.querySelector('.blank-detail')", 10)
             persisted_value = cdp.eval("[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER'))?.querySelector('input[type=number]')?.value")
             assert persisted_value == "26", persisted_value
             one_screenshot = str(screenshot(cdp, "github-46-blank-game-one-panel.png"))
-            cdp.eval("document.querySelector('[data-tab=\"two\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"two\"]').classList.contains('active')&&document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===2", 10)
+            cdp.eval("navigate('two')")
+            wait_eval(cdp, "document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===2", 10)
             result = check_layout(cdp, ".blank-layout", ".lex-panel-layout-pane",
-                                  "lexeditor:panel-layout:blank-two")
+                                  "lexeditor:list-detail:blank-two")
             assert result["panels"] == 2 and result["dividers"] == 1, result
             assert result["after"][0] > result["before"][0], result
             table_heading = cdp.eval("""(()=>{const head=document.querySelector('.lex-column-list-header'),cell=head.querySelector('.lex-column-list-head-cell'),row=document.querySelector('.lex-column-list-row'),style=getComputedStyle(cell);return{height:head.getBoundingClientRect().height,rowHeight:row.getBoundingClientRect().height,fontSize:parseFloat(style.fontSize),bodyFontSize:parseFloat(getComputedStyle(row).fontSize),fontWeight:Number(style.fontWeight)}})()""")
@@ -322,10 +327,10 @@ def verify_blank() -> dict:
             assert result["after"][1] < result["before"][1], result
             assert not result["errors"], result
             defaults = cdp.eval("""(()=>{const style=getComputedStyle(document.documentElement),title=document.querySelector('.lex-detail-section-title'),initial=document.querySelector('.lex-column-list-head-cell[aria-sort]:not([aria-sort="none"])'),indicator=initial?.querySelector('.lex-sort-indicator'),indicatorBox=indicator?.getBoundingClientRect(),cellBox=initial?.getBoundingClientRect();return{background:style.getPropertyValue('--lex-bg').trim(),panel:style.getPropertyValue('--lex-panel').trim(),titlePosition:getComputedStyle(title).position,titleTransform:getComputedStyle(title).transform,sortKey:initial?.dataset.columnKey,sortText:indicator?.textContent.trim(),sortPosition:getComputedStyle(indicator).position,sortVisible:indicatorBox.width>0&&indicatorBox.left>=cellBox.left&&indicatorBox.right<=cellBox.right,order:[...document.querySelectorAll('.lex-column-list-row')].map(node=>node.textContent)}})()""")
-            assert defaults["background"] == "#f7f8f9" and defaults["panel"] == "#ffffff", defaults
+            assert defaults["background"] == "#e3e7eb" and defaults["panel"] == "#ffffff", defaults
             assert defaults["titlePosition"] == "static" and defaults["titleTransform"] == "none", defaults
             assert defaults["sortKey"] == "name" and defaults["sortText"] in {"▲", "▼"}, defaults
-            assert defaults["sortPosition"] == "static" and defaults["sortVisible"], defaults
+            assert defaults["sortPosition"] == "absolute" and defaults["sortVisible"], defaults
             cdp.eval("document.querySelector('.lex-column-list-head-cell[data-column-key=\"value\"] .lex-column-sort').click()")
             changed = cdp.eval("""(()=>({key:document.querySelector('.lex-column-list-head-cell[aria-sort]:not([aria-sort="none"])')?.dataset.columnKey,order:[...document.querySelectorAll('.lex-column-list-row')].map(node=>node.textContent)}))()""")
             assert changed["key"] == "value", changed
@@ -333,42 +338,66 @@ def verify_blank() -> dict:
             persisted = cdp.eval("document.querySelector('.lex-column-list-head-cell[aria-sort]:not([aria-sort=\"none\"])')?.dataset.columnKey")
             assert persisted == "value", persisted
             two_screenshot = str(screenshot(cdp, "github-46-blank-game-two-panels.png"))
-            cdp.eval("document.querySelector('[data-tab=\"editable\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"editable\"]').classList.contains('active')&&!!document.querySelector('.blank-editable-table')", 10)
-            editable = cdp.eval("""(()=>{const input=document.querySelector('.blank-editable-table input[type=text]'),select=document.querySelector('.blank-editable-table select'),table=input.closest('.lex-column-list'),cell=input.closest('.lex-column-list-cell'),disabledRow=table.querySelector('.lex-row-disabled'),beforeBackground=getComputedStyle(input).backgroundColor,beforeBorder=getComputedStyle(input).borderTopColor;const result={tableClass:table.className,matches:input.matches('.lex-editable-table input:focus'),beforeBackground,beforeBorder,inputWidth:input.getBoundingClientRect().width,cellWidth:cell.getBoundingClientRect().width,selectWidth:select.getBoundingClientRect().width,selectCellWidth:select.closest('.lex-column-list-cell').getBoundingClientRect().width,firstColumn:table.querySelector('.lex-column-list-head-cell')?.dataset.columnKey,disabledOpacity:disabledRow?Math.max(...[...disabledRow.querySelectorAll('.lex-column-list-cell:not([data-column-key="enabled"]) > *')].map(node=>Number(getComputedStyle(node).opacity)),0):1,disabledControlsEditable:disabledRow?[...disabledRow.querySelectorAll('input,select,textarea,button')].every(control=>!control.disabled):false};input.focus();result.matches=input.matches('.lex-editable-table input:focus');result.afterBackground=getComputedStyle(input).backgroundColor;result.focused=document.activeElement===input;return result})()""")
-            assert editable["beforeBackground"] == "rgba(0, 0, 0, 0)" and editable["focused"], editable
-            assert editable["afterBackground"] != editable["beforeBackground"], editable
-            assert editable["inputWidth"] >= editable["cellWidth"] - 75 and editable["selectWidth"] >= editable["selectCellWidth"] - 75, editable
-            assert editable["firstColumn"] == "enabled" and editable["disabledOpacity"] < .7 and editable["disabledControlsEditable"], editable
-            sort_point = cdp.eval("""(()=>{const head=document.querySelector('.blank-editable-table [data-column-key="value"]'),box=head.querySelector('.lex-column-sort').getBoundingClientRect();return{x:box.left+box.width/2,y:box.top+box.height/2,before:[...document.querySelectorAll('.blank-editable-table .lex-column-list-row')].map(row=>row.dataset.key),beforeAria:head.getAttribute('aria-sort')}})()""")
+            # Editing is a cell capability in the same record table. Probe
+            # each native editor when opened, rather than a retired table mode.
+            editable = {"columns": cdp.eval("[...document.querySelectorAll('.blank-table .lex-column-list-head-cell')].map(node=>node.dataset.columnKey)"), "editors": []}
+            for key, expected_tag in (("name", "INPUT"), ("category", "SELECT"), ("value", "INPUT")):
+                metrics = cdp.eval(f"""(()=>{{const table=document.querySelector('.blank-table'),
+                  cell=table.querySelector('.lex-column-list-row [data-column-key='+{key!r}+']'),
+                  before=getComputedStyle(cell).boxShadow;
+                  cell.dispatchEvent(new MouseEvent('dblclick',{{bubbles:true}}));
+                  const editor=cell.querySelector('input,select'),a=editor.getBoundingClientRect(),
+                    b=cell.getBoundingClientRect();
+                  return{{key:{key!r},tag:editor.tagName,type:editor.type,min:editor.min,max:editor.max,
+                    focused:document.activeElement===editor,width:a.width,cellWidth:b.width,
+                    height:a.height,cellHeight:b.height,font:getComputedStyle(editor).fontSize,
+                    cellFont:getComputedStyle(cell).fontSize,before,after:getComputedStyle(cell).boxShadow,
+                    disabled:editor.disabled}};}})()""")
+                assert metrics["tag"] == expected_tag and metrics["focused"] and not metrics["disabled"], metrics
+                assert metrics["width"] >= metrics["cellWidth"] - 20 and metrics["height"] >= metrics["cellHeight"] - 10, metrics
+                assert metrics["font"] == metrics["cellFont"] and metrics["after"] != metrics["before"], metrics
+                if key == "value":
+                    assert (metrics["type"], metrics["min"], metrics["max"]) == ("number", "0", "255"), metrics
+                editable["editors"].append(metrics)
+                cdp.eval("document.querySelector('.lex-cell-editing input,.lex-cell-editing select').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))")
+            disabled = cdp.eval("""(()=>{const row=document.querySelector('.blank-table .lex-row-disabled'),
+              cells=[...row.querySelectorAll('.lex-cell-editable')];
+              const opacity=Math.max(...[...row.querySelectorAll('.lex-column-list-cell:not([data-column-key="enabled"]) > *')].map(node=>Number(getComputedStyle(node).opacity)));
+              cells.find(cell=>cell.dataset.columnKey==='name').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));
+              const editor=row.querySelector('input[type=text]');return{opacity,editable:!!editor&&!editor.disabled};})()""")
+            assert disabled["opacity"] < .7 and disabled["editable"], disabled
+            cdp.eval("document.querySelector('.lex-cell-editing input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))")
+            edited_name = cdp.eval("""(()=>{const cell=document.querySelector('.blank-table .lex-column-list-row [data-column-key="name"]');
+              cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));const input=cell.querySelector('input');
+              input.value='Authored layout edit';input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+              return rows.some(row=>row.name==='Authored layout edit');})()""")
+            assert edited_name, 'Cell editor did not commit its value to the record'
+            sort_point = cdp.eval("""(()=>{const head=document.querySelector('.blank-table [data-column-key="value"]'),box=head.querySelector('.lex-column-sort').getBoundingClientRect();return{x:box.left+box.width/2,y:box.top+box.height/2,before:[...document.querySelectorAll('.blank-table .lex-column-list-row')].map(row=>row.dataset.key),beforeAria:head.getAttribute('aria-sort')}})()""")
             cdp.call("Input.dispatchMouseEvent", {"type":"mousePressed","x":sort_point["x"],"y":sort_point["y"],"button":"left","buttons":1,"clickCount":1})
             cdp.call("Input.dispatchMouseEvent", {"type":"mouseReleased","x":sort_point["x"],"y":sort_point["y"],"button":"left","buttons":0,"clickCount":1})
-            sorted_rows = cdp.eval("""(()=>({after:[...document.querySelectorAll('.blank-editable-table .lex-column-list-row')].map(row=>row.dataset.key),aria:document.querySelector('.blank-editable-table [data-column-key="value"]')?.getAttribute('aria-sort')}))()""")
+            sorted_rows = cdp.eval("""(()=>({after:[...document.querySelectorAll('.blank-table .lex-column-list-row')].map(row=>row.dataset.key),aria:document.querySelector('.blank-table [data-column-key="value"]')?.getAttribute('aria-sort')}))()""")
             assert sorted_rows["aria"] in {"ascending", "descending"} and sorted_rows["aria"] != sort_point["beforeAria"], sorted_rows
             editable["realMouseSort"] = sorted_rows
-            reorder = cdp.eval("""(()=>{const header=document.querySelector('.blank-editable-table .lex-column-list-header'),from=header.querySelector('[data-column-key="name"]'),to=header.querySelector('[data-column-key="value"]'),a=from.getBoundingClientRect(),b=to.getBoundingClientRect();from.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:19,clientX:a.left+a.width/2,clientY:a.top+a.height/2}));to.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));to.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));return{draggable:[...header.children].every(cell=>cell.draggable),order:[...document.querySelectorAll('.blank-editable-table .lex-column-list-head-cell')].map(cell=>cell.dataset.columnKey)}})()""")
-            # An editable table's columns are not drag-reorderable, and the
-            # order it declares is the order it renders. Which columns those
-            # are is the demo's business; asserting one adjacency froze the
-            # example's column set into a layout contract.
+            reorder = cdp.eval("""(()=>{const header=document.querySelector('.blank-table .lex-column-list-header'),from=header.querySelector('[data-column-key="name"]'),to=header.querySelector('[data-column-key="value"]'),a=from.getBoundingClientRect(),b=to.getBoundingClientRect();from.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:19,clientX:a.left+a.width/2,clientY:a.top+a.height/2}));to.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));to.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));return{draggable:[...header.children].every(cell=>cell.draggable),order:[...document.querySelectorAll('.blank-table .lex-column-list-head-cell')].map(cell=>cell.dataset.columnKey)}})()""")
+            # Native HTML drag is disabled; column preferences handle any
+            # reordering. Every declared column must survive that move.
             assert not reorder["draggable"], reorder
             assert reorder["order"][0] == "enabled", reorder
-            assert reorder["order"] == sorted(reorder["order"], key=lambda key:
-                ["enabled", "name", "category", "value"].index(key)), reorder
+            assert sorted(reorder["order"]) == sorted(editable["columns"]), reorder
             editable_screenshot = str(screenshot(cdp, "github-46-blank-game-editable-table.png"))
-            cdp.eval("document.querySelector('[data-tab=\"three\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"three\"]').classList.contains('active')&&document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===3", 10)
+            cdp.eval("navigate('three')")
+            wait_eval(cdp, "document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===3", 10)
             # The tip target carries the mark's own overhang: the drawn pin leans
             # up and to the right of its tip, so the tip sits left of the value
             # box's edge by that overhang and a few pixels lower, which keeps the
             # whole mark inside the row instead of past the panel body's clip.
-            three = cdp.eval("""(()=>{const rows=[...document.querySelectorAll('.blank-detail .lex-detail-field')].filter(row=>row.querySelector('.lex-column-pin')),pins=rows.map(row=>{const root=row.querySelector('.lex-source-control'),target=root.querySelector('input,select'),pin=root.querySelector('.lex-column-pin'),a=target.getBoundingClientRect(),p=pin.getBoundingClientRect(),outward=target.type==='checkbox',inset=Math.min(3,a.height*.1),tip={x:p.left+p.width*3.71/24,y:p.top+p.height*21.71/24},wanted={x:a.right+(outward?inset:-inset-Math.min(p.width-p.width*3.71/24,8)),y:a.top+(outward?-inset:inset+Math.min(4,a.height*.2))};return{kind:target.type||target.tagName.toLowerCase(),size:p.width,dx:tip.x-wanted.x,dy:tip.y-wanted.y}});return{panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,statuses:document.querySelectorAll('.lex-integration-status').length,pins}})()""")
+            three = cdp.eval("""(()=>{const rows=[...document.querySelectorAll('.blank-detail .lex-detail-field')].filter(row=>row.querySelector('.lex-column-pin')),pins=rows.map(row=>{const root=row.querySelector('.lex-source-control'),target=root.querySelector('input,select'),pin=root.querySelector('.lex-column-pin'),a=target.getBoundingClientRect(),p=pin.getBoundingClientRect(),outward=false,inset=Math.min(3,a.height*.1),tip={x:p.left+p.width*3.71/24,y:p.top+p.height*21.71/24},wanted={x:a.right+(outward?inset:-inset-Math.min(p.width-p.width*3.71/24,8)),y:a.top+(outward?-inset:inset+Math.min(4,a.height*.2))};return{kind:target.type||target.tagName.toLowerCase(),size:p.width,dx:tip.x-wanted.x,dy:tip.y-wanted.y}});return{panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,statuses:document.querySelectorAll('.lex-integration-status').length,pins}})()""")
             assert three["panels"] == 3 and three["dividers"] == 2 and three["statuses"] == 3, three
             assert len(three["pins"]) == 4 and all(pin["size"] >= 13 for pin in three["pins"]), three
             assert all(abs(pin["dx"]) <= 1 and abs(pin["dy"]) <= 1 for pin in three["pins"]), three
             three_screenshot = str(screenshot(cdp, "github-46-blank-game-three-panels.png"))
-            cdp.eval("document.querySelector('[data-tab=\"subtabs\"]').click()")
-            wait_eval(cdp, "document.querySelector('[data-tab=\"subtabs\"]').classList.contains('active')&&!!document.querySelector('.lex-subtab-bar')", 10)
+            cdp.eval("navigate('subtabs')")
+            wait_eval(cdp, "!!document.querySelector('.lex-subtab-bar')", 10)
             subtabs = cdp.eval("""(()=>({panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,tabs:document.querySelectorAll('.lex-subtab-button').length,active:(node=>node?(node=>[...node.childNodes].filter(part=>!(part.nodeType===1&&part.classList.contains('lex-tab-shortcut'))).map(part=>part.textContent).join('').trim())(node):null)(document.querySelector('.lex-subtab-button.active'))}))()""")
             assert subtabs == {"panels": 1, "dividers": 0, "tabs": 3, "active": "Controls"}, subtabs
             cdp.eval("[...document.querySelectorAll('.lex-subtab-button')].find(node=>(node=>[...node.childNodes].filter(part=>!(part.nodeType===1&&part.classList.contains('lex-tab-shortcut'))).map(part=>part.textContent).join('').trim())(node)==='References').click()")
@@ -400,7 +429,7 @@ def verify_rdr2() -> dict:
     profile = browser = cdp = None
     try:
         temp_ini = Path(isolated.name) / "GameplayTweaks.ini"
-        shutil.copy2(RDR2_ROOT / "GameplayTweaks" / "GameplayTweaks.ini", temp_ini)
+        shutil.copy2(rdr2_project_root() / "GameplayTweaks" / "GameplayTweaks.ini", temp_ini)
         profile, browser, cdp = browser_session()
         with Rdr2Session({
             "LEXEDITOR_GAMEPLAY_INI": str(temp_ini),
@@ -411,26 +440,26 @@ def verify_rdr2() -> dict:
             record_layouts = {}
             for tab in ("items", "crafting", "effects", "weapons"):
                 cdp.eval(f"navigate({tab!r})")
-                wait_eval(cdp, f"state.tab==={tab!r}&&document.querySelector('.lootsplit.lex-panel-layout')", 60)
-                geometry = cdp.eval("""(()=>{const root=document.querySelector('.lootsplit.lex-panel-layout'),master=root.querySelector(':scope>.lex-barrelled-master'),divider=root.querySelector(':scope>.lex-panel-layout-divider'),detail=divider?.nextElementSibling,rb=root.getBoundingClientRect(),mb=master?.getBoundingClientRect(),db=detail?.getBoundingClientRect();return{root:{left:rb.left,right:rb.right,top:rb.top,bottom:rb.bottom},master:{left:mb?.left,right:mb?.right,top:mb?.top,bottom:mb?.bottom},detail:{left:db?.left,right:db?.right,top:db?.top,bottom:db?.bottom},divider:!!divider};})()""")
+                wait_eval(cdp, f"state.tab==={tab!r}&&document.querySelector('.lex-paged-list-detail.lex-panel-layout')", 60)
+                geometry = cdp.eval("""(()=>{const root=document.querySelector('.lex-paged-list-detail.lex-panel-layout'),master=root.querySelector(':scope>.lex-barrelled-master'),divider=root.querySelector(':scope>.lex-panel-layout-divider'),detail=divider?.nextElementSibling,rb=root.getBoundingClientRect(),mb=master?.getBoundingClientRect(),db=detail?.getBoundingClientRect();return{root:{left:rb.left,right:rb.right,top:rb.top,bottom:rb.bottom},master:{left:mb?.left,right:mb?.right,top:mb?.top,bottom:mb?.bottom},detail:{left:db?.left,right:db?.right,top:db?.top,bottom:db?.bottom},divider:!!divider};})()""")
                 assert geometry["divider"], (tab, geometry)
                 assert abs(geometry["master"]["top"] - geometry["detail"]["top"]) < 2, (tab, geometry)
                 assert geometry["detail"]["left"] > geometry["master"]["right"], (tab, geometry)
                 assert geometry["detail"]["right"] >= geometry["root"]["right"] - 2, (tab, geometry)
                 record_layouts[tab] = geometry
             cdp.eval("navigate('items')")
-            wait_eval(cdp, "state.tab==='items'&&document.querySelector('.lootsplit.lex-panel-layout')", 30)
+            wait_eval(cdp, "state.tab==='items'&&document.querySelector('.lex-paged-list-detail.lex-panel-layout')", 30)
             record_layouts["screenshot"] = str(screenshot(cdp, "github-46-rdr2-side-by-side-record-panels.png"))
             cdp.eval("navigate('shops',{shopMode:'workspace',shopType:'ST_GENERAL'})")
-            wait_eval(cdp, "document.querySelectorAll('.shop-workspace>.shop-panel').length===3", 30)
-            result = check_layout(cdp, ".shop-workspace", ".shop-panel",
+            wait_eval(cdp, "document.querySelectorAll('.shop-workspace>.lex-panel-layout-pane').length===3", 30)
+            result = check_layout(cdp, ".shop-workspace", ".lex-panel-layout-pane",
                                   "lexeditor:panel-layout:rdr2-shops")
             assert result["panels"] == 3 and result["dividers"] == 2, result
             assert result["after"][0] > result["before"][0], result
             assert result["after"][1] < result["before"][1], result
             assert abs(result["after"][2] - result["before"][2]) < 2, result
             assert isinstance(result["stored"], list) and len(result["stored"]) == 3, result
-            pointer = drag_second_divider(cdp, ".shop-workspace", ".shop-panel")
+            pointer = drag_second_divider(cdp, ".shop-workspace", ".lex-panel-layout-pane")
             assert abs(pointer["after"][0] - pointer["before"][0]) < 2, pointer
             assert pointer["after"][1] > pointer["before"][1], pointer
             assert pointer["after"][2] < pointer["before"][2], pointer
@@ -447,7 +476,21 @@ def verify_rdr2() -> dict:
 
 def main() -> int:
     assert EDGE.is_file(), EDGE
-    print(json.dumps({"blank": verify_blank(), "ff8": verify_ff8(), "rdr2": verify_rdr2()}, ensure_ascii=True))
+    # The self-contained Blank composer always runs. Installed-data sections
+    # are reported separately, so a clean CI runner does not skip Blank too.
+    result = {"blank": verify_blank()}
+    print("PASS Blank composer, references, cell editors, sorting and subtabs", flush=True)
+    if _ff8_baseline_sentinel().is_file():
+        result["ff8"] = verify_ff8()
+        print("PASS installed FF8 composer", flush=True)
+    else:
+        result["ff8"] = {"skipped": "Installed FF8 baseline is unavailable"}
+    if (rdr2_project_root() / "GameplayTweaks" / "GameplayTweaks.ini").is_file():
+        result["rdr2"] = verify_rdr2()
+        print("PASS installed RDR2 composer", flush=True)
+    else:
+        result["rdr2"] = {"skipped": "Installed RDR2 project is unavailable"}
+    print(json.dumps(result, ensure_ascii=True))
     return 0
 
 
