@@ -1259,11 +1259,15 @@ def save(edits: list[dict]) -> dict:
                           if movie_edits else None)
         prepared_scripts = None
         if script_documents:
+            if any(set(edit) - {"type", "map", "method", "source"} for edit in script_documents):
+                raise ValueError("Field JSM document contains an unsupported field")
             prepared_scripts = _prepare_script_documents(key, [
-                {"id": int(edit.get("method", -1)), "source": str(edit.get("source", ""))}
+                {"id": edit.get("method", -1), "source": edit.get("source", "")}
                 for edit in script_documents
             ])
         if script_edits:
+            if any(set(edit) - {"type", "map", "player", "param", "value"} for edit in script_edits):
+                raise ValueError("Field card-player edit contains an unsupported field")
             row = _map_row(key)
             source, sym = _source_paths(key, "current")
             if source is None:
@@ -1280,7 +1284,8 @@ def save(edits: list[dict]) -> dict:
                 raise ValueError("General script edits changed the CARDGAME call order")
             seen = set()
             for edit in script_edits:
-                player_id, param_id = int(edit.get("player", -1)), int(edit.get("param", -1))
+                player_id = integer_value(edit.get("player", -1), "Field card player ID")
+                param_id = integer_value(edit.get("param", -1), "Field card parameter ID")
                 identity = (player_id, param_id)
                 if identity in seen or not 0 <= player_id < len(players) or not 0 <= param_id < 7:
                     raise ValueError("Invalid or duplicate field card-player edit")
@@ -1290,7 +1295,7 @@ def save(edits: list[dict]) -> dict:
                 param = players[player_id]["params"][param_id]
                 if not param["editable"]:
                     raise ValueError("This field script expression is not a supported literal or variable push")
-                value = int(edit.get("value"))
+                value = integer_value(edit.get("value"), "Field card parameter value")
                 if not 0 <= value <= 0xFFFFFF:
                     raise ValueError("Field script values must be 0 to 16777215")
                 struct.pack_into("<I", raw, param["offset"], (param["opcode"] << 24) | value)
