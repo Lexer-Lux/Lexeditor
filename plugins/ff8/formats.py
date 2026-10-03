@@ -744,12 +744,16 @@ def save_text(edits: list[dict]) -> dict:
         source = executable_text.BY_ID[source_id]
         replacements: dict[int, str] = {}
         for edit in source_edits:
-            if int(edit.get("sectionId", -1)) != source.section_id or int(edit.get("slot", -1)) != 0:
+            if (integer_value(edit.get("sectionId", -1), "Executable text section id") != source.section_id
+                    or integer_value(edit.get("slot", -1), "Executable text slot") != 0):
                 raise ValueError(f"A {source.label} edit has the wrong source identity")
-            record_id = int(edit["recordId"])
+            record_id = integer_value(edit["recordId"], "Executable text record id")
             if record_id in replacements:
                 raise ValueError(f"Duplicate {source.label} text edit")
-            replacements[record_id] = str(edit.get("value", ""))
+            value = edit.get("value", "")
+            if not isinstance(value, str):
+                raise ValueError("Executable text value must be text")
+            replacements[record_id] = value
         current = _executable_text_msd(source, "current")
         rebuilt, changed = executable_text.apply_edits(current, source, replacements)
         if changed:
