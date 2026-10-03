@@ -90,7 +90,7 @@
     }
     return out;
   }
-  const dirtyCount=()=>dataEdits().length+textEdits().length+tweakEditGroups().reduce((total,group)=>total+group.edits.length,0);
+  const dirtyCount=()=>dataEdits().length+numericDraftCount(state.data,state.dataBaseline)+textEdits().length+tweakEditGroups().reduce((total,group)=>total+group.edits.length,0)+Object.values(state.tweaks||{}).reduce((total,entry)=>total+numericDraftCount(entry.data,entry.baseline),0);
 
   function flattenStrings(value,out=[]){if(typeof value==="string")out.push(value);else if(Array.isArray(value))for(const child of value)flattenStrings(child,out);else if(value&&typeof value==="object")for(const child of Object.values(value))flattenStrings(child,out);return out}
   function resolvedText(value){return typeof value==="string"?state.data?.textLookup?.[value]||"":""}
@@ -113,7 +113,7 @@
   }
 
   async function confirmReplace(kind){
-    const count=kind==="text"?textEdits().length:dataEdits().length;
+    const count=kind==="text"?textEdits().length:dataEdits().length+numericDraftCount(state.data,state.dataBaseline);
     if(!count)return true;
     return LexeditorUI.confirmAction({
       title:"Discard unsaved changes?",
@@ -217,10 +217,27 @@
 
   function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
   function setArrayValue(row,prop,index,value){if(!Array.isArray(row.values[prop.name]))return;row.values[prop.name][index]=value;refreshShell()}
+  let numericDrafts=new WeakMap();
+  function numericDraftEntries(data){return (data?.records||[]).flatMap(row=>[...(numericDrafts.get(row)?.values()||[])].map(draft=>({...draft,row})))}
+  function numericDraftCount(data,baseline){
+    if(state.activeSource!=="mine")return 0;
+    return numericDraftEntries(data).filter(draft=>{
+      const before=baseline?.records?.find(row=>row.id===draft.row.id)?.values?.[draft.prop];
+      const after=draft.row.values?.[draft.prop];
+      return comparable(draft.index===null?before:before?.[draft.index])===comparable(draft.index===null?after:after?.[draft.index]);
+    }).length;
+  }
   function numericInput(row,prop,index=null){
-    const current=index===null?row.values[prop.name]:row.values[prop.name][index];
+    const draftKey=JSON.stringify([prop.name,index]);
+    const current=numericDrafts.get(row)?.get(draftKey)?.text??(index===null?row.values[prop.name]:row.values[prop.name][index]);
     const disabled=state.activeSource!=="mine"||!prop.editable;
-    const change=value=>index===null?setScalar(row,prop,value):setArrayValue(row,prop,index,value);
+    const change=value=>{numericDrafts.get(row)?.delete(draftKey);index===null?setScalar(row,prop,value):setArrayValue(row,prop,index,value)};
+    const remember=(input,valid)=>{
+      if(valid){change(Number(input.value));return}
+      if(!numericDrafts.has(row))numericDrafts.set(row,new Map());
+      numericDrafts.get(row).set(draftKey,{prop:prop.name,index,text:input.value,label:displayLabel(prop)});
+      refreshShell();
+    };
     const bounds={BYTE:[0,255],INT16:[-32768,32767],UINT16:[0,65535],INT32:[-2147483648,2147483647]}[prop.type];
     const declaredLow=semanticMin(prop),declaredHigh=semanticMax(prop);
     const low=bounds?Math.max(declaredLow??bounds[0],bounds[0]):declaredLow;
@@ -228,7 +245,7 @@
     if(prop.type!=="FLOAT"&&bounds&&!disabled){
       const control=LexeditorUI.exactIntegerInput({value:current,min:low,max:high,label:displayLabel(prop),change:text=>change(Number(text))});
       const input=control.querySelector("input");
-      input.addEventListener("input",()=>{if(input.lexValidateInteger())change(Number(input.value))});
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
       return control;
     }
     const input=el("input",{type:"number",value:current,disabled,required:true,
@@ -242,7 +259,7 @@
       return input.checkValidity();
     };
     input.lexValidateNumber=validate;
-    input.oninput=()=>{if(validate())change(Number(input.value))};
+    input.oninput=()=>remember(input,validate());
     return input;
   }
   function percentInput(row,prop,index){return numericInput(row,{...prop,type:"BYTE",min:0,max:100},index)}
@@ -902,6 +919,8 @@
         throw new Error(`Correct ${input.getAttribute("aria-label")||"the numeric value"} before saving.`);
       }
     }
+    const draft=[...numericDraftEntries(state.data),...Object.values(state.tweaks||{}).flatMap(entry=>numericDraftEntries(entry.data))][0];
+    if(draft)throw new Error(`Correct ${draft.label} in ${draft.row.tag||draft.row.id} before saving.`);
     const gameplay=dataEdits(),text=textEdits(),tweaks=tweakEditGroups();
     if(!gameplay.length&&!text.length&&!tweaks.length)return;
     state.busy=true;state.error="";render();
@@ -925,7 +944,7 @@
     }catch(error){state.error=error.message;throw error}
     finally{state.busy=false;render();refreshShell()}
   }
-  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const pack of textPacks())pack.data.records=clone(pack.baseline.records);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  async function discard(){numericDrafts=new WeakMap();if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const pack of textPacks())pack.data.records=clone(pack.baseline.records);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
   const editHistory=new EditHistory({
     capture:()=>({
       data:state.data?clone(state.data.records):null,
@@ -933,6 +952,7 @@
       tweaks:Object.fromEntries(Object.entries(state.tweaks||{}).map(([asset,entry])=>[asset,clone(entry.data.records)])),
     }),
     restore:snapshot=>{
+      numericDrafts=new WeakMap();
       if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);
       for(const [asset,records] of Object.entries(snapshot?.text||{})){const pack=state.textPacks?.[asset];if(pack)pack.data.records=clone(records)}
       for(const [asset,records] of Object.entries(snapshot?.tweaks||{})){const entry=state.tweaks?.[asset];if(entry)entry.data.records=clone(records)}

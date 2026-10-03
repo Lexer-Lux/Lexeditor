@@ -84,3 +84,29 @@ def test_exact_integer_drafts_save_undo_and_bounded_chances(tmp_path):
         finally:
             context.close()
             browser.close()
+
+
+def test_invalid_only_draft_survives_redraw_record_switch_and_discard():
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        context, page, errors = fixture.new_page(browser, fixture.document(), 1200, 800)
+        try:
+            page.get_by_label("Power", exact=True).fill("10.5")
+            assert page.evaluate("dirtyCount()") == 1
+            page.evaluate("render()")
+            assert page.get_by_label("Power", exact=True).input_value() == "10.5"
+            assert page.evaluate("state.data.records[0].values.Power") == 10
+            page.evaluate("()=>{state.selected=1;render()}")
+            assert page.get_by_label("Power", exact=True).input_value() == "11"
+            failure = page.evaluate("async()=>{try{await save();return null}catch(error){return error.message}}")
+            assert "Correct Power in MISC_000" in failure
+            assert not page.evaluate("window.__requests.some(row=>row.path==='/api/save'&&row.method==='POST')")
+            page.evaluate("()=>{state.selected=0;render()}")
+            assert page.get_by_label("Power", exact=True).input_value() == "10.5"
+            page.evaluate("discard()")
+            assert page.get_by_label("Power", exact=True).input_value() == "10"
+            assert page.evaluate("dirtyCount()") == 0
+            assert not errors
+        finally:
+            context.close()
+            browser.close()

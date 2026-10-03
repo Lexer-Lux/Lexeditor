@@ -40,6 +40,16 @@ def test_mixed_resident_types_use_source_bounds_and_real_save_reload(tmp_path):
                 assert "Correct ATB Override" in failure
                 assert not posts
                 assert page.evaluate("selectedRecord().values.OverrideValue") == 0
+            integer.fill("1.5")
+            page.evaluate("render()")
+            assert page.get_by_label("ATB Override", exact=True).input_value() == "1.5"
+            page.evaluate("()=>{state.selected=state.data.records.find(row=>row.tag.endsWith('|ParamFloat')).id;render()}")
+            failure = page.evaluate("async()=>{try{await save();return null}catch(error){return error.message}}")
+            assert "Correct ATB Override in ATB_Player|ParamInt" in failure
+            assert not posts
+            page.evaluate("()=>{state.selected=state.data.records.find(row=>row.tag.endsWith('|ParamInt')).id;render()}")
+            integer = page.get_by_label("ATB Override", exact=True)
+            assert integer.input_value() == "1.5"
             integer.fill("2147483647")
             page.evaluate("save()")
             assert posts[-1]["edits"][0]["value"] == 2147483647
@@ -70,5 +80,22 @@ def test_mixed_resident_types_use_source_bounds_and_real_save_reload(tmp_path):
                 assert float(controls.nth(i).get_attribute("max")) == schema["max"]
             if os.environ.get("LEX_ATB_TYPED_SCREENSHOT"):
                 page.screenshot(path=os.environ["LEX_ATB_TYPED_SCREENSHOT"])
+            integer_index = page.evaluate("state.data.records.findIndex(row=>row.tag.endsWith('|ParamInt'))")
+            page.evaluate("""()=>{
+              const entry={item:{name:'ATB Resident',asset:state.asset},data:state.data,baseline:clone(state.data)};
+              state.tweaks={[state.asset]:entry};state.data=null;
+              document.querySelector('#main').replaceChildren(tweakCard(entry));
+            }""")
+            page.get_by_label("ATB Override", exact=True).nth(integer_index).fill("2.5")
+            page.evaluate("()=>{document.querySelector('#main').replaceChildren(tweakCard(state.tweaks[state.asset]))}")
+            assert page.get_by_label("ATB Override", exact=True).nth(integer_index).input_value() == "2.5"
+            before = len(posts)
+            page.evaluate("()=>{document.querySelector('#main').replaceChildren(detailPanel({title:'Other view',body:[]}))}")
+            failure = page.evaluate("async()=>{try{await save();return null}catch(error){return error.message}}")
+            assert "Correct ATB Override in ATB_Player|ParamInt" in failure
+            assert len(posts) == before
+            page.evaluate("discard()")
+            assert page.evaluate("numericDraftEntries(state.tweaks[state.asset].data).length") == 0
+            assert page.evaluate("dirtyCount()") == 0
         finally:
             browser.close()
