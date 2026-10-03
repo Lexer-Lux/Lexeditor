@@ -1150,8 +1150,8 @@ def _prepare_encounter_edits(key: str, edits: list[dict]
         kind = str(edit.get("kind", ""))
         if kind == "formation":
             formation_edits.append({
-                "slot": int(edit.get("slot", -1)),
-                "formation": int(edit.get("value", -1)),
+                "slot": edit.get("slot", -1),
+                "formation": edit.get("value", -1),
             })
         elif kind == "rate":
             rate_edits.append(edit)
@@ -1167,7 +1167,7 @@ def _prepare_encounter_edits(key: str, edits: list[dict]
         prepared.append((directory / f"{row['name']}.mrt", raw, changed))
     if rate_edits:
         raw, changed = field_encounters.apply_rat_edit(
-            rat_source.read_bytes(), int(rate_edits[0].get("value", -1)))
+            rat_source.read_bytes(), rate_edits[0].get("value", -1))
         prepared.append((directory / f"{row['name']}.rat", raw, changed))
     return prepared
 
