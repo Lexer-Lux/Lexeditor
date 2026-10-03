@@ -41,13 +41,15 @@ WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
 CATALOG_LOCK = threading.Lock()
 
 
-def settings_rows() -> list[dict]:
+def settings_rows(payload: bytes | None = None) -> list[dict]:
     rows = []
-    if not SETTINGS.is_file():
+    if payload is None and not SETTINGS.is_file():
         return rows
+    if payload is None:
+        payload = SETTINGS.read_bytes()
     section = ""
     pending_comments: list[str] = []
-    for line_number, raw in enumerate(SETTINGS.read_text(encoding="utf-8", errors="replace").splitlines()):
+    for line_number, raw in enumerate(payload.decode("utf-8-sig", errors="replace").splitlines()):
         stripped = raw.strip()
         if stripped.startswith((";", "#")):
             pending_comments.append(stripped.lstrip(";# "))
@@ -71,10 +73,21 @@ def settings_rows() -> list[dict]:
     return rows
 
 
-def save_settings(edits: list[dict]) -> dict:
+def settings_data() -> dict:
+    if not SETTINGS.is_file():
+        return {"file": str(SETTINGS), "rows": [], "sha256": None}
+    payload = SETTINGS.read_bytes()
+    return {"file": str(SETTINGS), "rows": settings_rows(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+
+
+def save_settings(edits: list[dict], expected_sha256: str) -> dict:
     if not isinstance(edits, list):
         raise ValueError("Settings edits must be an array")
     original = SETTINGS.read_bytes()
+    if not isinstance(expected_sha256, str):
+        raise ValueError("Settings checksum is required")
+    if hashlib.sha256(original).hexdigest() != expected_sha256:
+        raise RuntimeError("Settings changed since they were opened; reload before saving")
     lines = original.decode("utf-8").splitlines(True)
     by_line = {}
     for edit in edits:
@@ -832,7 +845,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/dashboard":
                 self.json_response({"paths": {"Project": str(PROJECT), "Module System": str(MODULE_SYSTEM), "Game": paths.WARBAND_ROOT, "Installed modules": str(MODULES)}, "problems": paths.check()})
             elif path == "/api/settings":
-                self.json_response({"file": str(SETTINGS), "rows": settings_rows()})
+                self.json_response(settings_data())
             elif path == "/api/troops":
                 self.json_response(mark_created("troops", troop_data(MODULE_SYSTEM)))
             elif path == "/api/items":
@@ -898,7 +911,7 @@ class Handler(PluginRequestHandler):
         try:
             body = self.body()
             if path == "/api/settings/save":
-                self.json_response(save_settings(body.get("edits", [])))
+                self.json_response(save_settings(body.get("edits", []), body.get("sha256")))
             elif path == "/api/troops/save":
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/troops/create":

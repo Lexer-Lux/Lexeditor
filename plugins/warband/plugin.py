@@ -75,6 +75,7 @@ def smoke() -> list[str]:
             target = rows[0]
             new_value = "0" if target["value"] != "0" else "1"
             result = request_json(session.url + "api/settings/save", {
+                "sha256": settings["sha256"],
                 "edits": [{"line": target["line"], "value": new_value}]
             })
             if result.get("saved") != 1:
