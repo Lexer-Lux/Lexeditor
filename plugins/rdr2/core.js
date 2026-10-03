@@ -170,7 +170,12 @@ function humanName(scope,key){return state.labels?.[scope]?.[key]||"";}
 function effectDisplayName(key){
   return humanName("effects",key) || (state.effectByKey[key]?.label ? state.effectByKey[key].label + "*" : key);
 }
-function humanNameInput(scope,key,placeholder="Add display name…"){return el("input",{class:"human-name",type:"text",value:humanName(scope,key),placeholder,title:"Editor-only human-readable label; stored in this RDR2 plugin's labels.json and never written to the mod.",onchange:async ev=>{const value=ev.target.value;state.labels[scope]=state.labels[scope]||{};if(value.trim())state.labels[scope][key]=value.trim();else delete state.labels[scope][key];await api("/api/labels/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope,key,value})});}});}
+async function saveHumanName(scope,key,value){
+  await api("/api/labels/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope,key,value})});
+  state.labels[scope]=state.labels[scope]||{};
+  if(value.trim())state.labels[scope][key]=value.trim();else delete state.labels[scope][key];
+}
+function humanNameInput(scope,key,placeholder="Add display name…",onSaved){return el("input",{class:"human-name",type:"text",value:humanName(scope,key),placeholder,title:"Editor-only human-readable label; stored in this RDR2 plugin's labels.json and never written to the mod.",onchange:async ev=>{try{await saveHumanName(scope,key,ev.target.value);await onSaved?.();}catch(error){ev.target.value=humanName(scope,key);showSaveFailure(error);}}});}
 function localizedValue(key){return state.localizationEdits[key]??state.localization?.values?.[key]??"";}
 // A localisation entry that holds only whitespace is not a name. Several
 // catalogue headings and their base-game rows both resolve to a non-breaking

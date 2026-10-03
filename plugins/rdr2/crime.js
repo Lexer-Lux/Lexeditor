@@ -326,7 +326,8 @@ async function renderCrime() {
   }
   tb.append(el("span", { class: "count", id: "crimecount" }),savebar(saveCrime));
   const q = (f.crimeQ || "").trim().toUpperCase();
-  let rows = data.crimes.filter(c => !q || c.key.toUpperCase().includes(q)||humanName("crimes",c.key).toUpperCase().includes(q));
+  let rows = data.crimes.filter(c => !q || c.key.toUpperCase().includes(q)||humanName("crimes",c.key).toUpperCase().includes(q))
+    .map(c=>({...c,name:humanName("crimes",c.key)||c.key}));
   const crimeGetters={name:c=>humanName("crimes",c.key)||c.key,severity:c=>c.severity};CRIME_COLS.forEach(([field])=>crimeGetters[field]=c=>field==="Disabled"?String(c[field]):+c[field]);
   rows=sortedRows("crime",rows,crimeGetters);
   $("#crimecount").textContent = `${rows.length} crimes (SP variation)`;
@@ -398,6 +399,7 @@ async function renderCrime() {
       (v)=>{if(editable)applyToControl(sev,v)}, v=>String(v)));
   };
   m.append(LexeditorUI.pagedListDetail({rows,key:c=>c.key,selected:f.crimeSelected||rows[0]?.key,
+    renamable:()=>!isRO(),rename:async(c,name)=>{try{await saveHumanName('crimes',c.key,name);}catch(error){showSaveFailure(error);}await renderCrime();},
     page:f.crimePage||0,pageSize:15,noun:"crimes",slots:false,splitKey:"rdr2-crime",defaultSplit:35,
     search:{value:f.crimeQ||"",label:"Search crimes",change:value=>{f.crimeQ=value;f.crimePage=0;renderCrime()}},
     sync:view=>{f.crimePage=view.page;f.crimeSelected=view.selected},
@@ -405,7 +407,7 @@ async function renderCrime() {
     master:view=>columnList({class:"crime-table",rows:view.rows,key:c=>c.key,selected:view.selected,select:view.select,
       columns:[{key:"name",label:"Crime",render:c=>LexeditorUI.stack({fill:false},el("strong",{},humanName("crimes",c.key)||c.key),humanName("crimes",c.key)?el("span",{class:"crime-key"},c.key):null)}],"aria-label":"Crimes"}),
     detail:c=>LexeditorUI.detailPanel({title:humanName("crimes",c.key)||c.key,body:[
-      LexeditorUI.detailField({label:"Name",control:humanNameInput("crimes",c.key),help:fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")}),
+      LexeditorUI.detailField({label:"Name",control:humanNameInput("crimes",c.key,undefined,()=>renderCrime()),help:fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")}),
       ...CRIME_COLS.map(col=>LexeditorUI.detailField({label:col[1],control:fieldControl(c,col),help:col[3]?fieldHelp(col[3]):undefined})),
       LexeditorUI.detailField({label:"Severity",control:severityControl(c),help:fieldHelp("Qualitative severity class used by crime escalation and law-response rules.")})
     ]})}));
