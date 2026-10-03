@@ -1077,9 +1077,11 @@ def save_enemy_ai(edits: list[dict], documents: list[dict] | None = None) -> dic
         has_sources = "sources" in document
         if has_scripts == has_sources:
             raise ValueError("Enemy AI document must contain scripts or sources, but not both")
+        if has_scripts and not isinstance(document["scripts"], list):
+            raise ValueError("Enemy AI scripts must be a list")
         document_map[monster_id] = (
             enemy_ai_format.compile_sources(document["sources"])
-            if has_sources else list(document["scripts"]))
+            if has_sources else document["scripts"])
     for edit in edits:
         monster_id = integer_value(edit["id"], "Enemy AI record id")
         if monster_id not in valid_ids or monster_id in document_map:

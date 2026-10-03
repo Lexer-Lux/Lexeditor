@@ -131,6 +131,9 @@ def format_script(script: dict) -> str:
 
 def parse_script(source: str, script_id: int = 0, name: str | None = None) -> dict:
     """Parse one strict source script into the structural compiler document."""
+    script_id = integer_value(script_id, "Enemy AI script ID")
+    if not 0 <= script_id < len(SCRIPT_NAMES):
+        raise ValueError("Enemy AI script ID is outside the five-script table")
     if not isinstance(source, str):
         raise ValueError("Enemy AI source must be text")
     rows = []
@@ -200,7 +203,7 @@ def parse_script(source: str, script_id: int = 0, name: str | None = None) -> di
     for _, target in pending_targets:
         if target != "END" and target not in labels:
             raise ValueError(f"Enemy AI source branch target does not exist: {target}")
-    return {"id": int(script_id), "name": name or SCRIPT_NAMES[int(script_id)],
+    return {"id": script_id, "name": name or SCRIPT_NAMES[script_id],
             "instructions": rows, "source": source}
 
 
@@ -211,7 +214,7 @@ def parse_sources(sources: list[object]) -> list[dict]:
     result = []
     for index, entry in enumerate(sources):
         if isinstance(entry, dict):
-            if int(entry.get("id", -1)) != index:
+            if integer_value(entry.get("id", -1), "Enemy AI source script ID") != index:
                 raise ValueError("Enemy AI source scripts must remain in their fixed order")
             source = entry.get("source")
         else:
@@ -286,7 +289,8 @@ def _control(kind: str, value: int) -> dict:
 
 def instruction_template(opcode: int) -> dict:
     """Return a validated new instruction with neutral operand values."""
-    definition = OPCODES.get(int(opcode))
+    opcode = integer_value(opcode, "Enemy AI opcode")
+    definition = OPCODES.get(opcode)
     if definition is None:
         raise ValueError(f"Unsupported enemy AI opcode: {opcode}")
     name, types = definition
@@ -298,7 +302,7 @@ def instruction_template(opcode: int) -> dict:
             operand["value"] = choices[0]["id"]
         operand.update(index=index, size=_operand_width(kind))
         operands.append(operand)
-    return {"opcode": int(opcode), "name": name, "operands": operands,
+    return {"opcode": opcode, "name": name, "operands": operands,
             "size": 1 + sum(_operand_width(kind) for kind in types),
             "editable": True}
 
@@ -471,7 +475,7 @@ def _compile_script(script: dict) -> bytes:
     keys = set()
     cursor = 0
     for index, source in enumerate(rows):
-        opcode = int(source["opcode"])
+        opcode = integer_value(source["opcode"], "Enemy AI opcode")
         definition = OPCODES.get(opcode)
         if definition is None:
             raise ValueError(f"Unsupported enemy AI opcode: {opcode}")
@@ -534,7 +538,10 @@ def rebuild_scripts(raw: bytes, scripts: list[dict]) -> tuple[bytes, int]:
     parsed = read(raw)
     if not parsed["available"] or len(parsed["scripts"]) != 5:
         raise ValueError("Enemy DAT has no supported battle-script section")
-    if len(scripts) != 5 or [int(row.get("id", -1)) for row in scripts] != list(range(5)):
+    if (not isinstance(scripts, list) or len(scripts) != 5
+            or any(not isinstance(row, dict) for row in scripts)):
+        raise ValueError("Enemy AI rebuild requires five script objects")
+    if [integer_value(row.get("id", -1), "Enemy AI script ID") for row in scripts] != list(range(5)):
         raise ValueError("Enemy AI rebuild requires Init, Turn, Counter, Death, and Pre-hit")
     if any(not instruction.get("editable", True)
            for script in parsed["scripts"] for instruction in script["instructions"]):
