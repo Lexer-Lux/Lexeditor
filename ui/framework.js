@@ -738,6 +738,12 @@
     marker.addEventListener("pointerenter", open);
     marker.addEventListener("pointerleave", scheduleClose);
     marker.addEventListener("focus", open);
+    // A help marker can sit inside a checkbox label or clickable record.
+    // Reading help must not activate the control that contains it.
+    marker.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
     marker.addEventListener("dblclick", event => {
       if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
