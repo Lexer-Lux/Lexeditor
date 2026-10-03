@@ -3066,10 +3066,30 @@ def _catalog_numeric_edits(edits):
     """Prepare numeric values for the whole batch before touching cached XML."""
     if not isinstance(edits, dict):
         raise ValueError("catalog edits must be an object")
+    schemas = {
+        "prices": ({"item", "section", "costKey", "partItem", "qty"}, set()),
+        "yields": ({"item", "section", "costKey", "qty"}, set()),
+        "bundles": ({"key", "qty"}, set()), "carry": ({"item", "slot", "qty"}, set()),
+        "buyability": ({"item", "buyable"}, {"cents"}),
+        "sellability": ({"item", "sellable"}, {"cents"}),
+        "effects": ({"key", "field", "value"}, set()),
+        "itemEffects": ({"item", "effects"}, set()), "itemTags": ({"item", "tags"}, set()),
+        "descriptions": ({"item", "key"}, set()), "quickSelect": ({"item", "slots"}, set()),
+        "craft": ({"item", "entries"}, set()),
+    }
+    if set(edits) - set(schemas):
+        raise ValueError("unsupported catalog edit family")
     prepared = copy.deepcopy(edits)
     for family, rows in prepared.items():
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise ValueError(f"{family}: edits must be a list of objects")
+        required, optional = schemas[family]
+        for row in rows:
+            if required - set(row) or set(row) - (required | optional):
+                raise ValueError(f"{family}: missing or unsupported fields")
+            for field in (required | optional) & {"item", "key", "section", "costKey", "partItem", "slot", "field"}:
+                if not isinstance(row.get(field), str) or not row[field].strip():
+                    raise ValueError(f"{family} {field} must be nonempty text")
     def whole(row, key, label, minimum=None, default=None):
         value = integer_value(row.get(key, default), label)
         if minimum is not None and value < minimum:
@@ -3108,6 +3128,46 @@ def _catalog_numeric_edits(edits):
     return prepared
 
 
+def _validate_catalog_targets(root, edits):
+    items = {item.get("key") or txt(item, "key"): item
+             for item in root.findall("./catalog/items/item")}
+    effects = {txt(effect, "key"): effect for effect in root.findall("./effectsids/item")}
+    behaviors = {txt(effect, "id") for effect in effects.values()}
+    durations = {txt(effect, "durationcategory") for effect in effects.values()}
+    for family, rows in edits.items():
+        for row in rows:
+            if "item" in row and row["item"] not in items:
+                raise ValueError(f"Unknown catalog item: {row['item']}")
+            if family in {"prices", "yields"}:
+                if row["section"] not in {"buy", "sell"}:
+                    raise ValueError("Unknown catalog price section")
+                section = "acquirecosts" if row["section"] == "buy" else "sellprices"
+                costs = [cost for cost in items[row["item"]].findall(f"./{section}/item")
+                         if txt(cost, "key") == row["costKey"]]
+                if not costs:
+                    raise ValueError("Unknown catalog cost")
+                if family == "yields" and not any(cost.find("quantity") is not None for cost in costs):
+                    raise ValueError("Catalog cost has no quantity")
+                if family == "prices" and not any(txt(part, "item") == row["partItem"] and part.find("quantity") is not None
+                        for cost in costs for part in cost.findall("./items/item")):
+                    raise ValueError("Unknown catalog price ingredient")
+            if family == "effects":
+                effect = effects.get(row["key"])
+                field = row["field"]
+                if effect is None:
+                    raise ValueError("Unknown catalog effect")
+                if field not in {"value", "percent", "time", "timeunits", "durationcategory", "id"} or effect.find(field) is None:
+                    raise ValueError("Unsupported effect field")
+                if field in {"id", "durationcategory"}:
+                    value = row["value"]
+                    if not isinstance(value, str) or value not in (behaviors if field == "id" else durations):
+                        raise ValueError("Effect choice must match an existing engine value")
+            if family == "itemEffects":
+                values = row["effects"]
+                if not isinstance(values, list) or any(not isinstance(value, str) or value not in effects for value in values):
+                    raise ValueError("Item effects must be a list of existing catalog effect keys")
+
+
 def apply_catalog_edits(edits):
     """edits: {prices: [{item, section, costKey, partItem, qty}],
               yields: [{item, section, costKey, qty}],
@@ -3118,6 +3178,7 @@ def apply_catalog_edits(edits):
               quickSelect: [{item, slots: [{id, sortOrder}]}]}"""
     edits = _catalog_numeric_edits(edits)
     root = load_file(CATALOG_FILE)["root"]
+    _validate_catalog_targets(root, edits)
     # Allowed tag pairs = observed tags from this mod + vanilla/kiddos references
     # + curated alcohol-strength options. New free-typed hashes are rejected.
     allowed_tag_pairs = set()
@@ -3352,7 +3413,7 @@ def apply_catalog_edits(edits):
             continue
         eff_el = it.find("effectids")
         if eff_el is None:
-            continue
+            eff_el = ET.SubElement(it, "effectids")
         for child in list(eff_el):
             eff_el.remove(child)
         if e["effects"]:
