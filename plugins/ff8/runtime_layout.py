@@ -773,8 +773,12 @@ def _compose_logical_payload(logical_path: str,
                              inputs: list[tuple[str, bytes]],
                              baseline_root: Path | None,
                              kernel_definitions: dict[int, dict] | None,
-                             fallback: bytes | None) -> tuple[bytes | None, str, list[dict]]:
+                             fallback: bytes | None,
+                             encounter_context: dict | None = None) -> tuple[bytes | None, str, list[dict]]:
     """Compose one complete path for one live-condition outcome."""
+    if logical_path == 'direct/world/dat/wmsetus.obj' and encounter_context is not None:
+        output, conflicts = _compose_encounter_payload(inputs, encounter_context)
+        return output, 'semantic merge', conflicts
     if not inputs:
         return fallback, "pass-through" if fallback is None else "unconditional", []
     if logical_path == "direct/kernel.bin" and baseline_root is not None:
@@ -889,7 +893,8 @@ def _precompose_live_routes(staging: Path, enabled: list[dict],
                             resolved_by_mod: dict[str, dict[str, tuple[object, str]]],
                             live_by_mod: dict[str, dict[str, list[tuple[object, str, list[dict]]]]],
                             baseline_root: Path | None,
-                            kernel_definitions: dict[int, dict] | None) -> list[dict]:
+                            kernel_definitions: dict[int, dict] | None,
+                            encounter_context: dict | None = None) -> list[dict]:
     """Enumerate bounded outcomes and emit only complete final files.
 
     The route data remains inert until the FFNx derivative has a guarded live
@@ -1002,7 +1007,7 @@ def _precompose_live_routes(staging: Path, enabled: list[dict],
                     inputs.append((mod["id"], selected_source))
                     selected.append({"mod": mod["id"], "folder": selected_folder})
             payload, mode, conflicts = _compose_logical_payload(
-                logical_path, inputs, baseline_root, kernel_definitions, fallback)
+                logical_path, inputs, baseline_root, kernel_definitions, fallback, encounter_context)
             variant = {"outcome": outcome, "mode": mode, "sources": selected}
             if conflicts:
                 variant["conflicts"] = conflicts
@@ -1036,7 +1041,7 @@ def _precompose_live_routes(staging: Path, enabled: list[dict],
             if source is not None:
                 fallback_inputs.append((mod["id"], source[0]()))
         fallback_payload, fallback_mode, fallback_conflicts = _compose_logical_payload(
-            logical_path, fallback_inputs, baseline_root, kernel_definitions, fallback)
+            logical_path, fallback_inputs, baseline_root, kernel_definitions, fallback, encounter_context)
         route_fallback: dict = {"mode": fallback_mode}
         if fallback_conflicts:
             route_fallback["conflicts"] = fallback_conflicts
@@ -1111,7 +1116,7 @@ def _validate_encounter_pairs(enabled, resolved_by_mod, static_by_mod,
             raise ValueError(f"{mod['id']}: encounter weights and their generated Hext must be paired")
         pairs.append((mod['id'], patch, weighted))
     if not pairs:
-        return False
+        return None
     baseline = (Path(baseline_root)/'world/wmsetus.obj'
                 if baseline_root is not None else None)
     if baseline is None or not baseline.is_file():
@@ -1134,11 +1139,19 @@ def _validate_encounter_pairs(enabled, resolved_by_mod, static_by_mod,
             merged, _, reason = world_data_merge.merge(raw, [(mod_id, data)], 'wmset', world_key)
             if merged is None:
                 raise ValueError(f'{mod_id}: encounter weight composition failed: {reason}')
-    if any(live_by_mod[mod['id']].get(world_key) for mod in enabled):
-        # Hext is loaded once; live world-data routes can otherwise select a
-        # plain file while the selector still reads an appended weight table.
-        raise ValueError('Encounter weights cannot yet be combined with live conditional world data')
-    return True
+    return {'baseline': raw, 'count': count, 'owners': [mod_id for mod_id, _, _ in pairs]}
+
+
+def _compose_encounter_payload(inputs, context):
+    """Every output read by the weighted selector has a complete fixed table."""
+    output, conflicts, reason = world_data_merge.merge(
+        context['baseline'], inputs, 'wmset', 'direct/world/dat/wmsetus.obj')
+    if output is None:
+        raise ValueError(f'Encounter weight composition failed: {reason}')
+    # Hext is loaded once. Even a live outcome with no weighted input must
+    # carry the default table at the exact address in that generated patch.
+    return encounter_chances.with_weights(
+        output, context['count'], {}, force_extension=True), conflicts
 
 
 def compose(project_root: Path, runtime_root: Path,
@@ -1204,7 +1217,7 @@ def compose(project_root: Path, runtime_root: Path,
         # a raw package candidate.
         live_routes = _precompose_live_routes(
             staging, enabled, static_by_mod, resolved_by_mod, live_by_mod,
-            baseline_root, kernel_definitions,
+            baseline_root, kernel_definitions, weighted_encounters,
         )
         live_manifest = staging / Path(*_path_parts(LIVE_CONDITIONAL_MANIFEST))
         live_manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -1267,8 +1280,18 @@ def compose(project_root: Path, runtime_root: Path,
             for world_key, (baseline_name, kind) in WORLD_MERGE_SPECS.items():
                 world_claimants = claims.get(world_key, [])
                 world_baseline = Path(baseline_root) / baseline_name
-                if ((len(world_claimants) < 2 and not (weighted_encounters and kind == 'wmset'))
-                        or not world_baseline.is_file()):
+                if weighted_encounters and kind == 'wmset':
+                    inputs = [(mod['id'], resolved_by_mod[mod['id']][world_key][0]())
+                              for mod in enabled if world_key in resolved_by_mod[mod['id']]]
+                    merged, unit_conflicts = _compose_encounter_payload(inputs, weighted_encounters)
+                    destination = staging / world_key
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(merged)
+                    claims.setdefault(world_key, weighted_encounters['owners'])
+                    semantic_merged.add(world_key)
+                    semantic_conflicts_by_path[world_key] = unit_conflicts
+                    continue
+                if len(world_claimants) < 2 or not world_baseline.is_file():
                     continue
                 inputs = []
                 for mod in enabled:
@@ -1282,8 +1305,6 @@ def compose(project_root: Path, runtime_root: Path,
                     semantic_merged.add(world_key)
                     semantic_conflicts_by_path[world_key] = unit_conflicts
                 else:
-                    if weighted_encounters and kind == 'wmset':
-                        raise ValueError(f'Encounter weight composition failed: {fallback}')
                     semantic_fallback_by_path[world_key] = fallback
             for encounter_key, encounter_claimants in claims.items():
                 encounter_baseline = _field_encounter_baseline(

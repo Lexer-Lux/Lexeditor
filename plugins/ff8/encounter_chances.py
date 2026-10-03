@@ -106,7 +106,8 @@ def read_extension(data: bytes, group_count: int) -> tuple[bytes, list[tuple[int
     return data[:base_size], records
 
 
-def with_weights(data: bytes, group_count: int, changes: dict[int, list[int]]) -> bytes:
+def with_weights(data: bytes, group_count: int, changes: dict[int, list[int]],
+                 *, force_extension: bool = False) -> bytes:
     """Prepare a complete bounded output without touching files or offsets."""
     base, weights = read_extension(data, group_count)
     if not isinstance(changes, dict):
@@ -119,7 +120,7 @@ def with_weights(data: bytes, group_count: int, changes: dict[int, list[int]]) -
         prepared.append((group, tuple(values)))
     for group, values in prepared:
         weights[group] = values
-    if all(record == DEFAULT_OUTCOMES for record in weights):
+    if not force_extension and all(record == DEFAULT_OUTCOMES for record in weights):
         return base
     payload = encode_weights(DEFAULT_OUTCOMES) + b''.join(encode_weights(record) for record in weights)
     result_size = len(base)+len(base)%2+len(payload)+_FOOTER.size

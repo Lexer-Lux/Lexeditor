@@ -143,7 +143,7 @@ def test_production_composer_orders_and_removes_weight_mods(deployment):
 
 
 @pytest.mark.parametrize('defect', ['missing-patch', 'wrong-patch', 'orphan-patch',
-                                   'corrupt-weights', 'opaque-world', 'unsupported-exe', 'live-world'])
+                                   'corrupt-weights', 'opaque-world', 'unsupported-exe', 'opaque-live-world'])
 def test_bad_pairs_preserve_the_entire_previous_runtime(deployment, defect):
     base, roots, rows, active, compose = deployment
     compose()
@@ -168,15 +168,70 @@ def test_bad_pairs_preserve_the_entire_previous_runtime(deployment, defect):
     else:
         candidate = roots[1]/'live'/PATH
         candidate.parent.mkdir(parents=True)
-        candidate.write_bytes(base)
+        opaque = bytearray(base)
+        opaque[-1] = 1
+        candidate.write_bytes(opaque)
         (roots[1]/'mod.xml').write_text(
             '<ModInfo><Conditional Folder="live"><RuntimeVar ApplyTo="" '
             'Var="Byte:0x00DC08EB" Values="1"/></Conditional></ModInfo>', encoding='utf-8')
     reasons = {'missing-patch': 'must be paired', 'wrong-patch': 'Hext does not match',
                'orphan-patch': 'must be paired', 'corrupt-weights': 'checksum',
                'opaque-world': 'outside proved', 'unsupported-exe': 'supported English Steam',
-               'live-world': 'live conditional world data'}
+               'opaque-live-world': 'outside proved'}
     with pytest.raises(ValueError, match=reasons[defect]):
         compose()
     assert snapshot(active) == previous
     assert not list(active.parent.glob('.runtime.staging-*'))
+
+
+@pytest.mark.parametrize('static_worlds', [True, False])
+@pytest.mark.parametrize('colliding_groups', [True, False])
+def test_all_live_outcomes_and_fallback_keep_the_selector_table(deployment, static_worlds, colliding_groups):
+    base, roots, rows, active, compose = deployment
+    for index, root in enumerate(roots):
+        candidate = root/'live'/PATH
+        candidate.parent.mkdir(parents=True)
+        candidate.write_bytes(chances.with_weights(
+            base, 3, {0 if colliding_groups else index: FIRST if index == 0 else LAST}))
+        if static_worlds:
+            (root/PATH).write_bytes(base)
+        else:
+            (root/PATH).unlink()
+        (root/'mod.xml').write_text(
+            '<ModInfo><Conditional Folder="live"><RuntimeVar ApplyTo="" '
+            f'Var="Byte:0x{0xDC08EB+index:08X}" Values="1"/></Conditional></ModInfo>', encoding='utf-8')
+    for selected in (rows, list(reversed(rows))):
+        compose(selected)
+        manifest = json.loads((active/runtime_layout.COMPOSITION_FILE).read_text())
+        route = next(row for row in manifest['liveConditionalRoutes'] if row['logicalPath'] == PATH)
+        assert len(route['variants']) == 4
+        for variant in route['variants']:
+            assert not variant.get('passThrough') and variant['mode'] == 'semantic merge'
+            data = (active/'direct'/variant['asset']).read_bytes()
+            assert chances.has_extension(data)
+            stripped, weights = chances.read_extension(data, 3)
+            assert stripped == base
+            expected = [chances.DEFAULT_OUTCOMES]*3
+            for source in variant['sources']:
+                if source['folder'] == 'live':
+                    index = int(source['mod'][-1])
+                    expected[0 if colliding_groups else index] = tuple(FIRST if index == 0 else LAST)
+            assert weights == expected
+            assert sha256(data).hexdigest() == variant['sha256']
+            assert chances.extension_offset(data, 3, world_map._pointers(base)[3]) == (
+                len(base)+len(base)%2-world_map._pointers(base)[3])
+            weighted_sources = [source for source in variant['sources'] if source['folder'] == 'live']
+            if colliding_groups and len(weighted_sources) == 2:
+                assert variant['conflicts'] == [{
+                    'unit': f'{PATH}:group:0:initialOutcomes', 'winner': weighted_sources[-1]['mod'],
+                    'claimants': [source['mod'] for source in weighted_sources]}]
+            else:
+                assert not variant.get('conflicts')
+        fallback = (active/'direct'/route['fallback']['asset']).read_bytes()
+        current = (active/PATH).read_bytes()
+        assert fallback == current
+        assert chances.has_extension(current)
+        assert chances.read_extension(current, 3) == (base, [chances.DEFAULT_OUTCOMES]*3)
+    compose([])
+    assert not (active/PATH).exists()
+    assert not list((active/'hext').rglob('*.txt'))
