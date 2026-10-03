@@ -52,7 +52,9 @@ def apply_edits(data: bytes, edits: list[dict], schema_root: Path,
                 parameter_choices: dict | None = None) -> tuple[bytes, int]:
     if len(data) % RECORD_SIZE:
         raise ValueError("mitem.bin has a partial item record")
-    types = {int(row["id"]): row for row in _schema(schema_root)["item_type"]}
+    schema = _schema(schema_root)
+    types = {int(row["id"]): row for row in schema["item_type"]}
+    parameters = {row["name"]: row for row in schema.get("param_type", [])}
     raw = bytearray(data)
     seen: set[int] = set()
     for edit in edits:
@@ -71,6 +73,14 @@ def apply_edits(data: bytes, edits: list[dict], schema_root: Path,
         base = item_id * RECORD_SIZE
         for key, value, offset in (("param1", param1, 2), ("param2", param2, 3)):
             kind = types[type_id].get(key)
+            meta = parameters.get(kind)
+            if kind is not None and (meta is None or meta.get("widget") == "none"):
+                if value != data[base + offset]:
+                    raise ValueError(f"Menu item {key} is read-only for this type")
+            if meta is not None and meta.get("widget") == "flags":
+                writable = sum(1 << int(row["bit"]) for row in meta["values"] if not row.get("readonly"))
+                if (value ^ data[base + offset]) & ~writable:
+                    raise ValueError(f"Menu item {key} unknown flags are read-only")
             choices = (parameter_choices or {}).get(kind)
             if (choices is not None and (type_id != data[base] or value != data[base + offset])
                     and value not in {int(row["id"]) for row in choices}):
