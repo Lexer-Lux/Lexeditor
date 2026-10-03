@@ -75,6 +75,21 @@ def test_readonly_noop_and_mapping_only_transaction(shell):
     assert not list(shell.mine.rglob('*.bak'))
 
 
+def test_shell_validation_checks_mapping_without_publication(shell,monkeypatch):
+    before=snapshot(shell.mine)
+    entries=[s.load_file(relative) for _,relative in s.WEAPON_STACK[:7]]
+    roots=[entry['root'] for entry in entries]
+    def forbidden(*args,**kwargs):raise AssertionError('validation published files')
+    monkeypatch.setattr(s,'_commit_xml_roots',forbidden);monkeypatch.setattr(s,'_commit_file_outputs',forbidden)
+    assert s.apply_weapon_shell_vfx(False,validate_only=True)==7
+    assert s.apply_weapon_shell_vfx(True,validate_only=True)==0
+    assert snapshot(shell.mine)==before
+    assert all(entry['root'] is root for entry,root in zip(entries,roots))
+    (shell.mine/'install.xml').write_text('<LML/>');before=snapshot(shell.mine)
+    with pytest.raises(ValueError):s.apply_weapon_shell_vfx(False,validate_only=True)
+    assert snapshot(shell.mine)==before
+
+
 def test_http_requires_explicit_boolean_then_restores_all_layers(shell):
     http=s.create_server(0);worker=threading.Thread(target=http.serve_forever,daemon=True);worker.start()
     def post(body):

@@ -292,11 +292,10 @@ async function renderWeapons() {
   }
   const records=d[section],names=records.map(x=>x.name).sort();if(!f.weapon||!names.includes(f.weapon))f.weapon=names[0];
   const sv=d.shellVfx;
-  const shellBox=sv&&sv.available?el("label",{style:"display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer",
-    title:`Blank every weapon's shell-eject VFX so vanilla shells stop duplicating the physical collectible casings. Currently ${sv.blank}/${sv.total} fields blank across ${(sv.files||[]).length} weapon files${sv.mixed?" (mixed)":""}.`},
-    el("input",{type:"checkbox",checked:(state.weaponShellVfxEdit??sv.blanked)===true,
-      onchange:ev=>{state.weaponShellVfxEdit=ev.target.checked;renderToolbarOnly();}}),
-    "Blank vanilla shell VFX (collectible casings)"):sv?el("span",{class:"hint"},"Shell comparison unavailable: a weapon layer or its vanilla reference is missing."):null;
+  const shellBox=sv&&sv.available?LexeditorUI.toggleRow({toggles:[{label:"Blank vanilla shell VFX (collectible casings)",
+    help:`Hides vanilla shell effects when collectible casings supply their own. ${sv.blank} of ${sv.total} fields are blank across ${(sv.files||[]).length} weapon files.${sv.mixed?" The layers currently have mixed values.":""}`,
+    disabled:isRO(),checked:(state.weaponShellVfxEdit??sv.blanked)===true,
+    change:checked=>{if(isRO())return;state.weaponShellVfxEdit=!sv.mixed&&checked===sv.blanked?null:checked;renderToolbarOnly();}}]}):sv?el("span",{class:"hint"},"Shell comparison unavailable: a weapon layer or its vanilla reference is missing."):null;
   tb.append(sectionTabs);
   const weaponFilters=[...(shellBox?[shellBox]:[]),savebar(saveWeapons)];
   const m=$("#main");m.innerHTML="";
@@ -497,21 +496,29 @@ function weaponSaveBody(key){
   }
   return {section,name,sourceFile:record.sourceFile,edits};
 }
+async function preflightWeaponShellVfx(){
+  if(state.weaponShellVfxEdit===null)return;
+  if(typeof state.weaponShellVfxEdit!=="boolean")throw new Error("Shell VFX requires a boolean.");
+  await api("/api/weapons/shell-vfx/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blanked:state.weaponShellVfxEdit})});
+}
 async function preflightWeaponSave(){
   const bodies=Object.entries(state.weaponEdits).filter(([,map])=>Object.keys(map).length).map(([key])=>[key,weaponSaveBody(key)]);
   for(const [,body] of bodies)await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await preflightWeaponShellVfx();
   return bodies;
 }
 async function saveWeapons(){
   if(isRO())return;
   const section=state.filters.weaponSection||"weapons",name=state.filters.weapon,key=`${section}|${name}`,body=weaponSaveBody(key);
   await api("/api/weapons/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await preflightWeaponShellVfx();
   const localizedSaved=await saveLocalization();const r=await api("/api/weapons/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  delete state.weaponEdits[key];delete state.weaponData.mine;toast(`Saved ${r.saved} weapon + ${localizedSaved} in-game text field(s)`);renderWeapons();
+  delete state.weaponEdits[key];const shellSaved=await saveWeaponShellVfx();delete state.weaponData.mine;toast(`Saved ${r.saved+shellSaved} weapon + ${localizedSaved} in-game text field(s)`);renderWeapons();
 }
 
 async function saveWeaponShellVfx(){
-  if(state.weaponShellVfxEdit===null)return 0;
+  if(isRO()||state.weaponShellVfxEdit===null)return 0;
+  await preflightWeaponShellVfx();
   const r=await api("/api/weapons/shell-vfx/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({blanked:state.weaponShellVfxEdit})});
   state.weaponShellVfxEdit=null;delete state.weaponData.mine;return r.saved;
 }

@@ -31,7 +31,7 @@ const challengeValidation = challenges.slice(challenges.indexOf('function valida
 const challengeSave = challenges.slice(challenges.indexOf('async function saveChallenges()'));
 
 async function weaponSaveGuards(){
-  const weaponFunctions=weapons.slice(weapons.indexOf('function weaponSaveBody('),weapons.indexOf('async function saveWeaponShellVfx('));
+  const weaponFunctions=weapons.slice(weapons.indexOf('function weaponSaveBody('));
   for(const global of [false,true])for(const reject of [false,true]){
     const calls=[],errors=[];
     const context=vm.createContext({isRO:()=>false,dirtyCount:()=>1,

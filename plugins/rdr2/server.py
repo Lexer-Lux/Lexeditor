@@ -5740,17 +5740,17 @@ def _apply_weapon_batch(section, name, edits, source_file, *, validate_only=Fals
     return len(edits)
 
 
-def apply_weapon_shell_vfx(blanked):
+def apply_weapon_shell_vfx(blanked, *, validate_only=False):
     """Restore/blank all seven shell layers; never publish a partial reference."""
     if not isinstance(blanked, bool):
         raise ValueError("blanked must be a boolean")
     if DATASETS['mine'].get('readonly'):
         raise ValueError("This dataset is read-only")
     with _lock:
-        return _apply_weapon_shell_vfx(blanked)
+        return _apply_weapon_shell_vfx(blanked, validate_only=validate_only)
 
 
-def _apply_weapon_shell_vfx(blanked):
+def _apply_weapon_shell_vfx(blanked, *, validate_only=False):
     replacements = install_replacements()
     stack = [(game_path, replacements.get(game_path.casefold(), relative))
              for game_path, relative in WEAPON_STACK]
@@ -5778,6 +5778,8 @@ def _apply_weapon_shell_vfx(blanked):
     payload = _prepare_file_replacements(stack)
     outputs = [(install_path, payload)] if payload is not None else []
     expected = {install_path: original} if outputs else {}
+    if validate_only:
+        return sum(count for _, _, _, count in prepared)
     if prepared:
         _commit_xml_roots([(name, entry, root) for name, entry, root, _ in prepared], outputs, expected)
     elif outputs:
@@ -6629,11 +6631,12 @@ class Handler(PluginRequestHandler):
                             body.get("edits", []), body.get("sourceFile", WEAPONS_FILE), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
-                elif path == "/api/weapons/shell-vfx/save":
+                elif path in {"/api/weapons/shell-vfx/save", "/api/weapons/shell-vfx/validate"}:
                     try:
                         if not isinstance(body, dict) or set(body) != {'blanked'}:
                             raise ValueError("Shell VFX settings require only blanked")
-                        self._json({"saved": apply_weapon_shell_vfx(body.get("blanked"))})
+                        validate_only = path.endswith('/validate')
+                        self._json({"validated" if validate_only else "saved": apply_weapon_shell_vfx(body.get("blanked"), validate_only=validate_only)})
                     except ValueError as error:
                         self._json({"error": str(error)}, 400)
                 elif path == "/api/weapons/projectile-speeds/save":
