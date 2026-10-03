@@ -3905,7 +3905,55 @@ def get_loot(name, ds="mine"):
 def apply_loot_edits(name, edits):
     """edits: [{tableKey, entries: [{name, rate, type, min, max, rewardcondition}]}]
     Rebuilds the <Entries> block of each edited table."""
-    valid_items = {item["key"] for item in get_catalog()["items"]}
+    if name not in LOOT_FILES:
+        raise ValueError(f"unknown loot file: {name}")
+    if not isinstance(edits, list):
+        raise ValueError("Loot edits must be a list")
+    if not edits:
+        return 0
+    entry = load_file(name)
+    root = copy.deepcopy(entry["root"])
+    tables = {table.get("key"): table for table in root.findall('./LootTables/Item')}
+    prepared, seen = [], set()
+    allowed_fields = {field.lower() for field in ENTRY_FIELDS}
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"tableKey", "entries"}:
+            raise ValueError("Loot edits require tableKey and entries only")
+        key = edit["tableKey"]
+        if not isinstance(key, str) or key not in tables:
+            raise ValueError("Unknown loot table")
+        if key in seen:
+            raise ValueError(f"Duplicate loot table target: {key}")
+        seen.add(key)
+        if not isinstance(edit["entries"], list):
+            raise ValueError("Loot entries must be a list")
+        for old in tables[key].findall('./Entries/Item'):
+            if old.attrib or any(child.tag not in ENTRY_FIELDS or list(child)
+                or set(child.attrib) - ({"value"} if child.tag in VALUE_FIELDS else {"ref"} if child.tag == "RewardCondition" else set())
+                for child in old if isinstance(child.tag, str)):
+                raise ValueError(f"Loot table {key} has unmodeled entry data and is read-only")
+            if any(len(old.findall(field)) > 1 for field in ENTRY_FIELDS):
+                raise ValueError(f"Loot table {key} has repeated entry fields and is read-only")
+        rows = []
+        for incoming in edit["entries"]:
+            if not isinstance(incoming, dict) or "name" not in incoming or set(incoming) - allowed_fields:
+                raise ValueError("Loot entries require name and supported fields only")
+            row = dict(incoming)
+            for field in ("name", "type", "rewardcondition"):
+                if field in row and not isinstance(row[field], str):
+                    raise ValueError(f"Loot {field} must be text")
+            for field in ("min", "max", "rate"):
+                if field not in row or row[field] == "":
+                    continue
+                row[field] = finite_number(row[field], "Loot rate") if field == "rate" else integer_value(row[field], f"Loot {field}")
+                if field == "rate" and row[field] < 0:
+                    raise ValueError("Loot rate must be nonnegative")
+            if row.get("min") not in (None, "") and row.get("max") not in (None, "") and row["min"] > row["max"]:
+                raise ValueError("Loot minimum cannot exceed maximum")
+            rows.append(row)
+        prepared.append({"tableKey": key, "entries": rows})
+    edits = prepared
+    valid_items = set(_catalog_ids())
     valid_tables = {table["key"] for file in LOOT_FILES if (ds_dir("mine") / file).exists()
                     for table in get_loot(file)["tables"]}
     valid_conditions = {entry.get("rewardcondition") for file in LOOT_FILES if (ds_dir("mine") / file).exists()
@@ -3925,7 +3973,6 @@ def apply_loot_edits(name, edits):
                 raise ValueError(f"unknown loot {row_type.lower()} identifier: {row.get('name')}")
             if row.get("rewardcondition") and row["rewardcondition"] not in valid_conditions:
                 raise ValueError(f"unknown loot condition: {row['rewardcondition']}")
-    root = load_file(name)["root"]
     changed = 0
     for e in edits:
         for t in root.find("LootTables").findall("Item"):
@@ -3935,7 +3982,8 @@ def apply_loot_edits(name, edits):
             if entries_el is None:
                 entries_el = ET.SubElement(t, "Entries")
             for child in list(entries_el):
-                entries_el.remove(child)
+                if child.tag == "Item":
+                    entries_el.remove(child)
             entries_el.text = "\n        "
             rows = e["entries"]
             for i, row in enumerate(rows):
@@ -3961,7 +4009,7 @@ def apply_loot_edits(name, edits):
             entries_el.tail = "\n    "
             changed += 1
     if changed:
-        save_file(name)
+        _commit_xml_roots([(name, entry, root)])
     return changed
 
 
