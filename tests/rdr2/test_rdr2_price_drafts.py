@@ -78,5 +78,29 @@ def test_price_drafts_redraw_history_rejection_and_exact_cents():
                 page.evaluate('''({section})=>clearCatalogMoneyDrafts(priceItem.key,section)''', {'section': section})
                 assert page.evaluate('Object.keys(state.moneyDrafts).length') == 0
                 page.evaluate('''family=>{state[family+'Edits']={}}''', family)
+            page.evaluate('''()=>{
+              priceItem.buy=[];state.buyabilityEdits[priceItem.key]={buyable:true,cents:100};
+              document.querySelector('#main').replaceChildren(buyPriceCell(priceItem,[],document.createElement('div')),
+                purchaseQuantityCell(priceItem));
+            }''')
+            page.get_by_role('spinbutton', name='buy price for CONSUMABLE_RUM', exact=True).fill('1.29')
+            page.get_by_role('spinbutton', name='Purchase quantity for CONSUMABLE_RUM', exact=True).fill('4')
+            page.evaluate('saveCatalog()')
+            assert page.evaluate('priceItem.buy') == [
+                {'key': 'COST_SHOP_DEFAULT', 'costtype': 'COST_TYPE_PRICE', 'yield': '4',
+                 'parts': [{'item': 'CURRENCY_CASH', 'qty': '129'}], 'unlocks': []}
+            ]
+            page.evaluate('''()=>{
+              state.priceEdits['CONSUMABLE_RUM|buy|COST_SHOP_DEFAULT|CURRENCY_CASH']='145';
+              state.yieldEdits['CONSUMABLE_RUM|buy|COST_SHOP_DEFAULT']='5';
+              state.priceEdits['OTHER|buy|OTHER_COST|CURRENCY_CASH']='999';
+              clearCatalogCashPriceEdits(priceItem,'buy');
+            }''')
+            assert page.evaluate('Object.keys(state.yieldEdits).length') == 0
+            assert page.evaluate('Object.keys(state.priceEdits)') == ['OTHER|buy|OTHER_COST|CURRENCY_CASH']
+            page.evaluate('state.priceEdits={}')
+            page.evaluate('''()=>{state.buyabilityEdits[priceItem.key]={buyable:false}}''')
+            page.evaluate('saveCatalog()')
+            assert page.evaluate('priceItem.buy') == []
         finally:
             browser.close()

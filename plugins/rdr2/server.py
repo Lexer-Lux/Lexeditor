@@ -3168,6 +3168,49 @@ def _validate_catalog_targets(root, edits):
                     raise ValueError("Item effects must be a list of existing catalog effect keys")
 
 
+def _prepare_cash_purchase_prices(root, rows):
+    changed = 0
+    for row in rows:
+        item = find_catalog_item(root, row["item"])
+        if item is None:
+            raise ValueError(f"Unknown catalog item: {row['item']}")
+        section = item.find("acquirecosts")
+        if section is None:
+            if not row["buyable"]:
+                continue
+            section = ET.SubElement(item, "acquirecosts")
+        costs = [cost for cost in section.findall("item") if txt(cost, "costtype") == "COST_TYPE_PRICE"
+                 and any(txt(part, "item") == "CURRENCY_CASH" for part in cost.findall("./items/item"))]
+        if not row["buyable"]:
+            for cost in costs:
+                section.remove(cost)
+                changed += 1
+            continue
+        if not costs:
+            cost = ET.SubElement(section, "item")
+            ET.SubElement(cost, "key").text = "COST_SHOP_DEFAULT"
+            ET.SubElement(cost, "quantity", {"value": "1"})
+            ET.SubElement(cost, "costtype").text = "COST_TYPE_PRICE"
+            parts = ET.SubElement(cost, "items")
+            part = ET.SubElement(parts, "item")
+            ET.SubElement(part, "item").text = "CURRENCY_CASH"
+            ET.SubElement(part, "quantity", {"value": str(row["cents"])})
+            ET.SubElement(cost, "unlocks")
+            changed += 1
+        else:
+            for cost in costs:
+                for part in cost.findall("./items/item"):
+                    if txt(part, "item") != "CURRENCY_CASH":
+                        continue
+                    quantity = part.find("quantity")
+                    if quantity is None:
+                        quantity = ET.SubElement(part, "quantity")
+                    if quantity.get("value") != str(row["cents"]):
+                        quantity.set("value", str(row["cents"]))
+                        changed += 1
+    return changed
+
+
 def apply_catalog_edits(edits):
     """edits: {prices: [{item, section, costKey, partItem, qty}],
               yields: [{item, section, costKey, qty}],
@@ -3177,7 +3220,10 @@ def apply_catalog_edits(edits):
               descriptions: [{item, key}],
               quickSelect: [{item, slots: [{id, sortOrder}]}]}"""
     edits = _catalog_numeric_edits(edits)
-    root = load_file(CATALOG_FILE)["root"]
+    catalog_entry = load_file(CATALOG_FILE)
+    original_root = catalog_entry["root"]
+    root = copy.deepcopy(original_root)
+    changed = _prepare_cash_purchase_prices(root, edits.get("buyability", []))
     _validate_catalog_targets(root, edits)
     # Allowed tag pairs = observed tags from this mod + vanilla/kiddos references
     # + curated alcohol-strength options. New free-typed hashes are rejected.
@@ -3194,18 +3240,6 @@ def apply_catalog_edits(edits):
                 allowed_tag_pairs.add((tag["key"], tag["type"]))
     for row in ALCOHOL_STRENGTH_TAGS:
         allowed_tag_pairs.add((_normalize_tag_token(row["key"]), _normalize_tag_token(row["type"])))
-    changed = 0
-    for e in edits.get("buyability", []):
-        present = bool(e.get("buyable"))
-        shop_types = set(shop_stock_types(root, e["item"]))
-        shop_types.update(catalog_page_shops(root, e["item"]))
-        if present:
-            vanilla_root = load_file(CATALOG_FILE, "vanilla")["root"]
-            shop_types.update(shop_stock_types(vanilla_root, e["item"]))
-            shop_types.update(catalog_page_shops(vanilla_root, e["item"]))
-        for shop_type in shop_types:
-            result = set_item_shop_presence(root, e["item"], shop_type, present)
-            changed += result["stock"] + result["catalogue"]
     for e in edits.get("sellability", []):
         it = find_catalog_item(root, e["item"])
         if it is None:
@@ -3479,7 +3513,12 @@ def apply_catalog_edits(edits):
             description.text = key
             changed += 1
     if changed:
-        save_file(CATALOG_FILE)
+        catalog_entry["root"] = root
+        try:
+            save_file(CATALOG_FILE)
+        except Exception:
+            catalog_entry["root"] = original_root
+            raise
         for name in bundle_files:
             save_file(name)
     return changed + apply_quick_select_edits(edits.get("quickSelect", []))

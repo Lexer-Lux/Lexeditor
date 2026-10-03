@@ -655,6 +655,13 @@ async function saveCatalog() {
     const r = await api("/api/catalog/save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prices, buyability, sellability, yields, bundles:Object.entries(state.bundleEdits).map(([key,qty])=>({key,qty})), effects, itemEffects, itemTags, quickSelect: quickSelect, descriptions, carry, craft }) });
     // fold edits into local model so UI stays consistent
+    for(const e of buyability){
+      const it=state.catalog.items.find(i=>i.key===e.item);if(!it)continue;
+      const cash=it.buy.filter(c=>c.costtype==="COST_TYPE_PRICE"&&c.parts.some(p=>p.item==="CURRENCY_CASH"));
+      if(!e.buyable)it.buy=it.buy.filter(c=>!cash.includes(c));
+      else if(cash.length){for(const cost of cash)for(const part of cost.parts)if(part.item==="CURRENCY_CASH")part.qty=e.cents??100;}
+      else it.buy.push({key:"COST_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]});
+    }
     for (const e of prices) {
       const it = state.catalog.items.find(i => i.key === e.item);
       const list = e.section === "buy" ? it.buy : it.sell;
@@ -662,7 +669,6 @@ async function saveCatalog() {
         for (const p of c.parts) if (p.item === e.partItem) p.qty = e.qty;
     }
     for(const e of yields){const it=state.catalog.items.find(i=>i.key===e.item);const cost=it&&it[e.section].find(c=>c.key===e.costKey);if(cost)cost.yield=e.qty;}
-    for(const e of buyability){const it=state.catalog.items.find(i=>i.key===e.item);if(it){const other=it.buy.filter(c=>c.costtype!=="COST_TYPE_PRICE"||!c.parts.some(p=>p.item==="CURRENCY_CASH"));it.buy=e.buyable?other.concat([{key:"COST_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]}]):other;}}
     for(const e of sellability){const it=state.catalog.items.find(i=>i.key===e.item);if(it)it.sell=e.sellable?[{key:"SELL_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:e.cents??100}],unlocks:[]}]:[];}
     for (const e of effects) {
       const eff = state.effectByKey[e.key];

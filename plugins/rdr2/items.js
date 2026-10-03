@@ -164,6 +164,14 @@ function catalogMoneyInput({key,cents,change,...attrs}){
 function clearCatalogMoneyDrafts(item,section){
   for(const key of Object.keys(state.moneyDrafts))if(key.startsWith(`${item}|${section}|`)||key===`${item}|${section}ability`)delete state.moneyDrafts[key];
 }
+function clearCatalogCashPriceEdits(it,section){
+  clearCatalogMoneyDrafts(it.key,section);
+  const costs=new Set(it[section].filter(cost=>cost.costtype==="COST_TYPE_PRICE"&&cost.parts.some(part=>part.item==="CURRENCY_CASH")).map(cost=>cost.key));
+  costs.add(section==="buy"?"COST_SHOP_DEFAULT":"SELL_SHOP_DEFAULT");
+  for(const store of [state.priceEdits,state.yieldEdits])for(const key of Object.keys(store)){
+    const [item,side,cost]=key.split("|");if(item===it.key&&side===section&&costs.has(cost))delete store[key];
+  }
+}
 function priceInput(it, section, cost, part) {
   const editKey = [it.key, section, cost.key, part.item].join("|");
   const cur = isRO() ? part.qty : (state.priceEdits[editKey] ?? part.qty);
@@ -183,7 +191,7 @@ function sellPriceCell(it,sellCash,sellRef){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|sellability`,cents:p.qty,"aria-label":`sell price for ${it.key}`,change:cents=>{state.sellabilityEdits[it.key]={sellable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{clearCatalogMoneyDrafts(it.key,"sell");state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{clearCatalogCashPriceEdits(it,"sell");state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash sell price is defined."}),!isRO()?newButton({title:"Add a generic SELL_SHOP_DEFAULT payout. This does not choose which merchants accept the item.",onclick:()=>{state.sellabilityEdits[it.key]={sellable:true,cents:100};render();}}):el("span"),el("span"));
   }
@@ -198,7 +206,7 @@ function buyPriceCell(it,buyCash,buyRef){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.unitField(catalogMoneyInput({key:`${it.key}|buyability`,cents:part.qty,"aria-label":`buy price for ${it.key}`,change:cents=>{state.buyabilityEdits[it.key]={buyable:true,cents};}}),"$"));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
-    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{clearCatalogMoneyDrafts(it.key,"buy");state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
+    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{clearCatalogCashPriceEdits(it,"buy");state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:(it.shopListings||[]).length?"No cash cost; commonly a free/default option already present in a shop inventory":"No generic cash purchase cost is defined"}),!isRO()?newButton({title:"Add COST_SHOP_DEFAULT cash price; also list it in Shops if it is not already present",onclick:()=>{state.buyabilityEdits[it.key]={buyable:true,cents:100};renderItems();}}):el("span"),el("span"));
   }
