@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 from .field_data import TREASURE_BASES, item_names
 from .project import OverlayStore, digest
 
@@ -102,6 +104,8 @@ def _save_stat_table(store: OverlayStore, kind: str, expected_sha256: str, edits
     payload, _ = store.read(spec["path"], "mine")
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{spec['path']} changed since it was opened; reload before saving")
+    if len(payload) < 4:
+        raise ValueError(f"{spec['path']} is missing its record-count header")
     count = struct.unpack_from("<I", payload, 0)[0]
     if count != spec["count"]:
         raise ValueError(
@@ -112,26 +116,34 @@ def _save_stat_table(store: OverlayStore, kind: str, expected_sha256: str, edits
     stat_bytes = spec["statBytes"]
     stat_field = spec["statField"]
     stat_bound = spec["statBound"]
+    if len(payload) < 4 + count * record_size:
+        raise ValueError(f"{spec['path']} is shorter than its declared fixed records")
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit["token"])
+        if not isinstance(edit, dict):
+            raise ValueError(f"{kind} edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError(f"{kind} edit token must be text")
         if token in seen:
             raise ValueError(f"Duplicate {kind} edit")
         try:
             index = int(token)
         except ValueError as error:
             raise ValueError(f"Invalid {kind} edit token") from error
-        if not 0 <= index < count:
+        if token != str(index) or not 0 <= index < count:
             raise ValueError(f"Invalid {kind} edit token")
         seen.add(token)
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError(f"{kind} values must be an object")
         unknown = set(values) - {stat_field}
         if unknown:
             raise ValueError(f"Unsupported {kind} fields: {', '.join(sorted(unknown))}")
         if stat_field not in values:
             continue
-        value = int(values[stat_field])
+        value = integer_value(values[stat_field], f"{kind} {stat_field}")
         if not 0 <= value <= stat_bound:
             raise ValueError(f"{kind} {stat_field} must be between 0 and {stat_bound}")
         offset = 4 + index * record_size
