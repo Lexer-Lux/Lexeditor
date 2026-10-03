@@ -909,15 +909,21 @@ def _prepare_localization_save(edits):
     return path, payload, _localization_install_bytes(), len(edits)
 
 
-def _commit_localization_save(prepared):
+def _localization_outputs(prepared):
     if prepared is None:
-        return 0
-    path, payload, install_payload, count = prepared
+        return []
+    path, payload, install_payload, _ = prepared
     outputs = [(path, payload)]
     if install_payload is not None:
         outputs.append((ds_dir("mine") / "install.xml", install_payload))
-    _commit_file_outputs(outputs, "Localization")
-    return count
+    return outputs
+
+
+def _commit_localization_save(prepared):
+    if prepared is None:
+        return 0
+    _commit_file_outputs(_localization_outputs(prepared), "Localization")
+    return prepared[3]
 
 
 def _commit_file_outputs(outputs, label):
@@ -927,8 +933,16 @@ def _commit_file_outputs(outputs, label):
     original = {target: target.read_bytes() if target.exists() else None for target, _ in outputs}
     timestamps = {target: (target.stat().st_atime_ns, target.stat().st_mtime_ns)
                   for target, data in original.items() if data is not None}
-    temporary, committed = [], []
+    temporary, committed, created_dirs = [], [], []
+    succeeded = False
     def stage(target, data):
+        missing, parent = [], target.parent
+        while not parent.exists():
+            missing.append(parent)
+            parent = parent.parent
+        for parent in reversed(missing):
+            parent.mkdir()
+            created_dirs.append(parent)
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
             temp_path = Path(stream.name)
             temporary.append(temp_path)
@@ -939,6 +953,7 @@ def _commit_file_outputs(outputs, label):
         for target, temp_path in staged:
             temp_path.replace(target)
             committed.append(target)
+        succeeded = True
     except Exception as error:
         failures = []
         for target in reversed(committed):
@@ -956,9 +971,15 @@ def _commit_file_outputs(outputs, label):
     finally:
         for temp_path in temporary:
             temp_path.unlink(missing_ok=True)
+        if not succeeded:
+            for parent in reversed(created_dirs):
+                try:
+                    parent.rmdir()
+                except OSError:
+                    pass  # Do not remove directories populated by another writer.
 
 
-def _commit_xml_roots(prepared):
+def _commit_xml_roots(prepared, additional_outputs=()):
     """Publish prepared mine XML and first backups only after the batch saves."""
     if not prepared:
         return
@@ -977,6 +998,7 @@ def _commit_xml_roots(prepared):
             outputs.append((backup, path.read_bytes()))
         outputs.append((path, payload))
         published.append((entry, root, path))
+    outputs.extend(additional_outputs)
     _commit_file_outputs(outputs, "XML batch")
     for entry, root, path in published:
         entry["root"] = root
@@ -1517,6 +1539,38 @@ def record_custom_catalog_origin(section, key):
         values.add(key)
         data[field] = sorted(values)
         _write_origin_provenance(data)
+
+
+def _prepare_custom_catalog_origin(section, key):
+    """Validate existing metadata and build creation provenance without writes."""
+    data = json.loads(ORIGIN_PROVENANCE_FILE.read_text(encoding="utf-8")) if ORIGIN_PROVENANCE_FILE.exists() else {"schema": 2}
+    if not isinstance(data, dict) or data.get("schema") not in {1, 2}:
+        raise ValueError("Creation provenance requires a supported schema object")
+    for field in ("catalogItems", "catalogEffects", "customCatalogItems", "customCatalogEffects",
+                  "weapons", "ammo", "weaponHashes", "ammoHashes"):
+        values = data.get(field, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"Creation provenance {field} must be a list of text keys")
+        data[field] = sorted(set(values))
+    field = {"items": "customCatalogItems", "effects": "customCatalogEffects"}[section]
+    data[field] = sorted(set(data[field]) | {key})
+    data["schema"] = 2
+    return ORIGIN_PROVENANCE_FILE, (json.dumps(data, indent=2) + "\n").encode("utf-8")
+
+
+def _prepare_effect_creation_labels(key, symbol, label):
+    labels = _raw_labels()
+    if not isinstance(labels, dict):
+        raise ValueError("Effect labels must be an object")
+    for scope in ("effects", "effectSymbols"):
+        values = labels.get(scope, {})
+        if not isinstance(values, dict) or any(not isinstance(value, str) for value in values.values()):
+            raise ValueError(f"Effect labels {scope} must contain text values")
+    if symbol:
+        labels.setdefault("effectSymbols", {})[key] = symbol
+    if label:
+        labels.setdefault("effects", {})[key] = label
+    return LABELS_FILE, (json.dumps(labels, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def catalog_origin_marker_sets(ds="mine"):
@@ -2596,7 +2650,8 @@ def create_catalog_item(data):
     key = data["key"].strip().upper()
     if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", key):
         raise ValueError("Item ID must be 3-64 uppercase letters, numbers, or underscores")
-    root = load_file(CATALOG_FILE)["root"]
+    catalog_entry = load_file(CATALOG_FILE)
+    root = copy.deepcopy(catalog_entry["root"])
     if find_catalog_item(root, key) is not None:
         raise ValueError(f"Item already exists: {key}")
     template = find_catalog_item(root, "LEX_GUNPOWDER")
@@ -2650,9 +2705,9 @@ def create_catalog_item(data):
         {"key": description_key, "value": description},
     ])
     root.find("catalog").find("items").append(item)
-    save_file(CATALOG_FILE)
-    record_custom_catalog_origin("items", key)
-    _commit_localization_save(localization)
+    metadata = [_prepare_custom_catalog_origin("items", key), *_localization_outputs(localization)]
+    _commit_xml_roots([(CATALOG_FILE, catalog_entry, root)], metadata)
+    _ORIGIN_MARKER_CACHE.clear()
     return {"key": key}
 
 
@@ -2675,7 +2730,8 @@ def create_catalog_effect(data):
     if not re.fullmatch(r"(?:0X[0-9A-F]{8}|[A-Z][A-Z0-9_]{2,63})", requested_key):
         raise ValueError("Effect ID must be a symbolic name or an 8-digit 0x hash")
     key = canonical_effect_key(requested_key)
-    root = load_file(CATALOG_FILE)["root"]
+    catalog_entry = load_file(CATALOG_FILE)
+    root = copy.deepcopy(catalog_entry["root"])
     effects_root = root.find("effectsids")
     if effects_root is None:
         raise ValueError("catalog_sp.ymt has no effectsids section")
@@ -2705,14 +2761,14 @@ def create_catalog_effect(data):
         effects_root.remove(item)
     for item in ordered:
         effects_root.append(item)
-    save_file(CATALOG_FILE)
-    record_custom_catalog_origin("effects", key)
     label = data.get("label", "").strip()
-    if not requested_key.startswith("0X"):
-        save_label("effectSymbols", key, requested_key)
-    if label:
-        save_label("effects", key, label)
-    return {"key": key, "label": label, "symbol": requested_key if not requested_key.startswith("0X") else ""}
+    symbol = requested_key if not requested_key.startswith("0X") else ""
+    metadata = [_prepare_custom_catalog_origin("effects", key)]
+    if symbol or label:
+        metadata.append(_prepare_effect_creation_labels(key, symbol, label))
+    _commit_xml_roots([(CATALOG_FILE, catalog_entry, root)], metadata)
+    _ORIGIN_MARKER_CACHE.clear()
+    return {"key": key, "label": label, "symbol": symbol}
 
 
 def shop_stock_types(root, item_key):
