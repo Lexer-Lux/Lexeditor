@@ -26,6 +26,7 @@
 ==================================================================== GITHUB
 
 - Verify plugin parents, required subissues, dependencies, and workflow labels against the current project rules; preserve existing discussions.
+    > status 2026-10-03: #651 Create Editor is actionable while Warband integration repairs remain unpublished. #772 Ceaseless Discharge Rework now has ds1, an unprefixed title and actionable status; its body names no specific blocking Lexer action. #848-851 Better Binoculars titles now rely on their existing game labels. Their concrete design questions and all descriptions/comments were preserved. The semantic audit remains open.
     > status 2026-10-03: Redundant Plugin containers were permanently deleted with Lexer's explicit approval after detaching their children. Standard-issue dependency repairs and exactly-one-workflow checks pass. Semantic audit continues: #815-819 and #824-827 now have game labels, unprefixed titles, and actionable status because research remains possible without a Lexer answer.
 
 
