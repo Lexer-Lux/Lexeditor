@@ -30,7 +30,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 import browser_guard  # noqa: E402
@@ -120,6 +119,7 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
     project = tempfile.TemporaryDirectory(prefix="lexeditor-gap-project-")
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
+    cdp = None
     try:
         with session_for(plugin, None if live else project.name) as session:
             port = free_port()
@@ -145,6 +145,7 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
             time.sleep(1.5)
             found = tabs_of(cdp)
             for tab in found or [""]:
+                print(f"measuring {plugin}/{tab or 'default'} at {width}x{height}", flush=True)
                 if tab:
                     cdp.eval(f"navigate({tab!r})")
                     time.sleep(1.8)
@@ -174,7 +175,11 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
                         f"{plugin}/{tab or 'default'}: {gap}px of dead space under the "
                         f"content ({box['height']}px window)")
     finally:
+        if cdp:
+            cdp.close()
         browser_guard.kill_tree(browser)
+        profile.cleanup()
+        project.cleanup()
     return failures
 
 
