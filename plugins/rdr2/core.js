@@ -921,6 +921,7 @@ async function saveAllChanges() {
     validateMatrixDrafts();
     validateDispatchDrafts();
     validateCrimeDrafts();
+    validateChallengeDrafts();
     if(Object.keys(state.settingEdits).length)await saveSettings();
     if(state.customCraftingDirty)await saveCustomCrafting();
     if(state.shopDirty.size)await saveShops();

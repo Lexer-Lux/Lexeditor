@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 import pytest
 from plugins.rdr2 import server as s
 from test_rdr2_catalog_numeric_validation import fixture, snapshot
+REAL_GET_CHALLENGES = s.get_challenges
 
 GOAL = {'name': 'Goal', 'index': 0, 'value': '12', 'sources': []}
 LABEL = {'file': s.CHALLENGES_FILE, 'owner': 'Challenge', 'rank': 0,
@@ -521,3 +522,39 @@ def test_series_merge_disk_failure_retains_original_strands(strands, monkeypatch
         s.apply_challenge_edits([GOAL], mode_edits=[MODE])
     assert snapshot(strands) == before
     assert all(s.load_file(name)['root'] is root for name, root in roots.items())
+
+
+def test_reader_keeps_empty_source_slot_and_writer_uses_displayed_index(challenges):
+    root = s.load_file(s.GOALS_FILE)['root']
+    parent = root.find('.//scoreParams/Item')
+    parent.insert(0, ET.Element('statId'))
+    condition = next(node for node in root.iter() if node.get('type') == CONDITION['type'])
+    condition.append(ET.Comment('condition note'))
+    s.save_file(s.GOALS_FILE)
+    data = REAL_GET_CHALLENGES('mine')
+    sources = data['goals'][0]['requirements'][0]['sources']
+    assert [source['index'] for source in sources] == [0, 1]
+    assert sources[0]['readonly'] and sources[0]['base'] == ''
+    assert sources[1]['base'] == 'BASE' and not sources[1]['readonly']
+    assert list(data['goals'][0]['conditions'][0]['fields']) == ['ContextHash']
+    assert s.apply_challenge_edits([dict(GOAL, sources=[dict(SOURCE, index=1)])]) == 2
+    s._files.clear()
+    root = s.load_file(s.GOALS_FILE)['root']
+    stats = list(root.find('.//scoreParams/Item').iter('statId'))
+    assert len(stats) == 2 and len(stats[0]) == 0
+    assert stats[1].findtext('BaseId') == 'SECOND'
+    assert b'<!--condition note-->' in s.data_file_path(s.GOALS_FILE, 'mine').read_bytes()
+
+
+@pytest.mark.parametrize('change', ['nonfinite', 'duplicate_name', 'duplicate_goal'])
+def test_reader_marks_uneditable_targets_readonly(challenges, change):
+    root = s.load_file(s.GOALS_FILE)['root']
+    goal = root.find('goals/Item')
+    if change == 'nonfinite':
+        goal.find('.//desiredGoal').set('value', 'NaN')
+    elif change == 'duplicate_name':
+        ET.SubElement(goal, 'name').text = 'Goal'
+    else:
+        root.find('goals').append(ET.fromstring(ET.tostring(goal)))
+    s.save_file(s.GOALS_FILE)
+    assert all(row['requirements'][0]['readonly'] for row in REAL_GET_CHALLENGES('mine')['goals'])

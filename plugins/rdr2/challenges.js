@@ -1,4 +1,13 @@
 // ----- Challenges (goals_sp.meta) -----
+function validateChallengeDrafts(){
+  for(const [key,value] of Object.entries(state.challengeEdits)){
+    const cut=key.lastIndexOf('|'),name=key.slice(0,cut),rawIndex=key.slice(cut+1),index=Number(rawIndex);
+    const goals=refStore(state.ds).challenges?.goals.filter(goal=>goal.name===name)||[];
+    const requirements=goals.length===1?goals[0].requirements.filter(req=>req.index===index):[];
+    if(cut<1||!/^(?:0|[1-9]\d*)$/.test(rawIndex)||!Number.isSafeInteger(index)||requirements.length!==1||requirements[0].readonly||dispatchNumericError(requirements[0].value))throw new Error(`${key} is read-only or unavailable.`);
+    const error=dispatchNumericError(value);if(error)throw new Error(`${key}: ${error}`);
+  }
+}
 function challengeUiInput(key,base,meta){const cur=state.challengeUiEdits[key]?.value??base;return el("input",{class:"key",value:cur,title:"Localization key, not literal English text. The displayed wording lives in localization resources.",onchange:ev=>{if(ev.target.value===base)delete state.challengeUiEdits[key];else state.challengeUiEdits[key]={...meta,value:ev.target.value};renderToolbarOnly();}});}
 const CHALLENGE_XP_AMOUNTS={FIRST:25,SECOND:50,THIRD:100,FOURTH:150};
 function challengeRewardLabel(reward){
@@ -67,15 +76,23 @@ async function renderChallenges() {
         if(!req.sources.length)sourceCell.append(el("span",{class:"cat"},"Derived condition (not a stat selector)"));
         const activeSourceCount=req.sources.filter((source,sourceIndex)=>!state.challengeSourceEdits[`${goal.name}|${req.index}|${sourceIndex}`]?.remove).length;
         req.sources.forEach((source,sourceIndex)=>{const sk=`${goal.name}|${req.index}|${sourceIndex}`,edited=state.challengeSourceEdits[sk]||source;if(edited.remove)return;const current=`${edited.base||""}::${edited.permutation||""}`;
+          const supported=!source.readonly&&sourceValues.some(value=>(value.base||'')===(source.base||'')&&(value.permutation||'')===(source.permutation||''));
+          if(!supported){const locked=LexeditorUI.readonlyField([source.base,source.permutation].filter(Boolean).join(' + ')||'(empty score source)');locked.setAttribute('aria-label',`${goal.name} score source ${sourceIndex}`);sourceCell.append(locked);return;}
           const sel=el("select",{class:"key",onchange:ev=>{const [base,permutation]=ev.target.value.split("::");state.challengeSourceEdits[sk]={index:sourceIndex,base,permutation};renderChallenges();}},
             ...sourceValues.map(v=>{const value=`${v.base||""}::${v.permutation||""}`,label=v.label||[v.base,v.permutation].filter(Boolean).join(" + "),o=el("option",{value,title:value},label);if(value===current)o.selected=true;return o;}));
+          sel.disabled=isRO();
+          sel.setAttribute('aria-label',`${goal.name} score source ${sourceIndex}`);
           const vsource=vreq?.sources?.[sourceIndex],controls=LexeditorUI.actionRow(sel);if(activeSourceCount>1&&!isRO())controls.append(closeButton({title:"Remove this counter from the summed requirement",onclick:()=>{state.challengeSourceEdits[sk]={index:sourceIndex,remove:true};renderChallenges();}}));sourceCell.append(LexeditorUI.stack({fill:false},controls,vsource&&current!==`${vsource.base||""}::${vsource.permutation||""}`?refLine([["V","vtag",vsource.label||[vsource.base,vsource.permutation].filter(Boolean).join(" + ")]],String):""));});
-        const amount=LexeditorUI.stack({fill:false},el("input",{type:"number",step:"any",value:cur,class:ek in state.challengeEdits?"edited":"",onchange:ev=>{state.challengeEdits[ek]=ev.target.value;renderChallenges();}}));
-        if(vreq&&Number(cur)!==Number(vreq.value)){const vr=el("span",{title:"Vanilla target — click to apply",onclick:()=>{state.challengeEdits[ek]=vreq.value;renderChallenges();}},el("b",{class:"vtag"},"V "),vreq.value);amount.append(el("div",{class:"ref"},vr));}
+        const editable=!isRO()&&!req.readonly&&!dispatchNumericError(req.value);
+        const target=dispatchNumericError(req.value)?LexeditorUI.readonlyField(req.value):el("input",{type:"number",step:"any",required:true,disabled:!editable,"data-lex-validate-number":"true",value:cur,class:ek in state.challengeEdits?"edited":"",oninput:ev=>{if(!editable)return;const value=ev.target.value;ev.target.setCustomValidity(dispatchNumericError(value));if(value===String(req.value))delete state.challengeEdits[ek];else state.challengeEdits[ek]=value;renderToolbarOnly();}});
+        target.setAttribute('aria-label',`${goal.name} target ${req.index}`);
+        const amount=LexeditorUI.stack({fill:false},target);
+        if(vreq&&String(cur)!==String(vreq.value)){const vr=el("span",{title:"Vanilla target — click to apply",onclick:()=>{if(!editable)return;state.challengeEdits[ek]=vreq.value;renderChallenges();}},el("b",{class:"vtag"},"V "),vreq.value);amount.append(el("div",{class:"ref"},vr));}
         conditionsBox.append(LexeditorUI.controlGroup([sourceCell,{label:"Target",control:amount}]));});
       for(const condition of goal.conditions||[]){const vg=vanillaGoal[goal.name],vc=vg?.conditions?.find(x=>x.index===condition.index),fields=LexeditorUI.stack({fill:false});
         for(const [field,base] of Object.entries(condition.fields)){const ck=`${goal.name}|${condition.index}|${field}`,cur=state.challengeConditionEdits[ck]?.value??base,known=conditionValues.find(x=>x.type===condition.type&&x.field===field)?.values||[],values=[...new Set([cur,...known])];
           const sel=el("select",{onchange:ev=>{if(ev.target.value===base)delete state.challengeConditionEdits[ck];else state.challengeConditionEdits[ck]={goal:goal.name,index:condition.index,type:condition.type,field,value:ev.target.value};renderToolbarOnly();}},...values.map(value=>{const o=el("option",{value},value);if(value===cur)o.selected=true;return o;}));
+          sel.disabled=isRO()||!known.includes(base);
           fields.append(LexeditorUI.detailField({label:field,control:LexeditorUI.stack({fill:false},sel,refLine([["V","vtag",vc?.fields?.[field]]],String))}));
         }
         conditionsBox.append(LexeditorUI.detailSection({title:challengeConditionLabel(condition),body:fields}));
@@ -123,6 +140,7 @@ async function renderChallenges() {
 
 async function saveChallenges() {
   if (isRO()) return;
+  validateChallengeDrafts();
   const keys=new Set([...Object.keys(state.challengeEdits), ...Object.keys(state.challengeSourceEdits).map(k=>k.split("|").slice(0,2).join("|"))]);
   const edits=[...keys].map(key=>{const cut=key.lastIndexOf("|"); const name=key.slice(0,cut), index=+key.slice(cut+1); const goal=refStore(state.ds).challenges.goals.find(g=>g.name===name); const req=goal.requirements.find(r=>r.index===index);
     return {name,index,value:state.challengeEdits[key] ?? req.value,sources:Object.entries(state.challengeSourceEdits).filter(([k])=>k.startsWith(key+"|")).map(([,v])=>v)};});

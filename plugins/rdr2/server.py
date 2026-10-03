@@ -4330,11 +4330,16 @@ def get_challenges(ds="mine"):
                 role = "reset"
             sources = []
             if parent is not None:
-                for stat in parent.iter("statId"):
+                for source_index, stat in enumerate(parent.iter("statId")):
                     base = txt(stat, "BaseId")
                     permutation = txt(stat, "PermutationId")
-                    if base or permutation:
-                        sources.append({"base": base, "permutation": permutation})
+                    sources.append({"index": source_index, "base": base, "permutation": permutation,
+                                    "readonly": len(stat.findall('BaseId')) != 1 or len(stat.findall('PermutationId')) > 1 or not (base or permutation)})
+            try:
+                finite_number(desired.get('value'), 'Challenge target')
+                readonly = len(root.findall('goals')) != 1 or sum(txt(item, 'name') == txt(goal, 'name') for item in root.find('goals').findall('Item')) != 1 or len(goal.findall('name')) != 1
+            except ValueError:
+                readonly = True
             requirements.append({
                 "index": index,
                 "value": desired.get("value", ""),
@@ -4342,6 +4347,7 @@ def get_challenges(ds="mine"):
                 "role": role,
                 "behavior": behavior,
                 "sources": sources,
+                "readonly": readonly,
             })
         ui = goal.find("uiInfo")
         goal_name = txt(goal, "name")
@@ -4353,7 +4359,7 @@ def get_challenges(ds="mine"):
                 continue
             fields = {}
             for child in list(node):
-                if len(child) == 0:
+                if isinstance(child.tag, str) and len(child) == 0:
                     value = (child.text or "").strip() or child.get("value", "")
                     if value:
                         fields[child.tag] = value
