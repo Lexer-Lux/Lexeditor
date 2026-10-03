@@ -31,6 +31,7 @@ ALLOWED = {
     '"RANDOM = 240 to 272")',
     "`INCOMPLETE: ${formula.blocker}`)",
     "settings.formulaeReworkBlocker",
+    "formulaeBlocker)",  # Missing tweak mod blocks the requested formula preview.
     "'Location data is unavailable.')",
     "`Could not load opponent: ${map._error}`)",
     "`No other CARDGAME call in the game data names deck ${deck}.`)",

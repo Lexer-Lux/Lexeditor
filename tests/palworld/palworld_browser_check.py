@@ -28,6 +28,12 @@ OUT.mkdir(parents=True, exist_ok=True)
 def reveal_detail_control(page, control):
     """Follow the shared detail pager to a control rather than editing a hidden page."""
     pane = page.locator(".pal-detail .lex-tweaks-paged").first
+    if control.is_visible():
+        return
+    first_page = pane.get_by_role("button", name="First page", exact=True)
+    if first_page.count() and first_page.is_enabled():
+        first_page.click()
+        page.wait_for_timeout(100)
     for _ in range(20):
         if control.is_visible():
             return
