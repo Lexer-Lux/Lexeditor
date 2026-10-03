@@ -66,6 +66,7 @@ from ui_tab_sweep import sweep_nested_tabs  # noqa: E402
 
 # Share the exact detector with the fast browser regression gate.
 PROBE = (ROOT / "tests/shared/text_clipping_probe.js").read_text(encoding="utf-8")
+BOOLEAN_HELP_PROBE = (ROOT / "tests/shared/boolean_help_probe.js").read_text(encoding="utf-8")
 
 
 # A list of records without a pager is a list the user cannot page or search.
@@ -302,6 +303,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                         (CHROME_PROBE, "boxed-header-control"),
                         (CONTAINER_PROBE, "clipped-container"),
                         (CONTROLS_PROBE, "broken-control"),
+                        (BOOLEAN_HELP_PROBE, "misplaced-boolean-help"),
                         (PAGER_PROBE, "table-without-pager")):
                         hits = json.loads(cdp.eval(probe))
                         if defect == "empty-tab" and hits:

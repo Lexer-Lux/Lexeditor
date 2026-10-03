@@ -17,6 +17,7 @@
 - (reopened) Reduce the heading-to-property-label offset further: cut from 26px to 18px on 2026-09-26, not confirmed enough.
     > status 2026-09-27: it was really 22px; now 15px (type rail 11px, 4px inset). Lower and the rail's letters touch the name. Tell me if 15 is enough.
 - (reopened) Boolean rows: only each tab's default view was checked for misplaced help buttons; subtabs were not swept.
+    > status 2026-10-03: The generic nested-tab audit now measures boolean help placement after every reachable shared-tab change. A focused browser check catches a misplaced help button in a nondefault tab under both boolean styles, skips hidden controls and restores the parent tab. Cross-game results remain pending; this item stays open.
     > status 2026-09-27: FF8 swept (every tab, subtab and panel tab) - all fine. Other games not swept yet.
 
 
