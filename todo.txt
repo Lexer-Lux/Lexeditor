@@ -8,30 +8,16 @@
     > status 2026-10-03: Detector repaired; FF8 swept at 1600x900. Not done: other games, smaller windows, and an answer to your question below.
     > Lexer: okayy, umm. i do everything % based in my own code so it can work on every screen size. is that not normal? like idk why all text doesn't just auto size to fit whatever, too. is there some reason everyone doesn't do that? can we not do that? That way it would work at any resolution, we don't have to test it at all resolutions? what is SOP for other devs for checking for these issues, do they check at every posssible resolution or just certain ones or something else entirely? also yet, it shoudn't even be a game-specific thing but a more general script that just checks the wholeass app automatically, not needing to be scripted for every new thing we make or change. or is that not doable?
     > Claude: % sizing is normal and Lexeditor uses it too, but it only scales boxes; text does not shrink to fit its box on its own, and shrinking it would make labels unreadably small in narrow panels. Standard practice is a few breakpoint sizes (a small laptop, a normal desktop, a large UI scale) plus an automatic checker that measures every text box for overflow, rather than testing every resolution. That checker exists and is general, not per game: tests/shared/verify_no_clipped_text.py opens every game with your installed data, walks every tab and subtab at 1600x950 and 1280x720, and reports any text cut off by its container. Its first full run (2026-10-03) found mostly one shared cause: tables wider than their panel.
-- (reopened) Reduce the heading-to-property-label offset further: cut from 26px to 18px on 2026-09-26, not confirmed enough.
-    > status 2026-10-03: Now 15px (was really 22px); lower and the type rail touches the name. Tell me if 15 is enough.
 - (reopened) Boolean rows: only each tab's default view was checked for misplaced help buttons; subtabs were not swept.
     > status 2026-10-03: FF8 swept (every tab, subtab and panel tab): fine. Other games not swept yet.
 
 
 ==================================================================== FF8 - PAGES
 
-Encounters
-- WAIT HOLY SHIT. nah it must be hallucinating. it says that encounter chances aren't actually equal, and they vary by region? there's no way. because the editor doesn't say that at all!
-  lol what? wait, so they repeat formations, so i can't set all 8 to be different? and why is there an X of 8 text now that makes no sense? They're not in order and i see multiple of the same number. also i should be able to see the probability and edit it. okay, i need to understand this before we redesign.
-    > status 2026-10-03: True: each group has 8 slots that repeat formations (group 0: 514 x3, 512 x2, 513 x2, 520 x1), so they are not equally likely. Each group's probabilities are now editable and saved as a Hext patch in your mod. Not tried in game yet.
 GF
 - gfs -> Center panel -> attack: uhhh how is the entire left 1/3rd reserved for the property names????? i even told you to get rid of all the overrides and make it globally always the same % that i indicated. so how the fuck is this possible.
     > status 2026-10-03: Need your call: in this 463px panel the global 7.5% is 35px and names become unreadable (tried: removing every override wrapped names nearly one letter per line). Options: fewer, wider columns when names cannot fit; a different % for narrow panels; a px minimum; or 7.5% of the window instead of the panel?
-Models
-- models: 90% of things here have no preview, say "locked", and have basically nothing in their details panel. what gives?
-    > status 2026-10-03: 805 of 853 battle files decode now. Of the 48 undecoded, 32 now show the one number they hold and 2 list their parts; 14 hold nothing provable. Left: check it on screen.
 World
-- i asked for a button on the world->regions->left panel to swap between that brown map and the more detailed 3d map thing dollet has.
-    > status 2026-10-03: World > Map has a Terrain button that draws the real terrain from above. Not done: zoom, camera movement, in-game look.
-    > Lexer: i don't know why you have to condense these questions into like 8 words, they're all no inscrutable. yes, the new improved mapmode is cool but without being able to move the camera or zoom in it's not too useful, i should be able to zooom in and move around and it should look almost exactly like in game.
-- FUCK YOU. I ASKED TO BE ABLE TO FUCKING EDIT THE AMOUNT AND SPELL ON THE FUCKING DRAW POINTS AND YOU JUST FUCKING WIPED IT INSTEAD OF DOING IT FUCK YOU. oh. you really need a better way to leave me messages on these long task strings. okay, can you not ilke, just do some hext editing shit that makes it so we can set values in the editor to read and change the draw points? kind of like how you added the custom shots per turn property to irvine's guns?
-    > status 2026-10-03: Each draw point edits its magic, refill and high yield, saved as Hext in your mod; the amount is shown (1-2, or 2-5 with High Yield) but the game stores no per-point amount. Left: try one edited point in game.
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
     > status 2026-10-03: Field name on top as a link and the field picture with the landing point. Not done: the world-map side; the trigger is in the world map scripts, not found yet.
 - FF8 Field-to-World: recover the original requested behaviour and implement it.
@@ -47,11 +33,7 @@ World
 - Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
     > status 2026-10-03: Driver rebuilt and packaged; package checks pass. Left: CI, then the in-game checks. Also: its warning toasts still draw an imitation box, not the message box of the game itself.
 - Deliver and verify the implemented proportional FF8 vehicle throttle in-game, including partial trigger pressure, braking, coasting, and digital controls.
-- when i use the shot command in ff8 the crosshair thinsg over my target are so transparent i can barely see them. make them fully opaque. this should be part of the better targeting tweak.
-    > status 2026-10-03: Done in your Better Targeting mod (opaque crosshair only while Shot is aiming). Left: trust its changed script, then check in game.
 - FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
-- Flat stats (you asked "Flat stat????"):
-    > Claude: in your mod's data Squall's VIT, SPR, SPD and LUCK are 0 at every level, and several characters' growth curves are flat or near-flat (vanilla Squall VIT is 26,5,5,41). Your Design.txt says levels should barely matter, so I took it as deliberate and changed nothing. If you didn't set those, they need restoring - say so.
 - ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
 
 
