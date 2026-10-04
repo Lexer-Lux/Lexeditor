@@ -147,8 +147,9 @@ def validate(spec: dict, owner: str) -> dict:
             branch = raw.get("branch")
             if not isinstance(branch, dict) or branch.get("opcode") not in ("E8", "E9") or branch.get("island") not in names:
                 raise PatchError(f"{owner} hook {rva:X} needs bytes or a branch into one of its islands")
+            target = next(island for island in islands if island["name"] == branch["island"])
             replacement = ("branch", int(branch["opcode"], 16), branch["island"],
-                           _int(branch.get("offset", 0), "branch offset"))
+                           _int(branch.get("offset", 0), "branch offset", 0, len(target["code"]) - 1))
         length = len(replacement[1]) if replacement[0] == "bytes" else 5
         if length + len(pad) != len(original) or not original:
             raise PatchError(f"{owner} hook {rva:X} must replace exactly its original instruction bytes")
