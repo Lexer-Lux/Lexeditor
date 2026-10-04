@@ -29,3 +29,39 @@ The original build fingerprint, verified backup, owned-image reproduction, guard
 The continuation's `test_ds1_load_bands.py` passed 53 tests on Linux x86-64 with GCC and the private identified executable. This covers validation, split/merge preservation, migration values, independent recovery, bounded tables, compiled classifier/recovery selectors, original-versus-patched classifier comparisons, certificate preservation and unchanged bytes outside declared spans. No proprietary image is committed.
 
 The integration fixture, native-rule integration tests and rendered browser check have been updated for variable bands. Their current-head full CI and rendered acceptance still require verification. Earlier browser/native test totals are historical, not substituted for this head. Windows game startup, real gameplay, animation behavior and offline restoration remain unverified. Native function execution does not establish retail-game acceptance or multiplayer safety.
+
+## Shared-composer export
+
+`load_bands_patch.patch_spec(original, rules)` now exports a versioned patch
+description for the native composer from master, rather than another complete
+executable. It returns no edits for vanilla rules and only a baseline edit when
+the load rules are unchanged. The expected hook bytes come from the caller's
+fingerprinted original; no proprietary original bytes are embedded in source.
+
+The code and table form one movable island. The composer relocates the
+classifier branch, the recovery call and the three in-place table references
+after allocating every enabled patch. The existing nonleaf frames and their
+unwind records do not move. It retains the original certificate bytes and owns
+the single combined PE layout. As with any executable modification, this does
+not retain a valid signature or establish online safety.
+
+Description version 2 adds bounded hook displacements targeting an island in
+the same description. Version 1 remains readable. Version 2 is deliberately
+rejected by an old composer, rather than silently ignoring its relocations.
+Overlapping displacements, out-of-island targets, duplicate owner/island
+identities and conflicting original edit spans are rejected.
+
+Synthetic tests exercise placement after zero-, 16- and 4096-byte independent
+islands, no-op/base-only export, conflict and malformed-input rejection.
+An independent assembler check matches the displacement offsets to the
+assembly relocation records. The optional private-image child-process check
+executes the composed classifier, recovery selector, full recovery call site
+and interpolation body across eight configurations, including one and 32
+bands, split ranges and special/forced conditions.
+
+This is an export/integration step, not a completed deployment migration.
+`StaminaRebalance.apply` still uses the legacy ownership path. Before merging,
+reconcile it with master's library-mod Tweaks UI, shared native installation,
+and migration of existing verified originals without losing user settings.
+The legacy installer must not be called on a shared-composer image. No
+installed-game startup, animation, or multiplayer acceptance is claimed.

@@ -52,6 +52,19 @@ def test_variable_band_machine_code_in_isolated_process(tmp_path):
     assert evidence["factorCallSite"] is True
 
 
+def test_composed_band_machine_code_in_isolated_process(tmp_path):
+    if not os.environ.get("LEXEDITOR_DS1_NATIVE_EXE"):
+        pytest.skip("Private identified executable not supplied")
+    if platform.system() != "Linux" or platform.machine() not in ("x86_64", "AMD64") or not shutil.which("gcc"):
+        pytest.skip("Machine-code execution requires x86-64 Linux and GCC")
+    result = subprocess.run([sys.executable, str(Path(__file__)), "--compose", str(tmp_path)],
+                            cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    evidence = json.loads(result.stdout.strip().splitlines()[-1])
+    assert evidence["comparisons"] > 20000
+    assert evidence["composed"] is True and evidence["relocatedBlock"] is True
+
+
 def test_private_executable_band_roundtrip(tmp_path):
     filename = os.environ.get("LEXEDITOR_DS1_NATIVE_EXE")
     if not filename:
@@ -93,7 +106,7 @@ def reference(rules, weight, capacity, special, forced):
     return profile, f32(recovery), fraction
 
 
-def execute(work):
+def execute(work, composed=False):
     """Run selectors in a child process, optionally using the supplied private image."""
     import mmap
     adapter = work / "bands-abi.so"
@@ -134,7 +147,11 @@ def execute(work):
              "movement": i % 4 + 1, "recovery": float(i * 31)} for i in range(32)]
     configs.append({**bands.project_defaults(), "bands": many})
 
-    image = mmap.mmap(-1, patch.BLOCK_RVA + patch.EXTENSION_SIZE,
+    if composed:
+        # The default no-op intentionally has no selector island. Splitting the
+        # light band is the first composed case and must still preserve gameplay.
+        configs = configs[1:]
+    image = mmap.mmap(-1, patch.BLOCK_RVA + 0x400000,
                      prot=mmap.PROT_READ | mmap.PROT_WRITE | mmap.PROT_EXEC)
     address = ctypes.addressof(ctypes.c_char.from_buffer(image))
     filename = os.environ.get("LEXEDITOR_DS1_NATIVE_EXE")
@@ -159,8 +176,21 @@ def execute(work):
     try:
         for config in configs:
             rules = bands.native_projection({"baseRecovery": 60, **config})
+            block_rva = patch.BLOCK_RVA
             if original is not None:
-                data = native.transform(original, rules)
+                if composed:
+                    from plugins.ds1 import exe_patches
+                    # A separate mod occupies the first island. The band island
+                    # must relocate after it without changing any rule behavior.
+                    prefix = exe_patches.validate(
+                        {"version": 1, "islands": [{"name": "other-feature", "code": "c3" * 4096}]},
+                        "Independent test mod")
+                    spec = exe_patches.validate(patch.patch_spec(original, rules), "Band editor")
+                    data = exe_patches.compose(original, [prefix, spec])
+                    block_rva = patch.CLASS_RVA + 5 + struct.unpack_from("<i", data, patch.CLASS_OFFSET + 1)[0] - patch.CLASSIFIER_OFFSET
+                    assert block_rva > patch.BLOCK_RVA
+                else:
+                    data = native.transform(original, rules)
                 pe = struct.unpack_from("<I", data, 0x3C)[0]
                 section = pe + 24 + struct.unpack_from("<H", data, pe + 20)[0]
                 for index in range(struct.unpack_from("<H", data, pe + 6)[0]):
@@ -203,7 +233,7 @@ def execute(work):
                     for forced in (0, 1):
                         profile, recovery, _ = reference(rules, weight, capacity, special, forced)
                         actual = bridge.bands_class(address + patch.CLASS_RVA, weight, capacity, special, forced)
-                        rate = bridge.bands_rate(address + patch.BLOCK_RVA + patch.RECOVERY_OFFSET,
+                        rate = bridge.bands_rate(address + block_rva + patch.RECOVERY_OFFSET,
                                                   weight, capacity, special, forced)
                         player = ctypes.c_float(capacity)
                         factor = bridge.bands_factor(address + patch.FACTOR_RVA, ctypes.byref(player),
@@ -217,11 +247,12 @@ def execute(work):
     if filename:
         assert hashlib.sha256(Path(filename).read_bytes()).hexdigest() == native.ORIGINAL_SHA256
     print(json.dumps({"comparisons": comparisons, "configurations": len(configs),
-                      "factorCallSite": True, "privateImage": bool(original),
+                       "factorCallSite": True, "privateImage": bool(original),
+                      "composed": composed, "relocatedBlock": composed,
                       "originalComparisonSamples": len(original_samples)}))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "--execute":
+    if len(sys.argv) != 3 or sys.argv[1] not in ("--execute", "--compose"):
         raise SystemExit("Use pytest for this verifier")
-    execute(Path(sys.argv[2]))
+    execute(Path(sys.argv[2]), composed=sys.argv[1] == "--compose")

@@ -94,3 +94,45 @@ def transform_verified(original: bytes, rules: dict) -> bytes:
     result[FRACTION_OFFSET:FRACTION_OFFSET + len(FRACTION)] = FRACTION
     struct.pack_into("<f", result, BASELINE_OFFSET, rules["baseRecovery"])
     return bytes(result)
+
+
+# Displacements emitted by load_bands.S, relative to the end of each word.
+# The independent assembler test checks these against GNU relocation records.
+FACTOR_ISLAND_RELOCATIONS = ((0x17, RECOVERY_OFFSET),)
+FRACTION_ISLAND_RELOCATIONS = ((0x04, 40), (0x12, TABLE_OFFSET), (0x18, 24))
+
+
+def patch_spec(original: bytes, rules: dict) -> dict:
+    """Export editor rules for the shared native composer, without writing files.
+
+    The composer chooses the code/table address, retains the certificate bytes,
+    and owns the PE layout. No private game bytes are stored in the source:
+    expected hook bytes come only from the caller's verified original image.
+
+    This is an export adapter. Legacy install/restore is intentionally unchanged
+    until the shared deployment's ownership migration is integrated.
+    """
+    from . import stamina_patch as native
+    rules = load_bands.validate_native(rules)
+    native._pristine(original)
+
+    def hook(rva, offset, code, relocations=()):
+        return {"rva": rva, "original": original[offset:offset + len(code)].hex(),
+                "bytes": code.hex(),
+                "relocations": [{"at": at, "island": "load-bands", "offset": target}
+                                for at, target in relocations]}
+
+    defaults = load_bands.native_projection(
+        {"baseRecovery": rules["baseRecovery"], **load_bands.project_defaults()})
+    hooks, islands = [], []
+    if rules != defaults:
+        islands.append({"name": "load-bands", "code": block(rules).hex(), "functions": []})
+        hooks.append({"rva": CLASS_RVA, "original": original[CLASS_OFFSET:CLASS_OFFSET + 5].hex(),
+                      "branch": {"opcode": "E9", "island": "load-bands",
+                                 "offset": CLASSIFIER_OFFSET}})
+        hooks.append(hook(FACTOR_RVA, FACTOR_OFFSET, FACTOR, FACTOR_ISLAND_RELOCATIONS))
+        hooks.append(hook(FRACTION_RVA, FRACTION_OFFSET, FRACTION, FRACTION_ISLAND_RELOCATIONS))
+    if rules["baseRecovery"] != native.VANILLA_RATE:
+        hooks.append(hook(native.BASELINE_RVA, native.BASELINE_OFFSET,
+                          struct.pack("<f", rules["baseRecovery"])))
+    return {"version": 2, "islands": islands, "hooks": hooks}
