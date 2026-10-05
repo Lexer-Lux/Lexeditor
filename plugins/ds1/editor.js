@@ -1,10 +1,13 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection}=LexeditorUI;
-const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],effectTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
+const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  bandForm:null,bandBusy:false,monster:null,allAttacks:false,attackLinks:null,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
-let edits=Promise.resolve(),navigation=0,recordsRequest=0;
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,
+  effectTabs:[],nativeRules:null,bandForm:null,bandBusy:false,
+  dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
+let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null;
+const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -16,78 +19,90 @@ const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.mess
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
-    {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances and enemy attack records. Attacks can be shared by several monsters. Reference links do not prove which attacks an animation uses. Vanilla is read-only. Save changes the mod project."},
-    {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. Each record can be shared by several items or abilities. Unknown and legacy properties stay protected. Equipment, Spells and Items show direct references. All effects includes unlinked records. Save changes the mod project."},
-    {id:"encumbrance",label:"Encumbrance",help:"Add, delete and edit load bands, their movement profiles and recovery percentages. Enable Encumbrance rules in Tweaks before editing. Special-light and forced-overburdened conditions are separate overrides."},
-    {id:"misc",label:"Misc.",help:"Base stamina regeneration is used by Stamina rebalance. Enable it in Tweaks before editing, then save and Apply."},
-    {id:"tweaks",label:"Tweaks"}],
+    {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
+    {id:"attacks",label:"Attacks",help:"Edit enemy attack damage. One attack record can be shared by several monsters, bosses and NPCs, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
+    {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
+    {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
+    {id:"misc",label:"Misc."},
+    {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   help:()=>navigate(state.tab==="datamap"?"effects":"datamap"),helpActive:()=>state.tab==="datamap",
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
 });
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="effects"?state.effectTabs:
+  tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
-  state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.effectTabs=result.effectTabs||[];
-  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules;
+  state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
+  state.effectTabs=result.effectTabs||[];state.nativeRules=result.nativeRules;
+  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;
+}
+function sortedRows(){
+  const query=state.query.toLowerCase();
+  const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  if(state.tab==="encumbrance")return filtered;
+  return filtered.sort((a,b)=>{
+    const left=a[state.sort.key],right=b[state.sort.key];
+    return state.sort.dir*(typeof left==="number"?left-right:String(left).localeCompare(String(right),undefined,{numeric:true}));
+  });
 }
 async function loadItems(){
   const request=++recordsRequest;
   const sub=state.sub;
-  const monster=state.monster;
-  const result=await api(monster?`/api/attacks?monster=${monster.id}&all=${state.allAttacks?1:0}`:"/api/table?tab="+encodeURIComponent(sub));
+  const result=await api("/api/table?tab="+encodeURIComponent(sub));
   if(request!==recordsRequest||state.sub!==sub)return;
-  if(monster!==state.monster)return;
-  if(monster)state.attackLinks=result;
   state.rows=result.rows;state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
   if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
   await loadDetail();
 }
 async function loadDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
-  if(!row){state.row=null;return;}
-  const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`);
-  if(state.selected===key(row))state.row=result.row;
+  if(!row){state.row=null;state.monsterAttacks=null;return;}
+  const [result,attacks]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`),
+    row.table==="NpcParam"?api(`/api/attacks?monster=${row.id}`):null]);
+  if(state.selected!==key(row))return;
+  state.row=result.row;state.monsterAttacks=attacks;
 }
+async function loadTweaks(){state.tweaks=await api("/api/tweaks");}
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
-async function navigate(tab,sub=state.sub,selection=null){
-  const token=++navigation;await edits;if(token!==navigation)return;state.bandForm=null;state.tab=tab;
-  const previousMonster=state.monster;
-  state.monster=null;
-  if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
-  else if(["misc","tweaks"].includes(tab))sub=tab;
-  else if(tab==="enemies")sub="monsters";
-  else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
+async function navigate(tab,sub=state.sub,selected=null){
+  const token=++navigation;await edits;
+  const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;
+  if(tab==="enemies")sub="monsters";
+  else if(tab==="attacks")sub="attacks";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
-  if(sub!==state.sub||previousMonster||selection!==null){state.sub=sub;state.selected=selection??(tab==="enemies"&&previousMonster?`NpcParam:${previousMonster.id}`:null);state.query="";state.page=0;}
+  else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
+  else if(tab==="misc")sub="misc";
+  else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
+  if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","effects","encumbrance","misc","tweaks"].includes(tab))await loadItems();else if(tab==="info")await loadDeployment();
-    else if(tab==="datamap")state.dataMap=await api("/api/data-map");
+    if(["items","enemies","attacks","effects","encumbrance","misc"].includes(tab))await loadItems();
+    else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
-    if(selection!==null){
-      const index=orderedRows().findIndex(row=>key(row)===selection);
-      if(index>=0)state.page=Math.floor(index/state.pageSize);
-    }
+    // A link lands on the page that holds its record, not on page one.
+    if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
     state.error="";render();
+    if(selected)revealSelection();
   }
   catch(error){if(token===navigation){state.error=error.message;render();}}
 }
-function openEffect(effect){
-  return navigate("effects","effects-all",`SpEffectParam:${effect.id}`);
+function revealSelection(){
+  const row=state.rows.find(row=>key(row)===state.selected);
+  if(row&&selectVisibleRecord)selectVisibleRecord(row);
 }
-async function openAttacks(monster,all=false){
-  await edits;state.monster=monster;state.allAttacks=all;state.selected=null;state.query="";state.page=0;
-  try{await loadItems();state.error="";render();}catch(error){notify(error);}
-}
+const openEffect=effect=>navigate("effects","effects-all",`SpEffectParam:${effect.id}`);
+const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 async function deploymentAction(action){
   if(state.deployBusy)return;
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
   const confirmations={
-    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive and enabled native rules, preserving each original once. Close the game first. Test native changes offline.",confirmLabel:"Apply"},
-    disable:{title:"Restore the original installed files?",message:"Lexeditor restores the original parameter archive and its owned native stamina/encumbrance changes. The mod project is unchanged.",confirmLabel:"Restore original"}
+    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive and composes this project's native rules with enabled library tweaks. Each original is preserved once. Close the game first and test native changes offline.",confirmLabel:"Apply"},
+    disable:{title:"Restore the original installed files?",message:"Lexeditor restores its owned parameter and executable changes. Project values and library tweak switches remain unchanged.",confirmLabel:"Restore original"}
   };
+  if(action==="apply"&&state.nativeRules?.migration)confirmations.apply.message+=" "+state.nativeRules.migration;
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
   if(!ok)return;
   state.deployBusy=true;render();
@@ -97,12 +112,14 @@ async function deploymentAction(action){
 }
 async function save(){
   await edits;
-  try{await api("/api/save",{});await refreshState();shell.refresh();LexeditorUI.showToast("Changes saved to the mod project.");}
+  try{await api("/api/save",{});attackPreviews.clear();await refreshState();shell.refresh();LexeditorUI.showToast("Changes saved to the mod project.");}
   catch(error){notify(error);throw error;}
 }
 async function discard(){
   await edits;state.bandForm=null;
-  try{await api("/api/discard",{});await refreshState();await loadItems();render();}catch(error){notify(error);}
+  try{await api("/api/discard",{});attackPreviews.clear();await refreshState();
+    if(["info","tweaks","datamap"].includes(state.tab))await navigate(state.tab);
+    else{await loadItems();render();}}catch(error){notify(error);}
 }
 function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
@@ -110,12 +127,11 @@ function commit(row,field,value,control){
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
-      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
+      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
-      if(row.table==="NativeRules"){await loadItems();render();}
-      else if(["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
+      if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
       else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
     }catch(error){
       notify(error);
@@ -165,60 +181,92 @@ function groupFor(field){
   if(/motion|anim|spatk|hold/.test(name))return "Use behavior";
   return "Properties";
 }
-function detail(){
-  const title=state.monster?(state.row?.impact?.variants.length>1?"Shared attack damage":state.row?.impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Resistances":"Properties";
-  if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
-  if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
-  if(state.bandForm&&state.bandForm.id===state.row.id)return renderBandForm();
+function fieldSections(row){
   const groups=new Map();
-  for(const field of state.row.fields){
+  for(const field of row.fields){
     const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
-    groups.get(group).push(detailField({label:field.label,property:field.key,control:controlFor(state.row,field),
+    groups.get(group).push(detailField({label:field.label,property:field.key,control:controlFor(row,field),
       help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum}));
   }
-  if(state.row.effectLinks?.length){
-    groups.set("Linked effects",state.row.effectLinks.map(effect=>detailField({
-      label:state.row.fields.find(field=>field.key===effect.field)?.label||effect.field,
+  if(row.effectLinks?.length){
+    groups.set("Linked effects",row.effectLinks.map(effect=>detailField({
+      label:row.fields.find(field=>field.key===effect.field)?.label||effect.field,
       control:effect.resolved?el("button",{type:"button",onclick:()=>openEffect(effect)},effect.name):readonlyField(effect.name),
       help:infoHelp("Open this item's or ability's referenced effect. Changing a shared effect changes every use of it.")})));
   }
-  if(state.row.effectUsage){
-    const usage=state.row.effectUsage;
+  if(row.effectUsage){
+    const usage=row.effectUsage;
     groups.set("Usage",[detailField({label:"Direct references",control:readonlyField(usage.length),
       help:infoHelp("Counts references in the supported parameter tables. Scripts and animations can add more uses. "+
         (usage.length?"Examples: "+usage.slice(0,3).map(source=>source.name).join(", ")+".":"No direct reference was found."))})]);
   }
-  const impact=state.row.impact;
+  return groups;
+}
+// A linked attack previews its damage so several can be compared from the
+// monster without leaving it. Values come from the live document, so an
+// unsaved edit shows here too.
+async function attackPreview(id){
+  if(!attackPreviews.has(id))attackPreviews.set(id,api(`/api/row?table=AtkParam_Npc&id=${id}`).then(result=>result.row,
+    error=>{attackPreviews.delete(id);throw error;}));
+  const row=await attackPreviews.get(id);
+  const users=row.impact.variants.length;
+  return el("div",{class:"ds1-attack-preview"},el("strong",{},`${row.name} #${row.id}`),
+    el("dl",{},...row.fields.flatMap(field=>[el("dt",{},field.label),
+      el("dd",{},field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))])),
+    el("p",{},users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
+}
+function monsterAttacksSection(){
+  const links=state.monsterAttacks;
+  if(!links)return LexeditorUI.loadingPanel({label:"Loading attacks"});
+  if(!links.rows.length)return LexeditorUI.detailNote("No attack link was resolved for this monster. The Attacks tab lists every attack record.");
+  return detailSection({title:"Referenced attacks",body:links.rows.map(attack=>detailField({label:attack.name,
+    control:hoverable({content:`#${attack.id} · ${attack.route}`,targetType:"ds1-attack",targetId:attack.id,
+      targetLabel:`${attack.name} in Attacks`,preview:()=>attackPreview(attack.id),activate:()=>openAttack(attack.id)})}))});
+}
+function monsterDetail(groups){
+  const links=state.monsterAttacks;
+  const attackHelp=links?`Attack records reached from behavior variation ${links.variation} across ${links.behaviorCount} behavior records. `+
+    `Direct means a behavior calls the attack; Projectile means a projectile or child projectile does. ${links.unresolved.length} references remain unresolved or lead to effects. `+
+    "These are parameter links; they do not prove an animation uses the attack. Hover an attack to preview its damage, and click it to edit it in Attacks.":
+    "Attack records reached from this monster's behavior parameters.";
+  return tabbedPanel({label:"Monster details",active:state.monsterTab,
+    tabs:[{id:"resistances",label:"Resistances"},{id:"attacks",label:"Attacks",help:attackHelp}],
+    change:id=>{state.monsterTab=id;render();},
+    content:state.monsterTab==="attacks"?monsterAttacksSection():[...groups].map(([title,body])=>detailSection({title,body}))});
+}
+function detail(){
+  const impact=state.row?.impact;
+  const title=state.tab==="attacks"?(impact?.variants.length>1?"Shared attack damage":impact?.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="enemies"?"Monster":"Properties";
+  if(!state.row)return detailPanel({title,body:[LexeditorUI.detailNote("Select a record.")]});
+  if(key(state.row)!==state.selected)return detailPanel({title,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
+  if(state.bandForm&&state.bandForm.id===state.row.id)return renderBandForm();
+  const groups=fieldSections(state.row);
+  if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,body:[monsterDetail(groups)]});
   let help=state.row.help;
   if(impact){
-    const route=state.rows.find(row=>key(row)===state.selected)?.route||"Not linked";
     const examples=impact.variants.slice(0,3).map(n=>`${n.name} #${n.id}`).join(", ");
     help=`Editing this record changes every use of it. Known parameter links reach ${impact.variants.length} NPC variants and ${impact.behaviors.length} behaviors.`+
       (examples?` Examples: ${examples}.`:" Ownership is unresolved.")+
       ` ${impact.bulletReferences.length} projectile records reference this attack ID; player and enemy contexts may differ.`+
       " Animation, script and effect calls are not fully traced, so this is a minimum impact estimate.";
-    groups.set("Reference paths",[detailField({label:"Monster link",control:readonlyField(route),
-      help:infoHelp("Direct means a behavior calls this attack. Projectile means a projectile or child projectile calls it. Not linked means ownership for the selected monster is unresolved.")}),
-      ...(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
-        help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")}))]);
+    groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
+      help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  return detailPanel({title,help,paginate:{inline:true},
-    actions:state.row.band?bandActions():state.tab==="enemies"&&!state.monster?[el("button",{type:"button",onclick:()=>openAttacks({id:state.row.id,name:state.row.name})},"Attacks")]:[],
+  return detailPanel({title,help,paginate:{inline:true},actions:state.row.band?bandActions():[],
     body:[...groups].map(([title,body])=>detailSection({title,body}))});
 }
-
 function bandActions(){
-  const disabled=state.readOnly||!state.nativeRules?.encumbranceEnabled||state.bandBusy||state.pending>0;
+  const disabled=state.readOnly||state.bandBusy||state.pending>0;
   return [
     el("button",{type:"button",disabled:disabled||!state.row.band.canAdd,onclick:()=>beginBandForm("add")},"Add band"),
     el("button",{type:"button",disabled:disabled||!state.row.band.canDelete,onclick:()=>beginBandForm("delete")},"Delete band")
   ];
 }
 function beginBandForm(action){
-  if(state.readOnly||!state.nativeRules?.encumbranceEnabled||state.bandBusy||state.pending||!state.row?.band)return;
+  if(state.readOnly||state.bandBusy||state.pending||!state.row?.band)return;
   const band=state.row.band;
   if(action==="add"&&!band.canAdd||action==="delete"&&!band.canDelete)return;
   const split=band.upper===null?band.lower+25:(band.lower+band.upper)/2;
@@ -289,66 +337,41 @@ function submitBandForm(form){
       state.nativeRules=result.nativeRules;state.dirty=result.dirtyCount;
       state.bandForm=null;state.selected=key(result.row);state.query="";
       await loadItems();
-      const index=orderedRows().findIndex(row=>key(row)===state.selected);
+      const index=sortedRows().findIndex(row=>key(row)===state.selected);
       state.page=Math.max(0,Math.floor(index/state.pageSize));
     }catch(error){
       state.bandForm=null;await refreshState();await loadItems();notify(error);
     }finally{
-      state.pending--;state.bandBusy=false;render();
+      state.pending--;state.bandBusy=false;render();revealSelection();
     }
   }).catch(notify);
 }
 
-function orderedRows(){
-  const query=state.query.toLowerCase();
-  const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
-  if(state.tab==="encumbrance")return filtered;
-  return filtered.sort((a,b)=>{
-    const left=a[state.sort.key],right=b[state.sort.key];
-    return state.sort.dir*(typeof left==="number"?left-right:String(left).localeCompare(String(right),undefined,{numeric:true}));
-  });
-}
 function renderItems(){
-  const enemies=state.tab==="enemies",effects=state.tab==="effects",encumbrance=state.tab==="encumbrance",attacks=!!state.monster,
-    noun=attacks?"attacks":enemies?"monsters":effects?"effects":encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):"items",label=enemies?"Enemies":effects?"Effects":encumbrance?"Encumbrance":"Items";
-  const rows=orderedRows();
-  const view=pagedListDetail({className:"ds1-records",rows,key,selected:state.selected,slots:false,noun,
+  const encumbrance=state.tab==="encumbrance";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?"attacks":state.tab==="enemies"?"monsters":"items";
+  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="enemies"?"Enemies":"Items";
+  const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     sync:next=>{
       state.page=next.page;state.pageSize=next.pageSize;
-      if(state.selected!==next.selected){state.bandForm=null;state.selected=next.selected;void loadDetail().then(render).catch(notify);}
+      if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}
     },
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;render();},
-    master:({rows:listed,selected,select})=>columnList({rows:listed,key,selected,sortState:state.sort,
-      sort:column=>{state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
-      select:async row=>{await edits;state.bandForm=null;select(row);state.selected=key(row);await loadDetail();render();},
-      columns:encumbrance?[{key:"name",label:"Name",grow:1},
-        ...(state.sub==="encumbrance"?[{key:"range",label:"Load",grow:1}]:[])]:
-        [{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]}),
-    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote(attacks&&!state.rows.length?
-      "No attack link was resolved. Choose All attack records to inspect records without a confirmed link to this monster.":"Change the search to find a record.")]})});
-  const links=state.attackLinks;
-  const attackHelp=attacks?`Matches behavior variation ${links?.variation} across ${links?.behaviorCount} behavior records. `+
-    `${links?.unresolved.length} references remain unresolved or lead to effects. Direct and projectile links are traced; animation use is unverified. `+
-    "All attack records includes bosses, NPCs and records with unresolved ownership; Not linked means no supported link to this monster.":"";
-  return el("div",{class:"ds1-items"},subtabBar({tabs:encumbrance?[{id:"encumbrance",label:"Load bands"},{id:"encumbrance-overrides",label:"Effect overrides"}]:enemies?state.enemyTabs:effects?state.effectTabs:state.tabs,showSingle:enemies,order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),
-    attacks?actionRow(el("button",{type:"button",onclick:()=>navigate("enemies")},"Back to monsters"),
-      el("span",{},state.monster.name),infoHelp(attackHelp)):null,
-    attacks?subtabBar({tabs:[{id:"linked",label:"Referenced attacks"},{id:"all",label:"All attack records"}],order:"given",
-      active:state.allAttacks?"all":"linked",label:"Attack scope",change:id=>openAttacks(state.monster,id==="all")}):null,view);
-}
-function renderTweaks(){
-  if(!state.row)return detail();
-  const groups=new Map();
-  for(const field of state.row.fields){
-    if(!groups.has(field.group))groups.set(field.group,[]);
-    groups.get(field.group).push(detailField({label:field.label,control:controlFor(state.row,field),
-      help:field.description?infoHelp(field.description):null}));
-  }
-  groups.get("Stamina rebalance")?.push(actionRow(el("button",{type:"button",onclick:()=>navigate("misc")},"Base regeneration")));
-  groups.get("Encumbrance rules")?.push(actionRow(el("button",{type:"button",onclick:()=>navigate("encumbrance")},"Edit encumbrance")));
-  return LexeditorUI.settingsColumns([...groups].map(([title,body])=>detailSection({title,body})));
+    master:({rows:listed,selected,select})=>{
+      selectVisibleRecord=select;
+      return columnList({rows:listed,key,selected,sortState:state.sort,
+      sort:column=>{if(encumbrance)return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
+      select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
+      columns:encumbrance?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
+        [{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]});
+    },
+    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
+  const subtabs=subtabsFor(state.tab);
+  // Enemies names its one list (Monsters) so the category reads; Attacks
+  // under Attacks would only repeat the tab.
+  return el("div",{class:"ds1-items"},subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";
@@ -370,9 +393,7 @@ function renderInfo(){
   const upToDate=deploy.enabled&&deploy.thisProjectActive?(deploy.stale?"No, reapply after the latest save":"Yes"):"-";
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
-      detailField({label:"SUPPORT",control:readonlyField("Items, monster resistances, enemy attacks and effects"),help:infoHelp("Edit documented item properties, reviewed monster resistances, enemy attack damage and special-effect properties. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")}),
-      detailField({label:"BASE RECOVERY",control:el("button",{type:"button",onclick:()=>navigate("misc")},"Edit in Misc."),
-        help:infoHelp("Misc. edits the native baseline used by Stamina rebalance. Equipment and buff adjustments stay in Effects. Encumbrance edits load limits and recovery percentages.")})]}),
+      detailField({label:"SUPPORT",control:readonlyField("Items, effects, native rules, monster resistances and enemy attacks"),help:infoHelp("Edit documented item properties, reviewed monster resistances and enemy attack damage. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")})]}),
     detailSection({title:"INSTALLED GAME",body:[
       detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
       detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
@@ -382,18 +403,58 @@ function renderInfo(){
       needsAttentionNote(deploy),
       actionRow(
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
-        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.rebalance?.native?.backupOk)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
+        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.backupOk&&!deploy.legacyRestoreAvailable)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
-    detailSection({title:"NATIVE RULES",help:state.deployment?.rebalance?.applyHelp,body:[
-      detailField({label:"SUPPORTED EXECUTABLE",control:readonlyField(state.deployment?.rebalance?.native?.available?"Yes":"Unavailable"),
-        help:infoHelp(state.deployment?.rebalance?.native?.problem||"The executable matches the supported build or this editor's verified output. This is not an in-game acceptance result.")}),
-      detailField({label:"INSTALLED BASE RECOVERY",control:readonlyField(state.deployment?.rebalance?.native?.rate??"Unknown")})
-    ]}),
+    detailSection({title:"NATIVE RULES",body:[
+      detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||"None"),
+        help:infoHelp("Native rules share the executable with library tweaks. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
+      deploy.legacyRestoreAvailable?LexeditorUI.detailNote("Restore the earlier draft's native patch before applying the combined rules. Its verified original is available."):
+        deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
+      deploy.native?.pendingRecovery?LexeditorUI.detailNote("An interrupted native operation is recoverable. Retry Apply or Restore original."):null,
+      state.nativeRules?.migration?LexeditorUI.detailNote(state.nativeRules.migration):null
+    ].filter(Boolean)}),
     modLoaderSection({loader:deploy.note||"Dark Souls Remastered reads this file as a loose file; no mod loader is installed.",
       output:"Apply replaces the installed param/GameParam/GameParam.parambnd.dcx with the mod project's saved copy, after preserving the original once.",
       order:"One complete parameter archive. Separate projects are not merged; applying a different project replaces what is currently installed.",
-      safety:"Enabled native rules also change the supported executable. Apply and Restore refuse externally modified files and retain one original of each.",
-      removal:"Restore original copies the preserved original bytes back over the installed file."})]});
+      safety:"Apply composes enabled library tweaks and project native rules before replacing the executable and parameter archive. Outside changes are refused.",
+      removal:"Restore original restores both owned files. The project and library tweak settings stay unchanged."})]});
+}
+// Tweaks are library mods: a switch saves at once, and Apply builds every
+// enabled one into the installed executable together.
+async function tweakRequest(path,body,failure){
+  if(state.tweakBusy)return;
+  state.tweakBusy=true;render();
+  try{state.tweaks=await api(path,body);}
+  catch(error){LexeditorUI.showAlert({title:failure,message:error.message||String(error)});await loadTweaks().catch(()=>{});}
+  finally{state.tweakBusy=false;render();}
+}
+async function tweakAction(action){
+  const spec=action==="apply"?{title:"Apply the enabled tweaks?",
+    message:"Close the game first. Lexeditor builds every enabled tweak into one executable, keeps one copy of the original the first time, and refuses an executable changed outside Lexeditor. These tweaks are experimental; test offline.",confirmLabel:"Apply"}
+    :{title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original"};
+  if(!await confirmAction({...spec,cancelLabel:"Cancel"}))return;
+  await tweakRequest("/api/tweaks/"+action,{},action==="apply"?"Could not apply the tweaks":"Could not restore the executable");
+}
+function renderTweaks(){
+  const status=state.tweaks;
+  if(!status)return LexeditorUI.loadingPanel({label:"Loading tweaks"});
+  const busy=state.tweakBusy;
+  const save=row=>tweakRequest("/api/tweaks/save",{tweaks:{[row.id]:{enabled:row.enabled,values:row.values}}},"Could not save the tweak");
+  const {panels,bind}=LexeditorUI.tweakModPanels({rows:status.tweaks||[],readOnly:busy,
+    change:()=>{const changed=(status.tweaks||[]).find(row=>row.enabled!==row._saved?.enabled||JSON.stringify(row.values)!==JSON.stringify(row._saved?.values));if(changed)save(changed)},
+    trust:row=>tweakRequest("/api/tweaks/trust",{id:row.id,trusted:true},"Could not trust the tweak")});
+  for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
+  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original executable":"Unknown";
+  const installed=detailPanel({title:"INSTALLED GAME",
+    help:"Apply builds every enabled tweak into one executable. The first Apply keeps one copy of the original; Restore original puts it back.",
+    body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      status.problem?LexeditorUI.detailNote(status.problem):null,
+      actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
+        el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
+  if(!(status.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}));
+  const view=LexeditorUI.settingsColumns([installed,...panels]);
+  requestAnimationFrame(()=>bind(view));
+  return view;
 }
 function renderDataMap(){
   const view=LexeditorUI.dataMap({rows:state.dataMap?.rows||[],query:state.mapQuery,status:state.mapStatus,
@@ -402,12 +463,12 @@ function renderDataMap(){
     changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render();},
     changePage:value=>{state.mapPage=value;render();},
     changeSort:key=>{state.mapSort=[key,state.mapSort[0]===key?-state.mapSort[1]:1];render();},
-    open:row=>navigate(["encumbrance","misc"].includes(row.target)?row.target:row.target==="enemies"?"enemies":row.target.startsWith("effects-")?"effects":"items",row.target)});
+    open:row=>navigate(["encumbrance","misc"].includes(row.target)?row.target:["enemies","attacks"].includes(row.target)?row.target:row.target.startsWith("effects-")?"effects":"items",row.target)});
   state.mapPage=view.page;
   return view.content;
 }
 function render(){
-  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="datamap"?renderDataMap():state.tab==="tweaks"?renderTweaks():state.tab==="misc"?detail():renderItems());
+  document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="info"?renderInfo():state.tab==="tweaks"?renderTweaks():state.tab==="datamap"?renderDataMap():state.tab==="misc"?detail():renderItems());
   shell.refresh();
 }
 async function boot(){

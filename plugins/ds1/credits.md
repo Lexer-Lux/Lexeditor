@@ -21,25 +21,6 @@ https://github.com/JKAnderson/SoulsTemplates
 Smithbox's SoulsFormats dependency was inspected as a research reference,
 found to be GPL-3.0, and excluded. It is not bundled, linked, or invoked.
 
-## Stamina recovery effects (stamina.py)
-
-Smithbox's DS1R `Defs/SpEffect.xml` at the same pinned revision supplied the
-368-byte special-effect row layout and signed recovery modifier at `0xB8`.
-Paramdex contributors' `DS1R/Names/SpEffectParam.txt`, blob
-`77e53462c28ea28e1abb140eea29d177da8bff74`, supplied reference identities such
-as Grass Crest Shield 6890 and the armour-piece penalty groups.
-https://github.com/soulsmods/Paramdex
-
-Metal-Crow and Dark-Souls-1-Overhaul contributors' `SpEffectEditor-Remaster.CT`
-at revision `2a3d8cbe2acee663bef03c7be4f968dbb68f951f` independently confirmed
-the recovery field's four-byte `+B8` layout. This is a factual cross-check;
-no Cheat Engine, injection or other upstream executable code is copied.
-https://github.com/metal-crow/Dark-Souls-1-Overhaul
-
-Implementation, compatibility limits, exact source paths and the unresolved
-native-baseline investigation are documented in `stamina-sources.md`.
-Only original code, reference identities and synthetic tests are added.
-
 ## Native param replacement (deployment.py)
 
 No mod loader is bundled or invoked. The finding that Dark Souls Remastered
@@ -75,3 +56,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Executable tweak loader
+
+Lexeditor combines DS1 tweak mods' native patches onto the vanilla
+executable (`exe_patches.py`). Microsoft's PE/COFF and x64 exception-handling
+documentation supplied the format facts; no implementation code is copied:
+- https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+- https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
+
+Each tweak's own credits travel with its mod.

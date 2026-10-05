@@ -25,7 +25,7 @@ int main(){
 }
 '''
 def main():
- p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path('C:/RDR2Mod/_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/satchel_ui_event_handler.ysc.c'));a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--source',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul/_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/satchel_ui_event_handler.ysc.c'));a=p.parse_args()
  f=functions(a.source.read_text(encoding='utf-8-sig'));body=f['func_519']['body'].strip();body=body[:body.rfind('}')].rstrip()
  assert body.endswith('return false;')
  for name,needle in [('func_235','func_519(panParam0->f_4, iParam1, false)'),('func_13','func_94(&unk, &unk3, iParam0)'),('func_94','func_235(panParam1, iParam2, true)'),('func_207','i < 11'),('func_210','num >= 2')]:assert needle in f[name]['body'],name

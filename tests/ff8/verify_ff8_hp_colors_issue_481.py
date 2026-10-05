@@ -1,6 +1,6 @@
 """Issue #481 deterministic smooth-HP source and interpolation checks."""
 from __future__ import annotations
-import argparse, subprocess, tempfile
+import argparse, subprocess, sys, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 HEADER=ROOT/"plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h"
@@ -19,10 +19,23 @@ def static_contract():
     wanted="lexeditor_ff8_hp_colors_requested() ? lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D"
     require(wanted in prepare,"disabled driver must select original paletted draw")
     require("enable_ff8_better_hp_colors ? lexeditor" not in prepare,"ff8_opengl must not read cfg global directly")
-    require("DEFAULT_BETTER_HP_COLORS = False" in settings,"Lexeditor default missing")
-    require('"betterHpColors"' in settings and '"Better HP Colors"' in settings,"persistence missing")
-    require('("enable_ff8_better_hp_colors", better_hp_colors)' in settings,"config writer missing")
-    require('"aria-label":"Better HP Colors"' in editor and 'row("BETTER HP COLORS"' in editor,"UI missing")
+    # The switch is a tweak mod now: Lexeditor manages the FFNx key, off by
+    # default, and the Tweaks page draws the mod from its schema.
+    require('"enable_ff8_better_hp_colors": False,' in settings,"Lexeditor default missing")
+    require("{**FFNX_DEFAULTS, **built[\"ffnx\"]}" in settings,"config writer missing")
+    require('"aria-label":row.name' in editor and "panel(schema.title||row.name.toUpperCase(),schema.help," in editor,"UI missing")
+def library_contract():
+    """The installed Better HP Colors tweak mod, when the reader's library has one."""
+    sys.path.insert(0,str(ROOT))
+    from core import script_mods
+    from plugins.ff8 import paths
+    mod=Path(paths.MODS_ROOT)/"Better HP Colors"
+    if not script_mods.is_script_mod(mod):return f"SKIP library mod: not installed in {paths.MODS_ROOT}"
+    schema=script_mods.schema(mod)
+    require(schema["title"]=="BETTER HP COLORS" and schema["needsDriver"],"library mod schema missing")
+    for phrase in ("white at full HP","yellow at 50%","orange at 25%","KO"):require(phrase in schema["help"],f"help missing {phrase}")
+    require("'enable_ff8_better_hp_colors', True" in (mod/"script/tweak.py").read_text(encoding="utf-8"),"library mod does not switch the driver on")
+    return "library mod checked"
 def compile_contract(compiler):
     code=r"""#include <cassert>
 #include "lexeditor_ff8_hp_colors.h"
@@ -37,7 +50,7 @@ int main(){c(100,100,255,255,255);c(75,100,255,255,128);c(50,100,255,255,0);c(37
         r=subprocess.run([str(out)],cwd=p,capture_output=True,text=True);require(r.returncode==0,"execution failed:\n"+r.stdout+r.stderr)
 def main():
     p=argparse.ArgumentParser();p.add_argument("--compile",action="store_true");p.add_argument("--compiler",default="cl");a=p.parse_args()
-    static_contract()
+    static_contract();print(library_contract())
     if a.compile:compile_contract(a.compiler)
     print("PASS: FF8 #481 interpolation, KO, fail-closed and vanilla-disable contracts");return 0
 if __name__=="__main__":raise SystemExit(main())

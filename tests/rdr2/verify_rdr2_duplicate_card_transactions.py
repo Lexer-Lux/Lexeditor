@@ -45,7 +45,7 @@ int main(){using namespace DuplicateCigaretteCards;
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args()
     source=(args.runtime_root/'GameplayTweaks/modules/duplicate_cigarette_cards.cpp').read_text(encoding='utf-8')
     variants={'production':source,

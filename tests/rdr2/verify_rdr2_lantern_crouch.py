@@ -36,7 +36,7 @@ int main(){
 }
 """
 def main():
- p=argparse.ArgumentParser();p.add_argument("--runtime-root",type=Path,default=Path("C:/RDR2Mod"));a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument("--runtime-root",type=Path,default=Path("D:/Documents/Mods/rdr2/RDR2-Overhaul"));a=p.parse_args()
  source=(a.runtime_root/"GameplayTweaks/modules/belt_lantern.cpp").read_text("utf-8")
  start=source.index("\tif (g_beltLanternMounted && g_beltLanternProp)")
  end=source.index("\tif (g_beltLanternLit && g_horseLanternOwned",start)

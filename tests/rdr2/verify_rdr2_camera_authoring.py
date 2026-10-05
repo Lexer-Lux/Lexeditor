@@ -52,7 +52,7 @@ int main(){
 }
 '''
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'));a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'));a=p.parse_args()
     source=(a.runtime_root/'GameplayTweaks/modules/gameplay_camera.cpp').read_text('utf-8')
     structs=source[source.index('enum class GameplayCameraMode'):source.index('static bool g_gameplayCameraConfigLoaded')]
     code=structs+source[source.index('static bool saveGameplayCameraProfiles()'):source.index('static void updateGameplayCameraEditor(')]

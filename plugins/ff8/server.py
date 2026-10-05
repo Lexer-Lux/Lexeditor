@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import assets, card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from . import world_preview
+from . import tweak_mods
 from . import draw_point_data
 from . import model_geometry
 from .game_icons import icon_path, portrait_path
@@ -417,9 +418,16 @@ class Handler(PluginRequestHandler):
                 self.json_response(assets.save_models(body.get("edits", [])))
             elif path == "/api/settings/save":
                 self.json_response(gameplay_settings.save(body))
+            elif path == "/api/settings/trust":
+                self.json_response(gameplay_settings.trust(str(body.get("id", "")), body.get("trusted")))
             elif path == "/api/editor-settings/save":
                 self.json_response(editor_settings.save(body))
             elif path == "/api/mods/configure":
+                # A switch that leaves an enabled tweak without what it needs
+                # is refused whole: the previous switches come back.
+                snapshots = [(Path(row["path"]) / "mod.json", (Path(row["path"]) / "mod.json").read_bytes())
+                             for row in runtime_layout.catalog(paths.PROJECT_ROOT, paths.MODS_ROOT)
+                             if (Path(row["path"]) / "mod.json").is_file()]
                 rows = runtime_layout.configure(
                     paths.PROJECT_ROOT, paths.MODS_ROOT,
                     [str(value) for value in body.get("order", [])],
@@ -427,6 +435,12 @@ class Handler(PluginRequestHandler):
                     {str(mod_id): values for mod_id, values
                      in body.get("folderOptions", {}).items()},
                 )
+                try:
+                    tweak_mods.build_enabled(paths.PROJECT_ROOT, paths.MODS_ROOT, paths.GAME_ROOT, paths.BASELINE_ROOT)
+                except Exception:
+                    for target, content in snapshots:
+                        target.write_bytes(content)
+                    raise
                 runtime_layout.compose(
                     paths.PROJECT_ROOT, paths.RUNTIME_ROOT, rows,
                     paths.BASELINE_ROOT, formats.SECTIONS,
@@ -437,6 +451,7 @@ class Handler(PluginRequestHandler):
                 imported = featured_mods.install_latest(
                     str(body.get("id") or ""), paths.PROJECT_ROOT, paths.MODS_ROOT)
                 rows = runtime_layout.catalog(paths.PROJECT_ROOT, paths.MODS_ROOT)
+                tweak_mods.build_enabled(paths.PROJECT_ROOT, paths.MODS_ROOT, paths.GAME_ROOT, paths.BASELINE_ROOT)
                 runtime_layout.compose(
                     paths.PROJECT_ROOT, paths.RUNTIME_ROOT, rows,
                     paths.BASELINE_ROOT, formats.SECTIONS,
@@ -469,6 +484,7 @@ class Handler(PluginRequestHandler):
             removed = runtime_layout.delete_mod(
                 paths.PROJECT_ROOT, paths.MODS_ROOT, mod_id)
             rows = runtime_layout.catalog(paths.PROJECT_ROOT, paths.MODS_ROOT)
+            tweak_mods.build_enabled(paths.PROJECT_ROOT, paths.MODS_ROOT, paths.GAME_ROOT, paths.BASELINE_ROOT)
             runtime_layout.compose(
                 paths.PROJECT_ROOT, paths.RUNTIME_ROOT, rows,
                 paths.BASELINE_ROOT, formats.SECTIONS,

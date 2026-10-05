@@ -99,7 +99,7 @@ def branch(source):
     return source[start:end]
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'))
+    parser=argparse.ArgumentParser();parser.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args()
     source=(args.runtime_root/'GameplayTweaks/modules/movement.cpp').read_text('utf-8')
     production=branch(source)

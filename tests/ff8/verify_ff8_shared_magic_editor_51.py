@@ -162,7 +162,7 @@ def verify_final_package_if_staged() -> bool:
 def main() -> int:
     editor = plugin_ui('ff8')
     gameplay_view = editor[editor.index("function renderGameplaySettings"):editor.index("function renderPlatformSettings")]
-    assert 'row("SHARED PARTY MAGIC INVENTORY"' in gameplay_view
+    assert 'panel("SHARED PARTY MAGIC INVENTORY"' in gameplay_view
     settings_dirty = editor.index("const settingsDirty=")
     other_saves = editor.index("const results=await Promise.all(jobs);")
     settings_save = editor.index('results.push(await api("/api/settings/save"')
@@ -287,20 +287,25 @@ def main() -> int:
             shutil.rmtree(link)
 
             # The outer gameplay transaction uses the real installer, mutates a
-            # real junction, then restores it after a later settings failure.
+            # real junction, then restores it after a later config failure.
             ffnx_manager._ensure_direct_link(game, old_direct)
             project = root / "mod"
+            # The project's own empty tweak library: saving never builds or
+            # enables the reader's real tweak mods.
+            (project / ".lexeditor-mods").mkdir(parents=True)
             runtime_config.write(project, shared_magic_inventory=False)
             old_state_path = ffnx_manager.STATE_PATH
             old_game_running = ffnx_manager._game_running
             ffnx_manager.STATE_PATH = state_path
             ffnx_manager._game_running = lambda: False
-            real_executable = gameplay_settings._verify_executable
-            gameplay_settings._verify_executable = lambda target: Path(target) / "FF8_EN.exe"
             loaded = gameplay_settings.load(project, game)
+            assert loaded["tweaks"] == [] and loaded["sharedMagicInventory"] is False
             watched = [
                 game / runtime_package.DRIVER_NAME,
                 game / "FFNx.toml",
+                game / "FFNx_steam_api.dll",
+                game / "steam_appid.txt",
+                *(game / "shaders" / shader.name for shader in (package_root / "shaders").glob("*") if shader.is_file()),
                 state_path,
                 gameplay_settings.patch_path(project),
                 gameplay_settings.settings_path(project),
@@ -308,25 +313,31 @@ def main() -> int:
             ]
             before_save = file_state(watched)
             before_link = link_state(link)
-            real_atomic = gameplay_settings._atomic_text
+            real_set_keys = gameplay_settings._set_ffnx_keys
+            real_install = ffnx_manager.install_derivative
 
-            def fail_settings(target: Path, text: str) -> None:
-                if Path(target).resolve() == gameplay_settings.settings_path(project).resolve():
-                    raise OSError("injected settings failure")
-                real_atomic(target, text)
+            def install_temporary(target, **kwargs):
+                return real_install(target, backup_root=root / "backup-save",
+                                    runtime_package_root=package_root, **kwargs)
 
-            gameplay_settings._atomic_text = fail_settings
+            def fail_config(target: Path, values: dict) -> None:
+                real_set_keys(target, values)
+                raise OSError("injected config failure")
+
+            gameplay_settings._set_ffnx_keys = fail_config
+            ffnx_manager.install_derivative = install_temporary
             try:
                 gameplay_settings.save(
-                    {**loaded, "sharedMagicInventory": True}, game, project,
+                    {"gfSpellbooksEnabled": loaded["gfSpellbooksEnabled"],
+                     "sharedMagicInventory": True}, game, project, install_runtime=True,
                 )
             except OSError as error:
-                assert "injected settings failure" in str(error)
+                assert "injected config failure" in str(error)
             else:
-                raise AssertionError("post-install settings failure was not injected")
+                raise AssertionError("post-install config failure was not injected")
             finally:
-                gameplay_settings._atomic_text = real_atomic
-                gameplay_settings._verify_executable = real_executable
+                gameplay_settings._set_ffnx_keys = real_set_keys
+                ffnx_manager.install_derivative = real_install
                 ffnx_manager.STATE_PATH = old_state_path
                 ffnx_manager._game_running = old_game_running
             assert_file_state(before_save)

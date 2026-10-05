@@ -3,40 +3,35 @@
 ## Editor access
 
 **Effects** exposes documented properties on every existing special-effect
-record. All effects includes unlinked/custom records; Equipment, Spells and
+record. All effects includes unlinked/custom records. Equipment, Spells and
 Items filter actual references in the selected archive. Unknown, legacy and
 padding fields remain protected.
 
 For Grass Crest Shield, use **Effects > Equipment > Grass Crest Shield (6890) >
 Recovery adjustment (stamina/second)** or follow the item's **Linked effects**
-button. Modified item references are followed rather than inferred from names.
-A shared effect changes every item or ability that uses it.
+button. Modified references are followed, not inferred from names. A shared
+effect changes every item or ability using that record.
 
-**Misc.** contains base regeneration, in stamina per second. **Encumbrance**
-contains five movement classes, their load ranges and recovery percentages.
-Light, Medium and Heavy have editable upper limits; the adjacent lower limits
-are derived. Ultralight shares Light's limit and requires the game's special
-movement condition. The list displays the native class IDs, 0 through 4.
+**Misc.** edits base regeneration, in stamina per second. **Encumbrance > Bands**
+edits numeric load ranges, existing movement profiles and independent recovery
+percentages. Add splits a range; Delete merges with a neighbour whose retained
+properties you explicitly choose. Special-light and forced-overburdened
+conditions belong to **Overrides**. See `load-bands.md` for boundaries,
+persistence, migration and native compatibility.
 
-## Independent tweaks and preservation
+## Apply and restore
 
-Enable **Stamina rebalance** in **Tweaks** to apply the configured Misc. baseline
-and the shield bonus. Its proposed settings are 60 base and +5 shield, and it
-starts disabled. Enable **Encumbrance rules** independently to use the class
-settings. Original limits are 25%/50%/100%, with recovery multipliers of
-100%/100%/100%/80%/70%. No preset is applied by opening the editor.
+New native projects start with vanilla values. Save writes the isolated
+project. Information > Apply combines saved native rules and enabled library
+tweak mods through the same composer, then installs the project's parameter
+archive. The library's schema-driven Tweaks interface is retained. No baked-in
+60/+5 preset or hidden shield overlay runs inside the editor.
 
-Save writes the isolated project. Apply, with the game closed, installs the saved
-archive and enabled native settings. The shield override is projected at Apply
-time, never written over the project's authored effect value. Disabling a tweak
-and applying restores its native defaults and removes its override, leaving the
-other toggle intact. Restore original restores owned installed files without
-changing project settings.
-
-Existing shield variants are resolved through their actual passive references.
-Missing or ambiguous custom references are refused. Other items sharing the
-resolved effect change too. The existing single-project archive deployment is
-retained; this PR does not claim multi-mod merging.
+Restore original restores verified owned output without changing project
+values or library switches. Conflicts and foreign installed changes are
+refused. The executable and parameter archive are separate filesystem writes,
+with explicit interruption recovery and guarded native rollback. This does
+not provide multi-mod parameter-archive merging.
 
 ## Sources
 
@@ -62,19 +57,19 @@ No Cheat Engine or upstream executable code is copied.
 
 ## Native evidence and limits
 
-`codex/ds1/stamina-recovery.md` records the privately inspected executable's
-fingerprint, baseline getter, class selector, class recovery factors and
-within-class fraction. It also credits Microsoft's PE and x64 unwind references.
-`encumbrance.S` is original replacement assembly, not a game disassembly dump.
+`codex/ds1/stamina-recovery.md` records the privately inspected baseline getter,
+movement selector, recovery factors and within-class interpolation.
+`load-bands.md` describes how the current project editor exports these rules
+to the shared composer. Previous standalone encoders exist only for draft
+identification/restoration; they are not the current Apply path.
 
-Tests execute selected functions from the identified private image in an isolated
-harness. The executable is not redistributed. Synthetic Apply/Restore and native
-function tests do not establish Windows game startup, real animation behavior,
-every effect's activation/stacking, or multiplayer safety. Initial candidates
-must be tested offline.
+Generated fixtures test documented fields, byte/bit preservation, exact
+no-op/reversion, linked references, invalid inputs, save/discard and protected
+writes. Separate semantic digests check consumed metadata against the pinned
+upstream snapshot. Private-image tests are optional and never bundle game
+bytes. Current-head results belong in the PR and its CI evidence, not inferred
+from a previous draft's successful tests.
 
-Animation timing, invincibility windows and other load-dependent formulas are
-not represented by invented editable fields. Player resonance effects 40-44
-remain effects, not substitutes for the engine baseline. Other independently
-owned executable patches, including the separate equip-load display PR, are
-refused rather than overwritten. Keep #758 open until installed-game acceptance.
+Rendered controls and isolated function execution do not establish game
+startup, animation timing, every effect's activation/stacking or online safety.
+Initial gameplay testing must be offline.

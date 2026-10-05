@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
 MARKER = '.lexeditor-ds1-project'
@@ -15,8 +15,9 @@ def digest(path):
 
 class ItemStore:
     def __init__(self, game_root, project=None, read_only=True):
-        self.game_root = Path(game_root).resolve()
-        self.project = Path(project).resolve() if project else None
+        from .tweak_mods import checked
+        self.game_root = checked(Path(game_root)).resolve()
+        self.project = checked(Path(project)).resolve() if project else None
         self.read_only = read_only or self.project is None
         self.output = self.project / RELATIVE if self.project else None
         self.document = None
@@ -26,7 +27,9 @@ class ItemStore:
             raise PermissionError('Create or select a mod before editing Vanilla.')
         if self.project == self.game_root or self.game_root in self.project.parents:
             raise ValueError('The mod project must be outside the game installation.')
-        resolved_output = self.output.resolve()
+        from .tweak_mods import checked
+        checked(self.project / MARKER)
+        resolved_output = checked(self.output).resolve()
         if self.game_root in resolved_output.parents or self.project not in resolved_output.parents:
             raise ValueError('The output path leaves the mod project or enters the installed game.')
         if not (self.project / MARKER).is_file():
@@ -44,6 +47,8 @@ class ItemStore:
         if not self.read_only: self.writable()
         vanilla = self._vanilla_path()
         source = self.output if self.output and self.output.is_file() else vanilla
+        from .tweak_mods import checked
+        checked(source)
         if source.stat().st_size > MAX_ARCHIVE:
             raise ValueError('The parameter archive is too large.')
         raw = source.read_bytes()
@@ -69,6 +74,8 @@ class ItemStore:
                                for key, label, table in EFFECT_SUBTABS],
                 'enemyTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in ENEMY_SUBTABS],
+                'attackTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                               for key, label, table in ATTACK_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS]}
 
@@ -77,8 +84,12 @@ class ItemStore:
         return self.get().edit(table, row_id, field, value)
 
     def validate_save(self):
+        from .tweak_mods import checked
         self.writable()
         document = self.get()
+        for path in (self.source, self._vanilla_path(), self.output):
+            if path is not None:
+                checked(path)
         # Apply can legitimately replace the live file while this editor stays
         # open. Compare against its verified preserved original after deployment.
         if digest(self.source) != self.source_hash or digest(self._vanilla_path()) != self.vanilla_hash:

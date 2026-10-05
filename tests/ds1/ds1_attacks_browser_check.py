@@ -1,4 +1,4 @@
-"""Real rendered attack controls, shared impact, projectile navigation and save."""
+"""Real rendered attack controls, monster links, hover previews, shared impact and save."""
 import hashlib
 import json
 import os
@@ -40,20 +40,29 @@ def main():
                 try:
                     page=browser.new_page(viewport={'width':1100,'height':800})
                     page.on('pageerror',lambda e:errors.append(str(e)))
-                    def open_monster(identity):
+                    def open_monster(identity,attacks=True):
                         page.locator('[data-tab="enemies"]').click()
-                        page.wait_for_function('state.row?.table==="NpcParam" && !state.monster')
+                        page.wait_for_function('state.tab==="enemies" && state.row?.table==="NpcParam"')
                         page.get_by_role('searchbox',name='Search monsters').fill(str(identity))
-                        try: page.wait_for_function('(id)=>state.row?.id===id',arg=identity)
-                        except Exception:
-                            print('NAVIGATION',page.evaluate('({tab:state.tab,selected:state.selected,query:state.query,row:state.row?.id,error:state.error})'),flush=True)
-                            if output: page.screenshot(path=str(output/'navigation-error.png'))
-                            raise
-                        page.get_by_role('button',name='Attacks',exact=True).click()
-                        page.wait_for_function('state.row?.table==="AtkParam_Npc"')
+                        page.wait_for_function('(id)=>state.row?.id===id && state.monsterAttacks',arg=identity)
+                        if attacks:
+                            page.locator('.lex-tabbed-panel [data-subtab="attacks"]').click()
+                            page.wait_for_function('state.monsterTab==="attacks"')
+                    def follow(link):
+                        link.click()
+                        page.wait_for_function('state.tab==="attacks" && state.row?.table==="AtkParam_Npc" && state.selected===`AtkParam_Npc:${state.row.id}`')
                     page.goto(session.url); page.wait_for_selector('body[data-ds1-ready="true"]')
                     open_monster(120000)
+                    links=page.locator('.lex-hoverable[data-hover-target-type="ds1-attack"]')
+                    assert links.count()==len(refs.list(120000)['rows'])
+                    links.first.hover()
+                    preview=page.locator('.lex-hover-preview')
+                    preview.wait_for()
+                    assert f'#{first_attack}' in preview.inner_text() and 'Physical' in preview.inner_text()
+                    if output: page.wait_for_timeout(250); page.screenshot(path=str(output/'monster-attack-preview.png'))
+                    follow(links.first)
                     assert page.evaluate('state.row.id')==first_attack
+                    assert page.locator('.lex-hover-preview').count()==0
                     edited=set()
                     for index in range(10):
                         for key,value in changes.items():
@@ -73,25 +82,21 @@ def main():
                         if not nxt.count() or not nxt.is_enabled():break
                         nxt.click()
                     assert edited==changes.keys()
+                    # The preview reads the live document, unsaved edits included.
+                    open_monster(120000); links.first.hover(); preview.wait_for()
+                    assert '321' in preview.inner_text()
+                    page.mouse.move(0,0)
                     page.locator('#global-save').click(); page.wait_for_function('state.dirty===0 && state.pending===0')
-                    page.reload(); page.wait_for_selector('body[data-ds1-ready="true"]'); open_monster(120000)
+                    page.reload(); page.wait_for_selector('body[data-ds1-ready="true"]')
                     reopened=ItemDocument((mod/RELATIVE).read_bytes())
                     for key,value in changes.items(): assert reopened.value('AtkParam_Npc',first_attack,key)==value
                     open_monster(ranged['id'])
-                    assert any('projectile' in r['route'].lower() for r in page.evaluate('state.rows'))
-                    attack=next(r['id'] for r in page.evaluate('state.rows') if 'projectile' in r['route'].lower())
-                    page.get_by_role('searchbox',name='Search attacks').fill(str(attack))
-                    page.wait_for_function('(id)=>state.row?.id===id',arg=attack)
+                    follow(links.filter(has_text='Projectile').first)
                     assert any('Bullet' in p for p in page.evaluate('state.row.impact.paths'))
-                    if output:
-                        following=page.locator('.lex-tweaks-pages').get_by_role('button',name='Next page',exact=True)
-                        if following.count() and following.is_enabled():following.click()
-                        page.wait_for_timeout(350)
-                        page.screenshot(path=str(output/'attacks-projectile.png'))
+                    if output: page.screenshot(path=str(output/'attacks-projectile.png'))
                     open_monster(shared['id'])
-                    attack=next(r['id'] for r in page.evaluate('state.rows') if len(refs.impact(r['id'])['variants'])>1)
-                    page.get_by_role('searchbox',name='Search attacks').fill(str(attack))
-                    page.wait_for_function('(id)=>state.row?.id===id',arg=attack)
+                    attack=next(r['id'] for r in refs.list(shared['id'])['rows'] if len(refs.impact(r['id'])['variants'])>1)
+                    follow(links.filter(has_text=f'#{attack} ').first)
                     page.get_by_text('Shared attack damage',exact=True).wait_for()
                     page.set_viewport_size({'width':1000,'height':700}); page.wait_for_timeout(400)
                     assert page.locator('[data-field-key="atkPhys"]').evaluate('n=>n.clientWidth')>=70
@@ -99,39 +104,38 @@ def main():
                     page.locator('.lex-detail-panel-title .lex-info-help').hover()
                     page.wait_for_timeout(250)
                     if output: page.screenshot(path=str(output/'attacks-shared-help.png'))
-                    page.locator('[data-subtab="all"]').click()
-                    page.wait_for_function('state.allAttacks && state.rows.length>10' if source else 'state.allAttacks && state.rows.length===3')
+                    page.set_viewport_size({'width':1100,'height':800})
+                    page.locator('[data-tab="attacks"]').click()
+                    page.wait_for_function('state.tab==="attacks"')
                     assert page.evaluate('state.rows.length')==len(refs.attack_ids)
-                    # A slow earlier scope response must not replace the latest list.
-                    page.evaluate('''async () => {
-                      const original=window.fetch;
-                      window.fetch=async (...args)=>{
-                        if(String(args[0]).includes('/api/attacks?')&&String(args[0]).includes('all=0'))
-                          await new Promise(resolve=>setTimeout(resolve,200));
-                        return original(...args);
-                      };
-                      try { await Promise.all([openAttacks(state.monster,false),openAttacks(state.monster,true)]); }
-                      finally { window.fetch=original; }
-                    }''')
-                    assert page.evaluate('state.allAttacks && state.rows.length')==len(refs.attack_ids)
                     orphan=next(a for a in sorted(refs.attack_ids,reverse=True) if not refs.impact(a)['variants'])
                     page.get_by_role('searchbox',name='Search attacks').fill(str(orphan))
                     page.wait_for_function('(id)=>state.row?.id===id',arg=orphan)
                     page.get_by_text('Unresolved attack ownership',exact=True).wait_for()
-                    assert page.evaluate('state.rows.find(r=>r.id===state.row.id).route')=='Not linked'
                     if output: page.screenshot(path=str(output/'attacks-unassigned.png'))
                     for table,key,value in [('AtkParam_Npc','atkPhys',10000),('AtkParam_Npc','atkAttribute',5),('AtkParam_Npc','atkPhysCorrection',1),('Bullet','atkId_Bullet',1)]:
                         try:
                             request_json(session.url+'api/edit',{'table':table,'id':first_attack,'field':key,'value':value})
                             raise AssertionError('Invalid edit accepted')
                         except HTTPError as error: assert error.code==400
-                    page.get_by_role('button',name='Back to monsters',exact=True).click()
-                    page.wait_for_function('!state.monster && state.row?.table==="NpcParam"')
+                    open_monster(120000,attacks=False)
+                    assert page.evaluate('state.monsterTab')=='attacks'
+                    page.locator('.lex-tabbed-panel [data-subtab="resistances"]').click()
+                    page.wait_for_function('state.monsterTab==="resistances"')
                     assert len(page.evaluate('state.row.fields'))==18
+                    assert page.locator('[data-field-key="def_phys"]:visible').count()==1
+                    if output: page.screenshot(path=str(output/'monster-resistances.png'))
                     session.stop(); session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(mod),'LEXEDITOR_NO_MOD':'1','LEXEDITOR_MOD_READ_ONLY':'1'})
                     session.start()
-                    page.goto(session.url+'?lexNoMod=1'); page.wait_for_selector('body[data-ds1-ready="true"]'); open_monster(120000)
+                    page.goto(session.url+'?lexNoMod=1'); page.wait_for_selector('body[data-ds1-ready="true"]'); open_monster(120000,attacks=False)
                     assert page.locator('#global-save').is_disabled()
+                    # A disabled Vanilla control still offers Create a mod when pressed.
+                    control=page.locator('[data-field-key="def_phys"]:visible')
+                    assert control.is_disabled()
+                    control.click(force=True)
+                    page.get_by_text('Create a mod to edit?',exact=True).wait_for()
+                    if output: page.screenshot(path=str(output/'vanilla-create-mod-prompt.png'))
+                    page.get_by_role('button',name='Cancel',exact=True).click()
                     try:
                         request_json(session.url+'api/edit',{'table':'AtkParam_Npc','id':first_attack,'field':'atkPhys','value':1})
                         raise AssertionError('Vanilla edit accepted')
@@ -141,7 +145,7 @@ def main():
         finally: session.stop()
         assert hashlib.sha256((game/RELATIVE).read_bytes()).hexdigest()==digest
     if source: assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
-    print(json.dumps({'attackFieldsSavedReloaded':len(edited),'projectileLinks':True,'sharedImpact':True,'allRecords':len(refs.attack_ids),'unresolvedOwnership':True,'vanillaReadOnly':True,'originalUnchanged':True,'browserErrors':errors}))
+    print(json.dumps({'attackFieldsSavedReloaded':len(edited),'hoverPreview':True,'projectileLinks':True,'sharedImpact':True,'allRecords':len(refs.attack_ids),'unresolvedOwnership':True,'vanillaCreateModPrompt':True,'originalUnchanged':True,'browserErrors':errors}))
 
 
 if __name__=='__main__':main()

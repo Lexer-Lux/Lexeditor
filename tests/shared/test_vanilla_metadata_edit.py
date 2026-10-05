@@ -138,6 +138,23 @@ def test_renaming_a_section_heading_ships_and_persists_across_rerender(page):
     assert section_title(page) == "Damage", "the saved section heading did not come back"
 
 
+def test_renaming_one_copy_of_a_heading_relabels_its_other_column(page):
+    """A section dealt across paginated columns repeats its heading."""
+    framework(page)
+    mount_vanilla_shell(page)
+    page.evaluate("""() => {
+      const section = () => LexeditorUI.detailSection({title: 'Combat', body: [LexeditorUI.detailNote('x')]});
+      document.querySelector('main').replaceChildren(section(), section());
+    }""")
+    page.locator(".lex-detail-section-title-text").first.dblclick()
+    field = page.locator(".lex-label-rename").first
+    field.wait_for(timeout=3000)
+    field.fill("Damage")
+    field.press("Enter")
+    page.wait_for_timeout(250)
+    assert page.locator(".lex-detail-section-title-text").all_text_contents() == ["Damage", "Damage"]
+
+
 def test_a_collapsible_sections_heading_is_not_renamed_in_place(page):
     """A collapsible summary already owns its click (open/close)."""
     framework(page)

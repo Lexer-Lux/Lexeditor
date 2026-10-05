@@ -1,34 +1,23 @@
-"""Native-rule editing, exact ownership, preservation and reversible overlay tests."""
+"""Compatibility checks for restoring previously installed draft native patches."""
 import hashlib
 import json
 from pathlib import Path
 import struct
-import sys
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-from ds1_native_fixture import make_native_archive, fake_executable
-from plugins.ds1 import stamina_patch as native, stamina_rebalance as module, deployment
-from plugins.ds1.stamina_rebalance import StaminaRebalance, DEFAULTS, project_overlay, effective_rules
-from plugins.ds1.store import ItemStore, RELATIVE, MARKER
-from plugins.ds1.formats import ItemDocument, inflate
-from plugins.ds1.effects import TABLE, RECOVERY_KEY
+from ds1_native_fixture import fake_executable
+from plugins.ds1 import stamina_patch as native
 
 
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     original = fake_executable(monkeypatch)
     monkeypatch.setattr(native, "ensure_game_closed", lambda: None)
-    game, mod = tmp_path / "game", tmp_path / "mod"
-    (game / RELATIVE).parent.mkdir(parents=True)
-    (game / RELATIVE).write_bytes(make_native_archive())
+    game = tmp_path / "legacy-game"
+    game.mkdir()
     (game / native.EXECUTABLE).write_bytes(original)
-    mod.mkdir()
-    (mod / MARKER).touch()
-    store = ItemStore(game, mod, False)
-    return game, mod, store, StaminaRebalance(game, mod, False), original
+    return game, None, None, None, original
 
 
 def test_native_noop_allowed_ranges_and_exact_identification(monkeypatch):
@@ -61,165 +50,6 @@ def test_native_noop_allowed_ranges_and_exact_identification(monkeypatch):
 def test_bad_rules_rejected(key, value):
     with pytest.raises(ValueError):
         native.validate_rules({**native.DEFAULT_RULES, key: value})
-
-
-def test_misc_and_each_band_use_single_canonical_settings(setup):
-    game, mod, store, rules, _ = setup
-    assert rules.read_row(0)["fields"][0]["key"] == "baseRecovery"
-    with pytest.raises(ValueError, match="Enable"):
-        rules.edit_row(0, "baseRecovery", 70)
-    rules.edit_row(100, "enabled", 1)
-    rules.edit_row(0, "baseRecovery", 70)
-    rules.edit_row(100, "encumbranceEnabled", True)
-    for index in range(4):
-        rules.edit_row(1001 + index, "recovery", 20 + index)
-    rules.edit_row(200, "specialRecovery", 24)
-    rules.edit_row(200, "forcedRecovery", 25)
-    rules.edit_row(1001, "upper", 30)
-    assert next(f for f in rules.read_row(1002)["fields"] if f["key"] == "lower")["value"] == 30
-    rules.save()
-    reopened = StaminaRebalance(game, mod, False)
-    assert effective_rules(reopened.saved)["baseRecovery"] == 70
-    assert [b["recovery"] for b in reopened.value["bands"]] == list(range(20, 24))
-    assert reopened.value["specialLight"]["recovery"] == 24
-    assert reopened.value["forcedRecovery"] == 25
-    with pytest.raises(ValueError):
-        rules.edit_row(1004, "upper", 140)
-    with pytest.raises(ValueError):
-        rules.edit_row(0, "upper", 20)
-    rules.edit("baseRecovery", 80)
-    rules.discard()
-    assert rules.value["baseRecovery"] == 70
-
-
-def test_overlay_preserves_authored_values_and_other_cells():
-    source = make_native_archive()
-    doc = ItemDocument(source)
-    doc.edit(TABLE, 6890, RECOVERY_KEY, 13)
-    source = doc.export()
-    assert project_overlay(source, DEFAULTS) == source
-    modified = project_overlay(source, {**DEFAULTS, "enabled": True})
-    result = ItemDocument(modified)
-    assert result.value(TABLE, 6890, RECOVERY_KEY) == 5
-    assert result.value(TABLE, 6200, RECOVERY_KEY) == -2
-    start = doc._row(TABLE, 6890)[1] + 184
-    allowed = set(range(start, start + 4))
-    assert {i for i, (a, b) in enumerate(zip(inflate(source), inflate(modified))) if a != b} <= allowed
-    doc.edit("EquipParamWeapon", 1453000, "residentSpEffectId", 99001)
-    reassigned = ItemDocument(project_overlay(doc.export(), {**DEFAULTS, "enabled": True}))
-    assert reassigned.value(TABLE, 99001, RECOVERY_KEY) == 5
-    assert reassigned.value(TABLE, 6890, RECOVERY_KEY) == 13
-
-
-def test_apply_disable_restore_are_independent_and_exact(setup):
-    game, mod, store, rules, original = setup
-    pristine = (game / RELATIVE).read_bytes()
-    store.edit(TABLE, 6890, RECOVERY_KEY, 13)
-    store.save()
-    authored = (mod / RELATIVE).read_bytes()
-    rules.edit("enabled", True)
-    rules.edit("encumbranceEnabled", True)
-    rules.edit_row(1001, "upper", 30)
-    rules.save()
-    status = rules.apply(store)
-    assert not status["stale"]
-    installed = (game / native.EXECUTABLE).read_bytes()
-    assert native.identify(installed, original)["bands"][0]["upper"] == 30
-    assert native.identify(installed, original)["baseRecovery"] == 60
-    assert ItemDocument((game / RELATIVE).read_bytes()).value(TABLE, 6890, RECOVERY_KEY) == 5
-    assert (mod / RELATIVE).read_bytes() == authored
-    rules.edit("enabled", False)
-    rules.save()
-    rules.apply(store)
-    current = native.identify((game / native.EXECUTABLE).read_bytes(), original)
-    assert current["bands"][0]["upper"] == 30 and current["baseRecovery"] == 45
-    assert (game / RELATIVE).read_bytes() == authored
-    rules.edit("encumbranceEnabled", False)
-    rules.save()
-    rules.apply(store)
-    assert (game / native.EXECUTABLE).read_bytes() == original
-    rules.restore()
-    assert (game / RELATIVE).read_bytes() == pristine
-    assert (game / native.BACKUP).read_bytes() == original
-    assert (mod / RELATIVE).read_bytes() == authored
-
-
-def test_no_write_on_unknown_image_missing_original_running_or_stale_settings(setup, monkeypatch):
-    game, mod, store, rules, original = setup
-    store.save()
-    rules.edit("enabled", True)
-    rules.save()
-    exe = game / native.EXECUTABLE
-    exe.write_bytes(original + b"foreign")
-    with pytest.raises(ValueError):
-        rules.apply(store)
-    assert not (game / native.BACKUP).exists()
-    exe.write_bytes(original)
-    def running():
-        raise RuntimeError("game running")
-    monkeypatch.setattr(native, "ensure_game_closed", running)
-    with pytest.raises(RuntimeError, match="running"):
-        rules.apply(store)
-    assert exe.read_bytes() == original and not (game / native.BACKUP).exists()
-    monkeypatch.setattr(native, "ensure_game_closed", lambda: None)
-    rules.apply(store)
-    (game / native.BACKUP).unlink()
-    with pytest.raises(ValueError):
-        rules.restore()
-    assert exe.read_bytes() != original
-    (mod / module.SETTINGS_FILE).write_text("{}")
-    with pytest.raises(ValueError):
-        rules.save()
-
-
-def test_parameter_failure_rolls_native_back_without_overwriting_others(setup, monkeypatch):
-    game, mod, store, rules, original = setup
-    store.save()
-    rules.edit("enabled", True)
-    rules.save()
-    def fail(*args, **kwargs):
-        raise RuntimeError("synthetic disk error")
-    monkeypatch.setattr(deployment, "apply", fail)
-    with pytest.raises(RuntimeError, match="previous rate"):
-        rules.apply(store)
-    assert (game / native.EXECUTABLE).read_bytes() == original
-
-
-def test_readonly_and_settings_conflicts(setup):
-    game, mod, store, rules, original = setup
-    with pytest.raises(PermissionError):
-        StaminaRebalance(game, mod, True).edit("enabled", True)
-    with pytest.raises(PermissionError):
-        StaminaRebalance(game).edit("enabled", True)
-    rules.edit("enabled", True)
-    rules.save()
-    other = StaminaRebalance(game, mod, False)
-    other.edit("baseRecovery", 65)
-    other.save()
-    with pytest.raises(ValueError, match="outside"):
-        rules.save()
-
-
-def test_source_native_schema_validation_does_not_touch_game():
-    for bad in ({"enabled": True}, {**DEFAULTS, "encumbranceEnabled": 1}):
-        with pytest.raises(ValueError):
-            module.settings(bad)
-    for key, value in [("enabled", True), ("encumbranceEnabled", True)]:
-        native.validate_rules(effective_rules({**DEFAULTS, key: value}))
-
-
-def test_external_project_change_refuses_apply_before_native_write(setup):
-    game, mod, store, rules, original = setup
-    store.save()
-    rules.edit("enabled", True)
-    rules.save()
-    changed = ItemDocument((mod / RELATIVE).read_bytes())
-    changed.edit(TABLE, 6890, RECOVERY_KEY, 9)
-    (mod / RELATIVE).write_bytes(changed.export())
-    with pytest.raises(ValueError, match="outside"):
-        rules.apply(store)
-    assert (game / native.EXECUTABLE).read_bytes() == original
-    assert not (game / native.BACKUP).exists()
 
 
 @pytest.mark.parametrize("phase", ["before-image", "after-image"])
@@ -259,90 +89,3 @@ def test_owner_rejects_schema_and_foreign_projected_image(setup):
     (game / native.EXECUTABLE).write_bytes(native.transform(original, {**native.DEFAULT_RULES, "baseRecovery": 80}))
     with pytest.raises(ValueError, match="outside"):
         native.install(game, native.DEFAULT_RULES)
-
-
-def test_native_http_routes_saved_state_and_protected_writes(setup, monkeypatch):
-    from http.server import ThreadingHTTPServer
-    import threading
-    from urllib.request import Request, urlopen
-    from urllib.error import HTTPError
-    from plugins.ds1 import server
-    game, mod, store, rules, original = setup
-    monkeypatch.setattr(server, "STORE", store)
-    monkeypatch.setattr(server, "RULES", rules)
-    http = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
-    thread = threading.Thread(target=http.serve_forever, daemon=True)
-    thread.start()
-    base = f"http://127.0.0.1:{http.server_port}"
-    def request(path, payload=None, origin=None):
-        headers = {"Content-Type": "application/json"}
-        if origin:
-            headers["Origin"] = origin
-        req = Request(base + path, data=None if payload is None else json.dumps(payload).encode(),
-                      headers=headers)
-        with urlopen(req) as response:
-            return json.load(response)
-    def edit(row, key, value):
-        return request("/api/edit", {"table": "NativeRules", "id": row, "field": key, "value": value})
-    try:
-        assert len(request("/api/table?tab=encumbrance")["rows"]) == 4
-        assert request("/api/row?table=NativeRules&id=0")["row"]["fields"][0]["disabled"]
-        edit(100, "enabled", 1)
-        edit(100, "encumbranceEnabled", 1)
-        edit(0, "baseRecovery", 72)
-        edit(1001, "upper", 30)
-        assert request("/api/state")["dirtyCount"] == 4
-        with pytest.raises(HTTPError) as error:
-            request("/api/edit", {"table": "NativeRules", "id": 0, "field": "baseRecovery", "value": 80},
-                    origin="http://other.invalid")
-        assert error.value.code == 403
-        with pytest.raises(HTTPError):
-            edit(1004, "upper", 135)
-        request("/api/save", {})
-        assert request("/api/state")["dirtyCount"] == 0
-        edit(0, "baseRecovery", 80)
-        request("/api/discard", {})
-        assert request("/api/row?table=NativeRules&id=0")["row"]["fields"][0]["value"] == 72
-        result = request("/api/deployment/apply", {})
-        assert not result["stale"]
-        assert native.inspect(game)[1]["baseRecovery"] == 72
-        request("/api/deployment/disable", {})
-        assert (game / native.EXECUTABLE).read_bytes() == original
-        monkeypatch.setattr(server, "RULES", StaminaRebalance(game))
-        with pytest.raises(HTTPError):
-            edit(100, "enabled", 1)
-    finally:
-        http.shutdown()
-        http.server_close()
-        thread.join()
-
-
-def test_band_actions_revision_save_discard_and_legacy_migration(setup):
-    game, mod, store, rules, original = setup
-    legacy = {**module.LEGACY_DEFAULTS, "encumbranceEnabled": True,
-              "lightLimit": 30, "lightRecovery": 115, "ultralightRecovery": 105}
-    settings_path = mod / module.SETTINGS_FILE
-    raw = (json.dumps({"schema": 1, module.TWEAK_ID: legacy}) + "\n").encode()
-    settings_path.write_bytes(raw)
-    rules.discard()
-    assert rules.value["bands"][0]["upper"] == 30
-    assert rules.value["bands"][0]["recovery"] == 115
-    assert rules.value["specialLight"]["recovery"] == 105
-    assert rules.dirty_count == 0 and settings_path.read_bytes() == raw
-    revision = rules.band_revision()
-    selected = rules.band_action("add", 1001, revision=revision, at=10)
-    assert selected["id"] == 1005
-    assert len(rules.value["bands"]) == 5
-    with pytest.raises(ValueError, match="changed"):
-        rules.band_action("delete", 1005, revision=revision, neighbour=1001, keep="neighbour")
-    rules.edit_row(1005, "recovery", 120)
-    rules.save()
-    assert json.loads(settings_path.read_text())["schema"] == 2
-    reopened = StaminaRebalance(game, mod, False)
-    assert reopened.value == rules.value
-    reopened.band_action("delete", 1005, revision=reopened.band_revision(),
-                         neighbour=1001, keep="selected")
-    assert reopened.value["bands"][0]["recovery"] == 120
-    reopened.discard()
-    assert len(reopened.value["bands"]) == 5
-    assert (game / native.EXECUTABLE).read_bytes() == original

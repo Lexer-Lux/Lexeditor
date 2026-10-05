@@ -12,7 +12,7 @@ def number(key, label, value, minimum, maximum, help_text="", editable=True, gro
 
 def finish(fields, config, read_only):
     for field in fields:
-        field["disabled"] = read_only or not config["encumbranceEnabled"]
+        field["disabled"] = read_only or not config.get("encumbranceEnabled", True)
         if not field["editable"]:
             field["protectedReason"] = field["description"]
     return fields

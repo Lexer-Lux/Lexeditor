@@ -50,7 +50,7 @@ int main(){ReferenceCanvas canvas;
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args()
     source=(args.runtime_root/'GameplayTweaks/modules/fortification_hud.cpp').read_text('utf-8')
     code=source[source.index('static const char* kCoreTextureNames'):source.index('static void updateCalibration')]

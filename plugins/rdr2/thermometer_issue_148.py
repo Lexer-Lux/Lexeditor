@@ -15,7 +15,12 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 
-PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_RDR2_PROJECT", r"C:\RDR2Mod")).resolve()
+try:
+    from .paths import PROJECT_ROOT
+except ImportError:  # Run as a script rather than with python -m.
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from plugins.rdr2.paths import PROJECT_ROOT
 DEFAULT_CATALOG = PROJECT_ROOT / "MyOverhaul" / "catalog_sp.ymt"
 DEFAULT_STRINGS = PROJECT_ROOT / "MyOverhaul" / "strings.gxt2"
 ITEM = "LEX_THERMOMETER"

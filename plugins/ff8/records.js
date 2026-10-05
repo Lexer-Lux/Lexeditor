@@ -113,7 +113,7 @@
       detailField({label:"STATUS 2",help:status2?.help?infoHelp(status2.help):null,control:fieldSourceControl(status2,"magic",row.id)}),
       detailField({label:"STATUS ACCURACY",control:fieldSourceControl(take("status_accuracy"),"magic",row.id)}),
     ];
-    if(state.data.settings.gfHpCasting)generalRows.unshift(detailField({label:"GF HP COST",help:infoHelp("GF HP spent when this spell is confirmed through the battle Magic command. Requires a junctioned GF, Monogamy and No Magic Consumption."),control:el("input",{type:"number",min:0,max:9999,step:1,value:state.data.settings.gfHpCastingCosts[row.id],"aria-label":`GF HP cost for ${row.name}`,oninput:event=>{if(event.target.validity.valid){state.data.settings.gfHpCastingCosts[row.id]=Number(event.target.value);shell.refresh()}}})}));
+    if(tweakOn("gf-hp-casting"))generalRows.unshift(detailField({label:"GF HP COST",help:infoHelp("GF HP spent when this spell is confirmed through the battle Magic command. Requires a junctioned GF, Monogamy and No Magic Consumption."),control:el("input",{type:"number",min:0,max:9999,step:1,value:tweakValues("gf-hp-casting").costs[row.id],"aria-label":`GF HP cost for ${row.name}`,oninput:event=>{if(event.target.validity.valid){tweakValues("gf-hp-casting").costs[row.id]=Number(event.target.value);shell.refresh()}}})}));
     const generalRemainder=row.fields.filter(field=>field.group==="General"&&!used.has(field.field));
     generalRemainder.forEach(field=>used.add(field.field));
     generalRows.unshift(...generalRemainder.map(field=>detailField({label:field.label,

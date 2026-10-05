@@ -39,7 +39,7 @@ change the live INI or the game directory.
 ## Paths
 
 - `LEXEDITOR_RDR2_PROJECT` selects the RDR2 project. The default is
-  `C:\RDR2Mod`.
+  `D:\Documents\Mods\rdr2\RDR2-Overhaul`.
 - `LEXEDITOR_MOD_ROOT` selects the editable LML mod. The default is the
   project's `MyOverhaul` directory.
 - `RDR2_GAME_ROOT` selects the game directory when a feature needs installed

@@ -119,7 +119,7 @@ int main(){
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--runtime-root', type=Path, default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime-root', type=Path, default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args = parser.parse_args()
     compiler = shutil.which('g++') or shutil.which('clang++')
     vcvars = Path('C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/vcvars64.bat')

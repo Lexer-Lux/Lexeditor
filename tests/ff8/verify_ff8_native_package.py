@@ -93,8 +93,11 @@ def run() -> None:
             assert (game / 'FFNx_steam_api.dll').read_bytes() == (root / 'FFNx_steam_api.dll').read_bytes()
             assert len(list((game / 'shaders').glob('*'))) == package['shaderCount']
             assert any(p.read_bytes() == b'old driver fixture' for p in (tmp / 'backups').rglob('AF3DN.P'))
-            gameplay_settings._set_ffnx_runtime_tweaks(config, xp_bars=True, hp_bars=True,
-                gf_hp_bars=True, better_targeting=True, party_switch=True, modern_controls=True)
+            # What saving writes when these driver tweak mods are enabled.
+            gameplay_settings._set_ffnx_keys(config, {**gameplay_settings.FFNX_DEFAULTS, **{
+                key: True for key in ('enable_ff8_xp_bars', 'enable_ff8_hp_bars', 'enable_ff8_gf_hp_bars',
+                                      'enable_ff8_better_targeting', 'enable_ff8_party_switch',
+                                      'enable_ff8_modern_controls')}})
             text = config.read_text()
             for marker in ('fullscreen = true', 'custom_setting = "retained"',
                            'enable_ff8_hp_bars = true', 'enable_ff8_gf_hp_bars = true',

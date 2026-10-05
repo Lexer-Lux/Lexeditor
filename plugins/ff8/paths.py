@@ -51,8 +51,7 @@ def check() -> list[str]:
     problems: list[str] = []
     for relative in (
         "editor.html", "server.py", "assets.py", "formats.py", "extractor.py", "game_font.py", "editor_settings.py",
-        "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py", "mug_drops.py",
-        "single_gf.py", "game_icons.py",
+        "gameplay_settings.py", "tweak_mods.py", "game_icons.py",
         "ffnx_issue_51/runtime_config.py", "ffnx_issue_51/runtime_package.py",
         "runtime_layout.py", "mod_support.py", "iroj_archive.py", "mod_folders.py", "mngrp_merge.py",
         "featured_mods.py", "featured_mods.json", "reshade-defaults.ini",

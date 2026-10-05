@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 
-SOURCE = Path("C:/RDR2Mod/GameplayTweaks/modules/gameplay_camera.cpp")
+SOURCE = Path("D:/Documents/Mods/rdr2/RDR2-Overhaul/GameplayTweaks/modules/gameplay_camera.cpp")
 PRELUDE = r"""
 #include <cmath>
 #include <cstdint>

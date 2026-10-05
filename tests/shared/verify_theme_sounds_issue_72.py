@@ -11,7 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
+sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from plugins.ff7.plugin import FF7Session  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
@@ -75,7 +75,7 @@ def decode_session(session_type, expected: dict[str, int | None]) -> dict:
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     settings = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
-    manual = Path(r"C:\RDR2Mod\codex\lexeditor.md").read_text(encoding="utf-8")
+    manual = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\codex\lexeditor.md").read_text(encoding="utf-8")
     for slot in SOUND_SLOTS:
         assert f'"{slot}"' in framework, slot
         assert f"`{slot}`" in manual, slot

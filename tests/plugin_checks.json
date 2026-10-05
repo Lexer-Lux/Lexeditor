@@ -1,14 +1,50 @@
 {
   "_about": "Read by tools/check_plugin.py. Test files belong to a plugin by folder: tests/<plugin>/, with tests/shared/ for the global checks. 'extra' lists commands a plugin genuinely needs beyond the standard steps ({python} = the running interpreter, {devcache} = %TEMP%/lexeditor-dev).",
-  "synthetic_service_checks": ["chrono_trigger"],
+  "synthetic_service_checks": [
+    "chrono_trigger"
+  ],
   "extra": {
     "ff7r": [
-      {"platform": "win32", "run": ["cmake", "-S", "plugins/ff7r/native_runtime", "-B", "{devcache}/ff7r-native-runtime", "-A", "x64"]},
-      {"platform": "win32", "run": ["cmake", "--build", "{devcache}/ff7r-native-runtime", "--config", "Release", "--parallel"]},
-      {"platform": "win32", "run": ["ctest", "--test-dir", "{devcache}/ff7r-native-runtime", "-C", "Release", "--output-on-failure"]}
+      {
+        "platform": "win32",
+        "run": [
+          "cmake",
+          "-S",
+          "plugins/ff7r/native_runtime",
+          "-B",
+          "{devcache}/ff7r-native-runtime",
+          "-A",
+          "x64"
+        ]
+      },
+      {
+        "platform": "win32",
+        "run": [
+          "cmake",
+          "--build",
+          "{devcache}/ff7r-native-runtime",
+          "--config",
+          "Release",
+          "--parallel"
+        ]
+      },
+      {
+        "platform": "win32",
+        "run": [
+          "ctest",
+          "--test-dir",
+          "{devcache}/ff7r-native-runtime",
+          "-C",
+          "Release",
+          "--output-on-failure"
+        ]
+      }
     ]
   },
   "ci_evidence": {
-    "ds1": {"push_branch": "codex/ds1-stamina-editor", "compare": "f81b575b3edd6797529e68fca654831889b688d1"}
+    "ds1": {
+      "push_branch": "codex/ds1-stamina-editor",
+      "compare": "f81b575b3edd6797529e68fca654831889b688d1"
+    }
   }
 }

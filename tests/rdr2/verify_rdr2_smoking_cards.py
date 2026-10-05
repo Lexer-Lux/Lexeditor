@@ -50,7 +50,7 @@ int main(){
 }
 """
 def main():
- p=argparse.ArgumentParser();p.add_argument("--runtime-root",type=Path,default=Path("C:/RDR2Mod"));a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument("--runtime-root",type=Path,default=Path("D:/Documents/Mods/rdr2/RDR2-Overhaul"));a=p.parse_args()
  code=(a.runtime_root/"GameplayTweaks/modules/premium_cigarette_cards.cpp").read_text("utf-8")
  assert "INVENTORY_REMOVE" not in code
  variants={"production":code,

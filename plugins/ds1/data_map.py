@@ -9,6 +9,8 @@ def build(document, source, native_rules=None):
         targets = [{"id": sub, "label": label} for sub, label, name in SUBTABS if name == table]
         if table == "NpcParam":
             targets = [{"id": "enemies", "label": "Enemies"}]
+        elif table == "AtkParam_Npc":
+            targets = [{"id": "attacks", "label": "Attacks"}]
         elif table == EFFECT_TABLE:
             targets = [{"id": "effects-all", "label": "Effects"}]
         editable = [f for f in document.schemas.get(table, {}).get("fields", []) if f["editable"]]
@@ -31,11 +33,11 @@ def build(document, source, native_rules=None):
                      "sourceAvailable": False, "openable": False,
                      "notes": "Open a complete Remastered parameter archive to edit effects."})
     available = bool(native_rules and native_rules["native"]["available"])
-    for key, label in (("misc", "Base stamina regeneration"), ("encumbrance", "Load limits and per-class stamina recovery")):
+    for key, label in (("misc", "Base stamina regeneration"), ("encumbrance", "Load bands, movement profiles and stamina recovery")):
         rows.append({"id": "native-" + key, "filename": "DarkSoulsRemastered.exe",
                      "controls": label, "status": "partial", "coverage": "structured",
                      "sourceAvailable": available, "openable": True,
                      "targets": [{"id": key, "label": "Misc." if key == "misc" else "Encumbrance"}],
-                     "notes": "Enable the corresponding tweak, save, and Apply with the game closed. "
+                     "notes": "Save and Apply with the game closed. Library tweaks and project rules share the native composer. "
                               "Only the fingerprinted build is supported. Animation timing, other native rules and in-game acceptance remain unverified."})
     return {"rows": rows}

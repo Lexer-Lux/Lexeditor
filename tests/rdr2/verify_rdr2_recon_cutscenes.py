@@ -58,7 +58,7 @@ int main(){
 '''
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'))
+    parser.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'))
     args=parser.parse_args();root=args.runtime_root
     source=(root/'GameplayTweaks/modules/recon.cpp').read_text('utf-8')
     sdk=(root/'_downloads/RDR2_SDK/SDK/inc/natives.h').read_text('utf-8')

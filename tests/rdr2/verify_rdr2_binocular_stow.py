@@ -41,7 +41,7 @@ def block(s,start):
         i+=1
     return s[begin:i]
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'));a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'));a=p.parse_args()
     s=(a.runtime_root/'GameplayTweaks/modules/combat_inventory.cpp').read_text('utf-8')
     helper=block(s,'auto stowPresentationRunning = [&]() -> bool').replace('auto stowPresentationRunning = [&]() -> bool','static bool stowPresentationRunning()')
     recovery=block(s,'if (stowRecovery) {')

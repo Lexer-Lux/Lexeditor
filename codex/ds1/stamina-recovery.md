@@ -70,22 +70,32 @@ or invincibility window.
 
 ## Patch form and ownership
 
-`plugins/ds1/encumbrance.S` is original replacement assembly, independently
-rebuilt by a test with `encumbrance.ld`. It uses two existing spans: a 41-byte
-factor selection containing five floats and a private heavy-limit float, and
-a 151-byte fraction body. No section, trampoline, DLL, new unwind record, or
-game-code call is added by the patch.
+`plugins/ds1/encumbrance.S` describes the original fixed-class draft encoding:
+a 41-byte factor span and a 151-byte fraction body. Those encodings are
+retained for exact identification/restoration of previous draft output.
 
-`stamina_patch.py` verifies the whole pristine executable before transforming
-it. Identification of an installed modification requires the verified backup,
-an ownership record and exact reproduction of the entire expected image.
-Unrelated patches, including other independently owned native PRs, are refused
-rather than overwritten.
+The current editor uses `load_bands_patch.patch_spec` and the shared native
+composer. A table-driven classifier returns the selected existing movement
+profile. Recovery is looked up independently from that profile, so two bands
+can share movement but have different recovery. Adjacent equal-profile bands
+use a common interpolation domain; the final unbounded domain uses the
+profile's starting fraction.
 
-The original image and one small ownership record are retained. Durable
-pending hashes allow interrupted writes to be identified. Restoration reproduces
-the original bytes. Parameter deployment separately preserves its original
-archive; the pair is not falsely described as one atomic filesystem operation.
+The classifier/recovery code and bounded table are one relocatable island.
+Version-2 hook descriptions include bounded displacements into that island.
+The composer fixes them after placing all contributions, preserves existing
+nonleaf frames and rejects intersecting hook ownership. A vanilla projection
+contains no edits. A baseline-only change contains no band selectors.
+
+Current installed ownership belongs to `tweak_mods.py`, shared by project
+native rules and library tweak mods. Its bounded manifest identifies completed
+and pending images. Original restoration does not change saved project values
+or library switches. The old standalone installer must not write a composed
+image; its only active UI route is verified legacy restoration.
+
+The parameter archive has separate backup/ownership and atomic replacement.
+The pair is not one atomic filesystem operation. Native rollback uses the
+expected post-image and cannot erase a subsequent external modification.
 
 ## Platform references
 

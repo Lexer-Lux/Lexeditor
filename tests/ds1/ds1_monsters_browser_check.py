@@ -47,7 +47,10 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     monsters()
-                    assert page.locator('[data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['monsters']
+                    assert page.locator('.ds1-items > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['monsters']
+                    # The detail pane opens on Resistances; Attacks is its other tab.
+                    assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['attacks', 'resistances']
+                    assert page.evaluate('state.monsterTab') == 'resistances'
                     assert page.evaluate('state.row.id') == 120000
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
@@ -82,7 +85,7 @@ def main():
                     for key, value in changes.items(): assert reopened.value('NpcParam', 120000, key) == value
                     page.locator('[data-tab="items"]').click()
                     page.wait_for_function('state.tab==="items" && state.row?.table==="EquipParamGoods"')
-                    assert page.locator('[data-subtab]').count() == 8
+                    assert page.locator('.ds1-items > .lex-subtab-bar [data-subtab]').count() == 8
                     monsters()
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     search = page.get_by_role('searchbox', name='Search monsters')
@@ -111,6 +114,7 @@ def main():
                     vanilla.wait_for_selector('body[data-ds1-ready="true"]')
                     vanilla.locator('[data-tab="enemies"]').click()
                     vanilla.wait_for_function('state.row?.table==="NpcParam"')
+                    vanilla.wait_for_selector('.lex-plugin-loading-screen', state='detached')
                     assert vanilla.locator('#global-save').is_disabled()
                     # The field is disabled now, matching every other plugin's
                     # read-only look; a real click still reaches the shared

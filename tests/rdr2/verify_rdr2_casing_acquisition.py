@@ -31,7 +31,7 @@ int main(){using namespace CasingAcquisition;State a,b;
 }
 '''
 def main():
- p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'));a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('D:/Documents/Mods/rdr2/RDR2-Overhaul'));a=p.parse_args()
  source=(a.runtime_root/'GameplayTweaks/modules/casing_acquisition.h').read_text(encoding='utf-8-sig')
  caller=(a.runtime_root/'GameplayTweaks/modules/items_casings.cpp').read_text(encoding='utf-8-sig')
  assert caller.index('CasingAcquisition::grant(casing.acquisition, casing.item)')<caller.index('if (acquisition != CasingAcquisition::Result::Granted)')<caller.index('CASING_FEED(',caller.index('CasingAcquisition::grant(casing.acquisition, casing.item)'))

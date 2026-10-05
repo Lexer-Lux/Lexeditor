@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_native_fixture import make_native_archive
 from plugins.ds1.store import RELATIVE, MARKER
-from plugins.ds1.stamina_rebalance import SETTINGS_FILE
+from plugins.ds1.native_rules import SETTINGS_FILE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
 
@@ -71,11 +71,8 @@ def main():
                 try:
                     page.goto(session.url, wait_until="domcontentloaded")
                     ready(page)
-                    tab(page, "Tweaks", "tweaks")
-                    page.locator('[data-field-key="enabled"]').check()
-                    page.wait_for_function("state.pending===0 && state.row.fields.find(f=>f.key==='enabled').value")
-                    page.locator('[data-field-key="encumbranceEnabled"]').check()
-                    page.wait_for_function("state.pending===0 && state.row.fields.find(f=>f.key==='encumbranceEnabled').value")
+                    assert page.locator('[data-tab="attacks"]').count() == 1
+                    assert page.locator('[data-tab="tweaks"]').count() == 1
                     tab(page, "Misc.", "misc")
                     fill(page, "baseRecovery", 70)
                     page.screenshot(path=str(output / "misc.png"))
@@ -87,6 +84,7 @@ def main():
                     page.get_by_label("Split at (%)", exact=True).fill("12.5")
                     page.get_by_role("button", name="Create band", exact=True).click()
                     page.wait_for_function("!state.pending && !state.bandBusy && state.rows.length===5 && state.row.id===1005")
+                    assert page.locator('.lex-list-row[data-key="NativeRules:1005"]').get_attribute("aria-selected") == "true"
                     fill(page, "name", "Second light band")
                     fill(page, "recovery", 125)
                     assert page.locator('[data-field-key="movement"]').input_value() == "1"
@@ -119,7 +117,7 @@ def main():
                     page.screenshot(path=str(output / "encumbrance-small.png"))
                     page.locator("#global-save").click()
                     page.wait_for_function("state.dirty===0 && state.pending===0")
-                    config = json.loads((mod / SETTINGS_FILE).read_text())["stamina-rebalance"]
+                    config = json.loads((mod / SETTINGS_FILE).read_text())["rules"]
                     assert config["baseRecovery"] == 70 and config["bands"][0]["upper"] == 30
                     assert config["bands"][2]["upper"] == 120 and config["bands"][0]["recovery"] == 115
                     assert config["nextBandId"] == 6
@@ -135,7 +133,7 @@ def main():
                     page.evaluate("""()=>{
                         state.deployment.everApplied=false;
                         state.deployment.changedExternally=false;
-                        state.deployment.rebalance.native.backupOk=true;
+                        state.deployment.native.backupOk=true;
                         render();
                     }""")
                     assert page.get_by_role("button", name="Restore original", exact=True).is_enabled()

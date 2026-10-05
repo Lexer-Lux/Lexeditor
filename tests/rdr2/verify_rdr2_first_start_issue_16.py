@@ -37,7 +37,7 @@ def verify_self_contained_extractor_source() -> None:
     source = Path(extractor.__file__).read_text(encoding="utf-8")
     folded = source.casefold()
     forbidden = (
-        r"c:\rdr2mod".casefold(),
+        r"D:\Documents\Mods\rdr2\RDR2-Overhaul".casefold(),
         "project_root",
         "snapshot_root",
         "verified-snapshot",
@@ -303,7 +303,7 @@ def main() -> int:
         assert all("dependency" in record for record in manifest["outputs"].values())
         serialized_manifest = json.dumps(manifest).casefold()
         assert "snapshot" not in serialized_manifest, "snapshot state remained in manifest"
-        assert r"c:\rdr2mod".casefold() not in serialized_manifest
+        assert r"D:\Documents\Mods\rdr2\RDR2-Overhaul".casefold() not in serialized_manifest
         assert not list(cache.rglob("*.lexeditor-part*"))
         for entry in extractor.ENTRIES:
             assert extractor._valid_output(entry, cache / entry.output), entry.output

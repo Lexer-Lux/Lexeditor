@@ -6,7 +6,7 @@ import json
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, r"C:\RDR2Mod\tools\reverse-engineering")
+sys.path.insert(0, r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")
 from plugins.ff8 import formats, game_icons
 from plugins.ff8.plugin import FF8Session
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))

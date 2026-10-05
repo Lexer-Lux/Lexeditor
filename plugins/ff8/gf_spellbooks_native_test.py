@@ -8,9 +8,15 @@ import unittest
 from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
 from unicorn.x86_const import *
-from . import gf_spellbooks_native as native, gf_spellbooks_native_asm as a, max_spell
+from core import script_mods
+from . import gf_spellbooks_native as native, gf_spellbooks_native_asm as a, paths
 
-EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe").read_bytes()
+exe_path = paths.GAME_ROOT / "FF8_EN.exe"
+max_spell_root = paths.MODS_ROOT / "Max Spell"
+if not exe_path.is_file() or not (max_spell_root / "script" / "max_spell.py").is_file():
+    raise unittest.SkipTest("Native spellbook checks require FF8_EN.exe and the Max Spell library mod")
+max_spell = script_mods.import_module(max_spell_root, "max_spell")
+EXE = exe_path.read_bytes()
 BOOK = {"schemaVersion":1,"books":[{"gfId":0,"pages":[[{"magicId":7,"abilityId":None},{"magicId":1,"abilityId":20}],[],[{"magicId":4,"abilityId":None}]]}]}
 REAL = 0x1cff082
 STACK = 0x3000800
@@ -178,35 +184,19 @@ class NativeSpellbookTests(unittest.TestCase):
         vm.emu_start(0x4fe6ff,0x4fe723,count=3000)
         self.assertNotEqual(bytes(vm.mem_read(REAL+19*5,2)),bytes((7,1)))
 
-    def test_composed_hext_has_no_patch_or_allocation_overlaps(self):
-        import re
-        from . import gameplay_settings
-        def spans(text):
-            writes=[]; allocations=[]
-            for line in text.splitlines():
-                if match:=re.fullmatch(r"([0-9A-F]+) = ([0-9A-F ]+)",line):
-                    begin=int(match[1],16);writes.append((begin,begin+len(bytes.fromhex(match[2]))))
-                elif match:=re.fullmatch(r"([0-9A-F]+):([0-9A-F]+)",line):
-                    begin=int(match[1],16);allocations.append((begin,begin+int(match[2],16)))
-            return writes,allocations
-        spell_writes,spell_allocations=spans(native.build_hext(BOOK,monogamy=True,shared_magic=False,executable=EXE))
-        for limit in (1,100,150,255):
-            base=gameplay_settings.build_hext(0,single_gf_enabled=True,max_spell_enabled=True,max_spell_value=limit,flat_stat_abilities_enabled=True,streamlined_draw_enabled=True,draw_once_per_enemy=True,better_card_enabled=True,auto_sort=True,auto_sort_magic=True,enhanced_ability_menu=True)
-            writes,allocations=spans(base)
-            for left in spell_writes:
-                self.assertFalse(any(left[0]<right[1] and right[0]<left[1] for right in writes),hex(left[0]))
-            for left in spell_allocations:
-                self.assertFalse(any(left[0]<right[1] and right[0]<left[1] for right in allocations))
-            for begin,end in spell_writes:
-                if begin>=a.BASE:
-                    self.assertTrue(any(start<=begin and end<=stop for start,stop in spell_allocations))
+    def test_shipping_hext_refuses_resource_overlapping_candidate(self):
+        # Candidate emulation is useful, but its cave is not safe to ship.
+        # A valid executable and even an empty book must not bypass this gate.
+        self.assertFalse(native.RUNTIME_READY)
+        for document in (BOOK, {"schemaVersion": 1, "books": []}):
+            with self.assertRaisesRegex(ValueError, "loader-owned memory"):
+                native.build_hext(document, monogamy=True, shared_magic=False, executable=EXE)
 
     def test_native_candidate_refuses_incompatible_modes(self):
         for mono,shared in ((False,False),(True,True)):
             with self.assertRaises(ValueError): native.candidate_fragments(BOOK,monogamy=mono,shared_magic=shared)
         with self.assertRaises(ValueError): native.build_hext(BOOK,monogamy=True,shared_magic=False,executable=b"bad")
-        self.assertTrue(native.RUNTIME_READY)
-        self.assertEqual(native.build_hext({"schemaVersion":1,"books":[]},monogamy=True,shared_magic=False,executable=EXE),"")
+        self.assertFalse(native.RUNTIME_READY)
 
 
 if __name__=="__main__":unittest.main()

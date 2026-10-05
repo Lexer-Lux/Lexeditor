@@ -55,7 +55,7 @@ int main(){
 }
 """
 def main():
- parser=argparse.ArgumentParser();parser.add_argument("--runtime-root",type=Path,default=Path("C:/RDR2Mod"));args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument("--runtime-root",type=Path,default=Path("D:/Documents/Mods/rdr2/RDR2-Overhaul"));args=parser.parse_args()
  source=(args.runtime_root/"GameplayTweaks/modules/collectibles_map.cpp").read_text("utf-8")
  code=source[source.index("static bool isMapTrainEngine"):]
  primary=(args.runtime_root/"_downloads/RDR2-Decompiled-Scripts-1491.50/1491.50/script_rel/long_update.ysc.c").read_text("utf-8")

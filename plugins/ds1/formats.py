@@ -36,6 +36,7 @@ SUBTABS = (
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
 )
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
+ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),)
 
 
 def inflate(source):
@@ -257,7 +258,7 @@ class ItemDocument:
             if EFFECT_TABLE not in self.params:
                 raise FormatError('SpEffectParam.param is missing. Open a complete Remastered parameter archive.')
             return self.effect_references().rows(tab)
-        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS if entry[0] == tab), None)
+        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
         result = []
@@ -273,7 +274,7 @@ class ItemDocument:
             if table == 'EquipParamWeapon':
                 ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
                 if (tab == 'ammo') != ammo: continue
-            result.append({'id': row.row_id, 'name': self.schemas[table]['names'].get(row.row_id) or row.name or f'Item {row.row_id}', 'table': table})
+            result.append({'id': row.row_id, 'name': self.schemas[table]['names'].get(row.row_id) or row.name or (f'Attack {row.row_id}' if table == 'AtkParam_Npc' else f'Item {row.row_id}'), 'table': table})
         if tab == 'spells':
             table = 'EquipParamGoods'
             for row in self.params[table].rows:
@@ -315,7 +316,7 @@ class ItemDocument:
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
-        result = {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or f'Item {row_id}', 'fields': fields}
+        result = {'id': row_id, 'table': table, 'name': self.schemas[table]['names'].get(row_id) or row.name or (f'Attack {row_id}' if table == 'AtkParam_Npc' else f'Item {row_id}'), 'fields': fields}
         if table == EFFECT_TABLE:
             fields.sort(key=lambda field: EFFECT_GROUPS.index(field['group']))
             result['effectUsage'] = self.effect_references().incoming.get(row_id, [])

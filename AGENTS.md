@@ -50,15 +50,21 @@ work, even if your tool does not load skills on its own.
 
 ## Tweaks
 
-- A **tweak** is a small, self-contained, toggleable modification that plugs into
-  Lexeditor's shared standardized tweak component/UI. Do not build a bespoke
-  settings surface or one-off toggle system for an individual tweak.
-- Implement each tweak as its own focused script/module (or the existing
-  project-standard equivalent for that plugin), so it can be enabled/disabled
-  independently through the shared tweak mechanism.
-- When an issue says a change "should be a tweak," treat that as a structural
-  requirement: reuse the shared tweak component and keep vanilla behavior
-  available when the tweak is disabled.
+- A **tweak** is an ordinary mod in the reader's mod library, never code in this
+  repository. It carries its own files: a build script (`script/tweak.py`),
+  its settings schema and values, and whatever the game loads (Hext, ASI, DLL,
+  INI section, data files). Enabling or disabling the mod is the toggle.
+- A tweak whose patch depends on settings is a **tweak mod**
+  (`core/script_mods.py`): the game's mod loader runs its trusted script with
+  the reader's values when applying, then deploys what it built like any other
+  mod file. The Tweaks page renders every tweak from its schema; do not build a
+  bespoke settings surface for one tweak.
+- Each game's loader builds and deploys tweak mods its own way (FF8:
+  `plugins/ff8/tweak_mods.py`). A tweak's code, built payloads and tests live in
+  the mod (and later Lexer's mod repository for that game);
+  `tests/shared/test_no_tweak_payloads.py` keeps them out of here.
+- When an issue says a change "should be a tweak," make it a tweak mod and keep
+  vanilla behavior when the mod is disabled.
 
 ## Git and publishing
 

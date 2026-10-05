@@ -27,7 +27,7 @@ HELP = (
     "Each band selects a movement profile and its own stamina recovery. "
     "Adjacent bands with the same profile share a continuous movement range. "
     "Use 1 to 32 bands. The final band has no upper limit. "
-    "Enable Encumbrance rules, save, then Apply."
+    "Save the project, then Apply with the game closed."
 )
 UPPER_HELP = (
     "Includes this equipment load percentage. Lower limits follow the preceding band. "

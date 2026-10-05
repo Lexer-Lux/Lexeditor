@@ -42,7 +42,7 @@ def main():
                     page.set_default_navigation_timeout(30000)
 
                     def ready():
-                        page.wait_for_selector('body[data-ds1-ready="true"]')
+                        page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
                         page.wait_for_selector('.lex-plugin-loading-screen',state='detached')
                         page.evaluate('() => document.fonts.ready')
 
