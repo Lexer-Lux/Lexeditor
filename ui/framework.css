@@ -464,6 +464,7 @@ body.lex-save-busy .lex-save-icon.saving {
 button.lex-info-help { cursor: pointer; }
 /* A mod conflict: the help bubble in the warning colour, holding a "!". */
 .lex-info-help.lex-conflict-mark { background:var(--lex-danger, #c0392b); border-color:var(--lex-danger, #c0392b); color:#fff; }
+.lex-project-menu-item-unavailable { opacity:.55; cursor:default; }
 .lex-mods-name { display:inline-flex; align-items:center; gap:6px; min-width:0; }
 .lex-conflict-list { margin:0; padding-inline-start:18px; display:grid; gap:4px; }
 .lex-info-help:focus-visible {

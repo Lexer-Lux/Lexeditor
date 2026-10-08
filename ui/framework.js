@@ -5576,7 +5576,16 @@ ${contents.path}`});
           + "an editable mod; Find a Mod opens one you already have."
           + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
-      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid && !row.noMod)).map(row => {
+      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => (row.valid || row.notEditable) && !row.noMod)).map(row => {
+        // The Mods tab's list: a mod the editor cannot open is shown, greyed,
+        // with the reason, rather than missing from one list and not the other.
+        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
+          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
+            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "⚙"),
+            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+            element("span", {class: "lex-project-menu-path"}, row.path),
+            element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
         type: "button", role: "menuitem", title: row.path,

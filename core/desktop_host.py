@@ -1305,6 +1305,7 @@ class HostApi:
     def mod_projects(self, plugin_id: str) -> dict:
         """Return known editable projects for the shared header selector."""
         result = self._projects.snapshot(plugin_id)
+        self._add_library_mods(plugin_id, result)
         for row in result["projects"]:
             row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
             from core.bundled_mods import components
@@ -1339,6 +1340,37 @@ class HostApi:
             target = library.import_mod(plugin_id, source_path, adapter, name, prepare_editable=True)
             project = self._projects.select(plugin_id, str(target))
         return self._restart_for_project(plugin_id, project)
+
+    def _add_library_mods(self, plugin_id: str, result: dict) -> None:
+        """List the same mods as the Mods tab, in its order, with their switch.
+
+        The selector used to know only the mods opened before, so it and the
+        Mods tab showed different lists. Every mod in the game's library is
+        listed now; one the editor cannot open (a tweak mod, which has no
+        game data to edit) is listed as such, not left out.
+        """
+        from core import mods_service
+        try:
+            library = mods_service.library_rows(self._game_mods(plugin_id))
+        except (OSError, ValueError):
+            return
+        _plugin, spec = self._projects._spec(plugin_id)
+        rows = {os.path.normcase(str(Path(row["path"]).resolve())): row for row in result["projects"]}
+        ordered = []
+        for mod in library:
+            key = os.path.normcase(str(Path(mod["path"]).resolve()))
+            row = rows.pop(key, None)
+            if row is None:
+                problems = self._projects._problems(Path(mod["path"]), spec.required_paths, spec.required_any)
+                row = {"path": mod["path"], "name": mod["name"], "version": mod.get("version", ""),
+                       "valid": not problems, "problems": problems, "noMod": False, "current": False}
+                if problems:
+                    row["notEditable"] = ("A tweak mod: it has no game data to edit here. Its settings are in the Tweaks tab."
+                                          if mod.get("script") else "This mod has no files the editor can open.")
+            row["enabled"] = bool(mod.get("enabled"))
+            ordered.append(row)
+        # Vanilla and any mod outside the library keep their place after these.
+        result["projects"] = ordered + list(rows.values())
 
     def mod_library_status(self, plugin_id: str) -> dict:
         from core.mod_library import default_user_library_root
