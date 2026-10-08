@@ -20,7 +20,6 @@ World
 - Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
 - Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
     > status 2026-10-03: Driver rebuilt and packaged; package checks pass. Left: CI, then the in-game checks. Also: its warning toasts still draw an imitation box, not the message box of the game itself.
-- Deliver and verify the implemented proportional FF8 vehicle throttle in-game, including partial trigger pressure, braking, coasting, and digital controls.
 - FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
 - ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
 
