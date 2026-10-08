@@ -8931,13 +8931,35 @@ ${contents.path}`});
     // the first draw on, not only the ones that stack when room runs out: a
     // three-pane page at 1100px squeezed its detail to 350px of a 430px
     // minimum while its other panes kept more than theirs (Enemies > Loot).
-    const updateResponsive = () => {
-      if(!vertical&&root.isConnected){
-        nodes.forEach((node,index)=>minSizes[index]=Math.max(configuredMinSizes[index],readablePropertyWidth([node],9)));
-        root.style.setProperty('--lex-panel-stack-min',`${Math.max(...minSizes)}px`);
+    // A pane holding a table is at least as wide as the table's own columns
+    // at their minimum, so a header is never cut off by its pane. The width
+    // is the table's real minimum, not its current width, so the pane can
+    // always shrink back to it; side-by-side barrels add up.
+    const tableMinimum = node => {
+      let widest = 0;
+      const grids = new Map();
+      for (const list of node.querySelectorAll(".lex-column-list")) {
+        if (list.closest(".lex-detail-panel") || !list.offsetParent) continue;
+        const grid = list.closest(".lex-barrel-grid") || list;
+        if (!grids.has(grid)) grids.set(grid, []);
+        grids.get(grid).push(list);
       }
+      for (const [grid, lists] of grids) {
+        const chrome = node.getBoundingClientRect().width - grid.getBoundingClientRect().width;
+        let need = 0;
+        for (const list of lists) {
+          const before = list.style.width;
+          list.style.width = "min-content";
+          need += list.getBoundingClientRect().width;
+          list.style.width = before;
+        }
+        need += 7 * (lists.length - 1);
+        widest = Math.max(widest, Math.ceil(need + Math.max(0, chrome)));
+      }
+      return widest;
+    };
+    const updateResponsive = () => {
       const extent = vertical ? root.clientHeight : root.clientWidth;
-      if (!extent) return 0;
       const css = getComputedStyle(root);
       const divider = root.querySelector(':scope > .lex-panel-layout-divider');
       const dividerSize = vertical ? divider?.offsetHeight : divider?.offsetWidth;
@@ -8945,6 +8967,22 @@ ${contents.path}`});
       else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(vertical ? css.rowGap : css.columnGap) || 0;
       const available = extent - (parseFloat(vertical ? css.paddingTop : css.paddingLeft) || 0)
         - (parseFloat(vertical ? css.paddingBottom : css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      if(!vertical&&root.isConnected){
+        // A table's columns and the configured minimum are hard floors. Room
+        // for a whole word in the label lane is only asked for from the space
+        // that is left: at 1280px a detail pane wanting 1020px for "Dependent"
+        // pushed the page into a sideways scroll (Bannerlord > Dependencies),
+        // where the label fit already shrinks a long name instead.
+        const hard=nodes.map((node,index)=>Math.max(configuredMinSizes[index],tableMinimum(node)));
+        const wanted=nodes.map((node,index)=>Math.max(0,readablePropertyWidth([node],9)-hard[index]));
+        const asked=wanted.reduce((sum,value)=>sum+value,0);
+        const spare=Math.max(0,(extent?available:Infinity)-hard.reduce((sum,value)=>sum+value,0));
+        // A layout that stacks below its minimum stacks instead of squeezing.
+        const granted=options.stackBelowMinimum||asked<=spare?1:spare/asked;
+        nodes.forEach((_node,index)=>minSizes[index]=Math.floor(hard[index]+wanted[index]*granted));
+        root.style.setProperty('--lex-panel-stack-min',`${Math.max(...minSizes)}px`);
+      }
+      if (!extent) return 0;
       const least = minSizes.reduce((sum, value) => sum + value, 0);
       root.classList.toggle('lex-panel-layout-overflow', available <
         (!vertical && options.stackBelowMinimum ? Math.max(...minSizes) : least));
