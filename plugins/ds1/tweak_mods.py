@@ -251,14 +251,32 @@ def ensure_game_closed() -> None:
         raise TweakError("Close Dark Souls Remastered before changing its executable")
 
 
-def _ensure_executable_free() -> None:
-    """A crashed game can stay listed with no threads (a zombie). It is not
-    running, but it keeps the executable locked, so replacing it would fail
-    halfway with a bare "Access is denied". Only putting back an executable
-    an earlier Lexeditor patched writes it, so only that waits on this."""
-    from core.process_probe import zombie_processes
-    if os.name == "nt" and zombie_processes([exe_patches.EXECUTABLE]):
-        raise TweakError(STUCK_GAME)
+LOCKED_SUFFIX = ".lexeditor-locked"
+MAX_LOCKED = 4
+
+
+def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
+    """Rename a pinned executable out of the way, keeping at most MAX_LOCKED."""
+    _clear_moved_aside(game_root)
+    for index in range(MAX_LOCKED):
+        target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
+        if target.exists():
+            continue
+        try:
+            os.replace(live, target)
+            return
+        except OSError:
+            break
+    raise TweakError(f"Windows will not let Lexeditor replace or move DarkSoulsRemastered.exe. {STUCK_GAME}") from error
+
+
+def _clear_moved_aside(game_root: Path) -> None:
+    """Delete executables moved aside earlier, once Windows has let go of them."""
+    for path in Path(game_root).glob(exe_patches.EXECUTABLE + LOCKED_SUFFIX + "*"):
+        try:
+            checked(path).unlink()
+        except OSError:
+            pass  # still pinned; a later Apply or Restore tries again
 
 
 # No project argument means retain the last explicitly applied project rules.
@@ -397,8 +415,6 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         raise TweakError(f"The {managed.label} tweak manifest exceeds its size limit")
     if after == before and not old and not mods and project is None:
         return
-    if managed is EXECUTABLE and after != before:
-        _ensure_executable_free()
     if not backup.exists():
         # Exclusive creation cannot overwrite an unmanaged file or a link.
         with backup.open("xb") as stream:
@@ -418,10 +434,14 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         try:
             atomic_write(live, after)
         except PermissionError as error:
-            # A game that has closed can stay in Windows' process list while
-            # Steam holds it, and it keeps the file locked. The journal above
-            # makes the retry safe.
-            raise TweakError(f"Windows will not let Lexeditor replace the {managed.label}. {STUCK_GAME}") from error
+            if managed is not EXECUTABLE:
+                raise TweakError(f"Windows will not let Lexeditor replace the {managed.label}. "
+                                 "Close Dark Souls Remastered and try again.") from error
+            # A crashed game Windows keeps listed pins the executable: it cannot
+            # be replaced, but it can be renamed. Move it aside and write the
+            # new one in its place; the journal above covers an interruption.
+            _move_aside(game_root, live, error)
+            atomic_write(live, after)
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
     _finish_manifest(game_root, after, mods, project, managed)
@@ -555,6 +575,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     """
     ensure_game_closed()
     game_root = checked(Path(game_root))
+    _clear_moved_aside(game_root)
     current, manifest = _installed(game_root, EXECUTABLE, "restore it before applying tweaks")
     original = _original(game_root, current, manifest)
     runtime = _runtime(game_root)
@@ -653,6 +674,7 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
     ensure_game_closed()
     game_root = checked(Path(game_root))
     with _exclusive(game_root):
+        _clear_moved_aside(game_root)
         managed_files = [EXECUTABLE] + ([LAYOUT] if _layout_in_use(game_root) else [])
         # Every file is checked before any of them is written.
         targets = [(managed, *_installed(game_root, managed, "it was left alone")) for managed in managed_files]

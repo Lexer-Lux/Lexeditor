@@ -21,7 +21,6 @@ def game(tmp_path, monkeypatch):
     monkeypatch.setattr(exe_patches, "VANILLA_SIZE", len(VANILLA))
     monkeypatch.setattr(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())
     monkeypatch.setattr(tweak_mods, "ensure_game_closed", lambda: None)
-    monkeypatch.setattr(tweak_mods, "_ensure_executable_free", lambda: None)
     root = tmp_path / "game"
     root.mkdir()
     library = tmp_path / "library"
@@ -175,18 +174,48 @@ def test_corrupt_backup_is_not_used_for_restore(game):
     assert image(game) == built
 
 
-def test_a_crashed_game_still_listed_stops_only_the_executable_write(game, monkeypatch):
+def test_a_pinned_executable_is_moved_aside_and_cleared_later(game, monkeypatch):
+    """A crashed game Windows keeps listed pins the executable: Windows refuses
+    to replace it but lets it be renamed. Lexeditor moves it aside, writes the
+    original in its place, and deletes the moved file once it is free."""
     root, library, built = game
-    monkeypatch.setattr(tweak_mods, "_ensure_executable_free",
-                        lambda: (_ for _ in ()).throw(tweak_mods.TweakError(tweak_mods.STUCK_GAME)))
-    with pytest.raises(tweak_mods.TweakError, match="restart Windows"):
-        tweak_mods.apply(root, library)
-    assert image(game) == built
-    # Once the executable is the original, nothing waits on that game.
-    (root / exe_patches.EXECUTABLE).write_bytes(VANILLA)
-    (root / tweak_mods.MANIFEST_FILE).unlink()
+    real = tweak_mods.atomic_write
+    refused = []
+
+    def pinned(path, data):
+        if Path(path).name == exe_patches.EXECUTABLE and not refused:
+            refused.append(path)
+            raise PermissionError(13, "Access is denied")
+        real(path, data)
+    monkeypatch.setattr(tweak_mods, "atomic_write", pinned)
+    tweak_mods.restore(root, library)
+    aside = root / (exe_patches.EXECUTABLE + tweak_mods.LOCKED_SUFFIX)
+    assert image(game) == VANILLA and aside.read_bytes() == built
+    assert not (root / tweak_mods.MANIFEST_FILE).exists()
     tweak_mods.apply(root, library)
-    assert loader_installed(game)
+    assert not aside.exists() and loader_installed(game)
+
+
+def test_an_executable_that_cannot_be_moved_either_says_why(game, monkeypatch):
+    root, library, built = game
+    real = tweak_mods.atomic_write
+
+    def pinned(path, data):
+        if Path(path).name == exe_patches.EXECUTABLE:
+            raise PermissionError(13, "Access is denied")
+        real(path, data)
+    monkeypatch.setattr(tweak_mods, "atomic_write", pinned)
+    real_replace = tweak_mods.os.replace
+
+    def unmovable(source, target):
+        if Path(source).name == exe_patches.EXECUTABLE:
+            raise PermissionError(13, "denied")
+        real_replace(source, target)
+    monkeypatch.setattr(tweak_mods.os, "replace", unmovable)
+    with pytest.raises(tweak_mods.TweakError, match="restart Windows"):
+        tweak_mods.restore(root, library)
+    assert image(game) == built
+    assert tweak_mods.status(root, library)["pendingRecovery"]
 
 
 def test_game_start_before_replacement_leaves_recoverable_intent(game, monkeypatch):
