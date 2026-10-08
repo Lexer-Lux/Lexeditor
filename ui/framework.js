@@ -5827,7 +5827,19 @@ ${contents.path}`});
         const value = options.projectSnapshot
           ? await options.projectSnapshot()
           : await callWindow("mod_projects", options.plugin.id);
-        if (value) { render(value); return; }
+        if (value) {
+          render(value);
+          // A selected mod deleted outside Lexeditor: the game opened on
+          // Vanilla instead. Said once per session, not on every reload.
+          const missing = value.missingProject;
+          if (missing) {
+            const key = `lex-missing-mod:${options.plugin.id}:${missing}`;
+            let told = false;
+            try { told = sessionStorage.getItem(key) === "1"; sessionStorage.setItem(key, "1"); } catch (_error) {}
+            if (!told) showToast(`${missing} was not found, so ${options.plugin.name} opened on Vanilla. Choose or create a mod to edit again.`, {tone: "warning"});
+          }
+          return;
+        }
         // WebView2 can expose window.pywebview before its API methods are
         // callable. Retry instead of permanently hiding the shared selector.
         if (!options.projectSnapshot && loadAttempts++ < 40) {
