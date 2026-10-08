@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from plugins.bannerlord.gauntlet_data import create_prefab, duplicate_element, read_prefab
+from plugins.bannerlord.gauntlet_data import BLANK_PREFAB, create_prefab, duplicate_element, read_prefab
 
 PREFAB = (
     "<Prefab>\r\n"
@@ -35,6 +35,13 @@ def test_a_new_prefab_is_a_copy_beside_its_template(project):
     created = create_prefab(project, "GUI/Prefabs/Shop/ShopWindow.xml", "ShopWindowCopy")
     assert created["relativePath"] == "GUI/Prefabs/Shop/ShopWindowCopy.xml"
     assert (project / created["relativePath"]).read_bytes() == PREFAB.encode("utf-8")
+
+
+def test_a_mod_without_prefabs_starts_a_blank_one(tmp_path):
+    created = create_prefab(tmp_path / "Empty", "", "FirstWindow")
+    assert created["relativePath"] == "GUI/Prefabs/FirstWindow.xml"
+    assert (tmp_path / "Empty" / created["relativePath"]).read_bytes() == BLANK_PREFAB.encode("utf-8")
+    assert [element["tag"] for element in created["elements"]] == ["Prefab", "Window", "Widget"]
 
 
 @pytest.mark.parametrize("name", ["ShopWindow", "ShopWindow.xml", "../Escape", "", "bad/name"])

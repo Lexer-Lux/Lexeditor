@@ -66,17 +66,18 @@ function gauntletElementLabel(element){
 }
 
 // New prefabs and elements are copies of existing ones, like every other
-// record Bannerlord creates: pick what to copy, then name the new prefab.
+// record Bannerlord creates: pick what to copy, then name the new prefab. A
+// mod with no prefabs yet starts its first one blank.
 function beginGauntletPrefabCreation(){
   const files=state.gauntletFiles||[];
-  if(!files.length||gauntletDirty())return;
-  let template=state.gauntlet?.relativePath&&files.includes(state.gauntlet.relativePath)?state.gauntlet.relativePath:files[0];
-  const name=textInput(template.split(/[\\/]/).pop().replace(/\.xml$/i,"")+"Copy",()=>{},
+  if(gauntletDirty())return;
+  let template=state.gauntlet?.relativePath&&files.includes(state.gauntlet.relativePath)?state.gauntlet.relativePath:(files[0]||"");
+  const name=textInput(template?template.split(/[\\/]/).pop().replace(/\.xml$/i,"")+"Copy":"NewPrefab",()=>{},
     {required:true,"aria-label":"New prefab name",spellcheck:"false",pattern:"[A-Za-z0-9_][A-Za-z0-9_. \\-]{0,78}"});
-  const source=select(template,files.map(path=>[path,path]),value=>{template=value});
+  const source=select(template,[...files.map(path=>[path,path]),["","Blank prefab"]],value=>{template=value});
   source.setAttribute("aria-label","Copy from prefab");
   main.replaceChildren(BLUI.detailPanel({title:"Add Gauntlet prefab",body:[
-    BLUI.detailField({label:"Copy from",control:source,help:BLUI.infoHelp("The new prefab starts as an exact copy of this one, in the same folder.")}),
+    BLUI.detailField({label:"Copy from",control:source,help:BLUI.infoHelp("The new prefab starts as an exact copy of this one, in the same folder. A blank prefab is one empty window, saved directly under GUI/Prefabs.")}),
     BLUI.detailField({label:"Name",control:name}),
     LexeditorUI.actionRow(uiButton("Cancel",()=>{state.gauntletView="files";render()}),uiButton("Create prefab",async()=>{
       if(!name.reportValidity())return;
@@ -111,9 +112,6 @@ function renderGauntlet(){
   if(state.gauntletFiles===null){
     main.replaceChildren(uiLoading("Gauntlet","Scanning GUI/Prefabs…"));
     ensureGauntletFiles().then(()=>render());return;
-  }
-  if(!state.gauntletFiles.length){
-    main.replaceChildren(uiEmpty("Gauntlet","No XML prefabs were found under GUI/Prefabs."));return;
   }
   if(state.gauntletView==="files"||!state.gauntlet){
     const files=state.gauntletFiles.map((path,index)=>({index,path,name:path.split(/[\\/]/).pop(),searchText:path}));

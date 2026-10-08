@@ -138,26 +138,38 @@ def save_prefab(
 
 
 _PREFAB_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_. -]{0,78}")
+# A mod with no prefabs yet has nothing to copy, so its first prefab can start
+# from the smallest window the game loads: one widget filling the screen.
+BLANK_PREFAB = (
+    "<Prefab>\r\n"
+    "  <Window>\r\n"
+    "    <Widget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" />\r\n"
+    "  </Window>\r\n"
+    "</Prefab>\r\n"
+)
 
 
 def create_prefab(project: Path, source: str, name: str) -> dict:
     """A new prefab, copied from an existing one into the same folder.
 
-    Never overwrites: a name that is already taken is refused.
+    With no source it is a blank prefab directly under GUI/Prefabs. Never
+    overwrites: a name that is already taken is refused.
     """
-    template = _prefab_path(project, source)
+    root = contained_project_path(project, "GUI", "Prefabs")
+    template = _prefab_path(project, source) if source else root / "Blank.xml"
     stem = str(name or "").strip()
     if stem.casefold().endswith(".xml"):
         stem = stem[:-4]
     if not _PREFAB_NAME.fullmatch(stem):
         raise ValueError("A prefab name uses letters, digits, spaces, dots, dashes and underscores (1-79).")
     target = template.with_name(stem + ".xml")
-    root = contained_project_path(project, "GUI", "Prefabs")
     if root not in target.parents:
         raise ValueError("Gauntlet prefabs are created under GUI/Prefabs")
+    content = template.read_bytes() if source else BLANK_PREFAB.encode("utf-8")
+    target.parent.mkdir(parents=True, exist_ok=True)
     try:
         with target.open("xb") as stream:
-            stream.write(template.read_bytes())
+            stream.write(content)
     except FileExistsError as error:
         raise ValueError(f"A prefab named {target.name} already exists here.") from error
     return read_prefab(project, target.relative_to(project.resolve()).as_posix())
