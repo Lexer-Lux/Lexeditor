@@ -205,5 +205,124 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(self.live.read_bytes(), VANILLA)
 
 
+LAYOUT_TWEAK = '''import json
+
+def build(settings, context):
+    return {"native/%s.json": json.dumps(%s), "layout/%s.json": json.dumps(%s)}
+'''
+
+
+class LayoutLoaderTests(unittest.TestCase):
+    """A tweak that adds menu rows: the layout follows the executable's rules."""
+
+    def setUp(self):
+        from test_ds1_menu_layout import STAMINA, dcx, drb
+        from plugins.ds1 import menu_layout
+        self.menu_layout = menu_layout
+        temp = tempfile.TemporaryDirectory(prefix="lexeditor-ds1-layout-")
+        self.addCleanup(temp.cleanup)
+        self.temp = Path(temp.name)
+        self.library = self.temp / "library"
+        self.game = self.temp / "game"
+        (self.game / "menu").mkdir(parents=True)
+        self.live = self.game / exe_patches.EXECUTABLE
+        self.live.write_bytes(VANILLA)
+        self.layout = self.game / "menu" / "menu.drb.dcx"
+        self.vanilla_layout = dcx(drb())
+        self.layout.write_bytes(self.vanilla_layout)
+        self.nodes = {"version": 1, "nodes": STAMINA}
+        root = self.library / "Details"
+        (root / "script").mkdir(parents=True)
+        (root / "script" / "__init__.py").write_text("", encoding="utf-8")
+        (root / "script" / "tweak.py").write_text(
+            LAYOUT_TWEAK % ("details", repr(SPECS["alpha"]), "details", repr(self.nodes)), encoding="utf-8")
+        (root / "mod.json").write_text(json.dumps({"id": "details", "name": "Details", "enabled": False,
+                                                   "script": {"version": 1}}), encoding="utf-8")
+        for patcher in (
+            mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.temp / "trust.json")}),
+            mock.patch.object(exe_patches, "VANILLA_SIZE", len(VANILLA)),
+            mock.patch.object(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
+            mock.patch.object(menu_layout, "VANILLA_SIZE", len(self.vanilla_layout)),
+            mock.patch.object(menu_layout, "VANILLA_SHA256", hashlib.sha256(self.vanilla_layout).hexdigest()),
+            mock.patch.object(tweak_mods, "ensure_game_closed"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        script_mods.set_trusted(root, True)
+
+    def enable(self, on=True):
+        tweak_mods.save({"details": {"enabled": on}}, self.library)
+
+    def expected_layout(self):
+        spec = self.menu_layout.validate(self.nodes, "Details")
+        return self.menu_layout.compose(self.vanilla_layout, [spec])
+
+    def menu_files(self):
+        return sorted(path.name for path in (self.game / "menu").iterdir())
+
+    def test_a_game_without_layout_tweaks_never_touches_the_layout(self):
+        tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.menu_files(), ["menu.drb.dcx"])
+        self.assertEqual(self.layout.read_bytes(), self.vanilla_layout)
+
+    def test_apply_changes_both_files_and_restore_puts_both_back(self):
+        self.enable()
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.layout.read_bytes(), self.expected_layout())
+        self.assertEqual(self.menu_files(), ["menu.drb.dcx", "menu.drb.dcx.lexeditor-original",
+                                             "menu.drb.dcx.lexeditor-tweaks.json"])
+        self.assertEqual((result["state"], result["applied"], result["problem"]), ("tweaked", ["Details"], ""))
+        result = tweak_mods.restore(self.game, self.library)
+        self.assertEqual(self.layout.read_bytes(), self.vanilla_layout)
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
+        self.assertNotIn("menu.drb.dcx.lexeditor-tweaks.json", self.menu_files())
+
+    def test_turning_the_tweak_off_and_applying_restores_the_layout(self):
+        self.enable()
+        tweak_mods.apply(self.game, self.library)
+        self.enable(False)
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.layout.read_bytes(), self.vanilla_layout)
+        self.assertEqual(result["state"], "vanilla")
+
+    def test_a_layout_changed_elsewhere_is_never_overwritten(self):
+        self.enable()
+        tweak_mods.apply(self.game, self.library)
+        foreign = self.layout.read_bytes() + b"\0"
+        self.layout.write_bytes(foreign)
+        for action in (tweak_mods.apply, tweak_mods.restore):
+            with self.assertRaisesRegex(tweak_mods.TweakError, "menu layout was changed outside Lexeditor"):
+                action(self.game, self.library)
+        self.assertEqual(self.layout.read_bytes(), foreign)
+        self.assertIn("menu layout", tweak_mods.status(self.game, self.library)["problem"])
+
+    def test_a_layout_the_tweak_cannot_patch_changes_nothing(self):
+        self.nodes["nodes"] = [{**self.nodes["nodes"][0], "lookLike": "missing"}]
+        root = self.library / "Details"
+        (root / "script" / "tweak.py").write_text(
+            LAYOUT_TWEAK % ("details", repr(SPECS["alpha"]), "details", repr(self.nodes)), encoding="utf-8")
+        script_mods.set_trusted(root, True)
+        self.enable()
+        with self.assertRaisesRegex(tweak_mods.TweakError, "missing"):
+            tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        self.assertEqual(self.menu_files(), ["menu.drb.dcx"])
+
+    def test_a_failed_layout_write_puts_the_executable_back(self):
+        self.enable()
+        real = tweak_mods._write
+
+        def fail_layout(game_root, before, after, mods, managed=tweak_mods.EXECUTABLE, **options):
+            if managed is tweak_mods.LAYOUT:
+                raise OSError("locked")
+            return real(game_root, before, after, mods, managed, **options)
+        with mock.patch.object(tweak_mods, "_write", fail_layout):
+            with self.assertRaises(OSError):
+                tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        self.assertEqual(self.layout.read_bytes(), self.vanilla_layout)
+
+
 if __name__ == "__main__":
     unittest.main()

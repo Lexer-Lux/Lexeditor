@@ -479,9 +479,9 @@ function renderTweaks(){
   const empty=!(status.tweaks||[]).length;
   const reshade=LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction});
   const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
-  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original executable":"Unknown";
+  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Apply builds every enabled tweak into one executable. The first Apply keeps one copy of the original; Restore original puts it back.",
+    help:"Apply builds every enabled tweak into one executable, and into the menu layout when a tweak adds menu rows. The first Apply that changes a file keeps one copy of its original; Restore original puts them back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       empty&&!reshade?missingMods:null,
       status.problem?LexeditorUI.detailNote(status.problem):null,

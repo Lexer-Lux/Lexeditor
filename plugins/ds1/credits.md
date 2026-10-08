@@ -65,4 +65,11 @@ documentation supplied the format facts; no implementation code is copied:
 - https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 - https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
 
+## Menu layout (menu_layout.py)
+
+The DRB section order, entry sizes and text-shape encodings were measured by
+read-only inspection of the installed Remastered `menu/menu.drb.dcx`; see
+`codex/ds1/menu-layout.md`. No third-party code is used. The DCX wrapper reuses
+the SoulsTemplates DCX facts above.
+
 Each tweak's own credits travel with its mod.
