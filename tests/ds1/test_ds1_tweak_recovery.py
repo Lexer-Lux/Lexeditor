@@ -196,6 +196,28 @@ def test_a_pinned_executable_is_moved_aside_and_cleared_later(game, monkeypatch)
     assert not aside.exists() and loader_installed(game)
 
 
+def test_a_pinned_loader_is_moved_aside_when_switching_mods(game, monkeypatch):
+    """The crashed game pins dinput8.dll as well as the executable (Lexer hit
+    this switching Better Details off): it is moved aside too."""
+    root, library, _built = game
+    tweak_mods.apply(root, library)
+    dll = root / tweak_mods.RUNTIME_DLL
+    real_unlink = Path.unlink
+
+    def pinned(self, *args, **kwargs):
+        if self.name == tweak_mods.RUNTIME_DLL:
+            raise PermissionError(13, "Access is denied")
+        return real_unlink(self, *args, **kwargs)
+    monkeypatch.setattr(Path, "unlink", pinned)
+    result = tweak_mods.restore(root, library)
+    assert result["state"] == "vanilla" and not dll.exists()
+    assert (root / (tweak_mods.RUNTIME_DLL + tweak_mods.LOCKED_SUFFIX)).is_file()
+    monkeypatch.setattr(Path, "unlink", real_unlink)
+    tweak_mods.apply(root, library)
+    assert dll.read_bytes() == tweak_mods.loader_bytes()
+    assert not (root / (tweak_mods.RUNTIME_DLL + tweak_mods.LOCKED_SUFFIX)).exists()
+
+
 def test_an_executable_that_cannot_be_moved_either_says_why(game, monkeypatch):
     root, library, built = game
     real = tweak_mods.atomic_write

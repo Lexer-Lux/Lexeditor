@@ -256,7 +256,13 @@ MAX_LOCKED = 4
 
 
 def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
-    """Rename a pinned executable out of the way, keeping at most MAX_LOCKED."""
+    """Rename a pinned file out of the way, keeping at most MAX_LOCKED of each.
+
+    A crashed game Windows keeps listed pins every file it had loaded: the
+    executable and dinput8.dll alike. Windows refuses to replace or delete
+    such a file but lets it be renamed, and the game never loads it by the
+    new name.
+    """
     _clear_moved_aside(game_root)
     for index in range(MAX_LOCKED):
         target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
@@ -267,16 +273,33 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
             return
         except OSError:
             break
-    raise TweakError(f"Windows will not let Lexeditor replace or move DarkSoulsRemastered.exe. {STUCK_GAME}") from error
+    raise TweakError(f"Windows will not let Lexeditor replace or move {live.name}. {STUCK_GAME}") from error
 
 
 def _clear_moved_aside(game_root: Path) -> None:
-    """Delete executables moved aside earlier, once Windows has let go of them."""
-    for path in Path(game_root).glob(exe_patches.EXECUTABLE + LOCKED_SUFFIX + "*"):
+    """Delete files moved aside earlier, once Windows has let go of them."""
+    for path in Path(game_root).glob("*" + LOCKED_SUFFIX + "*"):
         try:
             checked(path).unlink()
         except OSError:
             pass  # still pinned; a later Apply or Restore tries again
+
+
+def _put(game_root: Path, path: Path, data: bytes) -> None:
+    """Write a game-folder file, moving a pinned old copy aside first."""
+    try:
+        atomic_write(path, data)
+    except PermissionError as error:
+        _move_aside(game_root, path, error)
+        atomic_write(path, data)
+
+
+def _remove(game_root: Path, path: Path) -> None:
+    """Delete a game-folder file, or move it aside when it is pinned."""
+    try:
+        path.unlink(missing_ok=True)
+    except PermissionError as error:
+        _move_aside(game_root, path, error)
 
 
 # No project argument means retain the last explicitly applied project rules.
@@ -431,17 +454,9 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     if _read(live, managed) != before:
         raise TweakError(f"The {managed.label} changed before replacement")
     if after != before:
-        try:
-            atomic_write(live, after)
-        except PermissionError as error:
-            if managed is not EXECUTABLE:
-                raise TweakError(f"Windows will not let Lexeditor replace the {managed.label}. "
-                                 "Close Dark Souls Remastered and try again.") from error
-            # A crashed game Windows keeps listed pins the executable: it cannot
-            # be replaced, but it can be renamed. Move it aside and write the
-            # new one in its place; the journal above covers an interruption.
-            _move_aside(game_root, live, error)
-            atomic_write(live, after)
+        # A pinned file is moved aside and the new one written in its place;
+        # the journal above covers an interruption.
+        _put(game_root, live, after)
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
     _finish_manifest(game_root, after, mods, project, managed)
@@ -544,10 +559,10 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if patch is None:
         # The DLL first: without it the game never reads the rest.
         if state["dll"] is not None and not state["foreignDll"]:
-            dll_path.unlink()
-        patch_path.unlink(missing_ok=True)
-        record_path.unlink(missing_ok=True)
-        checked(game_root / RUNTIME_LOG).unlink(missing_ok=True)
+            _remove(game_root, dll_path)
+        _remove(game_root, patch_path)
+        _remove(game_root, record_path)
+        _remove(game_root, checked(game_root / RUNTIME_LOG))
         return
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
@@ -558,14 +573,10 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
-    try:
-        atomic_write(patch_path, patch)
-        atomic_write(record_path, raw)
-        if state["dll"] != _sha(loader):
-            atomic_write(dll_path, loader)
-    except PermissionError as error:
-        raise TweakError(f"Windows will not let Lexeditor write {RUNTIME_DLL}: Dark Souls Remastered is still "
-                         "running. Close it and try again.") from error
+    _put(game_root, patch_path, patch)
+    _put(game_root, record_path, raw)
+    if state["dll"] != _sha(loader):
+        _put(game_root, dll_path, loader)
 
 
 def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
