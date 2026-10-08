@@ -80,7 +80,7 @@ def main():
 
                     restore_button.click()
                     dialog.wait_for()
-                    assert 'Restore the original installed param archive' in dialog.inner_text()
+                    assert 'Restore the original installed files' in dialog.inner_text()
                     dialog.get_by_role('button', name='Restore original', exact=True).click()
                     page.wait_for_function('state.deployment && state.deployment.enabled===false')
                     assert hashlib.sha256((game / RELATIVE).read_bytes()).hexdigest() == original_hash

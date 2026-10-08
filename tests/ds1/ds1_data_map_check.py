@@ -41,7 +41,11 @@ def main():
             rows=request_json(session.url+'api/data-map')['rows']
             members=set(ItemDocument(archives[RELATIVE]).members)
             assert {row['filename'] for row in rows if row['id'].startswith('param:')}==members
-            assert len({row['id'] for row in rows})==len(rows)==len(members)+5
+            # Every parameter table, five name tables, the two native rule
+            # rows, and a missing-Effects row when the archive has none.
+            effects_missing = 'SpEffectParam.param' not in members
+            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+2+effects_missing
+            assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
             assert by_file['BehaviorParam.param']['coverage']=='view'

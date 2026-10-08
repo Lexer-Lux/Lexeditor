@@ -96,12 +96,13 @@ def _is_reparse_point(path: Path) -> bool:
     # confirmed against a real junction in this environment. Checking the raw
     # attribute catches symlinks, junctions and mount points alike.
     try:
-        attributes = os.lstat(path).st_file_attributes
+        metadata = os.lstat(path)
+        attributes = getattr(metadata, "st_file_attributes", 0)
     except FileNotFoundError:
         return False
     except OSError as error:
         raise RuntimeError(f"Could not check {path} for a symlink or junction: {error}") from error
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return stat.S_ISLNK(metadata.st_mode) or bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 def _assert_no_reparse_points(path: Path, boundary: Path) -> None:
@@ -256,7 +257,10 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     source_ready = bool(source and source.is_file())
     active_project_root = (marker or {}).get("activeProjectRoot") or ""
     this_project_active = bool(enabled and project_root is not None and active_project_root == str(project_root))
-    stale = bool(this_project_active and source_ready and _hash_file(source) != marker.get("activeHash"))
+    # A native rule rewrites the parameter archive as it is applied, so the
+    # live file differs from the project's; staleness compares the project's
+    # own bytes, recorded as sourceHash.
+    stale = bool(this_project_active and source_ready and _hash_file(source) != marker.get("sourceHash", marker.get("activeHash")))
     text = _text_status(game_root, project_root)
     return {
         "texts": text,
@@ -280,13 +284,13 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     }
 
 
-def apply(game_root: Path, project_root: Path | None) -> dict:
+def apply(game_root: Path, project_root: Path | None, *, transform=None) -> dict:
     """Preserve the installed original once, then replace it with the saved project archive."""
     if project_root is None:
         raise ValueError("Select or create a mod project before applying it to the installed game.")
     # Check the raw roots themselves, and everything above them, before any
     # .resolve() call: resolving first would silently follow a reparse point
-    # at or above the root and make it impossible to ever detect.
+    # at the root or on a parent and erase the evidence we need to reject it.
     game_root = _assert_no_reparse_ancestry(game_root).resolve()
     project_root = _assert_no_reparse_ancestry(project_root).resolve()
     project_marker = project_root / MARKER
@@ -307,8 +311,13 @@ def apply(game_root: Path, project_root: Path | None) -> dict:
         if candidate.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{candidate.name} is too large to apply.")
         payload = candidate.read_bytes()
+        source_hash = hashlib.sha256(payload).hexdigest()
+        if transform is not None and relative == RELATIVE:
+            payload = transform(payload)
+            if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
+                raise ValueError("The parameter transformation returned invalid output")
         reader(payload)  # Reject corrupt/unsupported project output before any backup or live write.
-        sources[relative] = (candidate, payload)
+        sources[relative] = (candidate, payload, source_hash)
     for relative, _reader in FILES:
         if relative in sources:
             _apply_file(game_root, project_root, relative, *sources[relative])
@@ -318,7 +327,8 @@ def apply(game_root: Path, project_root: Path | None) -> dict:
     return status(game_root, project_root)
 
 
-def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes) -> None:
+def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,
+                source_hash: str) -> None:
     live = game_root / relative
     backup = _backup_path(game_root, relative)
     marker_path = _marker_path(game_root, relative)
@@ -359,7 +369,7 @@ def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Pat
     atomic_write(live, new_bytes)
     if _hash_file(live) != new_hash:
         raise RuntimeError("Applying the mod failed verification; the original backup and pending intent were kept.")
-    marker.update({"activeHash": new_hash, "activeProjectRoot": str(project_root),
+    marker.update({"activeHash": new_hash, "sourceHash": source_hash, "activeProjectRoot": str(project_root),
                    "enabled": True, "appliedAt": datetime.now(timezone.utc).isoformat(),
                    "pendingHash": None, "pendingKind": None})
     _write_marker(marker_path, marker)

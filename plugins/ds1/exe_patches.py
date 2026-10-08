@@ -1,11 +1,10 @@
 """Combine DS1 tweak mods' native patches into one Remastered executable.
 
-Dark Souls Remastered has no runtime patch loader like FF8's FFNx: a native
-tweak has to live in DarkSoulsRemastered.exe itself. Each enabled tweak mod
-builds a patch description (see `validate`) instead of a finished
-executable, and this module combines all of them onto the verified vanilla
-build, so tweaks never fight over the same address, header field or
-exception table:
+This plugin's current native backend builds a patched executable. Each
+enabled tweak mod supplies a patch description (see `validate`) instead of
+a finished executable. This module combines those descriptions onto the
+verified vanilla build, rejecting conflicting addresses and creating one
+shared layout and exception table:
 
 - code islands go after every original file byte (the retained certificate
   included) in the final, already executable section. An island may ask for a
@@ -27,7 +26,7 @@ import struct
 EXECUTABLE = "DarkSoulsRemastered.exe"
 VANILLA_SIZE = 50286344
 VANILLA_SHA256 = "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b"
-SPEC_VERSION = 1
+SPEC_VERSION = 2
 MAX_ISLAND = 256 * 1024
 MAX_FUNCTIONS = 1024
 
@@ -98,16 +97,24 @@ def _int(value, label: str, low: int = 0, high: int = 0xFFFFFFFF) -> int:
 def validate(spec: dict, owner: str) -> dict:
     """Check one tweak's patch description and return it normalised.
 
-    {"version": 1,
+    {"version": 1 or 2,
      "islands": [{"name": str, "rva": int (optional, fixed address),
                   "code": hex, "relocations": [{"at": int, "rel32": int target RVA}],
                   "functions": [[start, end, unwind] offsets into the island]}],
      "hooks": [{"rva": int, "original": hex,
                 "bytes": hex | "branch": {"opcode": "E8"|"E9", "island": str, "offset": int},
-                "pad": hex (optional)}],
+                "pad": hex (optional),
+                "relocations": [{"at": int, "island": str, "offset": int}]}],
+     Version 2 is required for hook relocations, so an older composer refuses
+     the description instead of silently writing stale addresses.
+     Hook relocations patch a four-byte displacement in `bytes`, relative to
+     the end of that displacement. Targets belong to the same description.
+     They allow an existing function to read an allocated table or call a
+     leaf routine without moving its stack frame or unwind metadata.
      "sectionVirtualSize": {section name: minimum virtual size} (optional)}
     """
-    if not isinstance(spec, dict) or spec.get("version") != SPEC_VERSION:
+    if (not isinstance(spec, dict) or type(spec.get("version")) is not int
+            or spec["version"] not in (1, SPEC_VERSION)):
         raise PatchError(f"{owner}: unsupported native patch description")
     islands, names = [], set()
     for raw in spec.get("islands", []):
@@ -153,7 +160,32 @@ def validate(spec: dict, owner: str) -> dict:
         length = len(replacement[1]) if replacement[0] == "bytes" else 5
         if length + len(pad) != len(original) or not original:
             raise PatchError(f"{owner} hook {rva:X} must replace exactly its original instruction bytes")
-        hooks.append({"owner": owner, "rva": rva, "original": original, "replacement": replacement, "pad": pad})
+        raw_relocations = raw.get("relocations", [])
+        if type(raw_relocations) is not list or (raw_relocations and replacement[0] != "bytes"):
+            raise PatchError(f"{owner} hook {rva:X}: relocations require a bytes replacement")
+        if raw_relocations and spec["version"] < 2:
+            raise PatchError(f"{owner} hook {rva:X}: relocations require description version 2")
+        relocations, claimed_offsets = [], set()
+        for relocation in raw_relocations:
+            if (type(relocation) is not dict
+                    or set(relocation) != {"at", "island", "offset"}
+                    or type(relocation["island"]) is not str
+                    or relocation["island"] not in names):
+                raise PatchError(f"{owner} hook {rva:X}: invalid relocation target")
+            at = _int(relocation["at"], "hook relocation offset", 0, length - 4)
+            target = next(island for island in islands if island["name"] == relocation["island"])
+            offset = _int(relocation["offset"], "hook island offset", 0, len(target["code"]) - 1)
+            occupied = set(range(at, at + 4))
+            if occupied & claimed_offsets:
+                raise PatchError(f"{owner} hook {rva:X}: overlapping relocations")
+            claimed_offsets.update(occupied)
+            relocations.append((at, target["name"], offset))
+        if replacement[0] == "branch":
+            target = next(island for island in islands if island["name"] == replacement[2])
+            if replacement[3] >= len(target["code"]):
+                raise PatchError(f"{owner} hook {rva:X}: branch leaves its island")
+        hooks.append({"owner": owner, "rva": rva, "original": original,
+                      "replacement": replacement, "pad": pad, "relocations": relocations})
     sizes = spec.get("sectionVirtualSize", {})
     if not isinstance(sizes, dict):
         raise PatchError(f"{owner}: sectionVirtualSize must map section names to sizes")
@@ -187,6 +219,9 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
     while last["raw"] + base - last["rva"] < len(vanilla):
         base += 0x1000
     islands = [island for spec in patches for island in spec["islands"]]
+    identities = [(island["owner"], island["name"]) for island in islands]
+    if len(identities) != len(set(identities)):
+        raise PatchError("Two native patches share an owner and island name")
     placed, cursor = [], base
     for island in sorted((item for item in islands if item["rva"] is not None), key=lambda item: item["rva"]):
         if island["rva"] < cursor:
@@ -248,6 +283,11 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
                 _kind, opcode, name, offset = kind
                 target = addresses[(hook["owner"], name)] + offset
                 replacement = bytes((opcode,)) + _rel32(rva + 5, target)
+            replacement = bytearray(replacement)
+            for displacement, name, offset in hook.get("relocations", []):
+                target = addresses[(hook["owner"], name)] + offset
+                replacement[displacement:displacement + 4] = _rel32(
+                    rva + displacement + 4, target)
             result[at:at + len(original)] = replacement + hook["pad"]
 
     for spec in patches:

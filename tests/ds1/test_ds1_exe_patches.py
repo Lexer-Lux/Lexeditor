@@ -145,7 +145,7 @@ class CombinerTests(unittest.TestCase):
                 {"version": 1, "hooks": [{"rva": HOOK_A, "original": "E800000000", "bytes": "909090909090"}]}),
             "unwind data is not version 1": lambda: self.compose({"version": 1, "islands": [island("a", code="02000000" + "C3" * 12)]}),
             "section grows into the next": lambda: self.compose({"version": 1, "sectionVirtualSize": {".data": 0x1001}}),
-            "unsupported description": lambda: self.compose({"version": 2}),
+            "unsupported description": lambda: self.compose({"version": 3}),
         }
         for label, action in cases.items():
             with self.subTest(label), self.assertRaises(exe_patches.PatchError):

@@ -1,9 +1,12 @@
 """Coverage of the selected DS1 archives, derived from the existing editors."""
-from .formats import SUBTABS
+from .formats import SUBTABS, EFFECT_TABLE
 from . import texts
 
+TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
+              'misc':'Misc.', 'encumbrance':'Encumbrance'}
 
-def payload(store):
+
+def payload(store, native_rules=None):
     document = store.get()
     item_tables = {}
     for sub, label, table in SUBTABS:
@@ -27,11 +30,21 @@ def payload(store):
             row.update(coverage='structured',status='partial',openable=True,
                 target='attacks',sub='attacks',controls='Attacks: enemy attack damage',
                 notes='Edit reviewed attack properties. An attack may be shared by several enemies.')
+        elif table == EFFECT_TABLE:
+            editable = [f for f in document.schemas.get(table, {}).get('fields', []) if f['editable']]
+            row.update(coverage='structured',status='partial',openable=True,
+                target='effects',sub='effects-all',controls='Effects: buffs, debuffs and equipment passives',
+                notes=f'{len(editable)} documented properties are editable. Other properties and unknown bytes are preserved.')
         elif table in ('BehaviorParam','Bullet'):
             row.update(coverage='view',status='partial',openable=True,
                 target='enemies',sub='monsters',controls='Enemies: attack reference paths',
                 notes='These records connect enemies to their attacks. The Enemies view shows those paths; it does not edit these tables.')
         rows.append(row)
+    if EFFECT_TABLE not in document.params:
+        rows.append({'id':'effects-missing', 'filename':EFFECT_TABLE + '.param', 'path':str(store.source),
+            'coverage':'unavailable', 'status':'not-integrated', 'openable':False,
+            'controls':'Effects: buffs, debuffs and equipment passives',
+            'notes':'Open a complete Remastered parameter archive to edit effects.'})
     for table, filename in texts.NAME_TABLES.items():
         tabs = item_tables[table]
         available = document.texts is not None and document.texts.renamable(table)
@@ -49,4 +62,17 @@ def payload(store):
             rows.append({'id':f'message:{filename}', 'filename':filename, 'path':str(store.text_source),
                 'coverage':'unavailable','status':'not-integrated','openable':False,
                 'controls':'No editor', 'notes':'This message table has no editor. Its original bytes are preserved when item names are saved.'})
+    # Values the game keeps in its executable, changed by Lexeditor's native rules.
+    available = bool(native_rules and native_rules['native']['available'])
+    for key, label in (('misc', 'Misc.: base stamina regeneration'),
+                       ('encumbrance', 'Encumbrance: load bands, movement profiles and stamina recovery')):
+        rows.append({'id':'native-' + key, 'filename':'DarkSoulsRemastered.exe', 'path':str(store.game_root / 'DarkSoulsRemastered.exe'),
+            'coverage':'structured', 'status':'partial', 'openable':available,
+            'target':key if available else '', 'sub':key, 'controls':label,
+            'notes':'Save and Apply with the game closed. Only the fingerprinted build is supported.'
+                    if available else 'The installed executable is not the supported build, so these rules cannot be applied.'})
+    # The Data Map names its open buttons from these labels ("Open Effects").
+    for row in rows:
+        if row.get('target'):
+            row['targets'] = [{'id':row['target'], 'label':TAB_LABELS[row['target']]}]
     return {'rows':rows}

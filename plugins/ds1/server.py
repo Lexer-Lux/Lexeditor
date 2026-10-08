@@ -7,7 +7,8 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import deployment
+from . import deployment, data_map
+from .native_rules import NativeRules
 from .formats import FormatError
 from .store import ItemStore
 from . import tweak_mods
@@ -22,6 +23,9 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
                   os.environ.get('LEXEDITOR_MOD_READ_ONLY') == '1' or os.environ.get('LEXEDITOR_NO_MOD') == '1'
                   or not os.environ.get('LEXEDITOR_DS1_PROJECT'))
 
+RULES = NativeRules(STORE.game_root, STORE.project, STORE.read_only)
+NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "misc"}
+
 
 class Handler(PluginRequestHandler):
     def do_GET(self):
@@ -34,14 +38,19 @@ class Handler(PluginRequestHandler):
                     if path == '/api/state':
                         result = STORE.state()
                     elif path == '/api/data-map':
-                        result = data_map.payload(STORE)
+                        result = data_map.payload(STORE, RULES.snapshot(refresh=True))
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
                         result['dirtyCount'] = STORE.get().dirty_count
                     elif path == '/api/table':
-                        result = {'rows': STORE.get().list_rows(query.get('tab', [''])[0]), 'dirtyCount': STORE.get().dirty_count}
+                        tab = query.get('tab', [''])[0]
+                        result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
                     else:
-                        result = {'row': STORE.get().read_row(query.get('table', [''])[0], int(query.get('id', [''])[0])), 'dirtyCount': STORE.get().dirty_count}
+                        table, row_id = query.get('table', [''])[0], int(query.get('id', [''])[0])
+                        result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
+                                  else STORE.get().read_row(table, row_id)}
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                    result['nativeRules'] = RULES.snapshot()
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -50,7 +59,7 @@ class Handler(PluginRequestHandler):
             try:
                 with LOCK:
                     self.send_json(tweak_mods.status(STORE.game_root) if path == '/api/tweaks'
-                                   else deployment.status(STORE.game_root, STORE.project))
+                                   else RULES.deployment_status())
             except (RuntimeError, ValueError, OSError, KeyError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
@@ -59,7 +68,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["data-map", "items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks"]})
+                            "capabilities": ["data-map", "items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "encumbrance", "native-stamina"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -77,7 +86,7 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable',
+            if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/deployment/apply', '/api/deployment/disable',
                             '/api/tweaks/save', '/api/tweaks/trust', '/api/tweaks/apply', '/api/tweaks/restore'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
@@ -91,15 +100,28 @@ class Handler(PluginRequestHandler):
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
                 if path == '/api/edit':
-                    row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
+                    row = (RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
+                           if payload.get('table') == 'NativeRules' else
+                           STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value')))
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/rename':
                     row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'))
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
+                elif path in ('/api/bands/add', '/api/bands/delete'):
+                    action = path.rsplit('/', 1)[-1]
+                    allowed = {'id', 'revision', 'at'} if action == 'add' else {'id', 'revision', 'neighbour', 'keep'}
+                    if set(payload) != allowed:
+                        raise ValueError('Unsupported load-band operation')
+                    result = {'row': RULES.band_action(action, payload['id'], revision=payload['revision'],
+                              at=payload.get('at'), neighbour=payload.get('neighbour'), keep=payload.get('keep'))}
                 elif path == '/api/save':
+                    RULES.validate_save()
+                    STORE.validate_save()
                     result = STORE.save()
+                    RULES.save()
                 elif path == '/api/discard':
                     result = STORE.discard()
+                    RULES.discard()
                 # Tweaks are library mods, not part of the selected project, so
                 # they save at once and apply to the installed executable.
                 elif path == '/api/tweaks/save':
@@ -116,9 +138,12 @@ class Handler(PluginRequestHandler):
                 elif path == '/api/tweaks/restore':
                     result = tweak_mods.restore(STORE.game_root)
                 elif path == '/api/deployment/apply':
-                    result = deployment.apply(STORE.game_root, STORE.project)
+                    result = RULES.apply(STORE)
                 else:
-                    result = deployment.disable(STORE.game_root)
+                    result = RULES.restore()
+                if not path.startswith('/api/tweaks/'):
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                    result['nativeRules'] = RULES.snapshot()
                 self.send_json(result)
         except PermissionError as error:
             self.send_json({'error': str(error)}, 403)

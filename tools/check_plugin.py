@@ -130,7 +130,7 @@ WORKFLOW = """\
 name: {title}
 on:
   push:
-    branches: [master]
+    branches: {branches}
     {filter}:
 {paths}
   pull_request:
@@ -185,7 +185,7 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
         check_env = ("        env:\n          LEXEDITOR_CHECK_ARTIFACTS: ${{ runner.temp }}/lexeditor-dev/"
                      + plugin + "-evidence\n") if capture else ""
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
-            title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env,
+            title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env, branches="[master]",
             paths="\n".join(f"      - '{path}'" for path in paths))
         if capture:
             files[f"{plugin}-checks.yml"] += EVIDENCE_STEP.format(plugin=plugin)
@@ -193,7 +193,7 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
         return files
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
-        title="global checks", filter="paths-ignore", argument="--global", check_env="",
+        title="global checks", filter="paths-ignore", argument="--global", check_env="", branches="[master]",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))

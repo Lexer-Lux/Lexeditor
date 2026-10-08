@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -16,8 +16,9 @@ def digest(path):
 
 class ItemStore:
     def __init__(self, game_root, project=None, read_only=True):
-        self.game_root = Path(game_root).resolve()
-        self.project = Path(project).resolve() if project else None
+        from .tweak_mods import checked
+        self.game_root = checked(Path(game_root)).resolve()
+        self.project = checked(Path(project)).resolve() if project else None
         self.read_only = read_only or self.project is None
         self.output = self.project / RELATIVE if self.project else None
         # The game's item names live in a second archive the mod also carries.
@@ -29,8 +30,10 @@ class ItemStore:
             raise PermissionError('Create or select a mod before editing Vanilla.')
         if self.project == self.game_root or self.game_root in self.project.parents:
             raise ValueError('The mod project must be outside the game installation.')
+        from .tweak_mods import checked
+        checked(self.project / MARKER)
         for output in (self.output, self.text_output):
-            resolved_output = output.resolve()
+            resolved_output = checked(output).resolve()
             if self.game_root in resolved_output.parents or self.project not in resolved_output.parents:
                 raise ValueError('The output path leaves the mod project or enters the installed game.')
         if not (self.project / MARKER).is_file():
@@ -48,6 +51,8 @@ class ItemStore:
         if not self.read_only: self.writable()
         vanilla = self._vanilla_path()
         source = self.output if self.output and self.output.is_file() else vanilla
+        from .tweak_mods import checked
+        checked(source)
         if source.stat().st_size > MAX_ARCHIVE:
             raise ValueError('The parameter archive is too large.')
         raw = source.read_bytes()
@@ -82,6 +87,10 @@ class ItemStore:
         document = self.get()
         return {'source': str(self.source), 'output': str(self.output or ''),
                 'readOnly': self.read_only, 'dirtyCount': document.dirty_count,
+                'effectsAvailable': EFFECT_TABLE in document.params,
+                'effectTabs': [{'id': key, 'label': label, 'table': table,
+                                'count': len(document.list_rows(key)) if EFFECT_TABLE in document.params else 0}
+                               for key, label, table in EFFECT_SUBTABS],
                 'enemyTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in ENEMY_SUBTABS],
                 'attackTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
@@ -97,9 +106,13 @@ class ItemStore:
         self.writable()
         return self.get().rename(table, row_id, name)
 
-    def save(self):
+    def validate_save(self):
+        from .tweak_mods import checked
         self.writable()
         document = self.get()
+        for path in (self.source, self._vanilla_path(), self.output):
+            if path is not None:
+                checked(path)
         # Apply can legitimately replace the live file while this editor stays
         # open. Compare against its verified preserved original after deployment.
         if digest(self.source) != self.source_hash or digest(self._vanilla_path()) != self.vanilla_hash:
@@ -109,6 +122,10 @@ class ItemStore:
         if document.texts and (digest(self.text_source) != self.text_hash
                                or digest(self.text_output) != self.text_output_hash):
             raise ValueError('The item names changed outside Lexeditor. Reopen it before saving.')
+        return document
+
+    def save(self):
+        document = self.validate_save()
         payload = document.export()
         ItemDocument(payload)
         # Names are written only once the mod has changed one; until then the

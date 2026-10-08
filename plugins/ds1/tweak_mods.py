@@ -30,7 +30,7 @@ BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
 LOCK_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.lock"
-MAX_MANIFEST = 64 * 1024
+MAX_MANIFEST = 1024 * 1024
 
 
 @contextmanager
@@ -102,10 +102,15 @@ def is_vanilla(data: bytes) -> bool:
 
 def tweak_rows(root: Path | None = None) -> list[dict]:
     """Every tweak mod in the DS1 library, in load order."""
-    root = Path(root or mods_root())
+    root = checked(Path(root or mods_root()))
     rows = []
     if root.is_dir():
-        for folder in sorted((item for item in root.iterdir() if item.is_dir()), key=lambda item: item.name.casefold()):
+        for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+            checked(folder)
+            if not folder.is_dir():
+                continue
+            checked(folder / "mod.json")
+            checked(folder / script_mods.VALUES_FILE)
             if not script_mods.is_script_mod(folder):
                 continue
             metadata = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
@@ -176,6 +181,7 @@ def build_specs(root: Path | None = None) -> list[dict]:
     specs = []
     for row in rows:
         target = Path(row["path"]) / "native" / f"{row['id']}.json"
+        checked(target)
         if not target.is_file():
             continue  # A tweak with nothing to patch at its current settings.
         try:
@@ -192,16 +198,45 @@ def ensure_game_closed() -> None:
         raise TweakError("Close Dark Souls Remastered before changing its executable")
 
 
-def _valid_entry(entry) -> bool:
-    return (isinstance(entry, dict)
-            and isinstance(entry.get("sha256"), str)
-            and len(entry["sha256"]) == 64
-            and all(char in "0123456789abcdef" for char in entry["sha256"])
-            and isinstance(entry.get("mods"), list)
-            and all(isinstance(name, str) and name for name in entry["mods"]))
+# No project argument means retain the last explicitly applied project rules.
+# Passing None removes that contribution, without disabling library tweak mods.
+_KEEP_PROJECT = object()
+
+
+def locked(game_root: Path):
+    """Hold the executable lock across a whole prepare, commit and rollback."""
+    return _exclusive(checked(Path(game_root)))
+
+
+def _digest(value) -> bool:
+    return (type(value) is str and len(value) == 64
+            and all(char in "0123456789abcdef" for char in value))
+
+
+def _mod_names(value) -> bool:
+    return type(value) is list and all(type(name) is str and name for name in value)
+
+
+def _project(value):
+    if value is None:
+        return None
+    if (type(value) is not dict or set(value) != {"path", "settingsHash", "spec"}
+            or type(value["path"]) is not str or not value["path"]
+            or not _digest(value["settingsHash"])):
+        raise TweakError("The saved native project description is damaged")
+    try:
+        exe_patches.validate(value["spec"], "Project native rules")
+    except (ValueError, exe_patches.PatchError) as error:
+        raise TweakError("The saved native project description is damaged") from error
+    return value
 
 
 def _manifest(game_root: Path) -> dict:
+    """The ownership record: version 1 (library tweaks) or 2 (plus project rules).
+
+    Read with a hard bound, and refuse anything damaged, including a damaged
+    pending entry: a journal is only trusted when every hash in it is real.
+    """
     path = checked(Path(game_root) / MANIFEST_FILE)
     if not path.exists():
         return {}
@@ -211,35 +246,23 @@ def _manifest(game_root: Path) -> dict:
         raw = stream.read(MAX_MANIFEST + 1)
     if len(raw) > MAX_MANIFEST:
         raise TweakError("The executable tweak manifest grew beyond its limit")
-    data = json.loads(raw)
-    if (not _valid_entry(data) or type(data.get("version")) is not int or data["version"] != 1
-            or (data.get("pending") is not None and not _valid_entry(data["pending"]))):
+    try:
+        data = json.loads(raw)
+    except ValueError as error:
+        raise TweakError("The executable tweak manifest is damaged") from error
+    if (type(data) is not dict or type(data.get("version")) is not int or data["version"] not in (1, 2)
+            or not _digest(data.get("sha256")) or not _mod_names(data.get("mods"))):
         raise TweakError("The executable tweak manifest is damaged")
+    keys = {"sha256", "mods"} | ({"project"} if data["version"] == 2 else set())
+    pending = data.get("pending")
+    if pending is not None and (type(pending) is not dict or set(pending) != keys
+                                or not _digest(pending["sha256"]) or not _mod_names(pending["mods"])):
+        raise TweakError("The executable tweak manifest is damaged")
+    if data["version"] == 2:
+        _project(data.get("project"))
+        if pending is not None:
+            _project(pending["project"])
     return data
-
-
-def _matching_entry(current: bytes, manifest: dict) -> dict | None:
-    if is_vanilla(current):
-        return {"sha256": _sha(current), "mods": []}
-    digest = _sha(current)
-    for entry in (manifest.get("pending"), manifest):
-        if entry and entry.get("sha256") == digest:
-            return entry
-    return None
-
-
-def _save_manifest(game_root: Path, value: dict) -> None:
-    raw = (json.dumps(value, indent=2) + "\n").encode("utf-8")
-    if len(raw) > MAX_MANIFEST:
-        raise TweakError("The executable tweak manifest exceeds its size limit")
-    atomic_write(checked(Path(game_root) / MANIFEST_FILE), raw)
-
-
-def _finish_manifest(game_root: Path, current: bytes, mods: list[str]) -> None:
-    if is_vanilla(current):
-        checked(Path(game_root) / MANIFEST_FILE).unlink(missing_ok=True)
-    else:
-        _save_manifest(game_root, {"version": 1, "sha256": _sha(current), "mods": mods})
 
 
 def _original(game_root: Path, current: bytes, manifest: dict) -> bytes:
@@ -256,17 +279,58 @@ def _original(game_root: Path, current: bytes, manifest: dict) -> bytes:
 
 
 def _owned(current: bytes, manifest: dict) -> bool:
-    return _matching_entry(current, manifest) is not None
+    if is_vanilla(current):
+        return True
+    digest = _sha(current)
+    return bool(manifest) and digest in (
+        manifest.get("sha256"), (manifest.get("pending") or {}).get("sha256"))
 
 
-def _write(game_root: Path, before: bytes, after: bytes, mods: list[str]) -> None:
+def _current_manifest(current: bytes, manifest: dict) -> dict:
+    """Which recipe produced the bytes, including a write interrupted before completion."""
+    pending = manifest.get("pending")
+    if pending and _sha(current) == pending["sha256"]:
+        return {"version": 2, "sha256": pending["sha256"], "mods": list(pending["mods"]),
+                "project": pending.get("project"), "pending": None}
+    return {"version": 2, "sha256": _sha(current),
+            "mods": [] if is_vanilla(current) else list(manifest.get("mods", [])),
+            "project": None if is_vanilla(current) else manifest.get("project"),
+            "pending": None}
+
+
+def _save_manifest(game_root: Path, value: dict) -> None:
+    raw = (json.dumps(value, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    if len(raw) > MAX_MANIFEST:
+        raise TweakError("The executable tweak manifest exceeds its size limit")
+    atomic_write(checked(Path(game_root) / MANIFEST_FILE), raw)
+
+
+def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=None) -> None:
+    if is_vanilla(current) and not mods and project is None:
+        checked(Path(game_root) / MANIFEST_FILE).unlink(missing_ok=True)
+    else:
+        _save_manifest(game_root, {"version": 2, "sha256": _sha(current), "mods": list(mods),
+                                   "project": project, "pending": None})
+
+
+def _write(game_root: Path, before: bytes, after: bytes, mods: list[str], project=None) -> None:
+    """Journal one expected-image replacement; keep the original plus the latest intent."""
     game_root = checked(Path(game_root))
     live = checked(game_root / exe_patches.EXECUTABLE)
     backup = checked(game_root / BACKUP_FILE)
+    old = _manifest(game_root)
+    if not _owned(before, old) or _read(live) != before:
+        raise TweakError("The executable changed while the tweaks were being prepared")
+    original = _original(game_root, before, old)
+    project = _project(project)
+    desired = {"sha256": _sha(after), "mods": list(mods), "project": project}
+    journal = {**_current_manifest(before, old), "pending": desired}
+    # Check the bound before creating a backup or replacing anything.
+    if len(json.dumps(journal, allow_nan=False).encode("utf-8")) > MAX_MANIFEST - 1024:
+        raise TweakError("The executable tweak manifest exceeds its size limit")
+    if after == before and not old and not mods and project is None:
+        return
     if not backup.exists():
-        # Read the original before creating the copy: the new, still empty
-        # file must not be mistaken for a damaged one.
-        original = _original(game_root, before, {})
         # Exclusive creation cannot overwrite an unmanaged file or a link.
         with backup.open("xb") as stream:
             stream.write(original)
@@ -274,58 +338,69 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str]) -> Non
             os.fsync(stream.fileno())
         if not is_vanilla(_read(backup)):
             raise TweakError("The original executable backup did not verify")
-    ensure_game_closed()
-    # Check again immediately before replacing; atomic replacement also fails
-    # on a running Windows image's file lock.
-    if _read(live) != before:
-        raise TweakError("The executable changed while the tweaks were being prepared")
-    _original(game_root, before, _manifest(game_root))
-    entry = _matching_entry(before, _manifest(game_root))
-    if entry is None:
-        raise TweakError("Executable ownership changed before replacement")
     # Journal first. A crash before or after replacement leaves one of these
     # two complete, known images; neither an arbitrary hash nor a partial file
     # is accepted. Restore uses the same protocol.
-    _save_manifest(game_root, {"version": 1, "sha256": _sha(before),
-                               "mods": list(entry["mods"]),
-                               "pending": {"sha256": _sha(after), "mods": mods}})
+    _save_manifest(game_root, journal)
     ensure_game_closed()
     if _read(live) != before:
         raise TweakError("The executable changed before replacement")
-    atomic_write(live, after)
+    if after != before:
+        atomic_write(live, after)
     if _read(live) != after:
-        raise TweakError("Executable verification failed; the original backup was kept")
-    _finish_manifest(game_root, after, mods)
+        raise TweakError("Executable verification failed; the original and pending intent were kept")
+    _finish_manifest(game_root, after, mods, project)
 
 
-def apply(game_root: Path, root: Path | None = None) -> dict:
-    """Combine every enabled tweak onto the original executable and install it."""
+def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
+    """Build and validate everything before the caller changes installed files.
+
+    Hold locked(game_root) from here through commit or rollback.
+    """
     ensure_game_closed()
     game_root = checked(Path(game_root))
-    with _exclusive(game_root):
-        return _apply_locked(game_root, root)
-
-
-def _apply_locked(game_root: Path, root: Path | None) -> dict:
     current = _read(game_root / exe_patches.EXECUTABLE)
     manifest = _manifest(game_root)
     if not _owned(current, manifest):
         raise TweakError("The installed executable was changed outside Lexeditor; restore it before applying tweaks")
-    specs = build_specs(root)
+    previous = _current_manifest(current, manifest)
     original = _original(game_root, current, manifest)
+    # A project contribution can depend on verified original instruction bytes.
+    chosen = previous.get("project") if project is _KEEP_PROJECT else (
+        project(original) if callable(project) else project)
+    chosen = _project(chosen)
+    specs = build_specs(root)
+    if chosen is not None:
+        specs.append(exe_patches.validate(chosen["spec"], "Project native rules"))
     try:
         after = exe_patches.compose(original, specs)
     except exe_patches.PatchError as error:
         raise TweakError(str(error)) from error
-    mods = [spec["owner"] for spec in specs
+    # Only mods that change something are recorded as applied.
+    mods = [spec["owner"] for spec in specs[:len(specs) - (chosen is not None)]
             if spec["islands"] or spec["hooks"] or spec["sectionVirtualSize"]]
-    if after != current:
-        _write(game_root, current, after, mods)
-    elif manifest.get("pending"):
-        # The preceding process finished the bytes but not the journal.
-        if _read(game_root / exe_patches.EXECUTABLE) != current:
-            raise TweakError("The executable changed during recovery")
-        _finish_manifest(game_root, current, mods)
+    return {"before": current, "after": after, "mods": mods, "project": chosen,
+            "previous": previous}
+
+
+def commit(game_root: Path, plan: dict) -> None:
+    _write(game_root, plan["before"], plan["after"], plan["mods"], plan["project"])
+
+
+def rollback(game_root: Path, plan: dict) -> None:
+    """Never undo a file changed by somebody else after the prepared operation."""
+    previous = plan["previous"]
+    _write(game_root, plan["after"], plan["before"],
+           previous.get("mods", []), previous.get("project"))
+
+
+def apply(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
+    """Combine every enabled tweak and the project's rules onto the original executable."""
+    # A running game stops everything before any write, the lock file included.
+    ensure_game_closed()
+    game_root = checked(Path(game_root))
+    with _exclusive(game_root):
+        commit(game_root, prepare(game_root, root, project=project))
     return status(game_root, root)
 
 
@@ -334,27 +409,19 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
     ensure_game_closed()
     game_root = checked(Path(game_root))
     with _exclusive(game_root):
-        return _restore_locked(game_root, root)
-
-
-def _restore_locked(game_root: Path, root: Path | None) -> dict:
-    current = _read(game_root / exe_patches.EXECUTABLE)
-    manifest = _manifest(game_root)
-    if not _owned(current, manifest):
-        raise TweakError("The installed executable was changed outside Lexeditor; it was left alone")
-    if not is_vanilla(current):
-        _write(game_root, current, _original(game_root, current, manifest), [])
-    elif manifest:
-        if _read(game_root / exe_patches.EXECUTABLE) != current:
-            raise TweakError("The executable changed during recovery")
-        _finish_manifest(game_root, current, [])
+        current = _read(game_root / exe_patches.EXECUTABLE)
+        manifest = _manifest(game_root)
+        if not _owned(current, manifest):
+            raise TweakError("The installed executable was changed outside Lexeditor; it was left alone")
+        if not is_vanilla(current) or manifest:
+            _write(game_root, current, _original(game_root, current, manifest), [], None)
     return status(game_root, root)
 
 
 def status(game_root: Path, root: Path | None = None) -> dict:
     """What is installed now, without building or changing anything."""
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
-              "pendingRecovery": False,
+              "pendingRecovery": False, "project": None,
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root()))}
     try:
         result["tweaks"] = tweak_rows(root)
@@ -362,17 +429,16 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         manifest = _manifest(Path(game_root))
         backup = checked(Path(game_root) / BACKUP_FILE)
         result["backupOk"] = backup.is_file() and is_vanilla(_read(backup))
-        result["pendingRecovery"] = bool(manifest.get("pending"))
-        entry = _matching_entry(current, manifest)
-        if is_vanilla(current):
-            result["state"] = "vanilla"
-        elif entry:
-            result["state"] = "tweaked"
-            result["applied"] = list(entry["mods"])
-            if not result["backupOk"]:
-                result["problem"] = "The preserved original executable is missing or changed"
-        else:
+        if not _owned(current, manifest):
             result["problem"] = "The installed executable was changed outside Lexeditor"
+        else:
+            active = _current_manifest(current, manifest)
+            result["state"] = "vanilla" if is_vanilla(current) else "tweaked"
+            result["applied"] = list(active["mods"])
+            result["project"] = active.get("project")
+            result["pendingRecovery"] = bool(manifest.get("pending"))
+            if not is_vanilla(current) and not result["backupOk"]:
+                result["problem"] = "The preserved original executable is missing or changed"
     except (ValueError, OSError) as error:
         result.setdefault("tweaks", [])
         result["problem"] = str(error)
