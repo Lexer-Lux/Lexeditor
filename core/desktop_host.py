@@ -1198,7 +1198,7 @@ class HostApi:
         started game sit invisible behind a Play button while the helper
         manager refused to work because that same process existed.
         """
-        can_launch = getattr(self._plugins[plugin_id], "can_launch", True)
+        can_launch = getattr(self._plugins[plugin_id], "can_launch", True) or bool(self._steam_app_id(plugin_id))
         controller = self._game_controller(plugin_id)
         if controller is not None:
             return {**controller.status(), "canLaunch": can_launch}
@@ -1218,10 +1218,24 @@ class HostApi:
             "canLaunch": can_launch,
         }
 
+    def _steam_app_id(self, plugin_id: str) -> str:
+        spec = getattr(self._plugins[plugin_id], "installation", None)
+        value = str(getattr(spec, "steam_app_id", "") or "")
+        return value if value.isdigit() else ""
+
     def launch_game(self, plugin_id: str) -> dict:
-        """Start the configured game without opening a command window."""
+        """Start the configured game without opening a command window.
+
+        A game that must start through Steam (its executable cannot be run on
+        its own) is asked of Steam instead: the Play button did nothing for
+        Dark Souls Remastered, because its plugin cannot start the executable.
+        """
         if not getattr(self._plugins[plugin_id], "can_launch", True):
-            raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+            app_id = self._steam_app_id(plugin_id)
+            if not app_id or os.name != "nt":
+                raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+            os.startfile(f"steam://rungameid/{app_id}")
+            return {"running": False, "viaSteam": True, "alreadyRunning": False}
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is not None and getattr(adapter, "supports_bundle_components", False):
             with self._mod_library_lock:

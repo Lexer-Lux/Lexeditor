@@ -391,7 +391,16 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     if _read(live, managed) != before:
         raise TweakError(f"The {managed.label} changed before replacement")
     if after != before:
-        atomic_write(live, after)
+        try:
+            atomic_write(live, after)
+        except PermissionError as error:
+            # A game that has closed can stay in Windows' process list while
+            # Steam holds it, and it keeps the file locked. The journal above
+            # makes the retry safe.
+            raise TweakError(
+                f"Windows will not let Lexeditor replace the {managed.label}: a closed Dark Souls "
+                "Remastered is still holding it. Exit Steam completely (or end DarkSoulsRemastered.exe "
+                "in Task Manager), then try again. Nothing was lost.") from error
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
     _finish_manifest(game_root, after, mods, project, managed)
