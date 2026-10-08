@@ -8,6 +8,7 @@
  *         unwind=<0|1>
  */
 #define LX_NO_DLLMAIN
+#include <stdlib.h>
 #include "../../plugins/ds1/runtime/lexeditor_ds1_loader.c"
 
 #define IMAGE_SIZE 0x3000u
@@ -47,6 +48,9 @@ int main(int argc, char **argv)
 
     char message[256] = "";
     int applied = lx_apply(image, data, size, message, sizeof message);
+    /* A deferred patch writes its hooks from a thread: give it time. */
+    if (argc > 2)
+        Sleep((DWORD)atoi(argv[2]));
     int (*function)(void) = (int (*)(void))(image + 0x1000);
     int result = function();
     DWORD64 base = 0;

@@ -40,10 +40,11 @@ def test_the_shipped_loader_is_built_from_its_source():
     assert tweak_mods.loader_bytes()  # checks the published hash
 
 
-def patch_file(original=bytes.fromhex("B801000000"), image_size=IMAGE_SIZE):
+def patch_file(original=bytes.fromhex("B801000000"), image_size=IMAGE_SIZE, delay=None):
     block = 0x10000
     hook = bytes((0xE9,)) + struct.pack("<i", block - (0x1000 + 5))
-    records = [
+    records = [struct.pack("<III", exe_patches.DELAY, 0, delay)] if delay is not None else []
+    records += [
         struct.pack("<III", exe_patches.BLOCK, block, len(RETURNS_42)) + RETURNS_42,
         struct.pack("<III", exe_patches.FUNCTIONS, 0, 1) + struct.pack("<III", block, block + 6, block + 8),
         struct.pack("<III", exe_patches.HOOK, 0x1000, 5) + original + hook,
@@ -66,10 +67,11 @@ def harness(tmp_path_factory):
     return exe
 
 
-def run(harness, tmp_path, data):
+def run(harness, tmp_path, data, wait=None):
     path = tmp_path / "patch.bin"
     path.write_bytes(data)
-    out = subprocess.run([str(harness), str(path)], capture_output=True, text=True, timeout=30)
+    out = subprocess.run([str(harness), str(path), *([str(wait)] if wait is not None else [])],
+                         capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out
     first, second = out.stdout.strip().splitlines()
     return {"applied": first.startswith("applied=1"), "result": int(first.rsplit("result=", 1)[1]),
@@ -81,6 +83,14 @@ def test_the_loader_redirects_a_function_into_its_code(harness, tmp_path):
     result = run(harness, tmp_path, patch_file())
     assert result["applied"] and result["result"] == 42, result
     assert result["unwind"], "the patch code's unwind entry is registered"
+
+
+def test_deferred_hooks_are_written_later_by_the_loader(harness, tmp_path):
+    """The game crashes when its code differs while it starts up; hooks wait."""
+    early = run(harness, tmp_path, patch_file(delay=3000))
+    assert early["applied"] and early["result"] == 1 and "follow after" in early["message"], early
+    late = run(harness, tmp_path, patch_file(delay=100), wait=1500)
+    assert late["applied"] and late["result"] == 42, late
 
 
 @pytest.mark.parametrize("case", ["original", "build"])

@@ -361,10 +361,18 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
 #   2 BLOCK     data[length], placed at a page-aligned rva past the image
 #   3 FUNCTIONS length entries of (begin, end, unwind) rvas, 12 bytes each
 #   4 WRITABLE  no payload: [rva, rva+length) must be committed and writable
+#   5 DELAY     no payload: write the hooks `length` ms after the game starts
+
+# Dark Souls Remastered checks parts of its own code while it starts and
+# crashes on purpose when they differ (always into FMOD's read-only data).
+# The loader places the patch code at once and writes the hooks this long
+# after the game starts: past that check, still during the opening logos.
+# Measured 2026-10-08: hooks written at 0 ms crash it; at 5 s they hold.
+HOOK_DELAY_MS = 5000
 
 RUNTIME_MAGIC = b"LXD1PAT\0"
 RUNTIME_VERSION = 1
-HOOK, BLOCK, FUNCTIONS, WRITABLE = 1, 2, 3, 4
+HOOK, BLOCK, FUNCTIONS, WRITABLE, DELAY = 1, 2, 3, 4, 5
 
 
 def runtime_patch(vanilla: bytes, specs: list[dict]) -> bytes | None:
@@ -393,6 +401,8 @@ def runtime_patch(vanilla: bytes, specs: list[dict]) -> bytes | None:
         if minimum > section["vsize"]:
             records.append(struct.pack("<III", WRITABLE, section["rva"] + section["vsize"],
                                        minimum - section["vsize"]))
+    if layout["hooks"]:
+        records.append(struct.pack("<III", DELAY, 0, HOOK_DELAY_MS))
     for rva, original, replacement in sorted(layout["hooks"]):
         records.append(struct.pack("<III", HOOK, rva, len(original)) + original + replacement)
     return (RUNTIME_MAGIC + struct.pack("<IIII", RUNTIME_VERSION, image_size, timestamp, len(records))
@@ -410,7 +420,7 @@ def read_runtime_patch(data: bytes) -> dict:
     for _ in range(count):
         kind, rva, length = struct.unpack_from("<III", data, at)
         at += 12
-        size = {HOOK: 2 * length, BLOCK: length, FUNCTIONS: 12 * length, WRITABLE: 0}.get(kind)
+        size = {HOOK: 2 * length, BLOCK: length, FUNCTIONS: 12 * length, WRITABLE: 0, DELAY: 0}.get(kind)
         if size is None or at + size > len(data):
             raise PatchError("Damaged runtime patch")
         records.append((kind, rva, length, data[at:at + size]))

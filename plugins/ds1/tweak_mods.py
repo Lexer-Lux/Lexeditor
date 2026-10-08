@@ -252,7 +252,11 @@ def ensure_game_closed() -> None:
 
 
 LOCKED_SUFFIX = ".lexeditor-locked"
+# Moved-aside copies kept per file: four of the 50 MB executable, more of the
+# small files (every crash pins another copy of the 27 KB loader).
 MAX_LOCKED = 4
+MAX_LOCKED_SMALL = 64
+SMALL_FILE = 1024 * 1024
 
 
 def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
@@ -264,7 +268,8 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
     new name.
     """
     _clear_moved_aside(game_root)
-    for index in range(MAX_LOCKED):
+    limit = MAX_LOCKED_SMALL if live.is_file() and live.stat().st_size <= SMALL_FILE else MAX_LOCKED
+    for index in range(limit):
         target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
         if target.exists():
             continue
@@ -573,10 +578,12 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
-    _put(game_root, patch_path, patch)
-    _put(game_root, record_path, raw)
+    # The record names the DLL as Lexeditor's, so it goes last: a DLL write
+    # that fails must not leave a record claiming a DLL that is not there.
     if state["dll"] != _sha(loader):
         _put(game_root, dll_path, loader)
+    _put(game_root, patch_path, patch)
+    _put(game_root, record_path, raw)
 
 
 def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
