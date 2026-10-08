@@ -299,9 +299,9 @@ function renderTweaks(){
     change:()=>{const changed=(status.tweaks||[]).find(row=>row.enabled!==row._saved?.enabled||JSON.stringify(row.values)!==JSON.stringify(row._saved?.values));if(changed)save(changed)},
     trust:row=>tweakRequest("/api/tweaks/trust",{id:row.id,trusted:true},"Could not trust the tweak")});
   for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
-  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original executable":"Unknown";
+  const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Apply builds every enabled tweak into one executable. The first Apply keeps one copy of the original; Restore original puts it back.",
+    help:"Apply builds every enabled tweak into one executable, and into the menu layout when a tweak adds menu rows. The first Apply that changes a file keeps one copy of its original; Restore original puts them back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       status.problem?LexeditorUI.detailNote(status.problem):null,
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),

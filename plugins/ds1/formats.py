@@ -57,6 +57,15 @@ def inflate(source):
     return plain
 
 
+def deflate(original, plain):
+    """Compress plain bytes into a DCX shaped like the original one."""
+    inflate(original)
+    compressed = zlib.compress(bytes(plain), 9)
+    header = bytearray(original[:76])
+    struct.pack_into('>II', header, 28, len(plain), len(compressed))
+    return bytes(header) + compressed
+
+
 @dataclass(frozen=True)
 class Member:
     name: str
@@ -310,7 +319,4 @@ class ItemDocument:
 
     def export(self):
         if self.plain == self.original_plain: return self.original
-        compressed = zlib.compress(bytes(self.plain), 9)
-        header = bytearray(self.original[:76])
-        struct.pack_into('>II', header, 28, len(self.plain), len(compressed))
-        return bytes(header) + compressed
+        return deflate(self.original, self.plain)
