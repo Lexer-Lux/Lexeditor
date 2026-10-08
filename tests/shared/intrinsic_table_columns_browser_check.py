@@ -49,6 +49,11 @@ with sync_playwright() as pw:
         sizes = page.locator('.lex-column-list-row [data-column-key]').evaluate_all(
             'cells=>cells.map(cell=>cell.getBoundingClientRect().width)')
         assert len(sizes) == 4, sizes
+        # The sign and thousands separators take room too: a column sized
+        # from bare digits cut the last digit off "-123,456,789".
+        cut = page.locator('.lex-column-list-row .lex-magnitude-integer').evaluate_all(
+            'spans=>spans.filter(span=>span.scrollWidth>span.clientWidth+.5).map(span=>span.textContent)')
+        assert not cut, cut
         widths.append(sizes)
     assert all(abs(a-b)<1 for a,b in zip(*widths)), widths
     browser.close()

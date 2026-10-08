@@ -8575,8 +8575,11 @@ ${contents.path}`});
       for (const row of options.rows || []) {
         const value = Number(valueForSort(row, column));
         if (!Number.isFinite(value)) continue;
-        const [integer, fraction = ""] = String(Math.abs(value)).split(".");
-        integerDigits = Math.max(integerDigits, integer.length + (value < 0 ? 1 : 0));
+        // Count what the cell shows, sign and thousands separators included:
+        // counting bare digits left "-29,406" a character short, and its last
+        // digit was cut off (FF8 > World > Field Returns, Z).
+        const [integer, fraction = ""] = formatNumber(value).split(".");
+        integerDigits = Math.max(integerDigits, integer.length);
         fractionDigits = Math.max(fractionDigits, fraction.length);
       }
       return [column.key, {integerDigits, fractionDigits}];
