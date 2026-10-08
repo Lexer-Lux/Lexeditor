@@ -1,5 +1,0 @@
-{
-  "title": "Out-of-combat sprint",
-  "help": "Sprint without stamina loss when no living enemy is fighting you. Combat, other loaded players and uncertain enemy states retain normal costs. Attacks, dodges and blocking keep their costs.",
-  "fields": []
-}
