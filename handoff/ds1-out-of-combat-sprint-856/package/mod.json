@@ -1,0 +1,13 @@
+{
+  "id": "out-of-combat-sprint",
+  "name": "Out-of-combat sprint",
+  "version": "0.2.0-candidate",
+  "game": "ds1",
+  "enabled": false,
+  "order": 1000,
+  "script": {
+    "version": 1
+  },
+  "description": "Sprinting is free when no living AI character is engaged with the local player. Combat and uncertain states keep normal sprint costs.",
+  "source": "https://github.com/Lexer-Lux/Lexeditor/pull/918"
+}
