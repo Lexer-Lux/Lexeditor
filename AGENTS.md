@@ -63,6 +63,10 @@ work, even if your tool does not load skills on its own.
   large to keep correct in hand-written assembly. Say which of those applies
   when adding driver code.
 - In-game messages use the game's own message box, never an overlay imitation.
+- Never write a game's executable. Native changes are applied in memory as
+  the game starts (FF8: FFNx and Hext; DS1: Lexeditor's dinput8.dll loader,
+  `plugins/ds1/runtime/`). A crashed game Windows keeps listed locks its
+  executable, and a patched executable then cannot be restored until reboot.
 
 ## Tweaks
 

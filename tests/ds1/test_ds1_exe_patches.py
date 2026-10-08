@@ -63,8 +63,12 @@ def island(name, code="01000000" + "C3" * 12, **extra):
 
 class CombinerTests(unittest.TestCase):
     def setUp(self):
+        # These check the file layout's arithmetic on a tiny image, page by
+        # page; the 64 KB island boundary the loader needs is checked in
+        # RuntimePatchTests.
         for key, value in (("VANILLA_SIZE", len(VANILLA)),
-                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())):
+                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
+                           ("ISLAND_ALIGNMENT", 0x1000)):
             patcher = mock.patch.object(exe_patches, key, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -150,6 +154,45 @@ class CombinerTests(unittest.TestCase):
         for label, action in cases.items():
             with self.subTest(label), self.assertRaises(exe_patches.PatchError):
                 action()
+
+
+
+class RuntimePatchTests(unittest.TestCase):
+    """The in-memory loader's description: the same layout, no executable."""
+
+    def setUp(self):
+        for key, value in (("VANILLA_SIZE", len(VANILLA)),
+                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())):
+            patcher = mock.patch.object(exe_patches, key, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def specs(self):
+        return [exe_patches.validate({"version": 1, "islands": [island("payload")],
+                                      "hooks": [{"rva": HOOK_A, "original": "E800000000",
+                                                 "branch": {"opcode": "E8", "island": "payload", "offset": 4}}]},
+                                     "Alpha")]
+
+    def test_nothing_enabled_needs_no_loader(self):
+        self.assertIsNone(exe_patches.runtime_patch(VANILLA, []))
+
+    def test_code_lands_on_the_first_64kb_boundary_past_the_image_and_hooks_reach_it(self):
+        parsed = exe_patches.read_runtime_patch(exe_patches.runtime_patch(VANILLA, self.specs()))
+        self.assertEqual(parsed["imageSize"], 0x5000)
+        kinds = {kind: (rva, length, payload) for kind, rva, length, payload in parsed["records"]}
+        block_rva = kinds[exe_patches.BLOCK][0]
+        self.assertEqual(block_rva, 0x10000)
+        hook_rva, length, payload = kinds[exe_patches.HOOK]
+        self.assertEqual((hook_rva, length, payload[:length]), (HOOK_A, 5, bytes.fromhex("E800000000")))
+        replacement = payload[length:]
+        self.assertEqual(replacement[0], 0xE8)
+        self.assertEqual(struct.unpack_from("<i", replacement, 1)[0], block_rva + 4 - (HOOK_A + 5))
+
+    def test_a_damaged_description_is_refused(self):
+        data = exe_patches.runtime_patch(VANILLA, self.specs())
+        for broken in (data[:-1], b"NOTAPAT\0" + data[8:], data + b"\0"):
+            with self.assertRaises(exe_patches.PatchError):
+                exe_patches.read_runtime_patch(broken)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,24 @@
 """DS1 tweak mods: build the enabled ones and apply them to the game.
 
 A DS1 tweak mod (see core/script_mods.py) builds `native/<id>.json`, a patch
-description that exe_patches.py combines with every other enabled tweak's
-onto the vanilla executable, and optionally `layout/<id>.json`, text nodes
-menu_layout.py adds to the vanilla menu layout. Applying writes the combined
-files; Restore puts the preserved originals back. The menu layout is only
-touched when a tweak asks for nodes or an earlier Apply changed it.
+description that exe_patches.py combines with every other enabled tweak's,
+and optionally `layout/<id>.json`, text nodes menu_layout.py adds to the
+vanilla menu layout.
 
-Each managed file keeps one original copy and an ownership journal beside
-it, and the game folder holds a one-byte OS lock file. The journal records
-replacement intent before a file is written, so an interrupted Apply or
-Restore can be retried without trusting unknown bytes. Outside
-modifications are refused, never overwritten.
+DarkSoulsRemastered.exe is never written. Applying installs Lexeditor's
+loader (dinput8.dll) and lexeditor-ds1-patch.bin beside it, and the loader
+patches the game in memory as it starts (plugins/ds1/runtime/). Writing the
+executable failed whenever a crashed game was still listed by Windows,
+which keeps the file locked; FF8 learned the same lesson ("the executable is
+never modified"). An executable patched by an earlier Lexeditor is put back
+once, by the next Apply or Restore.
+
+The menu layout is a data file and is still replaced, only when a tweak asks
+for nodes or an earlier Apply changed it. It keeps one original copy and an
+ownership journal beside it; the journal records replacement intent before
+the file is written, so an interrupted Apply or Restore can be retried
+without trusting unknown bytes. Outside modifications are refused, never
+overwritten. The game folder also holds a one-byte OS lock file.
 """
 from __future__ import annotations
 
@@ -125,6 +132,8 @@ def is_vanilla(data: bytes) -> bool:
 
 
 EXECUTABLE = Managed(exe_patches.EXECUTABLE, "executable", 128 * 1024 * 1024, lambda data: is_vanilla(data))
+# The loader DLL in the game folder, read only to tell ours from another mod's.
+RUNTIME_FILE = Managed("dinput8.dll", "loader", 64 * 1024 * 1024, lambda data: False)
 LAYOUT = Managed(menu_layout.RELATIVE.as_posix(), "menu layout", 16 * 1024 * 1024,
                  lambda data: menu_layout.is_vanilla(data))
 assert EXECUTABLE.backup(Path()).name == BACKUP_FILE and EXECUTABLE.manifest(Path()).name == MANIFEST_FILE
@@ -240,11 +249,15 @@ def ensure_game_closed() -> None:
         raise TweakError("Executable tweaks can only be applied on Windows")
     if live_processes([exe_patches.EXECUTABLE]):
         raise TweakError("Close Dark Souls Remastered before changing its executable")
-    # A crashed game can stay listed with no threads (a zombie). It is not
-    # running, but it keeps the executable locked, so replacing it would fail
-    # halfway with a bare "Access is denied". Say so before anything starts.
+
+
+def _ensure_executable_free() -> None:
+    """A crashed game can stay listed with no threads (a zombie). It is not
+    running, but it keeps the executable locked, so replacing it would fail
+    halfway with a bare "Access is denied". Only putting back an executable
+    an earlier Lexeditor patched writes it, so only that waits on this."""
     from core.process_probe import zombie_processes
-    if zombie_processes([exe_patches.EXECUTABLE]):
+    if os.name == "nt" and zombie_processes([exe_patches.EXECUTABLE]):
         raise TweakError(STUCK_GAME)
 
 
@@ -384,6 +397,8 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         raise TweakError(f"The {managed.label} tweak manifest exceeds its size limit")
     if after == before and not old and not mods and project is None:
         return
+    if managed is EXECUTABLE and after != before:
+        _ensure_executable_free()
     if not backup.exists():
         # Exclusive creation cannot overwrite an unmanaged file or a link.
         with backup.open("xb") as stream:
@@ -431,16 +446,125 @@ def _changes(specs: list[dict]) -> list[str]:
             if spec.get("islands") or spec.get("hooks") or spec.get("sectionVirtualSize") or spec.get("nodes")]
 
 
+# --- The in-memory loader ------------------------------------------------------
+#
+# Tweaks are never written into DarkSoulsRemastered.exe. Apply puts Lexeditor's
+# loader (dinput8.dll, built from plugins/ds1/runtime/) beside it with the
+# combined patch description; the game loads the DLL before its own code runs
+# and the DLL patches the game in memory. A crashed game Windows keeps listed
+# locks only the executable, which is no longer written, and removing these
+# files is a full restore. An executable patched by an earlier Lexeditor is put
+# back once, by the first Apply or Restore.
+
+RUNTIME_DLL = "dinput8.dll"
+RUNTIME_PATCH = "lexeditor-ds1-patch.bin"
+RUNTIME_RECORD = "lexeditor-ds1-runtime.json"
+RUNTIME_LOG = "lexeditor-ds1-patch.log"
+LOADER_PACKAGE = Path(__file__).with_name("runtime") / "package"
+MAX_RUNTIME = 16 * 1024 * 1024
+# Any of these in the game folder means Lexeditor's tweaks are, or were, installed.
+OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH)
+
+
+def loader_bytes() -> bytes:
+    """The shipped loader, checked against the hash it was published with."""
+    manifest = json.loads((LOADER_PACKAGE / "runtime-manifest.json").read_text(encoding="utf-8"))
+    data = (LOADER_PACKAGE / RUNTIME_DLL).read_bytes()
+    if _sha(data) != manifest.get("sha256"):
+        raise TweakError("Lexeditor's DS1 loader does not match its published hash; reinstall Lexeditor")
+    return data
+
+
+def _runtime(game_root: Path) -> dict:
+    """What Lexeditor's loader files in the game folder hold now."""
+    game_root = Path(game_root)
+    record_path, patch_path, dll_path = (checked(game_root / name) for name in (RUNTIME_RECORD, RUNTIME_PATCH, RUNTIME_DLL))
+    record = None
+    if record_path.exists():
+        if not record_path.is_file() or record_path.stat().st_size > MAX_MANIFEST:
+            raise TweakError("Lexeditor's loader record is damaged")
+        try:
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+        except ValueError as error:
+            raise TweakError("Lexeditor's loader record is damaged") from error
+        if (type(record) is not dict or record.get("version") != 1 or not _mod_names(record.get("mods"))
+                or not _digest(record.get("patchSha256")) or not _digest(record.get("dllSha256"))):
+            raise TweakError("Lexeditor's loader record is damaged")
+        _project(record.get("project"))
+    patch = None
+    if patch_path.exists():
+        if not patch_path.is_file() or patch_path.stat().st_size > MAX_RUNTIME:
+            raise TweakError(f"{RUNTIME_PATCH} is damaged")
+        patch = patch_path.read_bytes()
+    dll = _sha(_read(dll_path, RUNTIME_FILE)) if dll_path.exists() else None
+    ours = {_sha(loader_bytes())} | ({record["dllSha256"]} if record else set())
+    return {"record": record, "patch": patch, "dll": dll, "foreignDll": dll is not None and dll not in ours,
+            "active": bool(record and patch is not None and dll in ours and _sha(patch) == record["patchSha256"])}
+
+
+def _runtime_status(game_root: Path) -> dict:
+    state = _runtime(game_root)
+    result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
+              "project": state["record"].get("project") if state["active"] else None,
+              "problem": "", "loaderMessage": ""}
+    if state["foreignDll"] and (state["record"] or state["patch"] is not None):
+        result["problem"] = (f"Another mod's {RUNTIME_DLL} replaced Lexeditor's loader, so the tweaks are not loaded. "
+                             "Remove it, then Apply again.")
+    log = checked(Path(game_root) / RUNTIME_LOG)
+    if log.is_file() and log.stat().st_size <= 4096:
+        result["loaderMessage"] = log.read_text(encoding="utf-8", errors="replace").strip()
+    return result
+
+
+def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project) -> None:
+    """Install, replace or remove the loader and its patch description."""
+    game_root = checked(Path(game_root))
+    state = _runtime(game_root)
+    dll_path, patch_path, record_path = (checked(game_root / name) for name in (RUNTIME_DLL, RUNTIME_PATCH, RUNTIME_RECORD))
+    if patch is None:
+        # The DLL first: without it the game never reads the rest.
+        if state["dll"] is not None and not state["foreignDll"]:
+            dll_path.unlink()
+        patch_path.unlink(missing_ok=True)
+        record_path.unlink(missing_ok=True)
+        checked(game_root / RUNTIME_LOG).unlink(missing_ok=True)
+        return
+    if state["foreignDll"]:
+        raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
+                         "remove or rename the other file, then Apply again. Nothing was changed.")
+    loader = loader_bytes()
+    record = {"version": 1, "mods": list(mods), "project": _project(project),
+              "patchSha256": _sha(patch), "dllSha256": _sha(loader)}
+    raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
+        raise TweakError("The combined tweaks are too large")
+    try:
+        atomic_write(patch_path, patch)
+        atomic_write(record_path, raw)
+        if state["dll"] != _sha(loader):
+            atomic_write(dll_path, loader)
+    except PermissionError as error:
+        raise TweakError(f"Windows will not let Lexeditor write {RUNTIME_DLL}: Dark Souls Remastered is still "
+                         "running. Close it and try again.") from error
+
+
 def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
-    """Build and check every file's new bytes before the caller changes anything.
+    """Build and check every file's new contents before the caller changes anything.
 
     Hold locked(game_root) from here through commit or rollback.
     """
     ensure_game_closed()
     game_root = checked(Path(game_root))
     current, manifest = _installed(game_root, EXECUTABLE, "restore it before applying tweaks")
-    previous = _current_manifest(current, manifest)
     original = _original(game_root, current, manifest)
+    runtime = _runtime(game_root)
+    if runtime["active"]:
+        previous = {"mods": list(runtime["record"]["mods"]), "project": runtime["record"].get("project"),
+                    "patch": runtime["patch"]}
+    else:
+        # Before the loader, an earlier Lexeditor kept this in the executable.
+        built_in = _current_manifest(current, manifest)
+        previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None}
     # A project contribution can depend on verified original instruction bytes.
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
@@ -449,11 +573,14 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     layout = layout_specs(root)
     specs = native + ([exe_patches.validate(chosen["spec"], "Project native rules")] if chosen else [])
     try:
-        after = exe_patches.compose(original, specs)
+        patch = exe_patches.runtime_patch(original, specs)
     except exe_patches.PatchError as error:
         raise TweakError(str(error)) from error
-    files = [{"managed": EXECUTABLE, "before": current, "after": after, "mods": _changes(native),
-              "project": chosen, "previous": previous}]
+    files = []
+    if not is_vanilla(current) or manifest:
+        # Put an executable patched by an earlier Lexeditor back, once.
+        files.append({"managed": EXECUTABLE, "before": current, "after": original, "mods": [], "project": None,
+                      "previous": _current_manifest(current, manifest)})
     if layout or _layout_in_use(game_root):
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
         layout_original = _original(game_root, layout_current, layout_manifest, LAYOUT)
@@ -464,12 +591,18 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
-    return {"files": files}
+    return {"files": files, "executableSha256": _sha(current),
+            "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
+                        "project": chosen if patch else None, "previous": previous}}
 
 
 def _undo(game_root: Path, done: list[dict]) -> None:
     """Put files already written back, newest first. Never undo a file changed since."""
     for item in reversed(done):
+        if item.get("managed") is None:
+            previous = item["previous"]
+            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"])
+            continue
         previous = item["previous"]
         _write(game_root, item["after"], item["before"], previous.get("mods", []),
                item["managed"], project=previous.get("project"))
@@ -477,12 +610,21 @@ def _undo(game_root: Path, done: list[dict]) -> None:
 
 def commit(game_root: Path, plan: dict) -> None:
     """Write every file in the plan; if one fails, the ones written go back."""
+    # The patch was made for the executable prepare() read; one replaced since
+    # would only be caught by the loader as the game starts.
+    if _sha(_read(EXECUTABLE.live(checked(Path(game_root))))) != plan["executableSha256"]:
+        raise TweakError("The executable changed while the tweaks were being prepared")
     done = []
     try:
         for item in plan["files"]:
             _write(game_root, item["before"], item["after"], item["mods"], item["managed"],
                    project=item["project"])
             done.append(item)
+        runtime = plan["runtime"]
+        # Counted before it starts: a failure between its files must be taken
+        # back too, not only a finished install.
+        done.append({"managed": None, "previous": runtime["previous"]})
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"])
     except Exception:
         try:
             _undo(game_root, done)
@@ -492,11 +634,12 @@ def commit(game_root: Path, plan: dict) -> None:
 
 
 def rollback(game_root: Path, plan: dict) -> None:
-    _undo(game_root, plan["files"])
+    runtime = plan["runtime"]
+    _undo(game_root, [*plan["files"], {"managed": None, "previous": runtime["previous"]}])
 
 
 def apply(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
-    """Combine every enabled tweak and the project's rules onto the original game files."""
+    """Combine every enabled tweak and the project's rules, for the loader."""
     # A running game stops everything before any write, the lock file included.
     ensure_game_closed()
     game_root = checked(Path(game_root))
@@ -506,7 +649,7 @@ def apply(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -
 
 
 def restore(game_root: Path, root: Path | None = None) -> dict:
-    """Put the original game files back; the mods' switches are unchanged."""
+    """The game as it ships: no loader, and the original files back."""
     ensure_game_closed()
     game_root = checked(Path(game_root))
     with _exclusive(game_root):
@@ -515,6 +658,7 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
         targets = [(managed, *_installed(game_root, managed, "it was left alone")) for managed in managed_files]
         originals = [(managed, current, manifest, _original(game_root, current, manifest, managed))
                      for managed, current, manifest in targets]
+        _write_runtime(game_root, None, [], None)
         for managed, current, manifest, original in originals:
             if not managed.vanilla(current) or manifest:
                 _write(game_root, current, original, [], managed)
@@ -543,22 +687,30 @@ def _file_status(game_root: Path, managed: Managed) -> dict:
 def status(game_root: Path, root: Path | None = None) -> dict:
     """What is installed now, without building or changing anything."""
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
-              "pendingRecovery": False, "project": None,
+              "pendingRecovery": False, "project": None, "loaderMessage": "",
+              "builtIntoExecutable": False,
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root()))}
     try:
         result["tweaks"] = tweak_rows(root)
         game_root = Path(game_root)
-        files = [_file_status(game_root, EXECUTABLE)]
+        executable = _file_status(game_root, EXECUTABLE)
+        files = [executable]
         if _layout_in_use(game_root):
             files.append(_file_status(game_root, LAYOUT))
-        result["backupOk"] = files[0]["backupOk"] and all(
-            item["backupOk"] for item in files[1:] if item["state"] == "tweaked")
+        runtime = _runtime_status(game_root)
+        # An executable still patched by an earlier Lexeditor is put back by
+        # the next Apply or Restore.
+        result["builtIntoExecutable"] = executable["state"] == "tweaked"
+        result["backupOk"] = executable["backupOk"] or executable["state"] == "vanilla"
         states = {item["state"] for item in files}
-        result["state"] = "unknown" if "unknown" in states else "tweaked" if "tweaked" in states else "vanilla"
-        result["applied"] = list(dict.fromkeys(name for item in files for name in item["applied"]))
-        result["project"] = files[0]["project"]
+        tweaked = "tweaked" in states or bool(runtime["applied"])
+        result["state"] = "unknown" if "unknown" in states else "tweaked" if tweaked else "vanilla"
+        names = runtime["applied"] + [name for item in files for name in item["applied"]]
+        result["applied"] = list(dict.fromkeys(names))
+        result["project"] = runtime["project"] or executable["project"]
         result["pendingRecovery"] = any(item["pendingRecovery"] for item in files)
-        result["problem"] = next((item["problem"] for item in files if item["problem"]), "")
+        result["loaderMessage"] = runtime["loaderMessage"]
+        result["problem"] = runtime["problem"] or next((item["problem"] for item in files if item["problem"]), "")
     except (ValueError, OSError) as error:
         result.setdefault("tweaks", [])
         result["problem"] = str(error)

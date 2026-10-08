@@ -240,8 +240,7 @@ class NativeRules:
     def _needs_native(self):
         return (load_bands.native_projection(self.saved) != load_bands.native_projection(DEFAULTS)
                 or any(row["enabled"] for row in tweak_mods.tweak_rows())
-                or any(tweak_mods.checked(self.game_root / name).exists()
-                       for name in (tweak_mods.MANIFEST_FILE, tweak_mods.BACKUP_FILE)))
+                or any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES))
 
     def _preflight_params(self, store):
         store.validate_save()
@@ -306,8 +305,7 @@ class NativeRules:
 
     def restore(self):
         # Original restoration never changes project values or tweak switches.
-        shared = any(tweak_mods.checked(self.game_root / name).exists()
-                     for name in (tweak_mods.MANIFEST_FILE, tweak_mods.BACKUP_FILE))
+        shared = any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES)
         if shared:
             tweak_mods.restore(self.game_root)
         elif legacy_native.checked(self.game_root / legacy_native.BACKUP).exists():

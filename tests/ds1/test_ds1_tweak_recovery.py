@@ -1,4 +1,10 @@
-"""Generic executable-mod recovery; fixtures contain no retail code or tweak."""
+"""Executable recovery; fixtures contain no retail code or tweak.
+
+Apply no longer writes the executable (the loader patches it in memory), so
+the only executable write left is putting back one an earlier Lexeditor
+patched. That write keeps its journal: an interruption at any point is
+recognised and retried, and unknown bytes are never overwritten.
+"""
 from __future__ import annotations
 import hashlib
 import json
@@ -15,101 +21,92 @@ def game(tmp_path, monkeypatch):
     monkeypatch.setattr(exe_patches, "VANILLA_SIZE", len(VANILLA))
     monkeypatch.setattr(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())
     monkeypatch.setattr(tweak_mods, "ensure_game_closed", lambda: None)
+    monkeypatch.setattr(tweak_mods, "_ensure_executable_free", lambda: None)
     root = tmp_path / "game"
     root.mkdir()
-    (root / exe_patches.EXECUTABLE).write_bytes(VANILLA)
     library = tmp_path / "library"
     library.mkdir()
     spec = exe_patches.validate({"version": 1, "hooks": [
         {"rva": HOOK_A, "original": "e800000000", "bytes": "9090909090"},
     ]}, "Synthetic fixture")
     monkeypatch.setattr(tweak_mods, "build_specs", lambda _root=None: [spec])
-    return root, library, exe_patches.compose(VANILLA, [spec])
+    # What an earlier Lexeditor left: the tweak built into the executable.
+    built = exe_patches.compose(VANILLA, [spec])
+    (root / exe_patches.EXECUTABLE).write_bytes(built)
+    (root / tweak_mods.BACKUP_FILE).write_bytes(VANILLA)
+    (root / tweak_mods.MANIFEST_FILE).write_text(json.dumps({
+        "version": 2, "sha256": hashlib.sha256(built).hexdigest(), "mods": ["Synthetic fixture"],
+        "project": None, "pending": None}), encoding="utf-8")
+    return root, library, built
 
 
 def image(game):
     return (game[0] / exe_patches.EXECUTABLE).read_bytes()
 
 
-def test_apply_restore_retains_one_original(game):
-    root, library, projected = game
-    assert tweak_mods.apply(root, library)["state"] == "tweaked"
-    assert image(game) == projected
-    assert (root / tweak_mods.BACKUP_FILE).read_bytes() == VANILLA
-    assert tweak_mods.restore(root, library)["state"] == "vanilla"
+def loader_installed(game):
+    return (game[0] / tweak_mods.RUNTIME_PATCH).is_file() and (game[0] / tweak_mods.RUNTIME_DLL).is_file()
+
+
+def interrupt_executable(monkeypatch, after_write):
+    real = tweak_mods.atomic_write
+
+    def interrupt(path, data):
+        if Path(path).name == exe_patches.EXECUTABLE:
+            if after_write:
+                real(path, data)
+            raise OSError("simulated interruption")
+        real(path, data)
+    monkeypatch.setattr(tweak_mods, "atomic_write", interrupt)
+    return real
+
+
+@pytest.mark.parametrize("action", ["apply", "restore"])
+def test_the_first_apply_or_restore_puts_the_original_back(game, action):
+    root, library, _built = game
+    result = getattr(tweak_mods, action)(root, library)
     assert image(game) == VANILLA
     assert not (root / tweak_mods.MANIFEST_FILE).exists()
+    assert result["builtIntoExecutable"] is False
+    assert loader_installed(game) is (action == "apply")
     assert (root / tweak_mods.LOCK_FILE).stat().st_size == 1
 
 
+@pytest.mark.parametrize("action", ["apply", "restore"])
 @pytest.mark.parametrize("after_write", [False, True])
-def test_interrupted_apply_is_recognized_and_retryable(game, monkeypatch, after_write):
-    root, library, projected = game
-    real = tweak_mods.atomic_write
-
-    def interrupt(path, data):
-        if Path(path).name == exe_patches.EXECUTABLE:
-            if after_write:
-                real(path, data)
-            raise OSError("simulated interruption")
-        real(path, data)
-
-    monkeypatch.setattr(tweak_mods, "atomic_write", interrupt)
+def test_an_interrupted_put_back_is_recognized_and_retryable(game, monkeypatch, action, after_write):
+    root, library, built = game
+    real = interrupt_executable(monkeypatch, after_write)
     with pytest.raises(OSError, match="interruption"):
-        tweak_mods.apply(root, library)
-    assert image(game) == (projected if after_write else VANILLA)
+        getattr(tweak_mods, action)(root, library)
+    assert image(game) == (VANILLA if after_write else built)
     state = tweak_mods.status(root, library)
-    assert state["pendingRecovery"] is True
-    assert state["problem"] == ""
-    assert state["state"] == ("tweaked" if after_write else "vanilla")
+    assert state["pendingRecovery"] is True and state["problem"] == ""
     monkeypatch.setattr(tweak_mods, "atomic_write", real)
-    state = tweak_mods.apply(root, library)
+    state = getattr(tweak_mods, action)(root, library)
     assert state["pendingRecovery"] is False
-    assert state["applied"] == ["Synthetic fixture"]
-    assert image(game) == projected
-
-
-@pytest.mark.parametrize("after_write", [False, True])
-def test_interrupted_restore_is_recognized_and_retryable(game, monkeypatch, after_write):
-    root, library, projected = game
-    tweak_mods.apply(root, library)
-    real = tweak_mods.atomic_write
-
-    def interrupt(path, data):
-        if Path(path).name == exe_patches.EXECUTABLE:
-            if after_write:
-                real(path, data)
-            raise OSError("simulated interruption")
-        real(path, data)
-
-    monkeypatch.setattr(tweak_mods, "atomic_write", interrupt)
-    with pytest.raises(OSError):
-        tweak_mods.restore(root, library)
-    assert image(game) == (VANILLA if after_write else projected)
-    assert tweak_mods.status(root, library)["pendingRecovery"]
-    monkeypatch.setattr(tweak_mods, "atomic_write", real)
-    assert tweak_mods.restore(root, library)["state"] == "vanilla"
     assert image(game) == VANILLA
     assert not (root / tweak_mods.MANIFEST_FILE).exists()
 
 
 def test_failed_journal_cannot_change_live_image(game, monkeypatch):
-    root, library, _ = game
+    root, library, built = game
     monkeypatch.setattr(tweak_mods, "_save_manifest",
                         lambda *_: (_ for _ in ()).throw(OSError("journal failed")))
     with pytest.raises(OSError, match="journal"):
         tweak_mods.apply(root, library)
-    assert image(game) == VANILLA
+    assert image(game) == built
+    assert not loader_installed(game)
 
 
 def test_finalization_failure_is_recoverable_without_rewriting_executable(game, monkeypatch):
-    root, library, projected = game
+    root, library, _built = game
     real = tweak_mods._finish_manifest
     monkeypatch.setattr(tweak_mods, "_finish_manifest",
                         lambda *_: (_ for _ in ()).throw(OSError("finalize failed")))
     with pytest.raises(OSError, match="finalize"):
-        tweak_mods.apply(root, library)
-    assert image(game) == projected
+        tweak_mods.restore(root, library)
+    assert image(game) == VANILLA
     monkeypatch.setattr(tweak_mods, "_finish_manifest", real)
     writes = []
     atomic = tweak_mods.atomic_write
@@ -119,19 +116,17 @@ def test_finalization_failure_is_recoverable_without_rewriting_executable(game, 
         return atomic(path, data)
 
     monkeypatch.setattr(tweak_mods, "atomic_write", record)
-    state = tweak_mods.apply(root, library)
+    state = tweak_mods.restore(root, library)
     assert not state["pendingRecovery"]
     assert exe_patches.EXECUTABLE not in writes
 
 
 def test_unknown_bytes_are_refused_even_with_a_pending_record(game, monkeypatch):
-    root, library, _ = game
-    real = tweak_mods._finish_manifest
-    monkeypatch.setattr(tweak_mods, "_finish_manifest",
-                        lambda *_: (_ for _ in ()).throw(OSError("stop")))
+    root, library, _built = game
+    real = interrupt_executable(monkeypatch, False)
     with pytest.raises(OSError):
-        tweak_mods.apply(root, library)
-    monkeypatch.setattr(tweak_mods, "_finish_manifest", real)
+        tweak_mods.restore(root, library)
+    monkeypatch.setattr(tweak_mods, "atomic_write", real)
     outsider = bytearray(image(game))
     outsider[-1] ^= 1
     (root / exe_patches.EXECUTABLE).write_bytes(outsider)
@@ -148,19 +143,19 @@ def test_unknown_bytes_are_refused_even_with_a_pending_record(game, monkeypatch)
     {"version": 1, "sha256": "a" * 64, "mods": [], "pending": {"sha256": 1, "mods": []}},
 ])
 def test_invalid_journal_is_refused(game, entry):
-    root, library, _ = game
+    root, library, built = game
     (root / tweak_mods.MANIFEST_FILE).write_text(json.dumps(entry))
     with pytest.raises(tweak_mods.TweakError, match="damaged"):
         tweak_mods.apply(root, library)
-    assert image(game) == VANILLA
+    assert image(game) == built
 
 
 def test_oversized_journal_is_refused(game):
-    root, library, _ = game
+    root, library, built = game
     (root / tweak_mods.MANIFEST_FILE).write_bytes(b"x" * (tweak_mods.MAX_MANIFEST + 1))
     with pytest.raises(tweak_mods.TweakError, match="large"):
         tweak_mods.apply(root, library)
-    assert image(game) == VANILLA
+    assert image(game) == built
 
 
 def test_cooperating_writers_do_not_enter_together(game):
@@ -173,16 +168,29 @@ def test_cooperating_writers_do_not_enter_together(game):
 
 
 def test_corrupt_backup_is_not_used_for_restore(game):
-    root, library, projected = game
-    tweak_mods.apply(root, library)
+    root, library, built = game
     (root / tweak_mods.BACKUP_FILE).write_bytes(b"bad")
     with pytest.raises(tweak_mods.TweakError, match="original"):
         tweak_mods.restore(root, library)
-    assert image(game) == projected
+    assert image(game) == built
+
+
+def test_a_crashed_game_still_listed_stops_only_the_executable_write(game, monkeypatch):
+    root, library, built = game
+    monkeypatch.setattr(tweak_mods, "_ensure_executable_free",
+                        lambda: (_ for _ in ()).throw(tweak_mods.TweakError(tweak_mods.STUCK_GAME)))
+    with pytest.raises(tweak_mods.TweakError, match="restart Windows"):
+        tweak_mods.apply(root, library)
+    assert image(game) == built
+    # Once the executable is the original, nothing waits on that game.
+    (root / exe_patches.EXECUTABLE).write_bytes(VANILLA)
+    (root / tweak_mods.MANIFEST_FILE).unlink()
+    tweak_mods.apply(root, library)
+    assert loader_installed(game)
 
 
 def test_game_start_before_replacement_leaves_recoverable_intent(game, monkeypatch):
-    root, library, _ = game
+    root, library, built = game
     calls = 0
 
     def game_closed():
@@ -194,5 +202,5 @@ def test_game_start_before_replacement_leaves_recoverable_intent(game, monkeypat
     monkeypatch.setattr(tweak_mods, "ensure_game_closed", game_closed)
     with pytest.raises(tweak_mods.TweakError, match="started"):
         tweak_mods.apply(root, library)
-    assert image(game) == VANILLA
+    assert image(game) == built
     assert tweak_mods.status(root, library)["pendingRecovery"]

@@ -439,7 +439,7 @@ function renderInfo(){
       )].filter(Boolean)}),
     detailSection({title:"NATIVE RULES",body:[
       detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||"None"),
-        help:infoHelp("Native rules share the executable with library tweaks. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
+        help:infoHelp("Native rules are applied in memory by the same loader as library tweaks, from one patch. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
       deploy.legacyRestoreAvailable?LexeditorUI.detailNote("Restore the earlier draft's native patch before applying the combined rules. Its verified original is available."):
         deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
       deploy.native?.pendingRecovery?LexeditorUI.detailNote("An interrupted native operation is recoverable. Retry Apply or Restore original."):null,
@@ -481,9 +481,12 @@ function renderTweaks(){
   const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Apply builds every enabled tweak into one executable, and into the menu layout when a tweak adds menu rows. The first Apply that changes a file keeps one copy of its original; Restore original puts them back.",
+    help:"Apply combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
+        help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty&&!reshade?missingMods:null,
+      status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Apply or Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
         el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});

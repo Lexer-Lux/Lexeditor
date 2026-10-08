@@ -1,4 +1,8 @@
-"""Project native rules compose with library tweaks through one owned executable."""
+"""Project native rules compose with library tweaks into one loader patch.
+
+The executable itself is never written: rules and library tweaks are one
+description the loader applies in memory (plugins/ds1/runtime/).
+"""
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -45,6 +49,12 @@ def image(game):
     return (game / exe_patches.EXECUTABLE).read_bytes()
 
 
+def runtime(game):
+    """The patch description the loader reads, or None when none is installed."""
+    path = game / tweak_mods.RUNTIME_PATCH
+    return path.read_bytes() if path.is_file() else None
+
+
 def test_new_projects_have_no_baked_balance_preset(project):
     game, mod, store, rules, original = project
     assert rules.value["baseRecovery"] == 45
@@ -63,10 +73,11 @@ def test_project_and_library_tweaks_share_one_composed_image(project, monkeypatc
     edit_rules(rules)
     status = rules.apply(store)
     spec = exe_patches.validate(rules._contribution(original)["spec"], "Project native rules")
-    assert image(game) == exe_patches.compose(original, [other, spec])
+    assert image(game) == original
+    assert runtime(game) == exe_patches.runtime_patch(original, [other, spec])
     assert status["nativeProjectActive"] and not status["stale"]
     assert status["native"]["applied"] == ["Independent library tweak"]
-    assert (game / tweak_mods.BACKUP_FILE).read_bytes() == original
+    assert not (game / tweak_mods.BACKUP_FILE).exists()
     assert not (game / "DarkSoulsRemastered.exe.lexeditor-stamina-original").exists()
     assert ItemDocument((game / RELATIVE).read_bytes()).value(TABLE, 6890, RECOVERY_KEY) == 10
 
@@ -78,13 +89,13 @@ def test_library_apply_preserves_last_applied_project_rules(project, monkeypatch
     monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None: [other_spec(original)])
     tweak_mods.apply(game)
     contribution = rules._contribution(original)
-    expected = exe_patches.compose(original, [other_spec(original),
+    expected = exe_patches.runtime_patch(original, [other_spec(original),
         exe_patches.validate(contribution["spec"], "Project native rules")])
-    assert image(game) == expected
+    assert runtime(game) == expected and image(game) == original
     # Removing the library mod does not remove native rules.
     monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None: [])
     tweak_mods.apply(game)
-    assert image(game) == exe_patches.compose(original, [
+    assert runtime(game) == exe_patches.runtime_patch(original, [
         exe_patches.validate(contribution["spec"], "Project native rules")])
 
 
@@ -94,11 +105,11 @@ def test_reset_project_rules_preserves_library_mod_and_full_restore_is_exact(pro
     monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None: [other])
     edit_rules(rules); rules.apply(store)
     rules.value = deepcopy(DEFAULTS); rules.save(); rules.apply(store)
-    assert image(game) == exe_patches.compose(original, [other])
+    assert runtime(game) == exe_patches.runtime_patch(original, [other])
     assert tweak_mods.status(game)["project"] is None
     rules.restore()
-    assert image(game) == original
-    assert (game / tweak_mods.BACKUP_FILE).read_bytes() == original
+    assert image(game) == original and runtime(game) is None
+    assert not (game / tweak_mods.RUNTIME_DLL).exists()
     assert not (game / tweak_mods.MANIFEST_FILE).exists()
 
 
@@ -118,26 +129,24 @@ def test_hook_conflict_changes_neither_installed_file(project, monkeypatch):
     assert not deployment._backup_path(game).exists()
 
 
-@pytest.mark.parametrize("phase", ["before-image", "after-image"])
-def test_pending_native_write_is_owned_and_retryable(project, monkeypatch, phase):
+@pytest.mark.parametrize("interrupted_file", [tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD,
+                                              tweak_mods.RUNTIME_DLL])
+def test_an_interrupted_loader_install_is_undone_and_retryable(project, monkeypatch, interrupted_file):
     game, mod, store, rules, original = project
     edit_rules(rules)
     atomic = tweak_mods.atomic_write
-    count = 0
     def interrupted(path, content):
-        nonlocal count
-        if Path(path).name == tweak_mods.MANIFEST_FILE:
-            count += 1
-        if ((phase == "before-image" and Path(path).name == exe_patches.EXECUTABLE)
-                or (phase == "after-image" and Path(path).name == tweak_mods.MANIFEST_FILE and count == 2)):
+        if Path(path).name == interrupted_file:
             raise OSError("interrupted")
         return atomic(path, content)
     monkeypatch.setattr(tweak_mods, "atomic_write", interrupted)
     with pytest.raises(OSError, match="interrupted"):
         rules.apply(store)
+    # What was written is taken back: no half-installed loader is left.
     status = tweak_mods.status(game)
-    assert status["pendingRecovery"] and not status["problem"]
-    assert status["state"] == ("vanilla" if phase == "before-image" else "tweaked")
+    assert not status["problem"] and status["state"] == "vanilla"
+    assert runtime(game) is None and not (game / tweak_mods.RUNTIME_DLL).exists()
+    assert image(game) == original
     monkeypatch.setattr(tweak_mods, "atomic_write", atomic)
     rules.apply(store)
     assert not tweak_mods.status(game)["pendingRecovery"]
@@ -148,18 +157,18 @@ def test_pending_native_write_is_owned_and_retryable(project, monkeypatch, phase
 def test_parameter_failure_rolls_back_the_entire_previous_native_recipe(project, monkeypatch):
     game, mod, store, rules, original = project
     edit_rules(rules); rules.apply(store)
-    previous_image, previous_project = image(game), tweak_mods.status(game)["project"]
+    previous_patch, previous_project = runtime(game), tweak_mods.status(game)["project"]
     rules.edit_row(0, "baseRecovery", 80); rules.save()
     def fail(*args, **kwargs):
         raise OSError("archive write failed")
     monkeypatch.setattr(deployment, "apply", fail)
     with pytest.raises(OSError, match="archive"):
         rules.apply(store)
-    assert image(game) == previous_image
+    assert runtime(game) == previous_patch and image(game) == original
     assert tweak_mods.status(game)["project"] == previous_project
 
 
-def test_failed_rollback_never_erases_somebody_elses_image(project, monkeypatch):
+def test_rollback_never_touches_somebody_elses_executable(project, monkeypatch):
     game, mod, store, rules, original = project
     edit_rules(rules)
     foreign = original[:-1] + b"x"
@@ -167,9 +176,10 @@ def test_failed_rollback_never_erases_somebody_elses_image(project, monkeypatch)
         (game / exe_patches.EXECUTABLE).write_bytes(foreign)
         raise OSError("archive write failed")
     monkeypatch.setattr(deployment, "apply", fail)
-    with pytest.raises(RuntimeError, match="incomplete"):
+    with pytest.raises(OSError, match="archive"):
         rules.apply(store)
-    assert image(game) == foreign
+    # The loader files are taken back; the executable is not Lexeditor's to write.
+    assert image(game) == foreign and runtime(game) is None
 
 
 def test_bad_archive_and_stale_settings_fail_before_any_native_write(project):
@@ -246,7 +256,7 @@ def test_legacy_native_values_import_without_a_new_balance_preset(project):
     store.edit(TABLE, 6890, RECOVERY_KEY, 13); store.save()
     migrated.edit_row(0, "baseRecovery", 74); migrated.save(); migrated.apply(store)
     assert (mod / LEGACY_FILE).read_bytes() == raw
-    assert image(game) != original
+    assert runtime(game) is not None and image(game) == original
     assert ItemDocument((game / RELATIVE).read_bytes()).value(TABLE, 6890, RECOVERY_KEY) == 13
     reopened = NativeRules(game, mod, False)
     reopened.apply(store)
@@ -288,11 +298,11 @@ def test_current_server_keeps_effects_attacks_and_library_tweaks(project, monkey
         call("/api/discard",{})
         assert len(call("/api/table?tab=encumbrance")["rows"])==4
         call("/api/deployment/apply",{})
-        assert image(game)!=original
+        assert runtime(game) is not None and image(game)==original
         call("/api/tweaks/apply",{})
         assert tweak_mods.status(game)["project"] is not None
         call("/api/deployment/disable",{})
-        assert image(game)==original
+        assert image(game)==original and runtime(game) is None
         monkeypatch.setattr(server,"RULES",NativeRules(game))
         with pytest.raises(HTTPError) as error: call("/api/edit",edit)
         assert error.value.code==403

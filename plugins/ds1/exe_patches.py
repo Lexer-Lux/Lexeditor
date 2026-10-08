@@ -29,6 +29,8 @@ VANILLA_SHA256 = "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d
 SPEC_VERSION = 2
 MAX_ISLAND = 256 * 1024
 MAX_FUNCTIONS = 1024
+# Where tweak code starts: Windows' allocation granularity (see _layout).
+ISLAND_ALIGNMENT = 0x10000
 
 
 class PatchError(ValueError):
@@ -200,24 +202,29 @@ def _rel32(source_next: int, target: int) -> bytes:
     return struct.pack("<i", value)
 
 
-def compose(vanilla: bytes, specs: list[dict]) -> bytes:
-    """The vanilla executable with every validated tweak patch applied.
+def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
+    """Where every island goes and what every hook writes, for the vanilla build.
 
-    With no patches it returns the vanilla bytes unchanged.
+    Shared by the two backends: compose() writes it into a new executable,
+    runtime_patch() describes it for the in-memory loader. None when no
+    patch changes anything.
     """
     if len(vanilla) != VANILLA_SIZE or hashlib.sha256(vanilla).hexdigest() != VANILLA_SHA256:
         raise PatchError("The source is not the supported vanilla Remastered executable")
     patches = [spec for spec in specs if spec["islands"] or spec["hooks"] or spec["sectionVirtualSize"]]
     if not patches:
-        return bytes(vanilla)
+        return None
     pe = _Pe(vanilla)
     last = pe.last
     section_end = last["rva"] + last["vsize"]
     # Islands start after every original byte, the certificate included, at
-    # the first page boundary past the section whose file offset clears them.
-    base = _align(section_end, 0x1000)
+    # the first 64 KB boundary past the image whose file offset clears them.
+    # 64 KB, not a page: the in-memory loader reserves this address, and
+    # Windows reserves memory in 64 KB units, so a page-aligned address
+    # inside the image's last unit (0x319E000) can never be had.
+    base = _align(section_end, ISLAND_ALIGNMENT)
     while last["raw"] + base - last["rva"] < len(vanilla):
-        base += 0x1000
+        base += ISLAND_ALIGNMENT
     islands = [island for spec in patches for island in spec["islands"]]
     identities = [(island["owner"], island["name"]) for island in islands]
     if len(identities) != len(set(identities)):
@@ -235,37 +242,17 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
     placed.sort(key=lambda item: item[0])
     addresses = {(island["owner"], island["name"]): rva for rva, island in placed}
 
-    def file_offset(rva: int) -> int:
-        return last["raw"] + rva - last["rva"]
-
-    table_rva = _align(cursor, 16)
-    table_offset = file_offset(table_rva)
-    original_offset, original_size = struct.unpack_from("<II", vanilla, pe.exception)
-    original_table = vanilla[pe.offset(original_offset, original_size):][:original_size]
-    entries = list(struct.iter_unpack("<III", original_table))
-    if any(a[0] > b[0] for a, b in zip(entries, entries[1:])) or entries[-1][1] > base:
-        raise PatchError("The original exception table cannot be extended safely")
-    for rva, island in placed:
-        entries.extend((rva + start, rva + end, rva + unwind) for start, end, unwind in island["functions"])
-    entries.sort(key=lambda row: row[0])
-    if any(a[1] > b[0] for a, b in zip(entries, entries[1:])):
-        raise PatchError("Two tweaks' native functions overlap")
-    table = b"".join(struct.pack("<III", *row) for row in entries)
-    size = _align(table_offset + len(table), 0x200)
-    raw_size = size - last["raw"]
-    image_size = _align(last["rva"] + raw_size, 0x1000)
-
-    result = bytearray(vanilla)
-    result.extend(b"\0" * (size - len(result)))
+    codes = []
     for rva, island in placed:
         code = bytearray(island["code"])
         for at, target in island["relocations"]:
             code[at:at + 4] = _rel32(rva + at + 4, target)
-        start = file_offset(rva)
-        result[start:start + len(code)] = code
-    result[table_offset:table_offset + len(table)] = table
+        codes.append((rva, bytes(code)))
+    functions = sorted((rva + start, rva + end, rva + unwind)
+                       for rva, island in placed for start, end, unwind in island["functions"])
 
     claimed: list[tuple[int, int, str]] = []
+    hooks = []
     for spec in patches:
         for hook in spec["hooks"]:
             rva, original = hook["rva"], hook["original"]
@@ -288,16 +275,62 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
                 target = addresses[(hook["owner"], name)] + offset
                 replacement[displacement:displacement + 4] = _rel32(
                     rva + displacement + 4, target)
-            result[at:at + len(original)] = replacement + hook["pad"]
+            hooks.append((rva, original, bytes(replacement) + hook["pad"]))
 
+    growth = []
     for spec in patches:
         for name, minimum in spec["sectionVirtualSize"].items():
             section = next((item for item in pe.sections if item["name"] == name), None)
             following = next((item for item in pe.sections if item["rva"] > (section or {}).get("rva", -1)), None)
             if section is None or following is None or not section["vsize"] <= minimum <= following["rva"] - section["rva"]:
                 raise PatchError(f"{spec['owner']}: cannot grow {name} to {minimum:X}")
-            current = struct.unpack_from("<I", result, section["header"] + 8)[0]
-            struct.pack_into("<I", result, section["header"] + 8, max(current, minimum))
+            growth.append((section, minimum))
+    return {"pe": pe, "base": base, "cursor": cursor, "codes": codes,
+            "functions": functions, "hooks": hooks, "growth": growth}
+
+
+def compose(vanilla: bytes, specs: list[dict]) -> bytes:
+    """The vanilla executable with every validated tweak patch applied.
+
+    With no patches it returns the vanilla bytes unchanged.
+    """
+    layout = _layout(vanilla, specs)
+    if layout is None:
+        return bytes(vanilla)
+    pe, base, cursor = layout["pe"], layout["base"], layout["cursor"]
+    last = pe.last
+
+    def file_offset(rva: int) -> int:
+        return last["raw"] + rva - last["rva"]
+
+    table_rva = _align(cursor, 16)
+    table_offset = file_offset(table_rva)
+    original_offset, original_size = struct.unpack_from("<II", vanilla, pe.exception)
+    original_table = vanilla[pe.offset(original_offset, original_size):][:original_size]
+    entries = list(struct.iter_unpack("<III", original_table))
+    if any(a[0] > b[0] for a, b in zip(entries, entries[1:])) or entries[-1][1] > base:
+        raise PatchError("The original exception table cannot be extended safely")
+    entries.extend(layout["functions"])
+    entries.sort(key=lambda row: row[0])
+    if any(a[1] > b[0] for a, b in zip(entries, entries[1:])):
+        raise PatchError("Two tweaks' native functions overlap")
+    table = b"".join(struct.pack("<III", *row) for row in entries)
+    size = _align(table_offset + len(table), 0x200)
+    raw_size = size - last["raw"]
+    image_size = _align(last["rva"] + raw_size, 0x1000)
+
+    result = bytearray(vanilla)
+    result.extend(b"\0" * (size - len(result)))
+    for rva, code in layout["codes"]:
+        start = file_offset(rva)
+        result[start:start + len(code)] = code
+    result[table_offset:table_offset + len(table)] = table
+    for rva, original, replacement in layout["hooks"]:
+        at = pe.offset(rva, len(original))
+        result[at:at + len(original)] = replacement
+    for section, minimum in layout["growth"]:
+        current = struct.unpack_from("<I", result, section["header"] + 8)[0]
+        struct.pack_into("<I", result, section["header"] + 8, max(current, minimum))
 
     # One layout, one set of headers. SizeOfCode follows the image size, as
     # the reviewed tweaks wrote it; the loader does not read it.
@@ -310,3 +343,78 @@ def compose(vanilla: bytes, specs: list[dict]) -> bytes:
     struct.pack_into("<II", result, last["header"] + 8, raw_size, last["rva"])
     struct.pack_into("<I", result, last["header"] + 16, raw_size)
     return bytes(result)
+
+
+# --- The in-memory backend ---------------------------------------------------
+#
+# Lexeditor never writes the game's executable. dinput8.dll (the loader in
+# plugins/ds1/runtime/, which the game loads before its own code runs) reads
+# this description and makes the same changes in memory: islands in pages
+# allocated right after the image (the executable has a fixed base and no
+# ASLR, so the composer's addresses hold), their unwind entries registered
+# with the system, and hooks written only after every hook's original bytes
+# and the image's identity have been checked. Any mismatch changes nothing.
+#
+# Little-endian: "LXD1PAT\0", version, SizeOfImage, TimeDateStamp, record
+# count, then records of (kind, rva, length) followed by their payload:
+#   1 HOOK      original[length] then replacement[length]
+#   2 BLOCK     data[length], placed at a page-aligned rva past the image
+#   3 FUNCTIONS length entries of (begin, end, unwind) rvas, 12 bytes each
+#   4 WRITABLE  no payload: [rva, rva+length) must be committed and writable
+
+RUNTIME_MAGIC = b"LXD1PAT\0"
+RUNTIME_VERSION = 1
+HOOK, BLOCK, FUNCTIONS, WRITABLE = 1, 2, 3, 4
+
+
+def runtime_patch(vanilla: bytes, specs: list[dict]) -> bytes | None:
+    """The in-memory loader's description of every patch, or None for none."""
+    layout = _layout(vanilla, specs)
+    if layout is None:
+        return None
+    pe, base = layout["pe"], layout["base"]
+    image_size = struct.unpack_from("<I", vanilla, pe.size_of_image)[0]
+    timestamp = struct.unpack_from("<I", vanilla, pe.nt + 8)[0]
+    if base < image_size:
+        raise PatchError("Native code would overlap the game's own image")
+    records = []
+    if layout["codes"]:
+        start = layout["codes"][0][0]
+        block = bytearray(layout["codes"][-1][0] + len(layout["codes"][-1][1]) - start)
+        for rva, code in layout["codes"]:
+            block[rva - start:rva - start + len(code)] = code
+        if start % ISLAND_ALIGNMENT:
+            raise PatchError("Native code must start on a 64 KB boundary")
+        records.append(struct.pack("<III", BLOCK, start, len(block)) + bytes(block))
+    if layout["functions"]:
+        records.append(struct.pack("<III", FUNCTIONS, 0, len(layout["functions"]))
+                       + b"".join(struct.pack("<III", *row) for row in layout["functions"]))
+    for section, minimum in layout["growth"]:
+        if minimum > section["vsize"]:
+            records.append(struct.pack("<III", WRITABLE, section["rva"] + section["vsize"],
+                                       minimum - section["vsize"]))
+    for rva, original, replacement in sorted(layout["hooks"]):
+        records.append(struct.pack("<III", HOOK, rva, len(original)) + original + replacement)
+    return (RUNTIME_MAGIC + struct.pack("<IIII", RUNTIME_VERSION, image_size, timestamp, len(records))
+            + b"".join(records))
+
+
+def read_runtime_patch(data: bytes) -> dict:
+    """Parse a runtime description, as the loader does, for checks and status."""
+    if data[:8] != RUNTIME_MAGIC or len(data) < 24:
+        raise PatchError("Not a Lexeditor DS1 runtime patch")
+    version, image_size, timestamp, count = struct.unpack_from("<IIII", data, 8)
+    if version != RUNTIME_VERSION:
+        raise PatchError("Unsupported runtime patch version")
+    at, records = 24, []
+    for _ in range(count):
+        kind, rva, length = struct.unpack_from("<III", data, at)
+        at += 12
+        size = {HOOK: 2 * length, BLOCK: length, FUNCTIONS: 12 * length, WRITABLE: 0}.get(kind)
+        if size is None or at + size > len(data):
+            raise PatchError("Damaged runtime patch")
+        records.append((kind, rva, length, data[at:at + size]))
+        at += size
+    if at != len(data):
+        raise PatchError("Damaged runtime patch")
+    return {"imageSize": image_size, "timestamp": timestamp, "records": records}
