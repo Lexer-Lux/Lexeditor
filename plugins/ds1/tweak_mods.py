@@ -232,11 +232,20 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
     return specs
 
 
+STUCK_GAME = ('A closed Dark Souls Remastered is still listed by Windows and keeps DarkSoulsRemastered.exe locked (a crashed game whose process cannot be ended). Close every Lexeditor window; if DarkSoulsRemastered.exe is still in Task Manager after that, restart Windows. Then try again; nothing was lost.')
+
+
 def ensure_game_closed() -> None:
     if os.name != "nt":
         raise TweakError("Executable tweaks can only be applied on Windows")
     if live_processes([exe_patches.EXECUTABLE]):
         raise TweakError("Close Dark Souls Remastered before changing its executable")
+    # A crashed game can stay listed with no threads (a zombie). It is not
+    # running, but it keeps the executable locked, so replacing it would fail
+    # halfway with a bare "Access is denied". Say so before anything starts.
+    from core.process_probe import zombie_processes
+    if zombie_processes([exe_patches.EXECUTABLE]):
+        raise TweakError(STUCK_GAME)
 
 
 # No project argument means retain the last explicitly applied project rules.
@@ -397,10 +406,7 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
             # A game that has closed can stay in Windows' process list while
             # Steam holds it, and it keeps the file locked. The journal above
             # makes the retry safe.
-            raise TweakError(
-                f"Windows will not let Lexeditor replace the {managed.label}: a closed Dark Souls "
-                "Remastered is still holding it. Exit Steam completely (or end DarkSoulsRemastered.exe "
-                "in Task Manager), then try again. Nothing was lost.") from error
+            raise TweakError(f"Windows will not let Lexeditor replace the {managed.label}. {STUCK_GAME}") from error
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
     _finish_manifest(game_root, after, mods, project, managed)
