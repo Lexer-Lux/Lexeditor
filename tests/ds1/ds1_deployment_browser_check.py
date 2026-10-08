@@ -33,8 +33,11 @@ def main():
         edited.edit('EquipParamGoods', 100, 'sellValue', 42)
         (mod / RELATIVE).write_bytes(edited.export())
         original_hash = hashlib.sha256(raw).hexdigest()
+        # Apply combines every enabled library mod; this check's library is empty.
+        (temp / 'library').mkdir()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
-                              'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
+                              'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0',
+                              'LEXEDITOR_DS1_MODS_ROOT': str(temp / 'library')})
         errors = []
         try:
             session.start()

@@ -284,8 +284,14 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     }
 
 
-def apply(game_root: Path, project_root: Path | None, *, transform=None) -> dict:
-    """Preserve the installed original once, then replace it with the saved project archive."""
+def apply(game_root: Path, project_root: Path | None, *, transform=None, composed=None) -> dict:
+    """Preserve the installed original once, then replace it with the saved project archive.
+
+    `composed` maps each file to the bytes the mod loader built from every
+    enabled mod (mod_loader.py); a file it leaves out goes back to the
+    original. The project still owns the deployment, and its own saved bytes
+    are what a later Apply compares to see whether it is out of date.
+    """
     if project_root is None:
         raise ValueError("Select or create a mod project before applying it to the installed game.")
     # Check the raw roots themselves, and everything above them, before any
@@ -298,7 +304,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None) -> dict
     if not project_marker.is_file():
         raise ValueError("Select a valid Dark Souls mod project before applying it.")
     source = project_root / RELATIVE
-    if not source.is_file():
+    if composed is None and not source.is_file():
         raise FileNotFoundError(f"Save the project before applying it; no {RELATIVE.as_posix()} was found in it.")
     _assert_disjoint(game_root, project_root)
     # Every file the project holds is checked before any of them is written.
@@ -306,12 +312,20 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None) -> dict
     for relative, reader in FILES:
         candidate = project_root / relative
         _assert_no_reparse_points(candidate, project_root)
-        if not candidate.is_file():
-            continue
-        if candidate.stat().st_size > MAX_ARCHIVE:
+        own = candidate.is_file()
+        if own and candidate.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{candidate.name} is too large to apply.")
-        payload = candidate.read_bytes()
-        source_hash = hashlib.sha256(payload).hexdigest()
+        if composed is not None:
+            if relative not in composed:
+                continue
+            payload = composed[relative]
+            if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
+                raise ValueError(f"The combined {relative.name} is invalid")
+        elif not own:
+            continue
+        else:
+            payload = candidate.read_bytes()
+        source_hash = hashlib.sha256(candidate.read_bytes() if own else payload).hexdigest()
         if transform is not None and relative == RELATIVE:
             payload = transform(payload)
             if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:

@@ -242,7 +242,10 @@ def test_service_exposes_apply_and_disable_routes(tmp_path):
     from urllib.request import Request, urlopen
     from plugins.ds1.plugin import DS1Session
     game, mod = project(tmp_path)
-    ItemStore(game, mod, False).save()
+    store = ItemStore(game, mod, False)
+    # A mod that changes nothing installs nothing, so this one changes a price.
+    store.edit("EquipParamGoods", 100, "sellValue", 42)
+    store.save()
     original = (game / RELATIVE).read_bytes()
     session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
                           "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})

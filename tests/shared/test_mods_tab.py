@@ -26,7 +26,12 @@ HOST = """(options) => {
     open_lexmod: async (...args) => record('open_lexmod')(...args),
     open_home_link: async (...args) => record('open_home_link')(...args),
     activate_enabled_mods: async (...args) => { record('activate_enabled_mods')(...args); return {activated: true}; },
-    mods_overview: async () => ({rows: JSON.parse(JSON.stringify(rows)), canManage: true,
+    // The game's loader reports a conflict while both mods are on.
+    mods_overview: async () => ({rows: JSON.parse(JSON.stringify(rows)).map(row =>
+        options.conflicts && rows.every(item => item.enabled)
+          ? {...row, conflicts: [row.name === 'Combat' ? 'Items 100, Sell value: overrides Mine'
+              : "Items 100, Sell value: Combat changes this too and loads later, so this mod's change is not used"]}
+          : row), canManage: true,
       remote: [{folder: 'Extra', name: 'Extra', author: 'Lexer', description: 'More.', enabled: true, remote: true}],
       lexmod: {repository: 'Lexer-Lux/X', url: 'https://github.com/Lexer-Lux/X', error: ''}}),
     lexmod_update: async () => ({updated: false}),
@@ -56,9 +61,9 @@ HOST = """(options) => {
 }"""
 
 
-def mount(page, first_run=False, lexmod=False, vanilla=False):
+def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False):
     framework(page)
-    page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla})
+    page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts})
     page.wait_for_timeout(250)
 
 
@@ -194,3 +199,22 @@ def test_vanilla_still_switches_mods_and_reads_text_boxes(page):
     page.get_by_role("checkbox", name="Flag").click(force=True)
     page.get_by_text("Create a mod to edit?").wait_for()
     assert not page.get_by_role("checkbox", name="Flag").is_checked()
+
+
+def test_switched_on_mods_that_conflict_show_a_red_mark_with_the_details(page):
+    mount(page, conflicts=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    assert page.locator(".lex-conflict-mark").count() == 0
+    page.get_by_role("checkbox", name="Switch Combat").check()
+    # Switching one mod re-reads every row: both now carry the mark.
+    page.wait_for_function("document.querySelectorAll('.lex-column-list .lex-conflict-mark').length === 2")
+    mark = page.locator(".lex-column-list .lex-conflict-mark").first
+    assert mark.inner_text() == "!"
+    colour = mark.evaluate("n => getComputedStyle(n).backgroundColor")
+    assert colour not in ("rgba(0, 0, 0, 0)", "transparent"), colour
+    mark.hover()
+    page.locator(".lex-help-popover .lex-conflict-list li").first.wait_for()
+    assert "Combat changes this too" in page.locator(".lex-help-popover").inner_text()
+    page.get_by_role("checkbox", name="Switch Combat").uncheck()
+    page.wait_for_function("!document.querySelector('.lex-column-list .lex-conflict-mark')")

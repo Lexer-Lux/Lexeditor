@@ -589,7 +589,7 @@
     if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
-      onclick = null, ...rest
+      onclick = null, symbol = "?", ...rest
     } = attrs;
     const interactive = typeof onclick === "function";
     const popupId = `lex-help-${++infoHelpSequence}`;
@@ -599,7 +599,7 @@
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
       "aria-label": ariaLabel, "aria-describedby": popupId,
-    }, element("span", {"aria-hidden": "true"}, "?"));
+    }, element("span", {"aria-hidden": "true"}, symbol));
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
     const scheduleClose = () => {
@@ -11814,6 +11814,14 @@ ${contents.path}`});
     : progress.total ? `Downloading… ${Math.round(progress.done / progress.total * 100)}%`
     : `Downloading… ${(progress.done / 1048576).toFixed(1)} MB`;
 
+  // A mod whose changes another switched-on mod overrides, or that overrides
+  // another's: a red "!" on its row, the list in its bubble. Every game's
+  // loader reports these the same way (core/mod_conflicts.py).
+  const conflictMark = lines => infoHelp(
+    element("ul", {class: "lex-conflict-list"}, ...lines.map(line => element("li", {}, line))),
+    {class: "lex-conflict-mark", symbol: "!", title: "",
+     "aria-label": `Conflicts with other mods: ${lines.join("; ")}`});
+
   const modsPage = (pluginId, pluginName) => {
     let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
@@ -11887,7 +11895,7 @@ ${contents.path}`});
       }
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
         onchange: async event => {
-          try { replaceRow(await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked)); draw(); }
+          try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
           catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
         }});
       const sections = [];
@@ -11916,6 +11924,8 @@ ${contents.path}`});
           detailField({label: "FOLDER", control: readonlyField(row.path)}),
           actionRow(element("button", {type: "button", onclick: () => callWindow("open_mod_folder", pluginId, row.path).catch(error => failure("Could not open the folder", error))}, "Open folder"))]}));
       const notes = [row.error ? detailNote(row.error) : null,
+        row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
+          conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
       return detailPanel({title: row.name, actions: [toggle], body: [...notes, ...sections], paginate: {inline: true}});
     };
@@ -11935,7 +11945,8 @@ ${contents.path}`});
           rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
           select: row => { select(row); selected = keyOf(row); draw(); },
           columns: [
-            {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.name)},
+            {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
+              row.name, row.on && row.conflicts?.length ? conflictMark(row.conflicts) : null)},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
             {key: "on", label: "On", sortable: false, render: row => row.remote
               ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,
@@ -11945,7 +11956,7 @@ ${contents.path}`});
               : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
                   onclick: event => event.stopPropagation(),
                   onchange: async event => {
-                    try { replaceRow(await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked)); draw(); }
+                    try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
                     catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
                   }})}]}),
         detail, emptyDetail: () => detail()});
@@ -11956,6 +11967,7 @@ ${contents.path}`});
         main = target;
         draw();
         try { await load(); } catch (error) { main.replaceChildren(notice({tone: "warning", message: error.message || String(error)})); return; }
+        if (data.conflictError) showToast?.(`Could not check the mods for conflicts: ${data.conflictError}`, {tone: "warning"});
         draw();
         // Downloaded Lexer's Mod modules stay up to date.
         callWindow("lexmod_update", pluginId).then(async result => {
@@ -12021,7 +12033,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

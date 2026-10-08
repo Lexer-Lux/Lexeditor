@@ -55,8 +55,11 @@ def main():
         (game / RELATIVE).write_bytes(source)
         mod.mkdir()
         (mod / MARKER).touch()
+        # Apply builds and combines the library's mods; this check's is empty.
+        (root / "library").mkdir()
         env = {"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
-               "LEXEDITOR_NO_MOD": "0", "LEXEDITOR_MOD_READ_ONLY": "0"}
+               "LEXEDITOR_NO_MOD": "0", "LEXEDITOR_MOD_READ_ONLY": "0",
+               "LEXEDITOR_DS1_MODS_ROOT": str(root / "library")}
         session = DS1Session(env)
         errors = []
         try:

@@ -125,6 +125,27 @@ class Ff8ModAdapter:
                 "runtimeRoot": str(runtime), "composition": composition,
                 "gameRoot": str(game_root), "libraryRoot": str(library)}
 
+    def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
+        """The last composition's files where one mod's version replaced another's.
+
+        Semantic merges and the ordered Hext stream combine their mods, so only
+        a file kept whole from one mod (the record says what was dropped) counts.
+        """
+        from core.mod_conflicts import lines_by_mod
+        project, library, runtime, _ = self._roots()
+        rows = {row["id"]: row for row in runtime_layout.catalog(project, library)}
+        wanted = {Path(path).resolve() for path in mods}
+        names = {row["id"]: row.get("name") or row["id"] for row in rows.values()}
+        folders = {names[key]: str(Path(row["path"]).resolve()) for key, row in rows.items()
+                   if Path(row["path"]).resolve() in wanted}
+        found = []
+        for record in runtime_layout.read(runtime).get("conflicts", []):
+            if not isinstance(record, dict) or not record.get("warning"):
+                continue
+            found.append((str(record.get("path", "")),
+                          [names.get(str(claimant), str(claimant)) for claimant in record.get("claimants", [])]))
+        return lines_by_mod(found, folders)
+
     def active_mod_ids(self, game_root: Path) -> list[str]:
         """Report the mods of the composed runtime, not the requested ones."""
         _, _, runtime, _ = self._roots()

@@ -1735,8 +1735,33 @@ class HostApi:
         plugin = self._plugins[plugin_id]
         result = mods_service.overview(root, plugin.lexmod)
         status = self.mod_library_status(plugin_id)
-        return {**result, "root": str(root), "canManage": bool(status.get("canManage")),
-                "message": status.get("message", "")}
+        result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
+                  "message": status.get("message", "")}
+        self._attach_conflicts(plugin_id, result)
+        return result
+
+    def _attach_conflicts(self, plugin_id: str, result: dict) -> None:
+        """Mark each switched-on mod whose changes another mod overrides.
+
+        A game's loader reports, by mod folder, what it cannot combine
+        (adapter.conflicts); the Mods tab shows it on the mod's row. A loader
+        without that report, or a game not located yet, marks nothing.
+        """
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get("root") if adapter is not None else ""
+        if not game or not hasattr(adapter, "conflicts"):
+            return
+        enabled = [Path(row["path"]) for row in result["rows"] if row.get("enabled")]
+        try:
+            found = adapter.conflicts(enabled, Path(game)) if enabled else {}
+        except (OSError, ValueError, RuntimeError) as error:
+            result["conflictError"] = str(error)
+            return
+        found = {str(Path(key).resolve()): lines for key, lines in found.items()}
+        for row in result["rows"]:
+            lines = found.get(str(Path(row["path"]).resolve())) if row.get("enabled") else None
+            if lines:
+                row["conflicts"] = list(lines)
 
     def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
         from core import mod_metadata, mods_service

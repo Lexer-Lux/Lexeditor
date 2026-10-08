@@ -279,12 +279,21 @@ class NativeRules:
                 raise ValueError("The saved project changed while Apply was being prepared")
             return current
 
+        # Every enabled mod is combined with this one over the game's own
+        # files, before anything installed is touched.
+        from . import mod_loader
+        composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project)
         # Preflight again after building scripts, before touching installed data.
         checked_source(_read_optional(self.project / RELATIVE, MAX_ARCHIVE))
         if plan is not None:
             tweak_mods.commit(self.game_root, plan)
+
+        # The project's saved archive is checked once more just before writing.
+        def unchanged(current):
+            checked_source(_read_optional(self.project / RELATIVE, MAX_ARCHIVE))
+            return current
         try:
-            deployment.apply(self.game_root, self.project, transform=checked_source)
+            deployment.apply(self.game_root, self.project, transform=unchanged, composed=composition.files)
         except Exception as error:
             if plan is not None:
                 try:

@@ -44,6 +44,11 @@ work, even if your tool does not load skills on its own.
   least a name (author, description and credits optional); every game gets
   the shared Mods tab and first-run screen from the shell. Lexer's Mod for a
   game is `lexmod` in its plugin.json. See `codex/shared/mod-format.md`.
+- A mod changes records, not files. A game's loader combines every enabled
+  mod over the game's own (vanilla) files, never copies one mod's whole file
+  over another's, and reports only what it truly cannot combine through its
+  adapter's `conflicts()`; the Mods tab marks those mods
+  (`core/mod_conflicts.py`, DS1's `plugins/ds1/mod_loader.py`).
 - Every game plugin exposes a Data Map screen. A generic Files tab is not the
   player-facing editor for data that needs a format-specific view.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the

@@ -25,8 +25,9 @@ def main():
         root=Path(folder);game=root/"game";mod=root/"mod"
         (game/RELATIVE).parent.mkdir(parents=True);(game/RELATIVE).write_bytes(raw)
         mod.mkdir();(mod/MARKER).touch()
+        (game.parent/"library").mkdir(exist_ok=True)  # Apply reads an empty library of its own
         env={"LEXEDITOR_DS1_ROOT":str(game),"LEXEDITOR_DS1_PROJECT":str(mod),
-             "LEXEDITOR_NO_MOD":"0","LEXEDITOR_MOD_READ_ONLY":"0"}
+             "LEXEDITOR_NO_MOD":"0","LEXEDITOR_MOD_READ_ONLY":"0","LEXEDITOR_DS1_MODS_ROOT":str(game.parent/"library")}
         session=DS1Session(env)
         try:
             session.start()
