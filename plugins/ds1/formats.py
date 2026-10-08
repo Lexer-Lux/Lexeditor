@@ -23,7 +23,7 @@ METADATA = Path(__file__).with_name('metadata')
 TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2),
           'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1),
-          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 1)}
+          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2)}
 OPTIONAL_TABLES = frozenset({'SpEffectParam'})
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}

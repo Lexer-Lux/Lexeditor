@@ -136,7 +136,7 @@ def test_missing_effect_table_keeps_old_projects_usable():
         doc.list_rows("effects-all")
 
 
-@pytest.mark.parametrize("options", [{"version":2},{"effect_size":364},{"effect_size":372}])
+@pytest.mark.parametrize("options", [{"version":1},{"effect_size":364},{"effect_size":372}])
 def test_wrong_layout_rejected(options):
     with pytest.raises(FormatError):
         ItemDocument(make_effects_archive(**options))

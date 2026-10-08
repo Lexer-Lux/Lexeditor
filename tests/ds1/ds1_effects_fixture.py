@@ -14,7 +14,7 @@ def wrap(plain, header):
     return bytes(result) + compressed
 
 
-def make_effects_archive(*, effect_size=368, version=1):
+def make_effects_archive(*, effect_size=368, version=2):
     """Append an independently specified effect table to the existing fixture."""
     source = make_archive()
     document = ItemDocument(source)
