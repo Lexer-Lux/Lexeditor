@@ -25,12 +25,12 @@ def rebuild(root: Path) -> tuple[bytes, list[tuple[int, int]]]:
             if "R_X86_64_" not in line:
                 continue
             match = re.fullmatch(
-                r"([0-9a-f]+)\\s+[0-9a-f]+\\s+R_X86_64_(?:PC32|PLT32)\\s+[0-9a-f]+\\s+(\\w+)\\s+- 4",
+                r"([0-9a-f]+)\s+[0-9a-f]+\s+R_X86_64_(?:PC32|PLT32)\s+[0-9a-f]+\s+(\w+)\s+- 4",
                 line.strip())
             if match is None or match[2] not in TARGETS:
                 raise ValueError("Unreviewed assembly relocation: " + line)
             relocations.append((int(match[1], 16), TARGETS[match[2]]))
         data = binary.read_bytes()
-        if len(relocations) != 6 or any(data[at:at+4] != b"\\0"*4 for at, _ in relocations):
+        if len(relocations) != 6 or any(data[at:at+4] != b"\0"*4 for at, _ in relocations):
             raise ValueError("The assembly externals changed")
         return data, sorted(relocations)
