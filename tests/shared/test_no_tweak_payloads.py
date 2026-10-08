@@ -47,7 +47,10 @@ MOVED_TWEAK_MODULES = {
         "switch_issue_52", "timed_hits", "true_atb_wait_issue_63",
         "vibration_consolidation_issue_66", "world_map_fullscreen_issue_90",
     },
-    "ds1": {"ammunition_controls", "ammunition_tweak", "equip_load_percentage", "tweaks"},
+    "ds1": {
+        "ammunition_controls", "ammunition_tweak", "equip_load_percentage", "tweaks",
+        "out_of_combat_sprint", "sprint_settings", "sprint_deployment", "sprint_editor",
+    },
 }
 # Modules named like a tweak that have not moved yet.
 ALLOWED_TWEAK_MODULES = {

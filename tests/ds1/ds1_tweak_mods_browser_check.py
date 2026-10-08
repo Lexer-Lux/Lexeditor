@@ -33,7 +33,8 @@ def make(library: Path, mod_id: str, name: str, order: int) -> Path:
 
 
 def main():
-    output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    destination = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("LEXEDITOR_CHECK_ARTIFACTS")
+    output = Path(destination) if destination else None
     if output:
         output.mkdir(parents=True, exist_ok=True)
     errors = []
@@ -91,8 +92,13 @@ def main():
                     reveal(page, page.get_by_text('DarkSoulsRemastered.exe is missing'))
                     assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
                     reveal(page, page.get_by_role('button', name='Trust this tweak'))
-                    if output:
-                        page.screenshot(path=str(output / 'ds1-tweaks.png'))
+                    # The Tweaks page must stay usable in both window sizes.
+                    for width, height in ((1440, 900), (1000, 700)):
+                        page.set_viewport_size({"width": width, "height": height})
+                        page.get_by_role('button', name='Trust this tweak').wait_for(state='visible')
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                        if output:
+                            page.screenshot(path=str(output / f'ds1-tweaks-{width}x{height}.png'))
                     # A tweak is a mod: the Tweaks tab has no switch, only
                     # an OFF mark while its mod is disabled.
                     assert page.get_by_role('checkbox', name='Equip Load Percentage').count() == 0
@@ -128,7 +134,11 @@ def main():
                     browser.close()
         finally:
             session.stop()
-    print(json.dumps({'tweakMods': 2, 'noSwitch': True, 'trusted': True, 'missingExecutableReported': True}))
+    evidence = {'tweakMods': 2, 'noSwitch': True, 'trusted': True,
+                'missingExecutableReported': True, 'viewports': [[1440, 900], [1000, 700]]}
+    if output:
+        (output / "ds1-tweak-controls.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    print(json.dumps(evidence))
 
 
 if __name__ == '__main__':
