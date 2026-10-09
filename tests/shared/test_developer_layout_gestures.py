@@ -69,6 +69,72 @@ def test_holding_right_on_a_heading_adds_a_section_and_removes_an_empty_one(page
     assert page.locator("[data-lex-custom-section]").count() == 0
 
 
+def test_a_hidden_property_stays_hidden_when_the_page_gains_a_field(page):
+    # Lexer: "I spent all this time hiding these properties and then they all
+    # just unhid themselves." A layout was keyed by the page's exact field list.
+    mount(page)
+    hold_right(page, page.locator(".lex-detail-field", has_text="Speed"))
+    page.evaluate("""() => {
+      const U = LexeditorUI;
+      const field = (label, value) => U.detailField({label, property: label.toLowerCase(),
+        control: U.el('input', {type: 'number', value})});
+      document.querySelector('main').replaceChildren(U.detailPanel({title: 'Record', body: [
+        U.detailSection({title: 'Combat', body: [field('Power', 7), field('Speed', 3), field('Reach', 2)]}),
+        U.detailSection({title: 'Drops', body: [field('Gold', 50)]})]}));
+    }""")
+    page.wait_for_timeout(300)
+    assert "lex-property-hidden" in page.locator(".lex-detail-field", has_text="Speed").get_attribute("class")
+    assert "lex-property-hidden" not in page.locator(".lex-detail-field", has_text="Reach").get_attribute("class")
+
+
+def test_a_pages_own_section_is_removed_once_its_properties_are_moved_out(page):
+    # Lexer: "I tried deleting a details panel header but couldn't." Holding on
+    # a shipped heading only ever added another section.
+    mount(page)
+    drops = page.locator(".lex-detail-section", has=page.locator(".lex-detail-section-title", has_text="Drops"))
+    # Move Gold into Combat, as dragging it would.
+    page.evaluate("""() => {
+      const gold = [...document.querySelectorAll('.lex-detail-field')].find(n => n.textContent.includes('Gold'));
+      const combat = [...document.querySelectorAll('.lex-detail-section')].find(n => n.textContent.includes('Combat'));
+      combat.querySelector('.lex-detail-section-content').append(gold);
+    }""")
+    hold_right(page, drops.locator(".lex-detail-section-title"))
+    assert drops.is_hidden()
+    assert page.locator("[data-lex-custom-section]").count() == 0, "removing must not add a section"
+    assert any("removed" in __import__("json").loads(value) and __import__("json").loads(value)["removed"]
+               for save in layout_saves(page) for value in save.values())
+    # Undo brings it back.
+    page.locator("body").click(position={"x": 2, "y": 2})
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    assert drops.is_visible()
+
+
+def test_a_heading_drags_its_section_and_the_order_is_kept(page):
+    # Lexer: "I can't move or rearrange [headers] like properties."
+    mount(page)
+    titles = lambda: page.locator(".lex-detail-section-title-text").all_text_contents()
+    assert titles() == ["Combat", "Drops"]
+    page.locator(".lex-detail-section-title", has_text="Drops").drag_to(
+        page.locator(".lex-detail-section-title", has_text="Combat"), target_position={"x": 10, "y": 2})
+    page.wait_for_timeout(200)
+    assert titles() == ["Drops", "Combat"]
+    page.evaluate(PANEL)
+    page.wait_for_timeout(300)
+    assert titles() == ["Drops", "Combat"], "the order belongs to the saved layout"
+    page.locator("body").click(position={"x": 2, "y": 2})
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    assert titles() == ["Combat", "Drops"]
+
+
+def test_holding_on_a_section_that_still_holds_properties_adds_one_instead(page):
+    mount(page)
+    hold_right(page, page.locator(".lex-detail-section-title", has_text="Drops"))
+    assert page.locator(".lex-detail-section-title", has_text="Drops").is_visible()
+    assert page.locator("[data-lex-custom-section]").count() == 1
+
+
 def test_right_clicking_the_shortcuts_button_lists_the_developer_gestures(page):
     mount(page)
     page.locator("#lexeditor-shortcuts, [aria-label='Keyboard shortcuts'], button[title*='shortcuts' i]").first.click(button="right")

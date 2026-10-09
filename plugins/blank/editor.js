@@ -15,7 +15,7 @@
   const activeRows=()=>activeSource==="vanilla"?vanillaRows:rows;
   const selectedRow=()=>activeRows().find(value=>value.id===selected)||activeRows()[0];
   const vanillaRow=id=>vanillaRows.find(value=>value.id===id)||vanillaRows[0];
-  const sortedRows=()=>[...activeRows()].filter(row=>!query||`${row.id} ${row.name} ${row.category} ${row.value}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((left,right)=>{const a=left[sort.key],b=right[sort.key];return(typeof a==="string"?a.localeCompare(b):Number(a)-Number(b))*sort.dir});
+  const sortedRows=()=>[...activeRows()].filter(row=>!query||`${row.id} ${row.name} ${row.category} ${row.value}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((left,right)=>LexeditorUI.compareRecords(left,right,sort));
   const dirtyCount=()=>activeSource==="mine"?Number(JSON.stringify({rows,demo})!==JSON.stringify(saved)):0;
   const refreshShell=()=>shell?.refresh?.();
   function sourceControl({control,current,vanilla,references=[],apply,internal=false}){return provenanceControl({control,current,vanilla,references,internal,apply:value=>{apply(value);refreshShell()}})}

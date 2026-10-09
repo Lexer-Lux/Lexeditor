@@ -701,8 +701,16 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+        # A layout change saves at once, so a fresh owner check per save (a
+        # GitHub CLI round trip, slower while the keyring is busy) queued up
+        # behind every drag and hide. One check holds for five minutes.
+        checked = getattr(self, "_default_view_owner_checked", 0.0)
+        fresh = time.monotonic() - checked > 300
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=fresh):
+            self._default_view_owner_checked = 0.0
             raise PermissionError("Developer Mode requires Lexer's active GitHub account")
+        if fresh:
+            self._default_view_owner_checked = time.monotonic()
         tab_id = str(tab_id).strip()
         token = f"{plugin_id}-{tab_id}"
         if not tab_id or not isinstance(preferences, dict):

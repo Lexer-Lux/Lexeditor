@@ -116,6 +116,18 @@ def reference_keys(document, table, row_id):
             break
 
 
+def reference_switches(document, table):
+    """The fields that decide whether another field is an effect reference
+    (an accessory's refCategory decides what its refId points at)."""
+    switches = set()
+    for item in document.schemas[table]["fields"]:
+        for expression in (item["spec"].reference or "").split(","):
+            match = re.fullmatch(r"SpEffectParam\((\w+)=(-?\d+)\)", expression)
+            if match:
+                switches.add(match[1])
+    return switches
+
+
 class EffectReferences:
     """A current-archive index, not an inference from vanilla item names."""
 

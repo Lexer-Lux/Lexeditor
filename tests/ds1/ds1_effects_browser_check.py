@@ -135,7 +135,8 @@ def main():
                     page.locator('[data-tab="items"]').click()
                     page.locator('[data-subtab="weapons"]').click()
                     page.wait_for_function("state.row?.table==='EquipParamWeapon' && state.row.id===100")
-                    link=page.get_by_role("button",name="Grass Crest Shield",exact=True)
+                    # An effect field opens its effect from the Open button beside it.
+                    link=page.get_by_role("button",name="Open Grass Crest Shield",exact=True)
                     for _ in range(60):
                         if link.count() and link.is_visible():break
                         next_page=page.locator(".lex-tweaks-pages").get_by_role("button",name="Next page",exact=True)

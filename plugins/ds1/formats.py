@@ -14,9 +14,9 @@ import xml.etree.ElementTree as ET
 import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
-from .monsters import RESISTANCES, classified_monster
+from .monsters import RESISTANCES, WEAKNESSES, classified_monster
 from .attacks import ATTACK_FIELDS, AttackReferences
-from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys
+from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys, reference_switches
 
 FormatError = DS3FormatError
 METADATA = Path(__file__).with_name('metadata')
@@ -221,7 +221,8 @@ def schema(table):
             protected = True
         field = FieldSpec(key, dtype, field_offset, count, bit_used if bits else None, bits,
                           label, description, group,
-                          'IsBool' in attrs or bits == 1, enum_name, attrs.get('Refs'), padding)
+                          'IsBool' in attrs or bits == 1 or (table == 'NpcParam' and key in WEAKNESSES),
+                          enum_name, attrs.get('Refs'), padding)
         low, high = field.minimum, field.maximum
         if low is None:
             low, high = (-3.4028234663852886e38, 3.4028234663852886e38) if dtype != 'f64' else (-1.7976931348623157e308, 1.7976931348623157e308)
@@ -233,6 +234,10 @@ def schema(table):
                 if math.isfinite(value):
                     if is_min: low = max(low, value)
                     else: high = min(high, value)
+        # An enemy's guard absorption is 0-100% for every kind; slash, strike
+        # and thrust were declared -100 to 100 though no enemy goes below 0.
+        if table == 'NpcParam' and key in ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'):
+            low = max(low, 0)
         if low > high:
             protected = True
         fields.append({'spec': field, 'min': low, 'max': high, 'enum': choices, 'editable': not protected, 'protectedReason': reason})
@@ -290,9 +295,48 @@ class ItemDocument:
             self.params[table] = param
             self._rows_by_id[table] = {row.row_id: row for row in param.rows}
 
+    def _change_key(self, table, row_id, key):
+        """The change a stored field belongs to, as the reader made it."""
+        if table == EFFECT_TABLE and key.endswith('DamageCutRate') and row_id >= ABSORPTION_BASE:
+            if row_id >= ENEMY_ABSORPTION_BASE:
+                return ('NpcParam', row_id - ENEMY_ABSORPTION_BASE, 'absorption:' + key)
+            return ('EquipParamProtector', (row_id - ABSORPTION_BASE) // 100 * 100, 'absorption:' + key)
+        return (table, row_id, key)
+
     @property
     def dirty_count(self):
-        return len(self.dirty) + (len(self.texts.dirty) if self.texts else 0)
+        changes = {self._change_key(*entry) for entry in self.dirty}
+        return len(changes) + (len(self.texts.dirty) if self.texts else 0)
+
+    def pending_changes(self, limit=200):
+        """What Save would write, one row per change: label, before and after."""
+        rows = []
+        for table, row_id, key in sorted({self._change_key(*entry) for entry in self.dirty}, key=str)[:limit]:
+            try:
+                name = self.display_name(table, row_id)
+                if key.startswith('absorption:'):
+                    cut = key.split(':', 1)[1]
+                    base = (ENEMY_ABSORPTION_BASE if table == 'NpcParam' else ABSORPTION_BASE) + row_id
+                    field = next(f['spec'] for f in self.schemas[EFFECT_TABLE]['fields'] if f['spec'].key == cut)
+                    _r, start, data = self._row(EFFECT_TABLE, base)
+                    before = read_field(bytes(self.original_plain[start:start + len(data)]), field, '<')
+                    after = read_field(data, field, '<')
+                    kind = dict(ABSORPTION_CUTS)[cut]
+                    rows.append({'label': f'{name} · {kind} absorption',
+                                 'before': f'{(1 - before) * 100:.1f}%', 'after': f'{(1 - after) * 100:.1f}%'})
+                    continue
+                item = next(f for f in self.schemas[table]['fields'] if f['spec'].key == key)
+                field = item['spec']
+                _r, start, data = self._row(table, row_id)
+                before = _shown(read_field(bytes(self.original_plain[start:start + len(data)]), field, '<'), field)
+                after = _shown(read_field(data, field, '<'), field)
+                rows.append({'label': f'{name} · {field.label}', 'before': before, 'after': after})
+            except (FormatError, StopIteration, KeyError):
+                rows.append({'label': f'{table} {row_id} · {key}'})
+        if self.texts:
+            for entry in sorted(self.texts.dirty, key=str)[:limit]:
+                rows.append({'label': f'Name · {entry}'})
+        return rows
 
     def display_name(self, table, row_id, row=None):
         """The item's in-game name, else its reference name, else a number."""
@@ -309,6 +353,7 @@ class ItemDocument:
             raise FormatError('These records have no in-game name to change.')
         self._row(table, row_id)
         self.texts.rename(table, row_id, name)
+        self._effects = None  # effect choices and links are listed by name
         return self.read_row(table, row_id)
 
     def _row(self, table, row_id):
@@ -403,12 +448,45 @@ class ItemDocument:
         _row, start, data = self._row(table, row_id)
         return bytes(self.original_plain[start:start + len(data)])
 
+    def _value_spans(self, table):
+        """Each number's span across the game's own rows of a table, for the
+        slider. A field bounded only by its type put every record's fill at
+        the same spot. Read once per table."""
+        cache = self.__dict__.setdefault('_spans_cache', {})
+        if table in cache:
+            return cache[table]
+        source = self.vanilla_document if self.vanilla_document is not None else self
+        plain = source.plain if source is not self else self.original_plain
+        offset, size = source.members[table + '.param'].offset, TABLES[table][0]
+        fields = [item['spec'] for item in self.schemas[table]['fields']
+                  if not item['spec'].padding and item['spec'].array_length == 1 and not item['spec'].is_bool]
+        found = {}
+        for row in source.params[table].rows:
+            data = bytes(plain[offset + row.data_offset:offset + row.data_offset + size])
+            for field in fields:
+                value = read_field(data, field, '<')
+                if isinstance(value, float) and not math.isfinite(value):
+                    continue
+                low, high = found.get(field.key, (value, value))
+                found[field.key] = (min(low, value), max(high, value))
+        spans = {}
+        for key, (low, high) in found.items():
+            # From zero (or the lowest value, when the game goes below zero)
+            # to a quarter past the highest, so the largest vanilla value is
+            # not already the end of the slider.
+            low = min(low, 0)
+            high = high + (high - low) * 0.25 if high > low else low + max(1, abs(low))
+            spans[key] = (low, high)
+        cache[table] = spans
+        return spans
+
     def read_row(self, table, row_id):
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
         vanilla = self._vanilla_row(table, row_id)
         fields = []
+        spans = self._value_spans(table)
         effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
         for item in self.schemas[table]['fields']:
             field = item['spec']
@@ -428,7 +506,9 @@ class ItemDocument:
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': item['min'], 'maximum': item['max'], 'enum': options, 'protectedReason': item.get('protectedReason', ''),
-                           'editable': item['editable'] and finite, 'vanilla': original})
+                           'editable': item['editable'] and finite, 'vanilla': original,
+                           'sliderMin': spans.get(field.key, (None, None))[0],
+                           'sliderMax': spans.get(field.key, (None, None))[1]})
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
@@ -473,8 +553,14 @@ class ItemDocument:
         if not levels:
             return []
         fields = []
+        # Right-click restores the mod's saved absorption: vanilla has no
+        # absorption effects, so the saved build is this field's original.
+        _row, start, data = self._row(EFFECT_TABLE, levels[0])
+        saved = bytes(self.original_plain[start:start + len(data)])
+        specs = {item['spec'].key: item['spec'] for item in self.schemas[EFFECT_TABLE]['fields']}
         for cut, kind in ABSORPTION_CUTS:
             rate = self.value(EFFECT_TABLE, levels[0], cut)
+            original = round((1 - read_field(saved, specs[cut], '<')) * 100, 3)
             fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
                            'description': (f'Share of {kind.lower()} damage this enemy takes off every hit, from its '
                                            'Armor Rework effect. Negative values make it take more damage.'
@@ -484,7 +570,7 @@ class ItemDocument:
                                            'Upgraded levels keep their bonus over this value.'),
                            'group': 'Absorption', 'dtype': 'f32', 'value': round((1 - rate) * 100, 3),
                            'type': 'number', 'minimum': -100.0, 'maximum': 99.0, 'enum': {},
-                           'protectedReason': '', 'editable': True})
+                           'protectedReason': '', 'editable': True, 'vanilla': original})
         return fields
 
     def _edit_absorption(self, row_id, cut, value, table='EquipParamProtector'):
@@ -498,7 +584,7 @@ class ItemDocument:
         for effect in levels:
             current = (1 - self.value(EFFECT_TABLE, effect, cut)) * 100
             absorbed = min(99.0, max(-100.0, current + change))
-            self.edit(EFFECT_TABLE, effect, cut, round(1 - absorbed / 100, 6))
+            self._write(EFFECT_TABLE, effect, cut, round(1 - absorbed / 100, 6))
         return self.read_row(table, row_id)
 
     def edit(self, table, row_id, key, value):
@@ -509,6 +595,11 @@ class ItemDocument:
             return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
+        self._write(table, row_id, key, value)
+        return self.read_row(table, row_id)
+
+    def _write(self, table, row_id, key, value):
+        """Validate and store one field. The caller reads the record back."""
         row, start, data = self._row(table, row_id)
         item = next((f for f in self.schemas[table]['fields'] if f['spec'].key == key), None)
         if item is None or not item['editable']:
@@ -524,11 +615,14 @@ class ItemDocument:
             raise FormatError(f"{field.label} must be between {item['min']} and {item['max']}")
         if item['enum'] and str(int(value)) not in item['enum']:
             raise FormatError('Choose a listed value')
-        if EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id)):
-            if str(int(value)) not in self.effect_references().choices:
-                raise FormatError('Choose an existing effect or None')
+        links_effect = EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id))
+        if links_effect and str(int(value)) not in self.effect_references().choices:
+            raise FormatError('Choose an existing effect or None')
         replacement = write_field(data, field, value, '<')
-        self._effects = None
+        # The effect index only changes when a link, or what decides whether a
+        # field is a link, does; rebuilding it on every edit froze the editor.
+        if links_effect or key in reference_switches(self, table):
+            self._effects = None
         self.plain[start:start + len(data)] = replacement
         original = self.original_plain[start:start + len(data)]
         dirty_key = (table, row_id, key)
@@ -536,7 +630,6 @@ class ItemDocument:
             self.dirty.discard(dirty_key)
         else:
             self.dirty.add(dirty_key)
-        return self.read_row(table, row_id)
 
     def export(self):
         if self.plain == self.original_plain: return self.original

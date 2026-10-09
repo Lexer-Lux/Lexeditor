@@ -1408,7 +1408,8 @@
     })
     : null;
   const autoFitControlText = (control, options = {}) => {
-    if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
+    const readOnlyBox = control instanceof HTMLElement && control.classList.contains("lex-readonly-field");
+    if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement || readOnlyBox)) return control;
     if (control.dataset.lexAutofit === "false") return control;
     if (control.__lexAutoFitUpdate) {
       queueAutoFit(control);
@@ -1437,6 +1438,7 @@
       const available = Math.max(1, control.clientWidth - horizontal);
       const value = control instanceof HTMLSelectElement
         ? control.selectedOptions[0]?.textContent || ""
+        : readOnlyBox ? (control.value ?? control.textContent ?? "").trim()
         : control.value || control.placeholder || "";
       const canvas = autoFitControlText.canvas ||= document.createElement("canvas");
       const context = canvas.getContext("2d");
@@ -1602,10 +1604,17 @@
       rail.probe=probe;
     }
     const widths=insideRails.map(({probe})=>Math.ceil(probe.getBoundingClientRect().width)+2);
-    insideRails.forEach(({control,probe},index)=>{
+    const boxes=insideRails.map(({control})=>control.getBoundingClientRect().width);
+    insideRails.forEach(({control,probe,fontSize},index)=>{
       probe.remove();
       const width=widths[index];
-      if (width > 2) control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+      if (width <= 2) return;
+      control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+      // The lane is capped at 35% of the box. Only when that cap is narrower
+      // than the reference needs does the reference shrink, and only by that
+      // much. A fixed "lane / 3.2" rule shrank a "V22" that fit to 60% size.
+      const lane=boxes[index] ? Math.min(width, boxes[index] * 0.35) : width;
+      control.style.setProperty("--lex-reference-fit", `${Math.max(8, fontSize * Math.min(1, lane / width))}px`);
     });
   };
 
@@ -2510,6 +2519,16 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    // The slider's span can be narrower than what the field accepts: a value
+    // bounded only by its type (a whole 32-bit range) put every record's fill
+    // at the same spot (Lexer: "all the sliders ... exact same initial
+    // position"). `sliderMin`/`sliderMax` give the span the data really uses;
+    // typing still accepts the whole range, and the fill pins at its ends.
+    const shownLow = Number.isFinite(Number(options.sliderMin ?? NaN)) && Number.isFinite(lowBound)
+      ? Math.max(lowBound, Number(options.sliderMin)) : lowBound;
+    const shownHigh = Number.isFinite(Number(options.sliderMax ?? NaN)) && Number.isFinite(highBound)
+      ? Math.min(highBound, Number(options.sliderMax)) : highBound;
+    const [sliderLow, sliderHigh] = shownHigh > shownLow ? [shownLow, shownHigh] : [lowBound, highBound];
     // Wide ranges still have a coarse slider; direct entry retains precise
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
@@ -2521,7 +2540,7 @@
       const ratio = () => {
         const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
-        return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
+        return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
       };
       const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
       input.__lexValueSliderPaint = paint;
@@ -2534,9 +2553,9 @@
         const bounds = box().getBoundingClientRect();
         const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
         const step = Number(input.step) || 1;
-        const raw = lowBound + share * (highBound - lowBound);
+        const raw = sliderLow + share * (sliderHigh - sliderLow);
         const snapped = Math.round(raw / step) * step;
-        const nextValue = Math.max(lowBound, Math.min(highBound, snapped));
+        const nextValue = Math.max(sliderLow, Math.min(sliderHigh, snapped));
         if (readNumeric(input) === nextValue) return;
         writeNumeric(input, nextValue);
         paint();
@@ -4600,6 +4619,27 @@
     root.lexPaging = () => ({starts:[...starts],page,
       cards:cards.filter(card=>!card.hidden).map(card=>({title:(card.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||"").trim(),height:cardHeights.get(card)??null}))});
     root.lexFitPage = refit;
+    // The pager deals its cards into columns from this list on every render,
+    // so a developer's section order is set here, not by moving nodes. The
+    // listed cards fill the places they hold now, in the order given; one the
+    // list has not seen (a section the developer added) goes after the card
+    // before it in the order.
+    root.lexCards = () => [...cards];
+    root.lexOrderCards = wanted => {
+      joinSections();
+      const was = [...cards];
+      const known = wanted.filter(card => cards.includes(card));
+      const slots = known.map(card => cards.indexOf(card)).sort((a, b) => a - b);
+      known.forEach((card, index) => { cards[slots[index]] = card; });
+      wanted.forEach((card, index) => {
+        if (cards.includes(card) || !card.isConnected) return;
+        const previous = wanted.slice(0, index).reverse().find(other => cards.includes(other));
+        cards.splice(previous ? cards.indexOf(previous) + 1 : cards.length, 0, card);
+      });
+      if (cards.length === was.length && cards.every((card, index) => card === was[index])) return;
+      pagedCount = -1;
+      refit();
+    };
     render();
     if (options.notice) root.prepend(options.notice);
     if ((options.tabs || []).length > 1) root.prepend(subtabBar({
@@ -4626,6 +4666,49 @@
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
     return root;
+  };
+
+  // Every game's Tweaks page. A plugin hands over its own pages (its tweak
+  // mods first) and how to redraw; the page adds ReShade on a subtab of its
+  // own when the game has it, and owns ReShade's loading and actions. Each
+  // plugin used to build this by hand, with its own copy of the ReShade
+  // calls, and one put ReShade in among the tweak mods (Lexer: "WHY AM I
+  // SEEING RESHADE IN THE MAIN TWEAKS TAB").
+  //   pages: [{id, label, body: () => [sections], bind?: view => void,
+  //            whole?: node}] - `whole` owns the screen when it is the only
+  //            page, as a lone status panel would look lost in a column.
+  //   render: () => void, called when the page must be drawn again
+  const tweaksPageMemory = new Map();
+  const tweaksPage = (options = {}) => {
+    const plugin = options.plugin || shellPluginId();
+    const memory = tweaksPageMemory.get(plugin) || {tab: "", reshade: null, loading: null};
+    tweaksPageMemory.set(plugin, memory);
+    const redraw = () => options.render?.();
+    if (options.reshade !== false && !memory.reshade && !memory.loading) {
+      memory.loading = Promise.resolve(callWindow("mod_reshade", plugin))
+        .then(value => { memory.reshade = value || {}; })
+        .catch(() => { memory.reshade = {}; })
+        .finally(() => { memory.loading = null; if (memory.reshade?.available) redraw(); });
+    }
+    const act = async (method, ...args) => {
+      try { memory.reshade = await callWindow(method, plugin, ...args) || memory.reshade; }
+      catch (error) { showAlert({title: "ReShade could not do that", message: error.message || String(error)}); }
+      redraw();
+    };
+    const pages = (options.pages || []).filter(Boolean);
+    const reshade = options.reshade === false ? null : reshadeSection({snapshot: memory.reshade, act});
+    if (reshade) pages.push({id: "reshade", label: "ReShade", body: () => [reshade]});
+    const active = pages.find(page => page.id === memory.tab) || pages[0];
+    if (!active) return notice({message: "This game has no tweaks yet."});
+    if (pages.length === 1 && active.whole) return active.whole;
+    const body = typeof active.body === "function" ? active.body() : active.body;
+    const view = settingsColumns([body].flat(), {...(options.columns || {}),
+      className: ["lex-tweaks-page", options.className || ""].filter(Boolean).join(" "),
+      tabs: pages.map(({id, label}) => ({id, label})), activeTab: active.id,
+      tabsLabel: options.tabsLabel || "Tweak pages",
+      changeTab: id => { memory.tab = id; redraw(); }});
+    if (typeof active.bind === "function") requestAnimationFrame(() => active.bind(view));
+    return view;
   };
 
   // One game's ReShade: a switch for the whole thing, then each of Lexeditor's
@@ -5063,7 +5146,7 @@
     {id: "edit-help", keys: ["Double-click", "?"], label: "Edit the help bubble's text"},
     {id: "move-property", keys: ["Drag", "property row"], label: "Move the property, within or between sections"},
     {id: "hide-property", keys: ["Hold right", "property"], label: "Hide it for readers without Show hidden properties; again to show it"},
-    {id: "add-section", keys: ["Hold right", "section heading"], label: "Add a new section below it; on an empty added section, remove it"},
+    {id: "add-section", keys: ["Hold right", "section heading"], label: "Add a new section below it; on an empty section, remove it"},
     {id: "save-view", keys: ["Hold right", "page tab or subtab"], label: "Save the page's view as the shipped default"},
     {id: "undo-layout", keys: ["Ctrl", "Z"], label: "Undo any of these"},
   ];
@@ -6955,6 +7038,35 @@ ${contents.path}`});
   const propertyRoot = field => field.closest(".lex-detail-panel") || field.closest(".lex-detail-section");
   const layoutFields = root => [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")]
     .filter(field => propertyRoot(field) === root && !field.parentElement.closest(".lex-detail-field"));
+  const hiddenKey = (plugin, tab) => `${plugin}-${tab}.hidden-properties`;
+  const propertyOf = id => String(id).split("/").pop().replace(/:\d+$/, "");
+  const readHiddenProperties = (plugin, tab) => {
+    const key = hiddenKey(plugin, tab);
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) || "null");
+      if (Array.isArray(stored)) return new Set(stored.map(String));
+    } catch (_error) {}
+    // First time: gather what every earlier layout of this page hid.
+    const gathered = new Set();
+    const prefix = `${plugin}-${tab}.property-layout.`;
+    try {
+      for (let index = 0; index < localStorage.length; index++) {
+        const name = localStorage.key(index);
+        if (!name?.startsWith(prefix)) continue;
+        const layout = JSON.parse(localStorage.getItem(name) || "null");
+        for (const id of Array.isArray(layout?.hidden) ? layout.hidden : []) gathered.add(propertyOf(id));
+      }
+      localStorage.setItem(key, JSON.stringify([...gathered]));
+    } catch (_error) {}
+    return gathered;
+  };
+  // The hidden list rides along with the layout's own save: one host call
+  // per change.
+  const writeHiddenProperties = (plugin, tab, hidden) => {
+    const key = hiddenKey(plugin, tab), value = JSON.stringify([...hidden].sort());
+    try { localStorage.setItem(key, value); } catch (_error) {}
+    return {[key]: value};
+  };
   const preparePropertyLayout = root => {
     const fields = layoutFields(root);
     const previous = propertyLayouts.get(root);
@@ -6997,11 +7109,58 @@ ${contents.path}`});
   };
   // A layout is each group's property order, plus the properties the
   // developer hid. Group ids always hold a colon, so "hidden" never clashes.
+  const layoutSectionOf = group => group.node.closest(".lex-detail-section");
+  // Sections in a flowing pane are dealt into columns, so their reading
+  // order is the pager's list, not where they sit in the document.
+  const byReadingOrder = (a, b) => {
+    if (a === b) return 0;
+    const pager = a.closest(".lex-tweaks-paged");
+    const list = pager && pager === b.closest(".lex-tweaks-paged") ? pager.lexCards?.() : null;
+    if (list?.includes(a) && list.includes(b)) return list.indexOf(a) - list.indexOf(b);
+    return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+  };
+  const sectionOrder = state => [...state.groups.values()].filter(group => layoutSectionOf(group))
+    .sort((a, b) => byReadingOrder(layoutSectionOf(a), layoutSectionOf(b))).map(group => group.id);
+  // The listed sections keep the places they hold now and fill them in the
+  // saved order, so a page that flows sections into columns keeps its flow.
+  const orderSections = (state, order) => {
+    if (!Array.isArray(order)) return;
+    const byId = new Map([...state.groups.values()].map(group => [group.id, layoutSectionOf(group)]));
+    const listed = [...new Set(order.map(id => byId.get(id)).filter(section => section?.parentNode))];
+    const movable = listed.filter(section => !listed.some(other => other !== section && other.contains(section)));
+    const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
+    if (pager) {
+      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager));
+      return;
+    }
+    if (movable.length < 2) return;
+    const slots = [...movable].sort(byReadingOrder).map(section => {
+      const mark = document.createComment("");
+      section.before(mark);
+      return mark;
+    });
+    movable.forEach((section, index) => slots[index].replaceWith(section));
+  };
   const capturePropertyLayout = state => ({
     ...Object.fromEntries([...state.groups.values()].map(group =>
       [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))])),
     hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id),
-    sections: (state.custom || []).map(spec => ({...spec}))});
+    sections: (state.custom || []).map(spec => ({...spec})),
+    removed: [...(state.removed || [])],
+    order: sectionOrder(state)});
+  // A page's own section the developer removed. It is hidden only while it
+  // holds no properties, so a property moved back into it (or one the page
+  // gains later) is never lost behind a removed heading.
+  const hideRemovedSections = state => {
+    const removed = new Set(state.removed || []);
+    for (const group of state.groups.values()) {
+      if (group.custom) continue;
+      const section = group.node.closest(".lex-detail-section");
+      if (!section) continue;
+      const empty = ![...group.node.children].some(node => state.fields.has(node));
+      section.hidden = removed.has(group.id) && empty;
+    }
+  };
   // A section the developer added: a heading and an empty body that
   // properties are dragged into. It belongs to the layout, after the section
   // it was added below, and its title is the layout's, not a shipped label.
@@ -7054,11 +7213,15 @@ ${contents.path}`});
     }
   };
   const applyPropertyLayout = (state, layout) => {
-    if (!layout || typeof layout !== "object") return;
+    // No saved layout for this exact page still gets the page's hidden properties.
+    if (!layout || typeof layout !== "object") layout = {};
     const byId = new Map([...state.fields].map(([field, id]) => [id, field]));
     placeCustomSections(state, layout.sections);
+    state.removed = Array.isArray(layout.removed) ? layout.removed.filter(id => typeof id === "string") : [];
     const hidden = new Set(Array.isArray(layout.hidden) ? layout.hidden : []);
-    for (const [field, id] of state.fields) field.classList.toggle("lex-property-hidden", hidden.has(id));
+    const byName = readHiddenProperties(state.plugin, state.tab);
+    for (const [field, id] of state.fields)
+      field.classList.toggle("lex-property-hidden", hidden.has(id) || byName.has(propertyOf(id)));
     const used = new Set();
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
@@ -7071,15 +7234,24 @@ ${contents.path}`});
         group.node.insertBefore(field, anchor?.parentNode === group.node ? anchor : null);
       }
     }
+    orderSections(state, layout.order);
+    hideRemovedSections(state);
   };
   const storePropertyLayout = async (state, layout) => {
     const value = JSON.stringify(layout);
     localStorage.setItem(state.key, value);
+    // This page's properties take their hidden state from this layout; ones
+    // only other record shapes have keep theirs.
+    const byName = readHiddenProperties(state.plugin, state.tab);
+    const hiddenNow = new Set((layout.hidden || []).map(propertyOf));
+    for (const id of state.fields.values()) byName.delete(propertyOf(id));
+    for (const name of hiddenNow) byName.add(name);
+    const hiddenEntry = writeHiddenProperties(state.plugin, state.tab, byName);
     for (const root of document.querySelectorAll(".lex-detail-panel, .lex-detail-section")) {
       const current = propertyLayouts.get(root);
       if (current?.key === state.key) applyPropertyLayout(current, layout);
     }
-    try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value}); }
+    try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value, ...hiddenEntry}); }
     catch (_error) { showToast("Layout saved on this device; the shared default could not be saved."); }
   };
   // Developer Mode: holding the right button on a property hides it for
@@ -7130,17 +7302,22 @@ ${contents.path}`});
       const before = capturePropertyLayout(state);
       const group = [...state.groups.values()].find(entry => entry.node.closest(".lex-detail-section") === section);
       const holdsFields = group && [...group.node.children].some(node => state.fields.has(node));
+      // An empty section, the page's own or an added one, is removed; one
+      // that still holds properties gets a new section added below it.
       let specs = [...(state.custom || [])];
-      if (group?.custom && !holdsFields) specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+      const removing = group && !holdsFields;
+      if (removing && group.custom) specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+      else if (removing) state.removed = [...new Set([...(state.removed || []), group.id])];
       else specs.push({id: `custom-${Date.now().toString(36)}`, title: "New section", after: group?.id || ""});
       placeCustomSections(state, specs);
+      hideRemovedSections(state);
       const after = capturePropertyLayout(state);
       const apply = layout => storePropertyLayout(state, layout);
       labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
       void apply(after);
-      showToast(specs.length > (before.sections || []).length
-        ? "Added a section. Double-click its heading to name it, and drag properties into it."
-        : "Removed the empty section.");
+      showToast(removing ? "Removed the empty section. Undo brings it back."
+        : "Added a section. Double-click its heading to name it, and drag properties into it. "
+          + "To remove a section, drag its properties out, then hold right on its heading.");
     }, 700);
   }, true);
   for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
@@ -7161,10 +7338,62 @@ ${contents.path}`});
   // In Developer Mode a property is dragged by its whole row - anywhere but
   // its value box, which still selects text and edits as usual.
   document.addEventListener("pointerover", event => {
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    if (heading && !event.target.closest(".lex-detail-field,.lex-label-rename,input"))
+      heading.draggable = !!sharedSettingsSnapshot?.developerMode;
     const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
     if (!field) return;
     field.draggable = !!sharedSettingsSnapshot?.developerMode &&
       !event.target.closest(".lex-detail-field-control,.lex-label-rename,.lex-help-edit");
+  });
+  // A heading drags its whole section before or after another section's.
+  let sectionDrag = null;
+  document.addEventListener("dragstart", event => {
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    const section = heading && !event.target.closest(".lex-detail-field") && heading.closest(".lex-detail-section");
+    if (!section || !sharedSettingsSnapshot?.developerMode) return;
+    const fieldInside = section.closest(".lex-detail-panel")?.querySelector(".lex-detail-field[data-lex-layout-field]");
+    const root = fieldInside && propertyRoot(fieldInside);
+    const state = root && preparePropertyLayout(root);
+    if (!state || ![...state.groups.values()].some(group => layoutSectionOf(group) === section)) { event.preventDefault(); return; }
+    sectionDrag = {state, section, before: capturePropertyLayout(state)};
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", heading.textContent || "");
+    section.classList.add("lex-property-dragging");
+  });
+  document.addEventListener("dragover", event => {
+    if (!sectionDrag) return;
+    clearPropertyDrop();
+    const {state, section} = sectionDrag;
+    const target = [...state.groups.values()].map(layoutSectionOf)
+      .find(node => node && node !== section && node.contains(event.target) && !node.contains(section) && !section.contains(node)
+        && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section));
+    if (!target) return;
+    const after = event.clientY >= target.getBoundingClientRect().top + target.offsetHeight / 2;
+    propertyDrop = {target, marker: target, after};
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    target.classList.add(after ? "lex-property-drop-after" : "lex-property-drop-before");
+  });
+  document.addEventListener("drop", event => {
+    if (!sectionDrag || !propertyDrop?.target || !sharedSettingsSnapshot?.developerMode) return;
+    event.preventDefault();
+    const {state, section, before} = sectionDrag;
+    const idOf = node => [...state.groups.values()].find(group => layoutSectionOf(group) === node)?.id;
+    const moving = idOf(section), target = idOf(propertyDrop.target);
+    const order = sectionOrder(state).filter(id => id !== moving);
+    order.splice(order.indexOf(target) + (propertyDrop.after ? 1 : 0), 0, moving);
+    clearPropertyDrop();
+    orderSections(state, order);
+    const after = capturePropertyLayout(state);
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    const apply = layout => storePropertyLayout(state, layout);
+    labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+    void apply(after);
+  });
+  document.addEventListener("dragend", () => {
+    sectionDrag?.section.classList.remove("lex-property-dragging");
+    sectionDrag = null;
   });
   document.addEventListener("dragstart", event => {
     const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
@@ -8176,6 +8405,22 @@ ${contents.path}`});
     return autoPinStores.get(viewKey);
   };
   const pinnedValue = (row, key) => row?.values?.[key] ?? row?.[key];
+  // The value a list sorts a record by: a pinned property (key "pin:<name>")
+  // from the row's values, anything else from the row itself.
+  const sortValueOf = (row, key) => {
+    const name = String(key ?? "");
+    return name.startsWith("pin:") ? pinnedValue(row, name.slice(4)) : (row?.[name] ?? row?.values?.[name]);
+  };
+  // Compare two records for a {key, dir} sort. Blanks go last whichever way.
+  const compareRecords = (left, right, sort = {}) => {
+    const a = sortValueOf(left, sort.key), b = sortValueOf(right, sort.key);
+    const blank = value => value === undefined || value === null || value === "" || value === "\u2014";
+    if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
+    const result = typeof a === "number" && typeof b === "number" ? a - b
+      : typeof a === "boolean" && typeof b === "boolean" ? Number(a) - Number(b)
+      : String(a).localeCompare(String(b), undefined, {numeric: true, sensitivity: "base"});
+    return result * (sort.dir || 1);
+  };
   const pinnedColumns = owner => owner.store.pinned.map(entry => ({
     key: `pin:${entry.key}`, label: entry.label, sortable: true, pinnedProperty: entry.key,
     sortValue: row => pinnedValue(row, entry.key) ?? "",
@@ -8714,6 +8959,7 @@ ${contents.path}`});
         onclick: event => {
           if (!sortable || event.target.closest(".lex-info-help,.lex-column-pin")) return;
           if (performance.now() < suppressSortUntil) return;
+          listResortedAt = performance.now();
           if (typeof options.sort === "function") options.sort(column.key);
           else localSort(column);
         },
@@ -10066,6 +10312,7 @@ ${contents.path}`});
       else target[key]=clone(b);
     }
   };
+  let listResortedAt = -Infinity;
   const pagedListDetail = options => {
     const slotBased = options.slots !== false;
     if (options.slots === undefined && sharedSettingsSnapshot?.developerMode) {
@@ -10135,7 +10382,14 @@ ${contents.path}`});
     // A null page is a link asking for its record, not a page choice: several
     // lists can share one key (FF8's World subtabs), and a link from one to
     // another must still reveal its record.
-    const pagedDeliberately = options.page !== null && options.page !== undefined &&
+    // A new sort starts at the top (Lexer: sorting "didn't sort", because the
+    // list stayed on the page that held the selected record, mid-order). The
+    // header click is read by the list it re-renders, even one that fetches
+    // first, and by no other.
+    const resorted = performance.now() - listResortedAt < 2000;
+    listResortedAt = -Infinity;
+    if (resorted) page = 0;
+    const pagedDeliberately = resorted || options.page !== null && options.page !== undefined &&
       lastRenderedPage.get(rowPreferenceKey) !== undefined &&
       lastRenderedPage.get(rowPreferenceKey) !== page;
     lastRenderedPage.set(rowPreferenceKey, page);
@@ -10179,12 +10433,12 @@ ${contents.path}`});
 
     // Synchronize clamped pages and selection fallback without causing a
     // second render. Interactive changes go through the one change callback.
-    options.sync?.({page, pageSize, selected});
     const selectionKey=options.splitKey || rowPreferenceKey;
     const selection=tableSelections.get(selectionKey)||{keys:new Set([selected]),anchor:selected};
     selection.keys=new Set([...selection.keys].filter(key=>records.some(row=>keyOf(row)===key)));
     if(!selection.keys.size)selection.keys.add(selected);
     tableSelections.set(selectionKey,selection);
+    options.sync?.({page, pageSize, selected, selection: [...selection.keys]});
     const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),toggle:(key,label)=>{
       const store=pinOwner.store;
       store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label}];
@@ -10254,7 +10508,7 @@ ${contents.path}`});
       }else {selection.keys=new Set([nextSelected]);selection.anchor=nextSelected;}
       selected = selection.keys.has(nextSelected)?nextSelected:[...selection.keys].at(-1);
       record=records.find(row=>keyOf(row)===selected)||record;
-      options.sync?.({page, pageSize, selected, reason:"select"});
+      options.sync?.({page, pageSize, selected, selection: [...selection.keys], reason:"select"});
       for (const node of masterNodes) {
         node.querySelectorAll(".lex-list-row[data-key]").forEach(row => {
           const active = [...selection.keys].some(key=>String(key)===String(row.dataset.key));
@@ -11252,6 +11506,7 @@ ${contents.path}`});
     const acceptsPadInput = () => document.hasFocus() && !document.hidden;
     const suspendPadInput = () => {
       awaitingNeutral = true;
+      adjusting = null;
       heldSince.clear();
       discreteDown.clear();
       lastRepeat.clear();
@@ -11395,34 +11650,65 @@ ${contents.path}`});
       return true;
     };
 
-    // Left and right on a bounded control change it instead of leaving it.
-    // A number or a slider with no way to move it is the one thing a pad
-    // cannot reach, and every value in this editor is bounded.
-    const stepControl = (node, direction) => {
-      const delta = direction === "left" ? -1 : 1;
-      if (node instanceof HTMLSelectElement) {
-        if (node.options.length < 2) return false;
-        const index = node.selectedIndex + delta;
-        if (index < 0 || index >= node.options.length) return false;
-        node.selectedIndex = index;
-        node.dispatchEvent(new Event("input", {bubbles: true}));
-        node.dispatchEvent(new Event("change", {bubbles: true}));
-        return true;
-      }
-      if (!numberish(node)) return false;
+    /* The d-pad walks; the left stick changes the value the ring is on, as
+       far and as fast as it is pushed. A light touch moves a step or two a
+       second, for exact values; full tilt crosses the whole range in about
+       two seconds. The rate climbs between the two on a log curve, so a
+       range of a million is as easy to steer as one of ten. While the stick
+       is held only input events go out, so the value, its fill and its
+       reference rail follow live; the change - the commit and the one undo
+       step - goes out when the stick comes back to the middle. On anything
+       that is not a value the stick walks like the d-pad. */
+    const ADJUST_DEADZONE = 0.2;
+    const valueControl = node => node instanceof HTMLElement && !node.disabled && !node.readOnly
+      && (numberish(node) || (node instanceof HTMLSelectElement && node.options.length > 1)) ? node : null;
+    let adjusting = null;
+    const finishAdjust = () => {
+      const done = adjusting;
+      adjusting = null;
+      if (done?.changed && done.node.isConnected) done.node.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+    const stepsOf = node => {
+      if (node instanceof HTMLSelectElement) return {step: 1, min: 0, max: node.options.length - 1, current: node.selectedIndex};
       const step = Math.abs(Number(node.step)) || 1;
-      const current = Number(node.value);
-      if (!Number.isFinite(current)) return false;
-      let next = current + delta * step;
-      const min = Number(node.min), max = Number(node.max);
-      if (node.min !== "" && Number.isFinite(min)) next = Math.max(min, next);
-      if (node.max !== "" && Number.isFinite(max)) next = Math.min(max, next);
-      if (next === current) return false;
-      // The same two events a typed edit sends, so every plugin's own dirty
-      // tracking, clamping and reference rail answer the pad identically.
-      node.value = String(next);
+      const min = node.min !== "" && Number.isFinite(Number(node.min)) ? Number(node.min) : -Infinity;
+      const max = node.max !== "" && Number.isFinite(Number(node.max)) ? Number(node.max) : Infinity;
+      return {step, min, max, current: Number(node.value)};
+    };
+    const setStepped = (node, value) => {
+      if (node instanceof HTMLSelectElement) { node.selectedIndex = value; return; }
+      const decimals = (String(node.step).split(".")[1] || "").length;
+      node.value = decimals ? value.toFixed(decimals) : String(Math.round(value));
+    };
+    const adjustWithStick = (pad, now) => {
+      const node = valueControl(padFocus?.isConnected ? padFocus : document.activeElement);
+      if (adjusting && adjusting.node !== node) finishAdjust();
+      if (!node) return false;
+      const [x = 0, y = 0] = pad.axes || [];
+      const push = Math.abs(x) >= Math.abs(y) ? x : -y;
+      if (Math.abs(push) < ADJUST_DEADZONE) { finishAdjust(); return true; }
+      const {step, min, max, current} = stepsOf(node);
+      if (!Number.isFinite(current)) return true;
+      const sign = Math.sign(push);
+      if (!adjusting || adjusting.sign !== sign) {
+        // The first step is immediate, so a flick moves the value by one.
+        adjusting = {node, sign, carry: sign * step, last: now, changed: adjusting?.changed || false};
+      } else {
+        const strength = (Math.abs(push) - ADJUST_DEADZONE) / (1 - ADJUST_DEADZONE);
+        const range = Number.isFinite(max - min) ? max - min : step * 400;
+        const slow = step * 2, fast = Math.max(range / 2, step * 4);
+        const rate = slow * Math.pow(fast / slow, strength);
+        adjusting.carry += sign * rate * Math.min(100, now - adjusting.last) / 1000;
+        adjusting.last = now;
+      }
+      const steps = Math.trunc(adjusting.carry / step);
+      if (!steps) return true;
+      adjusting.carry -= steps * step;
+      const next = Math.max(min, Math.min(max, current + steps * step));
+      if (next === current) return true;
+      setStepped(node, next);
+      adjusting.changed = true;
       node.dispatchEvent(new Event("input", {bubbles: true}));
-      node.dispatchEvent(new Event("change", {bubbles: true}));
       return true;
     };
 
@@ -11464,10 +11750,6 @@ ${contents.path}`});
       if (list.length && (!region || (region.matches(PANE) && from.matches(BAR_CONTROL)))) {
         return (region && enterRegion(region)) || enterFirstPanel(list);
       }
-      // In the menu bar and a pager, left and right walk the buttons; they
-      // never flip the mod selector or the page size under the player.
-      const bar = region?.matches(MENU_BAR) || from.closest(".lex-pager");
-      if ((direction === "left" || direction === "right") && !bar && stepControl(from, direction)) return true;
       const next = nearest(region ? reachable(pool, region) : pool, from, direction);
       return next ? setPadFocus(next) : false;
     };
@@ -11666,13 +11948,13 @@ ${contents.path}`});
       return button.pressed === true || Number(button.value) > 0.5;
     };
 
-    const directionState = pad => {
+    const directionState = (pad, stick = true) => {
       const down = new Set();
       if (held(pad, BUTTON.up)) down.add("up");
       if (held(pad, BUTTON.down)) down.add("down");
       if (held(pad, BUTTON.left)) down.add("left");
       if (held(pad, BUTTON.right)) down.add("right");
-      const [x = 0, y = 0] = pad.axes || [];
+      const [x = 0, y = 0] = stick ? pad.axes || [] : [];
       if (x <= -DEADZONE) down.add("left");
       if (x >= DEADZONE) down.add("right");
       if (y <= -DEADZONE) down.add("up");
@@ -11721,8 +12003,8 @@ ${contents.path}`});
         else if (!down) discreteDown.delete(index);
       }
 
-      // The left stick and d-pad move within a region, the right stick
-      // between regions; each repeats on its own clock while held.
+      // The d-pad (and the left stick, off a value) moves within a region,
+      // the right stick between regions; each repeats on its own clock.
       const steer = (down, prefix) => {
         for (const direction of DIRECTIONS) {
           const key = prefix + direction;
@@ -11738,7 +12020,8 @@ ${contents.path}`});
           }
         }
       };
-      steer(directionState(pad), "");
+      const stickOnValue = adjustWithStick(pad, now);
+      steer(directionState(pad, !stickOnValue), "");
       steer(panelDirectionState(pad), "panel:");
       return true;
     };
@@ -12128,7 +12411,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
@@ -12935,6 +13218,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const scope = root instanceof Element || root instanceof Document ? root : document;
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    for (const box of scope.querySelectorAll(".lex-detail-field-control .lex-readonly-field")) {
+      if (!box.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(box,{minimum:8});
+    }
     for (const input of inputs) {
       if (!input.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(input,{minimum:8});
       if (input.dataset.lexExactInteger || input.dataset.lexValidateNumber || groupedBoxes.has(input) || !wantsGrouping(input)) continue;

@@ -565,11 +565,7 @@ function renderArchive(key,host){
   const spec=SPECS[key],ds=datasetState(key);
   const rows=[...(ds.data?.rows||[])];
   const sort=ds.sort||{key:"path",dir:1};
-  rows.sort((a,b)=>{
-    const left=a[sort.key],right=b[sort.key];
-    const result=typeof left==="number"&&typeof right==="number"?left-right:String(left??"").localeCompare(String(right??""),undefined,{numeric:true});
-    return result*sort.dir;
-  });
+  rows.sort((a,b)=>LexeditorUI.compareRecords(a,b,sort));
   if(ds.selected==null||!rows.some(row=>row.path===ds.selected))ds.selected=rows[0]?.path||null;
   const view=pagedListDetail({addDisabledReason:"This lists the game's own files; a new file would never be loaded by the game.",
     rows:rows,key:row=>row.path,slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"files",

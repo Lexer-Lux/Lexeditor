@@ -173,7 +173,8 @@ for plugin in sorted((ROOT / "plugins").iterdir()):
     editor = page_source(plugin)
     if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
         continue
-    require("reshadeSection(" in editor,
+    # The shared Tweaks page (tweaksPage) brings ReShade with it.
+    require("reshadeSection(" in editor or "tweaksPage(" in editor,
             f"{plugin.name} has a Tweaks page but does not offer the shared "
             "ReShade section")
 

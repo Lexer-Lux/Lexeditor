@@ -63,8 +63,11 @@ def main():
                             field = fields.nth(i)
                             key = field.get_attribute('data-field-key')
                             seen.add(key)
-                            assert field.get_attribute('type') == 'number'
-                            assert field.get_attribute('min') is not None and field.get_attribute('max') is not None
+                            # The weaknesses (Divine, Occult, Abyssal) are flags.
+                            kind = field.get_attribute('type')
+                            assert kind in ('number', 'checkbox'), (key, kind)
+                            if kind == 'number':
+                                assert field.get_attribute('min') is not None and field.get_attribute('max') is not None
                             field.scroll_into_view_if_needed()
                             box = field.bounding_box()
                             assert 0 <= box['y'] and box['y'] + box['height'] <= 800

@@ -1117,8 +1117,10 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
    one fills it with the accent while the hold counts. */
 .lex-property-hidden:is(:root:not([data-lex-show-hidden="true"]) *) { display:none; }
 :root[data-lex-show-hidden="true"] .lex-property-hidden { opacity:.45; }
-.lex-property-holding { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent));
-  background-repeat:no-repeat; animation:lex-property-hold .7s linear forwards; }
+/* The fill is important: a property's hover background is a shorthand that
+   reset it, so a held property never filled while a held heading did. */
+.lex-property-holding { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent)) !important;
+  background-repeat:no-repeat !important; animation:lex-property-hold .7s linear forwards; }
 @keyframes lex-property-hold { from { background-size:0 100%; } to { background-size:100% 100%; } }
 .lex-has-readonly-lock { position:relative; }
 /* A locked list cannot open, so its arrow would only promise a menu - and it
@@ -1334,7 +1336,7 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) > .lex-detail-panel-heading { flex:0 0 auto; }
 .lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-content { flex:1 1 auto; min-height:0; }
 
-.lex-detail-field-control:has(> .lex-source-control) > .lex-column-pin {
+.lex-detail-field-control:has(> .lex-source-control:not(.lex-source-control-internal)) > .lex-column-pin {
   right:calc(var(--lex-field-reference-rail-width, 9em) + 12px);
 }
 
@@ -7021,7 +7023,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
      reference at the value's own size was wider than its lane and spilled out
      of the box. The type follows the lane; a wide box still gets full size. */
   font-size:clamp(8px,min(calc(1em - (var(--lex-reference-count,1) - 1) * 2px),
-    calc(var(--lex-internal-reference-width, 24px) / 3.2)),1em);
+    var(--lex-reference-fit, 1em)),1em);
 
   overflow:visible;
   padding-inline:2px;

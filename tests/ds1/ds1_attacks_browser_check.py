@@ -58,7 +58,8 @@ def main():
                     links.first.hover()
                     preview=page.locator('.lex-hover-preview')
                     preview.wait_for()
-                    assert f'#{first_attack}' in preview.inner_text() and 'Physical' in preview.inner_text()
+                    # DS1 shows no record IDs (Lexer: "dont show the id values in ds1").
+                    assert f'#{first_attack}' not in preview.inner_text() and 'Physical' in preview.inner_text()
                     if output: page.wait_for_timeout(250); page.screenshot(path=str(output/'monster-attack-preview.png'))
                     follow(links.first)
                     assert page.evaluate('state.row.id')==first_attack
@@ -97,7 +98,7 @@ def main():
                     if output: page.screenshot(path=str(output/'attacks-projectile.png'))
                     open_monster(shared['id'])
                     attack=next(r['id'] for r in refs.list(shared['id'])['rows'] if len(refs.impact(r['id'])['variants'])>1)
-                    follow(links.filter(has_text=f'#{attack} ').first)
+                    follow(page.locator(f'.lex-hoverable[data-hover-target-type="ds1-attack"][data-hover-target-id="{attack}"]').first)
                     page.get_by_text('Shared attack damage',exact=True).wait_for()
                     page.set_viewport_size({'width':1000,'height':700}); page.wait_for_timeout(400)
                     assert page.locator('[data-field-key="atkPhys"]').evaluate('n=>n.clientWidth')>=70
@@ -123,7 +124,7 @@ def main():
                     assert page.evaluate('state.monsterTab')=='attacks'
                     page.locator('.lex-tabbed-panel [data-subtab="resistances"]').click()
                     page.wait_for_function('state.monsterTab==="resistances"')
-                    assert len(page.evaluate('state.row.fields'))==18
+                    assert len(page.evaluate('state.row.fields'))==21  # 18 resistances, 3 weaknesses
                     assert page.locator('[data-field-key="def_phys"]:visible').count()==1
                     if output: page.screenshot(path=str(output/'monster-resistances.png'))
                     session.stop(); session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(mod),'LEXEDITOR_NO_MOD':'1','LEXEDITOR_MOD_READ_ONLY':'1'})

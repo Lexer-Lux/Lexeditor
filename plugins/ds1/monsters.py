@@ -59,6 +59,13 @@ for key, kind in [('resist_poison', 'Poison'), ('resist_desease', 'Toxic'),
         f'weapon\'s {kind.lower()} value, and the enemy is afflicted at this total. Not a percentage. '
         + ('Every vanilla enemy has 0, because nothing the player has inflicts curse.'
            if kind == 'Curse' else ''))
+# Weapons and spells of these kinds deal extra damage to an enemy that has
+# the flag (Divine weapons, Occult weapons; Abyssal is the Abyss Walking flag).
+WEAKNESSES = {'isWeakSaint': ('Weak to Divine', 'Divine weapons deal extra damage to this enemy.'),
+              'isWeakA': ('Weak to Occult', 'Occult weapons deal extra damage to this enemy.'),
+              'isWeakB': ('Abyssal', 'Marks the enemy as of the Abyss.')}
+for key, (label, description) in WEAKNESSES.items():
+    RESISTANCES[key] = (label, 'Weaknesses', description)
 for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic'),
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),

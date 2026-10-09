@@ -37,10 +37,10 @@ def test_all_resistances_roundtrip_only_their_cells_and_revert_exactly():
         spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == key)
         start = doc._row('NpcParam', 120000)[1] + spec.offset
         allowed.update(range(start, start + SIZES[spec.dtype]))
-        doc.edit('NpcParam', 120000, key, 25.5 if spec.dtype == 'f32' else 25)
+        doc.edit('NpcParam', 120000, key, 1 if spec.is_bool else 25.5 if spec.dtype == 'f32' else 25)
     reopened = ItemDocument(doc.export())
     for key in RESISTANCES:
-        assert reopened.value('NpcParam', 120000, key) in (25, 25.5)
+        assert reopened.value('NpcParam', 120000, key) in (1, 25, 25.5)
     changed = {index for index, (a, b) in enumerate(zip(inflate(original), inflate(doc.export()))) if a != b}
     assert changed and changed <= allowed
     for key in RESISTANCES:

@@ -61,7 +61,7 @@ def main():
                     page = browser.new_page(viewport={'width': 1200, 'height': 800})
                     page.on('pageerror', lambda e: errors.append(str(e)))
                     page.add_init_script("""(() => {
-                      const data={available:true,gameFound:true,installed:false,hasDefaults:true,
+                      const data=sessionStorage.noReshade?{}:{available:true,gameFound:true,installed:false,hasDefaults:true,
                         effects:[{file:'Fixture.fx',label:'Fixture effect',enabled:true,
                           values:{Mode:0},controls:[{name:'Mode',label:'Effect mode',widget:'combo',items:['Normal','Strong']}]}]};
                       window.reshadeCalls=[];
@@ -79,15 +79,23 @@ def main():
                     for title in ('INSTALLED GAME', 'EQUIP LOAD PERCENTAGE', 'LATER-GAME AMMUNITION'):
                         reveal(page, page.get_by_text(title, exact=True))
                     assert page.evaluate('reshadeCalls') == [['mod_reshade', 'ds1']]
+                    # ReShade is not a tweak mod: it has a subtab of its own,
+                    # from the shared Tweaks page.
+                    assert page.get_by_role('switch', name='ReShade on or off').count() == 0
+                    page.locator('.lex-subtab-button', has_text='ReShade').click()
+                    assert page.get_by_text('INSTALLED GAME', exact=True).count() == 0
                     reveal(page, page.get_by_role('switch', name='ReShade on or off')).check()
-                    page.wait_for_function('state.reshade.installed===true')
+                    page.wait_for_function('reshadeCalls.length===2')
+                    page.get_by_role('switch', name='ReShade on or off').wait_for()
+                    assert page.get_by_role('switch', name='ReShade on or off').is_checked()
                     reveal(page, page.get_by_role('combobox', name='Effect mode')).select_option('1')
-                    page.wait_for_function('state.reshade.effects[0].values.Mode===1')
+                    page.wait_for_function('reshadeCalls.length===3')
                     assert page.evaluate('reshadeCalls') == [
                         ['mod_reshade', 'ds1'], ['set_reshade_enabled', 'ds1', True],
                         ['set_reshade_value', 'ds1', 'Fixture.fx', 'Mode', 1]]
                     if output:
                         page.screenshot(path=str(output / 'ds1-reshade.png'))
+                    page.locator('.lex-subtab-button', has_text='Mods').click()
                     # No executable here: the problem is stated and Apply is off.
                     reveal(page, page.get_by_text('DarkSoulsRemastered.exe is missing'))
                     assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
@@ -108,6 +116,7 @@ def main():
                     reveal(page, page.get_by_role('button', name='Trust this tweak')).click()
                     page.wait_for_function('!state.tweakBusy && state.tweaks.tweaks.every(r=>r.trust==="trusted")')
                     assert script_mods.trust_state(ammo) == 'trusted'
+                    page.evaluate("sessionStorage.noReshade='1'")
                     page.reload()
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="tweaks"]').click()
@@ -117,7 +126,7 @@ def main():
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
                     # With no tweak mods or ReShade, the installed-game status
                     # owns the page instead of becoming one short settings card.
-                    page.evaluate('state.tweaks.tweaks=[];state.reshade={};render()')
+                    page.evaluate('state.tweaks.tweaks=[];render()')
                     page.wait_for_timeout(250)
                     assert page.locator('#main > .lex-detail-panel').count() == 1
                     assert page.locator('.lex-settings-columns').count() == 0

@@ -50,6 +50,7 @@ class Handler(PluginRequestHandler):
                         result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
                                   else STORE.get().read_row(table, row_id)}
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                    result['changes'] = STORE.get().pending_changes()
                     result['nativeRules'] = RULES.snapshot()
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
@@ -143,6 +144,7 @@ class Handler(PluginRequestHandler):
                     result = RULES.restore()
                 if not path.startswith('/api/tweaks/'):
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
+                    result['changes'] = STORE.get().pending_changes()
                     result['nativeRules'] = RULES.snapshot()
                 self.send_json(result)
         except PermissionError as error:

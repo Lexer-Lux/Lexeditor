@@ -102,14 +102,14 @@
       const values=flattenStrings(row.values);
       const resolved=values.map(value=>state.data?.textLookup?.[value]||"");
       return `${row.id} ${row.tag} ${values.join(" ")} ${resolved.join(" ")}`.toLocaleLowerCase().includes(q);
-    }).sort((a,b)=>compareValues(a[state.sort.key],b[state.sort.key])*state.sort.dir);
+    }).sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort));
   }
   function sortedTextRows(){
     const q=state.textQuery.toLocaleLowerCase();
     return textRecords()
       .filter(row=>!state.textResource||row.asset===state.textResource)
       .filter(row=>!q||`${row.resource} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
-      .sort((a,b)=>compareValues(a[state.textSort.key],b[state.textSort.key])*state.textSort.dir);
+      .sort((a,b)=>LexeditorUI.compareRecords(a,b,state.textSort));
   }
 
   async function confirmReplace(kind){
@@ -595,8 +595,7 @@
       return row;
     });
     const filtered=q?rows.filter(row=>`${Object.values(row).filter(value=>typeof value!=="object").join(" ")} ${flattenStrings(row.record.values).join(" ")}`.toLocaleLowerCase().includes(q)):rows;
-    const key=state.curatedSort.key,dir=state.curatedSort.dir;
-    return filtered.sort((a,b)=>compareValues(a[key],b[key])*dir);
+    return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.curatedSort));
   }
   function curatedPanel(spec){
     if(state.busy)return loadingPanel(spec.label,`Reading ${spec.basename}…`);

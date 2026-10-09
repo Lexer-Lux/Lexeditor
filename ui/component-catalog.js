@@ -36,6 +36,8 @@
       sample: () => el("div", {class: "lex-reshade-actions"},
         el("button", {type: "button", class: "lex-dialog-action", onclick: () => {}}, "A button it made"),
         el("span", {}, "and a span"))},
+    {id: "compareRecords", level: "utility", summary: "Orders two records by a sort state {key, dir}, pinned property columns included (\"pin:\" keys read the row's values). Every paged list sorts with it, so a pinned column sorts across all pages."},
+    {id: "sortValueOf", level: "utility", summary: "The value a record sorts by for one column key: its own field, or a pinned property's value."},
     {id: "el", level: "utility", summary: "The same function as element. Plugins destructure it under the short name."},
     {id: "newButton", level: "atom", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
@@ -199,6 +201,7 @@
       }},
 
     // ---- organisms -------------------------------------------------------
+    {id: "matrixTable", level: "organism", summary: "A two-axis table on the shared column list: the first column names the rows, the rest are the column axis's values, in a fixed order."},
     {id: "columnList", level: "organism", summary: "The shared list: columns, sorting, selection, pinning, the pointer.",
       sample: () => UI.columnList({rows, key: row => row.id, selected: 2, select: () => {},
         sortState: {key: "name", dir: 1}, sort: () => {}, enabledChange: () => {},
@@ -226,6 +229,13 @@
       sample: () => UI.modLoaderSection({loader: "Sample loader beside the game.",
         output: "Sample output folder.", order: "Sample load order.",
         safety: "Nothing of the game's own is written.", removal: "Delete the folder."})},
+    {id: "tweakPanel", level: "organism", summary: "One tweak mod's panel: title, help, an OFF mark while its mod is disabled, its fields, and why it cannot be used yet when it cannot."},
+    {id: "tweakModPanels", level: "organism", summary: "Every tweak mod's panel from its settings schema, with the trust prompt, as the Tweaks page's Mods subtab shows them."},
+    {id: "conflictMark", level: "atom", summary: "A red ! on a mod whose changes another enabled mod overrides, or that overrides another; its bubble lists them."},
+    {id: "tweaksPage", level: "template", summary: "A game's Tweaks page: the game's own pages (tweak mods first) as subtabs, and ReShade on a subtab of its own when the game has it. The page loads ReShade and runs its actions itself.",
+      sample: () => UI.tweaksPage({plugin: "catalog-sample", reshade: false, render: () => {},
+        pages: [{id: "mods", label: "Mods", body: () => [UI.tweakPanel("SAMPLE TWEAK", "A tweak mod's settings.", null,
+          [UI.detailField({label: "Strength", control: UI.el("input", {type: "number", min: 0, max: 10, value: 4})})])]}]})},
     {id: "reshadeSection", level: "organism", summary: "ReShade for one game: the switch, each effect and its controls.",
       // Its own sample state, so the section draws in full here whether or not
       // this machine has ReShade in a game.
@@ -333,7 +343,7 @@
     {id: "EditHistory", level: "utility", summary: "Undo and redo over a page's own state."},
     {id: "NavigationHistory", level: "utility", summary: "Back and forward between tabs."},
     {id: "createModProject", level: "utility", summary: "Names a new mod, asks the host to create it, and lets the host restart the plugin on it. A page showing a game with no mod uses it for its own Create a mod button."},
-    {id: "gamepadNavigation", level: "utility", summary: "Drives the interface from a game controller: the d-pad and stick move focus, A activates or edits, B closes or goes back, the bumpers change tabs and the triggers change page. Every page that mounts the shared UI installs it, so a game becomes usable on a Steam Deck without adding anything."},
+    {id: "gamepadNavigation", level: "utility", summary: "Drives the interface from a game controller: the d-pad moves focus, the left stick changes the focused value (further is faster) or moves focus elsewhere, A activates or edits, B closes or goes back, the bumpers change tabs and the triggers change page. Every page that mounts the shared UI installs it, so a game becomes usable on a Steam Deck without adding anything."},
     {id: "installBrowserHistoryGuard", level: "utility", summary: "Keeps the browser's own back button in step."},
     {id: "installExtendedMouseHistory", level: "utility", summary: "The mouse's back and forward buttons."},
     {id: "installControlHelp", level: "utility", summary: "Attaches help to controls a page built itself."},

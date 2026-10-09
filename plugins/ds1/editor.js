@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,reshade:null,
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,
   effectTabs:[],nativeRules:null,bandForm:null,bandBusy:false,
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null;
@@ -19,19 +19,21 @@ const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.mess
 const fieldHistory={undoStack:[],redoStack:[],applying:false,
   get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
   record(entry){
-    if(this.applying||entry.before===entry.after)return;
+    if(this.applying||(!entry.edits&&entry.before===entry.after))return;
     this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
     this.redoStack=[];shell.refresh();
   },
-  async undo(){const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,entry.before);return true;},
-  async redo(){const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,entry.after);return true;},
-  async apply(entry,value){
+  async undo(){const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,"before");return true;},
+  async redo(){const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,"after");return true;},
+  async apply(entry,side){
     this.applying=true;
     try{
       await edits;
-      const result=await api("/api/edit",{table:entry.table,id:entry.id,field:entry.field,value});
-      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
-      if(state.row&&state.row.table===entry.table&&state.row.id===entry.id)state.row=result.row;
+      for(const edit of entry.edits||[entry]){
+        const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side]});
+        state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+        if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
+      }
       render();
     }catch(error){notify(error);}
     finally{this.applying=false;shell.refresh();}
@@ -58,7 +60,7 @@ const shell=LexeditorUI.mountShell({
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Dark Souls Data Map",
-  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard,history:fieldHistory
+  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,pendingChanges:()=>state.changes||[],save,discard,history:fieldHistory
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="effects"?state.effectTabs:
   tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
@@ -66,23 +68,21 @@ async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
   state.effectTabs=result.effectTabs||[];state.nativeRules=result.nativeRules;
-  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;
+  state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
   const query=state.query.toLowerCase();
   const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
   if(state.tab==="encumbrance")return filtered;
-  return filtered.sort((a,b)=>{
-    const left=a[state.sort.key],right=b[state.sort.key];
-    return state.sort.dir*(typeof left==="number"?left-right:String(left).localeCompare(String(right),undefined,{numeric:true}));
-  });
+  // The game's own order (by record) breaks ties.
+  return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
 }
 async function loadItems(){
   const request=++recordsRequest;
   const sub=state.sub;
   const result=await api("/api/table?tab="+encodeURIComponent(sub));
   if(request!==recordsRequest||state.sub!==sub)return;
-  state.rows=result.rows;state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
+  state.rows=result.rows;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
   if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
   await loadDetail();
 }
@@ -96,12 +96,6 @@ async function loadDetail(){
 }
 async function loadTweaks(){
   state.tweaks=await api("/api/tweaks");
-  try{state.reshade=await LexeditorUI.callWindow('mod_reshade','ds1')||{};}
-  catch(error){notify(error);}
-}
-async function reshadeAction(method,...args){
-  try{state.reshade=await LexeditorUI.callWindow(method,'ds1',...args)||state.reshade;render();}
-  catch(error){notify(error);}
 }
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
@@ -167,7 +161,7 @@ function renameRecord(row,name){
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/rename",{table:row.table,id:row.id,name});
-      state.dirty=result.dirtyCount;
+      state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       for(const listed of state.rows||[])if(key(listed)===key(row))listed.name=result.row.name;
     }catch(error){notify(error);}
@@ -185,8 +179,17 @@ function commit(row,field,value,control){
     try{
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
       const after=result.row.fields.find(item=>item.key===field.key)?.value;
-      fieldHistory.record({table:row.table,id:row.id,field:field.key,before,after});
-      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
+      const done=[{table:row.table,id:row.id,field:field.key,before,after}];
+      // The other selected records of this table get the same value.
+      for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
+        const id=Number(other.slice(row.table.length+1));
+        const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}`)).row.fields.find(item=>item.key===field.key)?.value;
+        const changed=await api("/api/edit",{table:row.table,id,field:field.key,value});
+        state.dirty=changed.dirtyCount;state.changes=changed.changes||state.changes;
+        done.push({table:row.table,id,field:field.key,before:prior,after:changed.row.fields.find(item=>item.key===field.key)?.value});
+      }
+      fieldHistory.record(done.length>1?{edits:done}:done[0]);
+      state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
@@ -209,7 +212,7 @@ function controlFor(row,field){
   const input=plain;
   const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));
   return LexeditorUI.provenanceControl({control,current,vanilla:field.type==="bool"?Number(field.vanilla):field.vanilla,
-    internal:field.type!=="bool",
+    internal:true,
     format:field.type==="enum"?value=>field.enum[String(value)]||String(value):undefined,
     same:(left,right)=>Number(left)===Number(right),
     apply:value=>commit(row,field,value,input)});
@@ -260,16 +263,29 @@ function groupFor(field){
 }
 function fieldSections(row){
   const groups=new Map();
+  // A field that is itself an effect link opens that effect from its own row;
+  // only links with no editable field on the page are listed separately.
+  const links=new Map((row.effectLinks||[]).map(effect=>[effect.field,effect]));
+  const shownLinks=new Set();
   for(const field of row.fields){
     const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
-    groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control:controlFor(row,field),
-      help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum}));
+    const link=field.editable&&links.get(field.key);
+    let control=controlFor(row,field);
+    if(link){
+      shownLinks.add(field.key);
+      if(link.resolved)control=LexeditorUI.controlGroup([control,el("button",{type:"button",class:"ds1-open-effect",
+        title:`Open ${link.name}`,"aria-label":`Open ${link.name}`,onclick:()=>openEffect(link)},"Open")]);
+    }
+    groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control,
+      help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
+      sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
-  if(row.effectLinks?.length){
-    groups.set("Linked effects",row.effectLinks.map(effect=>detailField({
+  const unlisted=(row.effectLinks||[]).filter(effect=>!shownLinks.has(effect.field));
+  if(unlisted.length){
+    groups.set("Linked effects",unlisted.map(effect=>detailField({
       label:row.fields.find(field=>field.key===effect.field)?.label||effect.field,
       control:effect.resolved?el("button",{type:"button",onclick:()=>openEffect(effect)},effect.name):readonlyField(effect.name),
       help:infoHelp("Open this item's or ability's referenced effect. Changing a shared effect changes every use of it.")})));
@@ -312,10 +328,16 @@ function monsterDetail(groups){
     `Direct means a behavior calls the attack; Projectile means a projectile or child projectile does. ${links.unresolved.length} references remain unresolved or lead to effects. `+
     "These are parameter links; they do not prove an animation uses the attack. Hover an attack to preview its damage, and click it to edit it in Attacks.":
     "Attack records reached from this monster's behavior parameters.";
-  return tabbedPanel({label:"Monster details",active:state.monsterTab,
-    tabs:[{id:"resistances",label:"Resistances"},{id:"attacks",label:"Attacks",help:attackHelp}],
+  const effects=groups.get("Linked effects");
+  groups.delete("Linked effects");
+  const tabs=[{id:"resistances",label:"Resistances"},{id:"attacks",label:"Attacks",help:attackHelp}];
+  if(effects)tabs.push({id:"effects",label:"Effects",help:"Effects this monster carries. Changing a shared effect changes every use of it."});
+  const active=state.monsterTab==="effects"&&!effects?"resistances":state.monsterTab;
+  return tabbedPanel({label:"Monster details",active,tabs,
     change:id=>{state.monsterTab=id;render();},
-    content:state.monsterTab==="attacks"?monsterAttacksSection():[...groups].map(([title,body])=>detailSection({title,body}))});
+    content:active==="attacks"?monsterAttacksSection()
+      :active==="effects"?[detailSection({title:"Effects",body:effects})]
+      :[...groups].map(([title,body])=>detailSection({title,body}))});
 }
 function detail(){
   const impact=state.row?.impact;
@@ -418,7 +440,7 @@ function submitBandForm(form){
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/bands/"+form.action,body);
-      state.nativeRules=result.nativeRules;state.dirty=result.dirtyCount;
+      state.nativeRules=result.nativeRules;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
       state.bandForm=null;state.selected=key(result.row);state.query="";
       await loadItems();
       const index=sortedRows().findIndex(row=>key(row)===state.selected);
@@ -439,7 +461,7 @@ function renderItems(){
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     sync:next=>{
-      state.page=next.page;state.pageSize=next.pageSize;
+      state.page=next.page;state.pageSize=next.pageSize;state.selection=next.selection||[];
       if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}
     },
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;render();},
@@ -447,7 +469,7 @@ function renderItems(){
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,sortState:state.sort,
       sort:column=>{if(encumbrance)return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
-      select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
+      select:async(row,event)=>{await edits;select(row,event);state.selected=key(row);await loadDetail();render();},
       columns:encumbrance?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
@@ -533,7 +555,6 @@ function renderTweaks(){
     trust:row=>tweakRequest("/api/tweaks/trust",{id:row.id,trusted:true},"Could not trust the tweak")});
   for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
   const empty=!(status.tweaks||[]).length;
-  const reshade=LexeditorUI.reshadeSection({snapshot:state.reshade,act:reshadeAction});
   const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
@@ -541,16 +562,13 @@ function renderTweaks(){
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
-      empty&&!reshade?missingMods:null,
+      empty?missingMods:null,
       status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Apply or Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
       actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
         el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
-  if(empty&&!reshade)return installed;
-  if(empty)panels.unshift(missingMods);
-  const view=LexeditorUI.settingsColumns([installed,...panels,reshade].filter(Boolean));
-  requestAnimationFrame(()=>bind(view));
-  return view;
+  return LexeditorUI.tweaksPage({plugin:"ds1",render,
+    pages:[{id:"mods",label:"Mods",body:()=>[installed,...panels],bind,whole:empty?installed:null}]});
 }
 function renderDataMap(){
   const view=LexeditorUI.dataMap({plugin:"ds1",rows:state.dataMap.rows,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,
