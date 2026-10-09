@@ -2271,6 +2271,19 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 
 .lex-barrel-buttons { display:flex;align-items:center;gap:4px; }
 
+/* COLUMNS is BARRELS mirrored: the same control on the divider's detail side. */
+.lex-panel-layout-divider > .lex-barrel-control.lex-detail-column-control {
+  right: auto;
+  left: calc(100% - 21px);
+  transform: translateY(-50%) rotate(90deg);
+}
+.lex-panel-layout-vertical > .lex-panel-layout-divider > .lex-barrel-control.lex-detail-column-control {
+  bottom: auto;
+  top: calc(100% - 21px);
+  left: 50%;
+  transform: none;
+}
+
 .lex-panel-layout-divider:hover > .lex-barrel-control,
 .lex-barrel-control:hover,
 .lex-barrel-control.open,

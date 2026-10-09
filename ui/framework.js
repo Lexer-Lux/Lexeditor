@@ -4247,13 +4247,19 @@
     const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
     let cardHeights = new WeakMap();
     const columnCount = length => {
+      // The reader's own count, from the COLUMNS control on the divider.
+      const chosen=Number(content.closest('[data-lex-detail-columns]')?.dataset.lexDetailColumns)||0;
+      if(options.inline&&chosen>0)return Math.max(1,Math.min(length,chosen));
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
       // Allow room for the shared name, copy button, value and help lanes.
       // Narrower cards clipped flag names and could abort strict pagination.
       // A caller can supply a measured minimum for a simpler card.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
-      const target=Math.max(asked||400,readablePropertyWidth(cards));
+      // A record pane fits 400px columns. Requiring every label's longest
+      // word to fit its 7.5% lane demanded ~1100px per column on DS1, so its
+      // details were one column at any width.
+      const target=Math.max(asked||400,options.inline?0:readablePropertyWidth(cards));
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
@@ -9067,7 +9073,7 @@ ${contents.path}`});
       if (options.dividerClass) divider.classList.add(options.dividerClass);
       divider.dataset.dividerIndex = String(index);
       const accessory = options.dividerAccessories?.[index];
-      if (accessory) divider.append(accessory);
+      [accessory].flat().filter(Boolean).forEach(node => divider.append(node));
       return divider;
     });
     const updateDividerState = () => dividers.forEach((divider, index) => {
@@ -9903,6 +9909,27 @@ ${contents.path}`});
     } catch (_error) {}
     return boundedBarrelCount(fallback, maximum);
   };
+  // How many columns a page's details use: 1-6, or none saved for "fit".
+  const detailColumnsKey = options => `columns:${String(
+    options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
+  const readDetailColumns = key => {
+    const managed = sharedSettingsSnapshot?.viewPreferences?.[key];
+    let value = managed;
+    if (value === undefined) {
+      try { value = localStorage.getItem(`lexeditor:${key}`); } catch (_error) {}
+    }
+    const count = Number.parseInt(value, 10);
+    return count >= 1 && count <= 6 ? count : 0;
+  };
+  const saveDetailColumns = (key, value) => {
+    if (!value) {
+      try { localStorage.removeItem(`lexeditor:${key}`); } catch (_error) {}
+      if (sharedSettingsSnapshot?.viewPreferences) delete sharedSettingsSnapshot.viewPreferences[key];
+      if (window.pywebview?.api) callWindow("clear_lexeditor_view_preference", key).then(rememberSharedSettings).catch(() => {});
+      return;
+    }
+    saveBarrelCount(key, value, 6);
+  };
   const saveBarrelCount = (key, value, maximum = 6) => {
     const count = boundedBarrelCount(value, maximum);
     try { localStorage.setItem(`lexeditor:${key}`, String(count)); } catch (_error) {}
@@ -10332,6 +10359,46 @@ ${contents.path}`});
     }, element("span", {class: "lex-barrel-label"}, "BARRELS"),
     element("span", {class: "lex-barrel-buttons"}, decrease,
       element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(barrels)), increase));
+    // COLUMNS mirrors BARRELS on the other side of the same divider: how many
+    // columns the selected record's details flow into. Right-click: fit again.
+    const columnsKey = detailColumnsKey(options);
+    let chosenColumns = readDetailColumns(columnsKey);
+    const shownColumns = () => {
+      const columns = [...(detailNode?.querySelectorAll?.(".lex-tweaks-paged .lex-tweak-column") || [])]
+        .filter(column => column.offsetParent && column.childElementCount);
+      return chosenColumns || Math.max(1, columns.length);
+    };
+    const columnTally = element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(chosenColumns || ""));
+    const fewerColumns = element("button", {
+      class: "lex-barrel-decrease", type: "button", title: "One fewer column of details",
+      "aria-label": "Decrease detail columns", onclick: () => changeColumns(shownColumns() - 1),
+    });
+    const moreColumns = element("button", {
+      class: "lex-barrel-increase", type: "button", title: "One more column of details",
+      "aria-label": "Increase detail columns", onclick: () => changeColumns(shownColumns() + 1),
+    });
+    const showColumnCount = () => {
+      const count = shownColumns();
+      columnTally.textContent = String(count);
+      columnTally.title = chosenColumns ? "Your column count. Right-click to fit to width again." : "Fitted to width";
+      fewerColumns.disabled = count <= 1;
+      moreColumns.disabled = count >= 6;
+    };
+    const changeColumns = requested => {
+      chosenColumns = Math.max(0, Math.min(6, Number(requested) || 0));
+      saveDetailColumns(columnsKey, chosenColumns);
+      if (chosenColumns) root.dataset.lexDetailColumns = String(chosenColumns);
+      else delete root.dataset.lexDetailColumns;
+      detailNode?.querySelectorAll?.(".lex-tweaks-paged").forEach(paged => paged.lexFitPage?.());
+      requestAnimationFrame(showColumnCount);
+    };
+    const columnControl = element("div", {
+      class: "lex-barrel-control lex-detail-column-control",
+      title: "Columns of details",
+      onmouseenter: showColumnCount,
+      oncontextmenu: event => { event.preventDefault(); event.stopPropagation(); changeColumns(0); },
+    }, element("span", {class: "lex-barrel-label"}, "COLUMNS"),
+    element("span", {class: "lex-barrel-buttons"}, fewerColumns, columnTally, moreColumns));
     const barrelGrid = element("div", {
       class: "lex-barrel-grid", style: `--lex-barrels:${masterNodes.length}`,
     }, ...masterNodes);
@@ -10346,7 +10413,7 @@ ${contents.path}`});
         minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
         storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
         dividerClass: "lex-list-detail-divider",
-        dividerAccessories: [null, barrelControl],
+        dividerAccessories: [null, [barrelControl, columnControl]],
         dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
         eventName: "lex-list-detail-resize",
       }) : trailingNode ? panelLayout([masterNode, detailNode, trailingNode],
@@ -10355,7 +10422,7 @@ ${contents.path}`});
         minSizes:[barrelPanelMinimum, Math.max(240, Number(options.minRight) || 300), Math.max(240, Number(options.minTrailing) || 360)],
         storageKey:options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",
         dividerClass:"lex-list-detail-divider",
-        dividerAccessories:[barrelControl,null],
+        dividerAccessories:[[barrelControl, columnControl],null],
         dividerLabels:["Resize list and detail panels","Resize detail and related records"],
         eventName:"lex-list-detail-resize",
       }) : listDetail(masterNode, detailNode, options.className || "", {
@@ -10364,10 +10431,13 @@ ${contents.path}`});
       minLeft: barrelPanelMinimum,
       minRight: options.minRight,
       minimumSplit: Math.min(78, 22 * barrels),
-      dividerAccessories: [barrelControl],
+      dividerAccessories: [[barrelControl, columnControl]],
       paneClass: options.paneClass,
     });
     root.classList.add("lex-paged-list-detail");
+    if (chosenColumns) root.dataset.lexDetailColumns = String(chosenColumns);
+    // The count is current when the control appears, not only once touched.
+    columnControl.closest(".lex-panel-layout-divider")?.addEventListener("mouseenter", showColumnCount);
     root.addEventListener("lex-column-sorted", event => {
       const index = masterNodes.indexOf(event.detail.previous);
       if (index >= 0) masterNodes[index] = event.target;
