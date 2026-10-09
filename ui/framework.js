@@ -7734,8 +7734,13 @@ ${contents.path}`});
       context.append(...(Array.isArray(content) ? content : [content]));
     }
 
-    const history = options.history ? new EditHistory({...options.history, changed: refresh}) : null;
-    if (history) history.observe(document);
+    // A plugin whose data lives in the browser hands over capture and restore
+    // and gets snapshot history. One whose edits live on its server (DS1)
+    // hands over its own history, with undo and redo, and keeps it as given.
+    const ownHistory = typeof options.history?.undo === "function";
+    const history = !options.history ? null
+      : ownHistory ? options.history : new EditHistory({...options.history, changed: refresh});
+    if (history && !ownHistory) history.observe(document);
   // A name the developer changed is undone first, then the record history:
   // the two are different kinds of change and the newest one wins.
   undo.onclick = async () => { if (!(await undoLabel())) history?.undo(); };
@@ -11950,8 +11955,7 @@ ${contents.path}`});
       } catch (error) { failure("Could not add the mod", error); }
     });
     const textControl = (row, key, label, multiline) => {
-      const control = element(multiline ? "textarea" : "input", {
-        ...(multiline ? {rows: key === "credits" ? 6 : 3} : {type: "text"}),
+      const control = (multiline ? textArea : options => element("input", {type: "text", ...options}))({
         "aria-label": label, value: row[key] || "", placeholder: key === "name" ? "Required" : "Optional",
         onchange: async event => {
           const details = {name: row.name, author: row.author, description: row.description, credits: row.credits,
@@ -12392,6 +12396,26 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     event.preventDefault();
     input.click();
   });
+
+  let textDragSource = null;
+  document.addEventListener("dragstart", event => {
+    textDragSource = event.target?.matches?.("input,textarea") ? event.target : null;
+  }, true);
+  document.addEventListener("dragend", () => { textDragSource = null; }, true);
+  const otherTextBox = event => {
+    const box = event.target?.closest?.("input,textarea");
+    return box && textDragSource && box !== textDragSource;
+  };
+  document.addEventListener("dragover", event => {
+    if (!otherTextBox(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "none";
+  }, true);
+  document.addEventListener("drop", event => {
+    if (!otherTextBox(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 
   const syncRange = field => {
     if (!field) return;

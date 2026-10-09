@@ -63,6 +63,9 @@ class ItemStore:
         self.vanilla_hash = digest(vanilla)
         self.output_hash = digest(self.output) if self.output else None
         self._load_texts(document)
+        # A mod's saved archive is not vanilla: read the game's own once, for
+        # each field's vanilla value.
+        document.vanilla_document = ItemDocument(vanilla.read_bytes()) if source != vanilla else None
         self.document = document
         return document
 

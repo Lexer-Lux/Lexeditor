@@ -36,6 +36,30 @@ SUBTABS = (
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
 )
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
+
+# Armor defense, said the way the game uses it (0x2DC350): physical, magic,
+# fire and lightning are unsigned whole numbers the game reads as 0 or more;
+# slash, strike and thrust scale physical defense by (100 + value) / 100.
+ARMOR_FIELDS = {}
+for key, kind in [('defensePhysics', 'Physical'), ('defenseMagic', 'Magic'),
+                  ('defenseFire', 'Fire'), ('defenseThunder', 'Lightning')]:
+    ARMOR_FIELDS[key] = (f'{kind} defense', 'Defense',
+        f'Flat {kind.lower()} defense this piece adds. The game stores and reads it as a whole number '
+        'of 0 or more, so it cannot be negative. For negative protection, give the piece negative '
+        'absorption (Armor Rework) or an effect that raises damage taken.')
+for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defenseThrust', 'Thrust')]:
+    ARMOR_FIELDS[key] = (f'{kind} vs physical (%)', 'Defense',
+        f'Changes this piece\'s physical defense against {kind.lower()} attacks by this percentage: '
+        '-100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own.')
+
+# Armor Rework gives every armor piece its own absorption effect in slot 3,
+# one per upgrade level: effect ID = 30,000,000 + armor ID + level.
+ABSORPTION_BASE = 30_000_000
+ABSORPTION_CUTS = (('neutralDamageCutRate', 'Physical'), ('slashDamageCutRate', 'Slash'),
+                   ('blowDamageCutRate', 'Strike'), ('thrustDamageCutRate', 'Thrust'),
+                   ('magicDamageCutRate', 'Magic'), ('fireDamageCutRate', 'Fire'),
+                   ('thunderDamageCutRate', 'Lightning'))
+MAX_UPGRADE_LEVEL = 15
 ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),)
 
 
@@ -153,6 +177,8 @@ def schema(table):
             label, group, description = RESISTANCES[key]
         if table == 'AtkParam_Npc' and key in ATTACK_FIELDS:
             label, group, description = ATTACK_FIELDS[key]
+        if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
+            label, group, description = ARMOR_FIELDS[key]
         if table == EFFECT_TABLE:
             label, group, description = presentation(key, label, description)
         enum_name = attrs.get('Enum') or node.findtext('Enum')
@@ -214,6 +240,13 @@ def schema(table):
     return {'type': param_type, 'size': offset, 'fields': fields, 'names': names}
 
 
+def _shown(value, field):
+    """A stored value as the reader should see it."""
+    if field.dtype == 'f32' and isinstance(value, float) and math.isfinite(value):
+        return float(f'{value:.7g}')
+    return value
+
+
 class ItemDocument:
     def __init__(self, source):
         self.original = source
@@ -228,6 +261,10 @@ class ItemDocument:
         # The game's own item names (texts.TextDocument), when the store has
         # them; reference names stand in for the rest.
         self.texts = None
+        # The game's own parameters, when this document is a mod's: each
+        # field's vanilla value, for right-click restore. None means this
+        # document was read from the game's own file, so its original is vanilla.
+        self.vanilla_document = None
         for table, (row_size, version) in TABLES.items():
             member = self.members.get(table + '.param')
             if member is None and table in OPTIONAL_TABLES:
@@ -291,7 +328,7 @@ class ItemDocument:
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if field.padding or field.array_length != 1: continue
-            value = read_field(data, field, '<')
+            value = _shown(read_field(data, field, '<'), field)
             if isinstance(value, float) and not math.isfinite(value): value = str(value)
             values[field.key] = value
             if field.is_bool: display[field.key] = 'Yes' if value else 'No'
@@ -354,10 +391,21 @@ class ItemDocument:
             self._attack_references = AttackReferences(self)
         return self._attack_references
 
+    def _vanilla_row(self, table, row_id):
+        """The row's bytes in the game's own file, or None for a row vanilla lacks."""
+        if self.vanilla_document is not None:
+            try:
+                return self.vanilla_document._row(table, row_id)[2]
+            except FormatError:
+                return None
+        _row, start, data = self._row(table, row_id)
+        return bytes(self.original_plain[start:start + len(data)])
+
     def read_row(self, table, row_id):
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
+        vanilla = self._vanilla_row(table, row_id)
         fields = []
         effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
         for item in self.schemas[table]['fields']:
@@ -367,18 +415,23 @@ class ItemDocument:
             if table == 'AtkParam_Npc' and field.key not in ATTACK_FIELDS:
                 continue
             if field.padding or field.array_length != 1: continue
-            value = read_field(data, field, '<')
+            value = _shown(read_field(data, field, '<'), field)
             finite = not isinstance(value, float) or math.isfinite(value)
+            original = _shown(read_field(vanilla, field, '<'), field) if vanilla is not None else None
+            if isinstance(original, float) and not math.isfinite(original):
+                original = None
             options = self.effect_references().choices if field.key in effect_keys else item['enum']
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': field.group if table in ('NpcParam', 'AtkParam_Npc', EFFECT_TABLE) else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': item['min'], 'maximum': item['max'], 'enum': options, 'protectedReason': item.get('protectedReason', ''),
-                           'editable': item['editable'] and finite})
+                           'editable': item['editable'] and finite, 'vanilla': original})
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
+        if table == 'EquipParamProtector':
+            fields += self._absorption_fields(row_id)
         result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
                   'renamable': self.renamable(table), 'fields': fields}
         if table == EFFECT_TABLE:
@@ -388,7 +441,50 @@ class ItemDocument:
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
+    def _absorption_levels(self, row_id):
+        """The piece's Armor Rework effects, +0 first, or [] for a piece without one."""
+        if EFFECT_TABLE not in self.params:
+            return []
+        base = self.value('EquipParamProtector', row_id, 'residentSpEffectId3')
+        if base != ABSORPTION_BASE + row_id or base not in self._rows_by_id[EFFECT_TABLE]:
+            return []
+        return [base + level for level in range(MAX_UPGRADE_LEVEL + 1)
+                if base + level in self._rows_by_id[EFFECT_TABLE]]
+
+    def _absorption_fields(self, row_id):
+        levels = self._absorption_levels(row_id)
+        if not levels:
+            return []
+        fields = []
+        for cut, kind in ABSORPTION_CUTS:
+            rate = self.value(EFFECT_TABLE, levels[0], cut)
+            fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
+                           'description': (f'Share of {kind.lower()} damage this piece absorbs, from its Armor Rework '
+                                           'effect. Pieces multiply. Negative values make the wearer take more damage. '
+                                           'Upgraded levels keep their bonus over this value.'),
+                           'group': 'Absorption', 'dtype': 'f32', 'value': round((1 - rate) * 100, 3),
+                           'type': 'number', 'minimum': -100.0, 'maximum': 99.0, 'enum': {},
+                           'protectedReason': '', 'editable': True})
+        return fields
+
+    def _edit_absorption(self, row_id, cut, value):
+        levels = self._absorption_levels(row_id)
+        if not levels or cut not in dict(ABSORPTION_CUTS):
+            raise FormatError('This armor has no Armor Rework absorption')
+        if type(value) not in (int, float) or isinstance(value, bool) or not math.isfinite(value) or not -100 <= value <= 99:
+            raise FormatError('Absorption must be between -100 and 99')
+        # Every upgrade level moves by the same amount, so its bonus over +0 stays.
+        change = value - (1 - self.value(EFFECT_TABLE, levels[0], cut)) * 100
+        for effect in levels:
+            current = (1 - self.value(EFFECT_TABLE, effect, cut)) * 100
+            absorbed = min(99.0, max(-100.0, current + change))
+            self.edit(EFFECT_TABLE, effect, cut, round(1 - absorbed / 100, 6))
+        return self.read_row('EquipParamProtector', row_id)
+
     def edit(self, table, row_id, key, value):
+        if table == 'EquipParamProtector' and isinstance(key, str) and key.startswith('absorption:'):
+            self._row(table, row_id)
+            return self._edit_absorption(row_id, key.split(':', 1)[1], value)
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, start, data = self._row(table, row_id)

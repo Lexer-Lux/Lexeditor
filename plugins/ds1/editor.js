@@ -16,6 +16,36 @@ async function api(path,body){
   return result;
 }
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
+const fieldHistory={undoStack:[],redoStack:[],applying:false,
+  get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
+  record(entry){
+    if(this.applying||entry.before===entry.after)return;
+    this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
+    this.redoStack=[];shell.refresh();
+  },
+  async undo(){const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,entry.before);return true;},
+  async redo(){const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,entry.after);return true;},
+  async apply(entry,value){
+    this.applying=true;
+    try{
+      await edits;
+      const result=await api("/api/edit",{table:entry.table,id:entry.id,field:entry.field,value});
+      state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;
+      if(state.row&&state.row.table===entry.table&&state.row.id===entry.id)state.row=result.row;
+      render();
+    }catch(error){notify(error);}
+    finally{this.applying=false;shell.refresh();}
+  },
+  clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
+document.addEventListener("keydown",event=>{
+  if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
+  const pressed=event.key.toLowerCase();
+  if(pressed!=="z"&&pressed!=="y")return;
+  if(event.target.closest?.("textarea,input[type=text]:not([data-field-key])"))return;
+  event.preventDefault();
+  document.activeElement?.blur?.();
+  setTimeout(()=>pressed==="y"||event.shiftKey?fieldHistory.redo():fieldHistory.undo(),0);
+},true);
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered"},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
@@ -28,7 +58,7 @@ const shell=LexeditorUI.mountShell({
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Dark Souls Data Map",
-  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard
+  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,save,discard,history:fieldHistory
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="effects"?state.effectTabs:
   tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
@@ -125,7 +155,7 @@ async function save(){
 }
 async function discard(){
   await edits;state.bandForm=null;
-  try{await api("/api/discard",{});attackPreviews.clear();await refreshState();
+  try{await api("/api/discard",{});attackPreviews.clear();fieldHistory.clear();await refreshState();
     if(["info","tweaks","datamap"].includes(state.tab))await navigate(state.tab);
     else{await loadItems();render();}}catch(error){notify(error);}
 }
@@ -148,8 +178,14 @@ function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
   state.pending++;shell.refresh();
   edits=edits.then(async()=>{
+    // The value before this edit, as the record now stands (an earlier edit
+    // may have changed it since the page drew).
+    const live=state.row&&key(state.row)===key(row)?state.row:row;
+    const before=live.fields.find(item=>item.key===field.key)?.value;
     try{
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
+      const after=result.row.fields.find(item=>item.key===field.key)?.value;
+      fieldHistory.record({table:row.table,id:row.id,field:field.key,before,after});
       state.dirty=result.dirtyCount;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
@@ -164,7 +200,21 @@ function commit(row,field,value,control){
     }finally{state.pending--;if(row.table==="NativeRules")render();else shell.refresh();}
   }).catch(notify);
 }
+const PERCENT=/\s*\(%\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"");
 function controlFor(row,field){
+  const plain=plainControlFor(row,field);
+  const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%"):plain;
+  if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text")return control;
+  const input=plain;
+  const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));
+  return LexeditorUI.provenanceControl({control,current,vanilla:field.type==="bool"?Number(field.vanilla):field.vanilla,
+    internal:field.type!=="bool",
+    format:field.type==="enum"?value=>field.enum[String(value)]||String(value):undefined,
+    same:(left,right)=>Number(left)===Number(right),
+    apply:value=>commit(row,field,value,input)});
+}
+function plainControlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
   const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly||field.disabled};
   // The shared shell still catches an edit attempt here and offers Create a
@@ -192,10 +242,14 @@ function controlFor(row,field){
       commit(row,field,Number(input.value),input);
     }});
 }
+const GROUP_ORDER=["Basics","Defense","Absorption","Combat","Requirements & costs","Effects & references","Upgrades",
+  "Use behavior","Value & rewards","Appearance","Properties"];
 function groupFor(field){
   if(field.group)return field.group;
   const name=field.key.toLowerCase();
-  if(/icon|model|sort|menu|visual|sfx|material/.test(name))return "Appearance";
+  if(/^weight$|^durability|^sadurability$/.test(name))return "Basics";
+  if(/originequip|reinforcetype|materialset/.test(name))return "Upgrades";
+  if(/icon|model|sort|menu|visual|sfx|material|invisibleflag|facescale|headequip|bodyequip|armequip|legequip/.test(name))return "Appearance";
   if(/price|value|trophy|shop|qwc/.test(name))return "Value & rewards";
   if(/guard|defen|resist|damagecut/.test(name))return "Defense";
   if(/attack|damage|correct|reinforce|repa|durability/.test(name))return "Combat";
@@ -211,7 +265,7 @@ function fieldSections(row){
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
-    groups.get(group).push(detailField({label:field.label,property:field.key,control:controlFor(row,field),
+    groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control:controlFor(row,field),
       help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum}));
   }
   if(row.effectLinks?.length){
@@ -226,7 +280,9 @@ function fieldSections(row){
       help:infoHelp("Counts references in the supported parameter tables. Scripts and animations can add more uses. "+
         (usage.length?"Examples: "+usage.slice(0,3).map(source=>source.name).join(", ")+".":"No direct reference was found."))})]);
   }
-  return groups;
+  // Fixed section order, so the same section is in the same place on every record.
+  const rank=group=>{const at=GROUP_ORDER.indexOf(group);return at<0?GROUP_ORDER.length:at;};
+  return new Map([...groups].sort((a,b)=>rank(a[0])-rank(b[0])));
 }
 // A linked attack previews its damage so several can be compared from the
 // monster without leaving it. Values come from the live document, so an
@@ -237,7 +293,7 @@ async function attackPreview(id){
   const row=await attackPreviews.get(id);
   const users=row.impact.variants.length;
   // The shared label-and-value rows, read-only: a preview is a small panel.
-  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},`${row.name} #${row.id}`),
+  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},row.name),
     ...row.fields.map(field=>detailField({label:field.label,control:readonlyField(
       field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))})),
     LexeditorUI.detailText(users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
@@ -247,7 +303,7 @@ function monsterAttacksSection(){
   if(!links)return LexeditorUI.loadingPanel({label:"Loading attacks"});
   if(!links.rows.length)return LexeditorUI.detailNote("No attack link was resolved for this monster. The Attacks tab lists every attack record.");
   return detailSection({title:"Referenced attacks",body:links.rows.map(attack=>detailField({label:attack.name,
-    control:hoverable({content:`#${attack.id} · ${attack.route}`,targetType:"ds1-attack",targetId:attack.id,
+    control:hoverable({content:attack.route,targetType:"ds1-attack",targetId:attack.id,
       targetLabel:`${attack.name} in Attacks`,preview:()=>attackPreview(attack.id),activate:()=>openAttack(attack.id)})}))});
 }
 function monsterDetail(groups){
@@ -275,7 +331,7 @@ function detail(){
   if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,body:[monsterDetail(groups)]});
   let help=state.row.help;
   if(impact){
-    const examples=impact.variants.slice(0,3).map(n=>`${n.name} #${n.id}`).join(", ");
+    const examples=impact.variants.slice(0,3).map(n=>n.name).join(", ");
     help=`Editing this record changes every use of it. Known parameter links reach ${impact.variants.length} NPC variants and ${impact.behaviors.length} behaviors.`+
       (examples?` Examples: ${examples}.`:" Ownership is unresolved.")+
       ` ${impact.bulletReferences.length} projectile records reference this attack ID; player and enemy contexts may differ.`+
@@ -393,7 +449,7 @@ function renderItems(){
       sort:column=>{if(encumbrance)return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       select:async row=>{await edits;select(row);state.selected=key(row);await loadDetail();render();},
       columns:encumbrance?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
-        [{key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},{key:"name",label:"Name",sortable:true,grow:1}]});
+        [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
     rename:renameRecord,
     // Items have in-game names; monsters, attacks, effects and load bands

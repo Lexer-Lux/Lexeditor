@@ -43,16 +43,22 @@ def classified_monster(row_id, reference_name, npc_type):
 RESISTANCES = {}
 for key, kind in [('def_phys', 'Physical'), ('def_mag', 'Magic'),
                   ('def_fire', 'Fire'), ('def_thunder', 'Lightning')]:
-    RESISTANCES[key] = (kind, 'Damage defense',
-        f'Defense rating against {kind.lower()} damage. This is not a fixed amount subtracted from each hit.')
+    RESISTANCES[key] = (f'{kind} defense', 'Defense rating',
+        f'Flat defense against {kind.lower()} damage, in the same units as the player\'s defense: '
+        'a whole number of 0 or more, not a percentage. The game weighs it against the attack\'s '
+        'damage, so the same defense blocks more of a weak hit than of a strong one. Armor Rework '
+        'changes player armor only; enemies keep this.')
 for key, kind in [('def_slash', 'Slash'), ('def_blow', 'Strike'), ('def_thrust', 'Thrust')]:
-    RESISTANCES[key] = (kind + ' (%)', 'Physical defense modifiers',
-        f'Adjusts physical defense against {kind.lower()} attacks by this percentage. '
-        '25 means 25% more defense, not 25% less damage.')
+    RESISTANCES[key] = (f'{kind} vs physical (%)', 'Defense rating',
+        f'Changes physical defense against {kind.lower()} attacks by this percentage: -100 makes it 0, '
+        '25 makes it 25% higher. It does not reduce damage by 25%.')
 for key, kind in [('resist_poison', 'Poison'), ('resist_desease', 'Toxic'),
                   ('resist_blood', 'Bleed'), ('resist_curse', 'Curse')]:
-    RESISTANCES[key] = (kind, 'Status buildup resistance',
-        f'Resistance to {kind.lower()} buildup. This is separate from damage defense and is not a percentage.')
+    RESISTANCES[key] = (f'{kind} resistance', 'Status buildup resistance',
+        f'How much {kind.lower()} buildup this enemy takes before it is afflicted: each hit adds its '
+        f'weapon\'s {kind.lower()} value, and the enemy is afflicted at this total. Not a percentage. '
+        + ('Every vanilla enemy has 0, because nothing the player has inflicts curse.'
+           if kind == 'Curse' else ''))
 for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic'),
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),

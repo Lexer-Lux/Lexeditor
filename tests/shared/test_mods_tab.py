@@ -218,3 +218,48 @@ def test_switched_on_mods_that_conflict_show_a_red_mark_with_the_details(page):
     assert "Combat changes this too" in page.locator(".lex-help-popover").inner_text()
     page.get_by_role("checkbox", name="Switch Combat").uncheck()
     page.wait_for_function("!document.querySelector('.lex-column-list .lex-conflict-mark')")
+
+
+LONG = "A long description.\n" * 8
+
+
+def test_description_is_as_tall_as_its_text_and_stays_so_after_saving(page):
+    # It was a textarea fixed at three rows: saving (which happens when the
+    # window loses focus) redrew it back to three rows, whatever its text.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    box = page.get_by_role("textbox", name="Description")
+    box.wait_for()
+    box.fill(LONG)
+    grown = box.evaluate("n => [n.clientHeight, n.scrollHeight]")
+    assert grown[0] >= grown[1] - 2, grown
+    page.get_by_role("textbox", name="Author").focus()   # change -> save -> redraw
+    page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_details' && c[1][2].description.length > 100)")
+    page.wait_for_timeout(200)
+    after = page.get_by_role("textbox", name="Description").evaluate("n => [n.clientHeight, n.scrollHeight]")
+    assert after[0] >= after[1] - 2 and after[0] >= grown[0] - 2, (grown, after)
+
+
+def test_text_dragged_from_one_box_is_not_dropped_into_another(page):
+    # Dropping moved the text: the description lost it, the credits gained it,
+    # and both saved at once with no undo.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Description").wait_for()
+    blocked = page.evaluate("""() => {
+      const description = document.querySelector('[aria-label="Description"]');
+      const credits = document.querySelector('[aria-label="Credits"]');
+      const data = new DataTransfer(); data.setData('text/plain', 'Mine.');
+      description.dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
+      const over = new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: data});
+      credits.dispatchEvent(over);
+      const drop = new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data});
+      credits.dispatchEvent(drop);
+      description.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: data}));
+      // Within one box, dragging still behaves as the browser does.
+      description.dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
+      const inside = new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data});
+      description.dispatchEvent(inside);
+      return {overEffect: over.dataTransfer.dropEffect, dropBlocked: drop.defaultPrevented, insideBlocked: inside.defaultPrevented};
+    }""")
+    assert blocked == {"overEffect": "none", "dropBlocked": True, "insideBlocked": False}, blocked

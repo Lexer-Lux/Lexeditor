@@ -127,7 +127,8 @@ class EffectReferences:
         if TABLE not in document.params:
             return
         for row in document.params[TABLE].rows:
-            self.choices[str(row.row_id)] = f"{document.row_name(TABLE, row.row_id)} ({row.row_id})"
+            # DS1 pages show no record IDs; a choice reads as the effect's name.
+            self.choices[str(row.row_id)] = document.row_name(TABLE, row.row_id)
         for table, param in document.params.items():
             for row in param.rows:
                 links = []
