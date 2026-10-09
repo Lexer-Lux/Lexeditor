@@ -184,7 +184,8 @@ for plugin in sorted((ROOT / "plugins").iterdir()):
 # The user changed the shared lane to 7.5%. Do not restore the old 10% rule
 # while bringing back an archived UI patch.
 flat = css.replace(" ", "")
-require("--lex-detail-label-width:7.5%" in flat,
+require("--lex-detail-label-share:7.5;" in flat
+        and "--lex-detail-label-width:calc(var(--lex-detail-label-share)*1%);" in flat,
         "Detail property-name lane does not use the shared 7.5% default")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")

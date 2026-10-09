@@ -4256,10 +4256,10 @@
       // Narrower cards clipped flag names and could abort strict pagination.
       // A caller can supply a measured minimum for a simpler card.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
-      // A record pane fits 400px columns. Requiring every label's longest
-      // word to fit its 7.5% lane demanded ~1100px per column on DS1, so its
-      // details were one column at any width.
-      const target=Math.max(asked||400,options.inline?0:readablePropertyWidth(cards));
+      // Columns are at least 400px. Names no longer decide it: in a paged
+      // flow their lane is a share of the whole panel (framework.css), so a
+      // narrower column does not shrink it.
+      const target=asked||400;
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,

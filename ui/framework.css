@@ -7064,6 +7064,12 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 body:has(> main .lex-tweaks-paged) { display:flex; flex-direction:column; }
 body:has(> main .lex-tweaks-paged) > :not(main) { flex-shrink:0; }
 body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
+/* In a paged flow the name lane is a share of the whole panel, not of each
+   column: three columns of 7.5% of a 430px column gave 30px lanes and names
+   like "Durab". Every column's lane is the same share of the panel, however
+   many columns the reader picks. */
+.lex-tweaks-paged { container-type:inline-size; }
+.lex-tweaks-paged .lex-tweak-card-grid { --lex-detail-label-width:calc(var(--lex-detail-label-share) * 1cqw); }
 .lex-tweaks-paged {
   flex-direction:column;
   height:100%;
@@ -7837,7 +7843,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   /* Just enough to hold a short property name. Six and a half ems was more
      than the tenth it was meant to rescue, so it took over lanes that were
      perfectly usable and the shared ten-percent rule stopped being the rule. */
-  --lex-detail-label-width:7.5%;
+  --lex-detail-label-share:7.5;
+  --lex-detail-label-width:calc(var(--lex-detail-label-share) * 1%);
 
   --lex-font-size-adjust: none;
   --lex-text-nudge: 0px;
