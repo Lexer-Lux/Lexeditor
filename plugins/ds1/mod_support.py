@@ -28,6 +28,8 @@ class Ds1ModAdapter:
                "files: parameters and item names field by field, tweaks onto the "
                "original executable. Close the game before switching mods.")
     package_types = ("folder", "zip")
+    # Steam starts the game; Play installs the enabled mods first, rebuilt.
+    deploys_on_launch = True
     context: dict[str, str] = {}
 
     def __init__(self):

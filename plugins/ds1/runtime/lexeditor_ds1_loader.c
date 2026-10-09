@@ -43,6 +43,10 @@
 #define MAX_THREADS 2048
 #define MAX_PATCH (16u * 1024u * 1024u)
 #define MAX_RECORDS 4096u
+/* Dark Souls Remastered silently puts back guarded code (its stamina update
+ * among it) a minute or so after a hook is written. The loader checks every
+ * hook this often and writes again any the game has restored. */
+#define WATCH_MS 250
 
 typedef struct {
     unsigned kind, rva, length;
@@ -196,6 +200,57 @@ static void resume_all(HANDLE *paused, unsigned count)
     }
 }
 
+/* Write one hook again once the game has put its original bytes back.
+ * 1 when written; 0 when its bytes are something else, or no safe moment came. */
+static int rewrite_hook(deferred_t *later, HANDLE *paused, unsigned index)
+{
+    unsigned char *site = later->image + later->rva[index];
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        unsigned count = 0;
+        if (!pause_others(later, paused, &count)) {
+            resume_all(paused, count);
+            Sleep(5);
+            continue;
+        }
+        DWORD old, ignored;
+        int written = 0;
+        if (memcmp(site, later->original[index], later->length[index]) == 0 &&
+            VirtualProtect(site, later->length[index], PAGE_EXECUTE_READWRITE, &old)) {
+            memcpy(site, later->replacement[index], later->length[index]);
+            VirtualProtect(site, later->length[index], old, &ignored);
+            FlushInstructionCache(GetCurrentProcess(), site, later->length[index]);
+            written = 1;
+        }
+        resume_all(paused, count);
+        return written;
+    }
+    return 0;
+}
+
+/* For the game's lifetime: keep every hook in place. Only a site holding its
+ * exact original bytes is written; anything else there is left alone. */
+static void keep_hooks(deferred_t *later, HANDLE *paused)
+{
+    char text[200];
+    unsigned repairs = 0;
+    for (;;) {
+        Sleep(WATCH_MS);
+        for (unsigned index = 0; index < later->count; ++index) {
+            if (memcmp(later->image + later->rva[index], later->original[index], later->length[index]) != 0)
+                continue;
+            if (!rewrite_hook(later, paused, index))
+                continue;
+            ++repairs;
+            /* The log stays small: the first few, then every hundredth. */
+            if (repairs <= 5 || repairs % 100 == 0) {
+                snprintf(text, sizeof text, "The game put back its code at %08X; the hook was written again (%u so far)",
+                         later->rva[index], repairs);
+                report(text);
+            }
+        }
+    }
+}
+
 static DWORD WINAPI deferred_hooks(LPVOID argument)
 {
     deferred_t *later = (deferred_t *)argument;
@@ -246,6 +301,7 @@ static DWORD WINAPI deferred_hooks(LPVOID argument)
         resume_all(paused, count);
         snprintf(text, sizeof text, "Applied %u hooks", later->count);
         report(text);
+        keep_hooks(later, paused);
         return 0;
     }
     report("No moment was found with every thread outside the hooks; nothing was changed");

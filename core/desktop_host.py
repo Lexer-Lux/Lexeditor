@@ -1234,6 +1234,7 @@ class HostApi:
             app_id = self._steam_app_id(plugin_id)
             if not app_id or os.name != "nt":
                 raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+            self._deploy_before_launch(plugin_id)
             os.startfile(f"steam://rungameid/{app_id}")
             return {"running": False, "viaSteam": True, "alreadyRunning": False}
         adapter = self._plugins[plugin_id].mod_adapter
@@ -1262,6 +1263,28 @@ class HostApi:
             process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
             self._game_processes[plugin_id] = process
             return {"running": True, "pid": process.pid, "alreadyRunning": False}
+
+    def _deploy_before_launch(self, plugin_id: str) -> None:
+        """Install the enabled mods as they are now, for an adapter that asks.
+
+        Steam starts the game, so nothing else runs between Play and the
+        game reading its files. Without this, a mod whose files changed while
+        it stayed enabled (a rebuilt tweak, edited settings) reached the game
+        only after someone switched mods: DS1 kept loading a stale build.
+        """
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None or not getattr(adapter, "deploys_on_launch", False):
+            return
+        game = self._installations.snapshot(plugin_id).get("root")
+        if not game or self.game_process_status(plugin_id).get("running"):
+            return
+        from core.mod_library import relative_path
+        status = self.mod_library_status(plugin_id)
+        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
+        with self._mod_library_lock:
+            adapter = self._mod_adapter(plugin_id)
+            enabled = [library / name for name in adapter.active_mod_ids(Path(game))]
+            adapter.activate(enabled, Path(game))
 
     def stop_game(self, plugin_id: str) -> dict:
         """Stop this game, including a copy this host did not start.

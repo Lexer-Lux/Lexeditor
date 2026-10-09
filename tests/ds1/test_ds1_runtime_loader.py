@@ -67,16 +67,20 @@ def harness(tmp_path_factory):
     return exe
 
 
-def run(harness, tmp_path, data, wait=None):
+def run(harness, tmp_path, data, wait=None, repair=None):
     path = tmp_path / "patch.bin"
     path.write_bytes(data)
-    out = subprocess.run([str(harness), str(path), *([str(wait)] if wait is not None else [])],
-                         capture_output=True, text=True, timeout=30)
+    extra = [str(wait)] if wait is not None else []
+    extra += [str(repair)] if repair is not None else []
+    out = subprocess.run([str(harness), str(path), *extra], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out
-    first, second = out.stdout.strip().splitlines()
-    return {"applied": first.startswith("applied=1"), "result": int(first.rsplit("result=", 1)[1]),
-            "message": first.split("message=", 1)[1].rsplit(" result=", 1)[0],
-            "unwind": second == "unwind=1"}
+    first, second, *rest = out.stdout.strip().splitlines()
+    result = {"applied": first.startswith("applied=1"), "result": int(first.rsplit("result=", 1)[1]),
+              "message": first.split("message=", 1)[1].rsplit(" result=", 1)[0],
+              "unwind": second == "unwind=1"}
+    if rest:
+        result["repaired"] = int(rest[0].split("=", 1)[1])
+    return result
 
 
 def test_the_loader_redirects_a_function_into_its_code(harness, tmp_path):
@@ -91,6 +95,12 @@ def test_deferred_hooks_are_written_later_by_the_loader(harness, tmp_path):
     assert early["applied"] and early["result"] == 1 and "follow after" in early["message"], early
     late = run(harness, tmp_path, patch_file(delay=100), wait=1500)
     assert late["applied"] and late["result"] == 42, late
+
+
+def test_a_hook_the_game_puts_back_is_written_again(harness, tmp_path):
+    """DSR restores its guarded stamina code about a minute after the sprint hook."""
+    result = run(harness, tmp_path, patch_file(delay=100), wait=800, repair=1500)
+    assert result["result"] == 42 and result["repaired"] == 42, result
 
 
 @pytest.mark.parametrize("case", ["original", "build"])

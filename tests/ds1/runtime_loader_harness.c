@@ -6,6 +6,8 @@
  *
  * Prints: applied=<0|1> message=<...> result=<function's return>
  *         unwind=<0|1>
+ * With argv[3], the harness then puts the function's original bytes back, as
+ * the game's own guard does, waits argv[3] ms and adds: repaired=<return>
  */
 #define LX_NO_DLLMAIN
 #include <stdlib.h>
@@ -56,5 +58,13 @@ int main(int argc, char **argv)
     DWORD64 base = 0;
     int unwind = RtlLookupFunctionEntry((DWORD64)(ULONG_PTR)(image + 0x10000), &base, NULL) != NULL;
     printf("applied=%d message=%s result=%d\nunwind=%d\n", applied, message, result, unwind);
+    if (argc > 3) {
+        VirtualProtect(image + 0x1000, 0x1000, PAGE_EXECUTE_READWRITE, &old);
+        memcpy(image + 0x1000, returns_one, sizeof returns_one);
+        VirtualProtect(image + 0x1000, 0x1000, PAGE_EXECUTE_READ, &old);
+        FlushInstructionCache(GetCurrentProcess(), image + 0x1000, sizeof returns_one);
+        Sleep((DWORD)atoi(argv[3]));
+        printf("repaired=%d\n", function());
+    }
     return 0;
 }
