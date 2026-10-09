@@ -93,8 +93,8 @@ work, even if your tool does not load skills on its own.
   the same session. Say plainly if you stop with unmerged work. A worker may
   push the branch it owns. Pushing master, or merging into it, is the root
   agent's job and needs Lexer's explicit go-ahead.
-- This repository is public. Never commit credentials, private binaries,
-  proprietary game dumps or unrelated personal data.
+- This repository is public. Never commit credentials, private binaries
+  or unrelated personal data.
 
 ## Checks
 
