@@ -55,6 +55,8 @@ for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defens
 # Armor Rework gives every armor piece its own absorption effect in slot 3,
 # one per upgrade level: effect ID = 30,000,000 + armor ID + level.
 ABSORPTION_BASE = 30_000_000
+# Enemies too: 40,000,000 + enemy ID, in one of the enemy's spEffectID slots.
+ENEMY_ABSORPTION_BASE = 40_000_000
 ABSORPTION_CUTS = (('neutralDamageCutRate', 'Physical'), ('slashDamageCutRate', 'Slash'),
                    ('blowDamageCutRate', 'Strike'), ('thrustDamageCutRate', 'Thrust'),
                    ('magicDamageCutRate', 'Magic'), ('fireDamageCutRate', 'Fire'),
@@ -430,8 +432,8 @@ class ItemDocument:
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
-        if table == 'EquipParamProtector':
-            fields += self._absorption_fields(row_id)
+        if table in ('EquipParamProtector', 'NpcParam'):
+            fields += self._absorption_fields(row_id, table)
         result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
                   'renamable': self.renamable(table), 'fields': fields}
         if table == EFFECT_TABLE:
@@ -441,25 +443,32 @@ class ItemDocument:
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
-    def _absorption_levels(self, row_id):
-        """The piece's Armor Rework effects, +0 first, or [] for a piece without one."""
+    def _absorption_levels(self, row_id, table='EquipParamProtector'):
+        """The record's Armor Rework effects, +0 first, or [] for a record without one."""
         if EFFECT_TABLE not in self.params:
             return []
+        if table == 'NpcParam':
+            base = ENEMY_ABSORPTION_BASE + row_id
+            slots = [self.value('NpcParam', row_id, f'spEffectID{index}') for index in range(8)]
+            return [base] if base in slots and base in self._rows_by_id[EFFECT_TABLE] else []
         base = self.value('EquipParamProtector', row_id, 'residentSpEffectId3')
         if base != ABSORPTION_BASE + row_id or base not in self._rows_by_id[EFFECT_TABLE]:
             return []
         return [base + level for level in range(MAX_UPGRADE_LEVEL + 1)
                 if base + level in self._rows_by_id[EFFECT_TABLE]]
 
-    def _absorption_fields(self, row_id):
-        levels = self._absorption_levels(row_id)
+    def _absorption_fields(self, row_id, table='EquipParamProtector'):
+        levels = self._absorption_levels(row_id, table)
         if not levels:
             return []
         fields = []
         for cut, kind in ABSORPTION_CUTS:
             rate = self.value(EFFECT_TABLE, levels[0], cut)
             fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
-                           'description': (f'Share of {kind.lower()} damage this piece absorbs, from its Armor Rework '
+                           'description': (f'Share of {kind.lower()} damage this enemy takes off every hit, from its '
+                                           'Armor Rework effect. Negative values make it take more damage.'
+                                           if table == 'NpcParam' else
+                                           f'Share of {kind.lower()} damage this piece absorbs, from its Armor Rework '
                                            'effect. Pieces multiply. Negative values make the wearer take more damage. '
                                            'Upgraded levels keep their bonus over this value.'),
                            'group': 'Absorption', 'dtype': 'f32', 'value': round((1 - rate) * 100, 3),
@@ -467,10 +476,10 @@ class ItemDocument:
                            'protectedReason': '', 'editable': True})
         return fields
 
-    def _edit_absorption(self, row_id, cut, value):
-        levels = self._absorption_levels(row_id)
+    def _edit_absorption(self, row_id, cut, value, table='EquipParamProtector'):
+        levels = self._absorption_levels(row_id, table)
         if not levels or cut not in dict(ABSORPTION_CUTS):
-            raise FormatError('This armor has no Armor Rework absorption')
+            raise FormatError('This record has no Armor Rework absorption')
         if type(value) not in (int, float) or isinstance(value, bool) or not math.isfinite(value) or not -100 <= value <= 99:
             raise FormatError('Absorption must be between -100 and 99')
         # Every upgrade level moves by the same amount, so its bonus over +0 stays.
@@ -479,12 +488,14 @@ class ItemDocument:
             current = (1 - self.value(EFFECT_TABLE, effect, cut)) * 100
             absorbed = min(99.0, max(-100.0, current + change))
             self.edit(EFFECT_TABLE, effect, cut, round(1 - absorbed / 100, 6))
-        return self.read_row('EquipParamProtector', row_id)
+        return self.read_row(table, row_id)
 
     def edit(self, table, row_id, key, value):
-        if table == 'EquipParamProtector' and isinstance(key, str) and key.startswith('absorption:'):
+        if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
+            if table == 'NpcParam' and not self.is_monster(row_id):
+                raise FormatError('This record is not a reviewed standard monster')
             self._row(table, row_id)
-            return self._edit_absorption(row_id, key.split(':', 1)[1], value)
+            return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, start, data = self._row(table, row_id)

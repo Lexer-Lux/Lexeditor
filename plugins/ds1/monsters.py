@@ -47,7 +47,7 @@ for key, kind in [('def_phys', 'Physical'), ('def_mag', 'Magic'),
         f'Flat defense against {kind.lower()} damage, in the same units as the player\'s defense: '
         'a whole number of 0 or more, not a percentage. The game weighs it against the attack\'s '
         'damage, so the same defense blocks more of a weak hit than of a strong one. Armor Rework '
-        'changes player armor only; enemies keep this.')
+        'sets it to 0 and gives the enemy percentage absorption instead.')
 for key, kind in [('def_slash', 'Slash'), ('def_blow', 'Strike'), ('def_thrust', 'Thrust')]:
     RESISTANCES[key] = (f'{kind} vs physical (%)', 'Defense rating',
         f'Changes physical defense against {kind.lower()} attacks by this percentage: -100 makes it 0, '
