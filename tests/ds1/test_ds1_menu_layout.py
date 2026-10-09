@@ -1,4 +1,4 @@
-"""DS1 menu layout: a tweak adds text nodes and nothing else moves.
+"""DS1 menu layout: a tweak adds text and icon nodes, and nothing else moves.
 
 Uses a synthetic DRB built here with the measured Remastered encodings
 (16-byte section headers, 46-byte dynamic and 50-byte message-text shapes,
@@ -46,6 +46,10 @@ DIALOGS = {
     ],
     "list_armor": [
         ("text_name", "Text", text_shape((10, 10, 200, 38), kind="dynamic")),
+        # The armour screen's poise icon, as measured: rectangle, then the
+        # texture region and index, flags, and an untinted colour (alpha first).
+        ("icon_tolerance_sa", "Sprite", struct.pack("<4h", 332, 111, 360, 139)
+         + bytes.fromhex("ffffffff00000000aa010602fe015a020a00000100000000ffffffff")),
     ],
 }
 
@@ -195,6 +199,49 @@ class LayoutTests(unittest.TestCase):
                      {"version": 1, "nodes": [{**STAMINA[0], "name": ""}]}):
             with self.subTest(spec=spec), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate(spec, "Mod")
+
+
+
+class IconTests(unittest.TestCase):
+    """Better Details' Poise DMG icon: the armour poise icon, red, in a weapon row."""
+
+    def test_a_sprite_is_copied_placed_and_tinted_and_its_source_is_untouched(self):
+        layout = menu_layout.Drb(drb())
+        before = snapshot(layout)
+        layout.add_sprite("data_simple_arms", "icon_lexeditor_poise", ("list_armor", "icon_tolerance_sa"),
+                          "icon_receive", 30, "ffff4040")
+        again = menu_layout.Drb(layout.to_bytes())
+        kind, blob = again._blob("SHAP", "SHPR", again.node("data_simple_arms", "icon_lexeditor_poise").shape)
+        source = dict((name, shape) for name, shape, _control in before["list_armor"])["icon_tolerance_sa"][1]
+        self.assertEqual(kind, "Sprite")
+        self.assertEqual(struct.unpack_from("<4h", blob), (332, 292, 360, 320))
+        self.assertEqual(blob[8:32], source[8:32])  # the same picture
+        self.assertEqual(blob[32:36], bytes.fromhex("ffff4040"))
+        self.assertEqual(snapshot(again)["list_armor"], before["list_armor"])
+
+    def test_a_text_node_can_be_widened_leftwards(self):
+        layout = menu_layout.Drb(drb())
+        layout.add_text("data_simple_arms", "text_param_wide", "text_param_receive", 30, 32, left=400)
+        self.assertEqual(layout.text("data_simple_arms", "text_param_wide")["rect"], [400, 292, 615, 320])
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_text("data_simple_arms", "text_param_bad", "text_param_receive", 30, 32, left=700)
+
+    def test_bad_sprites_are_refused(self):
+        layout = menu_layout.Drb(drb())
+        for source, colour in ((("data_simple_arms", "text_receive_name"), "ffff4040"),
+                               (("list_armor", "icon_tolerance_sa"), "red"),
+                               (("list_armor", "icon_tolerance_sa"), "ffff40")):
+            with self.subTest(source=source, colour=colour), self.assertRaises(menu_layout.LayoutError):
+                layout.add_sprite("data_simple_arms", "icon_x", source, "icon_receive", 30, colour)
+
+    def test_a_patch_may_mix_text_and_sprites(self):
+        spec = {"version": 1, "nodes": [*STAMINA, {
+            "dialog": "data_simple_arms", "name": "icon_lexeditor_poise", "sprite": ["list_armor", "icon_tolerance_sa"],
+            "lookLike": "icon_receive", "dy": 30, "color": "ffff4040"}]}
+        composed = menu_layout.compose(dcx(drb()), [menu_layout.validate(spec, "Details")])
+        layout = menu_layout.Drb(formats.inflate(composed))
+        self.assertEqual([node.name for node in layout.nodes("data_simple_arms")][-3:],
+                         ["text_lexeditor_stamina", "text_param_lexeditor_stamina", "icon_lexeditor_poise"])
 
 
 if __name__ == "__main__":
