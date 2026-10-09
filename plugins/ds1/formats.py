@@ -433,7 +433,18 @@ class ItemDocument:
             order = {key: index for index, key in enumerate(RESISTANCES)}
             fields.sort(key=lambda field: order[field['key']])
         if table in ('EquipParamProtector', 'NpcParam'):
-            fields += self._absorption_fields(row_id, table)
+            # With Armor Rework, absorption replaces flat defense: it takes the
+            # defense fields' place, and they are not shown (they stay 0).
+            absorption = self._absorption_fields(row_id, table)
+            if absorption:
+                replaced = set(ARMOR_FIELDS) if table == 'EquipParamProtector' else {
+                    'def_phys', 'def_slash', 'def_blow', 'def_thrust', 'def_mag', 'def_fire', 'def_thunder'}
+                group = next(field['group'] for field in fields if field['key'] in replaced)
+                for field in absorption:
+                    field['group'] = group
+                at = next(index for index, field in enumerate(fields) if field['key'] in replaced)
+                fields = ([field for field in fields[:at] if field['key'] not in replaced] + absorption
+                          + [field for field in fields[at:] if field['key'] not in replaced])
         result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
                   'renamable': self.renamable(table), 'fields': fields}
         if table == EFFECT_TABLE:

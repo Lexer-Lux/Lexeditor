@@ -43,13 +43,13 @@ def classified_monster(row_id, reference_name, npc_type):
 RESISTANCES = {}
 for key, kind in [('def_phys', 'Physical'), ('def_mag', 'Magic'),
                   ('def_fire', 'Fire'), ('def_thunder', 'Lightning')]:
-    RESISTANCES[key] = (f'{kind} defense', 'Defense rating',
+    RESISTANCES[key] = (f'{kind} defense', 'Defense',
         f'Flat defense against {kind.lower()} damage, in the same units as the player\'s defense: '
         'a whole number of 0 or more, not a percentage. The game weighs it against the attack\'s '
         'damage, so the same defense blocks more of a weak hit than of a strong one. Armor Rework '
         'sets it to 0 and gives the enemy percentage absorption instead.')
 for key, kind in [('def_slash', 'Slash'), ('def_blow', 'Strike'), ('def_thrust', 'Thrust')]:
-    RESISTANCES[key] = (f'{kind} vs physical (%)', 'Defense rating',
+    RESISTANCES[key] = (f'{kind} vs physical (%)', 'Defense',
         f'Changes physical defense against {kind.lower()} attacks by this percentage: -100 makes it 0, '
         '25 makes it 25% higher. It does not reduce damage by 25%.')
 for key, kind in [('resist_poison', 'Poison'), ('resist_desease', 'Toxic'),
