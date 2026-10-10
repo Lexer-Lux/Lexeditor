@@ -26,3 +26,16 @@ Verified against the installed Remastered `GameParam.parambnd.dcx`
 ## Magic.stamina
 
 - 0 on every sampled vanilla row. Spells cost no stamina unmodded.
+
+## The only usage-modifying effect: stateInfo 194
+
+- Of all 850 SpEffect rows, exactly one carries stateInfo 194
+  ("Increase number of magic uses"): row 2060, the Dusk Crown
+  Ring's effect (Accessory 116, refCategory SpEffect).
+- Row 2060's only other functional field is maxHpRate 0.5. There
+  is no magnitude field for the cast-count change, so the halving
+  (and any damage change) is keyed off 194 in code.
+- For the mana tweak: when stateInfo 194 is active, scale mana
+  costs instead of halving counts. No param field in Magic,
+  SpEffect or Accessory accounts for attunement copies either, so
+  that multiplication also lives in code.
