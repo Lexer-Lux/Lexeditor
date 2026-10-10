@@ -190,7 +190,11 @@ class SettingsStore:
             "loadingTransitionMinimumSeconds": max(
                 0.0, min(10.0, loading_transition_minimum_seconds)
             ),
-            "trustWarningSeen": payload.get("trustWarningSeen", False) is True,
+            # The mods whose first-enable warning was accepted. An older file
+            # stored one yes/no for all mods; it counts as none.
+            "trustWarningSeen": sorted({str(item) for item in payload.get("trustWarningSeen", [])
+                                        if isinstance(item, str) and item})
+            if isinstance(payload.get("trustWarningSeen"), list) else [],
             "viewPreferences": view_preferences,
         }
 
@@ -291,11 +295,15 @@ class SettingsStore:
             self._write(payload)
         return self.snapshot()
 
-    def acknowledge_trust_warning(self) -> dict:
-        """Remember that the first-enable mod warning was accepted."""
+    def acknowledge_trust_warning(self, mod: str) -> dict:
+        """Remember that the first-enable warning was accepted for this mod."""
+        if not isinstance(mod, str) or not mod.strip():
+            raise ValueError("Which mod was enabled is missing")
         with self._lock:
             value = self._read()
-            value["trustWarningSeen"] = True
+            seen = set(value.get("trustWarningSeen") or [])
+            seen.add(mod.strip().casefold())
+            value["trustWarningSeen"] = sorted(seen)
             self._write({"version": 8, **value})
         return self.snapshot()
 

@@ -636,9 +636,9 @@ class HostApi:
         )
         return self.lexeditor_settings()
 
-    def acknowledge_trust_warning(self) -> dict:
-        """Remember that the reader accepted the first-enable mod warning."""
-        self._settings.acknowledge_trust_warning()
+    def acknowledge_trust_warning(self, mod: str) -> dict:
+        """Remember that the reader accepted the first-enable warning for one mod."""
+        self._settings.acknowledge_trust_warning(mod)
         return self.lexeditor_settings()
 
     def save_developer_setting_defaults(self, values: dict) -> dict:

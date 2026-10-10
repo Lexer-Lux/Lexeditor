@@ -5074,22 +5074,27 @@
 
   const hoverableAltClickEnabled = () => sharedSettingsSnapshot?.hoverableAltClick === true;
   const sharedSettings = () => sharedSettingsSnapshot ? clone(sharedSettingsSnapshot) : null;
-  // Enabling a mod runs its scripts, so the first time any mod is enabled
-  // the reader confirms they trust what they enable. Once accepted it never
-  // shows again; the Trust Warning setting switches it off entirely.
-  const confirmFirstModEnable = async () => {
+  // Enabling a mod runs its scripts, so the first time each mod is enabled
+  // the reader confirms they trust it (Lexer: "the first time you enable a
+  // mod"). The Trust Warning setting switches the warning off entirely. `mod`
+  // is the mod's folder, or its key where a list has no folder.
+  const confirmFirstModEnable = async mod => {
     let settings = sharedSettingsSnapshot;
     if (!settings) {
       try { settings = rememberSharedSettings(await callWindow("lexeditor_settings")); }
       catch (_error) { settings = null; }
     }
-    if (!settings || settings.trustWarning === false || settings.trustWarningSeen === true) return true;
+    const seen = new Set((Array.isArray(settings?.trustWarningSeen) ? settings.trustWarningSeen : []).map(String));
+    const id = String(mod || "").trim().toLocaleLowerCase();
+    if (!settings || settings.trustWarning === false || (id && seen.has(id))) return true;
     const agreed = await confirmAction({title: "Enable this mod?",
       message: "Are you sure you want to enable this mod? Only enable mods you trust.\n\nThis warning shows up the first time you enable a mod because it's important. You can disable this in the settings under \"Trust Warning\".",
       confirmLabel: "Enable", cancelLabel: "Cancel"});
     if (!agreed) return false;
-    const updated = await callWindow("acknowledge_trust_warning");
-    if (updated) rememberSharedSettings(updated);
+    if (id) {
+      const updated = await callWindow("acknowledge_trust_warning", id);
+      if (updated) rememberSharedSettings(updated);
+    }
     return true;
   };
   const soundCoverageTable = rows => element("table", {class:"lex-theme-sound-table"},
@@ -5876,7 +5881,7 @@ ${contents.path}`});
           ? element("input",{type:"checkbox",checked:row.enabled!==false,
             class:"lex-project-source-status",
             "aria-label":`Enable ${row.label}`,onchange:event=>run(async()=>{
-              if(event.target.checked && !(await confirmFirstModEnable()))return;
+              if(event.target.checked && !(await confirmFirstModEnable(row.path||row.key)))return;
               await options.changeProjectSource(row.key,{enabled:event.target.checked})})})
           : null;
         if(row.managed && options.changeProjectSource){
@@ -12458,7 +12463,7 @@ ${contents.path}`});
       }
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
         onchange: async event => {
-          if (event.target.checked && !(await confirmFirstModEnable())) { event.target.checked = false; return; }
+          if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
           try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
           catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
         }});
@@ -12517,7 +12522,7 @@ ${contents.path}`});
               : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
                   onclick: event => event.stopPropagation(),
                   onchange: async event => {
-                    if (event.target.checked && !(await confirmFirstModEnable())) { event.target.checked = false; return; }
+                    if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
                     try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
                     catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
                   }})}]}),

@@ -1,8 +1,9 @@
 """The first-enable mod warning and the global Trust Warning setting.
 
-Enabling a mod runs its scripts, so the first time any mod is enabled the
-reader confirms they trust what they enable. Once accepted the warning never
-shows again; the Trust Warning setting (default on) switches it off entirely.
+Enabling a mod runs its scripts, so the first time each mod is enabled the
+reader confirms they trust it (Lexer: "the first time you enable a mod").
+Once accepted for a mod it does not show for that mod again; the Trust
+Warning setting (default on) switches it off entirely.
 """
 import json
 from pathlib import Path
@@ -20,12 +21,14 @@ HOST = """(options) => {
   const rows = [
     {path: 'C:/lib/game/Mine', folder: 'Mine', name: 'Mine', author: 'Me', description: '', credits: '',
      version: '', missing: [], enabled: false, order: 1, lexmod: null, script: null, error: '', remote: false},
+    {path: 'C:/lib/game/Other', folder: 'Other', name: 'Other', author: 'Me', description: '', credits: '',
+     version: '', missing: [], enabled: false, order: 2, lexmod: null, script: null, error: '', remote: false},
   ];
   const record = name => (...args) => { calls.push([name, args]); };
   window.pywebview = {api: {
     lexeditor_settings: async () => JSON.parse(JSON.stringify(settings)),
-    acknowledge_trust_warning: async () => { record('acknowledge_trust_warning')();
-      settings.trustWarningSeen = true; return JSON.parse(JSON.stringify(settings)); },
+    acknowledge_trust_warning: async mod => { record('acknowledge_trust_warning')(mod);
+      settings.trustWarningSeen = [...settings.trustWarningSeen, mod]; return JSON.parse(JSON.stringify(settings)); },
     save_lexeditor_settings: async values => { record('save_lexeditor_settings')(values);
       Object.assign(settings, values); return JSON.parse(JSON.stringify(settings)); },
     save_developer_setting_defaults: async () => JSON.parse(JSON.stringify(settings)),
@@ -57,7 +60,7 @@ def mount(page, settings):
 
 def warned(page):
     return dict(BASE, developerMode=False, developerAuthorized=False,
-                developerLogin="", viewPreferences={}, trustWarningSeen=False)
+                developerLogin="", viewPreferences={}, trustWarningSeen=[])
 
 
 def calls(page, name):
@@ -71,7 +74,7 @@ def dialog(page):
 def test_trust_warning_defaults_on_and_round_trips(tmp_path):
     store = SettingsStore(tmp_path / 'settings.json', ROOT / 'ui/default_settings.json')
     assert store.snapshot()['trustWarning'] is True
-    assert store.snapshot()['trustWarningSeen'] is False
+    assert store.snapshot()['trustWarningSeen'] == []
     store.save('daily', trust_warning=False)
     assert store.snapshot()['trustWarning'] is False
     store.save('daily')
@@ -80,13 +83,20 @@ def test_trust_warning_defaults_on_and_round_trips(tmp_path):
     assert store.snapshot()['trustWarning'] is True
 
 
-def test_acknowledge_persists_and_survives_later_saves(tmp_path):
+def test_acknowledge_persists_per_mod_and_survives_later_saves(tmp_path):
     store = SettingsStore(tmp_path / 'settings.json', ROOT / 'ui/default_settings.json')
-    assert store.acknowledge_trust_warning()['trustWarningSeen'] is True
+    assert store.acknowledge_trust_warning('C:/lib/game/Mine')['trustWarningSeen'] == ['c:/lib/game/mine']
+    store.acknowledge_trust_warning('C:/lib/game/Other')
     reopened = SettingsStore(tmp_path / 'settings.json', ROOT / 'ui/default_settings.json')
-    assert reopened.snapshot()['trustWarningSeen'] is True
+    assert reopened.snapshot()['trustWarningSeen'] == ['c:/lib/game/mine', 'c:/lib/game/other']
     reopened.save('daily', trust_warning=False)
-    assert reopened.snapshot()['trustWarningSeen'] is True
+    assert reopened.snapshot()['trustWarningSeen'] == ['c:/lib/game/mine', 'c:/lib/game/other']
+
+
+def test_an_older_single_yes_counts_as_no_mod_seen(tmp_path):
+    path = tmp_path / 'settings.json'
+    path.write_text(json.dumps({"version": 8, "trustWarningSeen": True}), encoding='utf-8')
+    assert SettingsStore(path, ROOT / 'ui/default_settings.json').snapshot()['trustWarningSeen'] == []
 
 
 def test_first_enable_warns_and_cancel_keeps_the_mod_off(page):
@@ -105,14 +115,14 @@ def test_first_enable_warns_and_cancel_keeps_the_mod_off(page):
     assert not page.get_by_role("checkbox", name="Switch Mine").is_checked()
 
 
-def test_confirming_enables_once_and_never_warns_again(page):
+def test_confirming_enables_and_that_mod_is_not_warned_about_again(page):
     mount(page, warned(page))
     page.get_by_role("checkbox", name="Switch Mine").check()
     dialog(page).get_by_role("button", name="Enable", exact=True).click()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
     assert calls(page, "set_mod_enabled") == [["game", "C:/lib/game/Mine", True]]
-    assert len(calls(page, "acknowledge_trust_warning")) == 1
-    # Disabling never warns, and the accepted warning never shows again.
+    assert calls(page, "acknowledge_trust_warning") == [["c:/lib/game/mine"]]
+    # Disabling never warns, and this mod's accepted warning does not return.
     page.get_by_role("checkbox", name="Switch Mine").uncheck()
     page.wait_for_function("window.calls.filter(c => c[0] === 'set_mod_enabled').length === 2")
     assert dialog(page).count() == 0
@@ -149,8 +159,8 @@ def test_mod_dropdown_enable_warns_first(page):
       let secondEnabled = false;
       window.pywebview = {api: {
         lexeditor_settings: async () => structuredClone(settings),
-        acknowledge_trust_warning: async () => {
-          settings.trustWarningSeen = true; return structuredClone(settings); },
+        acknowledge_trust_warning: async mod => {
+          settings.trustWarningSeen = [...settings.trustWarningSeen, mod]; return structuredClone(settings); },
       }};
       document.body.insertAdjacentHTML('afterbegin', '<div id="shell"></div>');
       LexeditorUI.mountShell({host: '#shell', plugin: {id: 'fixture', name: 'Fixture'},
@@ -173,3 +183,15 @@ def test_mod_dropdown_enable_warns_first(page):
     dialog(page).get_by_role("button", name="Enable", exact=True).click()
     page.wait_for_function("window.changes.length === 1")
     assert page.evaluate("changes") == [{"key": "second", "enabled": True}]
+
+
+def test_each_mod_gets_its_own_first_warning(page):
+    mount(page, warned(page))
+    page.get_by_role("checkbox", name="Switch Mine").check()
+    dialog(page).get_by_role("button", name="Enable", exact=True).click()
+    page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
+    page.get_by_role("checkbox", name="Switch Other").check()
+    dialog(page).get_by_role("heading", name="Enable this mod?").wait_for()
+    dialog(page).get_by_role("button", name="Enable", exact=True).click()
+    page.wait_for_function("window.calls.filter(c => c[0] === 'set_mod_enabled').length === 2")
+    assert calls(page, "acknowledge_trust_warning") == [["c:/lib/game/mine"], ["c:/lib/game/other"]]
