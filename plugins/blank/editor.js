@@ -136,8 +136,6 @@
   // Which group of tweaks is on screen. A tweak page divides with subtabs, the
   // same control every other page divides with, and the bar is not drawn until
   // there are at least two groups to choose between.
-  let tweakGroup="gameplay";
-  const TWEAK_GROUPS=[{id:"gameplay",label:"Gameplay"},{id:"presentation",label:"Presentation"}];
   function tweaksPanel(){
     const gate=!tweaks.enabled||activeSource!=="mine";
     // The reference shape, and the one to copy: a page of cards dealt into as
@@ -180,37 +178,11 @@
                 help:`Blank sample flag: ${label}.`,
                 change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
         ]})];
-    const presentation=[
-        // Every game's Tweaks page offers the same ReShade section. Lexeditor
-        // keeps one ReShade; the mod carries only its preset and any shaders
-        // its author wrote, so the mod stays installable by hand.
-        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade})];
-    return LexeditorUI.settingsColumns(
-      tweakGroup==="presentation"?presentation:gameplay,
-      {className:"blank-tweaks",tabs:TWEAK_GROUPS,activeTab:tweakGroup,
-       tabsLabel:"Blank tweak groups",
-       changeTab:value=>{tweakGroup=value;render()}});
-  }
-  let reshade={manifest:{enabled:false,preset:""},presets:[],shaders:[],
-    reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
-  async function loadReshade(){
-    try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
-    catch(_error){/* the browser preview has no desktop host; the section still renders */}
-  }
-  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
-  async function actReshade(method,...args){
-    try{
-      const value=method==="adopt_reshade"
-        ? await LexeditorUI.callWindow?.(method)
-        : await LexeditorUI.callWindow?.(method,"blank",...args);
-      if(value&&value.manifest)reshade=value;else await loadReshade();
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    render();
-  }
-  async function saveReshade(manifest){
-    try{reshade=await LexeditorUI.callWindow?.("save_mod_reshade","blank",manifest)||reshade}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    render();
+    // Every game's Tweaks page is the shared one: the game's own pages as
+    // subtabs, and ReShade on a subtab of its own, which the page loads and
+    // drives itself.
+    return LexeditorUI.tweaksPage({plugin:"blank",render,className:"blank-tweaks",tabsLabel:"Blank tweak groups",
+      pages:[{id:"gameplay",label:"Gameplay",body:()=>gameplay}]});
   }
 
   function graphsPanel(){
@@ -405,7 +377,6 @@
     dialog.append(el("button",{type:"button",onclick:()=>close({cancelled:true})},"Cancel"));
     document.body.append(dialog);dialog.showModal();
   });
-  void loadReshade().then(()=>render());
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"template",label:"Templates",order:0},{id:"organism",label:"Organisms",order:1},{id:"molecule",label:"Molecules",order:2},{id:"atom",label:"Atoms",order:3},{id:"utility",label:"Utilities",order:4}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
   async function restoreSample(){
     try{

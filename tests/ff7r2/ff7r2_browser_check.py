@@ -225,7 +225,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.screenshot(path=str(OUT / "information.png"), full_page=True)
 
                 page.evaluate('navigate("tweaks")')
-                expect(page.get_by_text("ReShade", exact=True).first).to_be_visible()
+                # No desktop host, so no ReShade defaults: the shared Tweaks
+                # page gives ReShade no subtab rather than an empty one.
+                expect(page.locator(".lex-subtab-button", has_text="ReShade")).to_have_count(0)
                 expect(page.get_by_text("Shader Injector", exact=True).first).to_be_visible()
                 page.screenshot(path=str(OUT / "tweaks.png"), full_page=True)
 

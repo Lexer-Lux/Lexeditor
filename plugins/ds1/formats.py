@@ -265,6 +265,8 @@ class ItemDocument:
         self._effects = None
         self.schemas = {table: schema(table) for table in TABLES}
         self.dirty = set()
+        # When each change was last made, so Save's list reads newest first.
+        self._edited_at = {}
         # The game's own item names (texts.TextDocument), when the store has
         # them; reference names stand in for the rest.
         self.texts = None
@@ -311,7 +313,11 @@ class ItemDocument:
     def pending_changes(self, limit=200):
         """What Save would write, one row per change: label, before and after."""
         rows = []
-        for table, row_id, key in sorted({self._change_key(*entry) for entry in self.dirty}, key=str)[:limit]:
+        latest = {}
+        for entry in self.dirty:
+            change = self._change_key(*entry)
+            latest[change] = max(latest.get(change, 0), self._edited_at.get(entry, 0))
+        for table, row_id, key in sorted(latest, key=lambda change: (-latest[change], str(change)))[:limit]:
             try:
                 name = self.display_name(table, row_id)
                 if key.startswith('absorption:'):
@@ -630,6 +636,7 @@ class ItemDocument:
             self.dirty.discard(dirty_key)
         else:
             self.dirty.add(dirty_key)
+            self._edited_at[dirty_key] = len(self._edited_at) + 1
 
     def export(self):
         if self.plain == self.original_plain: return self.original

@@ -1491,10 +1491,13 @@
       "bannerlord",
       "blank",
       "ds1",
+      "ff7",
       "ff7r",
       "ff7r2",
       "ff8",
-      "ff9"
+      "ff9",
+      "rdr",
+      "rdr2"
     ],
     "saveIcon": [
       "bannerlord",
@@ -1567,9 +1570,11 @@
       "bannerlord",
       "blank",
       "ds1",
+      "ff7",
       "ff7r",
       "ff7r2",
       "ff8",
+      "ff9",
       "rdr",
       "rdr2"
     ],
@@ -1607,6 +1612,7 @@
       "ff7r",
       "ff7r2",
       "ff8",
+      "ff9",
       "rdr",
       "rdr2"
     ],
@@ -1706,8 +1712,6 @@
       "bannerlord",
       "blank",
       "ds1",
-      "ff7",
-      "ff7r2",
       "ff8",
       "terraria"
     ],
@@ -1800,8 +1804,16 @@
       "warband"
     ],
     "tweaksPage": [
+      "bannerlord",
       "blank",
-      "ds1"
+      "ds1",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "rdr",
+      "rdr2"
     ],
     "uiScaleControl": [
       "bannerlord",

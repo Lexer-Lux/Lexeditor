@@ -1117,10 +1117,11 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
    one fills it with the accent while the hold counts. */
 .lex-property-hidden:is(:root:not([data-lex-show-hidden="true"]) *) { display:none; }
 :root[data-lex-show-hidden="true"] .lex-property-hidden { opacity:.45; }
-/* The fill is important: a property's hover background is a shorthand that
-   reset it, so a held property never filled while a held heading did. */
-.lex-property-holding { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent)) !important;
-  background-repeat:no-repeat !important; animation:lex-property-hold .7s linear forwards; }
+/* A property's hover background is a shorthand that reset the fill, so a
+   held property never filled while a held heading did. The :not() of an id
+   that never exists outranks the hover rule with no priority flag. */
+.lex-property-holding:not(#lex-property-hold-rank) { background-image:linear-gradient(color-mix(in srgb, var(--lex-accent) 30%, transparent), color-mix(in srgb, var(--lex-accent) 30%, transparent));
+  background-repeat:no-repeat; animation:lex-property-hold .7s linear forwards; }
 @keyframes lex-property-hold { from { background-size:0 100%; } to { background-size:100% 100%; } }
 .lex-has-readonly-lock { position:relative; }
 /* A locked list cannot open, so its arrow would only promise a menu - and it
@@ -7070,9 +7071,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    column: three columns of 7.5% of a 430px column gave 30px lanes and names
    like "Durab". Every column's lane is the same share of the panel, however
    many columns the reader picks. */
-.lex-tweaks-paged { container-type:inline-size; }
 .lex-tweaks-paged .lex-tweak-card-grid { --lex-detail-label-width:calc(var(--lex-detail-label-share) * 1cqw); }
 .lex-tweaks-paged {
+  container-type:inline-size;
   flex-direction:column;
   height:100%;
   min-height:0;

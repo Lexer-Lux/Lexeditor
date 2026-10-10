@@ -139,7 +139,7 @@ def check_persistence() -> None:
 
 def check_editor() -> str:
     editor = plugin_ui('ff8')
-    rendered = editor[editor.index("function renderGameplaySettings(){"):
+    rendered = editor[editor.index("function renderGameplaySettings(tabProps){"):
                       editor.index('const settingsView=LexeditorUI.settingsColumns(panels')]
     # Every tweak is drawn by the one shared component; nothing on the page
     # is a hand-made switch beside it, and Vanilla does not hide the page.

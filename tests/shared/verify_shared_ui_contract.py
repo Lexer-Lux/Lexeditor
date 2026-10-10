@@ -165,8 +165,8 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in page_source("plugins/blank"),
-        "plugins/blank does not demonstrate the shared ReShade section")
+require("tweaksPage(" in page_source("plugins/blank"),
+        "plugins/blank does not demonstrate the shared Tweaks page")
 for plugin in sorted((ROOT / "plugins").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue

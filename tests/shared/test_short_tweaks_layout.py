@@ -1,4 +1,9 @@
-"""Unavailable ReShade uses the shared, centered settled-state tab panel."""
+"""A game without ReShade for players shows no ReShade subtab.
+
+FF7R2 kept a ReShade tab that only said ReShade was not set up. The shared
+Tweaks page shows ReShade only where the host offers it (defaults saved, or
+Developer Mode), so the page opens on Rebirth's own tools and fills the window.
+"""
 from pathlib import Path
 import re
 import tempfile
@@ -8,7 +13,7 @@ from playwright.sync_api import sync_playwright
 from verify_no_dead_space import PROBE, STUB, session_for
 
 
-def test_unavailable_reshade_uses_the_shared_empty_panel(tmp_path):
+def test_unavailable_reshade_has_no_subtab(tmp_path):
     plugin='ff7r2'
     with session_for(plugin, str(tmp_path/'project')) as session:
         with sync_playwright() as playwright:
@@ -28,9 +33,6 @@ def test_unavailable_reshade_uses_the_shared_empty_panel(tmp_path):
             output.parent.mkdir(parents=True,exist_ok=True)
             page.screenshot(path=str(output))
             measure=page.evaluate(PROBE)
-            content=page.locator('.lex-tabbed-panel-empty').bounding_box()
-            message=page.locator('.lex-tabbed-panel-empty > .lex-notice').bounding_box()
-            assert abs(message['y']+message['height']/2-content['y']-content['height']/2)<2
             geometry=page.locator('#main,.lex-tweaks-paged,.lex-tweaks-scroll,.lex-tweaks-pages,.lex-pager').evaluate_all('''nodes=>nodes.map(node=>{
               const box=node.getBoundingClientRect(),style=getComputedStyle(node);
               return {class:node.className,height:box.height,top:box.top,bottom:box.bottom,
@@ -39,10 +41,9 @@ def test_unavailable_reshade_uses_the_shared_empty_panel(tmp_path):
             assert measure['bottom']-measure['lowest'] <= measure['height']*.2, geometry
             page.get_by_role('tab',name=re.compile('Engine Config',re.I)).click()
             page.locator('#main .lex-detail-panel-title').filter(has_text=re.compile('ENGINE CONFIG',re.I)).first.wait_for()
-            assert page.locator('.lex-subtab-bar').first.locator('[role=tab]').count()==3
+            assert page.locator('.lex-subtab-bar').first.locator('[role=tab]').count()==2
+            assert page.get_by_role('tab',name=re.compile('ReShade',re.I)).count()==0
             page.get_by_role('tab',name=re.compile('Shader Injector',re.I)).click()
             page.wait_for_selector('#main .lex-tweaks-paged')
-            page.get_by_role('tab',name=re.compile('ReShade',re.I)).click()
-            page.wait_for_selector('.lex-tabbed-panel-empty > .lex-notice')
             assert not errors, errors
             browser.close()

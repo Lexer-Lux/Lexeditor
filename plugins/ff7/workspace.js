@@ -143,7 +143,10 @@
       ...(state.platformError?[detailSection({title:"ERROR",body:[detailField({label:"MESSAGE",control:readonlyField(state.platformError)})]})]:[]),
       detailSection({title:"SETTINGS",body:[view]}),
     ]});
-    return tabbedPanel({tabs:[{id:"ffnx",label:"FFNx"}],active:"ffnx",label:"Tweaks sections",change:()=>{},content:panel});
+    // The shared Tweaks page: FFNx, and ReShade on a subtab of its own
+    // wherever the host offers it.
+    return LexeditorUI.tweaksPage({plugin:"ff7",render,tabsLabel:"Tweaks sections",
+      pages:[{id:"ffnx",label:"FFNx",body:()=>[panel]}]});
   }
   function ff7ModLoaderSection(){
     return LexeditorUI.modLoaderSection({

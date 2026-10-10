@@ -3,7 +3,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload;try{payload=await response.json()}catch(_error){throw new Error(`${path}: Invalid JSON response`)}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"tag",dir:1},
+  const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,curatedQuery:"",curatedSort:{key:"tag",dir:1},
     tab:"misc",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -409,11 +409,15 @@
   const enginePanel=LexeditorUnrealConfig.createPanel({route:"/api/unreal-config",rerender:()=>render()});
   function tweaksPanel(){
     const list=tweakAssets();
+    // The shared Tweaks page: the game's tweak groups on one page, and ReShade
+    // on a subtab of its own, which the page loads and drives.
+    const page=cards=>LexeditorUI.tweaksPage({plugin:"ff7r",render,className:"ff7r-tweaks",
+      pages:[{id:"game",label:"Game",body:()=>cards}]});
     // Engine Config edits Engine.ini directly and needs no catalog entry, so
     // it stays usable even when the catalog yields no tweak groups.
-    if(!list.length)return LexeditorUI.stack(
+    if(!list.length)return page([
       emptyPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
-      enginePanel.element());
+      enginePanel.element()]);
     if(!Object.keys(state.tweaks||{}).length&&state.tweaksPending>0)
       return loadingPanel("Loading tweaks",`Reading ${state.tweaksPending} tweak group${state.tweaksPending===1?"":"s"}…`);
     if(state.tweaksError&&!Object.keys(state.tweaks||{}).length)return errorPanel(state.tweaksError);
@@ -422,10 +426,8 @@
     if(state.tweaksPending)cards.push(el("section",{class:"ff7r-card ff7r-tweaks-pending"},
       el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
       el("p",{},"These take longer to read than the rest and will appear here when they arrive.")));
-    cards.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
     cards.push(enginePanel.element());
-    return LexeditorUI.stack(
-      LexeditorUI.settingsColumns(cards,{className:"ff7r-tweaks"}));
+    return page(cards);
   }
   // A group with one record shows its properties by name. A group with several
   // names each row, because the row is the thing being configured.
@@ -501,25 +503,6 @@
     return Object.values(state.tweaks)
       .map(entry=>({entry,edits:diffRecords(entry.data,entry.baseline)}))
       .filter(group=>group.edits.length);
-  }
-  async function loadReshade(){
-    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff7r");if(value)state.reshade=value}
-    catch(_error){/* browser preview has no desktop host; the section still renders */}
-  }
-  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
-  async function actReshade(method,...args){
-    try{
-      const value=method==="adopt_reshade"
-        ? await LexeditorUI.callWindow?.(method)
-        : await LexeditorUI.callWindow?.(method,"ff7r",...args);
-      if(value&&value.manifest)state.reshade=value;else await loadReshade();
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    render();
-  }
-  async function saveReshade(manifest){
-    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff7r",manifest);if(value)state.reshade=value}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    render();
   }
   // "Mod contents only" hides everything this mod does not touch. For a data
   // table that means the rows whose values differ from the vanilla baseline the
@@ -898,7 +881,6 @@
       state.pages[tab]=0;render();
     }
     else if(tab==="tweaks"){
-      if(!state.reshade)await loadReshade();
       await enginePanel.ensure();
       if(!state.tweaks)await loadAllTweaks();else render();
     }

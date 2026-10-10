@@ -180,16 +180,18 @@ function commit(row,field,value,control){
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
       const after=result.row.fields.find(item=>item.key===field.key)?.value;
       const done=[{table:row.table,id:row.id,field:field.key,before,after}];
+      let latest=result;
       // The other selected records of this table get the same value.
       for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
         const id=Number(other.slice(row.table.length+1));
         const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}`)).row.fields.find(item=>item.key===field.key)?.value;
         const changed=await api("/api/edit",{table:row.table,id,field:field.key,value});
-        state.dirty=changed.dirtyCount;state.changes=changed.changes||state.changes;
+        latest=changed;
         done.push({table:row.table,id,field:field.key,before:prior,after:changed.row.fields.find(item=>item.key===field.key)?.value});
       }
       fieldHistory.record(done.length>1?{edits:done}:done[0]);
-      state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
+      // The count and the list come from the last edit made, which saw them all.
+      state.dirty=latest.dirtyCount;state.changes=latest.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
@@ -469,7 +471,13 @@ function renderItems(){
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,sortState:state.sort,
       sort:column=>{if(encumbrance)return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
-      select:async(row,event)=>{await edits;select(row,event);state.selected=key(row);await loadDetail();render();},
+      // The record is fetched first, then the shared list swaps in its detail
+      // pane once. It used to draw the pane with the old record, then render
+      // the whole page twice more as two loads of the same row came back.
+      select:async(row,event)=>{
+        await edits;
+        if(!event?.shiftKey&&!event?.ctrlKey&&!event?.metaKey){state.selected=key(row);await loadDetail();}
+        select(row,event);shell.refresh();},
       columns:encumbrance?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },

@@ -1,9 +1,9 @@
-"""FF8 Tweaks grows a ReShade subtab backed by the shared section.
+"""FF8's Tweaks page is the shared one, with ReShade on a subtab of its own.
 
-Without a desktop host the page says to open it in the desktop app; with a
-host snapshot it renders the shared RESHADE section (master switch plus one
-row per effect). The snapshot here is canned: the shared section's own
-controls are covered once, this check covers FF8's wiring.
+Without a desktop host there is no ReShade for players, so no subtab; with a
+host snapshot the shared page adds the subtab and renders the shared RESHADE
+section (master switch plus one row per effect). The snapshot is canned: the
+section's own controls are covered once, this check covers the wiring.
 """
 import os
 import sys
@@ -21,18 +21,14 @@ from playwright.sync_api import sync_playwright
 
 BOOTED = "typeof state==='object' && !state.booting && !state.bootFailed"
 SNAPSHOT = """() => {
-  const original = LexeditorUI.callWindow;
-  LexeditorUI.callWindow = async (method, ...args) => {
-    if (method === "mod_reshade") return {
+  window.pywebview = {api: {mod_reshade: async () => ({
       available: true, installed: false, gameFound: true, developerMode: false,
       hasDefaults: true, error: "",
       effects: [{file: "Sharpen.fx", id: "Sharpen", label: "Sharpen", tooltip: "",
         techniques: [{name: "Sharpen", label: "Sharpen", tooltip: ""}],
         controls: [{name: "Strength", type: "float", widget: "slider",
           label: "Strength", tooltip: "", default: 0.5, min: 0, max: 1, step: 0.01}],
-        enabled: true, values: {Strength: 0.5}}]};
-    return original?.(method, ...args);
-  };
+        enabled: true, values: {Strength: 0.5}}]})}};
 }"""
 
 
@@ -48,12 +44,15 @@ def main():
             page.goto(f"http://127.0.0.1:{server.server_port}/")
             page.wait_for_function(BOOTED, timeout=90000)
             page.locator('nav [data-tab="settings"]').click()
+            page.locator('.lex-subtab-bar button', has_text="Gameplay").wait_for()
+            page.wait_for_timeout(300)
             subtab = page.locator('.lex-subtab-bar button', has_text="ReShade")
-            subtab.wait_for()
-            subtab.click()
-            page.locator("#main", has_text="desktop app").wait_for()
-            assert page.locator(".lex-reshade").count() == 0
+            assert subtab.count() == 0, "no host, no ReShade for players: no subtab"
+            page.reload()
+            page.wait_for_function(BOOTED, timeout=90000)
             page.evaluate(SNAPSHOT)
+            page.locator('nav [data-tab="settings"]').click()
+            subtab.wait_for()
             subtab.click()
             page.locator(".lex-reshade").wait_for()
             assert page.locator('[aria-label="ReShade on or off"]').count() == 1
@@ -64,7 +63,7 @@ def main():
     finally:
         server.shutdown()
         _TEMPDIR.cleanup()
-    print("FF8 Tweaks ReShade subtab: host notice without a host, shared section with one.")
+    print("FF8 Tweaks ReShade subtab: none without a host, the shared section with one.")
 
 
 if __name__ == "__main__":

@@ -858,6 +858,8 @@
       ].filter(Boolean).join(" "),
       title: attrs.title,
       style: boxed ? `--lex-unit-reserve:${reserve}em` : null,
+      // A reference beside the value reads its unit from here.
+      "data-lex-unit": unit || null, "data-lex-unit-position": unit ? (prefix ? "prefix" : "suffix") : null,
     }, control, unit ? element("span", {
     class: ["lex-unit", unit === "×" ? "lex-unit-multiplier" : "", attrs.unitClass || ""].filter(Boolean).join(" "),
     "aria-hidden": "true",
@@ -1494,128 +1496,157 @@
   // Every value box on a panel should end at the same edge, so the reference
   // rail takes the widest requirement in that panel rather than each control
   // keeping its own.
-  const alignReferenceRails = (container = document) => {
-    const controlsFor=selector=>[
+  const alignReferenceRailsNow = (containers = [document]) => {
+    const controlsFor=(container,selector)=>[
       ...(container instanceof Element&&container.matches(selector)?[container]:[]),
       ...(container.querySelectorAll?.(selector)||[])
     ];
-    const panels = new Set();
-    controlsFor(".lex-source-control[data-lex-rail-tag]")
-      .forEach(control => panels.add(
-        control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
-    for (const panel of panels) {
+    // Every read first, then every write, then one read of the probes and
+    // their writes: two layouts for the whole pass. Reading a row after the
+    // previous row's write forced a layout per property, and with each caller
+    // running its own pass, switching records laid the page out dozens of
+    // times (Lexer: "OBSCENE amounts of lag every time i do LITERALLY
+    // ANYTHING").
+    const panels = new Map();
+    for (const container of containers)
+      controlsFor(container, ".lex-source-control[data-lex-rail-tag]").forEach(control => {
+        const panel = control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container;
+        if (!panels.has(panel)) panels.set(panel, null);
+      });
+    const outside = [...panels.keys()].map(panel => {
       const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")];
-      if (!controls.length) continue;
       // Each entry gets an equal share of the space beside the property it
       // annotates, so a deeper stack is a smaller stack rather than a taller
-      // row.
-      for (const control of controls) {
-        const stack = control.querySelector(":scope > .lex-reference-values");
-        const count = stack?.children.length || 0;
-        if (!count) {
+      // row. The share is taken from the PROPERTY ROW, not from the value box
+      // inside it: dividing the shorter box by three left a three-deep stack
+      // at seven pixels.
+      const caps = controls.map(control => {
+        const count = control.querySelector(":scope > .lex-reference-values")?.children.length || 0;
+        const row = control.closest(".lex-detail-field") || control;
+        return count ? {count, height: row.getBoundingClientRect().height} : null;
+      });
+      return {panel, controls, caps};
+    }).filter(entry => entry.controls.length);
+    // An inside rail lives in the value box, so its share comes from that box
+    // rather than from the property row: it is capped at the box's own height.
+    // These controls have no outside rail, so their share is measured on its
+    // own - a graph card's variable drawer is a panel with nothing else in it.
+    const insideRails = [];
+    const seenInside = new Set();
+    for (const container of containers)
+      controlsFor(container, ".lex-source-control[data-lex-inside-rail]").forEach(control => {
+        if (seenInside.has(control)) return;
+        seenInside.add(control);
+        const count = control.querySelector(":scope > .lex-reference-values")?.children.length || 0;
+        if (!count) return;
+        // The box the rail shares is the control's own input, not the grid
+        // cell around it, which is taller than the box inside it.
+        const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
+          || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
+        const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
+        const fontSize = Math.max(8, parseFloat(getComputedStyle(control).fontSize) || 16);
+        insideRails.push({control, cap, count, fontSize, boxWidth: control.getBoundingClientRect().width});
+      });
+
+    // Writes, and every probe mounted at once.
+    for (const {controls, caps} of outside) {
+      controls.forEach((control, index) => {
+        const measured = caps[index];
+        if (!measured) {
           control.style.removeProperty("--lex-reference-slot");
           control.style.removeProperty("--lex-reference-cap");
-          continue;
+          return;
         }
-        // The share is taken from the PROPERTY ROW, not from the value box
-        // inside it. The box is the shorter of the two, and dividing that by
-        // three left a three-deep stack at seven pixels - it fitted, and it
-        // could not be read. The row is the space actually available beside
-        // the box, and staying inside it is what keeps the stack from making
-        // the row taller.
-        const row = control.closest(".lex-detail-field") || control;
-        const cap = Math.max(12, Math.round(row.getBoundingClientRect().height) - 4);
+        const cap = Math.max(12, Math.round(measured.height) - 4);
         control.style.setProperty("--lex-reference-cap", `${cap}px`);
-        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
-      }
-      // The rail is reserved in advance from the longest tag and the longest
-      // value any control on this panel can ever put in it, measured in a
-      // hidden copy of a real entry rather than from the entries on screen.
-      // Two earlier attempts both moved the value boxes as values changed: a
-      // character count times a guessed em over-reserved by half a rail, and
-      // measuring what was displayed re-sized the rail on every edit that
-      // matched or stopped matching a reference. The probe is pinned to the
-      // largest type a stack ever uses, because a deeper stack only ever
-      // draws smaller.
-      const longest = (attribute, floor) => controls
+        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / measured.count))}px`);
+      });
+    }
+    // The outside rail is reserved in advance from the longest tag and the
+    // longest value any control on the panel can ever put in it, measured in
+    // a hidden copy of a real entry rather than from the entries on screen,
+    // so the value boxes never move as values change. The probe is pinned to
+    // the largest type a stack ever uses, because a deeper stack only ever
+    // draws smaller.
+    for (const entry of outside) {
+      const longest = (attribute, floor) => entry.controls
         .map(control => control.dataset[attribute] || "")
         .reduce((widest, text) => text.length > widest.length ? text : widest, floor);
-      const probe = element("div", {
+      entry.probe = element("div", {
         class: "lex-source-strip lex-reference-values lex-reference-probe",
         "aria-hidden": "true",
       }, element("span", {class: "lex-reference-value"},
         element("span", {class: "lex-reference-tag"}, longest("lexRailTag", "V")),
         element("span", {class: "lex-reference-text"}, longest("lexRailValue", "000"))));
-      (controls[0].parentElement || panel).append(probe);
-      const tag = Math.ceil(probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
-      const text = Math.ceil(probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
-      probe.remove();
-      // tag + the column gap the stack opens between the two + the value, and
-      // two pixels so the last glyph is not flush against the panel edge.
-      const widest = tag + text + 6;
-      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
-      panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
-      for (const control of controls) {
-        control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
-        control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
-      }
+      (entry.controls[0].parentElement || entry.panel).append(entry.probe);
     }
-    // An inside rail lives in the value box, so its share comes from that box
-    // rather than from the property row: it is capped at the box's own height.
-    // Uncapped, a drawer's strip was taller than the value it labelled and
-    // stood above it, which read as a rail that had left its box. These
-    // controls have no outside rail, so their share is measured on its own -
-    // a graph card's variable drawer is a panel with nothing else in it.
-    const insideRails = [];
-    controlsFor(".lex-source-control[data-lex-inside-rail]").forEach(control => {
-      const stack = control.querySelector(":scope > .lex-reference-values");
-      const count = stack?.children.length || 0;
-      if (!count) return;
-      // The box the rail shares is the control's own input, not the grid cell
-      // around it: a drawer's cell is taller than the box inside it, and
-      // measuring the cell left the strip taller than the value again.
-      const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
-        || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
-      const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
-      const fontSize=Math.max(8,parseFloat(getComputedStyle(control).fontSize)||16);
-      insideRails.push({control,cap,count,fontSize});
-    });
-    // Reserve every rail together. Reading each probe immediately after
-    // mounting it forced a full panel layout for each property, delaying the
-    // initial reservation until the reader's first edit on large panels.
     for (const rail of insideRails) {
-      const {control,cap,count,fontSize}=rail;
+      const {control, cap, count, fontSize} = rail;
       control.style.setProperty("--lex-reference-cap", `${cap}px`);
       control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
-      // The lane is measured from the longest entry this rail can paint, at the
-      // size it paints it. The old character-count estimate was tuned for the
-      // shared symbol font at an outside rail's small size; an inside rail
-      // draws at the value's own size, so "V 255" in a game font came out wider
-      // than the lane reserved for it and left the box.
+      // The lane is measured from the longest entry this rail can paint, at
+      // the size it paints it (an inside rail draws at the value's own size),
+      // and at the rail's preferred size, before its own reservation
+      // constrains it - measuring the constrained font fed the previous width
+      // back into the next reservation.
       const probe = element("span", {class: "lex-reference-value lex-reference-probe-value",
         "aria-hidden": "true"},
         element("span", {class: "lex-reference-tag"}, control.dataset.lexInsideTag || "V"),
         element("span", {class: "lex-reference-text"}, control.dataset.lexInsideValue || ""));
-      // Measure at the rail's preferred size, before its own reservation
-      // constrains it. Measuring the constrained font fed the previous width
-      // back into the next reservation and resized every value box again.
-      probe.style.fontSize=`${fontSize}px`;
+      probe.style.fontSize = `${fontSize}px`;
       control.append(probe);
-      rail.probe=probe;
+      rail.probe = probe;
     }
-    const widths=insideRails.map(({probe})=>Math.ceil(probe.getBoundingClientRect().width)+2);
-    const boxes=insideRails.map(({control})=>control.getBoundingClientRect().width);
-    insideRails.forEach(({control,probe,fontSize},index)=>{
+
+    // One read of every probe, then their writes.
+    for (const entry of outside) {
+      entry.tag = Math.ceil(entry.probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
+      entry.text = Math.ceil(entry.probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
+    }
+    const widths = insideRails.map(({probe}) => Math.ceil(probe.getBoundingClientRect().width) + 2);
+    for (const entry of outside) {
+      entry.probe.remove();
+      // tag + the column gap the stack opens between the two + the value, and
+      // two pixels so the last glyph is not flush against the panel edge.
+      const widest = entry.tag + entry.text + 6;
+      entry.panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
+      entry.panel.style?.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
+      for (const control of entry.controls) {
+        control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
+        control.style.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
+      }
+    }
+    insideRails.forEach(({control, probe, fontSize, boxWidth}, index) => {
       probe.remove();
-      const width=widths[index];
+      const width = widths[index];
       if (width <= 2) return;
       control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
       // The lane is capped at 35% of the box. Only when that cap is narrower
       // than the reference needs does the reference shrink, and only by that
-      // much. A fixed "lane / 3.2" rule shrank a "V22" that fit to 60% size.
-      const lane=boxes[index] ? Math.min(width, boxes[index] * 0.35) : width;
+      // much.
+      const lane = boxWidth ? Math.min(width, boxWidth * 0.35) : width;
       control.style.setProperty("--lex-reference-fit", `${Math.max(8, fontSize * Math.min(1, lane / width))}px`);
     });
+  };
+  // Every value box on a panel should end at the same edge, so the reference
+  // rail takes the widest requirement in that panel rather than each control
+  // keeping its own. Callers ask for it as often as they like; the work is
+  // done once, before the next paint, over everything asked for.
+  const pendingRailContainers = new Set();
+  let railFrame = 0;
+  const flushReferenceRails = () => {
+    cancelAnimationFrame(railFrame);
+    railFrame = 0;
+    const containers = [...pendingRailContainers].filter(node => node === document || node.isConnected);
+    pendingRailContainers.clear();
+    if (!containers.length) return;
+    const outer = containers.includes(document) ? [document]
+      : containers.filter(node => !containers.some(other => other !== node && other.contains(node)));
+    alignReferenceRailsNow(outer);
+  };
+  const alignReferenceRails = (container = document) => {
+    pendingRailContainers.add(container);
+    if (!railFrame) railFrame = requestAnimationFrame(flushReferenceRails);
   };
 
   // Refresh every mounted reference display from its live control value. This
@@ -1637,7 +1668,7 @@
       if(node instanceof Element&&node.isConnected&&
         (node.matches('.lex-source-control')||node.querySelector('.lex-source-control')))roots.add(node);
     }
-    for(const root of roots)alignReferenceRails(root);
+    for(const root of roots)alignReferenceRails(root.closest('.lex-detail-panel-body, .lex-detail-panel, .lex-detail')||root);
   }).observe(document.documentElement,{childList:true,subtree:true});
 
   // A section heading is renamed the same way a property name is: a
@@ -4257,8 +4288,17 @@
     // measured on: a page of tall cards ran under the pager.
     let starts = [0];
     let pagedCount = -1;
+    // The box size the pages were last fitted to; a refit at the same size,
+    // with the same cards, would only repeat the same work.
+    let fittedSize = "";
     const footer = element("div", {class:"lex-tweaks-pages"});
     const scroll = element("div", {class:"lex-tweaks-scroll", tabindex:"-1"}, content);
+    const sizeKey = () => scroll.isConnected ? `${scroll.clientWidth}x${scroll.clientHeight}` : "";
+    const refitIfChanged = () => {
+      const visible = cards.filter(card => !card.hidden).length;
+      if (fittedSize && fittedSize === sizeKey() && visible === pagedCount) return;
+      refit();
+    };
     const root = element("div", {class:"lex-tweaks-paged"}, scroll, footer);
 
     // Fill each page until one more card would overflow the box. A caller
@@ -4451,6 +4491,7 @@
         visible = cards.filter(card => !card.hidden);
       }
       pagedCount = visible.length;
+      fittedSize = "";
       if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
         const per = size || visible.length || 1;
         starts = Array.from({length: Math.max(1, Math.ceil(visible.length / per))}, (_, index) => index * per);
@@ -4507,6 +4548,7 @@
         loads[lane]+=(loads[lane]?gap:0)+height;
       }
       starts=next;
+      fittedSize=sizeKey();
     };
 
     // Measure at the final width, then fill ordered columns from top to bottom.
@@ -4649,13 +4691,15 @@
       let frame = 0;
       const observer = new ResizeObserver(() => {
         if (frame) return;
-        frame = requestAnimationFrame(() => {frame = 0; refit();});
+        frame = requestAnimationFrame(() => {frame = 0; refitIfChanged();});
       });
       observer.observe(scroll);
-      document.fonts?.ready.then(() => { labelWidths.clear(); if (root.isConnected) refit(); });
+      // Fonts still loading change every measurement once they arrive.
+      if (document.fonts && document.fonts.status !== "loaded")
+        document.fonts.ready.then(() => { labelWidths.clear(); if (root.isConnected) refit(); });
       root.lexPageObserver = observer;
     }
-    requestAnimationFrame(refit);
+    requestAnimationFrame(refitIfChanged);
     return root;
   };
   const settingsColumns = (sections, options = {}) => {
@@ -4674,9 +4718,15 @@
   // plugin used to build this by hand, with its own copy of the ReShade
   // calls, and one put ReShade in among the tweak mods (Lexer: "WHY AM I
   // SEEING RESHADE IN THE MAIN TWEAKS TAB").
-  //   pages: [{id, label, body: () => [sections], bind?: view => void,
+  //   pages: [{id, label, help?, body: () => [sections], bind?: view => void,
   //            whole?: node}] - `whole` owns the screen when it is the only
   //            page, as a lone status panel would look lost in a column.
+  //   notice: a step the reader must take, above every page
+  //   columnWidth: the cards' width, for pages of wide cards
+  //   active, change: a plugin that keeps the open page in its own state
+  // A page that draws its own view (a config list with its own search) gives
+  // `view: tabProps => node` instead of `body`, and puts the shared subtab
+  // props on its own component.
   //   render: () => void, called when the page must be drawn again
   const tweaksPageMemory = new Map();
   const tweaksPage = (options = {}) => {
@@ -4697,16 +4747,24 @@
     };
     const pages = (options.pages || []).filter(Boolean);
     const reshade = options.reshade === false ? null : reshadeSection({snapshot: memory.reshade, act});
-    if (reshade) pages.push({id: "reshade", label: "ReShade", body: () => [reshade]});
-    const active = pages.find(page => page.id === memory.tab) || pages[0];
+    if (reshade) pages.push({id: "reshade", label: "ReShade", help: "Effects over the finished frame.", body: () => [reshade]});
+    const active = pages.find(page => page.id === (options.active ?? memory.tab)) || pages[0];
     if (!active) return notice({message: "This game has no tweaks yet."});
     if (pages.length === 1 && active.whole) return active.whole;
-    const body = typeof active.body === "function" ? active.body() : active.body;
-    const view = settingsColumns([body].flat(), {...(options.columns || {}),
-      className: ["lex-tweaks-page", options.className || ""].filter(Boolean).join(" "),
-      tabs: pages.map(({id, label}) => ({id, label})), activeTab: active.id,
+    const tabProps = {tabs: pages.map(({id, label, help}) => ({id, label, help})), activeTab: active.id,
       tabsLabel: options.tabsLabel || "Tweak pages",
-      changeTab: id => { memory.tab = id; redraw(); }});
+      changeTab: id => { memory.tab = id; if (options.change) options.change(id); else redraw(); }};
+    if (typeof active.view === "function") {
+      const own = active.view(tabProps);
+      if (typeof active.bind === "function" && own) requestAnimationFrame(() => active.bind(own));
+      return own;
+    }
+    const body = typeof active.body === "function" ? active.body() : active.body;
+    const view = settingsColumns([body].flat(), {columnWidth: options.columnWidth, notice: options.notice,
+      className: ["lex-tweaks-page", options.className || ""].filter(Boolean).join(" "),
+      tabs: pages.map(({id, label, help}) => ({id, label, help})), activeTab: active.id,
+      tabsLabel: options.tabsLabel || "Tweak pages",
+      changeTab: id => { memory.tab = id; if (options.change) options.change(id); else redraw(); }});
     if (typeof active.bind === "function") requestAnimationFrame(() => active.bind(view));
     return view;
   };
@@ -5331,10 +5389,28 @@
     new MutationObserver(()=>{if(anchor.disabled)close()}).observe(anchor,{attributes:true,attributeFilter:['disabled']});
     return close;
   };
+  // The save button's list reads newest first (Lexer: "new things get placed
+  // on the top of the list"). A plugin's list is in its data's order, so each
+  // change is stamped when it first appears or its value changes; the shell
+  // looks after every edit, and the hover sorts by the stamps. A list given
+  // newest first already keeps its order.
   const saveChangePreview = (button, changes, count) => {
     const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
+    const stamps=new Map();let clock=0;
+    const order=rows=>{
+      const present=new Set();
+      for(const row of [...rows].reverse()){
+        const label=String(row.label),seen=stamps.get(label),signature=JSON.stringify([row.before,row.after]);
+        present.add(label);
+        if(!seen||seen.signature!==signature)stamps.set(label,{stamp:++clock,signature});
+      }
+      for(const label of [...stamps.keys()])if(!present.has(label))stamps.delete(label);
+      return rows.map((row,index)=>({row,index,stamp:stamps.get(String(row.label)).stamp}))
+        .sort((a,b)=>b.stamp-a.stamp||a.index-b.index).map(entry=>entry.row);
+    };
+    button.lexNoteChanges=()=>{try{order(count?.()?changes?.()||[]:[]);}catch(_error){}};
     hoverPreview(button,()=>{
-      const rows=count?.()?changes?.() || []:[];
+      const rows=order(count?.()?changes?.() || []:[]);
       return rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.');
     },'lex-save-preview');
   };
@@ -7039,6 +7115,17 @@ ${contents.path}`});
   const layoutFields = root => [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")]
     .filter(field => propertyRoot(field) === root && !field.parentElement.closest(".lex-detail-field"));
   const hiddenKey = (plugin, tab) => `${plugin}-${tab}.hidden-properties`;
+  // The section order is kept per page by section name too: a layout is keyed
+  // by its record's exact fields, so an order set on one armor piece did not
+  // reach a piece with one field more.
+  const orderKey = (plugin, tab) => `${plugin}-${tab}.section-order`;
+  const sectionNameOf = id => String(id).replace(/:\d+$/, "");
+  const readSectionOrder = (plugin, tab) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(orderKey(plugin, tab)) || "null");
+      return Array.isArray(stored) ? stored.map(String) : null;
+    } catch (_error) { return null; }
+  };
   const propertyOf = id => String(id).split("/").pop().replace(/:\d+$/, "");
   const readHiddenProperties = (plugin, tab) => {
     const key = hiddenKey(plugin, tab);
@@ -7234,7 +7321,10 @@ ${contents.path}`});
         group.node.insertBefore(field, anchor?.parentNode === group.node ? anchor : null);
       }
     }
-    orderSections(state, layout.order);
+    const pageOrder = readSectionOrder(state.plugin, state.tab);
+    // The page's order is the latest one set on any record of the page (every
+    // save, undo included, writes it), so it wins over an older layout's.
+    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
     hideRemovedSections(state);
   };
   const storePropertyLayout = async (state, layout) => {
@@ -7247,6 +7337,11 @@ ${contents.path}`});
     for (const id of state.fields.values()) byName.delete(propertyOf(id));
     for (const name of hiddenNow) byName.add(name);
     const hiddenEntry = writeHiddenProperties(state.plugin, state.tab, byName);
+    if (Array.isArray(layout.order)) {
+      const names = JSON.stringify([...new Set(layout.order.map(sectionNameOf))]);
+      try { localStorage.setItem(orderKey(state.plugin, state.tab), names); } catch (_error) {}
+      hiddenEntry[orderKey(state.plugin, state.tab)] = names;
+    }
     for (const root of document.querySelectorAll(".lex-detail-panel, .lex-detail-section")) {
       const current = propertyLayouts.get(root);
       if (current?.key === state.key) applyPropertyLayout(current, layout);
@@ -8068,7 +8163,7 @@ ${contents.path}`});
 
     let savedPreviewState;
     saveChangePreview(save,()=>options.pendingChanges?.() || pendingChangeList(savedPreviewState,options.history?.capture?.()),options.dirtyCount);
-    let lastReportedDirty = null;
+    let lastReportedDirty = null, noticedDirty = 0;
   function refresh() {
     // A rename outside a render - the shell's own undo - still has to move the
     // history buttons.
@@ -8076,6 +8171,7 @@ ${contents.path}`});
       refreshReferences();
       projectControl.refresh?.();
       const dirty = options.dirtyCount?.() || 0;
+      if (dirty !== noticedDirty) { noticedDirty = dirty; save.lexNoteChanges?.(); }
       // Only the built-in change list reads this copy; a plugin with its own
       // pendingChanges would pay for a full copy of its data on every refresh.
       if (!dirty && options.history?.capture && !options.pendingChanges) savedPreviewState=clone(options.history.capture());
@@ -9901,12 +9997,12 @@ ${contents.path}`});
         next.focus({preventScroll: true});
         if (Number.isInteger(start)) next.setSelectionRange(
           start, Number.isInteger(end) ? end : start, direction || "none");
+        typingSearch = {key, control: next, start, end, direction};
       };
       const delay = Math.max(0, Number(options.delay) || 0);
       if (delay) bottomSearchChangeTimers.set(key, setTimeout(apply, delay));
       else apply();
     };
-    control.addEventListener("input", change);
     // A page may rebuild its search box again later than the keystroke - DS1
     // loads the newly selected record and renders once more - and the restore
     // above only covers a rebuild inside the keystroke. So the box being typed
@@ -9914,7 +10010,13 @@ ${contents.path}`});
     // has left the page (taking focus with it, to <body>) takes over.
     const remember = () => { typingSearch = {key, control, start: control.selectionStart,
       end: control.selectionEnd, direction: control.selectionDirection}; };
-    for (const type of ["input", "keyup", "focus", "select"]) control.addEventListener(type, remember);
+    // The caret is read before the keystroke's own rebuild: read after it, the
+    // box had left the page and reported 0, and the next rebuild put the
+    // caret at the front ("travelling" came out "ingtravell").
+    for (const type of ["input", "keyup", "focus", "select"]) control.addEventListener(type, () => {
+      if (control.isConnected) remember();
+    });
+    control.addEventListener("input", change);
     control.addEventListener("blur", () => {
       // A blur while still on the page is the reader leaving the box.
       setTimeout(() => { if (typingSearch?.control === control && control.isConnected) typingSearch = null; }, 0);
@@ -10464,7 +10566,12 @@ ${contents.path}`});
       const chosen=records.filter(row=>selection.keys.has(keyOf(row)));
       if(chosen.length>1){
         const banner=element('div',{class:'lex-multi-edit-notice'},`${chosen.length} records selected. Edits apply to all selected records. Values shown are from ${record.name||keyOf(record)}; other records may differ.`);
-        node.prepend(banner);
+        // The notice heads the panel's body. Prepended to the panel itself it
+        // took the heading's grid row, the heading took the body's, and the
+        // body was left with no height: a giant name over an empty pane
+        // (Lexer: multi-select "literally doesn't work").
+        const body=node.querySelector?.(":scope > .lex-tweaks-paged, :scope > .lex-detail-panel-body");
+        if(body)body.prepend(banner);else node.prepend(banner);
         let editBefore;
         const beginEdit=event=>{
           if(!event.target.matches('input,select,textarea'))return;
@@ -11047,6 +11154,20 @@ ${contents.path}`});
   // Games supply values and the apply callback; the shared framework owns the
   // source labels, comparison, compact layout, and restore interaction.
   const provenanceControl = options => {
+    // A value with a unit shows its references with that unit too ("V 16%"),
+    // whichever plugin built it: the unit comes from the unitField.
+    const unitHost = options.control instanceof Element
+      ? (options.control.matches("[data-lex-unit]") ? options.control : options.control.querySelector("[data-lex-unit]")) : null;
+    const unit = unitHost?.dataset.lexUnit || "";
+    if (unit && !options.format) {
+      const tight = /^[%×°'"]$/.test(unit);
+      options = {...options, format: value => {
+        if (typeof value !== "number") return typeof value === "boolean" ? booleanMark(value) : compactReferenceText(value ?? "");
+        const number = compactReferenceNumber(value);
+        if (unitHost.dataset.lexUnitPosition === "prefix") return `${unit}${number}`;
+        return tight ? `${number}${unit}` : `${number} ${unit}`;
+      }};
+    }
     const sources = [
       {name: options.vanillaName || "Vanilla", shortName: options.vanillaShortName || "V", value: options.vanilla},
       ...(options.references || []),
@@ -13218,8 +13339,11 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const scope = root instanceof Element || root instanceof Document ? root : document;
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    // A locked value is sized like an editable one, but only a value: fitted
+    // to one line, a sentence shrank to a few pixels high.
     for (const box of scope.querySelectorAll(".lex-detail-field-control .lex-readonly-field")) {
-      if (!box.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(box,{minimum:8});
+      const text = String(box.value ?? box.textContent ?? "").trim();
+      if (!box.__lexAutoFitUpdate && text.length <= 24) window.LexeditorUI.autoFitControlText(box,{minimum:8});
     }
     for (const input of inputs) {
       if (!input.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(input,{minimum:8});

@@ -104,3 +104,24 @@ def test_service_edit_save_and_reload(tmp_path):
         with pytest.raises(HTTPError): request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'goodsType', 'value': 999})
     finally:
         session.stop()
+
+
+def test_pending_changes_read_newest_first():
+    # Lexer: "new things get placed on the top of the list".
+    document = ItemDocument(make_archive())
+    edited, originals = [], []
+    for tab, _, _ in SUBTABS[:3]:
+        row = document.list_rows(tab)[0]
+        field = next(f for f in document.read_row(row['table'], row['id'])['fields']
+                     if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'] and f['value'] != 1)
+        document.edit(row['table'], row['id'], field['key'], 1)
+        edited.append(field['label'])
+        originals.append(field['value'])
+    labels = [change['label'] for change in document.pending_changes()]
+    assert [next(label for label in edited if entry.endswith(label)) for entry in labels] == edited[::-1]
+    # Editing the oldest again brings it back to the top.
+    first = labels[-1]
+    row = document.list_rows(SUBTABS[0][0])[0]
+    key = next(f['key'] for f in document.read_row(row['table'], row['id'])['fields'] if f['label'] == edited[0])
+    document.edit(row['table'], row['id'], key, 2 if originals[0] != 2 else 3)
+    assert document.pending_changes()[0]['label'] == first

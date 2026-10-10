@@ -7,7 +7,7 @@
     {id:"characters",label:"Characters"},{id:"enemies",label:"Enemies"},{id:"encounters",label:"Encounters"},{id:"shops",label:"Shops"},{id:"synthesis",label:"Synthesis"},
     {id:"effects",label:"Effects"},{id:"tetra-master",label:"Tetra Master"},{id:"world",label:"World"},{id:"tweaks",label:"Tweaks"}
   ];
-  const state={tab:"items",modOnly:false,reshade:null,dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:"",tweak:"memoria",walkmeshScene:null,features:null,savedFeatures:null,deployment:null};
+  const state={tab:"items",modOnly:false,dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:"",tweak:"memoria",walkmeshScene:null,features:null,savedFeatures:null,deployment:null};
   const prefCache={};
   const catalogRow=key=>state.catalog.find(value=>value.key===key);
   const CHARACTER_NAV_KEYS=["characters","leveling"];
@@ -489,20 +489,24 @@
     catch(error){state.runtimeError=error.message;try{await refreshRuntime()}catch(refreshError){state.runtimeError+=` ${refreshError.message}`}}
     finally{state.busy=false;await render()}
   }
+  // The shared Tweaks page: Memoria and each Lexeditor tweak on a subtab,
+  // and ReShade on a subtab of its own, once, which the page loads and
+  // drives. ReShade used to sit inside every one of these pages.
   function tweaks(){
+    setToolbar();
     const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"},{id:"row",label:"Row Rework"}];
-    setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
-    if(state.tweak==="memoria"){
-      $("#main").replaceChildren(detailPanel({paginate:true,className:"ff9-detail ff9-tweaks",
+    const memoria=()=>[detailPanel({paginate:false,className:"ff9-detail ff9-tweaks",
         title:"Memoria",meta:"Handled by the Memoria launcher",body:[
           detailSection({title:"WHERE THESE SETTINGS LIVE",body:[
             detailField({label:"EDITOR",control:readonlyField("Memoria's own launcher. Lexeditor does not duplicate it.")}),
             detailField({label:"HOW",control:readonlyField("Press Play. The Memoria launcher opens and its settings are edited there.")}),
           ]}),
-          LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}),
-        ]}));
-      return;
-    }
+        ]})];
+    $("#main").replaceChildren(LexeditorUI.tweaksPage({plugin:"ff9",render:tweaks,tabsLabel:"Tweaks",
+      active:state.tweak,change:id=>{state.tweak=id;tweaks()},
+      pages:tabs.map(tab=>({...tab,body:tab.id==="memoria"?memoria:()=>[featurePanel(tab.id)]}))}));
+  }
+  function featurePanel(tweak){
     const defs={
       improved:{key:"ImprovedInterface",title:"Improved Interface",description:"Adds Circle reveal-only dialogue, Square fast-forward, snapshot-only dialogue history, full-width battle ATB/Trance with HP/MP bars, queued action drain, an unbeaten Tetra Master opponent prompt, and highlights Mognet when the current Moogle can receive one of your carried letters. Keyboard equivalents follow your normal Memoria bindings."},
       eat:{key:"BetterEat",title:"Better Eat",description:"Disables useless Eat/Cook targets, refuses to consume enemies that cannot teach Quina anything, and gives enemies carrying an unlearned Blue Magic ability a blue glow."},
@@ -510,7 +514,7 @@
       hpmp:{key:"HPMPBars",title:"HP/MP Bars",description:"Adds a red HP bar and blue MP bar directly below each party member's HP and MP text in battle."},
       row:{key:"RowRework",title:"Row Rework",description:"Doubles the battle distance between the front and back rows, prevents an all-back-row party formation, pulls the whole party to the front when no living front-row character remains, and prevents short-range physical melee from being used by or against back-row party members."}
     };
-    const def=defs[state.tweak]||defs.improved,key=def.key,title=def.title,description=def.description;
+    const def=defs[tweak]||defs.improved,key=def.key,title=def.title,description=def.description;
     const enabled=!!state.features?.features?.[key],deployed=state.deployment?.deployed;
     // The checkbox is built on its own and handed straight to the shared
     // field. Reaching back into a wrapper for it assumed a live DOM, which the
@@ -520,10 +524,7 @@
     const actions=LexeditorUI.actionRow(
       el("button",{type:"button",disabled:state.busy||dirtyCount()>0||state.activeSource!=="mine",onclick:()=>deploymentAction("deploy")},deployed?"Redeploy Project":"Deploy Project"),
       el("button",{type:"button",disabled:state.busy||!deployed||state.activeSource!=="mine",onclick:()=>deploymentAction("revert")},"Revert Lexeditor Mod"));
-    // The bespoke card is gone: Tweaks is the shared settings page every game
-    // uses, so the switch, the deployment state and the ReShade section all
-    // read the same here as anywhere else.
-    $("#main").replaceChildren(detailPanel({paginate:true,className:"ff9-detail ff9-tweaks",title,
+    return detailPanel({paginate:false,className:"ff9-detail ff9-tweaks",title,
       identity:enabled?"ON":"OFF",meta:"Memoria runtime tweaks",body:[
         detailSection({title:"TWEAK",body:[
           detailField({label:"WHAT IT DOES",control:readonlyField(description)}),
@@ -536,27 +537,7 @@
             :"Save changes, then Deploy Project to activate them in Memoria.")}),
           detailField({label:"ACTIONS",control:actions}),
         ]}),
-        LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}),
-      ]}));
-  }
-  async function loadReshade(){
-    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff9");if(value)state.reshade=value}
-    catch(_error){/* browser preview has no desktop host; the section still renders */}
-  }
-  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
-  async function actReshade(method,...args){
-    try{
-      const value=method==="adopt_reshade"
-        ? await LexeditorUI.callWindow?.(method)
-        : await LexeditorUI.callWindow?.(method,"ff9",...args);
-      if(value&&value.manifest)state.reshade=value;else await loadReshade();
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    tweaks();
-  }
-  async function saveReshade(manifest){
-    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff9",manifest);if(value)state.reshade=value}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    tweaks();
+      ]});
   }
   async function deploymentAction(action){
     if(state.busy||state.activeSource!=="mine")return;
@@ -571,7 +552,7 @@
     LexeditorUI.notice({tone:"warning",title:"Format not integrated",
       message:"The installed vanilla source for this area remains inside p0data asset containers. No safe editable CSV source is present."})]}))}
   function dataMap(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>{if(row.target){if(row.datasetKey)state.datasetChoice[row.target]=row.datasetKey;navigate(row.target)}},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;dataMap()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;dataMap()},changePage:page=>{state.mapPage=page;dataMap()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];dataMap()}});state.mapPage=view.page;setToolbar(view.controls);$("#main").replaceChildren(view.content);shell.refresh()}
-  async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks"){if(!state.reshade)await loadReshade();tweaks()}else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else{if(!state.datasets[key])$("#main").replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${catalogRow(key)?.label||tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data"}`}));if(state.tab==="characters"&&key==="characters")await renderCharacterComposite();else if(["weapons","armor","accessories"].includes(state.tab))await renderEquipmentComposite(state.tab);else renderDataset(await loadDataset(key),key)}}shell.refresh()}
+  async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks")tweaks();else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else{if(!state.datasets[key])$("#main").replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${catalogRow(key)?.label||tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data"}`}));if(state.tab==="characters"&&key==="characters")await renderCharacterComposite();else if(["weapons","armor","accessories"].includes(state.tab))await renderEquipmentComposite(state.tab);else renderDataset(await loadDataset(key),key)}}shell.refresh()}
   // render() is async, so navigate returns its promise: a caller that needs the
 // page to exist can wait for it instead of guessing.
 function navigate(tab){state.tab=tab;const drawn=render();if(tab==="info"&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()});return drawn}

@@ -100,50 +100,38 @@
       renderSettings();
     }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
   }
-  function renderGameplaySettings(){
+  function renderGameplaySettings(tabProps){
     const settings=state.data.settings;
     const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,trust:trustTweak,
       sounds:soundEntries,number:numberControl,select:selectControl});
     if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
-    const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
-    $("#main").replaceChildren(settingsView);
-    bind(settingsView);
+    const settingsView=LexeditorUI.settingsColumns(panels,tabProps);
+    requestAnimationFrame(()=>bind(settingsView));
+    return settingsView;
   }
 
-  async function loadReshade(){
-    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff8");if(value)state.reshade=value}
-    catch(_error){/* browser preview has no desktop host; the page names it below */}
+  function renderPlatformSettings(tabProps){
+    return platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tabProps,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}});
   }
-  async function actReshade(method,...args){
-    try{const value=await LexeditorUI.callWindow?.(method,"ff8",...args);if(value)state.reshade=value;else await loadReshade()}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    renderSettings();
-  }
-  async function renderReshade(){
-    if(!state.reshade)await loadReshade();
-    const section=LexeditorUI.reshadeSection({snapshot:state.reshade,act:actReshade});
-    const body=section||LexeditorUI.notice({message:"Open this page in the Lexeditor desktop app to manage ReShade."});
-    $("#main").replaceChildren(LexeditorUI.settingsColumns([body],tweakTabProps()));
-  }
-  function renderPlatformSettings(){
-    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
-  }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
-  // The subtab stays visible and openable even while its owning switch cannot
-  // be turned on - the same treatment GFs -> Spellbook uses. A tab that goes
-  // dead reads as a broken page; a tab that opens onto the reason reads as a
-  // feature that is not finished yet.
-  const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,
-    tabsLabel:"Tweak settings",
-    changeTab:value=>{state.settingsTab=value;renderSettings()}});
+  // The shared Tweaks page: FF8's own pages as subtabs, and ReShade on a
+  // subtab of its own, which the page loads and drives. Each of FF8's pages
+  // draws its own view with the shared subtab props. A subtab stays visible
+  // and openable even while its owning switch cannot be turned on - the same
+  // treatment GFs -> Spellbook uses: a tab that opens onto the reason reads as
+  // a feature that is not finished yet, not a broken page.
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
-    if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else if(state.settingsTab==="reshade")renderReshade();else renderGameplaySettings();
+    const view=LexeditorUI.tweaksPage({plugin:"ff8",render:renderSettings,tabsLabel:"Tweak settings",
+      active:state.settingsTab,change:id=>{state.settingsTab=id;renderSettings()},
+      pages:[{id:"gameplay",label:"Gameplay",view:renderGameplaySettings},
+        {id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet.",view:renderFormulae},
+        {id:"platform",label:"FFNx",view:renderPlatformSettings}]});
+    $("#main").replaceChildren(view);
   }
 
   const DEFAULT_FLYING_EVA_BONUS=25;
   function formulaInput(label,key,min,max,step=1){return detailField({label,control:numberControl(state.formula[key],min,max,step,value=>{state.formula[key]=value})})}
-  function renderFormulae(){
+  function renderFormulae(tabProps){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const f=state.formula,weapons=state.data.weapons?.rows||[],formulaeMod=tweakMod("formulae-rework"),rework=tweakOn("formulae-rework");
     const formulaRows=formulaeMod?.describe?.formulas||[];
@@ -207,8 +195,10 @@
     // tweaks scroll container; without it the lowest cards render below the
     // window with no way to reach them.
     // The Tweaks subtab bar sits above the scroll container, matching the Gameplay and FFNx lists, so the viewer can leave this subtab again.
-    const tweaks=tweakTabProps(),scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
-    $("#main").replaceChildren(subtabBar({tabs:tweaks.tabs,active:"formulae",label:tweaks.tabsLabel,change:tweaks.changeTab}),scroller);
+    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
+    // The shared stack keeps the bar's height; laid out loose in #main the
+    // scroller rode up over the subtab names.
+    return LexeditorUI.stack(subtabBar({tabs:tabProps.tabs,active:"formulae",label:tabProps.tabsLabel,change:tabProps.changeTab}),scroller);
   }
 
   function startingDataEdits(){const edits=[],current=state.data.init,before=state.base.init;if(!current||!before)return edits;for(const kind of ["general","config"])current[kind].fields.forEach((field,index)=>{if(field.value!==before[kind].fields[index].value)edits.push({kind,id:0,field:field.field,value:field.value})});for(const [key,kind] of [["gfs","gf"],["characters","character"]])for(const row of current[key].rows){const base=before[key].rows.find(value=>value.id===row.id);row.fields.forEach((field,index)=>{if(field.value!==base.fields[index].value)edits.push({kind,id:row.id,field:field.field,value:field.value})});if(kind==="character")row.magics.forEach((slot,index)=>{const old=base.magics[index];if(slot.magicId!==old.magicId||slot.quantity!==old.quantity)edits.push({kind:"magic",id:row.id,slot:slot.slot,magicId:slot.magicId,quantity:slot.quantity})})}current.inventory.rows.forEach((slot,index)=>{const old=before.inventory.rows[index];if(slot.itemId!==old.itemId||slot.quantity!==old.quantity)edits.push({kind:"inventory",id:0,slot:slot.slot,itemId:slot.itemId,quantity:slot.quantity})});return edits}

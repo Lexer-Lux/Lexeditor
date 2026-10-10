@@ -2,10 +2,7 @@
   const {el,columnList,columnPreferences,detailPanel,detailField,readonlyField,infoHelp,detailSection,clone,recordId,pagedListDetail,panelLayout,infoIcon}=LexeditorUI;
   const PLUGIN="ff7r2";
   let tab="characters";
-  // Which presentation tool the Tweaks page shows. One level of subtabs only.
-  let tweakTab="reshade";
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
-  let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
   const injectorNumericDrafts=new Map();
   let packageBusy=false;
@@ -15,18 +12,6 @@
   async function loadGame(){
     try{const response=await fetch("/api/game");if(response.ok)game=await response.json()}
     catch(_error){/* the browser preview has no service; the page still renders */}
-  }
-  async function loadReshade(){
-    try{reshade=await LexeditorUI.callWindow?.("mod_reshade",PLUGIN)||reshade}
-    catch(_error){/* the browser preview has no desktop host */}
-  }
-  // Every ReShade change answers with the game's fresh ReShade state.
-  async function actReshade(method,...args){
-    try{
-      const value=await LexeditorUI.callWindow?.(method,PLUGIN,...args);
-      if(value&&value.effects)reshade=value;else await loadReshade();
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    render();
   }
 
   // ---- Shader Injector ------------------------------------------------------
@@ -240,30 +225,22 @@
     });
   }
 
+  // The shared Tweaks page: Rebirth's own tools as subtabs, and ReShade on
+  // a subtab of its own, which the page loads and drives.
   function tweaks(){
-    const section=LexeditorUI.reshadeSection({snapshot:reshade,act:actReshade});
-    const tabs=[
-      {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
-      {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
-      {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue."},
-    ];
-    const changeTab=id=>{tweakTab=id;render()};
-    if(tweakTab==="reshade"&&!section)return LexeditorUI.detailPanel({paginate:false,
-      body:LexeditorUI.tabbedPanel({tabs,active:tweakTab,label:"Presentation tools",change:changeTab,
-        content:LexeditorUI.notice({message:"ReShade is not set up for this game yet."})})});
-    const cards=tweakTab==="injector"
-      ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
-      : tweakTab==="engine"
-      ? [enginePanel.element()]
-      : [section||LexeditorUI.detailNote("ReShade is not set up for this game yet.")];
     // Setup is not finished while the shader cache predates the injector, so
-    // the step and its button sit above both subtabs until it is done.
+    // the step and its button sit above every subtab until it is done.
     const notice=injector?.setupNotice;
     const banner=notice?LexeditorUI.notice({title:notice.title,message:notice.message,
       action:el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
         onclick:clearShaderCache},notice.actionLabel)}):null;
-    return LexeditorUI.settingsColumns(cards,{columnWidth:"520px",notice:banner,
-      tabs,activeTab:tweakTab,tabsLabel:"Presentation tools",changeTab});
+    return LexeditorUI.tweaksPage({plugin:PLUGIN,render,columnWidth:"520px",notice:banner,tabsLabel:"Presentation tools",
+      pages:[
+        {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders.",
+          body:()=>[injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)},
+        {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue.",
+          body:()=>[enginePanel.element()]},
+      ]});
   }
 
   async function loadDataMap(){
@@ -985,7 +962,7 @@
   });
 
   (async()=>{
-    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadEngineConfig(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattlePlayer(),loadBattleItem()]);
+    await Promise.all([loadGame(),loadInjector(),loadEngineConfig(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattlePlayer(),loadBattleItem()]);
     render();
     LexeditorUI.finishPluginLoading();
   })();
