@@ -12329,6 +12329,45 @@ ${contents.path}`});
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
     const keyOf = row => row.path;
     const replaceRow = fresh => { data.rows = data.rows.map(row => row.path === fresh.path ? fresh : row); };
+    // The Mods tab and the mod selector show one order: the library's load
+    // order, lowest first. A row moves within the full order, not the page,
+    // so a move stays correct while the list is searched, sorted or paged.
+    // A downloadable module is not in the library and cannot move.
+    const localPaths = () => (data?.rows || []).map(row => row.path);
+    const moveMod = async (path, delta) => {
+      try { await callWindow("move_mod", pluginId, path, delta); await load(); draw(); }
+      catch (error) { failure("Could not reorder the mods", error); }
+    };
+    const decorateModRow = (node, row) => {
+      if (row.remote) return;
+      node.draggable = true;
+      node.tabIndex = 0;
+      node.setAttribute("aria-description", "Drag onto another mod. Alt+Up or Alt+Down moves one place.");
+      let controlGesture = false;
+      node.onpointerdown = event => { controlGesture = !!event.target.closest("input,button"); };
+      node.ondragstart = event => {
+        if (controlGesture) { event.preventDefault(); return; }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/x-lex-mod", String(localPaths().indexOf(row.path)));
+      };
+      node.onkeydown = event => {
+        if (event.target !== event.currentTarget || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const delta = event.key === "ArrowUp" ? -1 : 1;
+        const paths = localPaths(), at = paths.indexOf(row.path);
+        if (paths[at + delta] !== undefined) moveMod(row.path, delta);
+      };
+      node.ondragover = event => {
+        if (event.dataTransfer.types.includes("application/x-lex-mod")) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
+      };
+      node.ondrop = event => {
+        const from = Number(event.dataTransfer.getData("application/x-lex-mod"));
+        const paths = localPaths(), to = paths.indexOf(row.path);
+        if (!Number.isInteger(from) || from < 0 || from >= paths.length || to < 0) return;
+        event.preventDefault();
+        if (from !== to) moveMod(paths[from], to - from);
+      };
+    };
     const add = () => modsDialog("Add a mod", close => [
       element("p", {}, "Create a new mod from this game's starter, or add one you already have."),
       element("div", {class: "lex-dialog-actions"},
@@ -12443,6 +12482,7 @@ ${contents.path}`});
           // The switch column below replaces the automatic on/off mark.
           rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
           select: row => { select(row); selected = keyOf(row); draw(); },
+          decorateRow: decorateModRow,
           columns: [
             {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
               row.name, row.on && row.conflicts?.length ? conflictMark(row.conflicts) : null)},

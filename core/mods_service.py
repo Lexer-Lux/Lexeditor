@@ -110,6 +110,34 @@ def set_enabled(folder: Path, enabled: bool) -> None:
     atomic_write(Path(folder) / mod_metadata.FILE, (json.dumps(stored, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
+def move(game_root: Path, path: str, delta: int) -> dict:
+    """Move one mod by delta places in the library's load order.
+
+    The Mods tab, the mod selector and the game loaders all read this one
+    order, so the moved mod's new place is rewritten into every library
+    mod's own order key. The block keeps its current lowest value: a game
+    whose order space holds rows outside the library (FF8's selected
+    project) keeps them where they were. A move past either end lands on
+    that end; a move of zero places changes nothing.
+    """
+    if type(delta) is not int:
+        raise ValueError("A mod moves by whole places")
+    folder = checked_mod(Path(game_root), path)
+    rows = library_rows(game_root)
+    folders = [Path(row["path"]).resolve() for row in rows]
+    index = folders.index(folder)
+    target = min(max(index + delta, 0), len(folders) - 1)
+    if target != index:
+        base = min((row["order"] for row in rows if isinstance(row["order"], int)), default=1000)
+        folders.insert(target, folders.pop(index))
+        from core.plugin_files import atomic_write
+        for position, each in enumerate(folders):
+            stored = mod_metadata._stored(each)
+            stored["order"] = base + position
+            atomic_write(each / mod_metadata.FILE, (json.dumps(stored, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    return mod_row(folder)
+
+
 class Downloads:
     """One Lexer's Mod download per game, run in the background.
 

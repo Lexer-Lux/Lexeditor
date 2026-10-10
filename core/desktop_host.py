@@ -1857,6 +1857,17 @@ class HostApi:
             self.activate_library_mods(plugin_id, enabled_paths, [])
         return mods_service.mod_row(folder)
 
+    def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:
+        """Move one mod within the library's load order, which the Mods tab shows.
+
+        The mod selector lists these same rows in this same order, and the
+        game loaders compose in it, so one persisted order serves every
+        screen. A move only persists: the new order reaches the game with
+        the next activation, as with the selector's own moves.
+        """
+        from core import mods_service
+        return mods_service.move(self._game_mods(plugin_id), path, delta)
+
     def save_mod_settings(self, plugin_id: str, path: str, values: dict) -> dict:
         from core import mods_service, script_mods
         folder = mods_service.checked_mod(self._game_mods(plugin_id), path)

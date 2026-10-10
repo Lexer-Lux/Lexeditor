@@ -81,6 +81,45 @@ class ModsServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mods_service.set_enabled(mine, "yes")
 
+    def test_moving_rewrites_every_order_key_and_keeps_the_rest(self):
+        self.make("First", name="First", order=10, enabled=True)
+        self.make("Second", name="Second", order=20)
+        last = self.make("Third", name="Third", order=30, enabled=True)
+        moved = mods_service.move(self.game, str(last), -2)
+        self.assertEqual(moved["name"], "Third")
+        self.assertEqual([(row["name"], row["order"]) for row in mods_service.library_rows(self.game)],
+                         [("Third", 10), ("First", 11), ("Second", 12)])
+        stored = json.loads((last / "mod.json").read_text())
+        self.assertEqual(stored, {"name": "Third", "order": 10, "enabled": True})
+
+    def test_moving_past_either_end_lands_on_that_end_and_zero_changes_nothing(self):
+        first = self.make("First", name="First", order=1)
+        self.make("Second", name="Second", order=2)
+        mods_service.move(self.game, str(first), -9)
+        self.assertEqual([row["name"] for row in mods_service.library_rows(self.game)], ["First", "Second"])
+        before = (first / "mod.json").read_text()
+        mods_service.move(self.game, str(first), 0)
+        self.assertEqual((first / "mod.json").read_text(), before)
+        mods_service.move(self.game, str(first), 9)
+        self.assertEqual([(row["name"], row["order"]) for row in mods_service.library_rows(self.game)],
+                         [("Second", 1), ("First", 2)])
+
+    def test_moving_an_unnamed_mod_still_moves_it(self):
+        self.make("Named", name="Named", order=1)
+        unnamed = self.make("Unnamed")
+        mods_service.move(self.game, str(unnamed), -1)
+        self.assertEqual([row["folder"] for row in mods_service.library_rows(self.game)], ["Unnamed", "Named"])
+        self.assertEqual(json.loads((unnamed / "mod.json").read_text()), {"order": 1})
+
+    def test_moving_rejects_outside_folders_and_fractional_places(self):
+        mine = self.make("Mine", name="Mine", order=1)
+        for bad in (self.game, self.temp, self.game / "missing"):
+            with self.assertRaises(ValueError):
+                mods_service.move(self.game, str(bad), 1)
+        for bad in ("1", 1.5, True, None):
+            with self.assertRaises(ValueError):
+                mods_service.move(self.game, str(mine), bad)
+
     def test_back_undoes_a_finished_download_and_stops_a_running_one(self):
         downloads = mods_service.Downloads()
         payload = {"version": {"version": "v1", "ref": "v1", "zip": ""}, "zip": archive({"Combat": module("Combat")})}

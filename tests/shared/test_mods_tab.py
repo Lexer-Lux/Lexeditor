@@ -44,6 +44,13 @@ HOST = """(options) => {
       record('set_mod_enabled')(plugin, path, enabled);
       const row = rows.find(item => item.path === path); row.enabled = enabled; return JSON.parse(JSON.stringify(row));
     },
+    move_mod: async (plugin, path, delta) => {
+      record('move_mod')(plugin, path, delta);
+      const at = rows.findIndex(item => item.path === path);
+      const to = Math.min(Math.max(at + delta, 0), rows.length - 1);
+      rows.splice(to, 0, ...rows.splice(at, 1));
+      return JSON.parse(JSON.stringify(rows[to]));
+    },
     save_mod_settings: async (plugin, path, values) => { record('save_mod_settings')(plugin, path, values);
       const row = rows.find(item => item.path === path); return JSON.parse(JSON.stringify(row)); },
     lexmod_download: async (...args) => { record('lexmod_download')(...args); download = {state: 'running', phase: 'download', done: 1, total: 2};
@@ -101,6 +108,62 @@ def test_the_table_lists_mods_then_downloadable_modules_and_edits_details(page):
     page.get_by_role("checkbox", name="Mine enabled").uncheck()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
     assert calls(page, "set_mod_enabled")[-1][1:] == ["C:/lib/game/Mine", False]
+
+
+def test_mods_reorder_with_alt_arrow_keys(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    rows = page.locator(".lex-mods-page .lex-column-list-row")
+    assert rows.nth(0).get_attribute("draggable") == "true"
+    assert rows.nth(0).get_attribute("tabindex") == "0"
+    assert "Alt+Up or Alt+Down" in (rows.nth(0).get_attribute("aria-description") or "")
+    # The downloadable module is not in the library and cannot move.
+    assert rows.nth(2).get_attribute("draggable") is None
+    rows.filter(has_text="Combat").focus()
+    page.keyboard.press("Alt+ArrowUp")
+    page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
+    assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Combat", -1]
+    page.wait_for_function(
+        "document.querySelector('.lex-mods-page .lex-column-list').innerText.indexOf('Combat')"
+        " < document.querySelector('.lex-mods-page .lex-column-list').innerText.indexOf('Mine')")
+    # At the top, Alt+Up is a no-op; Alt+Down moves back.
+    before = len(calls(page, "move_mod"))
+    page.locator(".lex-mods-page .lex-column-list-row").filter(has_text="Combat").focus()
+    page.keyboard.press("Alt+ArrowUp")
+    page.wait_for_timeout(200)
+    assert len(calls(page, "move_mod")) == before
+    page.keyboard.press("Alt+ArrowDown")
+    page.wait_for_function(f"window.calls.filter(c => c[0] === 'move_mod').length > {before}")
+    assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Combat", 1]
+
+
+def test_mods_reorder_by_dragging_one_row_onto_another(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    # A drop onto the downloadable module is ignored: it has no library place.
+    ignored = page.evaluate("""() => {
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const data = new DataTransfer(); data.setData('application/x-lex-mod', '1');
+      rows[2].dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data}));
+      return window.calls.some(c => c[0] === 'move_mod');
+    }""")
+    assert ignored is False
+    moved = page.evaluate("""() => {
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const data = new DataTransfer();
+      rows[1].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
+      rows[0].dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: data}));
+      const drop = new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data});
+      rows[0].dispatchEvent(drop);
+      return {carried: data.getData('application/x-lex-mod'), dropped: drop.defaultPrevented};
+    }""")
+    assert moved == {"carried": "1", "dropped": True}, moved
+    page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
+    assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Combat", -1]
+    names = page.locator(".lex-mods-page .lex-column-list").inner_text()
+    assert names.index("Combat") < names.index("Mine"), names
 
 
 def test_a_mods_settings_and_a_downloadable_module(page):

@@ -45,3 +45,31 @@ def test_the_selector_lists_every_library_mod_in_the_mods_tab_order(tmp_path):
     assert named[:3] == [("Better Details", True, True, False), ("Sell At Cost", True, False, False),
                          ("Soul Safety", False, False, True)], named
     assert "Tweaks tab" in rows[0]["notEditable"]
+
+
+def host_for(library, projects):
+    host = HostApi.__new__(HostApi)
+    host._projects = projects
+    host._game_mods = lambda plugin_id: library
+    host._managed_project_locked = lambda plugin_id, path: False
+    host._plugins = {PLUGIN.plugin_id: PLUGIN}
+    return host
+
+
+def selector_names(host):
+    return [row["name"] for row in host.mod_projects(PLUGIN.plugin_id)["projects"]
+            if not row.get("noMod") and (row["valid"] or row.get("notEditable"))]
+
+
+def test_a_mods_tab_move_reorders_the_selector_too(tmp_path):
+    """One order, shown in both places: the tab writes it, the selector reads it."""
+    library = tmp_path / "library"
+    opened = mod(library, "soul safety", 30, False)
+    mod(library, "better details", 10, True, data=False, script=True)
+    mod(library, "sell at cost", 20, True)
+    projects = ProjectManager({PLUGIN.plugin_id: PLUGIN}, tmp_path / "projects.json")
+    projects.select(PLUGIN.plugin_id, str(opened))
+    host = host_for(library, projects)
+    assert selector_names(host)[:3] == ["Better Details", "Sell At Cost", "Soul Safety"]
+    host.move_mod(PLUGIN.plugin_id, str(library / "soul safety"), -2)
+    assert selector_names(host)[:3] == ["Soul Safety", "Better Details", "Sell At Cost"]
