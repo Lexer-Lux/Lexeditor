@@ -80,7 +80,7 @@ def main():
                     page.goto(session.url,wait_until="domcontentloaded");ready()
                     open_effect()
                     assert page.locator('[data-subtab]').evaluate_all("nodes=>nodes.map(n=>n.dataset.subtab)") == [
-                        "effects-all","effects-equipment","effects-spells","effects-items"]
+                        "effects-all","effects-equipment","effects-items","effects-spells"]
                     changes={"effectEndurance":30,"maxHpRate":1.25,RECOVERY_KEY:4,
                              "disablePoison":True,"spCategory":20,"replaceSpEffectId":6920}
                     edit("effectEndurance",30)

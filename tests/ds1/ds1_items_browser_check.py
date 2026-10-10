@@ -48,7 +48,9 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == [t[0] for t in SUBTABS]
+                    # Subtabs follow the shared alphabetical rule, not declaration order.
+                    expected = [key for key, _label, _table in sorted(SUBTABS, key=lambda entry: entry[1].lower())]
+                    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == expected
                     for tab, _, _ in SUBTABS:
                         page.locator(f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && state.row && !state.error', arg=tab)

@@ -493,7 +493,7 @@ function renderItems(){
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
-  return LexeditorUI.stack(subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",order:"given",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
+  return LexeditorUI.stack(subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,change:id=>navigate(state.tab,id)}),view);
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";
