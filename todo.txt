@@ -1,35 +1,53 @@
+STOP FUCKING USING THIS FILE AS A DIARY
+LITERALLY EVERY SINGLE GOAL I HAVE EXPLICITLY TOLD YOU TO REMOVE THINGS WHEN YOU'RE DONE
+AND THEN I GAVE YOU THE CODEX
+AND THEN I GAVE YOU THE WORKLOGS
+AND STILL YOU FUCKING LITTER EVERYWHERE
+AT THIS POINT I HAVE ZERO FUCKING CLUE WHAT IS OR ISN'T DONE
+THIS FILE LITERALLY ONLY GETS LONGER OVER TIME
+
 =================================================================== GLOBAL / ALL GAMES
 
 - Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
-    > status 2026-10-03: Bounds and read-only protection done for Palworld, RDR2 weapons, DS3, Factorio, Chrono Trigger, FF8 world/field writers and DS1. RDR2 buy prices now write the real COST_SHOP_DEFAULT record (265 tests). Warband settings.ini values are whole numbers typed from the mod's own DEFAULTS. Every plugin's number helpers apply bounds where the data declares them. Open: checking each remaining plugin's fields against its schema.
+    > Left: check each remaining plugin's fields against its schema.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
-    > status 2026-10-08: Whole app swept at 1600x950 and 1280x720. Most hits were one cause, now fixed for every game: a list pane was a fixed 280px however wide its table, so headers were cut off; it is now at least as wide as its table. Also fixed: a detail pane reserving room for a whole word at 7.5% demanded 1020px and pushed the page into a sideways scroll. Left, all waiting on your GF label-width call: in narrow panels the 7.5% name lane is too thin, so names shrink to 9px and a long name can push its ? out of view.
-    > status 2026-10-08 (later): Numeric columns now count their sign and commas (the Z column lost a digit). Not done: FF7's empty-tab hits were the sweep shooting the loading screen (harness must wait for it); FF7 table headers (ID, Name, DEF) are dark on dark and barely readable; RDR2 Mob archetypes table has no pager; FF7 Remake text/abilities subtabs lose their tab bar during the sweep.
-    > Lexer: okayy, umm. i do everything % based in my own code so it can work on every screen size. is that not normal? like idk why all text doesn't just auto size to fit whatever, too. is there some reason everyone doesn't do that? can we not do that? That way it would work at any resolution, we don't have to test it at all resolutions? what is SOP for other devs for checking for these issues, do they check at every posssible resolution or just certain ones or something else entirely? also yet, it shoudn't even be a game-specific thing but a more general script that just checks the wholeass app automatically, not needing to be scripted for every new thing we make or change. or is that not doable?
-    > Claude: % sizing is normal and Lexeditor uses it too, but it only scales boxes; text does not shrink to fit its box on its own, and shrinking it would make labels unreadably small in narrow panels. Standard practice is a few breakpoint sizes (a small laptop, a normal desktop, a large UI scale) plus an automatic checker that measures every text box for overflow, rather than testing every resolution. That checker exists and is general, not per game: tests/shared/verify_no_clipped_text.py opens every game with your installed data, walks every tab and subtab at 1600x950 and 1280x720, and reports any text cut off by its container. Its first full run (2026-10-03) found mostly one shared cause: tables wider than their panel.
+    > Left: the sweep must wait for FF7's loading screen; FF7 table headers are dark on dark; RDR2 Mob archetypes has no pager; FF7 Remake text/abilities subtabs lose their tab bar during the sweep.
+- I can't even open up FF8 now because I'm getting some thing telling me to trust something??? How TF do I do that when I can't even open it???? And why is there this big ugly trust button everywhere on the DS1 plugin. BRo. If you want this so bad then put up a disclaimer saying are you sure you want to enable this mod? only enable mods you trust (This warning shows up the first time you enable a mod because it's important. You can disable this in the settings under "Trust Warning".), the first time you enable a mod, and then let the user bypass this disclaimer with a  trust warning setting in global settings, default on
+- oh and also we don't have override orders/mod reordering in either the mod dropdown or mod tab. we need those.
+    > Left: the mod dropdown can reorder (drag, or Alt+Up/Down); the Mods tab cannot.
+
 ==================================================================== FF8 - PAGES
 
 GF
 - gfs -> Center panel -> attack: uhhh how is the entire left 1/3rd reserved for the property names????? i even told you to get rid of all the overrides and make it globally always the same % that i indicated. so how the fuck is this possible.
-    > status 2026-10-03: Need your call: in this 463px panel the global 7.5% is 35px and names become unreadable (tried: removing every override wrapped names nearly one letter per line). Options: fewer, wider columns when names cannot fit; a different % for narrow panels; a px minimum; or 7.5% of the window instead of the panel?
+    > Left: your call. At 7.5% of this 463px panel names are unreadable. Paged panels now take the lane as 7.5% of the whole panel, which may already fix this; check it.
 World
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
-    > status 2026-10-03: Field name on top as a link and the field picture with the landing point. Not done: the world-map side; the trigger is in the world map scripts, not found yet.
+    > Left: the world-map side (its trigger is in the world map scripts, not found yet).
+
 ==================================================================== FF8 - DATA, MODS, NATIVE, IN-GAME
 
 - Finish FF8 mod composition for formats without a proven merger; test installing, combining, ordering, and removing real mods.
 - Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
 - Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
-    > status 2026-10-03: Driver rebuilt and packaged; package checks pass. Left: CI, then the in-game checks. Also: its warning toasts still draw an imitation box, not the message box of the game itself.
-    > status 2026-10-08: The toast is an ImGui drawing in FF8 colours. The fix is the Summon-refusal Hext patch calling the game's own battle message routine; that needs the routine found and confirmed in a running game (a visible game window, which needs your OK).
+    > Left: CI, then the in-game checks. Its warning toasts still draw an imitation box; the fix (a Hext patch calling the game's own battle message routine) needs the routine confirmed in a running game, with your OK.
 - FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
 - ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
 
+==================================================================== DS1
 
+- i am so fucking confused. when i click the mod dropdown in DS1 plugin they're all greyed out, everything except Soul Safety has neither the editable nor locked icons first but some weird star thing, everything except soul safety has no pencil, folder, nor i icons, just the x and then a fuckton of blank space, better details and enhanced sprinting have weird "0.2 candidate" after their names, there's this third button -- mod library -- full of weird and bizarre buttons and features i never recall asking for and i don't know who made them or why or why they exist or why we need them "Combines every enabled Dark Souls Remastered mod over the game's own files" WHAT????????? does this have something to do with what i asked you to make happen when you try to edit a lexer's mod. cuz uh, this is not remotely what i asked for lmao
+- OMFG. AND THE SUBTABS IN THE DS1 PLUGIN AREN'T ALPHABETICTALLY SORTED. HOW THE FUCK DOES THIS HAPPEN. WE REBUILT THE ENTIRE PROGRAM SO WE WOULDN'T HAVE THIS SPAGHETTI CODE AND YET THIS BUG KEEPS REAPEARRING ONE SCREEN AT A TIME, ONE GAME AT A TIME. HOW. THIS SHOULDN'T. EVEN. FUCKING. BE. POSSIBLE.
+    > Left: DS1's subtab bar passes order:"given", which the shared bar honours.
+
+DS1 - ARMOR REWORK (UNFINISHED MOD)
+- Armor Rework is UNFINISHED until this is done: add a Level-up gains tab to the DS1 plugin so level-up stat gains can be edited, then remove the DEF gain from level-ups in Armor Rework.
+    > Left: the Level-up gains tab (not started). The game computes level-up defense at 0x2DC850 from your stat levels (player data +0x40 onward) times fixed factors (0.9, 0.85, 1.8...).
+- Armor Rework: confirm in-game that upgraded armor uses its per-level absorption effect (the DS3 offset in ReinforceParamProtector; DS1 may ignore it).
+- Armor Rework: check the menus in-game. Built, not yet seen: armor panels (equipment and shop) show each piece's absorption, the equipment panel with a % sign; status screens show your combined absorption from the four armor pieces (whole numbers, no % sign; rings and other effects not counted).
+- Armor Rework: your saved mod zeroed the absorption of 9 enemy effects (40120000, 40120100-40120103, 40120200, 40120300, 40206000, 40206001; Rat shows 0%). Restore them or say they are meant.
 
 ==================================================================== CI / INTEGRATION
 
-- Resolve outstanding CI failures, including RDR2 source/browser checks and RDR provenance fixtures; check the latest FF7 and shared-suite results.
-    > status 2026-10-03: Everything is merged into master now; CI has not run on it. Push master (say sync) and I will go through the results.
-- Complete integration verification on local master, including native FF8 package validation and remaining CI checks.
-    > status 2026-10-03: Merged 2026-10-03. Left: CI on master, including the native FF8 package.
+- Resolve outstanding CI failures, including RDR2 source/browser checks and RDR provenance fixtures, the native FF8 package, and the latest FF7 and shared-suite results.
+    > Left: push master (say sync), then go through CI.
