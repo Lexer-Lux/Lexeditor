@@ -39,3 +39,12 @@ Verified against the installed Remastered `GameParam.parambnd.dcx`
   costs instead of halving counts. No param field in Magic,
   SpEffect or Accessory accounts for attunement copies either, so
   that multiplication also lives in code.
+
+## Spell description text path
+
+- `msg/ENGLISH/item.msgbnd.dcx` ships `Magic_description_.fmg`
+  (67 filled) and `Magic_long_desc_.fmg` (72 filled) next to
+  `Magic_name_.fmg`, all keyed by Magic row ID (3000 Soul Arrow's
+  short text is "Fire soul arrow") and parsed by the repo's own
+  FMG reader. The tweak rewrites these entries for mana wording;
+  `texts.py` currently handles names only.
