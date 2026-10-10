@@ -18,8 +18,9 @@ moved by `dy`, its font, colour and alignment) and `hold` dynamic text of a
 given length, empty until the game or a hook sets it; `left` widens the
 rectangle leftwards. It can also copy an existing sprite (an icon) from any
 dialog, placed like a node moved by `dy` and tinted: a sprite's last four
-bytes (32-35) are its colour, alpha first (vanilla icons are ffffffff, untinted;
-"blackout" overlays dc282828). It cannot remove, move or restyle an
+bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
+ffffffff, untinted; "blackout" overlays dc282828; the boss HP bar 960080ff is
+red). Read as alpha-red-green-blue, a red tint came out blue in the game. It cannot remove, move or restyle an
 existing node.
 """
 from __future__ import annotations
@@ -44,7 +45,7 @@ DYNAMIC = 2
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
 SPRITE_SIZE = 36
-SPRITE_COLOUR = 32  # four bytes, alpha first
+SPRITE_COLOUR = 32  # four bytes: alpha, blue, green, red
 
 
 class LayoutError(ValueError):
@@ -215,11 +216,11 @@ class Drb:
         """A copy of an existing sprite, placed like `place_like` moved by dy, tinted."""
         self._check_new(dialog, name, dy)
         if not isinstance(color, str) or len(color) != 8:
-            raise LayoutError("A sprite colour is eight hex digits, alpha first")
+            raise LayoutError("A sprite colour is eight hex digits: alpha, blue, green, red")
         try:
             tint = bytes.fromhex(color)
         except ValueError as error:
-            raise LayoutError("A sprite colour is eight hex digits, alpha first") from error
+            raise LayoutError("A sprite colour is eight hex digits: alpha, blue, green, red") from error
         source_dialog, source_name = sprite
         source = self.node(source_dialog, source_name)
         kind, blob = self._blob("SHAP", "SHPR", source.shape)

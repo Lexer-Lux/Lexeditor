@@ -47,7 +47,7 @@ DIALOGS = {
     "list_armor": [
         ("text_name", "Text", text_shape((10, 10, 200, 38), kind="dynamic")),
         # The armour screen's poise icon, as measured: rectangle, then the
-        # texture region and index, flags, and an untinted colour (alpha first).
+        # texture region and index, flags, and an untinted colour (alpha, blue, green, red).
         ("icon_tolerance_sa", "Sprite", struct.pack("<4h", 332, 111, 360, 139)
          + bytes.fromhex("ffffffff00000000aa010602fe015a020a00000100000000ffffffff")),
     ],
