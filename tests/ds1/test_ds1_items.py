@@ -125,3 +125,31 @@ def test_pending_changes_read_newest_first():
     key = next(f['key'] for f in document.read_row(row['table'], row['id'])['fields'] if f['label'] == edited[0])
     document.edit(row['table'], row['id'], key, 2 if originals[0] != 2 else 3)
     assert document.pending_changes()[0]['label'] == first
+
+
+def test_putting_a_float_back_as_shown_leaves_nothing_to_save():
+    # Lexer: undo all the way back "and there are still 7 changes". Undo sends
+    # back the value as shown (seven digits); a float needs up to nine.
+    document = ItemDocument(make_archive())
+    for tab, _, _ in SUBTABS:
+        row = document.list_rows(tab)[0]
+        fields = [f for f in document.read_row(row['table'], row['id'])['fields']
+                  if f['editable'] and f['dtype'] == 'f32' and isinstance(f['value'], float)]
+        if fields:
+            break
+    field = fields[0]
+    # A saved value that seven digits cannot spell exactly, as most are.
+    from plugins.ds1.formats import write_field, read_field
+    spec = next(f['spec'] for f in document.schemas[row['table']]['fields'] if f['spec'].key == field['key'])
+    _r, start, data = document._row(row['table'], row['id'])
+    third = write_field(data, spec, 1 / 3, '<')
+    document.plain[start:start + len(data)] = third
+    original = document.original_plain
+    document.original_plain = original[:start] + bytes(third) + original[start + len(data):]
+    shown = document.read_row(row['table'], row['id'])['fields'][[f['key'] for f in document.read_row(row['table'], row['id'])['fields']].index(field['key'])]['value']
+    assert shown != read_field(third, spec, '<')
+    document.edit(row['table'], row['id'], field['key'], shown + 1 if shown + 1 <= field['maximum'] else shown - 1)
+    assert document.dirty_count == 1
+    document.edit(row['table'], row['id'], field['key'], shown)
+    assert document.dirty_count == 0
+    assert bytes(document.plain) == bytes(document.original_plain)

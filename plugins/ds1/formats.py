@@ -328,8 +328,11 @@ class ItemDocument:
                     before = read_field(bytes(self.original_plain[start:start + len(data)]), field, '<')
                     after = read_field(data, field, '<')
                     kind = dict(ABSORPTION_CUTS)[cut]
+                    # The precision the field shows: at one decimal, 3.95% and
+                    # 4.04% both read "4.0% -> 4.0%", a change that looked like none.
+                    percent = lambda rate: f'{(1 - rate) * 100:.3f}'.rstrip('0').rstrip('.') + '%'
                     rows.append({'label': f'{name} · {kind} absorption',
-                                 'before': f'{(1 - before) * 100:.1f}%', 'after': f'{(1 - after) * 100:.1f}%'})
+                                 'before': percent(before), 'after': percent(after)})
                     continue
                 item = next(f for f in self.schemas[table]['fields'] if f['spec'].key == key)
                 field = item['spec']
@@ -587,10 +590,16 @@ class ItemDocument:
             raise FormatError('Absorption must be between -100 and 99')
         # Every upgrade level moves by the same amount, so its bonus over +0 stays.
         change = value - (1 - self.value(EFFECT_TABLE, levels[0], cut)) * 100
+        spec = next(f['spec'] for f in self.schemas[EFFECT_TABLE]['fields'] if f['spec'].key == cut)
         for effect in levels:
             current = (1 - self.value(EFFECT_TABLE, effect, cut)) * 100
             absorbed = min(99.0, max(-100.0, current + change))
-            self._write(EFFECT_TABLE, effect, cut, round(1 - absorbed / 100, 6))
+            # Back to the saved percentage, as shown (three decimals), is back
+            # to the saved rate exactly - undo sends the shown value.
+            _r, start, data = self._row(EFFECT_TABLE, effect)
+            saved = read_field(bytes(self.original_plain[start:start + len(data)]), spec, '<')
+            rate = saved if round((1 - saved) * 100, 3) == round(absorbed, 3) else round(1 - absorbed / 100, 6)
+            self._write(EFFECT_TABLE, effect, cut, rate)
         return self.read_row(table, row_id)
 
     def edit(self, table, row_id, key, value):
@@ -624,13 +633,21 @@ class ItemDocument:
         links_effect = EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id))
         if links_effect and str(int(value)) not in self.effect_references().choices:
             raise FormatError('Choose an existing effect or None')
+        original = self.original_plain[start:start + len(data)]
+        # A value that reads the same as the saved one IS the saved one. The
+        # editor shows a float to seven digits and undo sends back what it
+        # showed, so without this an undone edit stayed a pending change
+        # (Lexer: undo all the way back and "there are still 7 changes").
+        if field.dtype in ('f32', 'f64', 'angle32') and isinstance(value, (int, float)):
+            saved = read_field(original, field, '<')
+            if isinstance(saved, float) and math.isfinite(saved) and _shown(float(value), field) == _shown(saved, field):
+                value = saved
         replacement = write_field(data, field, value, '<')
         # The effect index only changes when a link, or what decides whether a
         # field is a link, does; rebuilding it on every edit froze the editor.
         if links_effect or key in reference_switches(self, table):
             self._effects = None
         self.plain[start:start + len(data)] = replacement
-        original = self.original_plain[start:start + len(data)]
         dirty_key = (table, row_id, key)
         if read_field(replacement, field, '<') == read_field(original, field, '<'):
             self.dirty.discard(dirty_key)
