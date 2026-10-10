@@ -2850,6 +2850,41 @@
   // default, as it does on the page tab: a subtab's layout is stored under its
   // page, so the page is what gets saved (Lexer: the hold did nothing on a
   // subtab). Developer mode only, like the page tab.
+  // A mod's place in the load order, moved the same way in every list of
+  // mods (the mod selector and the Mods tab): drag a row onto another, or
+  // Alt+Up / Alt+Down with the row focused. `index` is the row's place in the
+  // list, `movable(i)` whether the row at i takes part, and `move(from, by)`
+  // moves the row at `from` by `by` places. A press on one of the row's own
+  // controls (`controls`, a selector) never starts a drag.
+  const MOD_ORDER_TYPE = "application/x-lex-mod";
+  const modOrderGestures = ({index, movable, move, controls = "input,button"}) => {
+    let controlGesture = false;
+    return {
+      draggable: "true", tabindex: 0,
+      "aria-description": "Drag onto another mod. Alt+Up or Alt+Down moves one place.",
+      onpointerdown: event => { controlGesture = !!event.target.closest(controls); },
+      ondragstart: event => {
+        if (controlGesture) { event.preventDefault(); return; }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(MOD_ORDER_TYPE, String(index));
+      },
+      onkeydown: event => {
+        if (event.target !== event.currentTarget || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const by = event.key === "ArrowUp" ? -1 : 1;
+        if (movable(index + by)) move(index, by);
+      },
+      ondragover: event => {
+        if (event.dataTransfer.types.includes(MOD_ORDER_TYPE)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
+      },
+      ondrop: event => {
+        const from = Number(event.dataTransfer.getData(MOD_ORDER_TYPE));
+        if (!Number.isInteger(from) || !movable(from)) return;
+        event.preventDefault();
+        if (from !== index) move(from, index - from);
+      },
+    };
+  };
   const holdToSaveDefaultView = button => {
     let timer = 0, saved = false;
     button.addEventListener("pointerdown", event => {
@@ -5825,15 +5860,9 @@ ${contents.path}`});
             "aria-label":`Enable ${row.label}`,onchange:event=>run(()=>options.changeProjectSource(row.key,{enabled:event.target.checked}))})
           : null;
         if(row.managed && options.changeProjectSource){
-          let controlGesture=false;
-          Object.assign(dragAttrs,{draggable:"true",tabindex:0,
-            "aria-description":"Drag onto another mod. Alt+Up or Alt+Down moves one place.",
-            onpointerdown:event=>{controlGesture=!!event.target.closest('input,.lex-project-menu-item-actions');},
-            ondragstart:event=>{if(controlGesture){event.preventDefault();return;}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("application/x-lex-mod",String(index));},
-            onkeydown:event=>{if(event.target===event.currentTarget&&event.altKey&&["ArrowUp","ArrowDown"].includes(event.key)){
-              event.preventDefault();const delta=event.key==="ArrowUp"?-1:1;
-              if(sources[index+delta]?.managed)run(()=>options.changeProjectSource(row.key,{move:delta}));
-            }}});
+          Object.assign(dragAttrs,modOrderGestures({index,controls:"input,.lex-project-menu-item-actions",
+            movable:at=>!!sources[at]?.managed,
+            move:(from,by)=>run(()=>options.changeProjectSource(sources[from].key,{move:by}))}));
           if(row.removable)actions.append(element("button",{type:"button","aria-label":`Remove ${row.label}`,
             onclick:async()=>{if(await confirmAction({title:`Remove ${row.label}?`,message:"Remove this managed mod from the library?",confirmLabel:"Remove"}))run(()=>options.changeProjectSource(row.key,{remove:true}))}},"×"));
           if(row.settings?.length || row.notes?.length)actions.append(element("button",{
@@ -5854,12 +5883,8 @@ ${contents.path}`});
               document.body.append(backdrop);backdrop.querySelector("select,button")?.focus();
             }},"⚙"));
         }
-        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,...dragAttrs,
-          ondragover:event=>{if(row.managed&&event.dataTransfer.types.includes("application/x-lex-mod")){event.preventDefault();event.dataTransfer.dropEffect="move";}},
-          ondrop:event=>{const from=Number(event.dataTransfer.getData("application/x-lex-mod"));
-            if(!row.managed||!sources[from]?.managed)return;event.preventDefault();
-            if(from!==index)run(()=>options.changeProjectSource(sources[from].key,{move:index-from}));
-          }},select,actions,sourceStatus);
+        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,...dragAttrs},
+          select,actions,sourceStatus);
       });
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
@@ -12340,33 +12365,16 @@ ${contents.path}`});
     };
     const decorateModRow = (node, row) => {
       if (row.remote) return;
-      node.draggable = true;
-      node.tabIndex = 0;
-      node.setAttribute("aria-description", "Drag onto another mod. Alt+Up or Alt+Down moves one place.");
-      let controlGesture = false;
-      node.onpointerdown = event => { controlGesture = !!event.target.closest("input,button"); };
-      node.ondragstart = event => {
-        if (controlGesture) { event.preventDefault(); return; }
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("application/x-lex-mod", String(localPaths().indexOf(row.path)));
-      };
-      node.onkeydown = event => {
-        if (event.target !== event.currentTarget || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
-        event.preventDefault();
-        const delta = event.key === "ArrowUp" ? -1 : 1;
-        const paths = localPaths(), at = paths.indexOf(row.path);
-        if (paths[at + delta] !== undefined) moveMod(row.path, delta);
-      };
-      node.ondragover = event => {
-        if (event.dataTransfer.types.includes("application/x-lex-mod")) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
-      };
-      node.ondrop = event => {
-        const from = Number(event.dataTransfer.getData("application/x-lex-mod"));
-        const paths = localPaths(), to = paths.indexOf(row.path);
-        if (!Number.isInteger(from) || from < 0 || from >= paths.length || to < 0) return;
-        event.preventDefault();
-        if (from !== to) moveMod(paths[from], to - from);
-      };
+      const paths = localPaths();
+      // An existing row: handlers become properties, the rest attributes.
+      for (const [key, value] of Object.entries(modOrderGestures({
+        index: paths.indexOf(row.path),
+        movable: at => at >= 0 && at < paths.length,
+        move: (from, by) => moveMod(paths[from], by),
+      }))) {
+        if (key.startsWith("on")) node[key] = value;
+        else node.setAttribute(key, value);
+      }
     };
     const add = () => modsDialog("Add a mod", close => [
       element("p", {}, "Create a new mod from this game's starter, or add one you already have."),
