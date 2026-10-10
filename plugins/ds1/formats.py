@@ -19,12 +19,14 @@ from .attacks import ATTACK_FIELDS, AttackReferences
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys, reference_switches
 
 FormatError = DS3FormatError
+GRAPH_TABLE = 'CalcCorrectGraph'
 METADATA = Path(__file__).with_name('metadata')
 TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2),
           'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1),
-          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2)}
-OPTIONAL_TABLES = frozenset({'SpEffectParam'})
+          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2),
+          GRAPH_TABLE: (80, 1)}
+OPTIONAL_TABLES = frozenset({'SpEffectParam', GRAPH_TABLE})
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -63,6 +65,42 @@ ABSORPTION_CUTS = (('neutralDamageCutRate', 'Physical'), ('slashDamageCutRate', 
                    ('thunderDamageCutRate', 'Lightning'))
 MAX_UPGRADE_LEVEL = 15
 ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),)
+STATS_SUBTABS = (
+    ('curves', 'Scaling curves', GRAPH_TABLE),
+    ('scaling', 'Weapon scaling', 'EquipParamWeapon'),
+    ('spell-reqs', 'Spell requirements', 'Magic'),
+)
+# The Stats tab shows these properties of records it shares with Items. Curves
+# show every field, so the graph table lists its whole schema here.
+STATS_FIELDS = {
+    GRAPH_TABLE: ('stageMaxVal0', 'stageMaxVal1', 'stageMaxVal2', 'stageMaxVal3', 'stageMaxVal4',
+                  'stageMaxGrowVal0', 'stageMaxGrowVal1', 'stageMaxGrowVal2', 'stageMaxGrowVal3',
+                  'stageMaxGrowVal4', 'adjPt_maxGrowVal0', 'adjPt_maxGrowVal1', 'adjPt_maxGrowVal2',
+                  'adjPt_maxGrowVal3', 'adjPt_maxGrowVal4', 'init_inclination_soul',
+                  'adjustment_value', 'boundry_inclination_soul', 'boundry_value'),
+    'EquipParamWeapon': ('properStrength', 'properAgility', 'properMagic', 'properFaith',
+                         'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
+                         'correctType', 'isLuckCorrect', 'levelSyncCorrectID'),
+    'Magic': ('requirementIntellect', 'requirementFaith', 'slotLength'),
+}
+
+
+def stats_fields(sub, table):
+    """A Stats subtab's field filter for a record, or None for every field."""
+    match = next((entry for entry in STATS_SUBTABS if entry[0] == sub), None)
+    if match is None or match[2] != table or table == GRAPH_TABLE:
+        return None
+    return STATS_FIELDS[table]
+
+
+def _graph_group(key):
+    if key.startswith('stageMaxVal'):
+        return 'Thresholds'
+    if key.startswith('stageMaxGrowVal'):
+        return 'Growth'
+    if key.startswith('adjPt_maxGrowVal'):
+        return 'Curve shape'
+    return 'Level-up cost'
 
 
 def inflate(source):
@@ -357,13 +395,13 @@ class ItemDocument:
     def renamable(self, table):
         return bool(self.texts and self.texts.renamable(table))
 
-    def rename(self, table, row_id, name):
+    def rename(self, table, row_id, name, only=None):
         if not self.renamable(table):
             raise FormatError('These records have no in-game name to change.')
         self._row(table, row_id)
         self.texts.rename(table, row_id, name)
         self._effects = None  # effect choices and links are listed by name
-        return self.read_row(table, row_id)
+        return self.read_row(table, row_id, only=only)
 
     def _row(self, table, row_id):
         if table not in TABLES or type(row_id) is not int:
@@ -410,6 +448,8 @@ class ItemDocument:
             if EFFECT_TABLE not in self.params:
                 raise FormatError('SpEffectParam.param is missing. Open a complete Remastered parameter archive.')
             return self.effect_references().rows(tab)
+        if tab in {entry[0] for entry in STATS_SUBTABS}:
+            return self._stats_rows(tab)
         match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
@@ -436,6 +476,21 @@ class ItemDocument:
                     values, display = self.row_values(table, row.row_id)
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
                                    'values': values, 'display': display})
+        return result
+
+    def _stats_rows(self, tab):
+        """One Stats subtab: every curve, every weapon's scaling or every spell's requirements."""
+        if tab == 'curves':
+            if GRAPH_TABLE not in self.params:
+                raise FormatError('CalcCorrectGraph.param is missing. Open a complete Remastered parameter archive.')
+            table = GRAPH_TABLE
+        else:
+            table = next(entry[2] for entry in STATS_SUBTABS if entry[0] == tab)
+        result = []
+        for row in self.params[table].rows:
+            values, display = self.row_values(table, row.row_id)
+            result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
+                           'table': table, 'values': values, 'display': display})
         return result
 
     def is_monster(self, row_id):
@@ -489,7 +544,7 @@ class ItemDocument:
         cache[table] = spans
         return spans
 
-    def read_row(self, table, row_id):
+    def read_row(self, table, row_id, only=None):
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
@@ -511,7 +566,8 @@ class ItemDocument:
                 original = None
             options = self.effect_references().choices if field.key in effect_keys else item['enum']
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
-                           'group': field.group if table in ('NpcParam', 'AtkParam_Npc', EFFECT_TABLE) else '',
+                           'group': _graph_group(field.key) if table == GRAPH_TABLE else
+                           field.group if table in ('NpcParam', 'AtkParam_Npc', EFFECT_TABLE) else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': item['min'], 'maximum': item['max'], 'enum': options, 'protectedReason': item.get('protectedReason', ''),
@@ -534,6 +590,9 @@ class ItemDocument:
                 at = next(index for index, field in enumerate(fields) if field['key'] in replaced)
                 fields = ([field for field in fields[:at] if field['key'] not in replaced] + absorption
                           + [field for field in fields[at:] if field['key'] not in replaced])
+        if only is not None:
+            keep = set(only)
+            fields = [field for field in fields if field['key'] in keep]
         result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
                   'renamable': self.renamable(table), 'fields': fields}
         if table == EFFECT_TABLE:
@@ -602,7 +661,7 @@ class ItemDocument:
             self._write(EFFECT_TABLE, effect, cut, rate)
         return self.read_row(table, row_id)
 
-    def edit(self, table, row_id, key, value):
+    def edit(self, table, row_id, key, value, only=None):
         if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
             if table == 'NpcParam' and not self.is_monster(row_id):
                 raise FormatError('This record is not a reviewed standard monster')
@@ -611,7 +670,7 @@ class ItemDocument:
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         self._write(table, row_id, key, value)
-        return self.read_row(table, row_id)
+        return self.read_row(table, row_id, only=only)
 
     def _write(self, table, row_id, key, value):
         """Validate and store one field. The caller reads the record back."""
