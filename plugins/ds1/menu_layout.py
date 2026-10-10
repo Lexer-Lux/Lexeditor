@@ -1,4 +1,4 @@
-"""DS1 menu layout (DRB): add text nodes to a dialog, nothing else.
+"""DS1 menu layout (DRB): add text nodes to a dialog, or move existing nodes.
 
 Dark Souls Remastered draws its menus from menu/menu.drb.dcx, a DCX holding
 one DRB. A DRB is a run of tagged sections, each a 16-byte header (tag,
@@ -20,8 +20,8 @@ rectangle leftwards. It can also copy an existing sprite (an icon) from any
 dialog, placed like a node moved by `dy` and tinted: a sprite's last four
 bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
 ffffffff, untinted; "blackout" overlays dc282828; the boss HP bar 960080ff is
-red). Read as alpha-red-green-blue, a red tint came out blue in the game. It cannot remove, move or restyle an
-existing node.
+red). Read as alpha-red-green-blue, a red tint came out blue in the game. A tweak can also move an existing
+node: rewrite its rectangle in place, which shifts no offsets. It cannot remove a node or restyle one beyond its rectangle.
 """
 from __future__ import annotations
 
@@ -107,8 +107,8 @@ class Drb:
             raise LayoutError(f"{tag} offset {offset:#x} is invalid")
         return struct.unpack_from("<ii", data, offset)
 
-    def _blob(self, tag: str, blob_tag: str, offset: int) -> tuple[str, bytes]:
-        """The type name and data of one shape or control, bounded by the next blob."""
+    def _span(self, tag: str, blob_tag: str, offset: int) -> tuple[str, int, int]:
+        """One shape or control's type name and data span, bounded by the next blob."""
         kind, start = self._entry(tag, offset)
         data, count = self.sections[tag]
         starts = sorted({struct.unpack_from("<ii", data, index * 8)[1] for index in range(count)})
@@ -117,7 +117,12 @@ class Drb:
         end = later[0] if later else len(blobs)
         if not 0 <= start < end <= len(blobs):
             raise LayoutError(f"{tag} data at {start:#x} is outside {blob_tag}")
-        return self.string(kind), bytes(blobs[start:end])
+        return self.string(kind), start, end
+
+    def _blob(self, tag: str, blob_tag: str, offset: int) -> tuple[str, bytes]:
+        """The type name and data of one shape or control, bounded by the next blob."""
+        kind, start, end = self._span(tag, blob_tag, offset)
+        return kind, bytes(self.sections[blob_tag][0][start:end])
 
     def dialogs(self) -> dict[str, int]:
         """Dialog names mapped to their DLG offsets."""
@@ -250,6 +255,19 @@ class Drb:
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, text_type, bytes(shape), static_type, control)
 
+    def move(self, dialog: str, name: str, rect) -> None:
+        """Reposition and resize an existing node, rewriting its rectangle in place."""
+        if not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect):
+            raise LayoutError(f"{dialog}/{name} needs a rectangle of four whole numbers")
+        left, top, right, bottom = rect
+        if not all(-32768 <= value <= 32767 for value in rect) or not left < right or not top < bottom:
+            raise LayoutError(f"{dialog}/{name} has a rectangle outside the layout's range")
+        item = self.node(dialog, name)
+        _kind, start, end = self._span("SHAP", "SHPR", item.shape)
+        if end - start < 8:
+            raise LayoutError(f"{dialog}/{name} has no rectangle to move")
+        struct.pack_into("<4h", self.sections["SHPR"][0], start, left, top, right, bottom)
+
     def _insert(self, dialog: str, name: str, shape_type: int, shape: bytes,
                 control_type: int, control: bytes) -> None:
         """One new object at the end of a dialog: its name, shape and control."""
@@ -332,12 +350,19 @@ class Drb:
 # --- tweak patch descriptions ------------------------------------------------
 
 def validate(spec: object, owner: str) -> dict:
-    """A tweak's layout/<id>.json: {"version": 1, "nodes": [...]}."""
-    if not isinstance(spec, dict) or spec.get("version") != 1 or set(spec) - {"version", "nodes"}:
-        raise LayoutError(f"{owner}: a layout patch needs version 1 and nodes")
+    """A tweak's layout/<id>.json: {"version": 1, "nodes": [...], "moves": [...]}."""
+    if not isinstance(spec, dict) or spec.get("version") != 1 or set(spec) - {"version", "nodes", "moves"}:
+        raise LayoutError(f"{owner}: a layout patch needs version 1 with nodes and moves")
     nodes = spec.get("nodes", [])
-    if not isinstance(nodes, list) or not nodes or len(nodes) > 64:
-        raise LayoutError(f"{owner}: list between 1 and 64 layout nodes")
+    if not isinstance(nodes, list) or len(nodes) > 64:
+        raise LayoutError(f"{owner}: list between 0 and 64 layout nodes")
+    moves = spec.get("moves", [])
+    # Moves rewrite eight bytes each and never grow the file, so a grid
+    # rework touching every row of several lists fits; added nodes stay at 64.
+    if not isinstance(moves, list) or len(moves) > 256:
+        raise LayoutError(f"{owner}: list between 0 and 256 layout moves")
+    if not nodes and not moves:
+        raise LayoutError(f"{owner}: a layout patch needs nodes or moves")
     text = {"dialog", "name", "lookLike", "dy", "length"}
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
     clean = []
@@ -352,15 +377,30 @@ def validate(spec: object, owner: str) -> dict:
                                  or not all(isinstance(part, str) and part for part in node["sprite"])):
             raise LayoutError(f"{owner}: a sprite names its source as [dialog, node]")
         clean.append(dict(node))
-    return {"owner": owner, "nodes": clean}
+    clean_moves = []
+    for move in moves:
+        keys = set(move) if isinstance(move, dict) else set()
+        if keys != {"dialog", "name", "rect"}:
+            raise LayoutError(f"{owner}: a layout move names dialog, name and rect")
+        if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
+            raise LayoutError(f"{owner}: layout move names must be text")
+        rect = move["rect"]
+        if (not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect)
+                or not all(-32768 <= value <= 32767 for value in rect)
+                or not rect[0] < rect[2] or not rect[1] < rect[3]):
+            raise LayoutError(f"{owner}: a layout move rect is four whole numbers, left < right, top < bottom")
+        clean_moves.append({"dialog": move["dialog"], "name": move["name"], "rect": list(rect)})
+    return {"owner": owner, "nodes": clean, "moves": clean_moves}
 
 
 def compose(original: bytes, specs: list[dict]) -> bytes:
-    """Every enabled tweak's nodes added to the vanilla layout, or the vanilla bytes."""
+    """Every enabled tweak's nodes and moves applied to the original layout."""
     nodes = [(spec["owner"], node) for spec in specs for node in spec["nodes"]]
-    if not nodes:
+    moves = [(spec["owner"], move) for spec in specs for move in spec["moves"]]
+    if not nodes and not moves:
         return original
     layout = Drb(formats.inflate(original))
+    placed = {(dialog, node.name) for dialog in layout.dialogs() for node in layout.nodes(dialog)}
     seen = {}
     for owner, node in nodes:
         key = (node["dialog"], node["name"])
@@ -374,6 +414,18 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
             else:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
                                 node.get("left"))
+        except LayoutError as error:
+            raise LayoutError(f"{owner}: {error}") from error
+    moved = {}
+    for owner, move in moves:
+        key = (move["dialog"], move["name"])
+        if key not in placed:
+            raise LayoutError(f"{owner} moves {move['dialog']}/{move['name']}, which is not in the original layout")
+        if key in moved:
+            raise LayoutError(f"{owner} and {moved[key]} both move {move['dialog']}/{move['name']}")
+        moved[key] = owner
+        try:
+            layout.move(move["dialog"], move["name"], move["rect"])
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     return formats.deflate(original, layout.to_bytes())

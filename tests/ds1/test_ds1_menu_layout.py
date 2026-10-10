@@ -244,5 +244,80 @@ class IconTests(unittest.TestCase):
                          ["text_lexeditor_stamina", "text_param_lexeditor_stamina", "icon_lexeditor_poise"])
 
 
+MOVES = [
+    {"dialog": "data_simple_arms", "name": "text_receive_name", "rect": [100, 100, 217, 128]},
+    {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [68, 100, 96, 128]},
+]
+
+
+class MoveTests(unittest.TestCase):
+    """The UI rework's grid: existing rows move into denser positions."""
+
+    def test_a_move_rewrites_only_its_rectangle(self):
+        layout = menu_layout.Drb(drb())
+        before = layout.to_bytes()
+        layout.move("data_simple_arms", "text_receive_name", [100, 100, 217, 128])
+        self.assertEqual(layout.text("data_simple_arms", "text_receive_name")["rect"], [100, 100, 217, 128])
+        again = menu_layout.Drb(layout.to_bytes())
+        self.assertEqual(again.to_bytes(), layout.to_bytes())
+        changed = [index for index, (old, new) in enumerate(zip(before, layout.to_bytes())) if old != new]
+        self.assertEqual(changed, list(range(changed[0], changed[0] + 8)))
+        # Style bytes survive; every other node keeps its bytes.
+        moved = again._blob("SHAP", "SHPR", again.node("data_simple_arms", "text_receive_name").shape)[1]
+        source = menu_layout.Drb(before)._blob(
+            "SHAP", "SHPR", menu_layout.Drb(before).node("data_simple_arms", "text_receive_name").shape)[1]
+        self.assertEqual(moved[8:], source[8:])
+        untouched = snapshot(again)
+        del untouched["data_simple_arms"][0]
+        first = snapshot(menu_layout.Drb(before))
+        del first["data_simple_arms"][0]
+        self.assertEqual(untouched, first)
+
+    def test_bad_moves_are_refused_and_change_nothing(self):
+        layout = menu_layout.Drb(drb())
+        plain = layout.to_bytes()
+        bad = [("missing_dialog", "text_receive_name", [0, 0, 10, 10]),
+               ("data_simple_arms", "missing_node", [0, 0, 10, 10]),
+               ("data_simple_arms", "text_receive_name", (0, 0, 10, 10)),
+               ("data_simple_arms", "text_receive_name", [0, 0, 10]),
+               ("data_simple_arms", "text_receive_name", [0, 0, True, 10]),
+               ("data_simple_arms", "text_receive_name", [0, 10, 10, 10]),
+               ("data_simple_arms", "text_receive_name", [10, 0, 0, 10]),
+               ("data_simple_arms", "text_receive_name", [-40000, 0, 10, 10])]
+        for args in bad:
+            with self.subTest(args=args), self.assertRaises(menu_layout.LayoutError):
+                layout.move(*args)
+        self.assertEqual(layout.to_bytes(), plain)
+
+    def test_patch_moves_are_strict(self):
+        good = menu_layout.validate({"version": 1, "moves": MOVES}, "Grid")
+        self.assertEqual(good["moves"], MOVES)
+        self.assertEqual(good["nodes"], [])
+        mixed = menu_layout.validate({"version": 1, "nodes": STAMINA[:1], "moves": MOVES[:1]}, "Grid")
+        self.assertEqual((len(mixed["nodes"]), len(mixed["moves"])), (1, 1))
+        for spec in ({"version": 1}, {"version": 1, "nodes": [], "moves": []},
+                     {"version": 1, "moves": [{**MOVES[0], "rect": [0, 0, 0, 10]}]},
+                     {"version": 1, "moves": [{**MOVES[0], "name": ""}]},
+                     {"version": 1, "moves": [{**MOVES[0], "dy": 1}]},
+                     {"version": 1, "moves": "left"}):
+            with self.subTest(spec=spec), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate(spec, "Grid")
+
+    def test_compose_moves_merge_and_conflicts_refuse(self):
+        original = dcx(drb())
+        first = menu_layout.validate({"version": 1, "moves": MOVES[:1]}, "One")
+        second = menu_layout.validate({"version": 1, "moves": MOVES[1:]}, "Two")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [first, second])))
+        self.assertEqual(layout.text("data_simple_arms", "text_receive_name")["rect"], [100, 100, 217, 128])
+        clash = menu_layout.validate({"version": 1, "moves": MOVES[:1]}, "Clash")
+        with self.assertRaisesRegex(menu_layout.LayoutError, "both move"):
+            menu_layout.compose(original, [first, clash])
+        added = menu_layout.validate({"version": 1, "nodes": STAMINA[:1]}, "Adder")
+        stray = menu_layout.validate({"version": 1, "moves": [
+            {"dialog": "data_simple_arms", "name": "text_lexeditor_stamina", "rect": [0, 0, 10, 10]}]}, "Mover")
+        with self.assertRaisesRegex(menu_layout.LayoutError, "not in the original layout"):
+            menu_layout.compose(original, [added, stray])
+
+
 if __name__ == "__main__":
     unittest.main()

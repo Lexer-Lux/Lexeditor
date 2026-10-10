@@ -483,7 +483,8 @@ def _layout_in_use(game_root: Path) -> bool:
 def _changes(specs: list[dict]) -> list[str]:
     """Only mods that change something are recorded as applied."""
     return [spec["owner"] for spec in specs
-            if spec.get("islands") or spec.get("hooks") or spec.get("sectionVirtualSize") or spec.get("nodes")]
+            if spec.get("islands") or spec.get("hooks") or spec.get("sectionVirtualSize")
+            or spec.get("nodes") or spec.get("moves")]
 
 
 # --- The in-memory loader ------------------------------------------------------
