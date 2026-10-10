@@ -230,7 +230,7 @@
         output: "Sample output folder.", order: "Sample load order.",
         safety: "Nothing of the game's own is written.", removal: "Delete the folder."})},
     {id: "tweakPanel", level: "organism", summary: "One tweak mod's panel: title, help, an OFF mark while its mod is disabled, its fields, and why it cannot be used yet when it cannot."},
-    {id: "tweakModPanels", level: "organism", summary: "Every tweak mod's panel from its settings schema, with the trust prompt, as the Tweaks page's Mods subtab shows them."},
+    {id: "tweakModPanels", level: "organism", summary: "Every tweak mod's panel from its settings schema, as the Tweaks page's Mods subtab shows them."},
     {id: "conflictMark", level: "atom", summary: "A red ! on a mod whose changes another enabled mod overrides, or that overrides another; its bubble lists them."},
     {id: "tweaksPage", level: "template", summary: "A game's Tweaks page: the game's own pages (tweak mods first) as subtabs, and ReShade on a subtab of its own when the game has it. The page loads ReShade and runs its actions itself.",
       sample: () => UI.tweaksPage({plugin: "catalog-sample", reshade: false, render: () => {},

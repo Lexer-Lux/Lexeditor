@@ -69,8 +69,8 @@
     return {tweaks};
   };
   // A tweak's settings belong to its mod, not to the open project, so the
-  // Tweaks page saves them at once, to both copies, like trust - on Vanilla
-  // too. The number boxes report every keystroke; the save waits for a pause.
+  // Tweaks page saves them at once, to both copies - on Vanilla too. The
+  // number boxes report every keystroke; the save waits for a pause.
   const tweakSaves=new Map();
   function saveTweakValues(row){
     clearTimeout(tweakSaves.get(row.id));
@@ -92,17 +92,9 @@
   }
   const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
   const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
-  async function trustTweak(row,trusted){
-    try{
-      const result=await api("/api/settings/trust",post({id:row.id,trusted}));
-      // Trust is not a pending edit: it applies at once, to both copies.
-      for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id),fresh=result.tweaks.find(item=>item.id===row.id);if(match&&fresh){match.trust=fresh.trust;match.describe=fresh.describe;match.error=fresh.error}}
-      renderSettings();
-    }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
-  }
   function renderGameplaySettings(tabProps){
     const settings=state.data.settings;
-    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,trust:trustTweak,
+    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,
       sounds:soundEntries,number:numberControl,select:selectControl});
     if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
     const settingsView=LexeditorUI.settingsColumns(panels,tabProps);

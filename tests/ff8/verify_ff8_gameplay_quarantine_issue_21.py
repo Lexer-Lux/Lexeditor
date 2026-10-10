@@ -11,7 +11,6 @@ accepts nothing else, and what is saved is what loads back.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import tempfile
 from pathlib import Path
@@ -59,82 +58,73 @@ def make(library: Path, mod_id: str, name: str, schema: dict) -> Path:
     (root / "settings.schema.json").write_text(json.dumps(schema), encoding="utf-8")
     (root / "mod.json").write_text(json.dumps({"id": mod_id, "name": name, "enabled": False,
                                                "script": {"version": 1}}), encoding="utf-8")
-    script_mods.set_trusted(root, True)
     return root
 
 
 def check_persistence() -> None:
     with tempfile.TemporaryDirectory(prefix="ff8-quarantine-") as temporary:
         temp = Path(temporary)
-        previous = os.environ.get(script_mods.TRUST_ENV)
-        os.environ[script_mods.TRUST_ENV] = str(temp / "trust.json")
-        try:
-            project, game = temp / "project", temp / "game"
-            library = project / ".lexeditor-mods"
-            game.mkdir()
-            make(library, "monogamy", "Monogamy", {"title": "MONOGAMY", "fields": []})
-            make(library, "battle-shortcuts", "Battle Shortcuts", {"title": "BATTLE SHORTCUTS", "fields": [
-                {"key": "universalItem", "label": "Universal Item", "type": "bool", "default": True},
-                {"key": "partySwitch", "label": "FF10-style Party Switch", "type": "bool", "default": False}]})
-            make(library, "formulae-rework", "Formulae Rework", {"title": "FORMULAE REWORK", "fields": []})
-            make(library, "max-spell", "Max Spell", {"title": "MAX SPELL", "fields": [
-                {"key": "limit", "label": "Maximum stock", "type": "int", "default": 100, "min": 1, "max": 255}]})
-            make(library, "gf-spellbooks", "GF Spellbooks", {"title": "GF SPELLBOOKS", "fields": []})
-            make(library, "shared-party-magic-inventory", "Shared Party Magic Inventory",
-                 {"title": "SHARED PARTY MAGIC INVENTORY", "fields": []})
+        project, game = temp / "project", temp / "game"
+        library = project / ".lexeditor-mods"
+        game.mkdir()
+        make(library, "monogamy", "Monogamy", {"title": "MONOGAMY", "fields": []})
+        make(library, "battle-shortcuts", "Battle Shortcuts", {"title": "BATTLE SHORTCUTS", "fields": [
+            {"key": "universalItem", "label": "Universal Item", "type": "bool", "default": True},
+            {"key": "partySwitch", "label": "FF10-style Party Switch", "type": "bool", "default": False}]})
+        make(library, "formulae-rework", "Formulae Rework", {"title": "FORMULAE REWORK", "fields": []})
+        make(library, "max-spell", "Max Spell", {"title": "MAX SPELL", "fields": [
+            {"key": "limit", "label": "Maximum stock", "type": "int", "default": 100, "min": 1, "max": 255}]})
+        make(library, "gf-spellbooks", "GF Spellbooks", {"title": "GF SPELLBOOKS", "fields": []})
+        make(library, "shared-party-magic-inventory", "Shared Party Magic Inventory",
+             {"title": "SHARED PARTY MAGIC INVENTORY", "fields": []})
 
-            loaded = gameplay_settings.load(project, game)
-            listed = {row["id"]: row for row in loaded["tweaks"]}
-            assert set(listed) == {"monogamy", "battle-shortcuts", "formulae-rework", "max-spell",
-                                   "gf-spellbooks", "shared-party-magic-inventory"}, listed
-            assert loaded["gfSpellbooksEnabled"] is False and loaded["sharedMagicInventory"] is False
-            assert all(row["enabled"] is False for row in listed.values())
-            assert listed["battle-shortcuts"]["values"] == {"universalItem": True, "partySwitch": False}
+        loaded = gameplay_settings.load(project, game)
+        listed = {row["id"]: row for row in loaded["tweaks"]}
+        assert set(listed) == {"monogamy", "battle-shortcuts", "formulae-rework", "max-spell",
+                               "gf-spellbooks", "shared-party-magic-inventory"}, listed
+        assert loaded["gfSpellbooksEnabled"] is False and loaded["sharedMagicInventory"] is False
+        assert all(row["enabled"] is False for row in listed.values())
+        assert listed["battle-shortcuts"]["values"] == {"universalItem": True, "partySwitch": False}
 
-            everything = {mod_id: {"enabled": True} for mod_id in listed}
-            everything["battle-shortcuts"]["values"] = {"partySwitch": True}
-            everything["max-spell"]["values"] = {"limit": 200}
-            gameplay_settings.save({"tweaks": everything}, game_root=game, project_root=project)
-            loaded = gameplay_settings.load(project, game)
-            for row in loaded["tweaks"]:
-                assert row["enabled"] is True, row["id"]
-            values = {row["id"]: row["values"] for row in loaded["tweaks"]}
-            assert values["battle-shortcuts"] == {"universalItem": True, "partySwitch": True}
-            assert values["max-spell"] == {"limit": 200}
-            assert loaded["gfSpellbooksEnabled"] is True and loaded["sharedMagicInventory"] is True
-            assert loaded["singleGf"] is True
+        everything = {mod_id: {"enabled": True} for mod_id in listed}
+        everything["battle-shortcuts"]["values"] = {"partySwitch": True}
+        everything["max-spell"]["values"] = {"limit": 200}
+        gameplay_settings.save({"tweaks": everything}, game_root=game, project_root=project)
+        loaded = gameplay_settings.load(project, game)
+        for row in loaded["tweaks"]:
+            assert row["enabled"] is True, row["id"]
+        values = {row["id"]: row["values"] for row in loaded["tweaks"]}
+        assert values["battle-shortcuts"] == {"universalItem": True, "partySwitch": True}
+        assert values["max-spell"] == {"limit": 200}
+        assert loaded["gfSpellbooksEnabled"] is True and loaded["sharedMagicInventory"] is True
+        assert loaded["singleGf"] is True
 
-            # Disabling a supported tweak must preserve vanilla behavior too:
-            # its switch reads back off and its patch leaves the composed runtime.
-            runtime = project / ".lexeditor-runtime"
-            composed = gameplay_settings.materialized_tweak_patches(runtime, {"formulae-rework"})
-            assert len(composed) == 1 and composed[0].is_file(), composed
-            composed = composed[0]
-            gameplay_settings.save({"tweaks": {"formulae-rework": {"enabled": False}}},
-                                   game_root=game, project_root=project)
-            loaded = gameplay_settings.load(project, game)
-            assert next(row for row in loaded["tweaks"] if row["id"] == "formulae-rework")["enabled"] is False
-            assert not composed.exists()
+        # Disabling a supported tweak must preserve vanilla behavior too:
+        # its switch reads back off and its patch leaves the composed runtime.
+        runtime = project / ".lexeditor-runtime"
+        composed = gameplay_settings.materialized_tweak_patches(runtime, {"formulae-rework"})
+        assert len(composed) == 1 and composed[0].is_file(), composed
+        composed = composed[0]
+        gameplay_settings.save({"tweaks": {"formulae-rework": {"enabled": False}}},
+                               game_root=game, project_root=project)
+        loaded = gameplay_settings.load(project, game)
+        assert next(row for row in loaded["tweaks"] if row["id"] == "formulae-rework")["enabled"] is False
+        assert not composed.exists()
 
-            # Nothing outside the listed tweaks and their schemas is accepted.
-            for bad in ({"tweaks": {}, "gfSpellbooksEnabled": True},
-                        {"tweaks": {"not-listed": {"enabled": True}}},
-                        {"tweaks": {"monogamy": {"enabled": True, "hidden": 1}}},
-                        {"tweaks": {"max-spell": {"values": {"unknownKey": 1}}}},
-                        {"tweaks": {"max-spell": {"values": {"limit": 999}}}},
-                        {"tweaks": {"monogamy": {"enabled": "true"}}}):
-                try:
-                    gameplay_settings.save(bad, game_root=game, project_root=project)
-                except ValueError:
-                    pass
-                else:
-                    raise AssertionError(f"save accepted {bad}")
-            assert {row["id"]: row["values"] for row in gameplay_settings.load(project, game)["tweaks"]} == values
-        finally:
-            if previous is None:
-                os.environ.pop(script_mods.TRUST_ENV, None)
+        # Nothing outside the listed tweaks and their schemas is accepted.
+        for bad in ({"tweaks": {}, "gfSpellbooksEnabled": True},
+                    {"tweaks": {"not-listed": {"enabled": True}}},
+                    {"tweaks": {"monogamy": {"enabled": True, "hidden": 1}}},
+                    {"tweaks": {"max-spell": {"values": {"unknownKey": 1}}}},
+                    {"tweaks": {"max-spell": {"values": {"limit": 999}}}},
+                    {"tweaks": {"monogamy": {"enabled": "true"}}}):
+            try:
+                gameplay_settings.save(bad, game_root=game, project_root=project)
+            except ValueError:
+                pass
             else:
-                os.environ[script_mods.TRUST_ENV] = previous
+                raise AssertionError(f"save accepted {bad}")
+        assert {row["id"]: row["values"] for row in gameplay_settings.load(project, game)["tweaks"]} == values
 
 
 def check_editor() -> str:

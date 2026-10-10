@@ -161,13 +161,13 @@ def _validate_shared_magic_launch(project: Path, game: Path,
 
 
 def _tweak_payload(project: Path, game: Path) -> list[dict]:
-    """Every tweak mod as the Tweaks page shows it; trusted ones may describe more."""
+    """Every tweak mod as the Tweaks page shows it; each one may describe more."""
     rows = []
     for row in tweak_mods.tweak_rows(project, _mods_root(project)):
         entry = {key: row.get(key) for key in (
-            "id", "name", "order", "enabled", "trust", "error", "schema", "values", "path")}
+            "id", "name", "order", "enabled", "error", "schema", "values", "path")}
         entry["describe"] = {}
-        if row.get("trust") == "trusted" and not row.get("error"):
+        if not row.get("error"):
             try:
                 context = tweak_mods.BuildContext(game, paths.BASELINE_ROOT, {})
                 entry["describe"] = script_mods.describe(Path(row["path"]), context)
@@ -399,17 +399,6 @@ def ensure(game_root: Path | None = None, project_root: Path | None = None,
     """Rebuild and recompose with the current switches and values."""
     return save({}, game_root, project_root, install_runtime=install_runtime,
                 runtime_root=runtime_root)
-
-
-def trust(mod_id: str, trusted: bool, project_root: Path | None = None,
-          game_root: Path | None = None) -> dict:
-    """Let a tweak mod run its script, or stop it; the reader decides."""
-    project = (project_root or paths.PROJECT_ROOT).resolve()
-    rows = {row["id"]: row for row in tweak_mods.tweak_rows(project, _mods_root(project))}
-    if mod_id not in rows:
-        raise ValueError(f"There is no tweak mod {mod_id}")
-    script_mods.set_trusted(Path(rows[mod_id]["path"]), _boolean(trusted, "Trusted"))
-    return payload(project, game_root=game_root)
 
 
 def keep_previous_log(game: Path) -> Path | None:

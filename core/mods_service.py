@@ -54,7 +54,7 @@ def mod_row(folder: Path) -> dict:
     row["script"] = None
     if script_mods.is_script_mod(folder):
         script = script_mods.catalog_row(folder)
-        row["script"] = {key: script.get(key) for key in ("schema", "values", "trust", "error")}
+        row["script"] = {key: script.get(key) for key in ("schema", "values", "error")}
     return row
 
 

@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tests.shared.plugin_ui import plugin_ui
 
-from core import script_mods  # noqa: E402
 from plugins.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
 from plugins.ff8.ffnx_issue_51 import runtime_config, runtime_package  # noqa: E402
 
@@ -295,8 +294,7 @@ def main() -> int:
             ffnx_manager._ensure_direct_link(game, old_direct)
             project = root / "mod"
             # The project's own tweak library, holding only the sharing mod:
-            # saving never builds or enables the reader's real tweak mods, and
-            # trusting it never touches the reader's trust list.
+            # saving never builds or enables the reader's real tweak mods.
             sharing = project / ".lexeditor-mods" / "Shared Party Magic Inventory"
             (sharing / "script").mkdir(parents=True)
             (sharing / "script" / "__init__.py").write_text("", encoding="utf-8")
@@ -306,9 +304,6 @@ def main() -> int:
             (sharing / "mod.json").write_text(json.dumps({
                 "id": gameplay_settings.SHARED_MAGIC_MOD, "name": "Shared Party Magic Inventory",
                 "enabled": False, "script": {"version": 1}}), encoding="utf-8")
-            old_trust = os.environ.get(script_mods.TRUST_ENV)
-            os.environ[script_mods.TRUST_ENV] = str(root / "trust.json")
-            script_mods.set_trusted(sharing, True)
             runtime_config.write(project, shared_magic_inventory=False)
             old_state_path = ffnx_manager.STATE_PATH
             old_game_running = ffnx_manager._game_running
@@ -357,10 +352,6 @@ def main() -> int:
                 ffnx_manager.install_derivative = real_install
                 ffnx_manager.STATE_PATH = old_state_path
                 ffnx_manager._game_running = old_game_running
-                if old_trust is None:
-                    os.environ.pop(script_mods.TRUST_ENV, None)
-                else:
-                    os.environ[script_mods.TRUST_ENV] = old_trust
             assert_file_state(before_save)
             assert link_state(link) == before_link
 

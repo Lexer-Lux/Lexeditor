@@ -5074,6 +5074,24 @@
 
   const hoverableAltClickEnabled = () => sharedSettingsSnapshot?.hoverableAltClick === true;
   const sharedSettings = () => sharedSettingsSnapshot ? clone(sharedSettingsSnapshot) : null;
+  // Enabling a mod runs its scripts, so the first time any mod is enabled
+  // the reader confirms they trust what they enable. Once accepted it never
+  // shows again; the Trust Warning setting switches it off entirely.
+  const confirmFirstModEnable = async () => {
+    let settings = sharedSettingsSnapshot;
+    if (!settings) {
+      try { settings = rememberSharedSettings(await callWindow("lexeditor_settings")); }
+      catch (_error) { settings = null; }
+    }
+    if (!settings || settings.trustWarning === false || settings.trustWarningSeen === true) return true;
+    const agreed = await confirmAction({title: "Enable this mod?",
+      message: "Are you sure you want to enable this mod? Only enable mods you trust.\n\nThis warning shows up the first time you enable a mod because it's important. You can disable this in the settings under \"Trust Warning\".",
+      confirmLabel: "Enable", cancelLabel: "Cancel"});
+    if (!agreed) return false;
+    const updated = await callWindow("acknowledge_trust_warning");
+    if (updated) rememberSharedSettings(updated);
+    return true;
+  };
   const soundCoverageTable = rows => element("table", {class:"lex-theme-sound-table"},
     element("thead", {}, element("tr", {},
       element("th", {}, "Action"), element("th", {}, "Plugin sound"), element("th", {}, "Source"))),
@@ -5857,7 +5875,9 @@ ${contents.path}`});
         const sourceStatus=row.managed && options.changeProjectSource
           ? element("input",{type:"checkbox",checked:row.enabled!==false,
             class:"lex-project-source-status",
-            "aria-label":`Enable ${row.label}`,onchange:event=>run(()=>options.changeProjectSource(row.key,{enabled:event.target.checked}))})
+            "aria-label":`Enable ${row.label}`,onchange:event=>run(async()=>{
+              if(event.target.checked && !(await confirmFirstModEnable()))return;
+              await options.changeProjectSource(row.key,{enabled:event.target.checked})})})
           : null;
         if(row.managed && options.changeProjectSource){
           Object.assign(dragAttrs,modOrderGestures({index,controls:"input,.lex-project-menu-item-actions",
@@ -6315,6 +6335,7 @@ ${contents.path}`});
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
         {key:"booleanBoxStyle", scope:"user", title:"Wide boolean boxes", description:"An on/off property is one wide box that fills its row, ticked when on. Off draws a small checkbox at the end of an arrow from the property name.", type:"checkbox"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
+        {key:"trustWarning", scope:"user", title:"Trust Warning", description:"Warn the first time a mod is enabled. Only enable mods you trust.", type:"checkbox"},
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
@@ -12244,9 +12265,9 @@ ${contents.path}`});
   })();
 
   // One panel per tweak mod, drawn from its settings schema. Every game's
-  // Tweaks page uses this: the fields, the trust prompt and the "not
-  // available yet" badge look and behave the same everywhere. There is no
-  // switch: a tweak is a mod, and the Mods tab enables it.
+  // Tweaks page uses this: the fields and the "not available yet" badge
+  // look and behave the same everywhere. There is no switch: a tweak is a
+  // mod, and the Mods tab enables it.
   const tweakPanel = (title, help, toggle, body = [], blocker = "") => {
     // A tweak that cannot be switched on yet says so where it stands: what it
     // does in the help bubble, why it is unavailable in the body.
@@ -12296,10 +12317,6 @@ ${contents.path}`});
         : badge("OFF", {title: "Switch this mod on in the Mods tab."});
       const body = [];
       if (row.error) body.push(detailNote(row.error));
-      if (row.trust !== "trusted") body.push(detailNote(row.trust === "changed"
-        ? "This tweak's script changed since you trusted it, so it will not build until you trust it again."
-        : "This tweak runs its own script when it builds. Trust it only if you know where it came from."),
-      actionRow(element("button", {type: "button", onclick: () => options.trust?.(row, true)}, "Trust this tweak")));
       body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
       // A mod's own details pane already names the mod and has its switch.
       if (options.fieldsOnly) return element("div", {class: "lex-tweak-fields"}, ...(blocker ? [detailNote(blocker)] : []), ...body);
@@ -12441,6 +12458,7 @@ ${contents.path}`});
       }
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
         onchange: async event => {
+          if (event.target.checked && !(await confirmFirstModEnable())) { event.target.checked = false; return; }
           try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
           catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
         }});
@@ -12451,10 +12469,6 @@ ${contents.path}`});
           change: async () => {
             try { replaceRow(await callWindow("save_mod_settings", pluginId, row.path, row.script.values)); }
             catch (error) { failure("Could not save the mod's settings", error); await load(); draw(); }
-          },
-          trust: async () => {
-            try { replaceRow(await callWindow("trust_mod", pluginId, row.path, true)); draw(); }
-            catch (error) { failure("Could not trust the mod", error); }
           }});
         sections.push(detailSection({title: "SETTINGS", body: panels}));
       }
@@ -12503,6 +12517,7 @@ ${contents.path}`});
               : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
                   onclick: event => event.stopPropagation(),
                   onchange: async event => {
+                    if (event.target.checked && !(await confirmFirstModEnable())) { event.target.checked = false; return; }
                     try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
                     catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
                   }})}]}),

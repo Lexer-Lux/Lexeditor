@@ -1,7 +1,7 @@
 """Lexer's Mod for a game: a GitHub repository whose modules are mods.
 
 The repository a game uses is declared in its plugin.json (`lexmod`), never by
-anything downloaded, so its modules are trusted to run their build scripts.
+anything downloaded.
 
 Repository contract
 - README.md has a `## Features` section: a bullet list whose last bullet is
@@ -293,8 +293,6 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
                 retired = staged_root / f"{folder}.previous"
                 target.rename(retired)
             (staged_root / folder).rename(target)
-            if script_mods.is_script_mod(target):
-                script_mods.set_trusted(target, True)
             done.append(folder)
             if progress:
                 progress("install", len(done), len(plans))
@@ -309,8 +307,6 @@ def remove(library: Path, repository: str, folders: list[str]) -> list[str]:
         if folder not in present:
             continue
         target = Path(library) / folder
-        if script_mods.is_script_mod(target):
-            script_mods.set_trusted(target, False)
         shutil.rmtree(target)
         removed.append(folder)
     return removed

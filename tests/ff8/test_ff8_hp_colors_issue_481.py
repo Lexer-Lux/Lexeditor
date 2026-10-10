@@ -5,7 +5,6 @@ enable_ff8_better_hp_colors, and every driver switch no enabled mod asks for
 is written off. The fixture library below stands in for the reader's library.
 """
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -30,8 +29,6 @@ class FixtureLibrary:
     def __enter__(self):
         self._temp = tempfile.TemporaryDirectory(prefix="ff8-hp-colors-")
         temp = Path(self._temp.name)
-        self._trust = os.environ.get(script_mods.TRUST_ENV)
-        os.environ[script_mods.TRUST_ENV] = str(temp / "trust.json")
         self.project, self.game = temp / "project", temp / "game"
         self.library = self.project / ".lexeditor-mods"
         self.game.mkdir()
@@ -49,7 +46,6 @@ class FixtureLibrary:
         (root / "mod.json").write_text(json.dumps(
             {"id": mod_id, "name": name, "order": 400 + len(self.roots), "enabled": False,
              "script": {"version": 1}}), encoding="utf-8")
-        script_mods.set_trusted(root, True)
         self.roots[mod_id] = root
 
     def enable(self, **switches):
@@ -66,10 +62,6 @@ class FixtureLibrary:
         return built
 
     def __exit__(self, *exc):
-        if self._trust is None:
-            os.environ.pop(script_mods.TRUST_ENV, None)
-        else:
-            os.environ[script_mods.TRUST_ENV] = self._trust
         self._temp.cleanup()
 
 

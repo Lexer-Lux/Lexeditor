@@ -18,7 +18,6 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_ds1_exe_patches import VANILLA, HOOK_A, HOOK_B, island  # noqa: E402
-from core import script_mods  # noqa: E402
 from plugins.ds1 import exe_patches, tweak_mods  # noqa: E402
 
 # The guard every test below replaces, kept for the one that checks it.
@@ -58,15 +57,12 @@ class LoaderTests(unittest.TestCase):
             (root / "mod.json").write_text(json.dumps({"id": mod_id, "name": mod_id.title(), "order": order,
                                                        "enabled": False, "script": {"version": 1}}), encoding="utf-8")
         for patcher in (
-            mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.temp / "trust.json")}),
             mock.patch.object(exe_patches, "VANILLA_SIZE", len(VANILLA)),
             mock.patch.object(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
             mock.patch.object(tweak_mods, "ensure_game_closed"),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        for row in tweak_mods.tweak_rows(self.library):
-            script_mods.set_trusted(Path(row["path"]), True)
 
     def enable(self, **switches):
         tweak_mods.save({mod_id: {"enabled": on} for mod_id, on in switches.items()}, self.library)
@@ -114,12 +110,10 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual((self.game / tweak_mods.LOCK_FILE).read_bytes(), b"0")
         self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
 
-    def test_untrusted_tweak_never_builds(self):
+    def test_enabled_tweak_builds_with_no_trust_step(self):
         self.enable(alpha=True)
-        script_mods.set_trusted(Path(tweak_mods.tweak_rows(self.library)[0]["path"]), False)
-        with self.assertRaisesRegex(tweak_mods.TweakError, "trust"):
-            tweak_mods.apply(self.game, self.library)
-        self.assertEqual(self.live.read_bytes(), VANILLA)
+        tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.runtime(), self.expected("alpha"))
 
     def test_apply_installs_the_loader_and_never_writes_the_executable(self):
         self.enable(alpha=True)
@@ -276,7 +270,6 @@ class LayoutLoaderTests(unittest.TestCase):
         (root / "mod.json").write_text(json.dumps({"id": "details", "name": "Details", "enabled": False,
                                                    "script": {"version": 1}}), encoding="utf-8")
         for patcher in (
-            mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.temp / "trust.json")}),
             mock.patch.object(exe_patches, "VANILLA_SIZE", len(VANILLA)),
             mock.patch.object(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
             mock.patch.object(menu_layout, "VANILLA_SIZE", len(self.vanilla_layout)),
@@ -285,7 +278,6 @@ class LayoutLoaderTests(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        script_mods.set_trusted(root, True)
 
     def enable(self, on=True):
         tweak_mods.save({"details": {"enabled": on}}, self.library)
@@ -341,7 +333,6 @@ class LayoutLoaderTests(unittest.TestCase):
         root = self.library / "Details"
         (root / "script" / "tweak.py").write_text(
             LAYOUT_TWEAK % ("details", repr(SPECS["alpha"]), "details", repr(self.nodes)), encoding="utf-8")
-        script_mods.set_trusted(root, True)
         self.enable()
         with self.assertRaisesRegex(tweak_mods.TweakError, "missing"):
             tweak_mods.apply(self.game, self.library)

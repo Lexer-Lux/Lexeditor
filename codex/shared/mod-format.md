@@ -22,9 +22,8 @@ format, so popular mods keep working as they ship.
 ## Lexer's Mod for a game
 
 - A game's `plugin.json` names it: `"lexmod": "Owner/Repository"` on GitHub.
-  The developer dashboard's LEXMOD? column shows it. Because the repository
-  comes from Lexeditor's own manifest, never from a download, its modules
-  are trusted to run their build scripts.
+  The developer dashboard's LEXMOD? column shows it. The repository comes
+  from Lexeditor's own manifest, never from a download.
 - A Lexmod is a collection of modules. Every top-level folder of the
   repository holding a `mod.json` is one module, which is an ordinary mod. Its
   `mod.json` `enabled` is the module's default state and its `settings.json`
