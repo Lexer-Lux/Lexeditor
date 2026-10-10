@@ -162,7 +162,7 @@ class ModuleEntry(ctypes.Structure):
 
 
 def _same_path(left: str | Path, right: str | Path) -> bool:
-    return os.path.normcase(os.path.realpath(left)) == os.path.realpath(right)
+    return os.path.normcase(os.path.realpath(left)) == os.path.normcase(os.path.realpath(right))
 
 
 class WindowsReader:
