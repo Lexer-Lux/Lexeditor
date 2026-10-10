@@ -63,9 +63,10 @@ def make_archive():
     return bytes(header) + compressed
 
 
-def make_text_archive(names=None):
+def make_text_archive(names=None, extra=None):
     """A synthetic msg/ENGLISH/item.msgbnd.dcx: every name table twice (the
-    base and later copies Remastered ships), holding `names` by table."""
+    base and later copies Remastered ships), holding `names` by table.
+    `extra` maps an FMG file name to {id: text}, also carried twice."""
     from plugins.ds1 import texts
     names = names or {'EquipParamGoods': {100: 'Fixture Stone', 101: 'Fixture Key'},
                       'EquipParamWeapon': {100: 'Fixture Sword'}}
@@ -75,6 +76,9 @@ def make_text_archive(names=None):
         for offset, (table, file_name) in enumerate(texts.NAME_TABLES.items()):
             payload = texts.build_fmg(blank, [], dict(names.get(table, {})))
             entries.append((base + offset, 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92)) + file_name, payload))
+        for extra_offset, (file_name, contents) in enumerate((extra or {}).items()):
+            payload = texts.build_fmg(blank, [], dict(contents))
+            entries.append((base + 40 + extra_offset, 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92)) + file_name, payload))
     encoded = [name.encode('shift_jis') + b'\0' for _, name, _ in entries]
     directory_end = 32 + len(entries) * 24
     names_end = directory_end + sum(map(len, encoded))

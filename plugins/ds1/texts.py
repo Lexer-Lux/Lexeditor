@@ -23,6 +23,12 @@ import zlib
 from .formats import FormatError, MAX_ARCHIVE, inflate
 
 RELATIVE = Path('msg/ENGLISH/item.msgbnd.dcx')
+# Tables with no parameter rows behind them that still merge by entry.
+# Place_name_ holds the warp destination (2000-2020) and area (1000-1810)
+# names the bonfire warp menu shows; the editor offers no rename surface
+# for them, but a mod may carry its own bytes and the loader composes
+# them entry by entry instead of taking one member whole.
+MERGED_TABLES = frozenset({'Place_name_.fmg'})
 # The parameter table each name table names, by the table's file name.
 NAME_TABLES = {
     'EquipParamGoods': 'Item_name_.fmg',
@@ -151,8 +157,9 @@ class TextDocument:
         self.tables: dict[int, tuple[list, dict]] = {}
         self.original_texts: dict[int, dict] = {}
         wanted = set(NAME_TABLES.values())
+        known = wanted | MERGED_TABLES
         for position, entry in enumerate(self.entries):
-            if entry.name.replace('\\', '/').rsplit('/', 1)[-1] in wanted:
+            if entry.name.replace('\\', '/').rsplit('/', 1)[-1] in known:
                 groups, texts = parse_fmg(entry.data)
                 self.tables[position] = (groups, texts)
                 self.original_texts[position] = dict(texts)

@@ -115,6 +115,46 @@ def test_item_names_merge_by_entry_and_conflict_on_the_same_one():
     assert [c.mods for c in result.conflicts] == [["A", "B"]]
 
 
+PLACE = {"Place_name_.fmg": {2000: "Firelink Shrine", 2003: "Chamber of the Princess"}}
+
+
+def placed(archive):
+    """Every copy of Place_name_ in the archive; they must always agree."""
+    document = texts.TextDocument(archive)
+    copies = [document.tables[position][1] for position, entry in enumerate(document.entries)
+              if entry.name.rsplit(chr(92), 1)[-1] == "Place_name_.fmg"]
+    assert copies, "the archive carries no Place_name_ table"
+    assert all(copy == copies[0] for copy in copies), "Place_name_ copies disagree"
+    return copies[0]
+
+
+def test_place_names_merge_by_entry_and_conflict_on_the_same_one():
+    game = {RELATIVE: VANILLA, texts.RELATIVE: make_text_archive(extra=dict(PLACE))}
+    a = mod("A", names=make_text_archive(extra={"Place_name_.fmg": {2000: "Firelink Shrine", 2003: "Chamber (Anor Londo)"}}))
+    b = mod("B", names=make_text_archive(extra={"Place_name_.fmg": {2000: "Firelink!", 2003: "Chamber of the Princess"}}))
+    result = mod_loader.compose(game, [a, b])
+    merged = placed(result.files[texts.RELATIVE])
+    assert merged[2000] == "Firelink!" and merged[2003] == "Chamber (Anor Londo)"
+    assert [(c.part, c.mods) for c in result.conflicts] == []
+
+
+def test_the_same_place_name_conflicts_and_the_later_mod_is_used():
+    game = {RELATIVE: VANILLA, texts.RELATIVE: make_text_archive(extra=dict(PLACE))}
+    a = mod("A", names=make_text_archive(extra={"Place_name_.fmg": {2000: "Firelink A", 2003: "Chamber of the Princess"}}))
+    b = mod("B", names=make_text_archive(extra={"Place_name_.fmg": {2000: "Firelink B", 2003: "Chamber of the Princess"}}))
+    result = mod_loader.compose(game, [a, b])
+    assert placed(result.files[texts.RELATIVE])[2000] == "Firelink B"
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Name 2000 (Place name)", ["A", "B"])]
+
+
+def test_archives_without_place_names_merge_as_before():
+    document = texts.TextDocument(NAMES)
+    assert all(document._file(position) != "Place_name_.fmg" for position in document.tables)
+    alone = mod("A", names=renamed(("EquipParamGoods", 100, "Stone")))
+    result = mod_loader.compose(GAME, [alone])
+    assert result.files == alone.files and result.conflicts == []
+
+
 def test_a_library_lists_enabled_data_mods_in_order_and_the_open_project(tmp_path):
     import json
     for name, order, enabled in (("Late", 20, True), ("Early", 10, True), ("Off", 5, False), ("Open", 30, False)):
