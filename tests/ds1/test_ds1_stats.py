@@ -75,13 +75,32 @@ def test_stats_detail_shows_only_stat_fields():
     assert not graph['editable']
     row = document.read_row('Magic', 100, only=STATS_FIELDS['Magic'])
     assert {field['key'] for field in row['fields']} == {
-        'requirementIntellect', 'requirementFaith', 'slotLength'}
+        'requirementIntellect', 'requirementFaith', 'slotLength', 'stamina'}
     assert all(field['editable'] for field in row['fields'])
+    stamina = next(field for field in row['fields'] if field['key'] == 'stamina')
+    assert stamina['label'] == 'Stamina Consumption'
+    assert stamina['minimum'] == 0 and stamina['maximum'] == 9999
+    assert 'Spell Stamina Costs' in stamina['description']
     curves = document.read_row(GRAPH_TABLE, 200)
     assert {field['key'] for field in curves['fields']} == set(STATS_FIELDS[GRAPH_TABLE])
     groups = {field['key']: field['group'] for field in curves['fields']}
     assert groups['stageMaxVal0'] == 'Thresholds' and groups['stageMaxGrowVal4'] == 'Growth'
     assert groups['adjPt_maxGrowVal0'] == 'Curve shape' and groups['boundry_value'] == 'Level-up cost'
+
+
+def test_spell_stamina_cost_edits_roundtrip_and_validate():
+    document = ItemDocument(make_stats_archive())
+    document.edit('Magic', 100, 'stamina', 25)
+    assert document.value('Magic', 100, 'stamina') == 25
+    assert ItemDocument(document.export()).value('Magic', 100, 'stamina') == 25
+    assert document.dirty_count == 1
+    for value in (-1, 10000, 2.5, float('nan')):
+        try:
+            document.edit('Magic', 100, 'stamina', value)
+        except FormatError:
+            continue
+        raise AssertionError(f'stamina={value} was accepted')
+    assert document.value('Magic', 100, 'stamina') == 25
 
 
 def test_curve_edits_roundtrip_and_validate():
