@@ -14,7 +14,7 @@ HOST = """(options) => {
     {path: 'C:/lib/game/Combat', folder: 'Combat', name: 'Combat', author: 'Lexer', description: '', credits: '',
      version: '', missing: [], enabled: false, order: 2, lexmod: {repository: 'Lexer-Lux/X', version: 'v1'},
      script: {schema: {fields: [{key: 'amount', label: 'Amount', type: 'int', default: 1, min: 0, max: 9}]},
-              values: {amount: 3}, trust: 'trusted', error: ''}, error: '', remote: false},
+              values: {amount: 3}, error: ''}, error: '', remote: false},
   ];
   let download = {state: 'idle'};
   const record = name => (...args) => { calls.push([name, args]); };

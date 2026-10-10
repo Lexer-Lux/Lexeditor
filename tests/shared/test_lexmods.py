@@ -6,12 +6,10 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from pathlib import Path
 import tempfile
 import threading
 import unittest
-from unittest import mock
 import zipfile
 
 from core import lexmods, script_mods
@@ -75,9 +73,6 @@ class InstallTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.library = Path(temp.name) / "test"
-        patcher = mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(Path(temp.name) / "trust.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def install(self, version, upstream, **kwargs):
         return lexmods.install(self.REPO, self.library, fetch=fetch(version, upstream), **kwargs)
@@ -139,12 +134,12 @@ class InstallTests(unittest.TestCase):
             self.install("v1", {"Combat": module("Combat")}, cancel=cancel)
         self.assertEqual([p.name for p in self.library.iterdir()], [])
 
-    def test_script_modules_are_trusted_and_removal_touches_only_lexmod_modules(self):
+    def test_script_modules_install_and_removal_touches_only_lexmod_modules(self):
         tweak = module("Tweak", extra={"script": {"version": 1}})
         tweak["script/__init__.py"] = ""
         tweak["script/tweak.py"] = "def build(settings, context):\n    return {}\n"
         self.install("v1", {"Tweak": tweak})
-        self.assertEqual(script_mods.trust_state(self.library / "Tweak"), "trusted")
+        self.assertTrue(script_mods.is_script_mod(self.library / "Tweak"))
         (self.library / "Mine").mkdir()
         self.assertEqual(lexmods.remove(self.library, self.REPO, ["Tweak", "Mine"]), ["Tweak"])
         self.assertTrue((self.library / "Mine").is_dir())

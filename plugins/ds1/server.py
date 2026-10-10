@@ -13,7 +13,6 @@ from .formats import FormatError
 from .store import ItemStore
 from . import tweak_mods
 from . import data_map
-from core import script_mods
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -88,7 +87,7 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/trust', '/api/tweaks/apply', '/api/tweaks/restore'):
+                            '/api/tweaks/save', '/api/tweaks/apply', '/api/tweaks/restore'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -127,12 +126,6 @@ class Handler(PluginRequestHandler):
                 # they save at once and apply to the installed executable.
                 elif path == '/api/tweaks/save':
                     tweak_mods.save(payload.get('tweaks'))
-                    result = tweak_mods.status(STORE.game_root)
-                elif path == '/api/tweaks/trust':
-                    rows = {row['id']: row for row in tweak_mods.tweak_rows()}
-                    if payload.get('id') not in rows or type(payload.get('trusted')) is not bool:
-                        raise ValueError('Choose a DS1 tweak mod and whether to trust it')
-                    script_mods.set_trusted(Path(rows[payload['id']]['path']), payload['trusted'])
                     result = tweak_mods.status(STORE.game_root)
                 elif path == '/api/tweaks/apply':
                     result = tweak_mods.apply(STORE.game_root)

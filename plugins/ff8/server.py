@@ -418,8 +418,6 @@ class Handler(PluginRequestHandler):
                 self.json_response(assets.save_models(body.get("edits", [])))
             elif path == "/api/settings/save":
                 self.json_response(gameplay_settings.save(body))
-            elif path == "/api/settings/trust":
-                self.json_response(gameplay_settings.trust(str(body.get("id", "")), body.get("trusted")))
             elif path == "/api/editor-settings/save":
                 self.json_response(editor_settings.save(body))
             elif path == "/api/mods/configure":

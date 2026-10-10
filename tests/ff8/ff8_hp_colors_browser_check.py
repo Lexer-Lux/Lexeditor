@@ -18,7 +18,7 @@ try:
         # Keep the shipped views and shared controls. Replace only game discovery
         # and shell startup, so CI needs no private game installation.
         boot=(Path(__file__).resolve().parents[2]/'plugins/ff8/boot.js').read_text(encoding='utf-8')
-        rows=[{'id':mod_id,'name':name,'enabled':False,'trust':'trusted','values':{},
+        rows=[{'id':mod_id,'name':name,'enabled':False,'values':{},
                'schema':{'title':name.upper(),'help':help_text,'needsDriver':True,'fields':[]}}
               for mod_id,name,help_text in [('better-hp-colors','Better HP Colors',HELP),
                                              ('interaction-indicators','Interaction Indicators','')]]

@@ -632,7 +632,13 @@ class HostApi:
             None if "booleanBoxStyle" not in payload else bool(payload["booleanBoxStyle"]),
             show_hover_tooltips=None if "showHoverTooltips" not in payload else bool(payload["showHoverTooltips"]),
             show_hidden_properties=None if "showHiddenProperties" not in payload else bool(payload["showHiddenProperties"]),
+            trust_warning=None if "trustWarning" not in payload else bool(payload["trustWarning"]),
         )
+        return self.lexeditor_settings()
+
+    def acknowledge_trust_warning(self) -> dict:
+        """Remember that the reader accepted the first-enable mod warning."""
+        self._settings.acknowledge_trust_warning()
         return self.lexeditor_settings()
 
     def save_developer_setting_defaults(self, values: dict) -> dict:
@@ -1861,14 +1867,6 @@ class HostApi:
         from core import mods_service, script_mods
         folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
         script_mods.save_values(folder, values)
-        return mods_service.mod_row(folder)
-
-    def trust_mod(self, plugin_id: str, path: str, trusted: bool) -> dict:
-        from core import mods_service, script_mods
-        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
-        if type(trusted) is not bool:
-            raise ValueError("Trusted is yes or no")
-        script_mods.set_trusted(folder, trusted)
         return mods_service.mod_row(folder)
 
     def activate_enabled_mods(self, plugin_id: str) -> dict:

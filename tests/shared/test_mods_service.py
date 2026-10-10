@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import sys
 import tempfile
@@ -13,7 +12,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lexmods import archive, module  # noqa: E402
-from core import lexmods, mods_service, script_mods  # noqa: E402
+from core import lexmods, mods_service  # noqa: E402
 
 REPO = "Lexer-Lux/Lexers-Mod-For-Test"
 
@@ -25,9 +24,6 @@ class ModsServiceTests(unittest.TestCase):
         self.temp = Path(temp.name)
         self.game = self.temp / "library" / "test"
         self.game.mkdir(parents=True)
-        patcher = mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.temp / "trust.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
         mods_service._catalogs.clear()
 
     def make(self, folder, **mod):

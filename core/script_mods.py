@@ -13,10 +13,10 @@ the script runs with the reader's values and returns the files it wants in
 the mod (a Hext patch, an INI section, a data file). Those files then deploy
 exactly like a hand-made mod's files, through the game's own loader.
 
-Running a script runs code, so only trusted mods build. Trust is the reader's
-explicit choice, kept in Lexeditor's own data folder rather than in the
-library, and it is bound to a hash of the script: a changed script, such as an
-update to a downloaded mod, stops building until it is trusted again.
+Running a script runs code, so enabling a mod is the reader's explicit
+choice: the first time any mod is enabled, Lexeditor warns that only mods
+from sources the reader trusts should ever be enabled. That warning can be
+switched off in the global settings under "Trust Warning".
 """
 from __future__ import annotations
 
@@ -38,7 +38,6 @@ ENTRY_MODULE = "tweak"
 SCHEMA_FILE = "settings.schema.json"
 VALUES_FILE = "settings.json"
 MANIFEST_FILE = ".lexeditor-generated.json"
-TRUST_ENV = "LEXEDITOR_SCRIPT_TRUST_FILE"
 # The files a tweak mod owns besides its game files. A loader that validates
 # mod contents accepts these for a tweak mod, and only for one.
 OWN_FILES = frozenset({SCHEMA_FILE, VALUES_FILE, MANIFEST_FILE})
@@ -180,60 +179,11 @@ def save_values(root: Path, changes: dict) -> dict:
     return current
 
 
-# --- trust -----------------------------------------------------------------
-
-def _trust_path() -> Path:
-    override = os.environ.get(TRUST_ENV)
-    if override:
-        return Path(override)
-    from core.runtime_bootstrap import user_data_dir
-    return user_data_dir() / "trusted-script-mods.json"
-
+# --- running ---------------------------------------------------------------
 
 def _key(root: Path) -> str:
     return os.path.normcase(str(Path(root).resolve()))
 
-
-def script_hash(root: Path) -> str:
-    """Hash every file the script package holds, names included."""
-    digest = hashlib.sha256()
-    package = Path(root) / SCRIPT_FOLDER
-    for path in sorted((item for item in package.rglob("*")
-                        if item.is_file() and "__pycache__" not in item.parts),
-                       key=lambda item: item.relative_to(package).as_posix()):
-        digest.update(path.relative_to(package).as_posix().encode("utf-8") + b"\0")
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
-    return digest.hexdigest()
-
-
-def _trusted() -> dict:
-    data = _read_json(_trust_path()) or {}
-    mods = data.get("mods") if isinstance(data, dict) else None
-    return mods if isinstance(mods, dict) else {}
-
-
-def trust_state(root: Path) -> str:
-    """'trusted', 'changed' (trusted once, script edited since) or 'untrusted'."""
-    entry = _trusted().get(_key(root))
-    if not isinstance(entry, dict):
-        return "untrusted"
-    return "trusted" if entry.get("sha256") == script_hash(root) else "changed"
-
-
-def set_trusted(root: Path, trusted: bool) -> str:
-    mods = _trusted()
-    if trusted:
-        spec(root)
-        mods[_key(root)] = {"sha256": script_hash(root)}
-    else:
-        mods.pop(_key(root), None)
-    target = _trust_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(target, (json.dumps({"version": 1, "mods": mods}, indent=2) + "\n").encode("utf-8"))
-    return trust_state(root)
-
-
-# --- running ---------------------------------------------------------------
 
 def _package_name(root: Path) -> str:
     return "lexeditor_tweak_" + hashlib.sha1(_key(root).encode("utf-8")).hexdigest()[:16]
@@ -265,8 +215,8 @@ def _load(root: Path):
 def import_module(root: Path, name: str):
     """One module from a mod's script package, for that mod's own tests.
 
-    Running a mod's tests is the developer's explicit act, so this does not
-    ask for trust; Lexeditor itself only ever runs a script through build().
+    Running a mod's tests is the developer's explicit act; Lexeditor itself
+    only ever runs a script through build(), for a mod the reader enabled.
     """
     package = _package_name(Path(root))
     # One test may import several modules from the same mod; they must share
@@ -276,19 +226,15 @@ def import_module(root: Path, name: str):
     return importlib.import_module(f"{package}.{name}")
 
 
-def load_trusted(root: Path):
+def load_script(root: Path):
     """The mod's entry module, or an error naming why it may not run."""
     spec(root)
-    state = trust_state(root)
-    if state != "trusted":
-        raise ScriptModError("Its script changed since it was trusted; trust it again to build it"
-                             if state == "changed" else "It is not trusted to run its script")
     return _load(root)
 
 
 def describe(root: Path, context: Any) -> dict:
-    """Optional extra data a trusted mod offers the editor, such as a table."""
-    module = load_trusted(root)
+    """Optional extra data a mod offers the editor, such as a table."""
+    module = load_script(root)
     function: Callable | None = getattr(module, "describe", None)
     result = function(values(root), context) if function else {}
     if not isinstance(result, dict):
@@ -381,13 +327,13 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
 
 
 def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
-    """Run a trusted tweak mod's script and write what it returns into the mod.
+    """Run a tweak mod's script and write what it returns into the mod.
 
     Only files this build or an earlier one generated are replaced or
     removed: a file the reader put in the mod by hand is never overwritten.
     """
     root = Path(root)
-    module = load_trusted(root)
+    module = load_script(root)
     function: Callable | None = getattr(module, "build", None)
     if function is None:
         raise ScriptModError("The script has no build() function")
@@ -440,7 +386,7 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
                 error: type[Exception] = ScriptModError) -> list[dict]:
     """Build every row (enabled tweak mods, in load order), or none of them.
 
-    Each row carries id, name, path, schema, trust and error, as catalog_row
+    Each row carries id, name, path, schema and error, as catalog_row
     gives them. Everything that can be refused is refused before any mod
     writes; a failure during the builds puts back every mod already built.
     The context's `current` names the mod being built.
@@ -458,8 +404,6 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
-        if row["trust"] != "trusted":
-            raise error(f"{row['name']}: its script is {row['trust']}; trust it before building")
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
@@ -501,12 +445,11 @@ def clear(root: Path) -> list[str]:
 
 def catalog_row(root: Path) -> dict:
     """What the Tweaks page needs about one tweak mod, without running it."""
-    row = {"path": str(Path(root).resolve()), "trust": "untrusted", "error": ""}
+    row = {"path": str(Path(root).resolve()), "error": ""}
     try:
         row.update(spec(root))
         row["schema"] = schema(root)
         row["values"] = values(root)
-        row["trust"] = trust_state(root)
     except ScriptModError as error:
         row["error"] = str(error)
     return row

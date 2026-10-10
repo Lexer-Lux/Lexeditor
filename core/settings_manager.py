@@ -25,6 +25,7 @@ DEFAULTS = {
     "showHoverTooltips": False,
     "showHiddenProperties": False,
     "pageWrapAround": True,
+    "trustWarning": True,
     "booleanBoxStyle": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
@@ -169,6 +170,7 @@ class SettingsStore:
             "showHiddenProperties": payload.get("showHiddenProperties", defaults["showHiddenProperties"]) is True,
             "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
+            "trustWarning": payload.get("trustWarning", defaults["trustWarning"]) is not False,
             "booleanBoxStyle": payload.get("booleanBoxStyle", defaults.get("booleanBoxStyle", True)) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
@@ -188,6 +190,7 @@ class SettingsStore:
             "loadingTransitionMinimumSeconds": max(
                 0.0, min(10.0, loading_transition_minimum_seconds)
             ),
+            "trustWarningSeen": payload.get("trustWarningSeen", False) is True,
             "viewPreferences": view_preferences,
         }
 
@@ -222,7 +225,8 @@ class SettingsStore:
              pager_bar_height_percent: float | None = None,
              boolean_box_style: bool | None = None,
              show_hover_tooltips: bool | None = None,
-             show_hidden_properties: bool | None = None) -> dict:
+             show_hidden_properties: bool | None = None,
+             trust_warning: bool | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
@@ -231,6 +235,8 @@ class SettingsStore:
             show_hover_tooltips = current["showHoverTooltips"]
         if show_hidden_properties is None:
             show_hidden_properties = current["showHiddenProperties"]
+        if trust_warning is None:
+            trust_warning = current["trustWarning"]
         if panel_tab_target is None:
             panel_tab_target = current["panelTabTarget"]
         if panel_tab_target not in ("hover", "focus"):
@@ -268,6 +274,7 @@ class SettingsStore:
                 "showHiddenProperties": bool(show_hidden_properties),
                 "pageWrapAround": bool(page_wrap_around),
                 "booleanBoxStyle": bool(boolean_box_style),
+                "trustWarning": bool(trust_warning),
                 "panelTabTarget": panel_tab_target,
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
@@ -275,12 +282,21 @@ class SettingsStore:
                 "mainMenuHeightPercent": main_menu_height_percent,
                 "pagerBarHeightPercent": pager_bar_height_percent,
                 "soundEnabled": bool(sound_enabled),
+                "trustWarningSeen": stored["trustWarningSeen"],
                 "viewPreferences": stored["viewPreferences"],
                 "modLibraryPath": stored["modLibraryPath"],
             }
             if sound_volume_percent is not None:
                 payload["soundVolumePercent"] = max(0.0, min(100.0, float(sound_volume_percent)))
             self._write(payload)
+        return self.snapshot()
+
+    def acknowledge_trust_warning(self) -> dict:
+        """Remember that the first-enable mod warning was accepted."""
+        with self._lock:
+            value = self._read()
+            value["trustWarningSeen"] = True
+            self._write({"version": 8, **value})
         return self.snapshot()
 
     def set_mod_library_path(self, path: Path) -> dict:
@@ -312,6 +328,7 @@ class SettingsStore:
             "showHoverTooltips": bool(current["showHoverTooltips"]),
             "showHiddenProperties": bool(current.get("showHiddenProperties", False)),
             "pageWrapAround": bool(current["pageWrapAround"]),
+            "trustWarning": bool(current["trustWarning"]),
             "booleanBoxStyle": bool(current.get("booleanBoxStyle", True)),
             "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),

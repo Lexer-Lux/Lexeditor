@@ -1,12 +1,11 @@
 """The Tweaks page lists tweak mods from their schemas, edits them and saves them.
 
 Runs against a temporary project with its own small tweak-mod library, so it
-never reads or changes the reader's real mod library or trust list.
+never reads or changes the reader's real mod library.
 """
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import sys
 import tempfile
@@ -40,7 +39,6 @@ def main(output: Path | None = None) -> int:
         temp = Path(temp)
         project = temp / "project"
         library = project / ".lexeditor-mods"
-        os.environ[script_mods.TRUST_ENV] = str(temp / "trust.json")
         base = make(library, "base-tweak", "Base Tweak", 100, {
             "title": "BASE TWEAK", "help": "A tweak another one needs.", "fields": [
                 {"key": "amount", "label": "Amount", "type": "int", "default": 5, "min": 0, "max": 50, "unit": "%"}]}, True)
@@ -49,16 +47,13 @@ def main(output: Path | None = None) -> int:
                 {"key": "loud", "label": "Loud", "type": "bool", "default": False}]}, True)
         unfinished = make(library, "unfinished-tweak", "Unfinished Tweak", 120, {
             "title": "UNFINISHED TWEAK", "help": "Not ready.", "blocker": "Its hooks are not proved yet."}, False)
-        for root in (base, dependent, unfinished):
-            script_mods.set_trusted(root, True)
-        untrusted = make(library, "stranger-tweak", "Stranger Tweak", 130, {"title": "STRANGER TWEAK", "help": "From elsewhere."}, False)
+        make(library, "stranger-tweak", "Stranger Tweak", 130, {"title": "STRANGER TWEAK", "help": "From elsewhere."}, False)
         casting = make(library, "gf-hp-casting", "GF HP Casting", 140, {
             "title": "GF HP CASTING", "fields": [
                 {"key": "costs", "label": "GF HP costs", "type": "intList", "length": 57,
                  "default": [0] * 57, "min": 0, "max": 9999, "hidden": True}]}, True)
-        script_mods.set_trusted(casting, True)
         errors: list[str] = []
-        with FF8Session({"LEXEDITOR_FF8_PROJECT": str(project), script_mods.TRUST_ENV: str(temp / "trust.json")}) as session:
+        with FF8Session({"LEXEDITOR_FF8_PROJECT": str(project)}) as session:
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True, args=["--mute-audio"])
                 try:
@@ -78,7 +73,8 @@ def main(output: Path | None = None) -> int:
                     assert page.get_by_role("checkbox", name="Base Tweak").count() == 0
                     assert page.locator(".lex-tweak-off").count() == 2
                     page.get_by_text("NOT AVAILABLE YET").first.wait_for()
-                    page.get_by_role("button", name="Trust this tweak").wait_for()
+                    # No per-tweak trust button: enabling is the Mods tab's job.
+                    assert page.get_by_role("button", name="Trust this tweak").count() == 0
                     if output:
                         page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                         page.screenshot(path=str(output / "tweak-mods.png"), full_page=True)
@@ -96,9 +92,6 @@ def main(output: Path | None = None) -> int:
                     page.get_by_text("BASE TWEAK", exact=True).wait_for()
                     assert page.get_by_role("spinbutton", name="Amount").is_enabled()
                     page.evaluate("()=>{state.activeSource='mine';navigate('settings')}")
-                    # Trust is applied at once, not saved with the page.
-                    page.get_by_role("button", name="Trust this tweak").click()
-                    page.wait_for_function("()=>state.data.settings.tweaks.find(r=>r.id==='stranger-tweak').trust==='trusted'")
                     page.reload()
                     page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
                     page.wait_for_function("()=>!document.documentElement.classList.contains('lex-loading-live')")
@@ -134,11 +127,10 @@ def main(output: Path | None = None) -> int:
         built = (base / "hext/ff8/en_nv/base-tweak.txt").read_text(encoding="utf-8")
         assert "amount=12" in built, built
         assert (dependent / "hext/ff8/en_nv/dependent-tweak.txt").read_text(encoding="utf-8").count("loud=True") == 1
-        assert script_mods.trust_state(untrusted) == "trusted"
         assert json.loads((dependent / "mod.json").read_text(encoding="utf-8"))["enabled"] is True
         assert script_mods.values(casting)["costs"][1] == 321
         assert not errors, errors
-    print(json.dumps({"tweakMods": 5, "noSwitch": True, "savedAndRebuilt": True, "trusted": True,
+    print(json.dumps({"tweakMods": 5, "noSwitch": True, "savedAndRebuilt": True,
                       "magicCostSavedReloaded": True, "magicCostHiddenWhenDisabled": True}))
     return 0
 

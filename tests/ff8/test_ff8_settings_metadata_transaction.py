@@ -5,7 +5,6 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
-from core import script_mods
 from plugins.ff8 import gameplay_settings as settings, gf_spellbooks, reptile_atb, runtime_layout, paths
 from plugins.ff8.server import create_server
 from verify_ff8_gameplay_quarantine_issue_21 import make
@@ -17,7 +16,6 @@ ENABLE={'tweaks':{'gf-spellbooks':{'enabled':True},'monogamy':{'enabled':True}}}
 
 @pytest.fixture
 def project(tmp_path,monkeypatch):
-    monkeypatch.setenv(script_mods.TRUST_ENV,str(tmp_path/'trust.json'))
     root=tmp_path/'project';game=tmp_path/'game';game.mkdir()
     baseline=tmp_path/'baseline';baseline.mkdir()
     for mod_id in ['gf-spellbooks','monogamy','shared-party-magic-inventory']:
