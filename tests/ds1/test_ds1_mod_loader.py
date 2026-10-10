@@ -140,3 +140,87 @@ def two_bits_in_one_byte(table):
             if other is not item and other["spec"].offset == item["spec"].offset:
                 return item["spec"].key, other["spec"].key
     pytest.skip(f"{table} has no two editable one-bit fields in one byte")
+
+
+# --- Rows added and removed ---------------------------------------------------
+# Armor Rework adds thousands of effect rows and Repair Rework changes effect
+# rows; taking that table whole from the last mod threw the other mod's
+# effects away. Rows now merge by id. The fixture's tables are first laid out
+# the way the game's own are (the writer rebuilds every real table exactly).
+
+def game_layout(archive):
+    plain = inflate(archive)
+    entries = []
+    for entry in texts.bnd3_entries(plain):
+        spans = mod_loader._row_spans(entry.data)
+        data = entry.data
+        if spans:
+            size = spans[0][1] - spans[0][0]
+            data = mod_loader._write_table(entry.data, size, mod_loader._table_rows(entry.data, size), b"")
+        entries.append(texts.Entry(entry.member_id, entry.name, entry.flags, data))
+    return deflate(archive, texts.build_bnd3(plain, entries))
+
+
+GAME_LAYOUT = game_layout(VANILLA)
+
+
+def with_table(archive, table, change):
+    """The archive with one table's payload passed through change(payload)."""
+    plain = inflate(archive)
+    entries = [texts.Entry(e.member_id, e.name, e.flags,
+                           change(e.data) if e.name.replace("\\", "/").rsplit("/", 1)[-1] == f"{table}.param" else e.data)
+               for e in texts.bnd3_entries(plain)]
+    return deflate(archive, texts.build_bnd3(plain, entries))
+
+
+def added(archive, table, *copies):
+    """Rows appended the way a mod tool adds them: (source id, new id, name)."""
+    from plugins.ds3.formats import ParamView
+    def change(payload):
+        for source, new, name in copies:
+            view = ParamView(payload)
+            payload = view.copy_row(source, new, name, mod_loader._row_spans(payload)[0][1] - mod_loader._row_spans(payload)[0][0])
+        return payload
+    return with_table(archive, table, change)
+
+
+def test_rows_two_mods_add_to_one_table_are_all_kept():
+    game = {RELATIVE: GAME_LAYOUT}
+    a = mod("A", added(GAME_LAYOUT, "EquipParamGoods", (100, 150, "A one"), (101, 900, "A two")))
+    b = mod("B", added(GAME_LAYOUT, "EquipParamGoods", (102, 101500, "B one")))
+    c_doc = ItemDocument(GAME_LAYOUT)
+    c_doc.edit("EquipParamGoods", 100, "sellValue", 77)
+    c = mod("C", c_doc.export())
+    for order in ([a, b, c], [c, b, a]):
+        result = mod_loader.compose(game, order)
+        assert result.conflicts == []
+        document = ItemDocument(result.files[RELATIVE])
+        ids = [row.row_id for row in document.params["EquipParamGoods"].rows]
+        assert ids == [100, 101, 102, 150, 900, 101500]
+        assert document.value("EquipParamGoods", 100, "sellValue") == 77
+        assert document.value("EquipParamGoods", 900, "sellValue") == ItemDocument(GAME_LAYOUT).value("EquipParamGoods", 101, "sellValue")
+
+
+def test_rows_the_same_new_id_added_differently_conflicts_and_the_later_mod_is_used():
+    game = {RELATIVE: GAME_LAYOUT}
+    a = mod("A", added(GAME_LAYOUT, "EquipParamGoods", (100, 150, "A")))
+    b = mod("B", added(GAME_LAYOUT, "EquipParamGoods", (101, 150, "B")))
+    result = mod_loader.compose(game, [a, b])
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Items 150 (added by both)", ["A", "B"])]
+    document = ItemDocument(result.files[RELATIVE])
+    assert document.value("EquipParamGoods", 150, "sellValue") == ItemDocument(GAME_LAYOUT).value("EquipParamGoods", 101, "sellValue")
+
+
+def test_rows_a_removed_row_another_mod_changes_conflicts():
+    game = {RELATIVE: GAME_LAYOUT}
+    def without_102(payload):
+        size = mod_loader._row_spans(payload)[0][1] - mod_loader._row_spans(payload)[0][0]
+        rows = [row for row in mod_loader._table_rows(payload, size) if row[0] != 102]
+        return mod_loader._write_table(payload, size, rows, b"")
+    a = mod("A", with_table(GAME_LAYOUT, "EquipParamGoods", without_102))
+    b_doc = ItemDocument(GAME_LAYOUT)
+    b_doc.edit("EquipParamGoods", 102, "sellValue", 5)
+    b = mod("B", b_doc.export())
+    result = mod_loader.compose(game, [b, a])
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Items 102 (removed by one, changed by another)", ["B", "A"])]
+    assert 102 not in [row.row_id for row in ItemDocument(result.files[RELATIVE]).params["EquipParamGoods"].rows]

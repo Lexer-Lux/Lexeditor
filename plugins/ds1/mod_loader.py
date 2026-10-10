@@ -10,10 +10,14 @@ Parameters are merged by field. A mod's changes are the fields of its rows
 that differ from vanilla (a bitfield is its own bits, not the whole byte);
 two mods only conflict when they set the same field of the same row to
 different values. A table whose layout Lexeditor does not know is merged by
-whole row instead. Item names are merged by entry the same way. Anything else a mod changes in an archive member
-(rows added or removed, a table's layout, a text table that is not a name
-table) cannot be merged, so that member is taken whole from the last mod in
-load order, and every mod that changed it is told what was dropped.
+whole row instead. Rows a mod adds are added and rows it removes are
+removed, by row id, so two mods that each add rows to one table (Armor
+Rework's and Repair Rework's effects) both keep theirs; they conflict only
+when they add the same id differently, or one removes a row another changes.
+Item names are merged by entry the same way. Anything else a mod changes in
+an archive member (a table's layout or header, a text table that is not a
+name table) cannot be merged, so that member is taken whole from the last
+mod in load order, and every mod that changed it is told what was dropped.
 """
 from __future__ import annotations
 
@@ -258,6 +262,169 @@ def _directory(plain: bytes) -> list[tuple[int, int, int]]:
     return [struct.unpack_from("<3I", plain, 32 + index * 24) for index in range(count)]
 
 
+# A DS1 PARAM: a 48-byte header, a 12-byte directory entry per row (id, data
+# offset, name offset), the rows' data, then their names. The game's own
+# tables keep the data back to back in directory order with each name in
+# row order after it, and the header's strings field is the data end
+# rounded up to 16; every such table is rebuilt byte for byte by
+# _write_table. A mod's tool may lay its table out otherwise (rows appended
+# one at a time), so a mod's rows are read through the directory.
+_HEADER, _STRIDE = 48, 12
+
+
+def _table_rows(payload: bytes, size: int) -> list[tuple[int, bytes | None, bytes]] | None:
+    """(id, raw name or None, data) of every row, in directory order, or None."""
+    if len(payload) < _HEADER or payload[0x2C] != 0 or payload[0x2D] != 2 or payload[0x2E] & ~1:
+        return None
+    count, = struct.unpack_from("<H", payload, 10)
+    if _HEADER + _STRIDE * count > len(payload):
+        return None
+    terminator = b"\0\0" if payload[0x2E] & 1 else b"\0"
+    rows = []
+    for index in range(count):
+        row_id, offset, name_offset = struct.unpack_from("<iII", payload, _HEADER + _STRIDE * index)
+        if offset + size > len(payload):
+            return None
+        name = None
+        if name_offset:
+            end = payload.find(terminator, name_offset)
+            while end >= 0 and len(terminator) == 2 and (end - name_offset) % 2:
+                end = payload.find(terminator, end + 1)
+            if not 0 < name_offset < len(payload) or end < 0:
+                return None
+            name = payload[name_offset:end]
+        rows.append((row_id, name, payload[offset:offset + size]))
+    return rows
+
+
+def _standard_tail(payload: bytes, size: int, rows: list) -> bytes | None:
+    """The bytes after the names when the table has the game's own layout."""
+    count = len(rows)
+    data_start = _HEADER + _STRIDE * count
+    data_end = data_start + size * count
+    if (not count or struct.unpack_from("<H", payload, 4)[0] != data_start
+            or struct.unpack_from("<I", payload, 0)[0] != (data_end + 15) // 16 * 16):
+        return None
+    terminator = 2 if payload[0x2E] & 1 else 1
+    cursor = data_end
+    for index in range(count):
+        _id, offset, name_offset = struct.unpack_from("<iII", payload, _HEADER + _STRIDE * index)
+        if offset != data_start + index * size:
+            return None
+        if name_offset:
+            if name_offset != cursor:
+                return None
+            cursor += len(rows[index][1]) + terminator
+    return payload[cursor:]
+
+
+def _write_table(header: bytes, size: int, rows: list, tail: bytes) -> bytes:
+    """A PARAM in the game's own layout, rows in the order given."""
+    terminator = b"\0\0" if header[0x2E] & 1 else b"\0"
+    count = len(rows)
+    if count > 0xFFFF:
+        raise ValueError("A table can hold at most 65535 rows")
+    data_start = _HEADER + _STRIDE * count
+    data_end = data_start + size * count
+    directory, data, names = bytearray(), bytearray(), bytearray()
+    for index, (row_id, name, payload) in enumerate(rows):
+        name_offset = 0
+        if name is not None:
+            name_offset = data_end + len(names)
+            names += name + terminator
+        directory += struct.pack("<iII", row_id, data_start + index * size, name_offset)
+        data += payload
+    result = bytearray(header[:_HEADER]) + directory + data + names + tail
+    strings = (data_end + 15) // 16 * 16
+    # The strings field never points past the end: a table with short or no
+    # names is padded to it.
+    result += bytes(max(0, strings - len(result)))
+    struct.pack_into("<I", result, 0, strings)
+    struct.pack_into("<H", result, 4, data_start)
+    struct.pack_into("<H", result, 10, count)
+    return bytes(result)
+
+
+def _merge_rows(member: str, table: str, vanilla: bytes, mods: list[tuple[str, bytes]],
+                units: "_Units") -> tuple[bytes, list[Conflict]] | None:
+    """Every mod's rows over vanilla's, by row id: changed rows by field, added
+    rows added, removed rows removed. None when a table cannot be read so."""
+    spans = _row_spans(vanilla)
+    if spans is None:
+        return None
+    size = spans[0][1] - spans[0][0]
+    base = _table_rows(vanilla, size)
+    tail = _standard_tail(vanilla, size, base) if base else None
+    if base is None or tail is None or len({row_id for row_id, _n, _d in base}) != len(base):
+        return None
+    order = [row_id for row_id, _n, _d in base]
+    original = {row_id: (name, data) for row_id, name, data in base}
+    rows = {row_id: [name, bytearray(data)] for row_id, name, data in base}
+    owners: dict[tuple, str] = {}
+    added_by: dict[int, tuple[str, bytes]] = {}
+    removed_by: dict[int, str] = {}
+    conflicts: dict[tuple, Conflict] = {}
+
+    def conflict(key: tuple, part: str, *names: str) -> None:
+        entry = conflicts.setdefault(key, Conflict(RELATIVE, part))
+        for name in names:
+            entry.add(name)
+
+    for name, data in mods:
+        # Only rows and names may differ: a different header is a different table.
+        if data[6:10] != vanilla[6:10] or data[12:_HEADER] != vanilla[12:_HEADER]:
+            return None
+        theirs = _table_rows(data, size)
+        if theirs is None or len({row_id for row_id, _n, _d in theirs}) != len(theirs):
+            return None
+        present = {row_id for row_id, _n, _d in theirs}
+        for row_id in original:
+            if row_id not in present:
+                removed_by[row_id] = name
+        for row_id, row_name, row_data in theirs:
+            if row_id not in original:
+                earlier = added_by.get(row_id)
+                if earlier and earlier[1] != row_data:
+                    conflict(("added", row_id), f"{table} {row_id} (added by both)", earlier[0], name)
+                added_by[row_id] = (name, row_data)
+                rows[row_id] = [row_name, bytearray(row_data)]
+                continue
+            vanilla_name, vanilla_data = original[row_id]
+            if row_name != vanilla_name:
+                rows[row_id][0] = row_name
+            if row_data == vanilla_data:
+                continue
+            merged = rows[row_id][1]
+            for offset, width, mask, label in units.of(member, size):
+                value = int.from_bytes(row_data[offset:offset + width], "little") & mask
+                if value == int.from_bytes(vanilla_data[offset:offset + width], "little") & mask:
+                    continue
+                current = int.from_bytes(merged[offset:offset + width], "little")
+                key = (row_id, offset, mask)
+                if key in owners and owners[key] != name and current & mask != value:
+                    conflict(key, f"{table} {row_id}, {label}", owners[key], name)
+                merged[offset:offset + width] = ((current & ~mask) | value).to_bytes(width, "little")
+                owners[key] = name
+    for row_id, name in removed_by.items():
+        changers = sorted({owner for (owned_row, *_rest), owner in owners.items() if owned_row == row_id} - {name})
+        if changers:
+            conflict(("removed", row_id), f"{table} {row_id} (removed by one, changed by another)", *changers, name)
+        rows.pop(row_id, None)
+    # Added rows go after the nearest lower id already in the table, as the
+    # game's own tables are (almost) sorted.
+    for row_id in sorted(added_by):
+        position = len(order)
+        for index in range(len(order) - 1, -1, -1):
+            if order[index] < row_id:
+                position = index + 1
+                break
+        else:
+            position = 0
+        order.insert(position, row_id)
+    result = [(row_id, rows[row_id][0], bytes(rows[row_id][1])) for row_id in order if row_id in rows]
+    return _write_table(vanilla, size, result, tail), list(conflicts.values())
+
+
 def _merge_member(member: str, vanilla: bytes, mods: list[tuple[str, bytes | None]],
                   units: _Units) -> tuple[bytes, list[Conflict]]:
     """One PARAM: every mod's changed fields on top of vanilla, or the last whole one."""
@@ -293,6 +460,11 @@ def _merge_member(member: str, vanilla: bytes, mods: list[tuple[str, bytes | Non
                 merged[at:at + width] = ((current & ~mask) | theirs).to_bytes(width, "little")
                 owners[key] = name
     if whole:
+        # Rows added or removed: merged by row id, every mod's rows kept.
+        changed = [(name, data) for name, data in mods if data is not None and data != vanilla]
+        by_row = _merge_rows(member, table, vanilla, changed, units)
+        if by_row is not None:
+            return by_row
         # A whole-member change is kept only if it loads last; no other change
         # to this member, before or after it, can be kept beside it.
         winner = touched[-1]
