@@ -4,7 +4,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,
-  effectTabs:[],nativeRules:null,bandForm:null,bandBusy:false,
+  effectTabs:[],statsTabs:[],nativeRules:null,bandForm:null,bandBusy:false,
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null;
 const attackPreviews=new Map();
@@ -30,7 +30,7 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
     try{
       await edits;
       for(const edit of entry.edits||[entry]){
-        const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side]});
+        const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side],sub:state.sub});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
       }
@@ -54,6 +54,7 @@ const shell=LexeditorUI.mountShell({
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster resistances. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy attack damage. One attack record can be shared by several monsters, bosses and NPCs, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
+    {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements and slot cost. Full records stay in Items, and no graph here covers stamina or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
     {id:"misc",label:"Misc."},
     {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
@@ -63,11 +64,12 @@ const shell=LexeditorUI.mountShell({
   readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,pendingChanges:()=>state.changes||[],save,discard,history:fieldHistory
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="effects"?state.effectTabs:
+  tab==="stats"?state.statsTabs:
   tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
-  state.effectTabs=result.effectTabs||[];state.nativeRules=result.nativeRules;
+  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
@@ -89,7 +91,7 @@ async function loadItems(){
 async function loadDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
   if(!row){state.row=null;state.monsterAttacks=null;return;}
-  const [result,attacks]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`),
+  const [result,attacks]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(state.sub)}`),
     row.table==="NpcParam"?api(`/api/attacks?monster=${row.id}`):null]);
   if(state.selected!==key(row))return;
   state.row=result.row;state.monsterAttacks=attacks;
@@ -106,12 +108,14 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="enemies")sub="monsters";
   else if(tab==="attacks")sub="attacks";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
+  // Without the curve table, Stats opens on weapon scaling instead of an error.
+  else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":"scaling";
   else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
   else if(tab==="misc")sub="misc";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","attacks","effects","encumbrance","misc"].includes(tab))await loadItems();
+    if(["items","enemies","attacks","effects","stats","encumbrance","misc"].includes(tab))await loadItems();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
@@ -160,7 +164,7 @@ function renameRecord(row,name){
   state.pending++;shell.refresh();
   edits=edits.then(async()=>{
     try{
-      const result=await api("/api/rename",{table:row.table,id:row.id,name});
+      const result=await api("/api/rename",{table:row.table,id:row.id,name,sub:state.sub});
       state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       for(const listed of state.rows||[])if(key(listed)===key(row))listed.name=result.row.name;
@@ -177,15 +181,15 @@ function commit(row,field,value,control){
     const live=state.row&&key(state.row)===key(row)?state.row:row;
     const before=live.fields.find(item=>item.key===field.key)?.value;
     try{
-      const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value});
+      const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value,sub:state.sub});
       const after=result.row.fields.find(item=>item.key===field.key)?.value;
       const done=[{table:row.table,id:row.id,field:field.key,before,after}];
       let latest=result;
       // The other selected records of this table get the same value.
       for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
         const id=Number(other.slice(row.table.length+1));
-        const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}`)).row.fields.find(item=>item.key===field.key)?.value;
-        const changed=await api("/api/edit",{table:row.table,id,field:field.key,value});
+        const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}&sub=${encodeURIComponent(state.sub)}`)).row.fields.find(item=>item.key===field.key)?.value;
+        const changed=await api("/api/edit",{table:row.table,id,field:field.key,value,sub:state.sub});
         latest=changed;
         done.push({table:row.table,id,field:field.key,before:prior,after:changed.row.fields.find(item=>item.key===field.key)?.value});
       }
@@ -199,7 +203,7 @@ function commit(row,field,value,control){
       else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
     }catch(error){
       notify(error);
-      const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`);
+      const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(state.sub)}`);
       const original=result.row.fields.find(item=>item.key===field.key);
       if(control.isConnected){if(field.type==="bool")control.checked=!!original.value;else control.value=String(original.value);}
     }finally{state.pending--;if(row.table==="NativeRules")render();else shell.refresh();}
@@ -247,7 +251,7 @@ function plainControlFor(row,field){
       commit(row,field,Number(input.value),input);
     }});
 }
-const GROUP_ORDER=["Basics","Defense","Absorption","Combat","Requirements & costs","Effects & references","Upgrades",
+const GROUP_ORDER=["Basics","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
   "Use behavior","Value & rewards","Appearance","Properties"];
 function groupFor(field){
   if(field.group)return field.group;
@@ -345,7 +349,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing is
   // said under it, never in its place.
-  const noun=state.tab==="attacks"?"Attack":state.tab==="enemies"?"Monster":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":"Item";
+  const noun=state.tab==="attacks"?"Attack":state.tab==="enemies"?"Monster":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="scaling"?"Weapon":"Spell"):"Item";
   if(!state.row)return detailPanel({title:noun,body:[LexeditorUI.detailNote("Select a record.")]});
   if(key(state.row)!==state.selected)return detailPanel({title:noun,body:[LexeditorUI.loadingPanel({label:"Loading record"})]});
   if(state.bandForm&&state.bandForm.id===state.row.id)return renderBandForm();
@@ -457,8 +461,8 @@ function submitBandForm(form){
 
 function renderItems(){
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?"attacks":state.tab==="enemies"?"monsters":"items";
-  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="enemies"?"Enemies":"Items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?"attacks":state.tab==="enemies"?"monsters":state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":"spells"):"items";
+  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":"Items";
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
@@ -484,7 +488,7 @@ function renderItems(){
     rename:renameRecord,
     // Items have in-game names; monsters, attacks, effects and load bands
     // have only reference names.
-    renamable:row=>state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
+    renamable:row=>state.tab==="stats"?row.table!=="CalcCorrectGraph":state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks

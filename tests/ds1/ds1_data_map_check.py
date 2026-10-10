@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive,make_text_archive
+from ds1_stats_fixture import make_stats_archive
 from plugins.ds1 import texts
 from plugins.ds1.formats import TABLES,ItemDocument
 from plugins.ds1.store import RELATIVE,MARKER,ItemStore
@@ -20,7 +21,7 @@ from playwright.sync_api import sync_playwright
 def main():
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-map-') as temporary:
         root=Path(temporary);game=root/'game';mod=root/'mod';mod.mkdir();(mod/MARKER).touch()
-        archives={RELATIVE:make_archive(),texts.RELATIVE:make_text_archive()}
+        archives={RELATIVE:make_stats_archive(),texts.RELATIVE:make_text_archive()}
         for relative,data in archives.items():
             path=game/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
         store=ItemStore(game,mod,False)
@@ -42,9 +43,10 @@ def main():
             members=set(ItemDocument(archives[RELATIVE]).members)
             assert {row['filename'] for row in rows if row['id'].startswith('param:')}==members
             # Every parameter table, five name tables, the two native rule
-            # rows, and a missing-Effects row when the archive has none.
+            # rows, and a missing row per optional table the archive lacks.
             effects_missing = 'SpEffectParam.param' not in members
-            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+2+effects_missing
+            curves_missing = 'CalcCorrectGraph.param' not in members
+            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+2+effects_missing+curves_missing
             assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
@@ -69,6 +71,12 @@ def main():
                         page.locator('.lex-data-map-table .lex-column-list-row').filter(has_text=filename).click()
                         page.locator('.lex-data-map-open').click()
                         page.wait_for_function('''({target,sub})=>state.tab===target&&state.sub===sub&&state.rows.length>0&&!state.error''',arg={'target':target,'sub':sub})
+                    page.get_by_role('button',name='Open Dark Souls Data Map',exact=True).click()
+                    page.wait_for_selector('.lex-data-map-table')
+                    page.evaluate('''filename=>{state.mapQuery=filename;state.mapPage=0;render()}''','CalcCorrectGraph.param')
+                    page.locator('.lex-data-map-table .lex-column-list-row').filter(has_text='CalcCorrectGraph.param').click()
+                    page.locator('.lex-data-map-open').click()
+                    page.wait_for_function('state.tab==="stats"&&state.sub==="curves"&&state.rows.length>0&&state.rows[0].table==="CalcCorrectGraph"&&!state.error')
                     assert request_json(session.url+'api/state')['dirtyCount']==0
                     page.get_by_role('button',name='Open Dark Souls Data Map',exact=True).click()
                     page.wait_for_selector('.lex-data-map-table')

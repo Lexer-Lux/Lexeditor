@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -98,16 +98,19 @@ class ItemStore:
                               for key, label, table in ENEMY_SUBTABS],
                 'attackTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                                for key, label, table in ATTACK_SUBTABS],
+                'statsTabs': [{'id': key, 'label': label, 'table': table,
+                               'count': len(document.list_rows(key)) if table in document.params else 0}
+                              for key, label, table in STATS_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS]}
 
-    def edit(self, table, row_id, field, value):
+    def edit(self, table, row_id, field, value, only=None):
         self.writable()
-        return self.get().edit(table, row_id, field, value)
+        return self.get().edit(table, row_id, field, value, only=only)
 
-    def rename(self, table, row_id, name):
+    def rename(self, table, row_id, name, only=None):
         self.writable()
-        return self.get().rename(table, row_id, name)
+        return self.get().rename(table, row_id, name, only=only)
 
     def validate_save(self):
         from .tweak_mods import checked

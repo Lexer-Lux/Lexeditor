@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from core.plugin_http import PluginRequestHandler
 from . import deployment, data_map
 from .native_rules import NativeRules
-from .formats import FormatError
+from .formats import FormatError, stats_fields
 from .store import ItemStore
 from . import tweak_mods
 from . import data_map
@@ -47,8 +47,9 @@ class Handler(PluginRequestHandler):
                         result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
                     else:
                         table, row_id = query.get('table', [''])[0], int(query.get('id', [''])[0])
+                        only = stats_fields(query.get('sub', [''])[0], table)
                         result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
-                                  else STORE.get().read_row(table, row_id)}
+                                  else STORE.get().read_row(table, row_id, only=only)}
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count
                     result['changes'] = STORE.get().pending_changes()
                     result['nativeRules'] = RULES.snapshot()
@@ -69,7 +70,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["data-map", "items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "encumbrance", "native-stamina"]})
+                            "capabilities": ["data-map", "items", "monster-resistances", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "stats", "encumbrance", "native-stamina"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -101,12 +102,14 @@ class Handler(PluginRequestHandler):
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
                 if path == '/api/edit':
+                    only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     row = (RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                            if payload.get('table') == 'NativeRules' else
-                           STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value')))
+                           STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'), only=only))
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/rename':
-                    row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'))
+                    only = stats_fields(payload.get('sub', ''), payload.get('table'))
+                    row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path in ('/api/bands/add', '/api/bands/delete'):
                     action = path.rsplit('/', 1)[-1]

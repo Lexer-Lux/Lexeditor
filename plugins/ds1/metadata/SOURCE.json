@@ -2,7 +2,7 @@
   "source": "https://github.com/vawser/Smithbox",
   "revision": "057b417887cc7d0ddc8001602be3f5339f42c74f",
   "license": "MIT",
-  "scope": "DS1 item and enemy parameter metadata only; no GPL dependencies or executable code.",
+  "scope": "DS1 item, enemy and scaling-curve parameter metadata only; no GPL dependencies or executable code.",
   "unavailableEnums": [
     "WEP_CORRECT_TYPE"
   ],
@@ -305,6 +305,22 @@
     "enums/ATKPARAM_ATKATTR_TYPE.json": {
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATKPARAM_ATKATTR_TYPE.json",
       "sha256": "5558365cfdf67e4d540558de570b2e3dfc02a11a51fa8cf2278df55aa51a71f6"
+    },
+    "defs/CalcCorrectGraph.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/CalcCorrectGraph.xml",
+      "sha256": "a617f744136f91642cfd90f3d69b6a2869176b9880195976ea13289a1cb05089"
+    },
+    "meta/CalcCorrectGraph.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/CalcCorrectGraph.xml",
+      "sha256": "a065aba0a35ce67268e0523f5bb0c0bbef78be1849ae4619770cbabd910cbc9b"
+    },
+    "annotations/CACL_CORRECT_GRAPH_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/CACL_CORRECT_GRAPH_ST.json",
+      "sha256": "46607a4b88d81db128baa09f7daa7113ee07ed21e8a860641031a9a233e89698"
+    },
+    "row_names/CalcCorrectGraph.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/CalcCorrectGraph.json",
+      "sha256": "98f492df901dbb8692b1864069670ca9b0794c6a1d9f552f0d4a27a3affea19a"
     }
   }
 }

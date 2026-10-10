@@ -1,9 +1,9 @@
 """Coverage of the selected DS1 archives, derived from the existing editors."""
-from .formats import SUBTABS, EFFECT_TABLE
+from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
 from . import texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
-              'misc':'Misc.', 'encumbrance':'Encumbrance'}
+              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance'}
 
 
 def payload(store, native_rules=None):
@@ -35,6 +35,11 @@ def payload(store, native_rules=None):
             row.update(coverage='structured',status='partial',openable=True,
                 target='effects',sub='effects-all',controls='Effects: buffs, debuffs and equipment passives',
                 notes=f'{len(editable)} documented properties are editable. Other properties and unknown bytes are preserved.')
+        elif table == GRAPH_TABLE:
+            editable = [f for f in document.schemas[table]['fields'] if f['editable']]
+            row.update(coverage='structured',status='partial',openable=True,
+                target='stats',sub='curves',controls='Stats: weapon, level-up and resistance scaling curves',
+                notes=f'{len(editable)} curve properties are editable. The multiplayer level-sync rows keep the game\'s own reference names.')
         elif table in ('BehaviorParam','Bullet'):
             row.update(coverage='view',status='partial',openable=True,
                 target='enemies',sub='monsters',controls='Enemies: attack reference paths',
@@ -45,6 +50,11 @@ def payload(store, native_rules=None):
             'coverage':'unavailable', 'status':'not-integrated', 'openable':False,
             'controls':'Effects: buffs, debuffs and equipment passives',
             'notes':'Open a complete Remastered parameter archive to edit effects.'})
+    if GRAPH_TABLE not in document.params:
+        rows.append({'id':'curves-missing', 'filename':GRAPH_TABLE + '.param', 'path':str(store.source),
+            'coverage':'unavailable', 'status':'not-integrated', 'openable':False,
+            'controls':'Stats: weapon, level-up and resistance scaling curves',
+            'notes':'Open a complete Remastered parameter archive to edit scaling curves.'})
     for table, filename in texts.NAME_TABLES.items():
         tabs = item_tables[table]
         available = document.texts is not None and document.texts.renamable(table)
