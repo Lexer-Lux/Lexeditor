@@ -45,8 +45,19 @@ dialog's event-`1017` branch (`mov edx, 0x4650/0x4651` in `0x6ED340`).
 ## Later games
 
 Dark Souls III keeps the same dialog classes (`FrpgMenuDlgWarp`,
-`FrpgMenuDlgWarpPlate` in DarkSoulsIII.exe) with a `WindowList/Warp/ItemList`
-list and per-location tabs. Dark Souls II uses an unrelated `Fe` menu
-framework (`FeGroupTestBonfireTop`, …). Both pack their menus in encrypted
-BDT archives, so neither UI can be copied file by file; only the pattern
-(destinations grouped by area, area always shown) transfers.
+`FrpgMenuDlgWarpPlate` in DarkSoulsIII.exe), but its menus are Scaleform
+GFX (Flash) inside encrypted BDT archives (Data1 unpacked with
+BinderTool), so nothing transfers as files to DS1's DRB layouts. The
+travel screen is `menu/02_080_warp.gfx`: a 14-row `WindowList`/`ItemList`
+with per-row icons (`ItemIcon`, `MENU_WarpIcon` atlas), an L/R-navigated
+`TabList` with highlight, title, key guide and status bar. The 58
+`menu/mapimage` textures (`MENU_MapImage_10001`…, 512×256) are one vista
+per area, loaded by formatted ID for the loading screen
+(`MENU_MapImage_%05d`, `MENU_Common_LoadingMapImage` in the executable);
+the travel list itself carries no pictures. The bonfire menu
+(`03_002_bonfire.gfx`) is a plain list with no tabs or icons. The
+shipped DarkSoulsIII.exe is DRM-scrambled on disk (zero data
+directories, sampled `.text` high-entropy), so its warp methods need a
+runtime dump; static analysis stops at RTTI and strings. Dark Souls II
+uses an unrelated `Fe` menu framework (`FeGroupTestBonfireTop`,
+`FeGroupTestBonfireTransitionList`/`Top` for travel).
