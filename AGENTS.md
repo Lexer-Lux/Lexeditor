@@ -10,6 +10,7 @@ work, even if your tool does not load skills on its own.
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
+| ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-live-debugging/SKILL.md` |
 
 ## Editor UI
 
@@ -124,7 +125,10 @@ work, even if your tool does not load skills on its own.
 
 ## Editing files from a shell
 
-- Never pass code with quotes or backslashes through a bash heredoc. Write the
-  script to your scratchpad with the file-writing tool and run it.
+- Never pass code with quotes or backslashes through a bash heredoc, sed or
+  `python -c`. Write the script to your scratchpad with the file-writing tool
+  and run it. Inside a patch script, text that holds backslashes (`\n`, a
+  Windows path) goes in raw strings (`r'''...'''`), or the edit is made with
+  the editing tool instead: an ordinary string turns `\n` into a line break.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.

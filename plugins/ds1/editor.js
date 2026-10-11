@@ -571,6 +571,13 @@ function renderTweaks(){
   const installed=detailPanel({title:"INSTALLED GAME",
     help:"Apply combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      // Debug mode: the game runs offline with Arxan off, so a debugger
+      // (Cheat Engine's "find what writes", x64dbg) can attach (#742).
+      detailField({label:"DEBUG MODE",dataType:"BOOL",
+        help:infoHelp("For finding things in the running game with a debugger. Apply or Play installs a loader that switches the game's anti-debug protection (Arxan) off with dearxan, so Cheat Engine or x64dbg can attach without the game closing itself. The game has no network access while it is on: it cannot go online. Turn it off and Apply again for normal play."),
+        control:el("input",{type:"checkbox",checked:!!status.debugMode,disabled:busy,"aria-label":"Debug mode",
+          onchange:event=>tweakRequest("/api/tweaks/debug",{on:event.target.checked},"Could not switch debug mode")})}),
+      !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(status.debugMode?"Debug mode is on: Apply to install it.":"Debug mode is off: Apply to put the normal loader back."):null,
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,

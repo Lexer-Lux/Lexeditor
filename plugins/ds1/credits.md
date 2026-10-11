@@ -73,3 +73,14 @@ read-only inspection of the installed Remastered `menu/menu.drb.dcx`; see
 the SoulsTemplates DCX facts above.
 
 Each tweak's own credits travel with its mod.
+
+## Debug mode (runtime/lexeditor_ds1_debug.c)
+
+The debug loader links dearxan 0.5.6 by tremwil, dual-licensed MIT and
+Apache-2.0, from its official release `dearxan-0.5.6.zip`. dearxan neuters
+Arxan (GuardIT) in FromSoftware games so a debugger can attach; it is linked
+only into the debug loader (`runtime/package/debug/dinput8.dll`), never the
+everyday one. https://github.com/tremwil/dearxan
+
+me3's write-up on Arxan in FromSoftware games described why debuggers and
+breakpoints end the game. https://me3.help/en/latest/blog/posts/arxan-reversing-1/
