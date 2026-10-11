@@ -1,9 +1,10 @@
 """Coverage of the selected DS1 archives, derived from the existing editors."""
 from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
-from . import texts
+from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
-              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance'}
+              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'areas':'Areas',
+              'animations':'Animations', 'world':'World', 'assets':'Assets'}
 
 
 def payload(store, native_rules=None):
@@ -24,12 +25,48 @@ def payload(store, native_rules=None):
                 notes='Edit the reviewed properties in Items. Unidentified fields stay read-only.')
         elif table == 'NpcParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='enemies',sub='monsters',controls='Enemies: resistances and attack references',
-                notes='Edit reviewed monster resistances and follow their attack references. Other properties stay read-only.')
+                target='enemies',sub='monsters',controls='Enemies: stats, drops, effects and attack references',
+                notes='Edit reviewed monster stats and follow their attack references. Other properties stay read-only.')
+        elif table == 'BehaviorParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='enemies',sub='behaviors',controls='Enemies: behavior costs and call targets',
+                notes='Edit what behaviors cost and which attack, projectile or effect they call.')
+        elif table == 'Bullet':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='attacks',sub='projectiles',controls='Attacks: projectile flight and damage',
+                notes='Edit how projectiles fly, what they hit with, and which attack they deal.')
+        elif table == 'NpcThinkParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='enemies',sub='ai',controls='Enemies: AI senses, distances and goals',
+                notes='Edit how enemies sense, approach and answer the player.')
         elif table == 'AtkParam_Npc':
             row.update(coverage='structured',status='partial',openable=True,
-                target='attacks',sub='attacks',controls='Attacks: enemy attack damage',
-                notes='Edit reviewed attack properties. An attack may be shared by several enemies.')
+                target='attacks',sub='attacks',controls='Attacks: enemy attack damage and hitboxes',
+                notes='Edit reviewed damage and hitbox properties. An attack may be shared by several enemies.')
+        elif table == 'AtkParam_Pc':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='attacks',sub='player-attacks',controls='Attacks: player attack damage and hitboxes',
+                notes='Edit reviewed damage and hitbox properties. An attack may be shared by several player moves.')
+        elif table == 'ReinforceParamWeapon':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='stats',sub='weapon-upgrades',controls='Stats: weapon upgrade multipliers',
+                notes='Edit every weapon upgrade level, from Normal +0 to the special paths.')
+        elif table == 'ReinforceParamProtector':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='stats',sub='armor-upgrades',controls='Stats: armor upgrade multipliers',
+                notes='Edit every armor upgrade level.')
+        elif table == 'ItemLotParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='world',sub='drops',controls='World: enemy and corpse drops',
+                notes='Edit dropped items and their rates. One lot may be shared by several enemies.')
+        elif table == 'ShopLineupParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='world',sub='shops',controls='World: merchant stock and prices',
+                notes='Edit what each merchant sells, and at what price.')
+        elif table == 'ObjActParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='world',sub='treasure',controls='World: treasure and pickup behavior',
+                notes='Edit how treasure chests and pickups behave.')
         elif table == EFFECT_TABLE:
             editable = [f for f in document.schemas.get(table, {}).get('fields', []) if f['editable']]
             row.update(coverage='structured',status='partial',openable=True,
@@ -64,14 +101,27 @@ def payload(store, native_rules=None):
             'status':'partial' if available else 'not-integrated', 'openable':available,
             'target':'items' if available else '', 'sub':tabs[0][0],
             'controls':'Items: '+', '.join(label for _,label in tabs),
-            'notes':'Rename items through their detail headings. Other message text has no editor.' if available
-                    else 'The item-name archive is missing. Item names cannot be renamed.'})
+            'notes':'Rename items through their detail headings. NPC, place and feature text has no editor.' if available
+                    else 'The item-text archive is missing. Item names cannot be renamed.'})
+    for table, files in texts.DESC_TABLES.items():
+        tabs = item_tables[table]
+        available = document.texts is not None and document.texts.describable(table)
+        for role, filename in (('description', files[0]), ('full description', files[1])):
+            rows.append({'id':f'desc:{table}:{role}', 'filename':filename,
+                'path':str(store.text_source or store.game_root/texts.RELATIVE),
+                'coverage':'structured' if available else 'unavailable',
+                'status':'partial' if available else 'not-integrated', 'openable':available,
+                'target':'items' if available else '', 'sub':tabs[0][0],
+                'controls':'Items: '+', '.join(label for _,label in tabs),
+                'notes':f'Edit the {role} in the Description section of each item.' if available
+                        else 'The item-text archive is missing. Item descriptions cannot be edited.'})
     if document.texts is not None:
-        extra = {entry.name.replace('\\','/').rsplit('/',1)[-1] for entry in document.texts.entries} - set(texts.NAME_TABLES.values())
+        known = set(texts.NAME_TABLES.values()) | {filename for pair in texts.DESC_TABLES.values() for filename in pair}
+        extra = {entry.name.replace('\\','/').rsplit('/',1)[-1] for entry in document.texts.entries} - known
         for filename in sorted(extra):
             rows.append({'id':f'message:{filename}', 'filename':filename, 'path':str(store.text_source),
                 'coverage':'unavailable','status':'not-integrated','openable':False,
-                'controls':'No editor', 'notes':'This message table has no editor. Its original bytes are preserved when item names are saved.'})
+                'controls':'No editor', 'notes':'This message table has no editor. Its original bytes are preserved when item text is saved.'})
     # Values the game keeps in its executable, changed by Lexeditor's native rules.
     available = bool(native_rules and native_rules['native']['available'])
     for key, label in (('misc', 'Misc.: base stamina regeneration'),
@@ -81,6 +131,29 @@ def payload(store, native_rules=None):
             'target':key if available else '', 'sub':key, 'controls':label,
             'notes':'Save and Apply with the game closed. Only the fingerprinted build is supported.'
                     if available else 'The installed executable is not the supported build, so these rules cannot be applied.'})
+    # Area data beyond the parameter archive. Maps open the Areas tab;
+    # characters open the Animations tab.
+    map_path = store.game_root / 'map'
+    if map_path.is_dir():
+        rows.append({'id': 'area:maps', 'filename': 'map/', 'path': str(map_path),
+            'coverage': 'structured', 'status': 'partial', 'openable': True,
+            'target': 'areas', 'sub': 'placements', 'controls': 'Areas: enemy placements',
+            'notes': 'Move placements and swap which enemy appears. Anything else in the map is left untouched.'})
+    chr_path = store.game_root / 'chr'
+    if chr_path.is_dir():
+        rows.append({'id': 'area:characters', 'filename': 'chr/', 'path': str(chr_path),
+            'coverage': 'structured', 'status': 'partial', 'openable': True,
+            'target': 'animations', 'sub': 'animations', 'controls': 'Animations: event timing, settings, adding and removing',
+            'notes': 'Retime animation events, change their settings, and add or remove documented events. The 3D models themselves stay untouched.'})
+    # Whole-file asset overrides: every data folder outside the structured editors.
+    for top in assets.ASSET_ROOTS:
+        folder = store.game_root / top
+        if not folder.is_dir():
+            continue
+        rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
+            'coverage': 'structured', 'status': 'partial', 'openable': True,
+            'target': 'assets', 'sub': 'game', 'controls': 'Assets: whole-file replacement with texture previews',
+            'notes': 'Replace game files with your own. Textures preview; sounds, movies and models replace without one. Files owned by another editor change there instead.'})
     # The Data Map names its open buttons from these labels ("Open Effects").
     for row in rows:
         if row.get('target'):

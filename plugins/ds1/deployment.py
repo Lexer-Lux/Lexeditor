@@ -1,10 +1,10 @@
 """Reversible native replacement of the installed DS1 files a mod changes.
 
-Two loose files: the item parameter archive, and the English item text
-archive (msg/ENGLISH/item.msgbnd.dcx) that holds every item's in-game name.
-Each is guarded the same way and on its own, with its own backup and marker
-next to it; what follows is written about the parameter archive, and holds
-for both.
+Loose files: the item parameter archive, the English item text archive
+(msg/ENGLISH/item.msgbnd.dcx) that holds every item's in-game name, and
+any map file (map/MapStudio/*.msb) a mod carries. Each is guarded the
+same way and on its own, with its own backup and marker next to it;
+what follows is written about the parameter archive, and holds for all.
 
 Dark Souls Remastered ships param/GameParam/GameParam.parambnd.dcx as a plain
 loose file next to the executable, not packed inside a BHD5/dvdbnd archive
@@ -36,8 +36,12 @@ from pathlib import Path
 import stat
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, MAX_ARCHIVE
+from . import assets
+from .assets import MAX_ASSET_BYTES as MAX_ASSET
+from .formats import FormatError, ItemDocument, MAX_ARCHIVE, inflate, members
+from .msb import MAP_DIR, MsbDocument
 from .store import MARKER, RELATIVE
+from .tae import CHR_DIR, TaeDocument
 from . import texts
 
 # Each managed file, and the reader that proves a copy of it is sound.
@@ -45,10 +49,90 @@ FILES = ((RELATIVE, ItemDocument), (texts.RELATIVE, texts.TextDocument))
 
 MOD_ID = "lexeditor-ds1"
 NOTE = (
-    "Dark Souls Remastered reads param/GameParam/GameParam.parambnd.dcx as a loose file "
-    "from disk; no mod loader is installed or required. Apply preserves one original "
-    "copy before replacing the installed file, and Disable restores those exact bytes."
+    "Dark Souls Remastered reads param/GameParam/GameParam.parambnd.dcx, its map "
+    "files, its character files and any other asset as loose files from disk; no "
+    "mod loader is installed or required. Apply preserves one original copy "
+    "before replacing installed files, and Disable restores those exact bytes."
 )
+
+
+def _disk_maps(*roots: Path | None) -> list[Path]:
+    """Every map/MapStudio/*.msb under the given roots, canonically named."""
+    found: dict[Path, None] = {}
+    for root in roots:
+        if root is None:
+            continue
+        maps = Path(root) / MAP_DIR
+        if not maps.is_dir():
+            continue
+        for path in sorted(maps.glob("*.msb")):
+            found.setdefault(MAP_DIR / path.name.casefold())
+    return sorted(found)
+
+
+def _disk_chars(*roots: Path | None) -> list[Path]:
+    """Every chr/*.anibnd.dcx under the given roots, canonically named."""
+    found: dict[Path, None] = {}
+    for root in roots:
+        if root is None:
+            continue
+        chars = Path(root) / CHR_DIR
+        if not chars.is_dir():
+            continue
+        for path in sorted(chars.glob("*.anibnd.dcx")):
+            found.setdefault(CHR_DIR / path.name.casefold())
+    return sorted(found)
+
+
+def _check_anibnd(payload: bytes) -> None:
+    """Prove a character binder is sound: openable with readable animations."""
+    plain = inflate(payload)
+    owned = members(plain)
+    for name, entry in owned.items():
+        if name.endswith(".tae"):
+            TaeDocument(bytes(plain[entry.offset:entry.offset + entry.size]), name)
+
+
+def _disk_assets(game_root: Path | None = None, project_root: Path | None = None) -> list[Path]:
+    """Asset overrides the project carries, plus installed files Lexeditor marked.
+
+    The game side contributes only marked files, so status checks never hash
+    the whole installed game.
+    """
+    found: dict[Path, None] = {}
+    if project_root is not None and Path(project_root).is_dir():
+        for row in assets.scan_project(Path(project_root), strict=False):
+            found.setdefault(Path(row["relative"]))
+    if game_root is not None:
+        root = Path(game_root)
+        for top in assets.ASSET_ROOTS:
+            folder = root / top
+            if not folder.is_dir():
+                continue
+            for path in sorted(folder.rglob("*")):
+                if path.is_dir() or path.name.startswith(".lexeditor-") or path.name.endswith(".lexeditor-original"):
+                    continue
+                relative = path.relative_to(root)
+                if assets.is_owned(relative):
+                    continue
+                if _marker_path(root, relative).is_file():
+                    found.setdefault(relative)
+    return sorted(found)
+
+
+def _check_asset_like(game_root: Path, relative: Path, payload: bytes) -> None:
+    """An override of a binder must itself open as a binder."""
+    live = Path(game_root) / relative
+    if not live.is_file():
+        raise FileNotFoundError(f"The installed game has no {relative.as_posix()}; cannot safely preserve its original data.")
+    try:
+        members(inflate(live.read_bytes()))
+    except FormatError:
+        return
+    try:
+        members(inflate(bytes(payload)))
+    except FormatError as error:
+        raise ValueError(f"{relative.name} does not open as the binder it replaces") from error
 
 
 def _backup_path(game_root: Path, relative: Path = RELATIVE) -> Path:
@@ -56,7 +140,11 @@ def _backup_path(game_root: Path, relative: Path = RELATIVE) -> Path:
 
 
 def _marker_path(game_root: Path, relative: Path = RELATIVE) -> Path:
-    return game_root / relative.parent / ".lexeditor-ds1-deployment.json"
+    # The two archives keep their original shared marker names; map files
+    # share one folder, so each gets its own marker next to its backup.
+    if relative in (RELATIVE, texts.RELATIVE):
+        return game_root / relative.parent / ".lexeditor-ds1-deployment.json"
+    return game_root / relative.parent / (".lexeditor-ds1-deployment." + relative.name + ".json")
 
 
 def _hash_file(path: Path) -> str:
@@ -218,6 +306,8 @@ def _text_status(game_root: Path, project_root: Path | None) -> dict:
     wanted = _hash_file(source) if source and source.is_file() else None
     applied = bool(marker and marker.get("enabled") and live_hash == marker.get("activeHash"))
     pending = (marker or {}).get("pendingHash")
+    backup = _backup_path(game_root, texts.RELATIVE)
+    backup_ok = True if marker is None else (backup.is_file() and _hash_file(backup) == marker["originalHash"])
     return {
         "sourceReady": wanted is not None,
         "enabled": applied,
@@ -227,7 +317,116 @@ def _text_status(game_root: Path, project_root: Path | None) -> dict:
         "changedExternally": bool(marker and live_hash and live_hash != pending
                                   and live_hash not in (marker["originalHash"], marker.get("activeHash"))),
         "pendingRecovery": bool(marker and pending and live_hash == pending),
+        "marked": marker is not None,
+        "backupOk": backup_ok,
     }
+
+
+def _maps_status(game_root: Path, project_root: Path | None) -> dict:
+    """Which map files a project carries, and which are applied to the game."""
+    present, applied = [], []
+    stale = changed = recovery = foreign = False
+    backup_ok, ever = True, False
+    project_id = str(project_root.resolve()) if project_root else ""
+    for relative in _disk_maps(game_root, project_root):
+        live = game_root / relative
+        marker = _read_marker(_marker_path(game_root, relative))
+        live_hash = _hash_file(live) if live.is_file() else None
+        source = (project_root / relative) if project_root else None
+        if source is not None and source.is_file():
+            present.append(relative.name)
+        if marker is None:
+            continue
+        ever = True
+        backup = _backup_path(game_root, relative)
+        ok = backup.is_file() and _hash_file(backup) == marker["originalHash"]
+        backup_ok = backup_ok and ok
+        pending = marker.get("pendingHash")
+        if pending and live_hash == pending:
+            recovery = True
+        if live_hash and live_hash != pending and live_hash not in (marker["originalHash"], marker.get("activeHash")):
+            changed = True
+        if marker.get("enabled") and ok and live_hash == marker.get("activeHash"):
+            applied.append(relative.name)
+            if marker.get("activeProjectRoot") != project_id:
+                foreign = True
+            elif source is not None and source.is_file() and _hash_file(source) != marker.get("sourceHash", marker.get("activeHash")):
+                stale = True
+    return {"present": present, "applied": applied, "stale": stale, "changedExternally": changed,
+            "pendingRecovery": recovery, "backupOk": backup_ok, "everApplied": ever, "foreignApplied": foreign}
+
+
+def _chars_status(game_root: Path, project_root: Path | None) -> dict:
+    """Which character files a project carries, and which are applied to the game."""
+    present, applied = [], []
+    stale = changed = recovery = foreign = False
+    backup_ok, ever = True, False
+    project_id = str(project_root.resolve()) if project_root else ""
+    for relative in _disk_chars(game_root, project_root):
+        live = game_root / relative
+        marker = _read_marker(_marker_path(game_root, relative))
+        live_hash = _hash_file(live) if live.is_file() else None
+        source = (project_root / relative) if project_root else None
+        if source is not None and source.is_file():
+            present.append(relative.name)
+        if marker is None:
+            continue
+        ever = True
+        backup = _backup_path(game_root, relative)
+        ok = backup.is_file() and _hash_file(backup) == marker["originalHash"]
+        backup_ok = backup_ok and ok
+        pending = marker.get("pendingHash")
+        if pending and live_hash == pending:
+            recovery = True
+        if live_hash and live_hash != pending and live_hash not in (marker["originalHash"], marker.get("activeHash")):
+            changed = True
+        if marker.get("enabled") and ok and live_hash == marker.get("activeHash"):
+            applied.append(relative.name)
+            if marker.get("activeProjectRoot") != project_id:
+                foreign = True
+            elif source is not None and source.is_file() and _hash_file(source) != marker.get("sourceHash", marker.get("activeHash")):
+                stale = True
+    return {"present": present, "applied": applied, "stale": stale, "changedExternally": changed,
+            "pendingRecovery": recovery, "backupOk": backup_ok, "everApplied": ever, "foreignApplied": foreign}
+
+
+def _assets_status(game_root: Path, project_root: Path | None) -> dict:
+    """Which asset overrides a project carries, and which are applied."""
+    present, applied = [], []
+    stale = changed = recovery = foreign = False
+    backup_ok, ever = True, False
+    project_id = str(project_root.resolve()) if project_root else ""
+    for relative in _disk_assets(game_root, project_root):
+        live = game_root / relative
+        marker = _read_marker(_marker_path(game_root, relative))
+        live_hash = _hash_file(live) if live.is_file() else None
+        source = (project_root / relative) if project_root else None
+        if source is not None and source.is_file():
+            present.append(relative.as_posix())
+        if marker is None:
+            continue
+        ever = True
+        backup = _backup_path(game_root, relative)
+        ok = backup.is_file() and _hash_file(backup) == marker["originalHash"]
+        backup_ok = backup_ok and ok
+        pending = marker.get("pendingHash")
+        if pending and live_hash == pending:
+            recovery = True
+        if live_hash and live_hash != pending and live_hash not in (marker["originalHash"], marker.get("activeHash")):
+            changed = True
+        if marker.get("enabled") and ok and live_hash == marker.get("activeHash"):
+            applied.append(relative.as_posix())
+            if marker.get("activeProjectRoot") != project_id:
+                foreign = True
+            elif source is not None and source.is_file() and _hash_file(source) != marker.get("sourceHash", marker.get("activeHash")):
+                stale = True
+    return {"present": present, "applied": applied, "stale": stale, "changedExternally": changed,
+            "pendingRecovery": recovery, "backupOk": backup_ok, "everApplied": ever, "foreignApplied": foreign}
+
+
+def _empty_group_status() -> dict:
+    return {"present": [], "applied": [], "stale": False, "changedExternally": False,
+            "pendingRecovery": False, "backupOk": True, "everApplied": False, "foreignApplied": False}
 
 
 def status(game_root: Path | None, project_root: Path | None) -> dict:
@@ -235,7 +434,8 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
         return {"isProject": False, "sourceReady": False, "sourcePath": "",
                 "liveReady": False, "livePath": "", "everApplied": False, "backupOk": False, "enabled": False,
                 "matchesOriginal": False, "changedExternally": False, "stale": False, "pendingRecovery": False,
-                "activeProjectRoot": "", "thisProjectActive": False, "appliedAt": "", "note": NOTE}
+                "activeProjectRoot": "", "thisProjectActive": False, "appliedAt": "", "note": NOTE,
+                "maps": _empty_group_status(), "chars": _empty_group_status(), "assets": _empty_group_status()}
     game_root = Path(game_root).resolve()
     live = game_root / RELATIVE
     live_exists = live.is_file()
@@ -262,30 +462,43 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     # own bytes, recorded as sourceHash.
     stale = bool(this_project_active and source_ready and _hash_file(source) != marker.get("sourceHash", marker.get("activeHash")))
     text = _text_status(game_root, project_root)
+    maps = _maps_status(game_root, project_root)
+    chars = _chars_status(game_root, project_root)
+    asset_group = _assets_status(game_root, project_root)
+    combined_enabled = bool(enabled or text["enabled"] or maps["applied"] or chars["applied"] or asset_group["applied"])
+    combined_active = bool(combined_enabled and (not enabled or this_project_active)
+                           and (not maps["applied"] or not maps["foreignApplied"])
+                           and (not chars["applied"] or not chars["foreignApplied"])
+                           and (not asset_group["applied"] or not asset_group["foreignApplied"]))
+    ever = bool(marker is not None or maps["everApplied"] or chars["everApplied"] or asset_group["everApplied"] or text["marked"])
+    backup_all = bool(ever and (marker is None or backup_ok) and maps["backupOk"] and chars["backupOk"] and asset_group["backupOk"] and text["backupOk"])
     return {
         "texts": text,
+        "maps": maps,
+        "chars": chars,
+        "assets": asset_group,
         "isProject": is_project,
-        "sourceReady": source_ready,
+        "sourceReady": bool(source_ready or text["sourceReady"] or maps["present"] or chars["present"] or asset_group["present"]),
         "sourcePath": str(source) if source else "",
         "liveReady": live_exists,
         "livePath": str(live),
-        "everApplied": marker is not None,
-        "backupOk": backup_ok,
-        "enabled": enabled,
-        "matchesOriginal": matches_original,
-        "changedExternally": changed_externally or text["changedExternally"],
-        # Out of date when either file differs from what Apply would install.
-        "stale": stale or bool(this_project_active and not text["current"]),
-        "pendingRecovery": pending_recovery or text["pendingRecovery"],
+        "everApplied": ever,
+        "backupOk": backup_all,
+        "enabled": combined_enabled,
+        "matchesOriginal": bool(matches_original and not maps["applied"] and not chars["applied"] and not asset_group["applied"] and not text["enabled"]),
+        "changedExternally": changed_externally or text["changedExternally"] or maps["changedExternally"] or chars["changedExternally"] or asset_group["changedExternally"],
+        # Out of date when any file differs from what Apply would install.
+        "stale": stale or maps["stale"] or chars["stale"] or asset_group["stale"] or bool(combined_active and not text["current"]),
+        "pendingRecovery": pending_recovery or text["pendingRecovery"] or maps["pendingRecovery"] or chars["pendingRecovery"] or asset_group["pendingRecovery"],
         "activeProjectRoot": active_project_root,
-        "thisProjectActive": this_project_active,
+        "thisProjectActive": combined_active,
         "appliedAt": (marker or {}).get("appliedAt") or "",
         "note": NOTE,
     }
 
 
 def apply(game_root: Path, project_root: Path | None, *, transform=None, composed=None) -> dict:
-    """Preserve the installed original once, then replace it with the saved project archive.
+    """Preserve installed originals once, then replace them with the saved project files.
 
     `composed` maps each file to the bytes the mod loader built from every
     enabled mod (mod_loader.py); a file it leaves out goes back to the
@@ -304,22 +517,38 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
     if not project_marker.is_file():
         raise ValueError("Select a valid Dark Souls mod project before applying it.")
     source = project_root / RELATIVE
-    if composed is None and not source.is_file():
-        raise FileNotFoundError(f"Save the project before applying it; no {RELATIVE.as_posix()} was found in it.")
+    map_targets = _disk_maps(game_root, project_root)
+    char_targets = _disk_chars(game_root, project_root)
+    asset_targets = _disk_assets(game_root, project_root)
+    if composed is not None:
+        map_targets += [relative for relative in composed
+                        if relative.suffix == ".msb" and relative.parent == MAP_DIR and relative not in map_targets]
+        char_targets += [relative for relative in composed
+                         if relative.suffix == ".dcx" and relative.parent == CHR_DIR and relative not in char_targets]
+        asset_targets += [relative for relative in composed
+                          if relative not in dict(FILES) and relative not in map_targets and relative not in char_targets
+                          and relative not in asset_targets]
+    targets = (list(FILES) + [(relative, MsbDocument) for relative in map_targets]
+               + [(relative, _check_anibnd) for relative in char_targets]
+               + [(relative, None) for relative in asset_targets])
+    if composed is None and not source.is_file() and not (project_root / texts.RELATIVE).is_file() \
+            and not any((project_root / relative).is_file() for relative in map_targets + char_targets + asset_targets):
+        raise FileNotFoundError("Save the project before applying it; it holds no game files to install.")
     _assert_disjoint(game_root, project_root)
     # Every file the project holds is checked before any of them is written.
     sources = {}
-    for relative, reader in FILES:
+    for relative, reader in targets:
         candidate = project_root / relative
         _assert_no_reparse_points(candidate, project_root)
         own = candidate.is_file()
-        if own and candidate.stat().st_size > MAX_ARCHIVE:
+        cap = MAX_ASSET if reader is None else MAX_ARCHIVE
+        if own and candidate.stat().st_size > cap:
             raise ValueError(f"{candidate.name} is too large to apply.")
         if composed is not None:
             if relative not in composed:
                 continue
             payload = composed[relative]
-            if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
+            if not isinstance(payload, bytes) or len(payload) > cap:
                 raise ValueError(f"The combined {relative.name} is invalid")
         elif not own:
             continue
@@ -330,9 +559,10 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
             payload = transform(payload)
             if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
                 raise ValueError("The parameter transformation returned invalid output")
-        reader(payload)  # Reject corrupt/unsupported project output before any backup or live write.
+        # Reject corrupt/unsupported project output before any backup or live write.
+        _check_asset_like(game_root, relative, payload) if reader is None else reader(payload)
         sources[relative] = (candidate, payload, source_hash)
-    for relative, _reader in FILES:
+    for relative, _reader in targets:
         if relative in sources:
             _apply_file(game_root, project_root, relative, *sources[relative])
         elif _read_marker(_marker_path(game_root, relative)):
@@ -392,7 +622,10 @@ def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Pat
 def disable(game_root: Path) -> dict:
     """Restore the exact preserved original bytes, leaving the backup in place for later reapply."""
     game_root = _assert_no_reparse_ancestry(game_root).resolve()
-    for relative, _reader in FILES:
+    targets = (list(FILES) + [(relative, MsbDocument) for relative in _disk_maps(game_root)]
+               + [(relative, _check_anibnd) for relative in _disk_chars(game_root)]
+               + [(relative, None) for relative in _disk_assets(game_root)])
+    for relative, _reader in targets:
         if _read_marker(_marker_path(game_root, relative)) is not None:
             _restore_file(game_root, relative)
     return status(game_root, None)

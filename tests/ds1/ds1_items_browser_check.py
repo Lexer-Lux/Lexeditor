@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -99,6 +100,24 @@ def main():
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     assert texts.TextDocument((mod / texts.RELATIVE).read_bytes()).name('EquipParamGoods', renamed) == 'Soul Safety Stone'
+                    short = reveal(page, page.locator('input[data-field-key="description"]'))
+                    short.fill('A safer stone.')
+                    short.press('Tab')
+                    page.wait_for_function('!state.pending && state.row.fields.find(f=>f.key==="description").value==="A safer stone."')
+                    full = reveal(page, page.locator('textarea[data-field-key="longDescription"]'))
+                    full.fill('Line one.\nLine two.')
+                    full.press('Tab')
+                    page.wait_for_function('!state.pending && state.row.fields.find(f=>f.key==="longDescription").value==="Line one.\\nLine two."')
+                    if output: page.screenshot(path=str(output / 'descriptions.png'))
+                    page.locator('#global-save').click()
+                    page.wait_for_function('state.dirty===0 && state.pending===0')
+                    saved = texts.TextDocument((mod / texts.RELATIVE).read_bytes())
+                    assert saved.description('EquipParamGoods', renamed) == 'A safer stone.'
+                    assert saved.description('EquipParamGoods', renamed, long=True) == 'Line one.\nLine two.'
+                    try:
+                        request_json(session.url + 'api/edit', {'table': 'EquipParamGoods', 'id': renamed, 'field': 'description', 'value': 'two\nlines'})
+                        raise AssertionError('Invalid description accepted')
+                    except HTTPError as error: assert error.code == 400
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     page.locator('[data-subtab="weapons"]').click()
                     page.wait_for_timeout(500)

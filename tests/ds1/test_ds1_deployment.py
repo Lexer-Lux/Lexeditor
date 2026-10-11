@@ -12,8 +12,44 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
+from msb_fixture import build_msb
+from tae_fixture import build_anibnd, build_tae
 from plugins.ds1 import deployment
+from plugins.ds1.formats import FormatError
+from plugins.ds1.msb import MAP_DIR, MsbDocument
 from plugins.ds1.store import ItemStore, MARKER, RELATIVE
+from plugins.ds1.tae import TaeDocument
+from plugins.ds1.tae_store import CHR_DIR
+
+MAP = MAP_DIR / "m10_00_00_00.msb"
+CHAR = CHR_DIR / "c1200.anibnd.dcx"
+VANILLA_CHAR = build_anibnd({"a87.tae": build_tae()})
+
+
+def edited_map(*edits):
+    document = MsbDocument(build_msb())
+    for key, field, value in edits:
+        document.edit(key, field, value)
+    return document.export()
+
+
+def with_map(game, payload=None):
+    (game / MAP_DIR).mkdir(parents=True, exist_ok=True)
+    (game / MAP).write_bytes(build_msb() if payload is None else payload)
+
+
+def edited_char(member, *edits):
+    members = {"a87.tae": build_tae()}
+    document = TaeDocument(members[member])
+    for anim, event, field, value in edits:
+        document.edit(anim, event, field, value)
+    members[member] = document.export()
+    return build_anibnd(members)
+
+
+def with_char(game, payload=None):
+    (game / CHR_DIR).mkdir(parents=True, exist_ok=True)
+    (game / CHAR).write_bytes(VANILLA_CHAR if payload is None else payload)
 
 
 def project(tmp_path, name="mod"):
@@ -628,6 +664,98 @@ def test_ordinary_absolute_paths_with_dot_segments_still_work(tmp_path):
     applied = deployment.apply(noisy_game, noisy_mod)
     assert applied["enabled"]
     assert (game / RELATIVE).read_bytes() == (mod / RELATIVE).read_bytes()
+
+
+def test_apply_installs_maps_only_project_with_backup_and_marker(tmp_path):
+    game, mod = project(tmp_path)
+    with_map(game)
+    wanted = edited_map(((2, 0), "posX", 5.5))
+    (mod / MAP_DIR).mkdir(parents=True)
+    (mod / MAP).write_bytes(wanted)
+    applied = deployment.apply(game, mod)
+    assert (game / MAP).read_bytes() == wanted
+    assert deployment._backup_path(game, MAP).read_bytes() == build_msb()
+    marker = deployment._marker_path(game, MAP)
+    assert marker.name == ".lexeditor-ds1-deployment.m10_00_00_00.msb.json" and marker.is_file()
+    assert applied["maps"]["applied"] == ["m10_00_00_00.msb"]
+    assert applied["enabled"] and applied["thisProjectActive"] and applied["everApplied"]
+    assert applied["backupOk"] and not applied["matchesOriginal"] and not applied["stale"]
+    disabled = deployment.disable(game)
+    assert (game / MAP).read_bytes() == build_msb()
+    assert deployment._backup_path(game, MAP).is_file()
+    assert disabled["maps"]["applied"] == [] and not disabled["enabled"]
+
+
+def test_apply_restores_map_missing_from_the_new_project(tmp_path):
+    game, first = project(tmp_path, "first")
+    with_map(game)
+    wanted = edited_map(((2, 0), "posX", 5.5))
+    (first / RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (first / RELATIVE).write_bytes(make_archive())
+    (first / MAP_DIR).mkdir(parents=True)
+    (first / MAP).write_bytes(wanted)
+    deployment.apply(game, first)
+    assert (game / MAP).read_bytes() == wanted
+    _game, second = project(tmp_path, "second")
+    (second / RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (second / RELATIVE).write_bytes(make_archive())
+    applied = deployment.apply(game, second)
+    assert (game / MAP).read_bytes() == build_msb()
+    assert applied["maps"]["applied"] == []
+
+
+def test_map_staleness_after_the_project_changes(tmp_path):
+    game, mod = project(tmp_path)
+    with_map(game)
+    (mod / MAP_DIR).mkdir(parents=True)
+    (mod / MAP).write_bytes(edited_map(((2, 0), "posX", 5.5)))
+    deployment.apply(game, mod)
+    assert not deployment.status(game, mod)["stale"]
+    (mod / MAP).write_bytes(edited_map(((2, 0), "posX", 6.5)))
+    status = deployment.status(game, mod)
+    assert status["stale"] and status["maps"]["stale"]
+
+
+def test_apply_installs_chars_only_project_with_backup_and_marker(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    wanted = edited_char("a87.tae", (0, 0, "start", 0.25))
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(wanted)
+    applied = deployment.apply(game, mod)
+    assert (game / CHAR).read_bytes() == wanted
+    assert deployment._backup_path(game, CHAR).read_bytes() == VANILLA_CHAR
+    marker = deployment._marker_path(game, CHAR)
+    assert marker.name == ".lexeditor-ds1-deployment.c1200.anibnd.dcx.json" and marker.is_file()
+    assert applied["chars"]["applied"] == ["c1200.anibnd.dcx"]
+    assert applied["enabled"] and applied["thisProjectActive"] and applied["everApplied"]
+    assert applied["backupOk"] and not applied["matchesOriginal"] and not applied["stale"]
+    disabled = deployment.disable(game)
+    assert (game / CHAR).read_bytes() == VANILLA_CHAR
+    assert deployment._backup_path(game, CHAR).is_file()
+    assert disabled["chars"]["applied"] == [] and not disabled["enabled"]
+
+
+def test_char_staleness_after_the_project_changes(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(edited_char("a87.tae", (0, 0, "start", 0.25)))
+    deployment.apply(game, mod)
+    assert not deployment.status(game, mod)["stale"]
+    (mod / CHAR).write_bytes(edited_char("a87.tae", (0, 0, "start", 0.75)))
+    status = deployment.status(game, mod)
+    assert status["stale"] and status["chars"]["stale"]
+
+
+def test_apply_refuses_a_corrupt_character_file(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(b"not a binder")
+    with pytest.raises(FormatError):
+        deployment.apply(game, mod)
+    assert (game / CHAR).read_bytes() == VANILLA_CHAR
 
 
 if __name__ == "__main__":
