@@ -87,8 +87,10 @@ def scan_project(project, strict=True):
     Soft mode stops at the caps instead of raising, for status checks
     that must report on a project rather than refuse it.
     """
+    from core import script_mods
     from .store import MARKER
     root = _checked(project)
+    tweak_mod = script_mods.is_script_mod(root)
     found, total = [], 0
     for top in ASSET_ROOTS:
         folder = root / top
@@ -100,6 +102,12 @@ def scan_project(project, strict=True):
                 continue
             relative = path.relative_to(root)
             if is_owned(relative):
+                continue
+            # script/ is a game folder and also where a tweak mod keeps its
+            # build script, assembly and templates (core/script_mods). In a
+            # tweak mod that folder is the mod's own code, never an override:
+            # deploying it put tweak.py and its sources into the game.
+            if tweak_mod and script_mods.owns(relative.as_posix()):
                 continue
             if len(found) >= MAX_ASSET_FILES:
                 if strict:

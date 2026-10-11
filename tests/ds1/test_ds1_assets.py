@@ -136,6 +136,23 @@ def test_scan_project_skips_owned_and_partials(tmp_path):
     assert [row["relative"] for row in assets.scan_project(mod)] == [TPF.as_posix()]
 
 
+def test_a_tweak_mods_script_folder_is_not_an_asset(tmp_path):
+    """script/ is a game folder and a tweak mod's own code folder at once."""
+    import json
+    _, mod = project(tmp_path)
+    (mod / "script" / "__pycache__").mkdir(parents=True)
+    (mod / "script" / "m10_00_00_00.luabnd.dcx").write_bytes(b"a game script override")
+    # A data mod's script/ holds game files and deploys.
+    assert [row["relative"] for row in assets.scan_project(mod)] == ["script/m10_00_00_00.luabnd.dcx"]
+    # A tweak mod's script/ is its build script, sources and caches.
+    (mod / "mod.json").write_text(json.dumps({"name": "Tweak", "script": {"version": 1}}), encoding="utf-8")
+    (mod / "script" / "tweak.py").write_text("def build(values, root): return {}\n", encoding="utf-8")
+    (mod / "script" / "island.S").write_text("ret\n", encoding="utf-8")
+    (mod / "script" / "__pycache__" / "tweak.cpython-312.pyc").write_bytes(b"cache")
+    assets.store_bytes(mod, TPF.as_posix(), b"pixels")
+    assert [row["relative"] for row in assets.scan_project(mod)] == [TPF.as_posix()]
+
+
 def test_scan_game_lists_assets_not_owned(tmp_path):
     game, _ = project(tmp_path)
     (game / TPF).parent.mkdir(parents=True)
