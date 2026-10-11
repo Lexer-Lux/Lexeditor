@@ -34,12 +34,15 @@ and once wedged his controller until reboot).
   `a45aaa36...71f98d7b`) to find candidate code, then prove it with an
   in-memory hook from Lexeditor's DS1 loader (`plugins/ds1/runtime/`), which
   re-writes its hooks when Arxan restores code.
-- **Getting Arxan out of the way properly**: dearxan
-  (https://github.com/tremwil/dearxan, MIT/Apache-2.0) neuters Arxan in DSR
-  when it runs before the game's entry point; hooks must be placed in its
-  callback because DSR's entry stubs still check integrity. The DS1 loader
-  starts early enough to host it. Until that exists in the loader, assume no
-  debugger can attach.
+- **A real debugger: DS1 Debug mode.** Tweaks tab → INSTALLED GAME → DEBUG
+  MODE, then Apply or Play. The game then starts with the debug loader
+  (`plugins/ds1/runtime/package/debug/dinput8.dll`): every network call
+  fails, so it cannot go online, and dearxan
+  (https://github.com/tremwil/dearxan) switches Arxan off before the game's
+  code runs, so Cheat Engine or x64dbg can attach.
+  `lexeditor-ds1-patch.log` in the game folder says "a debugger can attach"
+  when it worked. Confirm that line before asking Lexer to set a watchpoint,
+  and ask him to turn Debug mode off and Apply again afterwards.
 
 ## Asking Lexer for game time
 

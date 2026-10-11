@@ -125,7 +125,10 @@ work, even if your tool does not load skills on its own.
 
 ## Editing files from a shell
 
-- Never pass code with quotes or backslashes through a bash heredoc. Write the
-  script to your scratchpad with the file-writing tool and run it.
+- Never pass code with quotes or backslashes through a bash heredoc, sed or
+  `python -c`. Write the script to your scratchpad with the file-writing tool
+  and run it. Inside a patch script, text that holds backslashes (`\n`, a
+  Windows path) goes in raw strings (`r'''...'''`), or the edit is made with
+  the editing tool instead: an ordinary string turns `\n` into a line break.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.
