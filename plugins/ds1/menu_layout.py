@@ -1,4 +1,4 @@
-"""DS1 menu layout (DRB): add text nodes to a dialog, or move existing nodes.
+"""DS1 menu layout (DRB): add text, sprite or clone nodes to a dialog, or move existing nodes.
 
 Dark Souls Remastered draws its menus from menu/menu.drb.dcx, a DCX holding
 one DRB. A DRB is a run of tagged sections, each a 16-byte header (tag,
@@ -21,7 +21,12 @@ dialog, placed like a node moved by `dy` and tinted: a sprite's last four
 bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
 ffffffff, untinted; "blackout" overlays dc282828; the boss HP bar 960080ff is
 red). Read as alpha-red-green-blue, a red tint came out blue in the game. A tweak can also move an existing
-node: rewrite its rectangle in place, which shifts no offsets. It cannot remove a node or restyle one beyond its rectangle.
+node: rewrite its rectangle in place, which shifts no offsets. It can also clone an existing node: the same shape and
+control bytes under a new name and rectangle, so a grid gains cells of the
+same kind its rows already use. A clone shares its source's content reference,
+which suits grid cells but not strips whose reference varies per index
+(data_tab); those are not cloned. It cannot remove a node or restyle one
+beyond its rectangle.
 """
 from __future__ import annotations
 
@@ -188,11 +193,14 @@ class Drb:
             raise LayoutError(f"The {tag} section has data after its last entry")
         del data[used:]
 
-    def _check_new(self, dialog: str, name: str, dy: int) -> None:
+    def _check_name(self, dialog: str, name: str) -> None:
         if not name or len(name) > 64 or not name.isascii() or not name.replace("_", "").isalnum():
             raise LayoutError(f"{name!r} is not a usable node name")
         if any(item.name == name for item in self.nodes(dialog)):
             raise LayoutError(f"{dialog} already has a node named {name}")
+
+    def _check_new(self, dialog: str, name: str, dy: int) -> None:
+        self._check_name(dialog, name)
         if type(dy) is not int or not -2000 <= dy <= 2000:
             raise LayoutError("dy must be a whole number of layout units")
 
@@ -254,6 +262,28 @@ class Drb:
         shape += bytes([DYNAMIC]) + struct.pack("<ii", TEXT_TAIL, length) + b"\0" * 6
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, text_type, bytes(shape), static_type, control)
+
+    def add_clone(self, dialog: str, name: str, source: str, rect) -> None:
+        """A copy of an existing node under a new name and rectangle.
+
+        The clone shares its source's shape and control bytes (and so a
+        Dialog node's content reference): a grid cell copies its row's own
+        cell, never a strip whose reference varies per index.
+        """
+        self._check_name(dialog, name)
+        if not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect):
+            raise LayoutError(f"{dialog}/{name} needs a rectangle of four whole numbers")
+        left, top, right, bottom = rect
+        if not all(-32768 <= value <= 32767 for value in rect) or not left < right or not top < bottom:
+            raise LayoutError(f"{dialog}/{name} has a rectangle outside the layout's range")
+        node = self.node(dialog, source)
+        _kind, blob = self._blob("SHAP", "SHPR", node.shape)
+        if len(blob) < 8:
+            raise LayoutError(f"{dialog}/{source} has no rectangle to place")
+        shape = bytearray(blob)
+        struct.pack_into("<4h", shape, 0, left, top, right, bottom)
+        shape_type = struct.unpack_from("<i", self.sections["SHAP"][0], node.shape)[0]
+        self._insert(dialog, name, shape_type, bytes(shape), *self._static_control(dialog, node))
 
     def move(self, dialog: str, name: str, rect) -> None:
         """Reposition and resize an existing node, rewriting its rectangle in place."""
@@ -365,14 +395,24 @@ def validate(spec: object, owner: str) -> dict:
         raise LayoutError(f"{owner}: a layout patch needs nodes or moves")
     text = {"dialog", "name", "lookLike", "dy", "length"}
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
+    clone = {"dialog", "name", "clone", "rect"}
     clean = []
     for node in nodes:
         keys = set(node) if isinstance(node, dict) else set()
-        if keys not in (text, text | {"left"}, sprite):
-            raise LayoutError(f"{owner}: a layout node is text ({', '.join(sorted(text))}, optional left) "
-                              f"or a sprite ({', '.join(sorted(sprite))})")
-        if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name", "lookLike")):
+        if keys not in (text, text | {"left"}, sprite, clone):
+            raise LayoutError(f"{owner}: a layout node is text ({', '.join(sorted(text))}, optional left), "
+                              f"a sprite ({', '.join(sorted(sprite))}) or a clone ({', '.join(sorted(clone))})")
+        if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout node names must be text")
+        for key in ("lookLike", "clone"):
+            if key in node and not (isinstance(node[key], str) and node[key]):
+                raise LayoutError(f"{owner}: layout node names must be text")
+        if "rect" in node:
+            rect = node["rect"]
+            if (not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect)
+                    or not all(-32768 <= value <= 32767 for value in rect)
+                    or not rect[0] < rect[2] or not rect[1] < rect[3]):
+                raise LayoutError(f"{owner}: a layout clone rect is four whole numbers, left < right, top < bottom")
         if "sprite" in node and (not isinstance(node["sprite"], list) or len(node["sprite"]) != 2
                                  or not all(isinstance(part, str) and part for part in node["sprite"])):
             raise LayoutError(f"{owner}: a sprite names its source as [dialog, node]")
@@ -408,7 +448,9 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
             raise LayoutError(f"{owner} and {seen[key]} both add {node['dialog']}/{node['name']}")
         seen[key] = owner
         try:
-            if "sprite" in node:
+            if "clone" in node:
+                layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"])
+            elif "sprite" in node:
                 layout.add_sprite(node["dialog"], node["name"], tuple(node["sprite"]), node["lookLike"],
                                   node["dy"], node["color"])
             else:

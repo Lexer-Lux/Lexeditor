@@ -60,18 +60,19 @@ def drb(dialogs=DIALOGS):
     shapes, controls, objects, entries = bytearray(), bytearray(), bytearray(), bytearray()
     shap, ctrl = [], []
 
-    def entry(kind, blob):
+    def entry(kind, blob, control=("Static", b"\0" * 4)):
         shap.append((builder.name(kind), len(shapes)))
         shapes.extend(blob)
-        ctrl.append((builder.name("Static"), len(controls)))
-        controls.extend(b"\0" * 4)
+        ctrl.append((builder.name(control[0]), len(controls)))
+        controls.extend(control[1])
         return (len(shap) - 1) * 8
 
     for dialog, nodes in dialogs.items():
         own = entry("Null", b"\0" * 16)
         start = len(objects)
-        for name, kind, blob in nodes:
-            at = entry(kind, blob)
+        for row in nodes:
+            name, kind, blob = row[:3]
+            at = entry(kind, blob, *row[3:4])
             objects += struct.pack("<iii", builder.name(name), at, at) + b"\0" * 20
         row = struct.pack("<iii", builder.name(dialog), own, own)
         row += b"\0" * 20 + struct.pack("<ii", len(nodes), start) + struct.pack("<ihh", 0, 636, 483)
@@ -317,6 +318,93 @@ class MoveTests(unittest.TestCase):
             {"dialog": "data_simple_arms", "name": "text_lexeditor_stamina", "rect": [0, 0, 10, 10]}]}, "Mover")
         with self.assertRaisesRegex(menu_layout.LayoutError, "not in the original layout"):
             menu_layout.compose(original, [added, stray])
+
+
+CLONES = {
+    "data_simple_arms": [
+        ("text_receive_name", "Text", text_shape((364, 262, 481, 290), kind="message", message=102125)),
+        ("icon_receive", "Sprite", struct.pack("<4h", 332, 262, 360, 290) + b"\0" * 16),
+        ("cursor_receive", "Null", b"\0" * 8),
+        ("short_receive", "Null", b"\0" * 4),
+        ("live_receive", "Null", b"\0" * 8, ("Button", b"\1" * 4)),
+    ],
+    "later_dialog": [
+        ("text_name", "Text", text_shape((10, 10, 200, 38), kind="dynamic")),
+    ],
+}
+
+
+class CloneTests(unittest.TestCase):
+    """The UI rework's grid: new cells copy their row's own cell."""
+
+    def test_a_clone_copies_bytes_new_name_and_rect(self):
+        layout = menu_layout.Drb(drb(CLONES))
+        before = snapshot(layout)
+        layout.add_clone("data_simple_arms", "cursor_new", "cursor_receive", [100, 100, 200, 130])
+        layout.add_clone("data_simple_arms", "icon_new", "icon_receive", [68, 100, 96, 128])
+        again = menu_layout.Drb(layout.to_bytes())
+        self.assertEqual(again.to_bytes(), layout.to_bytes())
+        kind, blob = again._blob("SHAP", "SHPR", again.node("data_simple_arms", "cursor_new").shape)
+        self.assertEqual((kind, struct.unpack_from("<4h", blob)), ("Null", (100, 100, 200, 130)))
+        _kind, control = again._blob("CTRL", "CTPR", again.node("data_simple_arms", "cursor_new").control)
+        self.assertEqual(control[:4], b"\0" * 4)
+        self.assertFalse(any(control[4:]))
+        kind, blob = again._blob("SHAP", "SHPR", again.node("data_simple_arms", "icon_new").shape)
+        source = dict((name, shape) for name, shape, _control in before["data_simple_arms"])["icon_receive"][1]
+        self.assertEqual(kind, "Sprite")
+        self.assertEqual(struct.unpack_from("<4h", blob), (68, 100, 96, 128))
+        self.assertEqual(blob[8:len(source)], source[8:])
+        self.assertFalse(any(blob[len(source):]))
+        after = snapshot(again)
+        self.assertEqual(after["data_simple_arms"][:-2], before["data_simple_arms"])
+        self.assertEqual(after["later_dialog"], before["later_dialog"], "a later dialog keeps its objects")
+        order = shape_order(again)
+        self.assertEqual(order, [index * 8 for index in range(again.sections["SHAP"][1])])
+
+    def test_bad_clones_are_refused_and_change_nothing(self):
+        layout = menu_layout.Drb(drb(CLONES))
+        plain = layout.to_bytes()
+        bad = [("missing_dialog", "new", "cursor_receive", [0, 0, 10, 10]),
+               ("data_simple_arms", "cursor_receive", "cursor_receive", [0, 0, 10, 10]),
+               ("data_simple_arms", "new", "missing_node", [0, 0, 10, 10]),
+               ("data_simple_arms", "bad name", "cursor_receive", [0, 0, 10, 10]),
+               ("data_simple_arms", "new", "cursor_receive", (0, 0, 10, 10)),
+               ("data_simple_arms", "new", "cursor_receive", [0, 0, 10]),
+               ("data_simple_arms", "new", "cursor_receive", [0, 0, True, 10]),
+               ("data_simple_arms", "new", "cursor_receive", [0, 10, 10, 10]),
+               ("data_simple_arms", "new", "cursor_receive", [10, 0, 0, 10]),
+               ("data_simple_arms", "new", "cursor_receive", [-40000, 0, 10, 10]),
+               ("data_simple_arms", "new", "short_receive", [0, 0, 10, 10]),
+               ("data_simple_arms", "new", "live_receive", [0, 0, 10, 10])]
+        for args in bad:
+            with self.subTest(args=args), self.assertRaises(menu_layout.LayoutError):
+                layout.add_clone(*args)
+        self.assertEqual(layout.to_bytes(), plain)
+
+    def test_patch_clones_are_strict(self):
+        good = {"dialog": "data_simple_arms", "name": "cursor_new", "clone": "cursor_receive",
+                "rect": [100, 100, 200, 130]}
+        validated = menu_layout.validate({"version": 1, "nodes": [good]}, "Grid")
+        self.assertEqual(validated["nodes"], [good])
+        for spec in ({"version": 1, "nodes": [{**good, "rect": [0, 0, 0, 10]}]},
+                     {"version": 1, "nodes": [{**good, "clone": ""}]},
+                     {"version": 1, "nodes": [{**good, "lookLike": "cursor_receive"}]},
+                     {"version": 1, "nodes": [{**good, "rect": "left"}]}):
+            with self.subTest(spec=spec), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate(spec, "Grid")
+
+    def test_compose_merges_clones_and_refuses_overlaps(self):
+        original = dcx(drb(CLONES))
+        first = menu_layout.validate({"version": 1, "nodes": [
+            {"dialog": "data_simple_arms", "name": "cursor_new", "clone": "cursor_receive",
+             "rect": [100, 100, 200, 130]}]}, "One")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [first])))
+        self.assertIn("cursor_new", [node.name for node in layout.nodes("data_simple_arms")])
+        clash = menu_layout.validate({"version": 1, "nodes": [
+            {"dialog": "data_simple_arms", "name": "cursor_new", "clone": "cursor_receive",
+             "rect": [0, 0, 10, 10]}]}, "Clash")
+        with self.assertRaisesRegex(menu_layout.LayoutError, "both add"):
+            menu_layout.compose(original, [first, clash])
 
 
 if __name__ == "__main__":
