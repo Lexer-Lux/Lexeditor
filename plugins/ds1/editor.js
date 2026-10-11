@@ -286,7 +286,9 @@ function fieldSections(row){
         title:`Open ${link.name}`,"aria-label":`Open ${link.name}`,onclick:()=>openEffect(link)},"Open")]);
     }
     groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control,
-      help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
+      // A flag is stored as a u8 bit but edited as a boolean; naming the
+      // storage type here kept the checkbox out of the boolean field layout.
+      help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
       sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
   const unlisted=(row.effectLinks||[]).filter(effect=>!shownLinks.has(effect.field));
