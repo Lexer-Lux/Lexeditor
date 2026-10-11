@@ -14,10 +14,12 @@ objects' and dialogs' references after it shift. Inserting DLGO entries moves
 the entries after them; only DLG points into DLGO, so those offsets shift.
 
 A tweak mod asks for a node as `look like` one text node (its rectangle,
-moved by `dy`, its font, colour and alignment) and `hold` dynamic text of a
+moved by `dy` and `dx`, its font, colour and alignment) and `hold` dynamic
+text of a
 given length, empty until the game or a hook sets it; `left` widens the
 rectangle leftwards. It can also copy an existing sprite (an icon) from any
-dialog, placed like a node moved by `dy` and tinted: a sprite's last four
+dialog, placed like a node moved by `dy` and `dx`, tinted, and optionally
+resized with `size` [width, height]: a sprite's last four
 bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
 ffffffff, untinted; "blackout" overlays dc282828; the boss HP bar 960080ff is
 red). Read as alpha-red-green-blue, a red tint came out blue in the game. It cannot remove, move or restyle an
@@ -44,6 +46,7 @@ TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
+MAX_SIZE = 4096
 SPRITE_SIZE = 36
 SPRITE_COLOUR = 32  # four bytes: alpha, blue, green, red
 
@@ -183,26 +186,41 @@ class Drb:
             raise LayoutError(f"The {tag} section has data after its last entry")
         del data[used:]
 
-    def _check_new(self, dialog: str, name: str, dy: int) -> None:
+    def _check_new(self, dialog: str, name: str, dy: int, dx: int = 0) -> None:
         if not name or len(name) > 64 or not name.isascii() or not name.replace("_", "").isalnum():
             raise LayoutError(f"{name!r} is not a usable node name")
         if any(item.name == name for item in self.nodes(dialog)):
             raise LayoutError(f"{dialog} already has a node named {name}")
         if type(dy) is not int or not -2000 <= dy <= 2000:
             raise LayoutError("dy must be a whole number of layout units")
+        if type(dx) is not int or not -2000 <= dx <= 2000:
+            raise LayoutError("dx must be a whole number of layout units")
 
     @staticmethod
-    def _moved(blob: bytes, dy: int, left: int | None = None) -> bytearray:
-        """A shape with its rectangle moved down by dy (and its left edge set)."""
+    def _moved(blob: bytes, dy: int, dx: int = 0, left: int | None = None,
+               size: list | tuple | None = None) -> bytearray:
+        """A shape with its rectangle moved by (dx, dy), its left edge set, resized."""
         shape = bytearray(blob)
         x0, top, right, bottom = struct.unpack_from("<4h", shape)
+        x0, right, top, bottom = x0 + dx, right + dx, top + dy, bottom + dy
+        if not (-32768 <= x0 and right <= 32767 and -32768 <= top and bottom <= 32767):
+            raise LayoutError("The moved rectangle is outside the layout's range")
         if left is not None:
             if type(left) is not int or not -32768 <= left < right:
                 raise LayoutError("left must be a whole number left of the rectangle's right edge")
             x0 = left
-        if not (-32768 <= top + dy and bottom + dy <= 32767):
-            raise LayoutError("The moved rectangle is outside the layout's range")
-        struct.pack_into("<4h", shape, 0, x0, top + dy, right, bottom + dy)
+        if size is not None:
+            try:
+                width, height = size
+            except (TypeError, ValueError):
+                width = height = 0
+            if (type(width) is not int or type(height) is not int
+                    or not 1 <= width <= MAX_SIZE or not 1 <= height <= MAX_SIZE):
+                raise LayoutError(f"size must be two whole numbers between 1 and {MAX_SIZE}")
+            right, bottom = x0 + width, top + height
+            if not (right <= 32767 and bottom <= 32767):
+                raise LayoutError("The sized rectangle is outside the layout's range")
+        struct.pack_into("<4h", shape, 0, x0, top, right, bottom)
         return shape
 
     def _static_control(self, dialog: str, node: Node) -> tuple[int, bytes]:
@@ -212,9 +230,9 @@ class Drb:
         return struct.unpack_from("<i", self.sections["CTRL"][0], node.control)[0], control
 
     def add_sprite(self, dialog: str, name: str, sprite: tuple[str, str], place_like: str, dy: int,
-                   color: str) -> None:
-        """A copy of an existing sprite, placed like `place_like` moved by dy, tinted."""
-        self._check_new(dialog, name, dy)
+                   color: str, dx: int = 0, size: list | tuple | None = None) -> None:
+        """A copy of an existing sprite, placed like `place_like` moved by (dx, dy), tinted."""
+        self._check_new(dialog, name, dy, dx)
         if not isinstance(color, str) or len(color) != 8:
             raise LayoutError("A sprite colour is eight hex digits: alpha, blue, green, red")
         try:
@@ -230,14 +248,14 @@ class Drb:
         place = self.node(dialog, place_like)
         _kind, place_blob = self._blob("SHAP", "SHPR", place.shape)
         shape = bytearray(blob[:SPRITE_SIZE])
-        shape[0:8] = self._moved(place_blob[:8], dy)[0:8]
+        shape[0:8] = self._moved(place_blob[:8], dy, dx, size=size)[0:8]
         shape[SPRITE_COLOUR:SPRITE_SIZE] = tint
         sprite_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, sprite_type, bytes(shape), *self._static_control(dialog, place))
 
     def add_text(self, dialog: str, name: str, look_like: str, dy: int, length: int,
-                 left: int | None = None) -> None:
-        self._check_new(dialog, name, dy)
+                 left: int | None = None, dx: int = 0) -> None:
+        self._check_new(dialog, name, dy, dx)
         if type(length) is not int or not 1 <= length <= MAX_TEXT:
             raise LayoutError(f"Text length must be between 1 and {MAX_TEXT}")
         source = self.node(dialog, look_like)
@@ -245,7 +263,7 @@ class Drb:
         if kind != "Text" or len(blob) <= TEXT_PREFIX:
             raise LayoutError(f"{dialog}/{look_like} is a {kind}, not text")
         static_type, control = self._static_control(dialog, source)
-        shape = self._moved(blob[:TEXT_PREFIX], dy, left)
+        shape = self._moved(blob[:TEXT_PREFIX], dy, dx, left)
         shape += bytes([DYNAMIC]) + struct.pack("<ii", TEXT_TAIL, length) + b"\0" * 6
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, text_type, bytes(shape), static_type, control)
@@ -340,17 +358,25 @@ def validate(spec: object, owner: str) -> dict:
         raise LayoutError(f"{owner}: list between 1 and 64 layout nodes")
     text = {"dialog", "name", "lookLike", "dy", "length"}
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
+    text_keys = (text, text | {"left"}, text | {"dx"}, text | {"left", "dx"})
+    sprite_keys = (sprite, sprite | {"dx"}, sprite | {"size"}, sprite | {"dx", "size"})
     clean = []
     for node in nodes:
         keys = set(node) if isinstance(node, dict) else set()
-        if keys not in (text, text | {"left"}, sprite):
-            raise LayoutError(f"{owner}: a layout node is text ({', '.join(sorted(text))}, optional left) "
-                              f"or a sprite ({', '.join(sorted(sprite))})")
+        if keys not in text_keys + sprite_keys:
+            raise LayoutError(f"{owner}: a layout node is text "
+                              f"({', '.join(sorted(text))}, optional left and dx) "
+                              f"or a sprite ({', '.join(sorted(sprite))}, optional dx and size)")
         if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name", "lookLike")):
             raise LayoutError(f"{owner}: layout node names must be text")
         if "sprite" in node and (not isinstance(node["sprite"], list) or len(node["sprite"]) != 2
                                  or not all(isinstance(part, str) and part for part in node["sprite"])):
             raise LayoutError(f"{owner}: a sprite names its source as [dialog, node]")
+        if "size" in node and (not isinstance(node["size"], list) or len(node["size"]) != 2
+                               or not all(type(part) is int for part in node["size"])):
+            raise LayoutError(f"{owner}: a sprite size is [width, height] as whole numbers")
+        if "dx" in node and type(node["dx"]) is not int:
+            raise LayoutError(f"{owner}: dx must be a whole number of layout units")
         clean.append(dict(node))
     return {"owner": owner, "nodes": clean}
 
@@ -370,10 +396,10 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
         try:
             if "sprite" in node:
                 layout.add_sprite(node["dialog"], node["name"], tuple(node["sprite"]), node["lookLike"],
-                                  node["dy"], node["color"])
+                                  node["dy"], node["color"], node.get("dx", 0), node.get("size"))
             else:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
-                                node.get("left"))
+                                node.get("left"), node.get("dx", 0))
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     return formats.deflate(original, layout.to_bytes())
