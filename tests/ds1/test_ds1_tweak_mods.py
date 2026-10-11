@@ -110,6 +110,31 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual((self.game / tweak_mods.LOCK_FILE).read_bytes(), b"0")
         self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
 
+    def test_debug_mode_installs_the_debug_loader_and_off_puts_the_normal_one_back(self):
+        # Debug mode: Arxan off and no network, so a debugger can attach (#742).
+        self.assertFalse(tweak_mods.status(self.game, self.library)["debugMode"])
+        tweak_mods.set_debug_mode(True, self.library)
+        status = tweak_mods.status(self.game, self.library)
+        self.assertEqual((status["debugMode"], status["debugInstalled"]), (True, False))
+        # With no tweak enabled the debug loader still goes in, with nothing to patch.
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
+        self.assertEqual(self.runtime(), b"")
+        self.assertTrue(result["debugInstalled"])
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        # Tweaks ride along.
+        self.enable(alpha=True)
+        tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.runtime(), self.expected("alpha"))
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
+        # Off, then Apply: the everyday loader again.
+        tweak_mods.set_debug_mode(False, self.library)
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes())
+        self.assertEqual((result["debugMode"], result["debugInstalled"]), (False, False))
+        with self.assertRaises(tweak_mods.TweakError):
+            tweak_mods.set_debug_mode("yes", self.library)
+
     def test_enabled_tweak_builds_with_no_trust_step(self):
         self.enable(alpha=True)
         tweak_mods.apply(self.game, self.library)

@@ -1857,10 +1857,18 @@ class HostApi:
         from core import mods_service
         root = self._game_mods(plugin_id)
         folder = mods_service.checked_mod(root, path)
+        was = bool(mods_service.mod_row(folder).get("enabled"))
         mods_service.set_enabled(folder, enabled)
         if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
             enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-            self.activate_library_mods(plugin_id, enabled_paths, [])
+            try:
+                self.activate_library_mods(plugin_id, enabled_paths, [])
+            except Exception:
+                # The switch failed, so the mod keeps its old state. Left
+                # saved, a mod that cannot build stayed on behind an
+                # unticked box and failed every later switch of any mod.
+                mods_service.set_enabled(folder, was)
+                raise
         return mods_service.mod_row(folder)
 
     def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:

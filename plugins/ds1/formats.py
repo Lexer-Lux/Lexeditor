@@ -59,6 +59,14 @@ for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defens
         f'Changes this piece\'s physical defense against {kind.lower()} attacks by this percentage: '
         '-100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own.')
 
+# What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
+# Stamina Costs tweak sets each spell's Elden Ring value.
+MAGIC_FIELDS = {
+    'stamina': ('Stamina Consumption', 'Properties',
+                'Each cast of this spell spends this much stamina. 0 is free, as in vanilla. '
+                'The Spell Stamina Costs tweak sets each spell\'s Elden Ring value.'),
+}
+
 # Armor Rework gives every armor piece its own absorption effect in slot 3,
 # one per upgrade level: effect ID = 30,000,000 + armor ID + level.
 ABSORPTION_BASE = 30_000_000
@@ -127,7 +135,7 @@ STATS_FIELDS = {
     'EquipParamWeapon': ('properStrength', 'properAgility', 'properMagic', 'properFaith',
                          'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
                          'correctType', 'isLuckCorrect', 'levelSyncCorrectID'),
-    'Magic': ('requirementIntellect', 'requirementFaith', 'slotLength'),
+    'Magic': ('requirementIntellect', 'requirementFaith', 'slotLength', 'stamina'),
     'ReinforceParamWeapon': ('physicsAtkRate', 'magicAtkRate', 'fireAtkRate', 'thunderAtkRate',
                   'staminaAtkRate', 'saWeaponAtkRate', 'saDurabilityRate', 'correctStrengthRate',
                   'correctAgilityRate', 'correctMagicRate', 'correctFaithRate', 'physicsGuardCutRate',
@@ -321,6 +329,8 @@ def schema(table):
             label, group, description = ATTACK_FIELDS[key]
         if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
             label, group, description = ARMOR_FIELDS[key]
+        if table == 'Magic' and key in MAGIC_FIELDS:
+            label, group, description = MAGIC_FIELDS[key]
         if table == EFFECT_TABLE:
             label, group, description = presentation(key, label, description)
         enum_name = attrs.get('Enum') or node.findtext('Enum')

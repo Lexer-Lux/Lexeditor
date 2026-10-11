@@ -12972,6 +12972,8 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const key = fitKey(label);
     if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1 && !labelTextOutside(label)) return;
     label.style.fontSize = '';
+    const nameText = label.classList.contains('lex-detail-field-label') ? label.querySelector(':scope > .lex-detail-field-label-text') : null;
+    if (nameText) nameText.style.width = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
       // Main tabs and subtabs fit their labels inside a single row.
@@ -13035,12 +13037,31 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         label.style.fontSize = `${size}px`;
       }
     }
+    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) {
+      // At the font floor a long word and its help mark still overran the
+      // lane, and the mark sat on the value ("Requirement: STR" in DS1
+      // Stats). The pane's lane grows just enough (framework.css), so every
+      // name in it keeps one edge.
+      const pane=label.closest('.lex-tweak-card-grid')||label.parentElement?.parentElement;
+      const need=Math.ceil(label.scrollWidth+1);
+      if(pane&&need>(parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor'))||0))
+        pane.style.setProperty('--lex-detail-label-floor',`${need}px`);
+    }
     if (label.classList.contains('lex-detail-field-label') && overflows()) {
       // At the readable font floor, give wrapped labels space rather than
       // letting their text consume the gap between adjacent properties.
       const css=getComputedStyle(label);
       const height=Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect().height));
       label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
+    }
+    // A wrapped name's box is as wide as its lane, not its longest line, so
+    // in a lane widened for a neighbour the help mark sat far past "Crit /
+    // bonus". The box hugs the longest line and the mark follows the name.
+    if (nameText && label.querySelector(':scope > .lex-field-help')) {
+      const range=document.createRange();range.selectNodeContents(nameText);
+      const lines=[...range.getClientRects()].filter(box=>box.width&&box.height);
+      const scale=nameText.getBoundingClientRect().width/(nameText.offsetWidth||1)||1;
+      if (lines.length>1) nameText.style.width=`${Math.ceil(Math.max(...lines.map(box=>box.width))/scale)+1}px`;
     }
     placeBooleanHelp(label);
 

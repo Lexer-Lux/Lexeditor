@@ -57,7 +57,7 @@ const shell=LexeditorUI.mountShell({
     {id:"areas",label:"Areas",help:"Move enemy and object placements, and swap which enemy appears. Each placement belongs to one map. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
-    {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements and slot cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no graph here covers stamina or attunement slots."},
+    {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements, slot cost and stamina cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
     {id:"world",label:"World",help:"Edit what the world gives you. Drops holds enemy and corpse drops with their rates. Shops holds each merchant's stock and prices. Treasure holds how treasure chests and pickups behave. Vanilla is read-only. Save changes the mod project."},
     {id:"assets",label:"Assets",help:"Replace game files with your own: textures, sounds, movies and models. Mod files holds the replacements the mod carries, and Installed game holds the files it can replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
@@ -332,7 +332,9 @@ function fieldSections(row){
         title:`Open ${link.name}`,"aria-label":`Open ${link.name}`,onclick:()=>openEffect(link)},"Open")]);
     }
     groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control,
-      help:help?infoHelp(help):null,dataType:field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
+      // A flag is stored as a u8 bit but edited as a boolean; naming the
+      // storage type here kept the checkbox out of the boolean field layout.
+      help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
       sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
   const unlisted=(row.effectLinks||[]).filter(effect=>!shownLinks.has(effect.field));
@@ -874,6 +876,13 @@ function renderTweaks(){
   const installed=detailPanel({title:"INSTALLED GAME",
     help:"Apply combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
+      // Debug mode: the game runs offline with Arxan off, so a debugger
+      // (Cheat Engine's "find what writes", x64dbg) can attach (#742).
+      detailField({label:"DEBUG MODE",dataType:"BOOL",
+        help:infoHelp("For finding things in the running game with a debugger. Apply or Play installs a loader that switches the game's anti-debug protection (Arxan) off with dearxan, so Cheat Engine or x64dbg can attach without the game closing itself. The game has no network access while it is on: it cannot go online. Turn it off and Apply again for normal play."),
+        control:el("input",{type:"checkbox",checked:!!status.debugMode,disabled:busy,"aria-label":"Debug mode",
+          onchange:event=>tweakRequest("/api/tweaks/debug",{on:event.target.checked},"Could not switch debug mode")})}),
+      !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(status.debugMode?"Debug mode is on: Apply to install it.":"Debug mode is off: Apply to put the normal loader back."):null,
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,

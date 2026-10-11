@@ -538,6 +538,14 @@ __declspec(dllexport) HRESULT WINAPI DirectInput8Create(HINSTANCE instance, DWOR
     return create(instance, version, iid, out, outer);
 }
 
+#ifdef LX_DEBUG_BUILD
+/* The debug loader (lexeditor_ds1_debug.c) blocks the network, switches
+ * Arxan off, and then applies the tweaks. */
+void lx_debug_start(void);
+void lx_debug_log(const char *text) { write_log(text); }
+void lx_debug_apply(void) { apply_from_file(); }
+#endif
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 {
     (void)reserved;
@@ -545,7 +553,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
         DisableThreadLibraryCalls(instance);
         started = GetTickCount();
         lx_report = write_log;
+#ifdef LX_DEBUG_BUILD
+        lx_debug_start();
+#else
         apply_from_file();
+#endif
     }
     return TRUE;
 }
