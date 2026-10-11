@@ -71,3 +71,14 @@ RVAs, and vftable slot −1 holds the locator's address. Dialog classes
 `button13_0` text rows plus `cursor0_0`..`cursor13_0` highlight rects
 (see `menu-lists.md`). Tab strips use `tab_cursor0_N`, and `data_list`
 uses `list0..N` dialog rows instead.
+
+## Row-host chain
+
+A Dialog shape's bytes 16-17 (u16, little-endian) are the DLG index of
+the hosted sub-dialog. The equipment list composes `data_list` `list{i}`
+(DLG 90, `list_set`: one stacked `list_arms`-family dialog per tab plus
+`blackout`/`grayout` rects) with `I02-02` `button{i}_0` (DLG 91,
+`button_item_select`: the 80x90 icon cell with count and owner marks)
+and `data_tab_{i}` (DLG 288+i, per-tab line strips). Unused price,
+weight and MP nodes in the row dialogs sit parked off-screen at
+negative coordinates, the vanilla idiom for hiding a stat.
