@@ -48,13 +48,14 @@ Dark Souls III keeps the same dialog classes (`FrpgMenuDlgWarp`,
 `FrpgMenuDlgWarpPlate` in DarkSoulsIII.exe), but its menus are Scaleform
 GFX (Flash) inside encrypted BDT archives (Data1 unpacked with
 BinderTool), so nothing transfers as files to DS1's DRB layouts. The
-travel screen is `menu/02_080_warp.gfx`: a 14-row `WindowList`/`ItemList`
-with per-row icons (`ItemIcon`, `MENU_WarpIcon` atlas), an L/R-navigated
-`TabList` with highlight, title, key guide and status bar. The 58
-`menu/mapimage` textures (`MENU_MapImage_10001`…, 512×256) are one vista
-per area, loaded by formatted ID for the loading screen
-(`MENU_MapImage_%05d`, `MENU_Common_LoadingMapImage` in the executable);
-the travel list itself carries no pictures. The bonfire menu
+travel screen is `menu/02_080_warp.gfx`: L/R-navigated area tabs with
+illustrated icons (`TabList`, `MENU_WarpIcon` atlas), a per-tab bonfire
+list with per-row icons (`WindowList`/`ItemList`, `ItemIcon`), and an
+area vista panel. The 58 `menu/mapimage` textures (`MENU_MapImage_10001`…,
+512×256) are one vista per area, loaded by formatted ID
+(`MENU_MapImage_%05d` in the executable); the loading screen uses them
+too (`MENU_Common_LoadingMapImage`). There are no header rows: tabs
+replace grouping, each tab listing only its area's bonfires. The bonfire menu
 (`03_002_bonfire.gfx`) is a plain list with no tabs or icons. The
 shipped DarkSoulsIII.exe is DRM-scrambled on disk (zero data
 directories, sampled `.text` high-entropy), so its warp methods need a
