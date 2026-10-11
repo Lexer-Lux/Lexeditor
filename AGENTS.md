@@ -10,6 +10,7 @@ work, even if your tool does not load skills on its own.
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
+| ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-live-debugging/SKILL.md` |
 
 ## Editor UI
 
@@ -99,9 +100,11 @@ work, even if your tool does not load skills on its own.
 ## Checks
 
 - Verify on CI, not on Lexer's machine. Several agents running suites at once
-  pin his six-core CPU at 100%. Locally, run only the one check that covers what
-  you changed, one browser at a time. For a full suite, push the branch you own
-  and open a draft pull request; never merge it yourself.
+  pin his six-core CPU at 100%. Locally, run only the one test file that
+  covers what you changed, one browser at a time. Never run a whole suite
+  locally: not `check_plugin.py --global` (the shared suite), not a plugin's.
+  For a full suite, push the branch you own and open a draft pull request;
+  never merge it yourself.
 - `python tools/check_plugin.py <plugin>` runs a plugin's checks and `--global`
   runs the shared ones; CI runs exactly these. New tests go in `tests/<plugin>/`
   or `tests/shared/` as `test_*.py`, `verify_*.py` or `*_check.py`, with file
@@ -124,7 +127,10 @@ work, even if your tool does not load skills on its own.
 
 ## Editing files from a shell
 
-- Never pass code with quotes or backslashes through a bash heredoc. Write the
-  script to your scratchpad with the file-writing tool and run it.
+- Never pass code with quotes or backslashes through a bash heredoc, sed or
+  `python -c`. Write the script to your scratchpad with the file-writing tool
+  and run it. Inside a patch script, text that holds backslashes (`\n`, a
+  Windows path) goes in raw strings (`r'''...'''`), or the edit is made with
+  the editing tool instead: an ordinary string turns `\n` into a line break.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.

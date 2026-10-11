@@ -40,6 +40,36 @@ def test_the_shipped_loader_is_built_from_its_source():
     assert tweak_mods.loader_bytes()  # checks the published hash
 
 
+def test_the_shipped_debug_loader_is_built_from_its_source():
+    build = build_module()
+    manifest = json.loads((RUNTIME / "package" / "debug" / "runtime-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["sourceSha256"] == build.source_hash(build.DEBUG_SOURCES), \
+        "Rebuild: python plugins/ds1/runtime/build.py --debug --dearxan FOLDER"
+    assert manifest["dearxan"] == build.DEARXAN
+    assert tweak_mods.loader_bytes(debug=True)  # checks the published hash
+
+
+def test_the_debug_loader_leaves_the_game_no_network(tmp_path):
+    """A game with Arxan off must never reach other players: once the debug
+    loader is in, a name lookup, a connection and a UDP send all fail."""
+    import shutil
+    try:
+        zig = build_module().find_zig(None)
+    except SystemExit:
+        pytest.skip("Zig is needed to build the test program")
+    folder = tmp_path / "game folder"
+    folder.mkdir()
+    exe = folder / "game.exe"
+    subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-O1", "-o", str(exe),
+                    str(Path(__file__).with_name("runtime_debug_harness.c")), "-lws2_32"], check=True)
+    shutil.copy2(RUNTIME / "package" / "debug" / "dinput8.dll", folder / "dinput8.dll")
+    out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60, cwd=tmp_path)
+    assert out.stdout.strip() == "before=1,1,1 after=0,0,0 loaded=1", out
+    log = (folder / "lexeditor-ds1-patch.log").read_text(encoding="utf-8")
+    assert "the game has no network access" in log
+    assert "a debugger can attach" in log, log
+
+
 def patch_file(original=bytes.fromhex("B801000000"), image_size=IMAGE_SIZE, delay=None):
     block = 0x10000
     hook = bytes((0xE9,)) + struct.pack("<i", block - (0x1000 + 5))

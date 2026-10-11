@@ -1,11 +1,11 @@
-"""Dark Souls Remastered's in-game item names: msg/ENGLISH/item.msgbnd.dcx.
+"""Dark Souls Remastered's in-game item text: msg/ENGLISH/item.msgbnd.dcx.
 
-An item's name is not part of its parameter row. The game reads it from a
+An item's name and descriptions are not part of its parameter row. The game reads them from a
 text table (FMG) by the row's ID, one table per kind of item, inside this
 compressed archive (the same DCX and BND3 shapes as the parameter archive,
 but its members carry folder paths and repeat names). Remastered keeps two
 copies of every table, IDs 10-29 and 100-120; both are read here and both
-are written, so a renamed item reads the same whichever copy the game uses.
+are written, so an edited item reads the same whichever copy the game uses.
 
 FMG, as Remastered ships it (little-endian, version 1): a 0x1C-byte header,
 then groups of (first index, first ID, last ID), then one string offset per
@@ -23,6 +23,12 @@ import zlib
 from .formats import FormatError, MAX_ARCHIVE, inflate
 
 RELATIVE = Path('msg/ENGLISH/item.msgbnd.dcx')
+# Tables with no parameter rows behind them that still merge by entry.
+# Place_name_ holds the warp destination (2000-2020) and area (1000-1810)
+# names the bonfire warp menu shows; the editor offers no rename surface
+# for them, but a mod may carry its own bytes and the loader composes
+# them entry by entry instead of taking one member whole.
+MERGED_TABLES = frozenset({'Place_name_.fmg'})
 # The parameter table each name table names, by the table's file name.
 NAME_TABLES = {
     'EquipParamGoods': 'Item_name_.fmg',
@@ -31,7 +37,21 @@ NAME_TABLES = {
     'EquipParamAccessory': 'Accessory_name_.fmg',
     'Magic': 'Magic_name_.fmg',
 }
+# The short and long description tables per parameter table. Short
+# descriptions are one line (60 characters at most in the game); long
+# ones are the full multi-line lore text (372 at most).
+DESC_TABLES = {
+    'EquipParamGoods': ('Item_description_.fmg', 'Item_long_desc_.fmg'),
+    'EquipParamWeapon': ('Weapon_description_.fmg', 'Weapon_long_desc_.fmg'),
+    'EquipParamProtector': ('Armor_description_.fmg', 'Armor_long_desc_.fmg'),
+    'EquipParamAccessory': ('Accessory_description_.fmg', 'Accessory_long_desc_.fmg'),
+    'Magic': ('Magic_description_.fmg', 'Magic_long_desc_.fmg'),
+}
 MAX_NAME = 200
+KIND_LABELS = {'name': 'Name', 'description': 'Description',
+               'longDescription': 'Full description'}
+MAX_DESCRIPTION = 200
+MAX_LONG_DESCRIPTION = 2000
 HEADER = 0x1C
 
 
@@ -140,7 +160,7 @@ def build_fmg(original: bytes, groups: list[tuple[int, int, int]], texts: dict[i
 
 
 class TextDocument:
-    """The item name tables of one item.msgbnd.dcx, renamable by item."""
+    """The item name and description tables of one item.msgbnd.dcx, editable by item."""
 
     def __init__(self, source: bytes):
         if len(source) > MAX_ARCHIVE:
@@ -150,9 +170,10 @@ class TextDocument:
         self.entries = bnd3_entries(self.plain)
         self.tables: dict[int, tuple[list, dict]] = {}
         self.original_texts: dict[int, dict] = {}
-        wanted = set(NAME_TABLES.values())
+        wanted = set(NAME_TABLES.values()) | {filename for pair in DESC_TABLES.values() for filename in pair}
+        known = wanted | MERGED_TABLES
         for position, entry in enumerate(self.entries):
-            if entry.name.replace('\\', '/').rsplit('/', 1)[-1] in wanted:
+            if entry.name.replace('\\', '/').rsplit('/', 1)[-1] in known:
                 groups, texts = parse_fmg(entry.data)
                 self.tables[position] = (groups, texts)
                 self.original_texts[position] = dict(texts)
@@ -163,12 +184,15 @@ class TextDocument:
     def _file(self, position: int) -> str:
         return self.entries[position].name.replace('\\', '/').rsplit('/', 1)[-1]
 
+    def _copies_of(self, filename: str) -> list[int]:
+        # The later copy (the higher member ID) is the one shown when they differ.
+        return sorted((position for position in self.tables if self._file(position) == filename),
+                      key=lambda position: self.entries[position].member_id, reverse=True)
+
     def _copies(self, table: str) -> list[int]:
         if table not in NAME_TABLES:
             return []
-        # The later copy (the higher member ID) is the one shown when they differ.
-        return sorted((position for position in self.tables if self._file(position) == NAME_TABLES[table]),
-                      key=lambda position: self.entries[position].member_id, reverse=True)
+        return self._copies_of(NAME_TABLES[table])
 
     def name(self, table: str, row_id: int) -> str | None:
         for position in self._copies(table):
@@ -179,6 +203,41 @@ class TextDocument:
 
     def renamable(self, table: str) -> bool:
         return bool(self._copies(table))
+
+    def describable(self, table: str) -> bool:
+        return table in DESC_TABLES and all(self._copies_of(filename) for filename in DESC_TABLES[table])
+
+    def description(self, table: str, row_id: int, long: bool = False) -> str | None:
+        if table not in DESC_TABLES:
+            return None
+        for position in self._copies_of(DESC_TABLES[table][long]):
+            text = self.tables[position][1].get(row_id)
+            if text:
+                return text
+        return None
+
+    def original_description(self, table: str, row_id: int, long: bool = False):
+        for position in self._copies_of(DESC_TABLES[table][long]):
+            if row_id in self.original_texts[position]:
+                return self.original_texts[position][row_id]
+        return None
+
+    def set_description(self, table: str, row_id: int, value, long: bool = False):
+        if not self.describable(table):
+            raise FormatError('These records have no in-game description to change.')
+        limit = MAX_LONG_DESCRIPTION if long else MAX_DESCRIPTION
+        text = str(value).replace('\r\n', '\n').replace('\r', '\n')
+        if any(ord(char) < 32 and (char != '\n' or not long) for char in text):
+            raise FormatError('A description holds text and, for a full description, line breaks.')
+        if not text.strip():
+            text = None
+        elif len(text) > limit:
+            if long:
+                raise FormatError(f'A full description is up to {limit} characters.')
+            raise FormatError(f'A description is one line of up to {limit} characters.')
+        for position in self._copies_of(DESC_TABLES[table][long]):
+            self.tables[position][1][row_id] = text
+        return text
 
     def rename(self, table: str, row_id: int, name: str) -> str:
         if not self.renamable(table):
@@ -191,12 +250,15 @@ class TextDocument:
         return name
 
     @property
-    def dirty(self) -> set[tuple[str, int]]:
+    def dirty(self) -> set[tuple[str, str, int]]:
         changed = set()
-        for table in NAME_TABLES:
-            for position in self._copies(table):
+        kinds = [('name', table, NAME_TABLES[table]) for table in NAME_TABLES]
+        kinds += [(role, table, filename) for table, (short, full) in DESC_TABLES.items()
+                  for role, filename in (('description', short), ('longDescription', full))]
+        for kind, table, filename in kinds:
+            for position in self._copies_of(filename):
                 texts, before = self.tables[position][1], self.original_texts[position]
-                changed |= {(table, item) for item in texts if texts.get(item) != before.get(item)}
+                changed |= {(kind, table, item) for item in texts if texts.get(item) != before.get(item)}
         return changed
 
     def export(self) -> bytes:

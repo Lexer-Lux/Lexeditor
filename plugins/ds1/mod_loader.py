@@ -18,6 +18,18 @@ Item names are merged by entry the same way. Anything else a mod changes in
 an archive member (a table's layout or header, a text table that is not a
 name table) cannot be merged, so that member is taken whole from the last
 mod in load order, and every mod that changed it is told what was dropped.
+
+Map files are merged by placement field: two mods moving different
+enemies, or one moving an enemy while another swaps which enemy it is,
+both apply. Two mods setting the same field of one placement conflict.
+A map a mod restructures (added or removed parts, or any byte outside
+the placement fields) is taken whole from the last mod instead.
+
+Character binders are merged by member: two mods changing different
+animation files in one binder both apply. Two mods changing the same
+member conflict. A resized member rebuilds the binder; a binder a mod
+restructures (added or removed members) is taken whole from the last
+mod instead.
 """
 from __future__ import annotations
 
@@ -29,14 +41,21 @@ import zlib
 from plugins.ds3.formats import DS3FormatError, ParamView
 
 from . import texts
-from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, schema
+from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
+from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
+from .tae_store import CHR_DIR, MAX_BINDER
 
 FILES = (RELATIVE, texts.RELATIVE)
+MAX_MAP_FILES = 64
+MAX_ANIBND_FILES = 64
 TABLE_NAMES = {"EquipParamGoods": "Items", "EquipParamWeapon": "Weapons",
                "EquipParamProtector": "Armor", "EquipParamAccessory": "Rings", "Magic": "Spells",
-               "NpcParam": "Enemies", "AtkParam_Npc": "Attacks", "SpEffectParam": "Effects",
-               "BehaviorParam": "Behaviors", "Bullet": "Projectiles"}
+               "NpcParam": "Enemies", "AtkParam_Npc": "Attacks", "AtkParam_Pc": "Player attacks",
+               "ReinforceParamWeapon": "Weapon upgrades", "ReinforceParamProtector": "Armor upgrades",
+               "ItemLotParam": "Drops", "ShopLineupParam": "Shops", "ObjActParam": "Treasure",
+               "BehaviorParam": "Behaviors", "NpcThinkParam": "AI",
+               "SpEffectParam": "Effects", "Bullet": "Projectiles"}
 
 
 @dataclass
@@ -90,6 +109,34 @@ def read_mod(folder: Path, name: str) -> Mod | None:
         if path.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{name}: {path.name} is too large")
         files[relative] = path.read_bytes()
+    maps = checked(folder / MAP_DIR)
+    if maps.is_dir():
+        found = sorted(maps.glob("*.msb"))
+        if len(found) > MAX_MAP_FILES:
+            raise ValueError(f"{name}: too many map files")
+        for path in found:
+            checked(path)
+            if path.stat().st_size > MAX_MAP:
+                raise ValueError(f"{name}: {path.name} is too large")
+            files[MAP_DIR / path.name.casefold()] = path.read_bytes()
+    chars = checked(folder / CHR_DIR)
+    if chars.is_dir():
+        found = sorted(chars.glob("*.anibnd.dcx"))
+        if len(found) > MAX_ANIBND_FILES:
+            raise ValueError(f"{name}: too many character files")
+        for path in found:
+            checked(path)
+            if path.stat().st_size > MAX_BINDER:
+                raise ValueError(f"{name}: {path.name} is too large")
+            files[CHR_DIR / path.name.casefold()] = path.read_bytes()
+    from . import assets
+    try:
+        carried = assets.scan_project(folder)
+    except assets.AssetError as error:
+        raise ValueError(f"{name}: {error}") from error
+    for row in carried:
+        relative = Path(row["relative"])
+        files[relative] = (folder / relative).read_bytes()
     return Mod(name, folder, files)
 
 
@@ -117,9 +164,10 @@ def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mo
     return mods
 
 
-def vanilla_files(game_root: Path) -> dict[Path, bytes]:
+def vanilla_files(game_root: Path, extra: frozenset[Path] = frozenset()) -> dict[Path, bytes]:
     """The game's own bytes of each file mods change: the preserved originals
-    once Lexeditor has applied, else the installed files."""
+    once Lexeditor has applied, else the installed files. `extra` names asset
+    files to load beyond the structured sets."""
     from . import deployment
     from .tweak_mods import checked
     result = {}
@@ -129,12 +177,49 @@ def vanilla_files(game_root: Path) -> dict[Path, bytes]:
             if path.stat().st_size > MAX_ARCHIVE:
                 raise ValueError(f"The game's {relative.name} is too large")
             result[relative] = path.read_bytes()
+    maps = Path(game_root) / MAP_DIR
+    if maps.is_dir():
+        for path in sorted(maps.glob("*.msb")):
+            relative = MAP_DIR / path.name.casefold()
+            source = checked(deployment.vanilla_source(Path(game_root), relative))
+            if source.is_file():
+                if source.stat().st_size > MAX_MAP:
+                    raise ValueError(f"The game's {relative.name} is too large")
+                result[relative] = source.read_bytes()
+    chars = Path(game_root) / CHR_DIR
+    if chars.is_dir():
+        for path in sorted(chars.glob("*.anibnd.dcx")):
+            relative = CHR_DIR / path.name.casefold()
+            source = checked(deployment.vanilla_source(Path(game_root), relative))
+            if source.is_file():
+                if source.stat().st_size > MAX_BINDER:
+                    raise ValueError(f"The game's {relative.name} is too large")
+                result[relative] = source.read_bytes()
+    from . import assets as _assets
+    for relative in sorted(extra):
+        if relative in result:
+            continue
+        source = checked(deployment.vanilla_source(Path(game_root), relative))
+        if source.is_file():
+            if source.stat().st_size > _assets.MAX_ASSET_BYTES:
+                raise ValueError(f"The game's {relative.name} is too large")
+            result[relative] = source.read_bytes()
     return result
 
 
 def build(game_root: Path, library_root: Path, project_root: Path | None = None) -> tuple[Composition, list[Mod]]:
     mods = active_mods(library_root, project_root)
-    return compose(vanilla_files(game_root), mods), mods
+    extra = frozenset(name for mod in mods for name in mod.files if _is_asset(name))
+    return compose(vanilla_files(game_root, extra), mods), mods
+
+
+def _is_asset(relative: Path) -> bool:
+    """A mod file no structured composer handles: a whole asset."""
+    if relative in FILES:
+        return False
+    if relative.suffix == ".msb" and relative.parent == MAP_DIR:
+        return False
+    return not (relative.suffix == ".dcx" and relative.parent == CHR_DIR)
 
 
 def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
@@ -156,6 +241,38 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
         conflicts += result[1]
         if result[0] != vanilla[texts.RELATIVE]:
             files[texts.RELATIVE] = result[0]
+    for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
+                            if path.suffix == ".msb" and path.parent == MAP_DIR}):
+        have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
+        if relative not in vanilla:
+            if have:
+                files[relative] = have[-1][1]
+            continue
+        result = _compose_maps(vanilla[relative], have, relative)
+        conflicts += result[1]
+        if result[0] != vanilla[relative]:
+            files[relative] = result[0]
+    for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
+                            if path.suffix == ".dcx" and path.parent == CHR_DIR}):
+        have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
+        if relative not in vanilla:
+            if have:
+                files[relative] = have[-1][1]
+            continue
+        result = _compose_anibnd(vanilla[relative], have, relative)
+        conflicts += result[1]
+        if result[0] != vanilla[relative]:
+            files[relative] = result[0]
+    for relative in sorted({name for mod in mods for name in mod.files if _is_asset(name)}):
+        have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
+        if relative not in vanilla:
+            if have:
+                files[relative] = have[-1][1]
+            continue
+        result = _compose_anibnd(vanilla[relative], have, relative, kind="file")
+        conflicts += result[1]
+        if result[0] != vanilla[relative]:
+            files[relative] = result[0]
     return Composition(files, conflicts)
 
 
@@ -486,7 +603,7 @@ def _rows_only(vanilla: bytes, data: bytes, spans: list[tuple[int, int, int]]) -
     return data[cursor:] == vanilla[cursor:]
 
 
-# --- Item names --------------------------------------------------------------
+# --- Item text ---------------------------------------------------------------
 
 def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list[Conflict]]:
     base = texts.TextDocument(vanilla)
@@ -516,7 +633,10 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
                         continue
                     key = (file, item)
                     if key in owners and owners[key] != name and merged[position].get(item) != after.get(item):
-                        conflict = conflicts.setdefault(key, Conflict(texts.RELATIVE, f"Name {item} ({file.removesuffix('_.fmg').replace('_', ' ')})"))
+                        # Merged-only tables (Place_name_) hold names too.
+                        role = ('Name' if file in texts.NAME_TABLES.values() or file in texts.MERGED_TABLES
+                                else 'Full description' if 'long_desc' in file else 'Description')
+                        conflict = conflicts.setdefault(key, Conflict(texts.RELATIVE, f"{role} {item} ({file.removesuffix('_.fmg').replace('_', ' ')})"))
                         conflict.add(owners[key])
                         conflict.add(name)
                     merged[position][item] = after.get(item)
@@ -556,3 +676,121 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
     header = bytearray(vanilla[:76])
     struct.pack_into(">II", header, 28, len(plain), len(compressed))
     return bytes(header) + compressed, result
+
+
+# --- Maps ------------------------------------------------------------------
+
+def _outside_same(base: MsbDocument, other: MsbDocument) -> bool:
+    """True when every byte outside the placement fields is unchanged."""
+    spans = sorted((start, start + size) for _key, _field, start, size, _label, _name in base.merge_units())
+    cursor = 0
+    for start, end in spans:
+        if other.plain[cursor:start] != base.plain[cursor:start]:
+            return False
+        cursor = max(cursor, end)
+    return other.plain[cursor:] == base.plain[cursor:]
+
+
+def _whole_map(vanilla: bytes, changed: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
+    touched = [name for name, _data in changed]
+    if len(touched) < 2:
+        return changed[-1][1], []
+    conflict = Conflict(relative, f"{relative.name} (whole map)")
+    for name in touched:
+        conflict.add(name)
+    return changed[-1][1], [conflict]
+
+
+def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
+    """Every mod's placement fields over vanilla's, or the last whole map."""
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    try:
+        base = MsbDocument(vanilla, relative.name)
+        docs = [(name, MsbDocument(data, relative.name)) for name, data in changed]
+    except MsbError:
+        return _whole_map(vanilla, changed, relative)
+    keys = [(part["type"], part["id"]) for part in base.parts]
+    units = base.merge_units()
+    for _name, doc in docs:
+        if len(doc.plain) != len(base.plain):
+            return _whole_map(vanilla, changed, relative)
+        if [(part["type"], part["id"]) for part in doc.parts] != keys:
+            return _whole_map(vanilla, changed, relative)
+        if not _outside_same(base, doc):
+            return _whole_map(vanilla, changed, relative)
+    merged = bytearray(vanilla)
+    owners: dict[tuple, str] = {}
+    conflicts: dict[tuple, Conflict] = {}
+    for name, doc in docs:
+        for key, field, start, size, label, pname in units:
+            theirs = bytes(doc.plain[start:start + size])
+            if theirs == bytes(base.plain[start:start + size]):
+                continue
+            current = bytes(merged[start:start + size])
+            unit = (key, field)
+            if unit in owners and owners[unit] != name and current != theirs:
+                part = f"{relative.name} {pname}, {label}"
+                entry = conflicts.setdefault(unit, Conflict(relative, part))
+                entry.add(owners[unit])
+                entry.add(name)
+            merged[start:start + size] = theirs
+            owners[unit] = name
+    return bytes(merged), list(conflicts.values())
+
+
+# --- Characters ------------------------------------------------------------
+
+def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
+    touched = [name for name, _data in changed]
+    if len(touched) < 2:
+        return changed[-1][1], []
+    conflict = Conflict(relative, f"{relative.name} (whole {kind})")
+    for name in touched:
+        conflict.add(name)
+    return changed[-1][1], [conflict]
+
+
+def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
+    """Every mod's changed binder members over vanilla's, or the last whole file."""
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    try:
+        base_plain = inflate(vanilla)
+        base_members = members(base_plain)
+        plains = []
+        for name, data in changed:
+            plain = inflate(data)
+            plains.append((name, plain, members(plain)))
+    except FormatError:
+        return _whole_anibnd(changed, relative, kind)
+    for _name, _plain, owned in plains:
+        if set(owned) != set(base_members):
+            return _whole_anibnd(changed, relative, kind)
+    winners: dict[str, bytes] = {}
+    owners: dict[str, str] = {}
+    conflicts: dict[str, Conflict] = {}
+    for name, plain, owned in plains:
+        for member, entry in owned.items():
+            base = base_members[member]
+            theirs = bytes(plain[entry.offset:entry.offset + entry.size])
+            if theirs == bytes(base_plain[base.offset:base.offset + base.size]):
+                continue
+            if member in owners and owners[member] != name and winners[member] != theirs:
+                entry_conflict = conflicts.setdefault(member, Conflict(relative, member))
+                entry_conflict.add(owners[member])
+                entry_conflict.add(name)
+            winners[member] = theirs
+            owners[member] = name
+    items = {member: bytes(base_plain[entry.offset:entry.offset + entry.size])
+             for member, entry in base_members.items()}
+    items.update(winners)
+    if all(len(items[member]) == base_members[member].size for member in items):
+        merged = bytearray(base_plain)
+        for member, data in winners.items():
+            base = base_members[member]
+            merged[base.offset:base.offset + base.size] = data
+        return deflate(vanilla, bytes(merged)), list(conflicts.values())
+    return deflate(vanilla, pack(base_plain, items)), list(conflicts.values())

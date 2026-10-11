@@ -16,6 +16,34 @@ ATTACK_FIELDS = {
 ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
     'Selects the physical defense used against this attack. Standard has no slash, strike or thrust attribute.')
 
+# Each attack carries four hit slots. A slot's size and its two model points
+# place the hitbox on the attacker; Smithbox's MIT annotations define the
+# radius and dummy-point placement. Priority breaks ties when slots strike
+# together. Hit type stays protected: its collision-type values are not
+# documented well enough to expose.
+for _slot in range(4):
+    ATTACK_FIELDS[f'hit{_slot}_Radius'] = (
+        f'Hit {_slot}: Size', 'Hitbox',
+        f"How large hit slot {_slot}'s hitbox is. Larger values hit a wider area.")
+    ATTACK_FIELDS[f'hit{_slot}_DmyPoly1'] = (
+        f'Hit {_slot}: First point', 'Hitbox',
+        f"The model point hit slot {_slot} follows. Use an ID from the attacker's model.")
+    ATTACK_FIELDS[f'hit{_slot}_DmyPoly2'] = (
+        f'Hit {_slot}: Second point', 'Hitbox',
+        f"The second model point for hit slot {_slot}. It shapes the hitbox together with the first point.")
+    ATTACK_FIELDS[f'hti{_slot}_Priority'] = (
+        f'Hit {_slot}: Priority', 'Hitbox',
+        'Which hit wins when several slots strike at once. Higher values win.')
+ATTACK_FIELDS['hitSourceType'] = (
+    'Hitbox source', 'Hitbox',
+    'Which part of the attacker the hitbox points attach to.')
+ATTACK_FIELDS['knockbackDist'] = (
+    'Knockback', 'Impact',
+    'How hard this attack knocks the victim back. Higher values throw the victim further.')
+ATTACK_FIELDS['hitStopTime'] = (
+    'Hit pause', 'Impact',
+    "How long the victim's animation pauses when hit, in seconds.")
+
 
 class AttackReferences:
     def __init__(self, document):

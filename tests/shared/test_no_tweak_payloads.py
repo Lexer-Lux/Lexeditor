@@ -24,6 +24,8 @@ ALLOWED_BINARIES = {
     "plugins/ff8/ffnx_issue_51/package/AF3DN.P": "FFNx derivative driver (plugin infrastructure)",
     "plugins/ff8/ffnx_issue_51/package/FFNx_steam_api.dll": "FFNx derivative driver (plugin infrastructure)",
     "plugins/ff9/runtime/Memoria.Scripts.Lexeditor.dll": "FF9 tweaks, moving to library mods in #913",
+    "plugins/ds1/runtime/package/dinput8.dll": "DS1 mod loader, built from plugins/ds1/runtime (plugin infrastructure)",
+    "plugins/ds1/runtime/package/debug/dinput8.dll": "DS1 debug loader: Arxan off, no network (plugin infrastructure)",
 }
 # Folders holding tweak source that has not moved yet.
 ALLOWED_FOLDERS = {

@@ -1,4 +1,4 @@
-"""Resistance-only edits, classification, validation, and byte preservation."""
+"""Reviewed-stat edits, classification, validation, and byte preservation."""
 from pathlib import Path
 import sys
 import pytest
@@ -6,15 +6,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
 from plugins.ds1.formats import ItemDocument, FormatError, inflate, SIZES
-from plugins.ds1.monsters import RESISTANCES
+from plugins.ds1.monsters import NPC_FIELDS
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds3.formats import write_field
 
 
-def test_only_reviewed_monsters_and_only_resistance_fields_are_accessible():
+def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     doc = ItemDocument(make_archive())
     assert [row['id'] for row in doc.list_rows('monsters')] == [120000, 120100]
-    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(RESISTANCES)
+    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(NPC_FIELDS)
     assert all(field['editable'] for field in doc.read_row('NpcParam', 120000)['fields'])
     # Stray Demon deliberately has type 0, and Egg Carrier shares a monster
     # family name but has type 2. Neither name-only nor type-only filtering works.
@@ -23,35 +23,42 @@ def test_only_reviewed_monsters_and_only_resistance_fields_are_accessible():
             doc.read_row('NpcParam', excluded)
         with pytest.raises(FormatError, match='not a reviewed'):
             doc.edit('NpcParam', excluded, 'def_phys', 10)
-    for key in ('hp', 'npcType', 'teamType', 'spEffectID0', 'poisonGuardResist'):
+    others = [f['spec'].key for f in doc.schemas['NpcParam']['fields']
+              if f['spec'].key not in NPC_FIELDS]
+    assert others and 'npcType' in others and 'behaviorVariationId' in others
+    for key in others:
         with pytest.raises(FormatError, match='protected'):
             doc.edit('NpcParam', 120000, key, 1)
 
 
-def test_all_resistances_roundtrip_only_their_cells_and_revert_exactly():
+def test_all_stats_roundtrip_only_their_cells_and_revert_exactly():
     original = make_archive()
     doc = ItemDocument(original)
     assert doc.export() == original
-    allowed = set()
-    for key in RESISTANCES:
-        spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == key)
+    allowed, written = set(), {}
+    for key in NPC_FIELDS:
+        item = next(f for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == key)
+        spec = item['spec']
         start = doc._row('NpcParam', 120000)[1] + spec.offset
         allowed.update(range(start, start + SIZES[spec.dtype]))
-        doc.edit('NpcParam', 120000, key, 1 if spec.is_bool else 25.5 if spec.dtype == 'f32' else 25)
+        value = 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
+        doc.edit('NpcParam', 120000, key, value)
+        written[key] = value
     reopened = ItemDocument(doc.export())
-    for key in RESISTANCES:
-        assert reopened.value('NpcParam', 120000, key) in (1, 25, 25.5)
+    for key, value in written.items():
+        assert reopened.value('NpcParam', 120000, key) == value
     changed = {index for index, (a, b) in enumerate(zip(inflate(original), inflate(doc.export()))) if a != b}
     assert changed and changed <= allowed
-    for key in RESISTANCES:
+    for key in NPC_FIELDS:
         doc.edit('NpcParam', 120000, key, 0)
     assert doc.dirty_count == 0 and doc.export() == original
 
 
 @pytest.mark.parametrize('field,value', [('def_phys', -1), ('def_phys', 10000), ('def_phys', 1.5),
     ('def_slash', -101), ('resist_poison', 1000), ('physGuardCutRate', 101),
-    ('physGuardCutRate', float('nan')), ('def_mag', '10')])
-def test_resistance_bounds_and_types_are_enforced(field, value):
+    ('physGuardCutRate', float('nan')), ('def_mag', '10'),
+    ('hp', -1), ('teamType', 27), ('dropType', 2), ('stamina', 1.5)])
+def test_stat_bounds_and_types_are_enforced(field, value):
     doc = ItemDocument(make_archive())
     with pytest.raises(FormatError): doc.edit('NpcParam', 120000, field, value)
     assert doc.export() == doc.original

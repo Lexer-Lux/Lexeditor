@@ -407,5 +407,75 @@ class CloneTests(unittest.TestCase):
             menu_layout.compose(original, [first, clash])
 
 
+class OffsetTests(unittest.TestCase):
+    """Warp tabs: nodes move horizontally (dx) and sprites resize (size)."""
+
+    def test_dx_moves_text_and_sprites_horizontally(self):
+        layout = menu_layout.Drb(drb())
+        layout.add_text("data_simple_arms", "text_moved", "text_receive_name", 30, 16, dx=100)
+        self.assertEqual(layout.text("data_simple_arms", "text_moved")["rect"], [464, 292, 581, 320])
+        layout.add_sprite("data_simple_arms", "icon_moved", ("list_armor", "icon_tolerance_sa"),
+                          "icon_receive", 30, "ffffffff", dx=-20)
+        kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "icon_moved").shape)
+        self.assertEqual(struct.unpack_from("<4h", blob), (312, 292, 340, 320))
+
+    def test_left_applies_after_dx(self):
+        layout = menu_layout.Drb(drb())
+        layout.add_text("data_simple_arms", "text_wide", "text_param_receive", 30, 32, left=400, dx=50)
+        self.assertEqual(layout.text("data_simple_arms", "text_wide")["rect"], [400, 292, 665, 320])
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_text("data_simple_arms", "text_bad", "text_param_receive", 30, 32,
+                            left=700, dx=50)
+
+    def test_sprite_size_sets_dimensions(self):
+        layout = menu_layout.Drb(drb())
+        layout.add_sprite("data_simple_arms", "icon_panel", ("list_armor", "icon_tolerance_sa"),
+                          "icon_receive", -11, "ff2a2622", dx=422, size=[620, 349])
+        kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "icon_panel").shape)
+        self.assertEqual(kind, "Sprite")
+        self.assertEqual(struct.unpack_from("<4h", blob), (754, 251, 1374, 600))
+        self.assertEqual(blob[32:36], bytes.fromhex("ff2a2622"))
+
+    def test_bad_offsets_and_sizes_are_refused(self):
+        layout = menu_layout.Drb(drb())
+        plain = layout.to_bytes()
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_text("data_simple_arms", "t1", "text_receive_name", 30, 16, dx=True)
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_text("data_simple_arms", "t2", "text_receive_name", 30, 16, dx=40000)
+        for size in ([0, 10], [10], [10, 5000], [True, 10], "wide"):
+            with self.subTest(size=size), self.assertRaises(menu_layout.LayoutError):
+                layout.add_sprite("data_simple_arms", "icon_x", ("list_armor", "icon_tolerance_sa"),
+                                  "icon_receive", 30, "ffffffff", size=size)
+        # Rectangles must stay inside the layout's int16 range.
+        blob = struct.pack("<4h", 32000, 0, 32100, 100) + b"\0" * 24
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.Drb._moved(blob, 0, 800)
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.Drb._moved(blob, 0, 0, size=[4000, 4000])
+        self.assertEqual(layout.to_bytes(), plain)
+
+    def test_patch_descriptions_accept_dx_and_size(self):
+        nodes = [{**STAMINA[0], "dx": 100},
+                 {**STAMINA[1], "dx": -50, "left": 400},
+                 {"dialog": "data_simple_arms", "name": "icon_panel",
+                  "sprite": ["list_armor", "icon_tolerance_sa"], "lookLike": "icon_receive",
+                  "dy": 30, "color": "ffffffff", "dx": 10, "size": [620, 349]}]
+        spec = menu_layout.validate({"version": 1, "nodes": nodes}, "Mod")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(dcx(drb()), [spec])))
+        self.assertEqual(layout.text("data_simple_arms", "text_lexeditor_stamina")["rect"],
+                         [464, 292, 581, 320])
+        kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "icon_panel").shape)
+        self.assertEqual(struct.unpack_from("<4h", blob), (342, 292, 962, 641))
+        for bad in ({**STAMINA[0], "dx": "1"},
+                    {"dialog": "data_simple_arms", "name": "icon_x",
+                     "sprite": ["list_armor", "icon_tolerance_sa"], "lookLike": "icon_receive",
+                     "dy": 30, "color": "ffffffff", "size": [10]},
+                    {"dialog": "data_simple_arms", "name": "text_x", "lookLike": "text_receive_name",
+                     "dy": 30, "length": 16, "size": [10, 10]}):
+            with self.subTest(bad=bad), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "nodes": [bad]}, "Mod")
+
+
 if __name__ == "__main__":
     unittest.main()

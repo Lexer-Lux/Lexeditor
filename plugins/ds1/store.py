@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -101,6 +101,8 @@ class ItemStore:
                 'statsTabs': [{'id': key, 'label': label, 'table': table,
                                'count': len(document.list_rows(key)) if table in document.params else 0}
                               for key, label, table in STATS_SUBTABS],
+                'worldTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                              for key, label, table in WORLD_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS]}
 
@@ -111,6 +113,14 @@ class ItemStore:
     def rename(self, table, row_id, name, only=None):
         self.writable()
         return self.get().rename(table, row_id, name, only=only)
+
+    def add_row(self, table, row_id, new_id=None):
+        self.writable()
+        return self.get().add_row(table, row_id, new_id)
+
+    def remove_row(self, table, row_id):
+        self.writable()
+        return self.get().remove_row(table, row_id)
 
     def validate_save(self):
         from .tweak_mods import checked
@@ -127,14 +137,14 @@ class ItemStore:
             raise ValueError('The mod archive changed outside Lexeditor. Reopen it before saving.')
         if document.texts and (digest(self.text_source) != self.text_hash
                                or digest(self.text_output) != self.text_output_hash):
-            raise ValueError('The item names changed outside Lexeditor. Reopen it before saving.')
+            raise ValueError('The item text changed outside Lexeditor. Reopen it before saving.')
         return document
 
     def save(self):
         document = self.validate_save()
         payload = document.export()
         ItemDocument(payload)
-        # Names are written only once the mod has changed one; until then the
+        # Text is written only once the mod has changed some; until then the
         # mod carries no text archive and the game keeps its own.
         names = document.texts.export() if document.texts and (document.texts.dirty or self.text_output.is_file()) else None
         if names is not None: texts.TextDocument(names)

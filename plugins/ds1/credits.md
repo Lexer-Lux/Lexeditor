@@ -15,11 +15,29 @@ are copied. The upstream MIT notice covers the redistributed metadata.
 
 TKGP / JKAnderson's SoulsTemplates BND3.bt and DCX.bt at commit
 `f1d114a3668e3c97a1ace82411158df6b3bc50a4` supplied archive format facts.
+The same revision's MSB/MSB1 templates (MSB1.bt, Model.bt, Part.bt, by
+Meowmaritus and TKGP) supplied the map layout facts behind `msb.py`,
+including the Part.bt type-data blob sizes placement duplication copies.
 These templates are Apache-2.0 licensed; no template code is redistributed.
 https://github.com/JKAnderson/SoulsTemplates
 
 Smithbox's SoulsFormats dependency was inspected as a research reference,
 found to be GPL-3.0, and excluded. It is not bundled, linked, or invoked.
+
+## Animation events (tae.py)
+
+The TAE container layout (header, animation table, event headers,
+timestamp pool) comes from the same revision's TAE3.bt and
+TAE3_EventData.bt templates (Apache-2.0, by TKGP), translated to the
+32-bit DS1 form and verified against every animation file in every
+readable character binder. No template code is redistributed.
+Event-type meanings and parameter facts were paraphrased from the
+soulsmodding wiki's format:tae page (CC BY-SA),
+http://soulsmodding.wikidot.com/format:tae, and confirmed against
+measured value distributions across the installed game before any
+field was exposed. DSAnimStudio's DS1 event template
+(Meowmaritus/DSAnimStudio) served as a read-only cross-check for
+field order and sizes; none of its text, names, or code is reused.
 
 ## Native param replacement (deployment.py)
 
@@ -73,3 +91,14 @@ read-only inspection of the installed Remastered `menu/menu.drb.dcx`; see
 the SoulsTemplates DCX facts above.
 
 Each tweak's own credits travel with its mod.
+
+## Debug mode (runtime/lexeditor_ds1_debug.c)
+
+The debug loader links dearxan 0.5.6 by tremwil, dual-licensed MIT and
+Apache-2.0, from its official release `dearxan-0.5.6.zip`. dearxan neuters
+Arxan (GuardIT) in FromSoftware games so a debugger can attach; it is linked
+only into the debug loader (`runtime/package/debug/dinput8.dll`), never the
+everyday one. https://github.com/tremwil/dearxan
+
+me3's write-up on Arxan in FromSoftware games described why debuggers and
+breakpoints end the game. https://me3.help/en/latest/blog/posts/arxan-reversing-1/

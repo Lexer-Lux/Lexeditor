@@ -1,4 +1,4 @@
-"""Rendered monster resistance edits against synthetic or copied installed data."""
+"""Rendered monster stat, behavior and AI edits against synthetic or copied installed data."""
 import hashlib
 import json
 import os
@@ -10,8 +10,8 @@ from urllib.error import HTTPError
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
-from plugins.ds1.formats import ItemDocument
-from plugins.ds1.monsters import RESISTANCES
+from plugins.ds1.formats import BEHAVIOR_EDITABLE, ENEMY_SUBTABS, THINK_EDITABLE, ItemDocument
+from plugins.ds1.monsters import NPC_FIELDS
 from plugins.ds1.store import RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 from core.service_session import request_json
@@ -25,7 +25,7 @@ def main():
     source = Path(real) / RELATIVE if real else None
     raw = source.read_bytes() if source else make_archive()
     original_hash = hashlib.sha256(raw).hexdigest()
-    changes = {'def_phys': 101, 'def_slash': -10, 'resist_poison': 275, 'physGuardCutRate': 33.5}
+    changes = {'def_phys': 101, 'def_slash': -10, 'resist_poison': 275, 'physGuardCutRate': 33.5, 'dropType': 1}
     errors = []
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-monsters-') as temporary:
         game, mod = Path(temporary) / 'game', Path(temporary) / 'mod'
@@ -47,15 +47,15 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     monsters()
-                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['monsters']
-                    # The detail pane opens on Resistances; Attacks is its other tab.
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(ENEMY_SUBTABS, key=lambda entry: entry[1].lower())]
+                    # The detail pane opens on Stats; Attacks is its other tab.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['attacks', 'resistances']
                     assert page.evaluate('state.monsterTab') == 'resistances'
                     assert page.evaluate('state.row.id') == 120000
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))
-                    assert expected == set(RESISTANCES)
+                    assert expected == set(NPC_FIELDS)
                     seen, edited = set(), set()
                     for index in range(12):
                         fields = page.locator('input[data-field-key]:visible')
@@ -65,8 +65,11 @@ def main():
                             seen.add(key)
                             # The weaknesses (Divine, Occult, Abyssal) are flags.
                             kind = field.get_attribute('type')
-                            assert kind in ('number', 'checkbox'), (key, kind)
-                            if kind == 'number':
+                            assert kind in ('number', 'checkbox', 'text'), (key, kind)
+                            if kind == 'text':
+                                # Grouped thousands: the bounds stay on the control.
+                                assert field.get_attribute('inputmode') in ('numeric', 'decimal'), key
+                            if kind in ('number', 'text'):
                                 assert field.get_attribute('min') is not None and field.get_attribute('max') is not None
                             field.scroll_into_view_if_needed()
                             box = field.bounding_box()
@@ -76,16 +79,48 @@ def main():
                                 page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
                                                        arg={'key': key, 'value': changes[key]})
                                 edited.add(key)
+                        # Fresh handle per control: a commit re-renders the pane.
+                        options = page.locator('select[data-field-key]:visible')
+                        for key in options.evaluate_all('nodes=>nodes.map(n=>n.dataset.fieldKey)'):
+                            select = page.locator(f'select[data-field-key="{key}"]:visible')
+                            seen.add(key)
+                            assert select.locator('option').count() > 1, key
+                            select.scroll_into_view_if_needed()
+                            if key in changes:
+                                select.select_option(str(changes[key]))
+                                page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
+                                                       arg={'key': key, 'value': changes[key]})
+                                edited.add(key)
                         if output: page.screenshot(path=str(output / f'monsters-{index}.png'))
                         following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
                         if not following.count() or not following.is_enabled(): break
                         following.click()
                     assert seen == expected and edited == changes.keys()
+                    brains = []
+                    for sub, table, allowed in [('behaviors', 'BehaviorParam', BEHAVIOR_EDITABLE), ('ai', 'NpcThinkParam', THINK_EDITABLE)]:
+                        page.locator(f'[data-subtab="{sub}"]').click()
+                        page.wait_for_function('(want)=>state.sub===want.sub && state.rows.length>0 && state.row && state.row.table===want.table && !state.error', arg={'sub': sub, 'table': table})
+                        assert {field['key'] for field in page.evaluate('state.row.fields')} == set(allowed)
+                        control = page.locator('input[data-field-key][type="number"][min]:visible').first
+                        if not control.count():
+                            control = page.locator('input[data-field-key][type="text"][min]:visible').first
+                        key = control.get_attribute('data-field-key')
+                        old = float(control.input_value() or 0)
+                        low, high = float(control.get_attribute('min')), float(control.get_attribute('max'))
+                        value = min(max(old + 1, low), high)
+                        if value == old: value = max(low, old - 1)
+                        identity = page.evaluate('state.row.id')
+                        control.fill(str(int(value)) if float(value).is_integer() else str(value))
+                        control.press('Tab')
+                        page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value', arg={'key': key, 'value': value})
+                        brains.append((table, identity, key, value))
+                        if output: page.screenshot(path=str(output / f'monsters-{sub}.png'))
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload(); page.wait_for_selector('body[data-ds1-ready="true"]'); monsters()
                     reopened = ItemDocument((mod / RELATIVE).read_bytes())
                     for key, value in changes.items(): assert reopened.value('NpcParam', 120000, key) == value
+                    for table, identity, key, value in brains: assert reopened.value(table, identity, key) == value
                     page.locator('[data-tab="items"]').click()
                     page.wait_for_function('state.tab==="items" && state.row?.table==="EquipParamGoods"')
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 8
@@ -97,7 +132,7 @@ def main():
                     page.wait_for_timeout(350)  # Let the shared label fitter finish after resize/search.
                     if output: page.screenshot(path=str(output / 'monsters-small.png'))
                     # Public API must enforce the same narrow boundary as the UI.
-                    for identity, key in [(120000, 'hp'), (223000, 'def_phys')]:
+                    for identity, key in [(120000, 'npcType'), (223000, 'def_phys')]:
                         try:
                             request_json(session.url + 'api/edit', {'table':'NpcParam','id':identity,'field':key,'value':1})
                             raise AssertionError('Out-of-scope field/record accepted')
@@ -123,7 +158,10 @@ def main():
                     # read-only look; a real click still reaches the shared
                     # shell's edit-attempt gate, so force this scripted one
                     # past Playwright's own actionability check for it.
-                    vanilla.locator('input[data-field-key="def_phys"]').click(force=True)
+                    target = vanilla.locator('input[data-field-key="def_phys"]:visible')
+                    if not target.count():
+                        target = vanilla.locator('[data-field-key]:visible').first
+                    target.click(force=True)
                     vanilla.get_by_role('button', name='Create a mod', exact=True).wait_for()
                     vanilla.get_by_role('button', name='Cancel', exact=True).click()
                     assert request_json(session.url + 'api/state')['dirtyCount'] == 0
@@ -132,7 +170,7 @@ def main():
         finally: session.stop()
         assert hashlib.sha256((game / RELATIVE).read_bytes()).hexdigest() == original_hash
     if source: assert hashlib.sha256(source.read_bytes()).hexdigest() == original_hash
-    print(json.dumps({'monsters':count,'resistanceFields':len(expected),'uiEditsSavedAndReloaded':len(edited),
+    print(json.dumps({'monsters':count,'statFields':len(expected),'uiEditsSavedAndReloaded':len(edited),'brainsEdits':len(brains),
                       'vanillaReadOnly':True,'originalUnchanged':True,'browserErrors':errors}))
 
 

@@ -3,8 +3,9 @@
 Switching a mod on or off in the Mods tab applies the new set at once, the
 same way the editor's Apply does: tweak mods are composed onto the original
 executable (tweak_mods.py), and data mods are combined over the game's own
-parameter and item-name archives (mod_loader.py), all under one lock and
-with the executable put back if the data files cannot be written.
+parameter, item-name, map and character files (mod_loader.py), all under
+one lock and with the executable put back if the data files cannot be
+written.
 """
 from __future__ import annotations
 
@@ -18,6 +19,8 @@ from .store import MARKER, RELATIVE
 
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
 DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold()}
+MAP_PREFIX = "map/mapstudio/"
+CHR_PREFIX = "chr/"
 
 
 class Ds1ModAdapter:
@@ -25,8 +28,9 @@ class Ds1ModAdapter:
 
     verified = True
     message = ("Combines every enabled Dark Souls Remastered mod over the game's own "
-               "files: parameters and item names field by field, tweaks onto the "
-               "original executable. Close the game before switching mods.")
+               "files: parameters and item names field by field, map placements "
+               "placement by placement, character binders member by member, tweaks "
+               "onto the original executable. Close the game before switching mods.")
     package_types = ("folder", "zip")
     # Steam starts the game; Play installs the enabled mods first, rebuilt.
     deploys_on_launch = True
@@ -47,13 +51,16 @@ class Ds1ModAdapter:
         tweak = script_mods.is_script_mod(Path(root))
         packages, ignored = [], []
         for path in files:
-            if path.as_posix().casefold() in DATA_FILES:
+            folded = path.as_posix().casefold()
+            if (folded in DATA_FILES or (folded.startswith(MAP_PREFIX) and folded.endswith(".msb"))
+                    or (folded.startswith(CHR_PREFIX) and folded.endswith(".anibnd.dcx"))):
                 packages.append(path.as_posix())
             else:
                 ignored.append(path.as_posix())
         problems = [] if packages or tweak else [
             f"This folder has no Dark Souls Remastered mod files. A data mod keeps "
-            f"{RELATIVE.as_posix()} and/or {texts.RELATIVE.as_posix()}; a tweak mod has a script."]
+            f"{RELATIVE.as_posix()}, {texts.RELATIVE.as_posix()} and/or map and character files; "
+            f"a tweak mod has a script."]
         return {"valid": not problems, "problems": problems, "packages": sorted(packages),
                 "assets": {}, "notDeployed": sorted(ignored)}
 

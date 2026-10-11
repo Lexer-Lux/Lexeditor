@@ -462,6 +462,72 @@ class ParamView:
         struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
         return bytes(result)
 
+    def delete_row(self, row_id: int, row_size: int) -> bytes:
+        """Drop one row's directory entry and payload, preserving the rest.
+
+        The row's name bytes stay orphaned after the strings, as they harm
+        nothing and their extent is not tracked. Row order is otherwise kept.
+        """
+        target = [index for index, row in enumerate(self.rows) if row.row_id == row_id]
+        if len(target) != 1:
+            raise DS3FormatError(f"Expected one row ID {row_id}; found {len(target)}")
+        if self.row_count <= 1:
+            raise DS3FormatError("A PARAM keeps at least one row")
+        target = target[0]
+        extended = bool(self.format2d & 4 or self.format2d & 3 == 3)
+        header_end = 64 if extended else 48
+        stride = 24 if self.long_offsets else 12
+        directory_end = header_end + self.row_count * stride
+        strings = self.strings_offset
+        if row_size <= 0 or not directory_end <= strings <= len(self.data):
+            raise DS3FormatError("PARAM data/string boundaries are inconsistent")
+        if any(not directory_end <= row.data_offset or row.data_offset + row_size > strings for row in self.rows):
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        entry_at = header_end + target * stride
+        data_pos = entry_at + (8 if self.long_offsets else 4)
+        code = 'q' if self.long_offsets else 'I'
+        data_at = self._unpack(code, data_pos)
+        if not directory_end <= data_at or data_at + row_size > strings:
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        # Nothing kept may point into either removed span.
+        for index, row in enumerate(self.rows):
+            if index == target:
+                continue
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if not offset:
+                    continue
+                if entry_at <= offset < entry_at + stride or data_at <= offset < data_at + row_size:
+                    raise DS3FormatError("PARAM row data overlaps another row's target")
+        result = bytearray(self.data[:entry_at] + self.data[entry_at + stride:data_at]
+                           + self.data[data_at + row_size:])
+
+        def relocated(offset):
+            return offset - (stride if offset >= entry_at + stride else 0) - (row_size if offset >= data_at + row_size else 0)
+
+        struct.pack_into(self.endian + 'H', result, 10, self.row_count - 1)
+        struct.pack_into(self.endian + 'I', result, 0, strings - stride - row_size)
+        data_code, data_position = ('q', 48) if self.long_offsets else ('I', 48) if extended else ('H', 4)
+        data_start = self._unpack(data_code, data_position)
+        struct.pack_into(self.endian + data_code, result, data_position, relocated(data_start))
+        if self.format2d & 0x80:
+            struct.pack_into(self.endian + 'q', result, 16, relocated(self._unpack('q', 16)))
+        for index in range(target):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if offset:
+                    struct.pack_into(self.endian + code, result, offset_position, relocated(offset))
+        for index in range(target + 1, self.row_count):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            moved = pos - stride
+            for shift in (0, 8 if self.long_offsets else 4):
+                offset = self._unpack(code, pos + shift)
+                if offset:
+                    struct.pack_into(self.endian + code, result, moved + shift, relocated(offset))
+        return bytes(result)
+
 _TYPE_SIZE = {"s8":1,"u8":1,"dummy8":1,"s16":2,"u16":2,"s32":4,"u32":4,"b32":4,"f32":4,"angle32":4,"f64":8}
 _INT_LIMITS = {
     "s8":(-128,127), "u8":(0,255), "s16":(-32768,32767), "u16":(0,65535),
