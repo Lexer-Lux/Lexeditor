@@ -43,7 +43,7 @@ def test_an_unchanged_text_archive_writes_back_its_exact_bytes():
 def test_a_rename_changes_every_copy_and_nothing_else():
     document = texts.TextDocument(make_text_archive())
     document.rename("EquipParamGoods", 100, "Soul Safety Stone")
-    assert document.dirty == {("EquipParamGoods", 100)}
+    assert document.dirty == {("name", "EquipParamGoods", 100)}
     reread = texts.TextDocument(document.export())
     assert reread.name("EquipParamGoods", 100) == "Soul Safety Stone"
     assert reread.name("EquipParamGoods", 101) == "Fixture Key"

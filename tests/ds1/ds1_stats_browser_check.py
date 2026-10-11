@@ -53,7 +53,7 @@ def main():
                     # The tab and subtab flip before the new rows arrive, so the
                     # wait names the new rows' table; stale rows would pass it.
                     page.wait_for_function('state.tab==="stats" && state.sub==="curves" && state.rows.length>0 && state.rows[0].table==="CalcCorrectGraph" && state.row && state.row.table==="CalcCorrectGraph" && !state.error')
-                    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == [t[0] for t in STATS_SUBTABS]
+                    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == [t[0] for t in sorted(STATS_SUBTABS, key=lambda entry: entry[1].lower())]
                     for tab, _, table in STATS_SUBTABS:
                         page.locator(f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(want)=>state.sub===want.tab && state.rows.length>0 && state.rows[0].table===want.table && state.row && state.row.table===want.table && !state.error', arg={'tab': tab, 'table': table})

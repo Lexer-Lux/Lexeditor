@@ -63,18 +63,28 @@ def make_archive():
     return bytes(header) + compressed
 
 
-def make_text_archive(names=None):
-    """A synthetic msg/ENGLISH/item.msgbnd.dcx: every name table twice (the
-    base and later copies Remastered ships), holding `names` by table."""
+def make_text_archive(names=None, descs=None):
+    """A synthetic msg/ENGLISH/item.msgbnd.dcx: every name and description
+    table twice (the base and later copies Remastered ships), holding `names`
+    and `descs` by table."""
     from plugins.ds1 import texts
     names = names or {'EquipParamGoods': {100: 'Fixture Stone', 101: 'Fixture Key'},
                       'EquipParamWeapon': {100: 'Fixture Sword'}}
+    descs = descs or {'EquipParamGoods': {100: ('A stone of safety.', 'A stone that keeps souls safe.\nIt has never broken.')},
+                      'EquipParamWeapon': {100: ('A blade for testing.', 'A blade made for testing.\nIt has never tasted blood.')}}
     blank = b'\0\0\x01\0' + bytes(4) + b'\x01\0\0\0' + bytes(texts.HEADER - 12)
     entries = []
+    folder = 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92))
     for base in (10, 110):
         for offset, (table, file_name) in enumerate(texts.NAME_TABLES.items()):
             payload = texts.build_fmg(blank, [], dict(names.get(table, {})))
-            entries.append((base + offset, 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92)) + file_name, payload))
+            entries.append((base + offset, folder + file_name, payload))
+        for offset, (table, (short, full)) in enumerate(texts.DESC_TABLES.items()):
+            pair = descs.get(table, {})
+            entries.append((base + 10 + offset * 2, folder + short,
+                            texts.build_fmg(blank, [], {item: text[0] for item, text in pair.items()})))
+            entries.append((base + 11 + offset * 2, folder + full,
+                            texts.build_fmg(blank, [], {item: text[1] for item, text in pair.items()})))
     encoded = [name.encode('shift_jis') + b'\0' for _, name, _ in entries]
     directory_end = 32 + len(entries) * 24
     names_end = directory_end + sum(map(len, encoded))
