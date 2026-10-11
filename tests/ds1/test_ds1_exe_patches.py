@@ -155,6 +155,35 @@ class CombinerTests(unittest.TestCase):
             with self.subTest(label), self.assertRaises(exe_patches.PatchError):
                 action()
 
+    def test_grown_state_is_owned_by_one_tweak(self):
+        """.data's tail (0x2100-0x2180 here) is state; two tweaks never share a byte."""
+        def grows(size=0x180, state=None):
+            spec = {"version": 1, "sectionVirtualSize": {".data": size}}
+            return spec if state is None else {**spec, "state": state}
+        low = [{"rva": 0x2100, "size": 0x20}]
+        high = [{"rva": 0x2120, "size": 0x18}]
+        # Side by side, each naming its own bytes; the section takes the larger size.
+        out = self.compose(grows(state=low), grows(state=high))
+        self.assertEqual(struct.unpack_from("<I", out, SECTIONS + 40 + 8)[0], 0x180)
+        # Undeclared growth owns the whole tail it grows, so a neighbour past
+        # it is fine and one inside it is refused.
+        self.compose(grows(0x120), grows(state=high))
+        refusals = {
+            "same bytes": (grows(state=low), grows(state=[{"rva": 0x211C, "size": 8}])),
+            "inside undeclared growth": (grows(0x120), grows(state=[{"rva": 0x2110, "size": 4}])),
+            "both undeclared": (grows(0x120), grows(0x140)),
+        }
+        for label, specs in refusals.items():
+            with self.subTest(label), self.assertRaisesRegex(exe_patches.PatchError, "both keep state"):
+                self.compose(*specs)
+        for label, spec in {
+                "outside the growth": grows(0x120, [{"rva": 0x2120, "size": 4}]),
+                "inside the original section": grows(state=[{"rva": 0x20F0, "size": 4}]),
+                "state without growth": {"version": 1, "state": low},
+                "malformed": grows(state=[{"rva": 0x2100}])}.items():
+            with self.subTest(label), self.assertRaises(exe_patches.PatchError):
+                self.compose(spec)
+
 
 
 class RuntimePatchTests(unittest.TestCase):

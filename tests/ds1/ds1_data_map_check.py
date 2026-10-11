@@ -9,7 +9,7 @@ sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive,make_text_archive
 from ds1_stats_fixture import make_stats_archive
-from plugins.ds1 import texts
+from plugins.ds1 import assets,texts
 from plugins.ds1.formats import TABLES,ItemDocument
 from plugins.ds1.store import RELATIVE,MARKER,ItemStore
 from plugins.ds1.data_map import payload
@@ -42,16 +42,21 @@ def main():
             rows=request_json(session.url+'api/data-map')['rows']
             members=set(ItemDocument(archives[RELATIVE]).members)
             assert {row['filename'] for row in rows if row['id'].startswith('param:')}==members
-            # Every parameter table, five name tables, the two native rule
-            # rows, and a missing row per optional table the archive lacks.
+            # Every parameter table, five name tables, ten description tables,
+            # the two native rule rows, one asset row per installed data folder,
+            # and a missing row per optional table the archive lacks.
             effects_missing = 'SpEffectParam.param' not in members
             curves_missing = 'CalcCorrectGraph.param' not in members
-            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+2+effects_missing+curves_missing
+            asset_rows=sum(1 for top in assets.ASSET_ROOTS if (game/top).is_dir())
+            assert asset_rows>0
+            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+2+asset_rows+effects_missing+curves_missing
+            assert {row['id'] for row in rows if row['id'].startswith('assets:')}=={'assets:'+top for top in assets.ASSET_ROOTS if (game/top).is_dir()}
+            assert all(row['target']=='assets' and row['sub']=='game' and row['openable'] for row in rows if row['id'].startswith('assets:'))
             assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
-            assert by_file['BehaviorParam.param']['coverage']=='view'
-            assert by_file['Bullet.param']['coverage']=='view'
+            assert by_file['BehaviorParam.param']['coverage']=='structured'
+            assert by_file['Bullet.param']['coverage']=='structured'
             assert by_file['NpcParam.param']['target']=='enemies'
             assert by_file['AtkParam_Npc.param']['target']=='attacks'
             assert by_file['EquipParamWeapon.param']['sub']=='weapons'

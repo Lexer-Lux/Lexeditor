@@ -113,7 +113,14 @@ def validate(spec: dict, owner: str) -> dict:
      the end of that displacement. Targets belong to the same description.
      They allow an existing function to read an allocated table or call a
      leaf routine without moving its stack frame or unwind metadata.
-     "sectionVirtualSize": {section name: minimum virtual size} (optional)}
+     "sectionVirtualSize": {section name: minimum virtual size} (optional),
+     "state": [{"rva": int, "size": int}] (optional)}
+     Growing a section gives its tail to the description as zero-filled,
+     writable state. "state" names the bytes of that tail the description
+     keeps; without it the description owns its whole grown tail. Two
+     descriptions that own the same bytes are refused, as two that patch one
+     instruction are: each picks its own addresses, so nothing else would
+     stop one tweak's state landing on another's.
     """
     if (not isinstance(spec, dict) or type(spec.get("version")) is not int
             or spec["version"] not in (1, SPEC_VERSION)):
@@ -191,8 +198,17 @@ def validate(spec: dict, owner: str) -> dict:
     sizes = spec.get("sectionVirtualSize", {})
     if not isinstance(sizes, dict):
         raise PatchError(f"{owner}: sectionVirtualSize must map section names to sizes")
+    raw_state = spec.get("state", [])
+    if type(raw_state) is not list or (raw_state and not sizes):
+        raise PatchError(f"{owner}: state is a list of ranges inside the sections it grows")
+    state = []
+    for item in raw_state:
+        if type(item) is not dict or set(item) != {"rva", "size"}:
+            raise PatchError(f"{owner}: every state range is {{rva, size}}")
+        state.append((_int(item["rva"], "state address"), _int(item["size"], "state size", 1, 1 << 20)))
     return {"owner": owner, "islands": islands, "hooks": hooks,
-            "sectionVirtualSize": {str(key): _int(value, "section size") for key, value in sizes.items()}}
+            "sectionVirtualSize": {str(key): _int(value, "section size") for key, value in sizes.items()},
+            "state": state}
 
 
 def _rel32(source_next: int, target: int) -> bytes:
@@ -278,13 +294,26 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
             hooks.append((rva, original, bytes(replacement) + hook["pad"]))
 
     growth = []
+    owned: list[tuple[int, int, str]] = []
     for spec in patches:
+        tails = []
         for name, minimum in spec["sectionVirtualSize"].items():
             section = next((item for item in pe.sections if item["name"] == name), None)
             following = next((item for item in pe.sections if item["rva"] > (section or {}).get("rva", -1)), None)
             if section is None or following is None or not section["vsize"] <= minimum <= following["rva"] - section["rva"]:
                 raise PatchError(f"{spec['owner']}: cannot grow {name} to {minimum:X}")
             growth.append((section, minimum))
+            if minimum > section["vsize"]:
+                tails.append((section["rva"] + section["vsize"], section["rva"] + minimum))
+        ranges = [(rva, rva + size) for rva, size in spec["state"]] or tails
+        for low, high in ranges:
+            if not any(start <= low and high <= end for start, end in tails):
+                raise PatchError(f"{spec['owner']}: state at {low:X} is outside the sections it grows")
+            for other_low, other_high, owner in owned:
+                if owner != spec["owner"] and low < other_high and other_low < high:
+                    raise PatchError(f"{spec['owner']} and {owner} both keep state at "
+                                     f"{max(low, other_low):X}")
+        owned.extend((low, high, spec["owner"]) for low, high in ranges)
     return {"pe": pe, "base": base, "cursor": cursor, "codes": codes,
             "functions": functions, "hooks": hooks, "growth": growth}
 

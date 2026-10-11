@@ -12,6 +12,8 @@ import pytest
 from test_ds1_band_composition import original  # noqa: F401: synthetic PE fixture
 from ds1_native_fixture import make_native_archive
 from plugins.ds1 import exe_patches, load_bands, load_bands_patch, tweak_mods, deployment
+from plugins.ds1.map_store import MapStore
+from plugins.ds1.tae_store import TaeStore
 from plugins.ds1.native_rules import NativeRules, DEFAULTS, SETTINGS_FILE, LEGACY_FILE
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.formats import ItemDocument
@@ -272,6 +274,8 @@ def test_current_server_keeps_effects_attacks_and_library_tweaks(project, monkey
     game, mod, store, rules, original = project
     monkeypatch.setattr(server, "STORE", store)
     monkeypatch.setattr(server, "RULES", rules)
+    monkeypatch.setattr(server, "MAPSTORE", MapStore(game, mod, False, store))
+    monkeypatch.setattr(server, "TAESTORE", TaeStore(game, mod, False, store))
     http = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
     thread = threading.Thread(target=http.serve_forever, daemon=True)
     thread.start()

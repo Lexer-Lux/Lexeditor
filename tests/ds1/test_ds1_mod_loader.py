@@ -264,3 +264,29 @@ def test_rows_a_removed_row_another_mod_changes_conflicts():
     result = mod_loader.compose(game, [b, a])
     assert [(c.part, c.mods) for c in result.conflicts] == [("Items 102 (removed by one, changed by another)", ["B", "A"])]
     assert 102 not in [row.row_id for row in ItemDocument(result.files[RELATIVE]).params["EquipParamGoods"].rows]
+
+def test_player_attacks_merge_by_field_and_conflict_by_name():
+    a = mod("A", edited(("AtkParam_Pc", 100, "atkPhys", 111)))
+    b = mod("B", edited(("AtkParam_Pc", 100, "atkMag", 222)))
+    result = mod_loader.compose(GAME, [a, b])
+    assert result.conflicts == []
+    merged = ItemDocument(result.files[RELATIVE])
+    assert merged.value("AtkParam_Pc", 100, "atkPhys") == 111
+    assert merged.value("AtkParam_Pc", 100, "atkMag") == 222
+    c = mod("C", edited(("AtkParam_Pc", 100, "atkPhys", 333)))
+    result = mod_loader.compose(GAME, [a, c])
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Player attacks 100, Physical", ["A", "C"])]
+    assert ItemDocument(result.files[RELATIVE]).value("AtkParam_Pc", 100, "atkPhys") == 333
+
+def test_reinforce_rows_merge_by_field_and_conflict_by_name():
+    a = mod("A", edited(("ReinforceParamWeapon", 100, "physicsAtkRate", 2.5)))
+    b = mod("B", edited(("ReinforceParamWeapon", 100, "magicAtkRate", 3.5)))
+    result = mod_loader.compose(GAME, [a, b])
+    assert result.conflicts == []
+    merged = ItemDocument(result.files[RELATIVE])
+    assert merged.value("ReinforceParamWeapon", 100, "physicsAtkRate") == 2.5
+    assert merged.value("ReinforceParamWeapon", 100, "magicAtkRate") == 3.5
+    c = mod("C", edited(("ReinforceParamWeapon", 100, "physicsAtkRate", 4.5)))
+    result = mod_loader.compose(GAME, [a, c])
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Weapon upgrades 100, Physical Damage", ["A", "C"])]
+    assert ItemDocument(result.files[RELATIVE]).value("ReinforceParamWeapon", 100, "physicsAtkRate") == 4.5

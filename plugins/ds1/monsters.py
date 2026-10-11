@@ -37,6 +37,26 @@ def classified_monster(row_id, reference_name, npc_type):
     return row_id >= 120000 and reference_name in MONSTER_FAMILIES and npc_type == 0
 
 
+def duplicate_stem(name, row_id):
+    """The family stem of a Lexeditor-duplicated row name ("Rat (1000000)"),
+    or None. No family name ends in digits in parentheses, so the suffix
+    only matches names this editor wrote when duplicating."""
+    suffix = f' ({row_id})'
+    if name and name.endswith(suffix) and len(name) > len(suffix):
+        return name[:-len(suffix)]
+    return None
+
+
+def base_stem(name):
+    """A row name without any Lexeditor duplicate suffixes."""
+    stem = name or ''
+    while True:
+        head, space, tail = stem.rpartition(' (')
+        if not space or not tail.endswith(')') or not tail[:-1].isdigit():
+            return stem
+        stem = head
+
+
 # All help lives with the property definition. Guard status fields and other
 # effects remain untouched: their annotation does not distinguish damage from
 # buildup clearly enough to expose them as percentage resistance controls.
@@ -72,3 +92,60 @@ for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic')
                   ('thrustGuardCutRate', 'Thrust')]:
     RESISTANCES[key] = (kind + ' (%)', 'Guard absorption',
         f'Reduces {kind.lower()} damage while this monster guards. This does not apply to an unguarded hit.')
+
+# Reviewed combat stats, drops, passive effects and AI links. Damage
+# multipliers state their unchanged baseline of 1, the way effect
+# multipliers do.
+NPC_STATS = {
+    'hp': ('HP', 'Basics', 'Maximum health. The enemy dies at 0.'),
+    'mp': ('MP', 'Basics', 'Maximum mana.'),
+    'stamina': ('Stamina', 'Basics', 'Maximum stamina. Enemies use it when they block.'),
+    'staminaRecoverBaseVel': ('Stamina recovery', 'Basics',
+        'Speed of stamina recovery. Higher values recover faster.'),
+    'superArmorDurability': ('Poise', 'Basics',
+        "Poise health. Only works when the enemy's damage level is set."),
+    'superArmorRecoverCorrection': ('Poise recovery', 'Basics',
+        'Adjusts poise recovery speed. 0 is unchanged.'),
+    'superArmorBrakeKnockbackDist': ('Poise-break stagger', 'Basics',
+        'How hard the enemy staggers when its poise breaks. Higher values throw it further.'),
+    'disableRespawn': ('No bonfire reset', 'Basics',
+        'When set, this enemy keeps its position and behavior when the player rests at a bonfire.'),
+    'teamType': ('Team', 'Basics', 'Which side this enemy fights for.'),
+    'weakPartsDamageRate': ('Damage taken: weak point', 'Defense',
+        'Multiplier on damage the weak point takes. 1 is unchanged.'),
+    'staminaGuardDef': ('Stamina guard (%)', 'Guard absorption',
+        'Reduces stamina damage while this monster guards. This does not apply to an unguarded hit.'),
+    'hitHeight': ('Body height', 'Defense',
+        'Height of the body used for hits. Ignored for ragdoll bodies.'),
+    'hitRadius': ('Body radius', 'Defense',
+        'Radius of the body used for hits. Ignored for ragdoll bodies.'),
+    'hitYOffset': ('Body offset', 'Defense',
+        'Vertical shift of the body used for hits. Positive values float the enemy.'),
+    'getSoul': ('Souls', 'Value & rewards', 'Souls dropped on death.'),
+    'humanityLotId': ('Humanity drop table', 'Value & rewards',
+        'Humanity lot dropped on death, as a lot ID from the Drops list. -1 drops nothing.'),
+    'dropType': ('Drop style', 'Value & rewards',
+        'How dropped items appear: on the corpse or on the ground.'),
+    'GameClearSpEffectID': ('Cleared-game effect', 'Effects & references',
+        'An effect active only on NG+ and higher. Used to scale enemies per journey.'),
+    'aiThinkId': ('AI table', 'Effects & references',
+        'The AI table this enemy thinks with, picked from the AI list.'),
+}
+for index in range(1, 9):
+    NPC_STATS[f'partsDamageRate{index}'] = (
+        f'Damage taken: Part {index}', 'Defense',
+        f'Multiplier on damage body part {index} takes. 1 is unchanged.')
+for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
+                  ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
+    NPC_STATS[key] = (f'{kind} guard (%)', 'Guard absorption',
+        f'Reduces {kind.lower()} damage while this monster guards. '
+        'This does not apply to an unguarded hit.')
+for index in range(1, 7):
+    NPC_STATS[f'itemLotId_{index}'] = (
+        f'Drop table {index}', 'Value & rewards',
+        'Item lot dropped on death, as a lot ID from the Drops list. -1 drops nothing.')
+for index in range(8):
+    NPC_STATS[f'spEffectID{index}'] = (
+        f'Passive effect {index + 1}', 'Effects & references',
+        'An effect always active on this enemy.')
+NPC_FIELDS = {**RESISTANCES, **NPC_STATS}

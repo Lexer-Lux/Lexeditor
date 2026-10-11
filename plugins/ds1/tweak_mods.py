@@ -506,13 +506,39 @@ MAX_RUNTIME = 16 * 1024 * 1024
 OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH)
 
 
-def loader_bytes() -> bytes:
-    """The shipped loader, checked against the hash it was published with."""
-    manifest = json.loads((LOADER_PACKAGE / "runtime-manifest.json").read_text(encoding="utf-8"))
-    data = (LOADER_PACKAGE / RUNTIME_DLL).read_bytes()
+def loader_bytes(debug: bool = False) -> bytes:
+    """The shipped loader, checked against the hash it was published with.
+
+    The debug loader (runtime/package/debug) blocks the game's network and
+    switches Arxan off with dearxan, so a debugger can attach (#742)."""
+    package = LOADER_PACKAGE / "debug" if debug else LOADER_PACKAGE
+    manifest = json.loads((package / "runtime-manifest.json").read_text(encoding="utf-8"))
+    data = (package / RUNTIME_DLL).read_bytes()
     if _sha(data) != manifest.get("sha256"):
         raise TweakError("Lexeditor's DS1 loader does not match its published hash; reinstall Lexeditor")
     return data
+
+
+# Debug mode is the reader's choice, kept beside the DS1 mod library so Play
+# and Apply both follow it.
+DEBUG_FILE = ".lexeditor-ds1.json"
+
+
+def debug_mode(root: Path | None = None) -> bool:
+    path = Path(root or mods_root()) / DEBUG_FILE
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("debugMode") is True
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def set_debug_mode(on: bool, root: Path | None = None) -> bool:
+    if type(on) is not bool:
+        raise TweakError("Debug mode is on or off")
+    folder = Path(root or mods_root())
+    folder.mkdir(parents=True, exist_ok=True)
+    atomic_write(folder / DEBUG_FILE, (json.dumps({"debugMode": on}, indent=2) + "\n").encode("utf-8"))
+    return on
 
 
 def _runtime(game_root: Path) -> dict:
@@ -537,7 +563,7 @@ def _runtime(game_root: Path) -> dict:
             raise TweakError(f"{RUNTIME_PATCH} is damaged")
         patch = patch_path.read_bytes()
     dll = _sha(_read(dll_path, RUNTIME_FILE)) if dll_path.exists() else None
-    ours = {_sha(loader_bytes())} | ({record["dllSha256"]} if record else set())
+    ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True))} | ({record["dllSha256"]} if record else set())
     return {"record": record, "patch": patch, "dll": dll, "foreignDll": dll is not None and dll not in ours,
             "active": bool(record and patch is not None and dll in ours and _sha(patch) == record["patchSha256"])}
 
@@ -546,7 +572,8 @@ def _runtime_status(game_root: Path) -> dict:
     state = _runtime(game_root)
     result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
               "project": state["record"].get("project") if state["active"] else None,
-              "problem": "", "loaderMessage": ""}
+              "problem": "", "loaderMessage": "",
+              "debug": bool(state["active"] and state["record"].get("debug") is True)}
     if state["foreignDll"] and (state["record"] or state["patch"] is not None):
         result["problem"] = (f"Another mod's {RUNTIME_DLL} replaced Lexeditor's loader, so the tweaks are not loaded. "
                              "Remove it, then Apply again.")
@@ -556,10 +583,14 @@ def _runtime_status(game_root: Path) -> dict:
     return result
 
 
-def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project) -> None:
-    """Install, replace or remove the loader and its patch description."""
+def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project, debug: bool = False) -> None:
+    """Install, replace or remove the loader and its patch description.
+
+    In debug mode the debug loader goes in even with no tweak to apply."""
     game_root = checked(Path(game_root))
     state = _runtime(game_root)
+    if patch is None and debug:
+        patch = b""
     dll_path, patch_path, record_path = (checked(game_root / name) for name in (RUNTIME_DLL, RUNTIME_PATCH, RUNTIME_RECORD))
     if patch is None:
         # The DLL first: without it the game never reads the rest.
@@ -572,9 +603,9 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
                          "remove or rename the other file, then Apply again. Nothing was changed.")
-    loader = loader_bytes()
+    loader = loader_bytes(debug)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
-              "patchSha256": _sha(patch), "dllSha256": _sha(loader)}
+              "patchSha256": _sha(patch), "dllSha256": _sha(loader), "debug": bool(debug)}
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
@@ -599,11 +630,12 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     runtime = _runtime(game_root)
     if runtime["active"]:
         previous = {"mods": list(runtime["record"]["mods"]), "project": runtime["record"].get("project"),
-                    "patch": runtime["patch"]}
+                    "patch": runtime["patch"], "debug": runtime["record"].get("debug") is True}
     else:
         # Before the loader, an earlier Lexeditor kept this in the executable.
         built_in = _current_manifest(current, manifest)
-        previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None}
+        previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None,
+                    "debug": False}
     # A project contribution can depend on verified original instruction bytes.
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
@@ -632,7 +664,8 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
     return {"files": files, "executableSha256": _sha(current),
             "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
-                        "project": chosen if patch else None, "previous": previous}}
+                        "project": chosen if patch else None, "previous": previous,
+                        "debug": debug_mode(root)}}
 
 
 def _undo(game_root: Path, done: list[dict]) -> None:
@@ -640,7 +673,8 @@ def _undo(game_root: Path, done: list[dict]) -> None:
     for item in reversed(done):
         if item.get("managed") is None:
             previous = item["previous"]
-            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"])
+            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"],
+                           previous.get("debug", False))
             continue
         previous = item["previous"]
         _write(game_root, item["after"], item["before"], previous.get("mods", []),
@@ -663,7 +697,7 @@ def commit(game_root: Path, plan: dict) -> None:
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
-        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"])
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("debug", False))
     except Exception:
         try:
             _undo(game_root, done)
@@ -728,7 +762,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
     """What is installed now, without building or changing anything."""
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
               "pendingRecovery": False, "project": None, "loaderMessage": "",
-              "builtIntoExecutable": False,
+              "builtIntoExecutable": False, "debugMode": debug_mode(root), "debugInstalled": False,
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root()))}
     try:
         result["tweaks"] = tweak_rows(root)
@@ -750,6 +784,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         result["project"] = runtime["project"] or executable["project"]
         result["pendingRecovery"] = any(item["pendingRecovery"] for item in files)
         result["loaderMessage"] = runtime["loaderMessage"]
+        result["debugInstalled"] = runtime["debug"]
         result["problem"] = runtime["problem"] or next((item["problem"] for item in files if item["problem"]), "")
     except (ValueError, OSError) as error:
         result.setdefault("tweaks", [])
