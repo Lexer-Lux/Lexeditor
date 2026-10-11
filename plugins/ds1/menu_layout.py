@@ -384,11 +384,12 @@ def validate(spec: object, owner: str) -> dict:
     if not isinstance(spec, dict) or spec.get("version") != 1 or set(spec) - {"version", "nodes", "moves"}:
         raise LayoutError(f"{owner}: a layout patch needs version 1 with nodes and moves")
     nodes = spec.get("nodes", [])
-    if not isinstance(nodes, list) or len(nodes) > 64:
-        raise LayoutError(f"{owner}: list between 0 and 64 layout nodes")
+    if not isinstance(nodes, list) or len(nodes) > 128:
+        raise LayoutError(f"{owner}: list between 0 and 128 layout nodes")
     moves = spec.get("moves", [])
     # Moves rewrite eight bytes each and never grow the file, so a grid
-    # rework touching every row of several lists fits; added nodes stay at 64.
+    # rework touching every row of several lists fits; added nodes stay
+    # at 128, room for a 40-cell icon grid at three nodes per cell.
     if not isinstance(moves, list) or len(moves) > 256:
         raise LayoutError(f"{owner}: list between 0 and 256 layout moves")
     if not nodes and not moves:
