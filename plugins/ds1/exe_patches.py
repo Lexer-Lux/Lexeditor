@@ -211,6 +211,20 @@ def validate(spec: dict, owner: str) -> dict:
             "state": state}
 
 
+def spans(spec: dict) -> dict[str, list[tuple[int, int]]]:
+    """(start, end) of every address a validated patch description claims, by kind.
+
+    Hooks claim their instruction bytes, state its ranges, islands only when
+    fixed: a floating island is placed when the enabled set is composed, so
+    its address is unknowable statically and stays the composer's check.
+    The Mods tab reads these without enabling anything; enabling rechecks.
+    """
+    return {"hooks": [(hook["rva"], hook["rva"] + len(hook["original"])) for hook in spec["hooks"]],
+            "state": [(rva, rva + size) for rva, size in spec["state"]],
+            "islands": [(island["rva"], island["rva"] + len(island["code"]))
+                        for island in spec["islands"] if island["rva"] is not None]}
+
+
 def _rel32(source_next: int, target: int) -> bytes:
     value = target - source_next
     if not -(1 << 31) <= value < (1 << 31):

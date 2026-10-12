@@ -23,9 +23,17 @@ def number(key, label, offset, size=1, signed=False, maximum=None, group="Data")
             "group": group}
 
 
-def text(key, label, offset=0, size=32, group="Text"):
-    return {"key": key, "label": label, "offset": offset, "size": size,
-            "dataType": "text", "group": group}
+def text(key, label, offset=0, size=32, group="Text", capacity="derive"):
+    """Describe one fixed text field. capacity is usable encoded content bytes
+    (the terminator byte stays reserved), or None when the field shares a
+    section-level buffer instead of fixed storage."""
+    if capacity == "derive":
+        capacity = size - 1
+    field = {"key": key, "label": label, "offset": offset, "size": size,
+             "dataType": "text", "group": group}
+    if capacity is not None:
+        field["byteCapacity"] = capacity
+    return field
 
 
 def read_values(raw, fields):

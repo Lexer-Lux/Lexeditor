@@ -1,7 +1,6 @@
-"""Headless browser import through the real host upload and import methods."""
+"""Headless browser import through the Mods tab and the real host methods."""
 from pathlib import Path
 import base64
-import json
 import sys
 import tempfile
 import threading
@@ -30,19 +29,19 @@ def main():
         host = HostApi.__new__(HostApi)
         host._mod_library_lock = threading.RLock()
         host._mod_uploads = {}
-        host._plugins = {"ff7r": SimpleNamespace(mod_adapter=PakModAdapter())}
+        host._plugins = {"ff7r": SimpleNamespace(mod_adapter=PakModAdapter(), managed_mod=None, lexmod="")}
+        host._installations = SimpleNamespace(snapshot=lambda _plugin: {"root": str(root / "game")})
+        host._projects = SimpleNamespace(
+            snapshot=lambda _plugin: {"current": "", "canCreate": True, "projects": []},
+            _spec=lambda _plugin: (None, SimpleNamespace(required_paths=[], required_any=[])),
+            _problems=lambda *args: [])
+        host._github = SimpleNamespace(visible_repository=lambda _repo: False)
+        host._managed_mod_results = {}
         enabled = [True]
-        update_status = {}
         host.mod_library_status = lambda plugin: {
             "root": str(library), "canManage": enabled[0], "authorTest": enabled[0],
             "message": "Mod management is not supported for this game yet."}
-        def entries(plugin):
-            rows = []
-            for folder in (library / plugin).glob("*"):
-                info = metadata(folder)
-                rows.append({"path": str(folder), "name": info["name"], "version": info["version"]})
-            return {**host.mod_library_status(plugin), "entries": rows, "managedUpdate": update_status}
-        host.mod_library_entries = entries
+        host.mod_library_location = lambda: {"root": str(library), "move": None}
         calls = []
         def bridge(_source, name, args):
             calls.append(name)
@@ -52,7 +51,7 @@ def main():
             try:
                 page = browser.new_page(viewport={"width": 1280, "height": 900})
                 page.route("http://fixture.test/**", lambda route: route.fulfill(
-                    body="<html><body></body></html>", content_type="text/html"))
+                    body='<html><body><main id="main"></main></body></html>', content_type="text/html"))
                 page.goto("http://fixture.test/")
                 page.add_style_tag(path=str(ROOT / "ui/framework.css"))
                 page.add_style_tag(path=str(ROOT / "plugins/ff7r/game-appearance.css"))
@@ -62,8 +61,14 @@ def main():
                         (window.__completedHostCalls ||= []).push(name);return result;
                     })})}; }""")
                 source = (ROOT / "ui/framework.js").read_text(encoding="utf-8")
-                page.add_script_tag(content=source.replace("window.LexeditorUI = {", "window.LexeditorUI = {openModLibrary,"))
-                page.evaluate("LexeditorUI.openModLibrary('ff7r')")
+                page.add_script_tag(content=source)
+                page.evaluate("""() => {
+                    document.body.insertAdjacentHTML('afterbegin', '<div id="shell"></div>');
+                    LexeditorUI.mountShell({host: '#shell', plugin: {id: 'ff7r', name: 'FF7R'},
+                        tabs: [], activeTab: () => '', navigate: () => {}});
+                }""")
+                page.locator('[data-tab="mods"]').click()
+                page.get_by_text("This game has no mods yet.").wait_for()
                 # A real File/FileReader travels through the folder-entry path
                 # and host chunk writer. Native OS drag delivery is outside this fixture.
                 page.evaluate("""payload => {
@@ -73,8 +78,9 @@ def main():
                         let read=false; return {readEntries:resolve=>{resolve(read?[]:[child]);read=true;}};
                     }};
                     const event = new Event('drop', {bubbles:true,cancelable:true});
-                    Object.defineProperty(event,'dataTransfer',{value:{items:[{webkitGetAsEntry:()=>folder}]}});
-                    document.querySelector('[aria-label="Mod library"]').dispatchEvent(event);
+                    Object.defineProperty(event,'dataTransfer',{value:{types:['Files'],
+                        items:[{webkitGetAsEntry:()=>folder}]}});
+                    document.querySelector('#main').dispatchEvent(event);
                 }""", base64.b64encode(pak.read_bytes()).decode())
                 page.get_by_role("button", name="Import mod", exact=True).wait_for()
                 page.get_by_label("Package data folder").select_option("Wrapped")
@@ -84,29 +90,26 @@ def main():
                 copied = library / "ff7r/Imported test/probe_P.pak"
                 assert get_file(copied, "End/Content/Probe.txt") == b"import probe"
                 assert "upload_mod_chunk" in calls and "import_mod_package" in calls
-                page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).click()
                 assert not host._mod_uploads
                 enabled[0] = False
-                update_status.update(message="The managed mod update did not finish.",
-                    error="No stable managed mod release is available from the configured repository yet.")
-                page.evaluate("LexeditorUI.openModLibrary('ff7r')")
-                page.get_by_text("No stable managed mod release", exact=False).wait_for()
-                assert page.get_by_role("button", name="Import folder…").is_disabled()
-                assert page.get_by_role("button", name="Apply enabled mods").is_disabled()
-                assert page.get_by_role("button", name="Make editable copy…").is_disabled()
-                page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).click()
+                page.locator('[data-tab="mods"]').click()
+                page.wait_for_timeout(250)
+                page.get_by_role("button", name="Add a mod").click()
+                assert page.get_by_role("button", name="Add a folder…").is_disabled()
+                assert page.get_by_role("button", name="Add a ZIP…").is_disabled()
+                page.get_by_role("button", name="Cancel", exact=True).click()
                 enabled[0] = True
                 selections = []
                 host._projects = SimpleNamespace(select=lambda plugin,path: selections.append(path) or {"path":path})
                 host._restart_for_project = lambda plugin,project: {"project":project}
-                host.mod_library_location = lambda: {"root": str(library)}
-                page.evaluate("LexeditorUI.openModLibrary('ff7r')")
+                page.locator('[data-tab="mods"]').click()
+                page.locator(".lex-mods-page .lex-column-list").get_by_text("Imported test").click()
                 page.get_by_role("button", name="Make editable copy…").click()
                 page.get_by_text("Managed mods update automatically.", exact=False).wait_for()
                 page.get_by_role("button", name="Make a copy", exact=True).click()
                 page.get_by_label("New mod name").fill("Independent copy")
                 page.get_by_role("button", name="Create copy", exact=True).click()
-                page.wait_for_function("() => !document.querySelector('[aria-label=\"New mod name\"]')")
+                page.wait_for_function("() => !document.querySelector('[aria-label=\\\"New mod name\\\"]')")
                 # The button disables before the host copies and selects the
                 # project. Wait for that actual bridge response, not its start.
                 page.wait_for_function("() => window.__completedHostCalls.includes('copy_library_mod')")
@@ -114,7 +117,6 @@ def main():
                 assert (independent / "content/End/Content/Probe.txt").read_text() == "import probe"
                 assert [Path(value).resolve() for value in selections] == [independent.resolve()], selections
                 assert metadata(independent)["editableContent"] is True
-                page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).click()
                 del host.mod_library_location
                 host._settings = SettingsStore(root / "settings.json")
                 host._settings.set_mod_library_path(library)
@@ -136,7 +138,7 @@ def main():
                 page.get_by_role("button", name="Remove recovery copy", exact=True).click()
                 page.get_by_role("button", name="Remove recovery copy…").wait_for(state="hidden")
                 assert moved.exists() and not library.exists()
-                print("Browser folder import, editable copy, unsupported controls, library move and recovery cleanup passed")
+                print("Browser Mods drop import, editable copy, unsupported controls, library move and recovery cleanup passed")
             finally:
                 browser.close()
                 for token in list(host._mod_uploads):

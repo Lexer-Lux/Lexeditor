@@ -142,20 +142,23 @@ Not covered today, with what each would need:
   The reader bounds files at 16 MB and full exports at 100,000 bone-frames.
   Models with unrecognized layouts remain unsupported. Tests:
   `test_ff8_model_geometry.py`, `ff8_model_viewer_check.py`.
-- **VRAM palette animation** (Dynamic Texture). Not worth building, and here is
-  the evidence. FF8 Ultimate Editor parses the section (battle `.dat` section 4)
-  and records in its own source that the feature is **vestigial in the retail PC
-  build**: the section's pointer is computed at load time but sits outside the
-  address range of the struct any renderer receives, so nothing in it is ever
-  displayed. Its own words: "this naming is the best-supported reading of the
-  file format, not an observed runtime behavior". The layout is recorded here so
-  nobody re-derives it: 16-bit offsets from the start of the section, a zero
-  slot meaning "no animation for this slot", each entry spanning to the next
-  offset, and each entry holding a texture number and CLUT in its first word,
-  an unknown byte, sprite width (in VRAM X references, two bytes per texel),
-  sprite height, a frame count, another unknown word, the anchor UV the model
-  samples, then that many UV frame pairs. Palettes themselves are still
-  previewable and editable elsewhere in this plugin.
+- **VRAM palette animation** (Dynamic Texture). Won't-do (#933, re-verified
+  against the pinned vendor source): FF8 Ultimate Editor parses the section
+  (battle `.dat` section 4) and records in its own source
+  (`plugins/ff8/vendor/ff8ue/monsterdata.py`, `DynamicTextureData`) that the
+  feature is **vestigial in the retail PC build**: the section's pointer is
+  computed at load time but sits outside the address range of the struct any
+  renderer receives, so nothing in it is ever displayed. Its own words: "this
+  naming is the best-supported reading of the file format, not an observed
+  runtime behavior". The layout is recorded here so nobody re-derives it:
+  16-bit offsets from the start of the section, a zero slot meaning "no
+  animation for this slot", each entry spanning to the next offset, and each
+  entry holding a texture number and CLUT in its first word, an unknown byte,
+  sprite width (in VRAM X references, two bytes per texel), sprite height, a
+  frame count, another unknown word, the anchor UV the model samples, then
+  that many UV frame pairs. Palettes themselves are still previewable and
+  editable elsewhere in this plugin, and no Data Map row or help text asks
+  for an editor here.
 - **Spreadsheet bulk import and export** (Xlsx). Covered for the tables that
   have a writer: item prices, the game's own name list, the world-to-field
   table and weapon upgrade recipes export as CSV and import back through the

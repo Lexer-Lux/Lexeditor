@@ -591,6 +591,12 @@ function effectBehaviorName(e){
   })[(e.id||"").toUpperCase()]||"";
 }
 
+// Proven effect time units, shared by the create dialog and the effect
+// editor so the two cannot drift apart.
+const EFFECT_TIME_UNIT_OPTIONS=[
+  {value:0,label:'0 — seconds'},{value:1,label:'1 — minutes'},
+  {value:2,label:'2 — in-game hours'},{value:3,label:'3 — in-game days'},
+];
 function showCreateEffect(){
   if(isRO())return;
   const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
@@ -599,7 +605,7 @@ function showCreateEffect(){
   const key=el("input",{placeholder:"LEX_EFFECT_SALTED_BEEF"}),label=el("input",{placeholder:"Salty snack"});
   const behavior=el("select",{},...behaviors.map(id=>el("option",{value:id},`${humanName("behaviors",id)||effectBehaviorName({id})||id}${humanName("behaviors",id)||effectBehaviorName({id})?` — ${id}`:""}`)));
   const value=el("input",{type:"number",step:"1",value:"0",required:true}),percent=el("input",{type:"number",step:"any",value:"0",required:true});
-  const time=el("input",{type:"number",step:"1",value:"0",required:true}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
+  const time=el("input",{type:"number",step:"1",value:"0",required:true}),units=el("select",{},...EFFECT_TIME_UNIT_OPTIONS.map(option=>el("option",{value:String(option.value)},option.label)));
   for(const input of [value,time,percent])input.setAttribute("data-lex-validate-number","true");
   for(const input of [value,time]){
     input.setAttribute("value","0");

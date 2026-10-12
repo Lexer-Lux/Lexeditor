@@ -252,7 +252,8 @@ function validateCatalogQuantityDrafts(){
   }
   for(const [key,raw] of Object.entries(state.effectEdits)){
     const field=key.slice(key.lastIndexOf("|")+1);
-    if(["value","time","timeunits"].includes(field)&&!catalogQuantityIsValid(raw))throw new Error(`Effect ${field}: enter a whole number.`);
+    if(["value","time"].includes(field)&&!catalogQuantityIsValid(raw))throw new Error(`Effect ${field}: enter a whole number.`);
+    if(field==="timeunits"&&!["0","1","2","3"].includes(String(raw)))throw new Error("Effect timeunits must be 0, 1, 2 or 3.");
     if(field==="percent"&&(String(raw).trim()===""||!Number.isFinite(Number(raw))))throw new Error("Effect percent: enter a finite number.");
   }
 }

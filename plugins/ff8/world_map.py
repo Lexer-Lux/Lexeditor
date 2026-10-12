@@ -492,13 +492,140 @@ def train_exit_positions(dataset: str = "current") -> dict:
     return {**payload, "path": str(path), "source": dataset}
 
 
+VEHICLE_WARP_CELL_MIN = 0
+VEHICLE_WARP_CELL_MAX = 767
+# The FF06 cell operand is the fourth word of a warp-case script.
+VEHICLE_WARP_OPERAND_OFFSET = 6
+
+
+def _vehicle_warp_decode(words: tuple[int, ...]) -> dict:
+    """(cell, vehicle, returnValue) of one warp-case script's words.
+
+    Tier-A shape, measured on the installed file: every section-11 script
+    opens FF01 0000 FF06 <cell>, tests one vehicle class with FF09, and
+    answers with FF15 <destination>. The operand is the world-map cell
+    (0-767 over the 32x24 grid), not the section-2 region id (a byte):
+    300/329/406 exceed a byte, every FF06 operand in sections 7/11/36
+    lands in 0-767, 406 is shared between sections 7 and 11 after the
+    same opcode, and none of 205/300/329/406 is a wm2field field, entry
+    or coordinate or appears in the section 8/10/12 position tables.
+    Anything else is refused, not guessed at.
+    """
+    long = len(words) == 19
+    if len(words) not in (17, 19) or words[0] != 0xFF01 or words[2] != 0xFF06 \
+            or words[4] != 0xFF04 or words[6] != 0xFF0A or words[-7] != 0xFF0B \
+            or words[-5] != 0xFF15 or words[-3] != 0xFF05 or words[-1] != 0xFF16:
+        raise ValueError("Vehicle warp script is not the proved warp-case shape")
+    if long and (words[8] != 0xFF0F or words[10] != 0xFF09):
+        raise ValueError("Vehicle warp script is not the proved warp-case shape")
+    if not long and words[8] != 0xFF09:
+        raise ValueError("Vehicle warp script is not the proved warp-case shape")
+    return {"cell": words[3], "vehicle": words[11 if long else 9],
+            "returnValue": words[-4]}
+
+
+def vehicle_warp_operands(data: bytes) -> list[tuple[int, int]]:
+    """(script index, absolute operand offset) of every warp-case cell word.
+
+    Raises when any script is not the proved shape, so the merger fails
+    closed instead of blessing an unknown word.
+    """
+    found = []
+    for row in scripts_in_section(data, VEHICLE_WARP_SECTION):
+        count = row["bytes"] // 2
+        words = struct.unpack(f"<{count}H",
+                              data[row["offset"]:row["offset"] + row["bytes"]])
+        _vehicle_warp_decode(words)
+        found.append((row["index"], row["offset"] + VEHICLE_WARP_OPERAND_OFFSET))
+    return found
+
+
+def apply_vehicle_warp_edits(data: bytes | bytearray, edits: list[dict]) -> bytearray:
+    """Retarget vehicle warp cases by cell, leaving the header untouched.
+
+    Each edit names a script and the world-map cell (0-767) its warp case
+    matches. Only the two operand bytes move; every script keeps its length,
+    so the 48-entry pointer header is never rebuilt.
+    """
+    raw = bytearray(data)
+    rows = {row["index"]: row for row in scripts_in_section(raw, VEHICLE_WARP_SECTION)}
+    seen: set[int] = set()
+    for edit in edits:
+        index = _bounded(edit.get("id"), 0, len(rows) - 1, "Vehicle warp script")
+        if index in seen:
+            raise ValueError(f"Vehicle warp script {index} is edited twice")
+        seen.add(index)
+        cell = _bounded(edit.get("cell"), VEHICLE_WARP_CELL_MIN,
+                        VEHICLE_WARP_CELL_MAX, "Vehicle warp cell")
+        row = rows[index]
+        count = row["bytes"] // 2
+        words = struct.unpack(f"<{count}H", raw[row["offset"]:row["offset"] + row["bytes"]])
+        _vehicle_warp_decode(words)
+        struct.pack_into("<H", raw, row["offset"] + VEHICLE_WARP_OPERAND_OFFSET, cell)
+        again = struct.unpack(f"<{count}H", raw[row["offset"]:row["offset"] + row["bytes"]])
+        if _vehicle_warp_decode(again)["cell"] != cell:
+            raise ValueError(f"Vehicle warp script {index} did not retarget")
+    return raw
+
+
 def vehicle_warp_scripts(dataset: str = "current") -> dict:
-    """The five vehicle warp scripts wmsetus.obj holds (Ragnarok, Garden, train)."""
+    """The four vehicle warp cases wmsetus.obj holds (Ragnarok, Garden, train).
+
+    Each script matches one world-map cell and answers the vehicle caller
+    with a destination id. A script that is not the proved warp-case shape
+    still reads as bytes, with its decoded fields left blank.
+    """
     path = source_path(dataset)
     data = path.read_bytes()
     rows = scripts_in_section(data, VEHICLE_WARP_SECTION)
+    for row in rows:
+        count = row["bytes"] // 2
+        words = struct.unpack(f"<{count}H", data[row["offset"]:row["offset"] + row["bytes"]])
+        try:
+            row.update(_vehicle_warp_decode(words))
+        except ValueError:
+            row.update({"cell": None, "vehicle": None, "returnValue": None})
     return {"rows": rows, "section": VEHICLE_WARP_SECTION, "path": str(path),
             "source": dataset, "sha256": hashlib.sha256(data).hexdigest()}
+
+
+SCRIPT_SECTIONS = (
+    (PLAYER_LOCATION_SCRIPT_SECTION, "Player location"),
+    (ENTITY_SPAWN_SCRIPT_SECTION, "Entity spawn"),
+    (VEHICLE_WARP_SECTION, "Vehicle warp"),
+    (EVENT_SCRIPT_SECTION, "Event"),
+)
+
+
+def world_scripts(dataset: str = "current") -> dict:
+    """The world map's script sections as stored, for the Scripts tab.
+
+    Opcodes are not decoded (codex/ff8/world-scripts.md), so each script is
+    a byte range with its first words: enough to identify it, nothing claimed
+    about what it does. A section that does not parse reads as empty rather
+    than breaking the World page.
+    """
+    readers = {PLAYER_LOCATION_SCRIPT_SECTION: player_location_scripts,
+               ENTITY_SPAWN_SCRIPT_SECTION: entity_spawn_scripts,
+               VEHICLE_WARP_SECTION: vehicle_warp_scripts,
+               EVENT_SCRIPT_SECTION: event_scripts}
+    sections = []
+    flattened = []
+    for section, label in SCRIPT_SECTIONS:
+        try:
+            bodies = readers[section](dataset)["rows"]
+        except ValueError:
+            bodies = []
+        sections.append({"section": section, "label": label,
+                         "count": len(bodies), "rows": bodies})
+        for body in bodies:
+            flattened.append({"kind": "worldScript",
+                              "id": section * 1000 + body["index"],
+                              "section": section, "sectionLabel": label,
+                              "index": body["index"], "offset": body["offset"],
+                              "bytes": body["bytes"], "head": body["head"],
+                              "padding": body["padding"]})
+    return {"sections": sections, "rows": flattened}
 
 
 def parse_rail(data: bytes) -> dict:
@@ -551,6 +678,7 @@ def rows(dataset: str = "current") -> dict:
         *texture_data["textures"],
         *({"kind": "groundName", "id": index, "name": ground_names.get(str(index), "")}
           for index in range(256)),
+        *world_scripts(dataset)["rows"],
     ]
     return {**parsed, **rail, "textures": texture_data["textures"],
             "segments": geometry_data["segments"], "rows": flattened,
@@ -738,13 +866,18 @@ def _save(edits: list[dict], expected_sha256: str | None) -> dict:
                        if str(edit.get("kind", "")) == "skyColor"]
     if sky_color_edits:
         raw = apply_sky_color_edits(raw, sky_color_edits)
-    changed = len(draw_edits) + len(field_return_edits) + len(sky_color_edits)
+    vehicle_warp_edits = [edit for edit in edits
+                          if str(edit.get("kind", "")) == "vehicleWarp"]
+    if vehicle_warp_edits:
+        raw = apply_vehicle_warp_edits(raw, vehicle_warp_edits)
+    changed = (len(draw_edits) + len(field_return_edits) + len(sky_color_edits)
+               + len(vehicle_warp_edits))
     rail_edits = [edit for edit in edits if str(edit.get("kind", "")) == "railTrack"]
     texture_edits = [edit for edit in edits if str(edit.get("kind", "")) == "worldTexture"]
     geometry_edits = [edit for edit in edits if str(edit.get("kind", "")) == "worldSegment"]
     wmset_edits = [edit for edit in edits if str(edit.get("kind", "")) not in (
         "drawPoint", "fieldReturn", "skyColor", "railTrack", "worldTexture",
-        "worldSegment", "groundName")]
+        "worldSegment", "groundName", "vehicleWarp")]
     for edit in wmset_edits:
         kind = str(edit.get("kind", ""))
         index = _bounded(edit.get("id"), 0, 100000, "Record ID")
@@ -816,7 +949,7 @@ def _save(edits: list[dict], expected_sha256: str | None) -> dict:
         prepared_source(world_geometry.source_path("current")), geometry_edits)
         if geometry_edits else None)
     destinations, pending = [], []
-    if wmset_edits or draw_edits or field_return_edits or sky_color_edits:
+    if wmset_edits or draw_edits or field_return_edits or sky_color_edits or vehicle_warp_edits:
         destination = wmset_destination
         pending.append((destination, bytes(raw)))
         destinations.append(str(destination))

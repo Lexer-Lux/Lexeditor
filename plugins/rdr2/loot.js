@@ -393,8 +393,8 @@ function lootEntryGrid(t, file, depth, seen) {
         closeButton({title:"Remove entry",disabled:!editable,onclick:()=>{if(!editable)return;t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}})),
       LexeditorUI.tileGrid([
         {label:"Rate",control:numeric("rate",{type:"number",step:"any",min:0})},
-        {label:"Min",control:numeric("min",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
-        {label:"Max",control:numeric("max",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
+        {label:"Min",control:numeric("min",{type:"number",step:1,min:0,placeholder:"default",title:"Blank = do not override quantity."})},
+        {label:"Max",control:numeric("max",{type:"number",step:1,min:0,placeholder:"default",title:"Blank = do not override quantity."})},
         {label:"Condition",control:lootReferenceControl(editable,refField(conditionSel,refPairs("rewardcondition",e.name,i),e.rewardcondition,v=>{if(!editable)return;e.rewardcondition=v;markLootDirty(t.key,file);renderLoot()}))}].map(LexeditorUI.detailField),{minWidth:150})]}));
     if(cyclic) grid.append(LexeditorUI.detailNote(`↻ ${e.name} already appears higher in this chain`));
     if(target&&isOpen){
@@ -422,7 +422,7 @@ function lootNumericError(entry,field){
   const raw=entry[field];
   if(raw===undefined||raw==="")return "";
   if(field==="rate")return (typeof raw==="string"||typeof raw==="number")&&String(raw).trim()&&Number.isFinite(Number(raw))&&Number(raw)>=0?"":"Enter a nonnegative finite rate.";
-  if(!catalogQuantityIsValid(String(raw)))return "Enter a whole quantity or leave it blank.";
+  if(!catalogQuantityIsValid(String(raw),0))return "Enter a nonnegative whole quantity or leave it blank.";
   if(entry.min!==undefined&&entry.min!==""&&entry.max!==undefined&&entry.max!==""
     &&catalogQuantityIsValid(String(entry.min))&&catalogQuantityIsValid(String(entry.max))&&BigInt(entry.min)>BigInt(entry.max))return "Minimum cannot exceed maximum.";
   return "";

@@ -16,9 +16,11 @@ except ModuleNotFoundError:  # Python 3.10 in Lexeditor's bundled environment.
     import tomli as tomllib
 
 from . import (encounter_chances, paths, world_map,
-               field_background, field_camera, field_dialogue, field_encounters,
-               field_movie, field_scripts, field_walkmesh, fixed_data_merge, init_data,
-               iroj_archive, kernel_merge, mngrp_merge, mod_folders, world_data_merge)
+               executable_text, field_background, field_camera, field_dialogue,
+               field_encounters, field_movie, field_scripts, field_walkmesh,
+               fixed_data_merge, init_data,
+               iroj_archive, kernel_merge, mngrp_merge, mod_folders, scan_text,
+               world_data_merge)
 
 
 COMPOSITION_FILE = "composition.json"
@@ -66,8 +68,47 @@ FIELD_SCRIPT_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.jsm$", re.IGNORECASE)
 FIELD_CAMERA_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.ca$", re.IGNORECASE)
+ENEMY_DAT_PATH = re.compile(r"^direct/battle/(c0m\d{3}\.dat)$", re.IGNORECASE)
 FIELD_MOVIE_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.msk$", re.IGNORECASE)
+# FFNx exe-override text: the Direct Mode path the editor writes, plus the
+# short exe/ spelling the readers also accept. Each maps to its merge kind.
+EXE_MSD_PATHS = {
+    "direct/ff8/en/exe/battle_scans.msd": ("scan", None),
+    "direct/exe/battle_scans.msd": ("scan", None),
+    "direct/ff8/en/exe/card_names.msd": ("exe", "exe_card_names"),
+    "direct/exe/card_names.msd": ("exe", "exe_card_names"),
+    "direct/ff8/en/exe/draw_point.msd": ("exe", "exe_draw_point"),
+    "direct/exe/draw_point.msd": ("exe", "exe_draw_point"),
+    "direct/ff8/en/exe/card_texts.msd": ("exe", "exe_card_texts"),
+    "direct/exe/card_texts.msd": ("exe", "exe_card_texts"),
+}
+_EXE_MSD_CACHE: dict = {"fingerprint": None, "values": {}}
+
+
+def _exe_msd_vanilla(kind: str, source_id: str | None) -> bytes | None:
+    """The installed game's text as the merge baseline, when it is provable."""
+    exe = paths.GAME_ROOT / "FF8_EN.exe"
+    try:
+        stat = exe.stat()
+        fingerprint = (str(exe.resolve()), stat.st_size, stat.st_mtime_ns)
+    except OSError:
+        return None
+    if _EXE_MSD_CACHE["fingerprint"] != fingerprint:
+        _EXE_MSD_CACHE.update(fingerprint=fingerprint, values={})
+    key = (kind, source_id)
+    if key not in _EXE_MSD_CACHE["values"]:
+        try:
+            if kind == "scan":
+                _EXE_MSD_CACHE["values"][key] = scan_text.build_msd(
+                    scan_text.read_executable(exe))
+            else:
+                source = executable_text.BY_ID[source_id or ""]
+                _EXE_MSD_CACHE["values"][key] = executable_text.extracted_msd(
+                    exe, source)
+        except (KeyError, OSError, ValueError):
+            _EXE_MSD_CACHE["values"][key] = None
+    return _EXE_MSD_CACHE["values"][key]
 
 
 def _field_walkmesh_baseline(logical_path: str,
@@ -114,6 +155,14 @@ def _field_dialogue_baseline(logical_path: str, baseline_root: Path | None
         return None
     # Claims are casefolded; the codec only needs the map name.
     return candidate, match.group(1)
+
+
+def _enemy_dat_baseline(logical_path: str, baseline_root: Path | None) -> Path | None:
+    match = ENEMY_DAT_PATH.fullmatch(logical_path)
+    if baseline_root is None or match is None:
+        return None
+    candidate = Path(baseline_root) / "battle" / match.group(1).casefold()
+    return candidate if candidate.is_file() else None
 
 
 def prelaunch_condition_state(config: Path | None = None,
@@ -885,6 +934,38 @@ def _compose_logical_payload(logical_path: str,
             if merged is not None:
                 return merged, "semantic merge", conflicts
             return inputs[-1][1], f"opaque winner: {reason}", []
+    enemy_baseline = _enemy_dat_baseline(logical_path, baseline_root)
+    if enemy_baseline is not None:
+        from . import enemy_data_merge as _enemy_data_merge
+        merged, conflicts, reason = _enemy_data_merge.merge(
+            enemy_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    if logical_path == "direct/namedic.bin" and baseline_root is not None:
+        from . import namedic as _namedic
+        baseline = Path(baseline_root) / "main" / "namedic.bin"
+        if baseline.is_file():
+            merged, conflicts, reason = _namedic.merge(
+                baseline.read_bytes(), inputs, logical_path)
+            if merged is not None:
+                return merged, "semantic merge", conflicts
+            return inputs[-1][1], f"opaque winner: {reason}", []
+    msd_spec = EXE_MSD_PATHS.get(logical_path)
+    if msd_spec is not None:
+        vanilla = _exe_msd_vanilla(*msd_spec)
+        if vanilla is not None:
+            kind, source_id = msd_spec
+            if kind == "scan":
+                merged, conflicts, reason = scan_text.merge(
+                    vanilla, inputs, logical_path)
+            else:
+                merged, conflicts, reason = executable_text.merge(
+                    vanilla, inputs, logical_path,
+                    executable_text.BY_ID[source_id or ""])
+            if merged is not None:
+                return merged, "semantic merge", conflicts
+            return inputs[-1][1], f"opaque winner: {reason}", []
     return inputs[-1][1], "opaque winner", []
 
 
@@ -1479,6 +1560,67 @@ def compose(project_root: Path, runtime_root: Path,
                     semantic_conflicts_by_path[init_key] = unit_conflicts
                 else:
                     semantic_fallback_by_path[init_key] = fallback
+            for enemy_key, enemy_claimants in claims.items():
+                enemy_baseline = _enemy_dat_baseline(enemy_key, baseline_root)
+                if len(enemy_claimants) < 2 or enemy_baseline is None:
+                    continue
+                from . import enemy_data_merge as _enemy_data_merge
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(enemy_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = _enemy_data_merge.merge(
+                    enemy_baseline.read_bytes(), inputs, enemy_key)
+                if merged is not None:
+                    (staging / enemy_key).write_bytes(merged)
+                    semantic_merged.add(enemy_key)
+                    semantic_conflicts_by_path[enemy_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[enemy_key] = fallback
+            namedic_key = "direct/namedic.bin"
+            namedic_claimants = claims.get(namedic_key, [])
+            namedic_baseline = Path(baseline_root) / "main" / "namedic.bin"
+            if len(namedic_claimants) > 1 and namedic_baseline.is_file():
+                from . import namedic as _namedic
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(namedic_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = _namedic.merge(
+                    namedic_baseline.read_bytes(), inputs, namedic_key)
+                if merged is not None:
+                    (staging / namedic_key).write_bytes(merged)
+                    semantic_merged.add(namedic_key)
+                    semantic_conflicts_by_path[namedic_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[namedic_key] = fallback
+            for msd_key, msd_spec in EXE_MSD_PATHS.items():
+                if len(claims.get(msd_key, [])) < 2:
+                    continue
+                vanilla = _exe_msd_vanilla(*msd_spec)
+                if vanilla is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(msd_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                kind, source_id = msd_spec
+                if kind == "scan":
+                    merged, unit_conflicts, fallback = scan_text.merge(
+                        vanilla, inputs, msd_key)
+                else:
+                    merged, unit_conflicts, fallback = executable_text.merge(
+                        vanilla, inputs, msd_key,
+                        executable_text.BY_ID[source_id or ""])
+                if merged is not None:
+                    (staging / msd_key).write_bytes(merged)
+                    semantic_merged.add(msd_key)
+                    semantic_conflicts_by_path[msd_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[msd_key] = fallback
         files = _files(staging)
         conflicts = []
         for path, claimants in sorted(claims.items()):

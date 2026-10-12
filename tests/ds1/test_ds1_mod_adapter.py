@@ -78,3 +78,18 @@ def test_a_folder_without_mod_files_is_refused_on_import(setup):
     _game, library, adapter = setup
     assert not adapter.inspect(library, [])["valid"]
     assert adapter.inspect(library, [RELATIVE])["valid"]
+
+
+def test_library_message_says_what_switching_does():
+    """The Mod Library status line names the action, not the machinery.
+
+    Lexer quoted the old "combines ... field by field" line back with
+    "WHAT?????". The line must say what switching does and that the game
+    must be closed, without loader internals.
+    """
+    message = Ds1ModAdapter.message
+    assert "Switch mods on or off" in message
+    assert "Close the game before switching" in message
+    for jargon in ("field by field", "placement by placement",
+                   "member by member", "executable", "binder"):
+        assert jargon not in message

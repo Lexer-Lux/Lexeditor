@@ -211,8 +211,10 @@ class ImportTests(unittest.TestCase):
             self.assertTrue(status["canManage"], status)
             self.assertNotIn("not supported", status["message"], status)
             self.assertEqual(status["packageTypes"], ["folder", "zip"], status)
-            entries = host.mod_library_entries("ff8")
-            self.assertEqual([row["name"] for row in entries["entries"]], ["My Mod"], entries)
+            with patch("core.mods_service.catalog", return_value={"version": "v", "url": "", "features": [],
+                                                                 "readmeProblems": [], "modules": []}):
+                overview = host.mods_overview("ff8")
+            self.assertEqual([row["name"] for row in overview["rows"]], ["My Mod"], overview)
             # The adapter was given the library the host knows, not its default.
             self.assertEqual(PLUGIN.mod_adapter.context["libraryRoot"], str(library / "ff8"))
             self.assertEqual(PLUGIN.mod_adapter.context["projectRoot"], str(project))

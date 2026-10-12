@@ -62,7 +62,7 @@ def use_installed_games() -> list[str]:
     return used
 from shot import EDGE, STUB, session_for  # noqa: E402
 import browser_guard  # noqa: E402
-from ui_tab_sweep import sweep_nested_tabs  # noqa: E402
+from ui_tab_sweep import sweep_nested_tabs, wait_for_loading_clear  # noqa: E402
 
 # Share the exact detector with the fast browser regression gate.
 PROBE = (ROOT / "tests/shared/text_clipping_probe.js").read_text(encoding="utf-8")
@@ -252,6 +252,20 @@ CONTROLS_PROBE = r"""
 """
 
 
+def settle_load(cdp) -> None:
+    """Let an async tab switch finish before the probes measure.
+
+    The click lands first (a handler may await before it shows its
+    loading state), then the wait holds until the shared loading panel
+    is gone. Measuring early flags a loading screen as an empty tab and
+    loses the tab bar the nested sweep restores afterwards. A load that
+    never finishes proceeds anyway; the probes report it as an empty
+    tab rather than stalling the sweep.
+    """
+    time.sleep(.55)
+    wait_for_loading_clear(cdp.eval)
+
+
 def sweep(plugin: str, width: int, height: int) -> list[dict]:
     profile = tempfile.TemporaryDirectory(prefix="lex-clip-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lex-clip-project-", ignore_cleanup_errors=True)
@@ -286,6 +300,16 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
             cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": STUB})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state==='undefined'||!state.booting", 90)
+            # FF7 has no state.booting flag: its data load (and the shell's
+            # own loading screen) is still up when the wait above passes, so
+            # wait for every loading screen to clear. A stuck load must fail
+            # as named empty tabs, not as a dead sweep, so a timeout here
+            # proceeds to the per-tab loop instead of raising.
+            try:
+                wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')"
+                               "&&!document.querySelector('.lex-panel-loading')", 60)
+            except AssertionError:
+                pass
             time.sleep(1.2)
             tabs = json.loads(cdp.eval(
                 "JSON.stringify([...document.querySelectorAll('nav button[data-tab]')]"
@@ -296,7 +320,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                     cdp.eval(
                         "(()=>{const b=[...document.querySelectorAll('nav button[data-tab]')]"
                         f".find(x=>x.dataset.tab==={json.dumps(tab)});if(b)b.click();}})()")
-                    time.sleep(.55)
+                    settle_load(cdp)
                 def measure(path):
                     wait_eval(cdp, "document.fonts.status==='loaded'", 30)
                     for probe, defect in ((PROBE, None), (EMPTY_PROBE, "empty-tab"),
@@ -315,7 +339,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                             if defect:
                                 entry["defect"] = defect
                             found.append(entry)
-                sweep_nested_tabs(cdp.eval, lambda: time.sleep(.55), measure)
+                sweep_nested_tabs(cdp.eval, lambda: settle_load(cdp), measure)
               except Exception as error:  # one tab must not lose the sweep
                 found.append({"plugin": plugin, "tab": tab,
                               "size": f"{width}x{height}", "defect": "probe-failed",
