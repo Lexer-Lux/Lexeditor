@@ -810,8 +810,8 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   font: inherit;
 }
 .lex-project-menu-action + .lex-project-menu-action { border-left: 1px solid var(--lex-border); }
-/* A game without mod management states it across the row, in the place the
-   Mod library button would take. */
+/* A game without mod management states it across the actions row, under
+   the Add and Find buttons that stay. */
 .lex-project-menu-actions > .lex-dialog-status {
   grid-column: 1 / -1;
   margin: 0;
@@ -993,16 +993,16 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    body fills its height and scrolls inside itself - tabs, a text editor, a
    table, a curve, paged settings, a picture - keeps the heading in place, and
    a panel used as a card (a Tweaks column) is not a scroller at all. */
-.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
+.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
   overflow-y:auto;
   overflow-x:clip;
   scrollbar-gutter:stable both-edges;
   grid-template-rows:minmax(min-content, 10%) 1fr;
 }
-.lex-detail-panel.no-heading:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
+.lex-detail-panel.no-heading:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
   grid-template-rows:1fr;
 }
-.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) > .lex-detail-panel-body {
+.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) > .lex-detail-panel-body {
   overflow-y:visible;
 }
 
@@ -1046,11 +1046,14 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   gap: 6px;
 }
 
+/* Multi-select prepends a banner beside the tabbed panel, so the pair below
+   gets the same fill treatment an only-child tabbed panel gets. The tabs
+   keep DOM order so the banner stays above the tab strip. */
 /* A body that is one tabbed panel fills the detail panel, so its tabs sit at
    the panel's foot. Sized to its content, the body ended wherever the
    content did and the tabs floated partway down a tall window. */
-.lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; padding:0; }
-.lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
+.lex-detail-panel-body:has(> .lex-tabbed-panel:only-child, > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) { flex:1 1 auto; padding:0; }
+.lex-detail-panel-body > .lex-tabbed-panel:only-child, .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child { flex:1 1 auto; }
 .lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); --lex-map-side-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px); }
 /* The overlay heading is shorter than what it holds once the panel is short, so
    its own clip cut the bottom of the record's identity away. The picture box
@@ -1327,15 +1330,15 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
    along its top, like with any other tabbed panel" (FF8's Magic). The body
    and the tabbed panel step aside so the bar, the heading and the tab's
    content are the panel's own rows. */
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) {
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) {
   display:flex;
   flex-direction:column;
 }
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) > .lex-detail-panel-body,
-.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child { display:contents; }
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-body,
+.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child, .lex-detail-panel > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child { display:contents; }
 .lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-tabs { order:-1; flex:0 0 auto; }
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) > .lex-detail-panel-heading { flex:0 0 auto; }
-.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-content { flex:1 1 auto; min-height:0; }
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-heading { flex:0 0 auto; }
+.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-content, .lex-detail-panel > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child > .lex-tabbed-panel-content { flex:1 1 auto; min-height:0; }
 
 .lex-detail-field-control:has(> .lex-source-control:not(.lex-source-control-internal)) > .lex-column-pin {
   right:calc(var(--lex-field-reference-rail-width, 9em) + 12px);

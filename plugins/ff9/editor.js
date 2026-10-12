@@ -273,6 +273,19 @@
     if(column==="comment"||source.prefix&&["id","name"].includes(column))return null;
     return prefsFor(base,key).pinButton(["id","name"].includes(column)?column:source.prefix+field.key,field.label);
   }
+  // A variable-length integer list keeps one bounded number box per entry
+  // and stores the same comma-separated string the backend validates, so an
+  // entry added or removed here saves exactly what the reader sees.
+  function listNumberControl(data,row,field){
+    const join=entries=>entries.join(", ");
+    const entries=String(row.values[field.key]??"").split(",").map(token=>token.trim()).filter(token=>token!=="");
+    const fallback=Math.min(Math.max(0,field.itemMin??0),field.itemMax??0);
+    const boxes=entries.map((token,index)=>({label:String(index+1),control:el("div",{class:"ff9-list-entry",style:"display:flex;gap:4px;align-items:center"},
+      el("input",{type:"number",min:field.itemMin,max:field.itemMax,step:1,value:Number(token),"aria-label":`${field.label} entry ${index+1}`,oninput:event=>{if(event.target.value==="")return;const next=[...entries];next[index]=event.target.value.trim();setValue(data,row,field,join(next))}}),
+      el("button",{type:"button",title:`Remove entry ${index+1}`,"aria-label":`Remove entry ${index+1}`,onclick:()=>{const next=[...entries];next.splice(index,1);setValue(data,row,field,join(next))}},"\u00d7"))}));
+    const add=el("button",{type:"button",title:"Add an entry to this list",onclick:()=>setValue(data,row,field,join([...entries,String(fallback)]))},"+ Add entry");
+    return el("div",{class:"ff9-list-control",style:"display:grid;gap:6px"},...(boxes.length?[multiNumberRow(boxes,{columns:Math.min(3,boxes.length)})]:[]),add);
+  }
   function fieldControl(data,row,field){
     const note=readOnlyNote(data,field),semantic=note||semanticFieldHelp(data,field),bounds=row.fieldBounds?.[field.key]||field;let control;
     if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""));
@@ -282,7 +295,8 @@
     else if(field.kind==="fixed-list"){
       const values=Array.isArray(row.values[field.key])?row.values[field.key]:[],labels=field.vector3?["X","Y","Z"]:field.key==="ColorBase"?["R","G","B"]:Array.from({length:field.length},(_value,index)=>String(index+1));
       control=multiNumberRow(labels.map((label,index)=>({label,control:el("input",{type:"number",min:field.itemMin,max:field.itemMax,step:field.itemKind==="integer"?1:(field.step||"any"),value:values[index]??0,oninput:event=>{if(event.target.value==="")return;const next=[...values];next[index]=Number(event.target.value);setValue(data,row,field,next)}})})),{columns:Math.min(3,field.length||3)});
-    }else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});
+    }else if(field.kind==="list"&&field.itemKind==="integer")control=listNumberControl(data,row,field);
+    else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});
     if(!note&&field.editable&&field.kind!=="stored")
       control=sourceControl(control,()=>row.values[field.key],vanillaValue(data,row,field),
         next=>setValue(data,row,field,next),formatFieldValue(field));

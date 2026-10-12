@@ -16,6 +16,13 @@ HOST = """(options) => {
      script: {schema: {fields: [{key: 'amount', label: 'Amount', type: 'int', default: 1, min: 0, max: 9}]},
               values: {amount: 3}, error: ''}, error: '', remote: false},
   ];
+  if (options.bundle) rows.push(
+    {path: 'C:/lib/game/Collection', folder: 'Collection', name: 'Collection', author: 'Me', description: '', credits: '',
+     version: '', missing: [], enabled: true, order: 3, lexmod: null, script: null, error: '', remote: false,
+     components: {schema: {title: '', help: '', blocker: '', fields: [
+       {key: 'combat', label: 'Combat', type: 'bool', default: false},
+       {key: 'balance', label: 'Balance', type: 'bool', default: false}]},
+       values: {combat: true, balance: false}, error: ''}});
   let download = {state: 'idle'};
   const record = name => (...args) => { calls.push([name, args]); };
   window.pywebview = {api: {
@@ -31,7 +38,8 @@ HOST = """(options) => {
         options.conflicts && rows.every(item => item.enabled)
           ? {...row, conflicts: [row.name === 'Combat' ? 'Items 100, Sell value: overrides Mine'
               : "Items 100, Sell value: Combat changes this too and loads later, so this mod's change is not used"]}
-          : row), canManage: true,
+          : row).map(row => options.alerts && row.folder === 'Combat' && row.enabled
+          ? {...row, alerts: ['This mod changed since the last build.']} : row), canManage: true,
       remote: [{folder: 'Extra', name: 'Extra', author: 'Lexer', description: 'More.', enabled: true, remote: true}],
       lexmod: {repository: 'Lexer-Lux/X', url: 'https://github.com/Lexer-Lux/X', error: ''}}),
     lexmod_update: async () => ({updated: false}),
@@ -52,7 +60,9 @@ HOST = """(options) => {
       return JSON.parse(JSON.stringify(rows[to]));
     },
     save_mod_settings: async (plugin, path, values) => { record('save_mod_settings')(plugin, path, values);
-      const row = rows.find(item => item.path === path); return JSON.parse(JSON.stringify(row)); },
+      const row = rows.find(item => item.path === path);
+      if (row.components) row.components.values = {...values};
+      return JSON.parse(JSON.stringify(row)); },
     lexmod_download: async (...args) => { record('lexmod_download')(...args); download = {state: 'running', phase: 'download', done: 1, total: 2};
       setTimeout(() => { download = {state: 'done', installed: ['Extra'], phase: 'install', done: 1, total: 1}; }, 300); return download; },
     lexmod_download_progress: async () => download,
@@ -68,9 +78,10 @@ HOST = """(options) => {
 }"""
 
 
-def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False):
+def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False):
     framework(page)
-    page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts})
+    page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
+                       "alerts": alerts, "bundle": bundle})
     page.wait_for_timeout(250)
 
 
@@ -326,3 +337,36 @@ def test_text_dragged_from_one_box_is_not_dropped_into_another(page):
       return {overEffect: over.dataTransfer.dropEffect, dropBlocked: drop.defaultPrevented, insideBlocked: inside.defaultPrevented};
     }""")
     assert blocked == {"overEffect": "none", "dropBlocked": True, "insideBlocked": False}, blocked
+
+
+def test_a_changed_mod_shows_one_mark_listing_every_flag(page):
+    mount(page, conflicts=True, alerts=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.get_by_role("checkbox", name="Switch Combat").check()
+    page.wait_for_function("document.querySelectorAll('.lex-column-list .lex-conflict-mark').length === 2")
+    combat = page.locator(".lex-mods-page .lex-column-list-row", has_text="Combat").locator(".lex-conflict-mark")
+    assert combat.count() == 1
+    assert (combat.get_attribute("aria-label") or "").startswith("Mod warnings"), combat.get_attribute("aria-label")
+    combat.hover()
+    page.locator(".lex-help-popover .lex-conflict-list li").first.wait_for()
+    popover = page.locator(".lex-help-popover").inner_text()
+    assert "overrides Mine" in popover and "changed since the last build" in popover
+    mine = page.locator(".lex-mods-page .lex-column-list-row", has_text="Mine").locator(".lex-conflict-mark")
+    assert (mine.get_attribute("aria-label") or "").startswith("Conflicts with other mods")
+    # The detail pane repeats the alert as its own note.
+    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-detail-note", has_text="This mod changed since the last build.").wait_for()
+
+
+def test_a_bundles_components_are_ordinary_settings_that_save(page):
+    mount(page, bundle=True)
+    page.locator('[data-tab="mods"]').click()
+    page.locator(".lex-mods-page .lex-column-list").get_by_text("Collection").click()
+    combat = page.get_by_role("checkbox", name="Combat", exact=True)
+    combat.wait_for()
+    assert combat.is_checked()
+    assert not page.get_by_role("checkbox", name="Balance", exact=True).is_checked()
+    page.get_by_role("checkbox", name="Balance", exact=True).check()
+    page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_settings')")
+    assert calls(page, "save_mod_settings")[-1][1:] == ["C:/lib/game/Collection", {"combat": True, "balance": True}]

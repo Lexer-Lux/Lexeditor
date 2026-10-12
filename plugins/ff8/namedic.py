@@ -213,6 +213,45 @@ def apply_edits(raw: bytes, edits: list[dict]) -> bytes:
     return bytes(output)
 
 
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+          ) -> tuple[bytes | None, list[dict], str]:
+    """Merge name edits per name, or return a visible whole-file fallback."""
+    try:
+        baseline = parse(vanilla)["entries"]
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    claims: dict[int, list[tuple[str, str]]] = {}
+    for mod_id, source in mods:
+        try:
+            entries = parse(source)["entries"]
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if len(entries) != len(baseline):
+            return None, [], f"{mod_id} changes the name count of {path}"
+        changed = [{"index": entry["index"], "text": entry["text"]}
+                   for entry, base in zip(entries, baseline)
+                   if entry["text"] != base["text"]]
+        for edit in changed:
+            claims.setdefault(edit["index"], []).append((mod_id, edit["text"]))
+        try:
+            reconstructed = apply_edits(vanilla, changed)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if reconstructed != source:
+            return None, [], f"{mod_id} contains changes outside proved names"
+    winners = {index: values[-1][1] for index, values in claims.items()}
+    output = apply_edits(
+        vanilla, [{"index": index, "text": text} for index, text in winners.items()])
+    conflicts = [
+        {"unit": f"{path}:name:{index}", "winner": values[-1][0],
+         "claimants": [mod_id for mod_id, _ in values]}
+        for index, values in claims.items()
+        if len(values) > 1 and len({value for _, value in values}) > 1
+    ]
+    parse(output)
+    return output, conflicts, ""
+
+
 def _write(destination: Path, raw: bytes) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     handle, temp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",

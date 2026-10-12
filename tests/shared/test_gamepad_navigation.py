@@ -727,3 +727,40 @@ def test_the_home_screen_walks_its_cards_and_opens_settings():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_the_loop_never_polls_while_another_app_has_the_focus():
+    """Polling holds the browser's DirectInput acquire and blocks a game.
+
+    A page Lexeditor leaves open while Dark Souls starts would otherwise keep
+    the pad for itself for the whole session. The loop stops the moment the
+    page cannot take pad input and resumes on the next focus.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = _page(browser)
+            page.evaluate("""()=>{
+              window.__focused = false;
+              document.hasFocus = () => window.__focused;
+              window.__sourceCalls = 0;
+              const pad = LexeditorUI.gamepadNavigation;
+              pad.setPadSource(() => { window.__sourceCalls++; return [window.__pad]; });
+              pad.install();
+            }""")
+            page.wait_for_timeout(1300)  # past the one-second retry
+            assert page.evaluate("()=>LexeditorUI.gamepadNavigation.state().running") is False
+            assert page.evaluate("()=>window.__sourceCalls") == 0
+            page.evaluate("""()=>{
+              window.__focused = true;
+              document.dispatchEvent(new FocusEvent('focusin'));
+            }""")
+            page.wait_for_function("()=>LexeditorUI.gamepadNavigation.state().running", timeout=5000)
+            page.wait_for_function("()=>window.__sourceCalls > 0", timeout=5000)
+            page.evaluate("()=>{ window.__focused = false; }")
+            page.wait_for_function("()=>!LexeditorUI.gamepadNavigation.state().running", timeout=5000)
+            calls = page.evaluate("()=>window.__sourceCalls")
+            page.wait_for_timeout(400)
+            assert page.evaluate("()=>window.__sourceCalls") == calls
+        finally:
+            browser.close()

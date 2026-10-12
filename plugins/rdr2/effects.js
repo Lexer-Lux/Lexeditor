@@ -90,6 +90,21 @@ function effectNumberEditor(e,field,currentBehavior){
     inactive?null:(value,event)=>applyToInput(event,value),value=>(+value%1?(+value).toFixed(2):String(+value)));
 }
 
+function effectTimeUnitsEditor(e){
+  const ek=e.key+"|timeunits",cur=String(isRO()?e.timeunits:(state.effectEdits[ek]??e.timeunits));
+  const unknown=value=>el("option",{value:String(value)},`${value} \u2014 unknown unit`);
+  const select=el("select",{"aria-label":`Effect timeunits for ${e.key}`,value:cur,class:ek in state.effectEdits?"edited":"",title:"Unit for the Time value: seconds, minutes, in-game hours or in-game days.",...(isRO()?{disabled:true}:{}),onchange:event=>{
+    const value=event.target.value;if(value===String(e.timeunits))delete state.effectEdits[ek];else state.effectEdits[ek]=value;select.classList.toggle("edited",ek in state.effectEdits);renderToolbarOnly();
+  }},...EFFECT_TIME_UNIT_OPTIONS.map(option=>el("option",{value:String(option.value),selected:String(option.value)===cur},option.label)));
+  // A hand-edited mod may hold a value outside the proven four. Keep it
+  // visible and let save-time validation refuse it instead of hiding it.
+  if(!EFFECT_TIME_UNIT_OPTIONS.some(option=>String(option.value)===cur)){const extra=unknown(cur);extra.selected=true;select.append(extra);}
+  select.dataset.rdr2EffectKey=e.key;
+  const vEff=state.store.vanilla?.effectByKey?.[e.key],kEff=state.store.kiddos?.effectByKey?.[e.key];
+  return refField(select,[["V","vtag",vEff?vEff.timeunits:null],["K","ktag",kEff?kEff.timeunits:null]],cur,
+    (value,event)=>{if(![...select.options].some(option=>option.value===String(value)))select.append(unknown(value));applyToInput(event,value);},String);
+}
+
 function effectDetail(e,behaviors,used){
   const body=[];
   const behaviorKey=e.key+"|id",currentBehavior=state.effectEdits[behaviorKey]??e.id;
@@ -101,7 +116,7 @@ function effectDetail(e,behaviors,used){
     field("Engine value / display tier",effectNumberEditor(e,"value",currentBehavior)),
     field("Percent override",effectNumberEditor(e,"percent",currentBehavior)),
     field("Time",effectNumberEditor(e,"time",currentBehavior)),
-    field("Time units",effectNumberEditor(e,"timeunits",currentBehavior)),
+    field("Time units",effectTimeUnitsEditor(e)),
     field("Duration category",el("span",{class:"cat"},e.durationcategory.replace("EFFECT_DURATION_CATEGORY_",""))));
   body.push(field("Used by",used.length?el("button",{class:"table-link",title:"Show every item using this effect",onclick:()=>showEffectUsage(e,used)},`${used.length} item${used.length===1?"":"s"}`):el("span",{class:"cat"},"No items")));
   return LexeditorUI.detailPanel({title:field("Name",humanNameInput("effects",e.key)),meta:`${e.symbol||e.label?`${e.symbol||e.label} · `:""}${e.key}`,actions:originMarker(e),body});

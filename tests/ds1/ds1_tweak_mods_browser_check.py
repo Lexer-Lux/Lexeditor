@@ -92,9 +92,11 @@ def main():
                     if output:
                         page.screenshot(path=str(output / 'ds1-reshade.png'))
                     page.locator('.lex-subtab-button', has_text='Mods').click()
-                    # No executable here: the problem is stated and Apply is off.
+                    # No executable here: the problem is stated, Restore is off,
+                    # and there is no Apply button at all anymore.
                     reveal(page, page.get_by_text('DarkSoulsRemastered.exe is missing'))
-                    assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
+                    assert page.get_by_role('button', name='Restore original', exact=True).is_disabled()
+                    assert page.get_by_role('button', name='Apply', exact=True).count() == 0
                     # No per-tweak trust button: enabling is the Mods tab's job.
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
                     # The Tweaks page must stay usable in both window sizes.
@@ -125,7 +127,8 @@ def main():
                     assert page.locator('#main > .lex-detail-panel').count() == 1
                     assert page.locator('.lex-settings-columns').count() == 0
                     assert page.get_by_text('No tweak mods are installed.', exact=False).is_visible()
-                    assert page.get_by_role('button', name='Apply', exact=True).is_disabled()
+                    assert page.get_by_role('button', name='Restore original', exact=True).is_disabled()
+                    assert page.get_by_role('button', name='Apply', exact=True).count() == 0
                     geometry=page.locator('#main').evaluate('''main=>({
                       main:main.getBoundingClientRect().toJSON(),
                       panel:main.firstElementChild.getBoundingClientRect().toJSON()})''')

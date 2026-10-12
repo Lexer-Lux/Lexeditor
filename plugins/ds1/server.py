@@ -34,7 +34,7 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
 RULES = NativeRules(STORE.game_root, STORE.project, STORE.read_only)
 MAPSTORE = MapStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
 TAESTORE = TaeStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
-NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "misc"}
+NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
 UPLOAD_BODY_LIMIT = 2100000
 
 
@@ -51,6 +51,47 @@ def _asset_bytes(relative, side):
     if not live.is_file():
         raise ValueError("The installed game has no such file")
     return live.read_bytes(), "game", relative.as_posix()
+
+
+def _tweaks_flag() -> bool:
+    """Whether the installed tweaks differ from the library (Save rebuilds them)."""
+    try:
+        return bool(tweak_mods.needs_rebuild(STORE.game_root).get("needed"))
+    except (ValueError, OSError, RuntimeError):
+        return False
+
+
+def _rebuild_tweaks_on_save() -> dict:
+    """Build changed tweaks into the installed game as part of Save.
+
+    The project is already saved when this runs; a tweak failure is
+    reported, never raised, so a broken tweak cannot block project saves.
+    With the game open the rebuild waits: the flag stays set and the next
+    Save (or Play) finishes it.
+    """
+    if not _tweaks_flag():
+        return {"tweaksNeedRebuild": False}
+    if not tweak_mods.game_closed():
+        return {"tweaksNeedRebuild": True, "tweaksDeferred": True}
+    try:
+        status = tweak_mods.apply(STORE.game_root)
+    except (ValueError, OSError, RuntimeError) as error:
+        return {"tweaksNeedRebuild": True, "tweaksError": str(error)}
+    return {"tweaksNeedRebuild": bool(status.get("needsRebuild")), "tweaksRebuilt": True}
+
+
+def _deploy_tweaks_now() -> None:
+    """Build and install changed tweaks at once, for a session without Save.
+
+    A session with no writable project has no Save button, so its Tweaks
+    page installs straight away. With the game open the install waits for
+    the next Play.
+    """
+    if _tweaks_flag() and tweak_mods.game_closed():
+        try:
+            tweak_mods.apply(STORE.game_root)
+        except (ValueError, OSError, RuntimeError) as error:
+            raise ValueError(f"Settings saved, but the rebuild failed: {error}") from error
 
 
 class Handler(PluginRequestHandler):
@@ -210,6 +251,7 @@ class Handler(PluginRequestHandler):
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
                     result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
+                    result['tweaksNeedRebuild'] = _tweaks_flag()
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -241,7 +283,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["data-map", "items", "monster-resistances", "monster-stats", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "stats", "encumbrance", "native-stamina", "map-placements", "animation-events", "world", "asset-replacement", "map-viewport"]})
+                            "capabilities": ["data-map", "items", "monster-resistances", "monster-stats", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "stats", "encumbrance", "levelup-gains", "native-stamina", "map-placements", "animation-events", "world", "asset-replacement", "map-viewport"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -260,7 +302,7 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/apply', '/api/tweaks/restore', '/api/tweaks/debug'):
+                            '/api/tweaks/save', '/api/tweaks/restore', '/api/tweaks/debug'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -360,29 +402,34 @@ class Handler(PluginRequestHandler):
                     MAPSTORE.save()
                     TAESTORE.save()
                     RULES.save()
+                    result.update(_rebuild_tweaks_on_save())
                 elif path == '/api/discard':
                     result = STORE.discard()
                     MAPSTORE.discard()
                     TAESTORE.discard()
                     RULES.discard()
                 # Tweaks are library mods, not part of the selected project, so
-                # they save at once and apply to the installed executable.
+                # they save at once; the rebuild rides on Save, or installs straight
+                # away when the session has no writable project.
                 elif path == '/api/tweaks/save':
                     tweak_mods.save(payload.get('tweaks'))
+                    if STORE.read_only:
+                        _deploy_tweaks_now()
                     result = tweak_mods.status(STORE.game_root)
-                elif path == '/api/tweaks/apply':
-                    result = tweak_mods.apply(STORE.game_root)
                 elif path == '/api/tweaks/restore':
                     result = tweak_mods.restore(STORE.game_root)
                 elif path == '/api/tweaks/debug':
-                    # Takes effect at the next Apply or Play.
+                    # Takes effect at the next Save or Play.
                     tweak_mods.set_debug_mode(payload.get('on'))
+                    if STORE.read_only:
+                        _deploy_tweaks_now()
                     result = tweak_mods.status(STORE.game_root)
                 elif path == '/api/deployment/apply':
                     result = RULES.apply(STORE)
                 else:
                     result = RULES.restore()
                 if not path.startswith('/api/tweaks/'):
+                    result['tweaksNeedRebuild'] = _tweaks_flag()
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
                     result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
                     result['nativeRules'] = RULES.snapshot()

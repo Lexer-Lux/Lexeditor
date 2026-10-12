@@ -159,11 +159,11 @@ function normalizeShopRequirementDraft(groups){
 function validateShopRequirementDraft(groups){
   for(let groupIndex=0;groupIndex<groups.length;groupIndex++){
     const group=groups[groupIndex];
-    if(!/^-?\d+$/.test(String(group.count??"")))return `Group ${groupIndex+1}: count must be a whole number.`;
+    if(!/^\d+$/.test(String(group.count??"")))return `Group ${groupIndex+1}: count must be a nonnegative whole number.`;
     for(let requirementIndex=0;requirementIndex<(group.requirements||[]).length;requirementIndex++){
       const requirement=group.requirements[requirementIndex],prefix=`Group ${groupIndex+1}, condition ${requirementIndex+1}`;
       if(!requirement.type||!requirement.key)return `${prefix}: type and key are required.`;
-      if(!/^-?\d+$/.test(String(requirement.state??"")))return `${prefix}: state must be a whole number.`;
+      if(!/^\d+$/.test(String(requirement.state??"")))return `${prefix}: state must be a nonnegative whole number.`;
       if(!["true","false"].includes(String(requirement.lock)))return `${prefix}: lock must be true or false.`;
     }
   }
@@ -183,12 +183,12 @@ function showShopRequirements(shop,row,it){
     const grid=LexeditorUI.stack({fill:false});
     draft.forEach((group,groupIndex)=>{
       const content=LexeditorUI.stack({fill:false});
-      content.append(LexeditorUI.detailField({label:"Count",control:el("input",{type:"number",step:1,required:true,"data-lex-validate-number":"true",value:group.count??"1",disabled:readonly,oninput:ev=>group.count=ev.target.value})}));
+      content.append(LexeditorUI.detailField({label:"Count",control:el("input",{type:"number",step:1,min:0,required:true,"data-lex-validate-number":"true",value:group.count??"1",disabled:readonly,oninput:ev=>group.count=ev.target.value})}));
       for(const [requirementIndex,requirement] of (group.requirements||[]).entries())content.append(LexeditorUI.detailSection({title:`Condition ${requirementIndex+1}`,body:[
         LexeditorUI.tileGrid([
           {label:"Type",control:el("input",{list:typeList,value:requirement.type||"",disabled:readonly,oninput:ev=>requirement.type=ev.target.value})},
           {label:"Key",control:el("input",{list:keyList,value:requirement.key||"",disabled:readonly,oninput:ev=>requirement.key=ev.target.value})},
-          {label:"State",control:el("input",{type:"number",step:1,required:true,"data-lex-validate-number":"true",value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value})},
+          {label:"State",control:el("input",{type:"number",step:1,min:0,required:true,"data-lex-validate-number":"true",value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value}),help:fieldHelp("The condition state that unlocks this listing. Use 0 or higher. No highest state is proven, so a large value may do nothing.")},
           {label:"Lock",control:el("input",{type:"checkbox",checked:String(requirement.lock)==="true",disabled:readonly,onchange:ev=>requirement.lock=String(ev.target.checked)})}].map(LexeditorUI.detailField)),
         el("button",{disabled:readonly,title:"Remove this condition",onclick:()=>{group.requirements.splice(requirementIndex,1);renderEditor()}},"Remove condition")]}));
       content.append(LexeditorUI.actionRow(newButton({disabled:readonly,title:"Add condition",onclick:()=>{group.requirements.push({type:"",key:"",state:"1",lock:"false"});renderEditor()}}),

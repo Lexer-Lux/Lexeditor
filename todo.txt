@@ -8,46 +8,43 @@ THIS FILE LITERALLY ONLY GETS LONGER OVER TIME
 
 =================================================================== GLOBAL / ALL GAMES
 
-- Audit controls across plugins: use appropriate bounded inputs and keep unknown or unproven fields read-only, including save validation.
-    > Left: check each remaining plugin's fields against its schema.
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
-    > Left: the sweep must wait for FF7's loading screen; FF7 table headers are dark on dark; RDR2 Mob archetypes has no pager; FF7 Remake text/abilities subtabs lose their tab bar during the sweep.
-- I can't even open up FF8 now because I'm getting some thing telling me to trust something??? How TF do I do that when I can't even open it???? And why is there this big ugly trust button everywhere on the DS1 plugin. BRo. If you want this so bad then put up a disclaimer saying are you sure you want to enable this mod? only enable mods you trust (This warning shows up the first time you enable a mod because it's important. You can disable this in the settings under "Trust Warning".), the first time you enable a mod, and then let the user bypass this disclaimer with a  trust warning setting in global settings, default on
-- oh and also we don't have override orders/mod reordering in either the mod dropdown or mod tab. we need those.
-    > Left: the mod dropdown can reorder (drag, or Alt+Up/Down); the Mods tab cannot.
+    > Per Lexer: the sweep runs on CI at sync; fixes get written against its output. No more local sweeps.
+    > Left: the detector mechanics are fixed (FF7 loading wait, FF7 headers pinned and the dark-on-dark not reproducible, RDR2 Mob pager added, FF7R async settle). Run the sweep and fix what it now finds.
 
 ==================================================================== FF8 - PAGES
 
-GF
-- gfs -> Center panel -> attack: uhhh how is the entire left 1/3rd reserved for the property names????? i even told you to get rid of all the overrides and make it globally always the same % that i indicated. so how the fuck is this possible.
-    > Left: your call. At 7.5% of this 463px panel names are unreadable. Paged panels now take the lane as 7.5% of the whole panel, which may already fix this; check it.
 World
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
-    > Left: the world-map side (its trigger is in the world map scripts, not found yet).
+    > Left: the field side is pinned (hoverable name, picture, arrival point). The world-map side has its trigger pairing measured (every script pairs a world-map cell with a field entry, 56 of 72 entries mapped) but no map UI is built yet. The World Scripts tab shows vehicle warps and siblings; warp cells are editable with merge + save tested.
 
 ==================================================================== FF8 - DATA, MODS, NATIVE, IN-GAME
 
-- Finish FF8 mod composition for formats without a proven merger; test installing, combining, ordering, and removing real mods.
 - Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
+    > Scoper rank: switch panel first, then mergers (namedic/msd/toml small, c0m medium), spreadsheet tables, archive note fix (the Data Map row is stale, capability shipped headless), Wm2field trigger hunt, vehicle tier A, animation last. VRAM palette animation: evidence says vestigial in the retail build, confirm close as won't-do?
+    > Done since: spreadsheet refine + shop tables, archive note fix. Animation writing moved to #934; VRAM to #933.
+    > Left: World Scripts tab added, vehicle warp cells decoded with editing + merge + save tested, Shot ammo uses the item select, wm2field field side noted, Wm2field trigger hunt HIT (cell->entry mapping measured, no map UI). Moved out: animation writing (#934), VRAM (#933, won't-do evidence ready for verdict). Still open: Wm2field map UI, spreadsheet bulk import/export, archive browsing/repacking.
 - Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
     > Left: CI, then the in-game checks. Its warning toasts still draw an imitation box; the fix (a Hext patch calling the game's own battle message routine) needs the routine confirmed in a running game, with your OK.
 - FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
 - ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
+    > Traces on all silent closes plus the likely fix are in (no local rebuild). Left: CI build, then one live repro to name the path.
 
 ==================================================================== DS1
+- DS1 gamepad dead (parked per Lexer, worry later). Ruled out: mods (dead with zero deployed), debug mode (on all night, pad worked earlier). Open: loader dinput8 proxy vs OS/Steam; ~40 zombie game processes noted.
 
-- i am so fucking confused. when i click the mod dropdown in DS1 plugin they're all greyed out, everything except Soul Safety has neither the editable nor locked icons first but some weird star thing, everything except soul safety has no pencil, folder, nor i icons, just the x and then a fuckton of blank space, better details and enhanced sprinting have weird "0.2 candidate" after their names, there's this third button -- mod library -- full of weird and bizarre buttons and features i never recall asking for and i don't know who made them or why or why they exist or why we need them "Combines every enabled Dark Souls Remastered mod over the game's own files" WHAT????????? does this have something to do with what i asked you to make happen when you try to edit a lexer's mod. cuz uh, this is not remotely what i asked for lmao
-- OMFG. AND THE SUBTABS IN THE DS1 PLUGIN AREN'T ALPHABETICTALLY SORTED. HOW THE FUCK DOES THIS HAPPEN. WE REBUILT THE ENTIRE PROGRAM SO WE WOULDN'T HAVE THIS SPAGHETTI CODE AND YET THIS BUG KEEPS REAPEARRING ONE SCREEN AT A TIME, ONE GAME AT A TIME. HOW. THIS SHOULDN'T. EVEN. FUCKING. BE. POSSIBLE.
-    > Left: DS1's subtab bar passes order:"given", which the shared bar honours.
+- DS1 mod dropdown: row alignment fixed and pinned by a test. One open question.
+    > Author lock: the bypass exists and works in a shell, so it is failing inside the running app; needs one check: Settings, is Developer Mode on or off?
 
 DS1 - ARMOR REWORK (UNFINISHED MOD)
 - Armor Rework is UNFINISHED until this is done: add a Level-up gains tab to the DS1 plugin so level-up stat gains can be edited, then remove the DEF gain from level-ups in Armor Rework.
-    > Left: the Level-up gains tab (not started). The game computes level-up defense at 0x2DC850 from your stat levels (player data +0x40 onward) times fixed factors (0.9, 0.85, 1.8...).
+    > Left: inputs named from live read + disassembly (VIT/ATT/END/STR/DEX/INT/FAI + humanity@+0x84 capped 99 + RES@+0x88; +0x78/+0x80 unread by the function; all factor addresses dumped). Tab + patch built and tested (tests/ds1/test_ds1_levelup_gains.py, 18 pass). Armor Rework's script now zeroes all 36 level-up gains (78 hooks verified). Left: in-game acceptance (level-ups grant no defense; menus; one armor upgrade).
 - Armor Rework: confirm in-game that upgraded armor uses its per-level absorption effect (the DS3 offset in ReinforceParamProtector; DS1 may ignore it).
+    > In game: upgrade one armor piece once; its absorption number should rise. If it doesn't move, DS1 ignores the mechanism.
 - Armor Rework: check the menus in-game. Built, not yet seen: armor panels (equipment and shop) show each piece's absorption, the equipment panel with a % sign; status screens show your combined absorption from the four armor pieces (whole numbers, no % sign; rings and other effects not counted).
-- Armor Rework: your saved mod zeroed the absorption of 9 enemy effects (40120000, 40120100-40120103, 40120200, 40120300, 40206000, 40206001; Rat shows 0%). Restore them or say they are meant.
+    > In game: open the equipment, shop and status screens and compare with the description above.
 
 ==================================================================== CI / INTEGRATION
 
 - Resolve outstanding CI failures, including RDR2 source/browser checks and RDR provenance fixtures, the native FF8 package, and the latest FF7 and shared-suite results.
-    > Left: push master (say sync), then go through CI.
+    > Parked until release time (say when). Then: push/sync master, re-run CI, go through failures.

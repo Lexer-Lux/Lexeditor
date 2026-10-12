@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,
+  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],areaTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
@@ -15,6 +15,7 @@ async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
   if(!response.ok||result.error)throw new Error(result.error||response.statusText);
+  if("tweaksNeedRebuild" in result)state.tweaksNeedRebuild=result.tweaksNeedRebuild;
   return result;
 }
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
@@ -61,22 +62,25 @@ const shell=LexeditorUI.mountShell({
     {id:"areas",label:"Areas",help:"Move enemy and object placements, and swap which enemy appears. Each placement belongs to one map. The Viewport shows the selected map in 3D: click a placement to select it, drag its arrows to move it, and Duplicate or Remove it from the bar. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
-    {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements, slot cost and stamina cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
+    {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements, slot cost and stamina cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
+    {id:"levelup",label:"Level-up gains",help:"Edit what each level-up adds to defense. Each defense grows with your stats and humanity. 0 removes a gain. Vanilla is read-only. Save and Apply to use your values."},
     {id:"world",label:"World",help:"Edit what the world gives you. Drops holds enemy and corpse drops with their rates. Shops holds each merchant's stock and prices. Treasure holds how treasure chests and pickups behave. Vanilla is read-only. Save changes the mod project."},
     {id:"assets",label:"Assets",help:"Replace game files with your own: textures, sounds, movies and models. Mod files holds the replacements the mod carries, and Installed game holds the files it can replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
     {id:"misc",label:"Misc."},
-    {id:"tweaks",label:"Tweaks",help:"Executable tweaks are mods in the mod library. Switching one on or off saves at once; Apply then builds every enabled tweak into the installed executable together, and Restore original puts the untouched executable back."}],
+    {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
   info:()=>navigate("info"),infoActive:()=>state.tab==="info",
   help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Dark Souls Data Map",
-  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending,pendingChanges:()=>state.changes||[],save,discard,history:fieldHistory
+  readonly:()=>state.readOnly,dirtyCount:()=>state.dirty+state.pending+(state.tweaksNeedRebuild?1:0),
+  pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
+  save,discard,history:fieldHistory
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="areas"?state.areaTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:
   tab==="stats"?state.statsTabs:
   tab==="world"?state.worldTabs:
   tab==="assets"?state.assetTabs:
-  tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
+  tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:tab==="levelup"?[{id:"levelup",label:"Gains"}]:state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
@@ -86,7 +90,7 @@ async function refreshState(){
 function sortedRows(){
   const query=state.query.toLowerCase();
   const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
-  if(state.tab==="encumbrance")return filtered;
+  if(state.tab==="encumbrance"||state.tab==="levelup")return filtered;
   // The game's own order (by record) breaks ties.
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
 }
@@ -155,6 +159,7 @@ async function loadDetail(){
 }
 async function loadTweaks(){
   state.tweaks=await api("/api/tweaks");
+  state.tweaksNeedRebuild=!!state.tweaks.needsRebuild;
 }
 async function loadDeployment(){
   state.deployment=await api("/api/deployment");
@@ -170,6 +175,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   // Without the curve table, Stats opens on weapon scaling instead of an error.
   else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":"scaling";
   else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
+  else if(tab==="levelup")sub="levelup";
   else if(tab==="misc")sub="misc";
   else if(tab==="world"&&!state.worldTabs.some(entry=>entry.id===sub))sub="drops";
   else if(tab==="assets"&&!state.assetTabs.some(entry=>entry.id===sub))sub="overrides";
@@ -177,7 +183,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="animations"&&changedTab)state.animScope={level:"chars"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","attacks","areas","animations","effects","stats","encumbrance","misc","world","assets"].includes(tab))await loadItems();
+    if(["items","enemies","attacks","areas","animations","effects","stats","encumbrance","levelup","misc","world","assets"].includes(tab))await loadItems();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
@@ -210,7 +216,14 @@ async function deploymentAction(action){
 }
 async function save(){
   await edits;
-  try{await api("/api/save",{});attackPreviews.clear();await refreshState();shell.refresh();LexeditorUI.showToast("Changes saved to the mod project.");}
+  try{
+    const result=await api("/api/save",{});attackPreviews.clear();await refreshState();
+    if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
+    if(result.tweaksError)LexeditorUI.showAlert({title:"Tweaks were not rebuilt",message:result.tweaksError});
+    else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
+    else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
+    else LexeditorUI.showToast("Changes saved to the mod project.");
+  }
   catch(error){notify(error);throw error;}
 }
 async function discard(){
@@ -558,7 +571,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing is
   // said under it, never in its place.
-  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="areas"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="scaling"?"Weapon":state.sub==="spell-reqs"?"Spell":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
+  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="areas"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="scaling"?"Weapon":state.sub==="spell-reqs"?"Spell":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
   const drillRow=state.tab==="animations"&&!state.row?state.rows.find(row=>key(row)===state.selected):null;
   if(drillRow&&isDrillRow(drillRow)){
     const opening=String(drillRow.id).startsWith("char:");
@@ -773,8 +786,8 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations"&&state.sub==="playback")return renderPlayback();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="areas"?"placements":state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
-  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="areas"?"Areas":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="areas"?"placements":state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
+  const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="areas"?"Areas":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
@@ -786,7 +799,7 @@ function renderItems(){
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,sortState:state.sort,
-      sort:column=>{if(encumbrance)return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
+      sort:column=>{if(encumbrance||state.tab==="levelup")return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       // The record is fetched first, then the shared list swaps in its detail
       // pane once. It used to draw the pane with the old record, then render
       // the whole page twice more as two loads of the same row came back.
@@ -806,6 +819,8 @@ function renderItems(){
     // HKX file references and character names come from map placements.
     // names: asset files keep the game's own paths; replacing swaps the
     // bytes under a path, never the path itself.
+    // names: level-up gains cover the game's four fixed defenses, which
+    // have no stored names to change.
     renamable:row=>state.tab==="stats"?row.table!=="CalcCorrectGraph":state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   const subtabs=subtabsFor(state.tab);
@@ -1067,21 +1082,19 @@ function renderInfo(){
       safety:"Apply composes enabled library tweaks and project native rules before replacing the executable, parameter archive and map files. Outside changes are refused.",
       removal:"Restore original restores all owned files. The project and library tweak settings stay unchanged."})]});
 }
-// Tweaks are library mods: a switch saves at once, and Apply builds every
-// enabled one into the installed executable together.
+// Tweaks are library mods: a switch saves at once, and changed tweaks
+// rebuild when the mod project saves.
 async function tweakRequest(path,body,failure){
   if(state.tweakBusy)return;
   state.tweakBusy=true;render();
-  try{state.tweaks=await api(path,body);}
+  try{state.tweaks=await api(path,body);state.tweaksNeedRebuild=!!state.tweaks.needsRebuild;}
   catch(error){LexeditorUI.showAlert({title:failure,message:error.message||String(error)});await loadTweaks().catch(()=>{});}
   finally{state.tweakBusy=false;render();}
 }
-async function tweakAction(action){
-  const spec=action==="apply"?{title:"Apply the enabled tweaks?",
-    message:"Close the game first. Lexeditor builds every enabled tweak into one executable, keeps one copy of the original the first time, and refuses an executable changed outside Lexeditor. These tweaks are experimental; test offline.",confirmLabel:"Apply"}
-    :{title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original"};
-  if(!await confirmAction({...spec,cancelLabel:"Cancel"}))return;
-  await tweakRequest("/api/tweaks/"+action,{},action==="apply"?"Could not apply the tweaks":"Could not restore the executable");
+async function restoreTweaks(){
+  const ok=await confirmAction({title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original",cancelLabel:"Cancel"});
+  if(!ok)return;
+  await tweakRequest("/api/tweaks/restore",{},"Could not restore the executable");
 }
 function renderTweaks(){
   const status=state.tweaks;
@@ -1095,22 +1108,29 @@ function renderTweaks(){
   const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Apply combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back.",
+    help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       // Debug mode: the game runs offline with Arxan off, so a debugger
       // (Cheat Engine's "find what writes", x64dbg) can attach (#742).
       detailField({label:"DEBUG MODE",dataType:"BOOL",
-        help:infoHelp("For finding things in the running game with a debugger. Apply or Play installs a loader that switches the game's anti-debug protection (Arxan) off with dearxan, so Cheat Engine or x64dbg can attach without the game closing itself. The game has no network access while it is on: it cannot go online. Turn it off and Apply again for normal play."),
+        help:infoHelp("For finding things in the running game with a debugger. Save or Play installs a loader that switches the game's anti-debug protection (Arxan) off with dearxan, so Cheat Engine or x64dbg can attach without the game closing itself. The game has no network access while it is on: it cannot go online. Turn it off and save again for normal play."),
         control:el("input",{type:"checkbox",checked:!!status.debugMode,disabled:busy,"aria-label":"Debug mode",
           onchange:event=>tweakRequest("/api/tweaks/debug",{on:event.target.checked},"Could not switch debug mode")})}),
-      !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(status.debugMode?"Debug mode is on: Apply to install it.":"Debug mode is off: Apply to put the normal loader back."):null,
+      !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(state.readOnly
+        ?(status.debugMode?"Debug mode is on. Close the game, then press Play to install it.":"Debug mode is off. Close the game, then press Play to put the normal loader back.")
+        :(status.needsRebuild
+          ?(status.debugMode?"Debug mode is on. Save to install it.":"Debug mode is off. Save to put the normal loader back.")
+          :(status.debugMode?"Debug mode is on. It installs when you press Play.":"Debug mode is off. The normal loader returns when you press Play."))):null,
+      (status.staleMods||[]).length?LexeditorUI.detailNote(state.readOnly
+        ?"The enabled tweaks changed since the last build. Close the game, then press Play to rebuild them."
+        :"The enabled tweaks changed since the last build. Save to rebuild them."):null,
+      status.state==="vanilla"&&!status.problem&&!status.needsRebuild&&(status.tweaks||[]).some(row=>row.enabled)?LexeditorUI.detailNote("These tweaks are on but not installed yet. Press Play to install them."):null,
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,
-      status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Apply or Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
+      status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
-      actionRow(el("button",{type:"button",disabled:busy||!status.windows||!!status.problem,onclick:()=>tweakAction("apply")},"Apply"),
-        el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:()=>tweakAction("restore")},"Restore original"))].filter(Boolean)});
+      actionRow(el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:restoreTweaks},"Restore original"))].filter(Boolean)});
   return LexeditorUI.tweaksPage({plugin:"ds1",render,
     pages:[{id:"mods",label:"Mods",body:()=>[installed,...panels],bind,whole:empty?installed:null}]});
 }
@@ -1130,5 +1150,5 @@ async function boot(){
   try{await refreshState();await loadItems();render();}catch(error){state.error=error.message;render();}
   finally{document.body.dataset.ds1Ready=state.error?"error":"true";await LexeditorUI.finishPluginLoading();}
 }
-window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending))event.preventDefault();});
+window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending||state.tweaksNeedRebuild))event.preventDefault();});
 boot();

@@ -27,8 +27,8 @@ recovery is 100%. No balance preset is applied by opening or saving the editor.
 
 Save writes the selected project. **Information > Apply** composes its saved
 native rules with enabled library tweak mods, then installs the parameter
-archive. Library **Tweaks** keeps master's schema-driven interface. Its
-standalone Apply retains the last explicitly applied native project rules.
+archive. Library **Tweaks** keeps master's schema-driven interface.
+Rebuilding the tweaks on Save retains the last explicitly applied native project rules.
 Resetting the project's native values to vanilla and applying removes that
 contribution without disabling independent library tweaks.
 

@@ -87,8 +87,7 @@ async function renderMobModels(){
   if(!f.mobModelGroup)f.mobModelGroup="gang";
   const groups=[["gang","Gangs"],["ambient","Ambient"],["unique","Unique"],["scenario","Scenario"]];
   tb.append(mobViewTabs("models"),
-    mobGroupFilter(groups,"mobModelGroup",renderMobModels),
-    el("input",{type:"text",placeholder:"Filter observed model…",value:f.mobModelQ||"",oninput:ev=>{f.mobModelQ=ev.target.value;filterRerender(ev,renderMobModels);}}));
+    mobGroupFilter(groups,"mobModelGroup",renderMobModels));
   const m=$("#main");m.innerHTML="";
   if(!data.probeAvailable){m.append(LexeditorUI.detailNote("No model observations are available. Run MobProbe in the game to collect them."));return;}
   const archetypes=state.mobs?.health?.records?.filter(r=>r.section==="HealthConfig")||[];
@@ -100,8 +99,10 @@ async function renderMobModels(){
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
   const ordered=sortedRows("mob-models",rows,getters);
   // names: Observed model identities are fixed game names, not editable labels.
-  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:row=>row.model,selected:f.mobModelSelected||ordered[0].model,renamable:false,pageSize:15,noun:"observed models",slots:false,splitKey:"rdr2-mobs",
-    sync:view=>{f.mobModelSelected=view.selected},
+  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:row=>row.model,selected:f.mobModelSelected||ordered[0].model,renamable:false,page:f.mobModelPage||0,pageSize:15,noun:"observed models",slots:false,splitKey:"rdr2-mobs",
+    search:{key:"rdr2-mob-models",value:f.mobModelQ||"",label:"Search observed models",change:value=>{f.mobModelQ=value;f.mobModelPage=0;renderMobModels()}},
+    sync:view=>{f.mobModelSelected=view.selected;f.mobModelPage=view.page},
+    change:next=>{if(next.selected!==null)f.mobModelSelected=next.selected;f.mobModelPage=next.page;renderMobModels()},
     master:view=>columnList({class:"mob-model-table",rows:view.rows,key:row=>row.model,selected:view.selected,select:view.select,"aria-label":"Mob models",columns:[{key:"model",label:"Model"},{key:"group",label:"Group"}]}),
     detail:row=>LexeditorUI.detailPanel({title:row.model,help:fieldHelp(`MobProbe lists ${data.probedCount} models. ${MOB_MODEL_HELP}`),body:[
       LexeditorUI.detailField({label:"Observed HP",control:LexeditorUI.readonlyField(row.observedHealth)}),
@@ -122,7 +123,6 @@ async function renderMobArchetypes(){
   const tb=$("#toolbar");tb.innerHTML="";
   tb.append(mobViewTabs("archetypes"),
     mobGroupFilter([["humans","Humans"],["animals","Animals"],["other","Other"]],"mobGroup",renderMobs),
-    el("input",{type:"text",placeholder:"Filter record…",value:f.mobQ||"",oninput:ev=>{f.mobQ=ev.target.value;filterRerender(ev,renderMobs);}}),
     savebar(saveMobs));
   const m=$("#main");m.innerHTML="";
   if(!data||!data.available)return noData(`No ${layerKey==="health"?"pedhealth.meta":"combatbehaviour.meta"} in this dataset and no vanilla extract to fall back on.`);
@@ -153,8 +153,10 @@ async function renderMobArchetypes(){
   };
   const ordered=sortedRows("mobs",rows,getters);
   // names: Game profile identities stay fixed; changing their names would change runtime bindings.
-  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:mobRecordKey,selected:f.mobSelected?.[layer.file]||mobRecordKey(ordered[0]),renamable:false,pageSize:15,noun:"archetypes",slots:false,splitKey:"rdr2-mobs",
-    sync:view=>{f.mobSelected ||= {};f.mobSelected[layer.file]=view.selected},
+  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:mobRecordKey,selected:f.mobSelected?.[layer.file]||mobRecordKey(ordered[0]),renamable:false,page:f.mobPage?.[layer.file]||0,pageSize:15,noun:"archetypes",slots:false,splitKey:"rdr2-mobs",
+    search:{key:`rdr2-mobs-${layer.file}`,value:f.mobQ||"",label:"Search archetypes",change:value=>{f.mobQ=value;f.mobPage ||= {};f.mobPage[layer.file]=0;renderMobs()}},
+    sync:view=>{f.mobSelected ||= {};f.mobSelected[layer.file]=view.selected;f.mobPage ||= {};f.mobPage[layer.file]=view.page},
+    change:next=>{f.mobSelected ||= {};if(next.selected!==null)f.mobSelected[layer.file]=next.selected;f.mobPage ||= {};f.mobPage[layer.file]=next.page;renderMobs()},
     master:view=>columnList({class:"mob-table",rows:view.rows,key:mobRecordKey,selected:view.selected,select:view.select,"aria-label":"Mob archetypes",columns:[{key:"name",label:"Record"},{key:"group",label:"Group"}]}),
     detail:record=>LexeditorUI.detailPanel({title:record.name,help:fieldHelp(layer.hint+" Numeric limits are not yet established. Unsupported values are read-only."),body:record.fields.filter(field=>field.field!=="Name").map(field=>{
       const definition=columns.find(col=>col[0]===field.field);

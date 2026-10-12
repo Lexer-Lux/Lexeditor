@@ -47,6 +47,8 @@ def _wmset_units(data: bytes) -> list[tuple[str, int, int]]:
         ))
         units.extend((f"skyColor:{row['id']}:{key}", start + offset, 3)
                      for key, offset in world_map.SKY_COLOR_FIELDS)
+    units.extend((f"warp:{index}:cell", offset, 2)
+                 for index, offset in world_map.vehicle_warp_operands(data))
     return units
 
 

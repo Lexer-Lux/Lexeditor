@@ -41,6 +41,8 @@ for field in ['value', 'time', 'timeunits', 'percent']:
         if field != 'percent' and isinstance(value, int) and not isinstance(value, bool):
             continue  # XML has no established storage maximum for integer fields.
         CASES.append({'effects': [{'key': '0x00000001', 'field': field, 'value': value}]})
+for value in [-1, 4, '-1', '4', 10**400]:
+    CASES.append({'effects': [{'key': '0x00000001', 'field': 'timeunits', 'value': value}]})
 for value in [0, -1, 1.5, True, None]:
     CASES.append({'craft': [{'item': 'FIXTURE', 'entries': [{'yield': value}]}]})
     CASES.append({'craft': [{'item': 'FIXTURE', 'entries': [{'parts': [{'item': 'INPUT', 'qty': value}]}]}]})
@@ -93,9 +95,10 @@ def test_real_http_rejects_and_valid_exact_values_reload(fixture):
                  'prices': [{'item': 'FIXTURE', 'section': 'buy', 'costKey': 'BUY', 'partItem': 'CURRENCY_CASH', 'qty': 0}],
                  'yields': [{'item': 'FIXTURE', 'section': 'buy', 'costKey': 'BUY', 'qty': 4}],
                  'effects': [{'key': '0x00000001', 'field': 'value', 'value': '9007199254740993'},
-                             {'key': '0x00000001', 'field': 'percent', 'value': 0.25}]}
+                             {'key': '0x00000001', 'field': 'percent', 'value': 0.25},
+                             {'key': '0x00000001', 'field': 'timeunits', 'value': 2}]}
         with urlopen(request(batch), timeout=5) as response:
-            assert json.load(response)['saved'] == 5
+            assert json.load(response)['saved'] == 6
         s._files.clear()
         doc = s.load_file(s.CATALOG_FILE)['root']
         assert doc.find('.//multiplicity/item/quantity').get('value') == '-1'
@@ -103,6 +106,7 @@ def test_real_http_rejects_and_valid_exact_values_reload(fixture):
         assert doc.find('.//acquirecosts/item/items/item/quantity').get('value') == '0'
         assert doc.find('./effectsids/item/value').get('value') == '9007199254740993'
         assert doc.find('./effectsids/item/percent').get('value') == '0.25'
+        assert doc.find('./effectsids/item/timeunits').get('value') == '2'
         assert path.with_suffix(path.suffix + '.bak').read_text() == XML
     finally:
         http.shutdown()

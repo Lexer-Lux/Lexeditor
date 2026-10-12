@@ -25,12 +25,12 @@ def library(tmp_path: Path) -> Path:
 
 
 def host(root: Path, refuse: bool):
-    def activate(_plugin, paths, _extra):
+    def activate(_plugin, paths):
         if refuse and any(Path(path).name == "Broken" for path in paths):
             raise ValueError("Broken: refuses to build")
     return SimpleNamespace(_game_mods=lambda _plugin: root, _mod_adapter=lambda _plugin: object(),
                            mod_library_status=lambda _plugin: {"canManage": True},
-                           activate_library_mods=activate)
+                           _activate_mods=activate)
 
 
 def enabled(root: Path, name: str) -> bool:

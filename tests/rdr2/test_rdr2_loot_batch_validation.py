@@ -25,6 +25,8 @@ for field in ['rate', 'min', 'max']:
 for field in ['min', 'max']:
     BAD.append([{'tableKey': 'FIRST', 'entries': [{**ROW, field: '1.5'}]}])
 BAD += [[{'tableKey': 'FIRST', 'entries': [{**ROW, 'rate': -1}]}],
+        [{'tableKey': 'FIRST', 'entries': [{**ROW, 'min': -1}]}],
+        [{'tableKey': 'FIRST', 'entries': [{**ROW, 'max': '-1'}]}],
         [{'tableKey': 'FIRST', 'entries': [{**ROW, 'min': 3, 'max': 2}]}],
         [{'tableKey': 'FIRST', 'entries': []}]]  # Duplicates the earlier FIRST edit.
 
@@ -86,14 +88,14 @@ def test_real_http_rejects_then_saves_exact_quantities_known_choices_and_omissio
             urlopen(request([{'tableKey': 'FIRST', 'entries': [{**ROW, 'min': '1.5'}]}]), timeout=5)
         assert failure.value.code == 400
         assert snapshot(root) == before
-        rows = [{**ROW, 'rate': '1.25', 'min': '-9007199254740993', 'max': '9007199254740995', 'rewardcondition': 'KNOWN'},
+        rows = [{**ROW, 'rate': '1.25', 'min': '9007199254740993', 'max': '9007199254740995', 'rewardcondition': 'KNOWN'},
                 {'name': 'SECOND', 'type': 'Table', 'rate': 0, 'min': '', 'max': '', 'rewardcondition': ''}]
         with urlopen(request([{'tableKey': 'FIRST', 'type': 'ContinuousLinearDrop', 'entries': rows}]), timeout=5) as response:
             assert json.load(response)['saved'] == 1
         s._files.clear()
         loaded = s.get_loot(name)['tables'][0]['entries']
         assert s.get_loot(name)['tables'][0]['type'] == 'ContinuousLinearDrop'
-        assert loaded[0]['min'] == '-9007199254740993'
+        assert loaded[0]['min'] == '9007199254740993'
         assert loaded[0]['max'] == '9007199254740995'
         assert loaded[0]['rate'] == '1.25'
         assert loaded[0]['rewardcondition'] == 'KNOWN'

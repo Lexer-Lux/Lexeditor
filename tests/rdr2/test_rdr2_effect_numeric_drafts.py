@@ -6,6 +6,11 @@ from playwright.sync_api import sync_playwright, expect
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rdr2_browser_check import document
 
+TIME_UNITS = [
+    {'value': 0, 'label': '0 \u2014 seconds'}, {'value': 1, 'label': '1 \u2014 minutes'},
+    {'value': 2, 'label': '2 \u2014 in-game hours'}, {'value': 3, 'label': '3 \u2014 in-game days'},
+]
+
 
 def test_effect_integer_and_percent_drafts_and_exact_save_payload():
     with sync_playwright() as play:
@@ -19,10 +24,10 @@ def test_effect_integer_and_percent_drafts_and_exact_save_payload():
             page.evaluate('''()=>{
                 window.effect={key:'0x00000001',id:'EFFECT_FIXTURE',value:'2',percent:'0.25',time:'3',timeunits:'1',durationcategory:''};
                 state.catalog.effects=[effect];state.effectByKey={[effect.key]:effect};
-                window.draw=()=>document.querySelector('#main').replaceChildren(...['value','percent','time','timeunits'].map(field=>effectNumberEditor(effect,field,effect.id)));
+                window.draw=()=>document.querySelector('#main').replaceChildren(...['value','percent','time'].map(field=>effectNumberEditor(effect,field,effect.id)),effectTimeUnitsEditor(effect));
                 draw();
             }''')
-            for field, initial in [('value', '2'), ('time', '3'), ('timeunits', '1'), ('percent', '0.25')]:
+            for field, initial in [('value', '2'), ('time', '3'), ('percent', '0.25')]:
                 control = page.get_by_role('spinbutton', name=f'Effect {field} for 0x00000001', exact=True)
                 for raw in (['1.5', ''] if field != 'percent' else ['', '1e309']):
                     control.fill(raw)
@@ -44,6 +49,43 @@ def test_effect_integer_and_percent_drafts_and_exact_save_payload():
                     page.evaluate('draw()')
                     control.fill(initial)
                     assert page.evaluate('Object.keys(state.effectEdits).length') == 0
+            units = page.get_by_role('combobox', name='Effect timeunits for 0x00000001', exact=True)
+            assert page.evaluate('EFFECT_TIME_UNIT_OPTIONS') == TIME_UNITS
+            assert units.evaluate('e=>[...e.options].map(o=>[o.value,o.text])') == [
+                [str(option['value']), option['label']] for option in TIME_UNITS]
+            assert units.input_value() == '1'
+            units.select_option('2')
+            assert page.evaluate('state.effectEdits["0x00000001|timeunits"]') == '2'
+            page.evaluate('draw()')
+            expect(units).to_have_value('2')
+            page.evaluate('saveCatalog()')
+            assert page.evaluate('window.__requests.filter(r=>r.path==="/api/catalog/save").at(-1).body.effects') == [
+                {'key': '0x00000001', 'field': 'timeunits', 'value': '2'},
+            ]
+            assert page.evaluate('Object.keys(state.effectEdits).length') == 0
+            assert page.evaluate('effect.timeunits') == '2'
+            page.evaluate('draw()')
+            units.select_option('0')
+            units.select_option('2')
+            assert page.evaluate('Object.keys(state.effectEdits).length') == 0
+            for raw in ['9', '1.5']:
+                page.evaluate(f'state.effectEdits["0x00000001|timeunits"]={raw!r};draw()')
+                assert units.evaluate('e=>e.options[e.selectedIndex].text') == f'{raw} \u2014 unknown unit'
+                page.evaluate("document.querySelector('#main').replaceChildren()")
+                before = page.evaluate('window.__requests.length')
+                failure = page.evaluate('''async()=>{try{await saveCatalog();return 'saved'}catch(e){return e.message}}''')
+                assert 'must be 0, 1, 2 or 3' in failure
+                page.evaluate('saveAllChanges()')
+                assert page.evaluate('window.__requests.length') == before
+                if page.locator('.lex-important-dialog').count():
+                    page.locator('.lex-important-dialog').get_by_role('button', name='Confirm and Close', exact=True).click()
+                page.evaluate('delete state.effectEdits["0x00000001|timeunits"];draw()')
+            page.evaluate('showCreateEffect()')
+            created = page.evaluate('''()=>[...document.querySelector('.lex-dialog').querySelectorAll('select')]
+                .map(select=>[...select.options].map(o=>[o.value,o.text]))''')
+            assert [[str(option['value']), option['label']] for option in TIME_UNITS] in created
+            page.get_by_role('dialog').filter(has_text='Create effect record').get_by_role(
+                'button', name='Cancel', exact=True).click()
             value = page.get_by_role('spinbutton', name='Effect value for 0x00000001', exact=True)
             percent = page.get_by_role('spinbutton', name='Effect percent for 0x00000001', exact=True)
             value.fill('9007199254740993')
@@ -70,7 +112,7 @@ def test_effect_integer_and_percent_drafts_and_exact_save_payload():
             expect(percent).to_have_value('50')
             page.locator('#global-save').click()
             page.wait_for_function('Object.keys(state.effectEdits).length===0')
-            assert page.evaluate('window.__requests.filter(r=>r.path==="/api/catalog/save").length') == 2
+            assert page.evaluate('window.__requests.filter(r=>r.path==="/api/catalog/save").length') == 3
             assert page.evaluate('effect.value') == '5'
             assert page.evaluate('effect.percent') == '50'
         finally:

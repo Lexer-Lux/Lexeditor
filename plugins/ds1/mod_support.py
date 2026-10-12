@@ -12,7 +12,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from core import script_mods
+from core import memory_conflicts, script_mods
+from core.mod_conflicts import MAX_LISTED
 
 from . import deployment, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
@@ -23,14 +24,29 @@ MAP_PREFIX = "map/mapstudio/"
 CHR_PREFIX = "chr/"
 
 
+def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Two folder-to-lines reports as one, capped like lines_by_mod does.
+
+    Neither input is changed: one of them may be the adapter's cached data
+    report, reused across calls.
+    """
+    merged = {folder: list(lines) for folder, lines in first.items()}
+    for folder, lines in second.items():
+        merged.setdefault(folder, []).extend(lines)
+    for folder, lines in merged.items():
+        if len(lines) > MAX_LISTED:
+            merged[folder] = lines[:MAX_LISTED] + [f"…and {len(lines) - MAX_LISTED} more"]
+    return merged
+
+
 class Ds1ModAdapter:
     """Import, enable and combine DS1 mods from the shared mod library."""
 
     verified = True
-    message = ("Combines every enabled Dark Souls Remastered mod over the game's own "
-               "files: parameters and item names field by field, map placements "
-               "placement by placement, character binders member by member, tweaks "
-               "onto the original executable. Close the game before switching mods.")
+    message = ("Switch mods on or off for the installed game. Switching on "
+               "installs the enabled mods over the game's own files; "
+               "switching everything off puts the originals back. "
+               "Close the game before switching.")
     package_types = ("folder", "zip")
     # Steam starts the game; Play installs the enabled mods first, rebuilt.
     deploys_on_launch = True
@@ -110,16 +126,74 @@ class Ds1ModAdapter:
         return [Path(row["path"]).name for row in mods_service.library_rows(self._library()) if row["enabled"]]
 
     def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
-        """Each switched-on mod's changes another one overrides, by mod folder."""
+        """Each switched-on mod's clashes with another one, by mod folder.
+
+        Data clashes come from composing the archives; memory clashes from
+        each tweak mod's already-built native patches, read without building
+        or enabling anything. A mod carrying a native binary is skipped for
+        memory: its addresses are unknowable without running it, so its
+        schema's declared conflicts still guard it at enable time.
+        """
         data = self._mods(mods)
-        if len(data) < 2:
+        data_lines: dict[str, list[str]] = {}
+        if len(data) >= 2:
+            key = tuple((str(mod.folder), tuple(sorted((str(name), hashlib.sha256(raw).hexdigest())
+                                                        for name, raw in mod.files.items()))) for mod in data)
+            key += (str(Path(game_root).resolve()),)
+            if self._cache and self._cache[0] == key:
+                data_lines = self._cache[1]
+            else:
+                composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
+                data_lines = composition.by_mod(data)
+                self._cache = (key, data_lines)
+        return _merge_marks(data_lines, self._memory_conflicts(mods))
+
+    def _memory_conflicts(self, mods: list[Path]) -> dict[str, list[str]]:
+        """Overlapping native addresses between switched-on mods, by folder.
+
+        Hooks, kept state and fixed islands are each compared only with
+        their own kind, the way the combiner refuses them; floating code is
+        placed at compose time and stays its check.
+        """
+        from core import mods_service
+        wanted = {Path(path).resolve() for path in mods}
+        rows = [row for row in mods_service.library_rows(self._library())
+                if Path(row["path"]).resolve() in wanted]
+        if len(rows) < 2:
             return {}
-        key = tuple((str(mod.folder), tuple(sorted((str(name), hashlib.sha256(raw).hexdigest())
-                                                    for name, raw in mod.files.items()))) for mod in data)
-        key += (str(Path(game_root).resolve()),)
-        if self._cache and self._cache[0] == key:
-            return self._cache[1]
-        composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
-        result = composition.by_mod(data)
-        self._cache = (key, result)
-        return result
+        per_mod = []
+        for row in rows:
+            folder = Path(row["path"])
+            try:
+                tweak = script_mods.is_script_mod(folder)
+            except (OSError, ValueError):
+                continue  # Unreadable metadata is the Mods tab's error row, not a mark.
+            # Only a tweak mod's built patches are ever composed; a stray
+            # native/ folder in a data mod is dead weight, never applied.
+            if not tweak or memory_conflicts.carries_native_code(folder):
+                continue
+            claimed = tweak_mods.native_spans(folder, row["name"])
+            if any(claimed.values()):
+                per_mod.append((row["name"], claimed))
+        if len(per_mod) < 2:
+            return {}
+        pairs = []
+        for kind in ("hooks", "state", "islands"):
+            pairs += memory_conflicts.overlaps([(name, claimed[kind]) for name, claimed in per_mod])
+        folders = {row["name"]: str(Path(row["path"]).resolve()) for row in rows}
+        return memory_conflicts.exclusive_lines_by_mod(pairs, folders)
+
+    #: What the Mods tab and the mod selector show on a tweak mod that changed
+    #: since the tweaks were last built. One line; the mark lists every flag.
+    ALERT_CHANGED = "This mod changed since the last build."
+
+    def alerts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
+        """Each switched-on tweak mod that changed since the last build, by folder."""
+        wanted = {Path(path).resolve() for path in mods}
+        try:
+            stale = set(tweak_mods.needs_rebuild(Path(game_root), self._library()).get("stale", []))
+            rows = tweak_mods.tweak_rows(self._library()) if stale else []
+        except (ValueError, OSError, RuntimeError):
+            return {}
+        return {str(Path(row["path"]).resolve()): [self.ALERT_CHANGED] for row in rows
+                if row["id"] in stale and Path(row["path"]).resolve() in wanted}

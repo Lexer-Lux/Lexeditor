@@ -3,8 +3,8 @@ from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
 from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
-              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'areas':'Areas',
-              'animations':'Animations', 'world':'World', 'assets':'Assets'}
+              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'levelup':'Level-up gains',
+              'areas':'Areas', 'animations':'Animations', 'world':'World', 'assets':'Assets'}
 
 
 def payload(store, native_rules=None):
@@ -125,7 +125,8 @@ def payload(store, native_rules=None):
     # Values the game keeps in its executable, changed by Lexeditor's native rules.
     available = bool(native_rules and native_rules['native']['available'])
     for key, label in (('misc', 'Misc.: base stamina regeneration'),
-                       ('encumbrance', 'Encumbrance: load bands, movement profiles and stamina recovery')):
+                       ('encumbrance', 'Encumbrance: load bands, movement profiles and stamina recovery'),
+                       ('levelup', 'Level-up gains: defense growth per stat')):
         rows.append({'id':'native-' + key, 'filename':'DarkSoulsRemastered.exe', 'path':str(store.game_root / 'DarkSoulsRemastered.exe'),
             'coverage':'structured', 'status':'partial', 'openable':available,
             'target':key if available else '', 'sub':key, 'controls':label,

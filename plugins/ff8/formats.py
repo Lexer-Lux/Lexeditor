@@ -560,6 +560,14 @@ def _protected_lookup_entry(entry: dict) -> bool:
 
 def _lookup_payload(field: dict) -> dict | None:
     lookup_name = field.get("lookup")
+    if lookup_name == "item":
+        # Shot ammo names the item it consumes. The 200 documented items are
+        # the finite choice, so the page offers the item select with menu
+        # icons (fieldControl's item path) rather than a bare 0-255 number,
+        # and saving refuses an undocumented id like any other unknown choice.
+        return {"name": "item", "type": "enum", "entries": [
+            {"value": row["id"], "name": row["name"], "readonly": False,
+             "iconId": item_icon_id(row["id"])} for row in ITEMS]}
     lookup = LOOKUPS.get(lookup_name) if lookup_name else None
     if not lookup:
         return None
@@ -1294,7 +1302,7 @@ def data_map_rows() -> dict:
         {"filename": "menu/mngrp.bin", "controls": "Tutorial text and all 377 refine/card-mod recipes", "notes": "Editable: proved text and recipe tables. Locked: scripts, text-box maps, images.", "status": "partial"},
         {"filename": "main.fs → namedic.bin", "controls": "The game's own name list: world place names and the words its text inserts", "notes": "Editable: all 32 names. A name of any length up to the file's 64 KB of offsets.", "status": "integrated"},
         {"filename": "main.fs → wm2field.tbl", "controls": "World to field: where each stored world position sends the player", "notes": "Editable: X, Y, Z and the field ID of all 72 entries. The unnamed byte and fifteen tail bytes are preserved.", "status": "integrated"},
-        {"filename": "ff8/*.fs + .fi + .fl archives", "controls": "What the game's archives hold: every stored entry name, size and compression flag", "notes": "Browse only: the list, with search and paging, reads metadata and never entry contents. Extracting an entry and repacking an archive are not built.", "status": "partial"},
+        {"filename": "ff8/*.fs + .fi + .fl archives", "controls": "What the game's archives hold: every stored entry name, size and compression flag", "notes": "Browse only in the UI: the list, with search and paging, reads metadata and never entry contents. Single-entry extract and full rebuild exist headless into the project's extracted/ and repacked/ folders; repacking is an export format, not the mod pipeline, which the game reads from direct/ overrides.", "status": "partial"},
         {"filename": "battle/c0m*.dat", "controls": "Enemy stats, actions, battle AI, battle text; battle model inventory and textures", "notes": "Editable: proved AI scripts, dialogue lines, whole-model replacement. Locked: unknown tails, undecoded battle files.", "status": "partial"},
         {"filename": "battle/scene.out", "controls": "Battle formations, stages, cameras, enemy slots and levels", "notes": "Editable: all supported record fields. Locked: unresolved special level bytes.", "status": "integrated"},
         {"filename": "world.fs / world/dat/wmx.obj + wmsetus.obj + rail.obj + texl.obj", "controls": "World map cells, encounters, draw points, sky colors, rails and textures", "notes": "Editable: proved map and texture fields. Locked: draw-point magic data (lives in the exe).", "status": "partial"},
@@ -1350,6 +1358,12 @@ def data_map_rows() -> dict:
 # from, and which writer applies an edit - the same writers the pages use, so a
 # sheet can never write something the editor itself would refuse.
 
+def _spreadsheet_rare(value: object) -> bool:
+    if value not in (0, 1):
+        raise ValueError("Shop rarity must be 0 or 1 in a spreadsheet")
+    return bool(value)
+
+
 def _table_specs() -> dict:
     return {
         "items": {
@@ -1403,6 +1417,44 @@ def _table_specs() -> dict:
                 for edit in edits]),
             "note": "Upgrade price is written in steps of 10; an ingredient slot of 0"
                     " with a count of 0 means the slot is empty.",
+        },
+        "refine": {
+            "label": "Refine and Card Mod recipes",
+            "identity": "id",
+            "columns": ("id", "table", "group", "inputId", "inputQuantity",
+                        "outputId", "outputQuantity", "text"),
+            "editable": ("inputId", "inputQuantity", "outputId", "outputQuantity", "text"),
+            "rows": lambda dataset="current": [
+                {**row, "id": f"{row['table']}:{row['id']}"}
+                for row in refine_rows(dataset)["rows"]],
+            "save": lambda edits: save_refine_tables([
+                {"table": str(edit["id"]).split(":")[0],
+                 "id": int(str(edit["id"]).split(":")[1]),
+                 "inputId": edit["inputId"], "inputQuantity": edit["inputQuantity"],
+                 "outputId": edit["outputId"], "outputQuantity": edit["outputQuantity"],
+                 "text": edit["text"]}
+                for edit in edits]),
+            "note": "IDs are numeric per table: item IDs for m000, m001 and m003, magic IDs "
+                    "for m002, card IDs in and item IDs out for m004. Recipe text shares "
+                    "its table's fixed message section.",
+        },
+        "shops": {
+            "label": "Shop inventories",
+            "identity": "id",
+            "columns": ("id", "shop", "shopName", "slot", "itemId", "itemName", "rare"),
+            "editable": ("itemId", "rare"),
+            "rows": lambda dataset="current": [
+                {"id": f"{shop['id']}:{slot['slot']}", "shop": shop["id"],
+                 "shopName": shop["name"], "slot": slot["slot"],
+                 "itemId": slot["itemId"], "itemName": slot["itemName"],
+                 "rare": 1 if slot["rare"] else 0}
+                for shop in shop_rows(dataset)["rows"] for slot in shop["slots"]],
+            "save": lambda edits: save_shops([
+                {"shopId": int(str(edit["id"]).split(":")[0]),
+                 "slot": int(str(edit["id"]).split(":")[1]),
+                 "itemId": edit["itemId"], "rare": _spreadsheet_rare(edit["rare"])}
+                for edit in edits]),
+            "note": "Rare is 1 for rare stock and 0 otherwise; itemId is the numeric item id.",
         },
     }
 

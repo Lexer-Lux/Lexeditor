@@ -12,7 +12,7 @@ from pathlib import Path
 import threading
 import time
 
-from core import lexmods, mod_metadata, script_mods
+from core import bundled_mods, lexmods, mod_metadata, script_mods
 from core.mod_library import metadata
 
 CATALOG_TTL = 600
@@ -52,10 +52,42 @@ def mod_row(folder: Path) -> dict:
         except (OSError, ValueError):
             pass
     row["script"] = None
-    if script_mods.is_script_mod(folder):
+    try:
+        tweak = script_mods.is_script_mod(folder)
+    except (OSError, ValueError):
+        tweak = False  # Unreadable metadata already made this an error row above.
+    if tweak:
         script = script_mods.catalog_row(folder)
         row["script"] = {key: script.get(key) for key in ("schema", "values", "error")}
+    row["components"] = None
+    try:
+        found = bundled_mods.components(folder)
+    except (OSError, ValueError) as error:
+        found = []
+        if _claims_bundle(folder):
+            row["components"] = {"schema": {"title": "", "help": "", "blocker": "", "fields": []},
+                                 "values": {}, "error": str(error)}
+    if found:
+        try:
+            row["components"] = {"schema": bundled_mods.schema(folder),
+                                 "values": bundled_mods.values(folder), "error": ""}
+        except (OSError, ValueError) as error:
+            row["components"] = {"schema": {"title": "", "help": "", "blocker": "", "fields": []},
+                                 "values": {}, "error": str(error)}
     return row
+
+
+def _claims_bundle(folder: Path) -> bool:
+    """True when the folder's own mod.json declares components.
+
+    Only a claimed bundle reports a components error; an unreadable
+    ordinary mod is already an error row without one.
+    """
+    try:
+        data = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and "bundle" in data
 
 
 def library_rows(game_root: Path) -> list[dict]:

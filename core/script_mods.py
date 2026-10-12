@@ -267,7 +267,11 @@ def _contained_target(root: Path, path: PurePosixPath) -> Path:
 
 
 def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[str, str]:
-    """Validate all recorded ownership before any generated file is changed."""
+    """Recorded ownership, validated, before any generated file is changed.
+
+    A rebuild always comes from the mod's script: a hand edit to a generated
+    file is overwritten, never refused.
+    """
     manifest = _contained_target(root, PurePosixPath(MANIFEST_FILE))
     data = _read_json(manifest)
     if data is None and not manifest.exists():
@@ -285,9 +289,7 @@ def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[
         if (not isinstance(digest, str) or len(digest) != 64
                 or any(char not in "0123456789abcdef" for char in digest)):
             raise ScriptModError(f"{relative} has an invalid generated-file hash")
-        target = _contained_target(root, path)
-        if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-            raise ScriptModError(f"{relative} changed since it was generated; preserve or restore your edits before rebuilding")
+        _contained_target(root, path)
         previous[key] = digest
     return previous
 
