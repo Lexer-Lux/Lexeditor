@@ -38,20 +38,31 @@ def main():
         raise RuntimeError("Node.js is required for JavaScript syntax checks.")
     files = sorted((ROOT / "ui").glob("*.js")) + sorted((ROOT / "plugins").glob("*/*.js"))
     html = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "plugins").glob("*/editor.html"))
-    blocks = [(str(p.relative_to(ROOT)), False, p.read_text(encoding="utf-8-sig")) for p in files]
+    blocks = []
     for path in html:
         parser = Scripts()
         parser.feed(path.read_text(encoding="utf-8-sig"))
         blocks.extend((f"{path.relative_to(ROOT)}:{line}", module, text)
                       for line, module, text in parser.blocks)
     failures = []
+    # Files go through node the way the per-plugin gate checks them: by
+    # path, so node itself decides module versus classic. Piping every
+    # file through stdin as commonjs rejects the ES modules the DS1
+    # viewport vendors (three.js and its control addons).
+    for path in files:
+        label = str(path.relative_to(ROOT))
+        result = subprocess.run([node, "--check", str(path)], capture_output=True, timeout=30)
+        if result.returncode:
+            failures.append(label)
+            print(f"FAIL {label}\n{result.stderr.decode('utf-8', 'replace')}")
     for label, module, text in blocks:
         result = subprocess.run([node, "--check", "--input-type=" + ("module" if module else "commonjs")],
                                 input=text, text=True, encoding="utf-8", capture_output=True, timeout=30)
         if result.returncode:
             failures.append(label)
             print(f"FAIL {label}\n{result.stderr}")
-    print(f"JavaScript syntax: {len(blocks)-len(failures)}/{len(blocks)} scripts passed")
+    total = len(files) + len(blocks)
+    print(f"JavaScript syntax: {total-len(failures)}/{total} scripts passed")
     return bool(failures)
 
 
