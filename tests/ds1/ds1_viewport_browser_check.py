@@ -132,7 +132,10 @@ def phase_edit(play, game, mod, output, errors):
             # without a model file never renders, so five parts show.
             page.wait_for_function('state.mapSelected===null && state.mapView.parts.length===6',
                                    timeout=30000)
-            assert '5 parts' in page.locator('[data-viewport-status]').inner_text()
+            # The state lands before the remount renders; the old status
+            # still shows the duplicate until the fresh map draws.
+            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
+                                   '.startsWith("test.msb: 5 parts")', timeout=30000)
             page.evaluate("viewportMove('test.msb','1:0',[9,8,7])")
             page.wait_for_function("state.pending===0 && state.mapView.parts.find(p=>p.key==='1:0').pos[0]===9",
                                    timeout=30000)
