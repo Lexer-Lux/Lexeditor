@@ -138,7 +138,7 @@ def _decode_member(semantic, format_enum, chunk):
             return [((x - 32767.0) / 32767.0, (y - 32767.0) / 32767.0,
                      (z - 32767.0) / 32767.0)]
         if format_enum == 0x2E:
-            x, y, z = struct.unpack('<3H', chunk)
+            x, y, z, _w = struct.unpack('<4H', chunk)
             return [((x - 32767.0) / 32767.0, (y - 32767.0) / 32767.0,
                      (z - 32767.0) / 32767.0)]
     elif semantic == UV:

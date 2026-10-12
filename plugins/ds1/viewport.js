@@ -309,6 +309,9 @@ window.Ds1Viewport = (() => {
       controls.dispose();
       gizmo.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
+      canvas.remove();
+      delete host.dataset.ready;
       for (const geos of geometries.values()) for (const entry of geos) entry.geo.dispose();
       front.dispose();
       double.dispose();
@@ -459,6 +462,9 @@ window.Ds1Viewport = (() => {
       window.removeEventListener("resize", resize);
       controls.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
+      canvas.remove();
+      delete host.dataset.ready;
       for (const item of trash) item.dispose();
     };
     const loop = () => {

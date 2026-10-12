@@ -17,6 +17,7 @@ import struct
 from .formats import FormatError
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_COUNT = 65536
 SDK_VERSIONS = frozenset({'20150100', '20160100', '20160200', '20180100', '20190100'})
 MAX_DEPTH = 100
 
@@ -88,9 +89,9 @@ def _packed(data, off):
         second, off = _u8(data, off)
         return ((first << 8) | second) & 0x3FFF, off
     if 0x18 <= head <= 0x1B:
-        raw = (first << 16) | (data[off] << 8) | data[off + 1]
         if not 0 <= off <= len(data) - 2:
             raise HkxError('A Havok file ends early')
+        raw = (first << 16) | (data[off] << 8) | data[off + 1]
         return raw & 0x1FFFFF, off + 2
     if head == 0x1C:
         if not 0 <= off <= len(data) - 3:
@@ -115,7 +116,7 @@ def _packed(data, off):
                 raise HkxError('A Havok file ends early')
             raw = int.from_bytes(data[off:off + 8], 'big')
             return raw, off + 8
-    return 0, off
+    raise HkxError('A Havok packed integer has an unknown form')
 
 
 def _cstr(data, off, end):
@@ -178,19 +179,25 @@ class _Type:
         raise HkxError('A Havok float has an unknown width')
 
     def resolve_subtype(self):
-        seen = self
+        seen, lineage = self, {id(self)}
         while True:
             if seen.flags & FLAG_SUBTYPE or seen.parent is None:
                 return seen.subtype
             if seen.parent is seen:
                 return seen.subtype
+            if id(seen.parent) in lineage:
+                raise HkxError('Havok types loop back on themselves')
+            lineage.add(id(seen.parent))
             seen = seen.parent
 
     def resolve_size(self):
-        seen = self
+        seen, lineage = self, {id(self)}
         while True:
             if seen.flags & FLAG_SIZE or seen.parent is None:
                 return seen.byte_size
+            if id(seen.parent) in lineage:
+                raise HkxError('Havok types loop back on themselves')
+            lineage.add(id(seen.parent))
             seen = seen.parent
 
     def all_fields(self):
@@ -215,6 +222,8 @@ def _read_types(data, section):
         elif sub['sig'] in ('TNAM', 'TNA1'):
             off = sub['pos']
             count, off = _packed(data, off)
+            if count > MAX_COUNT:
+                raise HkxError('A Havok file names too many types')
             types = [_Type() for _ in range(count)]
             for entry in types:
                 name_at, off = _packed(data, off)
@@ -240,6 +249,8 @@ def _read_types(data, section):
         elif sub['sig'] == 'THSH':
             off = sub['pos']
             count, off = _packed(data, off)
+            if count > MAX_COUNT:
+                raise HkxError('A Havok file names too many hashes')
             for _ in range(count):
                 _, off = _packed(data, off)
                 _, off = _i32(data, off)
@@ -290,6 +301,8 @@ def _read_types(data, section):
                                      'type': field_type})
         if entry.flags & FLAG_INTERFACES:
             count, off = _packed(data, off)
+            if count > MAX_COUNT:
+                raise HkxError('A Havok type names too many interfaces')
             for _ in range(count):
                 _, off = index(off)
                 _, off = _packed(data, off)
@@ -418,6 +431,8 @@ def _items(data, section, data_off, types):
         at &= 0xFFFFFF
         pos, off = _u32(data, off)
         count, off = _i32(data, off)
+        if not 0 <= count <= MAX_COUNT:
+            raise HkxError('A Havok item count is out of range')
         if at == 0:
             found.append({'type': None, 'pos': 0, 'count': 0, 'array': False})
         else:
@@ -510,7 +525,8 @@ class HkxDocument:
         except HkxError:
             raise
         except (IndexError, struct.error, UnicodeDecodeError, RecursionError,
-                ValueError, TypeError, KeyError, AttributeError) as error:
+                ValueError, TypeError, KeyError, AttributeError,
+                MemoryError) as error:
             raise HkxError(f'A Havok file is malformed: {error}') from error
 
     @staticmethod
