@@ -31,6 +31,7 @@ class MapStore:
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
+        self._npc_models = None
 
     def writable(self):
         if self.read_only:
@@ -92,6 +93,26 @@ class MapStore:
                 names[row.row_id] = document.display_name("NpcParam", row.row_id, row)
         return set(names), names
 
+    def npc_models(self):
+        """Each placed NPC ID with the character models it wears.
+
+        Links come from every map's enemy parts. One map's broken bytes
+        must not hide every other map's links, so unreadable maps are
+        skipped. NPC swaps and placement edits invalidate the cache."""
+        if self._npc_models is None:
+            links = {}
+            for map_name in self.maps():
+                try:
+                    document = self.get(map_name)
+                except (MsbError, OSError):
+                    continue
+                for part in document.parts:
+                    if part['type'] in ENEMY_TYPES:
+                        links.setdefault(part['npc'], set()).add(
+                            document.models[part['model']]['name'])
+            self._npc_models = {npc: sorted(models) for npc, models in links.items()}
+        return self._npc_models
+
     def list_rows(self):
         _ids, names = self._npc()
         rows = []
@@ -130,15 +151,18 @@ class MapStore:
         self.writable()
         ids, _names = self._npc()
         self.get(map_name).edit(parse_key(key), field, value, ids if field == "npcId" else None)
+        self._npc_models = None
         return self.read(map_name, key)
 
     def add_placement(self, map_name, key):
         self.writable()
         row = self.get(map_name).add_placement(parse_key(key))
+        self._npc_models = None
         return self.read(map_name, f"{row['type']}:{row['partId']}")
 
     def remove_placement(self, map_name, key):
         self.writable()
+        self._npc_models = None
         return self.get(map_name).remove_placement(parse_key(key))
 
     @property
@@ -196,10 +220,12 @@ class MapStore:
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
+        self._npc_models = None
         return {"saved": True, "dirtyCount": 0}
 
     def discard(self):
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
+        self._npc_models = None
         return {"discarded": True}

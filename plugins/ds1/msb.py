@@ -131,6 +131,7 @@ def _part(data, off):
         raise MsbError(f'Unsupported map part type {ptype}')
     pos = struct.unpack_from('<3f', data, off + 0x14)
     rot = struct.unpack_from('<3f', data, off + 0x20)
+    scale = struct.unpack_from('<3f', data, off + 0x2C)
     ent_off, type_off, unk60 = struct.unpack_from('<iii', data, off + 0x58)
     if unk60 != 0:
         raise MsbError('A map part entry has unexpected padding')
@@ -145,6 +146,7 @@ def _part(data, off):
     if not tabs < len(data):
         raise MsbError('A map part data offset is invalid')
     part = {'id': pid, 'type': ptype, 'model': model, 'name': name, 'pos': pos, 'rot': rot,
+            'scale': scale,
             'base': off, 'type_data': tabs, 'think': None, 'npc': None,
             'spans': [(off, off + PART_SIZE), (ns, ne), (ss, se), (ent, ent + ENTITY_SIZE)]}
     if ptype in ENEMY_TYPES:
@@ -211,10 +213,27 @@ class MsbDocument:
             entry = {'partId': part['id'], 'type': part['type'],
                      'kind': TYPE_LABELS[part['type']], 'name': part['name'],
                      'model': self.models[part['model']]['name'],
-                     'pos': tuple(part['pos']), 'rot': tuple(part['rot'])}
+                     'pos': tuple(part['pos']), 'rot': tuple(part['rot']),
+                     'scale': tuple(part['scale'])}
             if part['type'] in ENEMY_TYPES:
                 entry.update(think=part['think'], npc=part['npc'])
             result.append(entry)
+        return result
+
+    def view_parts(self):
+        """Every part with its model, for the viewport. Collision and
+        navigation parts have no visible mesh; the viewport skips them."""
+        result = []
+        for part in self.parts:
+            model = self.models[part['model']]
+            if part['type'] in TYPE_LABELS:
+                kind = TYPE_LABELS[part['type']]
+            else:
+                kind = 'Map piece' if part['type'] == 0 else 'Part'
+            result.append({'id': part['id'], 'type': part['type'], 'kind': kind,
+                           'name': part['name'], 'model': model['name'],
+                           'pos': tuple(part['pos']), 'rot': tuple(part['rot']),
+                           'scale': tuple(part['scale'])})
         return result
 
     @property
@@ -406,7 +425,8 @@ class MsbDocument:
         self.plain += entry + name_bytes + sib + entity + blob
         self._relocate_parts(extra=[base])
         new = {'id': new_id, 'type': ptype, 'model': part['model'], 'name': name,
-               'pos': part['pos'], 'rot': part['rot'], 'base': base, 'type_data': tabs_at,
+               'pos': part['pos'], 'rot': part['rot'], 'scale': part['scale'],
+               'base': base, 'type_data': tabs_at,
                'think': part['think'], 'npc': part['npc'],
                'spans': [(base, base + PART_SIZE), (name_at, name_at + len(name_bytes)),
                          (sib_at, sib_at + len(sib)), (ent_at, ent_at + ENTITY_SIZE)]}

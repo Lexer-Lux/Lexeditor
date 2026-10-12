@@ -10,6 +10,8 @@ from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
 from . import assets, deployment, data_map
+from . import anim
+from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore
 from .msb import MsbError
 from .tae import EVENT_TYPES, TaeError
@@ -19,6 +21,7 @@ from .formats import FormatError, stats_fields
 from .store import ItemStore
 from . import tweak_mods
 from . import data_map
+from . import viewport
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -55,7 +58,9 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets'):
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets',
+                    '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
+                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames'):
             try:
                 with LOCK:
                     if path == '/api/assets':
@@ -83,11 +88,66 @@ class Handler(PluginRequestHandler):
                             # whole editor down; Areas reports it when opened.
                             count = 0
                         result['areaTabs'] = [{'id': 'placements', 'label': 'Placements',
-                                               'table': 'Msb', 'count': count}]
+                                               'table': 'Msb', 'count': count},
+                                              {'id': 'viewport', 'label': 'Viewport',
+                                               'table': 'MapView', 'count': len(MAPSTORE.maps())}]
                         result['animTabs'] = [{'id': 'animations', 'label': 'Events',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
+                        chars = anim.list_chars(MAPSTORE.game_root, MAPSTORE.project)
+                        result['animTabs'].append({'id': 'playback', 'label': 'Playback',
+                                                   'table': 'AnimPlayback', 'count': len(chars)})
+                        monsters = next(entry['count'] for entry in result['enemyTabs']
+                                        if entry['id'] == 'monsters')
+                        result['enemyTabs'].append({'id': 'model', 'label': 'Model',
+                                                    'table': 'EnemyModel', 'count': monsters})
                     elif path == '/api/data-map':
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True))
+                    elif path == '/api/map/view':
+                        result = viewport.map_view(MAPSTORE, query.get('map', [''])[0])
+                    elif path == '/api/map/geometry':
+                        document = MAPSTORE.get(query.get('map', [''])[0])
+                        model = next((entry for entry in document.models
+                                      if entry['name'] == query.get('model', [''])[0]), None)
+                        if model is None:
+                            raise MsbError('Unknown map model')
+                        result = viewport.model_geometry(
+                            MAPSTORE.game_root, MAPSTORE.project, document.map_name, model)
+                    elif path == '/api/chr/view':
+                        npc = int(query.get('npc', [''])[0])
+                        document = STORE.get()
+                        links = MAPSTORE.npc_models().get(npc, [])
+                        chrs = []
+                        for chr_id in links:
+                            try:
+                                info = viewport.chr_dummies(MAPSTORE.game_root, MAPSTORE.project, chr_id)
+                            except (FormatError, OSError) as error:
+                                chrs.append({'id': chr_id, 'available': False, 'reason': str(error)})
+                            else:
+                                chrs.append({'id': chr_id, 'available': True, 'meshes': info['meshes'],
+                                             'bones': info['bones'], 'dummies': info['dummies']})
+                        attacks = []
+                        for entry in document.attack_references().list(npc)['rows']:
+                            attack = entry['id']
+                            attacks.append({'id': attack, 'name': entry['name'],
+                                            'source': document.value('AtkParam_Npc', attack, 'hitSourceType'),
+                                            'slots': hitbox_slots(document, attack)})
+                        result = {'npc': npc, 'name': document.display_name('NpcParam', npc),
+                                  'body': body_hitbox(document, npc), 'chrs': chrs, 'attacks': attacks}
+                    elif path == '/api/chr/geometry':
+                        result = viewport.chr_geometry(MAPSTORE.game_root, MAPSTORE.project,
+                                                       query.get('chr', [''])[0],
+                                                       query.get('skin', [''])[0] == '1')
+                    elif path == '/api/anim/list':
+                        result = anim.list_anims(MAPSTORE.game_root, MAPSTORE.project,
+                                                 query.get('chr', [''])[0])
+                    elif path == '/api/anim/skeleton':
+                        result = anim.skeleton(MAPSTORE.game_root, MAPSTORE.project,
+                                               query.get('chr', [''])[0])
+                    elif path == '/api/anim/frames':
+                        result = anim.anim_frames(MAPSTORE.game_root, MAPSTORE.project,
+                                                  query.get('chr', [''])[0],
+                                                  query.get('binder', [''])[0],
+                                                  query.get('anim', [''])[0], TAESTORE)
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
                         result['dirtyCount'] = STORE.get().dirty_count
@@ -95,6 +155,32 @@ class Handler(PluginRequestHandler):
                         tab = query.get('tab', [''])[0]
                         if tab == 'placements':
                             result = {'rows': MAPSTORE.list_rows()}
+                        elif tab == 'viewport':
+                            rows = []
+                            for name in MAPSTORE.maps():
+                                try:
+                                    parts = MAPSTORE.get(name).view_parts()
+                                except (MsbError, OSError):
+                                    parts = []
+                                rows.append({'id': name, 'table': 'MapView', 'name': name,
+                                             'values': {'parts': len(parts)}})
+                            result = {'rows': rows}
+                        elif tab == 'playback':
+                            labels = TAESTORE.char_names()
+                            rows = []
+                            for chr_id in anim.list_chars(MAPSTORE.game_root, MAPSTORE.project):
+                                rows.append({'id': chr_id, 'table': 'AnimPlayback',
+                                             'name': labels.get(chr_id, chr_id),
+                                             'values': {'binder': f'{chr_id}.anibnd.dcx'}})
+                            result = {'rows': rows}
+                        elif tab == 'model':
+                            links = MAPSTORE.npc_models()
+                            rows = []
+                            for entry in STORE.get().list_rows('monsters'):
+                                models = links.get(entry['id'], [])
+                                rows.append({'id': entry['id'], 'table': 'EnemyModel', 'name': entry['name'],
+                                             'values': {'chr': ', '.join(models) or 'No placed model'}})
+                            result = {'rows': rows}
                         elif tab == 'animations':
                             scope = query.get('scope', ['chars'])[0]
                             if scope == 'anims':
@@ -155,7 +241,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["data-map", "items", "monster-resistances", "monster-stats", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "stats", "encumbrance", "native-stamina", "map-placements", "animation-events", "world", "asset-replacement"]})
+                            "capabilities": ["data-map", "items", "monster-resistances", "monster-stats", "enemy-attacks", "project-export", "byte-preserving-roundtrip", "mod-deployment", "executable-tweaks", "effects", "stats", "encumbrance", "native-stamina", "map-placements", "animation-events", "world", "asset-replacement", "map-viewport"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
