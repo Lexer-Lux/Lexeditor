@@ -28,6 +28,12 @@ ARRAY_HEADER_SIZE = 32
 LAYOUT_SIZE = 16
 MEMBER_SIZE = 20
 TEXTURE_SIZE = 32
+HEADER_COUNTS = 8
+HEADER_BBOX_MIN = 40
+HEADER_BBOX_MAX = 52
+HEADER_FORMAT = 72
+HEADER_TABLE_COUNTS = 80
+MAX_TABLE_COUNT = 65536
 
 # Layout member semantics (soulstruct VertexDataType.type_int).
 POS, WEIGHTS, BONE_IDS, NORMAL, UV, TANGENT, BITANGENT, COLOR = 0, 1, 2, 3, 5, 6, 7, 10
@@ -172,7 +178,7 @@ def _decode_member(semantic, format_enum, chunk):
             return [struct.unpack('<4h', chunk)]
     elif semantic in (TANGENT, BITANGENT, COLOR):
         return None
-    raise FlverError(f'Unsupported vertex member (semantic {semantic}, format 0x{format_enum:02X})')
+    raise FlverError('A mesh uses a vertex layout the viewer does not read')
 
 
 class FlverDocument:
@@ -185,7 +191,10 @@ class FlverDocument:
         if len(data) > MAX_FILE:
             raise FlverError('File is too large to be a model')
         if data[:4] == b'DCX\0':
-            data = inflate(data)
+            try:
+                data = inflate(data)
+            except FormatError as error:
+                raise FlverError('A compressed model is unreadable') from error
         if len(data) < HEADER_SIZE or data[:6] != MAGIC:
             raise FlverError('Not a FLVER model')
         endian = data[6:8]
@@ -196,22 +205,23 @@ class FlverDocument:
         else:
             raise FlverError('FLVER byte-order marker is invalid')
         (version, self.vertex_data_offset, vertex_data_size, dummy_count, material_count,
-         bone_count, mesh_count, array_count) = struct.unpack_from('<8I', data, 8)
+         bone_count, mesh_count, array_count) = struct.unpack_from('<8I', data, HEADER_COUNTS)
         if version not in DS1_VERSIONS:
             raise FlverError(f'Unsupported FLVER version 0x{version:X}')
         self.version = version
-        self.bbox = (struct.unpack_from('<3f', data, 40), struct.unpack_from('<3f', data, 52))
-        bit_size, unicode, _unk0 = struct.unpack_from('<3B', data, 72)
+        self.bbox = (struct.unpack_from('<3f', data, HEADER_BBOX_MIN),
+                       struct.unpack_from('<3f', data, HEADER_BBOX_MAX))
+        bit_size, unicode, _unk0 = struct.unpack_from('<3B', data, HEADER_FORMAT)
         if bit_size not in (0, 16, 32):
             raise FlverError(f'Unsupported index bit size {bit_size}')
         self.default_bit_size = bit_size
         self.encoding = 'utf-16-le' if unicode else 'shift_jis_2004'
-        face_count, layout_count, texture_count = struct.unpack_from('<3I', data, 80)
+        face_count, layout_count, texture_count = struct.unpack_from('<3I', data, HEADER_TABLE_COUNTS)
         for what, count in (('dummies', dummy_count), ('materials', material_count),
                             ('bones', bone_count), ('meshes', mesh_count),
                             ('arrays', array_count), ('face sets', face_count),
                             ('layouts', layout_count), ('textures', texture_count)):
-            if count > 65536:
+            if count > MAX_TABLE_COUNT:
                 raise FlverError(f'Unreasonable {what} count {count}')
         cursor = HEADER_SIZE
         self.dummies = [self._dummy(data, cursor + i * DUMMY_SIZE) for i in range(dummy_count)]
@@ -402,7 +412,6 @@ class FlverDocument:
         for prefix, piece in CORRUPTED_PREFIXES:
             if blob[:32] == prefix:
                 self.notes.append(f'Known corrupted DSR vertex data ({piece}); values may be wrong')
-        base = len(mesh['positions'])
         positions, normals, uvs, weights, bone_ids = [], [], [], [], []
         for v in range(header['vcount']):
             cursor = v * stride
@@ -432,7 +441,6 @@ class FlverDocument:
         mesh['uvs'].extend(uvs)
         mesh['weights'].extend(weights)
         mesh['bone_ids'].extend(bone_ids)
-        return base
 
     def _repair(self, mtd, header, stride):
         table = QLOC_LAYOUTS.get(mtd)
@@ -448,6 +456,8 @@ class FlverDocument:
 
     def mesh_data(self, index):
         """Viewport-ready data for one mesh: triangles index into positions."""
+        if not 0 <= index < len(self.meshes):
+            raise FlverError('A mesh index is out of range')
         mesh = self.meshes[index]
         count = len(mesh['positions'])
         for triangle in mesh['triangles']:

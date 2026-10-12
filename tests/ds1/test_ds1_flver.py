@@ -91,3 +91,16 @@ def test_dcx_wrapped_model_parses():
     struct.pack_into('>II', header, 28, len(plain), len(payload))
     doc = FlverDocument(bytes(header) + payload)
     assert doc.mesh_data(0)['triangles'] == [(0, 2, 1), (0, 3, 2)]
+
+
+def test_mesh_data_bad_index():
+    doc = FlverDocument(build_flver())
+    with pytest.raises(FlverError, match='out of range'):
+        doc.mesh_data(9)
+    with pytest.raises(FlverError, match='out of range'):
+        doc.mesh_data(-1)
+
+
+def test_corrupt_dcx_wrapped_as_model_error():
+    with pytest.raises(FlverError, match='unreadable'):
+        FlverDocument(b'DCX\0' + b'\0' * 100)

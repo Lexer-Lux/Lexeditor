@@ -108,15 +108,15 @@ def _entry(plain, names, binder, member):
 @functools.lru_cache(maxsize=32)
 def _parsed_binder(binder, stamp):
     plain, names = _open(binder)
-    docs = {}
+    docs, broken = {}, {}
     for member in sorted(names):
         if not member.endswith('.hkx'):
             continue
         try:
             docs[member] = HkxDocument(_entry(plain, names, binder, member))
-        except HkxError:
-            continue
-    return docs
+        except HkxError as error:
+            broken[member] = str(error)
+    return docs, broken
 
 
 def _stamp(path):
@@ -144,8 +144,9 @@ def list_chars(game_root, project):
 
 def list_anims(game_root, project, chr_id):
     """The character's skeleton flag and playable motions: file, binder,
-    TAE link, duration and frame count. Unparseable members are skipped;
-    a character with no binders at all is an error."""
+    TAE link, duration and frame count. Members that fail to parse are
+    listed as unavailable, with the reason; a character with no binders
+    at all is an error."""
     binders = _binders(game_root, project, chr_id)
     if not binders:
         raise HkxError('No animation binder is installed')
@@ -156,21 +157,35 @@ def list_anims(game_root, project, chr_id):
 
 @functools.lru_cache(maxsize=16)
 def _listed_anims(chr_id, stamps, paths):
-    skeleton, anims, seen = False, [], set()
+    skeleton, anims, seen = False, [], {}
     for (binder, stamp), path in zip(stamps, paths):
-        docs = _parsed_binder(path, stamp)
+        docs, broken = _parsed_binder(path, stamp)
         for member, doc in sorted(docs.items()):
             if member in SKELETONS:
                 skeleton = skeleton or bool(doc.skeletons)
                 continue
-            if member in seen or not doc.animations or not doc.bindings:
+            if not doc.animations or not doc.bindings:
                 continue
-            seen.add(member)
             anim = doc.animations[0]
             match = ANIM_NAME.match(member)
+            entry = {'file': member, 'binder': binder, 'bank': match.group(1) if match else None,
+                     'id': int(match.group(2)) if match else None,
+                     'duration': anim['duration'], 'frames': anim['frames']}
+            if member in seen:
+                if anims[seen[member]].get('available', True):
+                    continue
+                anims[seen[member]] = entry
+                continue
+            seen[member] = len(anims)
+            anims.append(entry)
+        for member, reason in sorted(broken.items()):
+            if member in SKELETONS or member in seen:
+                continue
+            match = ANIM_NAME.match(member)
+            seen[member] = len(anims)
             anims.append({'file': member, 'binder': binder, 'bank': match.group(1) if match else None,
                           'id': int(match.group(2)) if match else None,
-                          'duration': anim['duration'], 'frames': anim['frames']})
+                          'available': False, 'reason': reason})
     return {'chr': chr_id, 'skeleton': skeleton, 'anims': anims}
 
 
@@ -184,7 +199,7 @@ def skeleton(game_root, project, chr_id):
         raise HkxError('No animation binder is installed')
     hka = None
     for binder, path in binders:
-        docs = _parsed_binder(str(path), _stamp(path))
+        docs, _broken = _parsed_binder(str(path), _stamp(path))
         for member in SKELETONS:
             if member in docs and docs[member].skeletons:
                 hka = docs[member].skeletons[0]
@@ -292,7 +307,7 @@ def anim_frames(game_root, project, chr_id, binder, member, tae_store=None):
         raise HkxError('Animation binder belongs to another character')
     skel_binder = next((name for name in expected if name == f'{chr_id}.anibnd.dcx'), expected[0])
     skel_path = _binder_path(game_root, project, skel_binder)
-    skel_docs = _parsed_binder(str(skel_path), _stamp(skel_path))
+    skel_docs, _broken = _parsed_binder(str(skel_path), _stamp(skel_path))
     skel_member = next((name for name in SKELETONS if name in skel_docs
                         and skel_docs[name].skeletons), None)
     if skel_member is None:

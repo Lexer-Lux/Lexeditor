@@ -16,8 +16,11 @@ import struct
 
 from .formats import FormatError
 
+# Ceilings no real game file reaches; corrupt counts stop here.
 MAX_FILE = 64 * 1024 * 1024
 MAX_COUNT = 65536
+# The sampler only blends curves up to this degree.
+MAX_SPLINE_DEGREE = 4
 SDK_VERSIONS = frozenset({'20150100', '20160100', '20160200', '20180100', '20190100'})
 MAX_DEPTH = 100
 
@@ -182,8 +185,6 @@ class _Type:
         seen, lineage = self, {id(self)}
         while True:
             if seen.flags & FLAG_SUBTYPE or seen.parent is None:
-                return seen.subtype
-            if seen.parent is seen:
                 return seen.subtype
             if id(seen.parent) in lineage:
                 raise HkxError('Havok types loop back on themselves')
@@ -418,6 +419,8 @@ class _TagReader:
             sub = kind.resolve_subtype()
             if not kind.fixed:
                 return self._item_index(off)
+            if kind.fixed_size > MAX_COUNT:
+                raise HkxError('A Havok array is too long')
             return ([self._value(sub, off + num * sub.resolve_size(), depth + 1)[0]
                      for num in range(kind.fixed_size)], off)
         raise HkxError('A Havok value has an unknown shape')
@@ -481,8 +484,13 @@ def _animation(node):
         per_block = node.get('maxFramesPerBlock', 0)
         if frames < 2 or blocks < 1 or per_block < 2:
             raise HkxError('A Havok animation has no frames to play')
+        tracks = node.get('numberOfTransformTracks', 0)
+        if tracks < 1:
+            raise HkxError('A Havok animation names no tracks')
+        if tracks > MAX_COUNT:
+            raise HkxError('A Havok animation names too many tracks')
         return {'kind': 'spline', 'duration': float(node.get('duration', 0.0)),
-                'tracks': node.get('numberOfTransformTracks', 0),
+                'tracks': tracks,
                 'frames': frames, 'blocks': blocks, 'per_block': per_block,
                 'block_duration': float(node.get('blockDuration', 0.0)),
                 'frame_duration': float(node.get('frameDuration', 0.0)),
@@ -496,6 +504,8 @@ def _animation(node):
                                'q': _vec4(entry.get('rotation'), 'rotation'),
                                's': _vec4(entry.get('scale'), 'scale')[:3]})
         tracks = node.get('numberOfTransformTracks', 0)
+        if tracks > MAX_COUNT:
+            raise HkxError('A Havok animation names too many tracks')
         frames = len(transforms) // tracks if tracks else 0
         if frames < 2 or not tracks:
             raise HkxError('A Havok animation has no frames to play')
@@ -517,14 +527,16 @@ class HkxDocument:
     """Skeletons, animations and track bindings from one TAG0 file."""
 
     def __init__(self, source):
-        data = bytes(source)
-        if len(data) > MAX_FILE:
-            raise HkxError('The Havok file is too large')
         try:
+            if len(source) > MAX_FILE:
+                raise HkxError('The Havok file is too large')
+            data = bytes(source)
             self.skeletons, self.animations, self.bindings = self._read(data)
         except HkxError:
             raise
-        except (IndexError, struct.error, UnicodeDecodeError, RecursionError,
+        except RecursionError:
+            raise HkxError('Havok types loop back on themselves') from None
+        except (IndexError, struct.error, UnicodeDecodeError,
                 ValueError, TypeError, KeyError, AttributeError,
                 MemoryError) as error:
             raise HkxError(f'A Havok file is malformed: {error}') from error
@@ -738,6 +750,8 @@ def _parse_vec(data, off, static, spline, qtype, default):
     count = struct.unpack_from('<H', data, off)[0]
     degree = data[off + 2]
     off += 3
+    if degree > MAX_SPLINE_DEGREE:
+        raise HkxError('A Havok motion curve is too complex to play')
     track.degree = degree
     track.knots = data[off:off + count + degree + 2]
     off = _align(off + count + degree + 2, 4)
@@ -790,6 +804,8 @@ def _parse_quat(data, off, static, spline, qtype):
     degree = data[off + 2]
     off += 3
     track.static = None
+    if degree > MAX_SPLINE_DEGREE:
+        raise HkxError('A Havok motion curve is too complex to play')
     track.degree = degree
     track.knots = data[off:off + count + degree + 2]
     off += count + degree + 2
@@ -832,6 +848,9 @@ def sample_frames(anim, skeleton, binding):
     blocks, offsets = [], anim['offsets']
     if len(offsets) != anim['blocks']:
         raise HkxError('A Havok animation has lost a block offset')
+    for at in offsets:
+        if not 0 <= at <= len(anim['data']) - 4 * anim['tracks']:
+            raise HkxError('A Havok animation block is out of range')
     try:
         for at in offsets:
             parsed, _ = _parse_block(anim['data'], at, anim['tracks'])
@@ -842,11 +861,15 @@ def sample_frames(anim, skeleton, binding):
     for track, bone in enumerate(binding['track_to_bone']):
         if 0 <= bone < len(bone_tracks):
             bone_tracks[bone] = track
+    if any(track >= anim['tracks'] for track in bone_tracks if track >= 0):
+        raise HkxError('A Havok binding points past its tracks')
     frames, per_block = anim['frames'], anim['per_block']
     out = []
     for num in range(frames):
         block = (num % (frames - 1)) // (per_block - 1)
         local = min(num, frames) % (per_block - 1)
+        if block >= len(blocks):
+            raise HkxError('A Havok animation has lost a block')
         pose = []
         for bone, entry in enumerate(skeleton['pose']):
             track = bone_tracks[bone] if bone < len(bone_tracks) else -1
@@ -869,6 +892,8 @@ def _sample_interleaved(anim, skeleton, binding):
         if 0 <= bone < len(bone_tracks):
             bone_tracks[bone] = track
     frames, tracks = anim['frames'], anim['tracks']
+    if any(track >= tracks for track in bone_tracks if track >= 0):
+        raise HkxError('A Havok binding points past its tracks')
     out = []
     for num in range(frames):
         pose = []

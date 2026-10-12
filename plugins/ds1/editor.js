@@ -19,6 +19,7 @@ async function api(path,body){
   return result;
 }
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
+const failMount=(status,text)=>error=>{status.textContent=text;notify(error);};
 const fieldHistory={undoStack:[],redoStack:[],applying:false,
   get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
   record(entry){
@@ -846,7 +847,6 @@ function viewportHooks(){
     onMove:(key,pos)=>viewportMove(state.mapView.map,key,pos),
     requestMod:()=>viewportRequestMod()};
 }
-function viewportMovable(key){return [1,2,4,9,10].includes(Number(String(key||"").split(":")[0]));}
 function refreshViewportBar(){
   const buttons=[...document.querySelectorAll("[data-viewport-action]")];
   if(!buttons.length)return;
@@ -924,7 +924,7 @@ async function reloadViewport(map,selectKey){
   const status=document.querySelector("[data-viewport-status]");
   if(host&&status&&state.tab==="areas"&&state.sub==="viewport"){
     viewportCtl=null;
-    viewportCtl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks());
+    viewportCtl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks()).catch(failMount(status,"Could not load the map."));
     if(selectKey&&viewportCtl)viewportCtl.select(selectKey);
   }
   refreshViewportBar();
@@ -953,6 +953,7 @@ async function viewportRemove(map){
   }catch(error){notify(error);}
   finally{state.mapBusy=false;refreshViewportBar();}
 }
+const VIEWPORT_STYLE="position:relative;width:100%;height:520px;min-height:320px;";
 function renderViewport(){
   const strip=subtabBar({tabs:subtabsFor("areas"),active:state.sub,label:"Areas",change:id=>navigate("areas",id)});
   const maps=state.rows.filter(row=>row.table==="MapView");
@@ -973,14 +974,14 @@ function renderViewport(){
   const remove=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"remove",
     onclick:()=>viewportRemove(current.id)},"Remove");
   const status=el("div",{class:"lex-viewport-status","data-viewport-status":""},"Loading map.");
-  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:"position:relative;width:100%;height:520px;min-height:320px;"});
+  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE});
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
     Ds1Viewport.mount(host,current.id,state.mapView,status,viewportHooks()).then(ctl=>{
       viewportCtl=ctl;
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       refreshViewportBar();
-    }).catch(notify);
+    }).catch(failMount(status,"Could not load the map."));
   });
   return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,collide,duplicate,remove),host,status);
 }
@@ -999,14 +1000,14 @@ function renderPlayback(){
   if(!motions.some(motion=>motion.file===state.animFile))state.animFile=motions.length?motions[0].file:null;
   const motion=motions.find(entry=>entry.file===state.animFile);
   const pickMotion=id=>{if(id===state.animFile)return;state.animFile=id;render();};
-  const motionPicker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Motion","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Motion",
-      choices:motions.map(entry=>({label:entry.file,value:entry.file})),select:pickMotion}).openFor(event.currentTarget);}},
-    `Motion: ${motion?motion.file:"none"}`);
-  const status=el("div",{class:"lex-viewport-status","data-anim-status":""},"Loading motion.");
-  const host=el("div",{class:"lex-viewport-host","data-anim-host":"",style:"position:relative;width:100%;height:520px;min-height:320px;"});
+  const motionPicker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Animation","aria-haspopup":"listbox",
+    onclick:event=>{LexeditorUI.choicePopover({label:"Animation",
+      choices:motions.map(entry=>({label:entry.available===false?`${entry.file} (unreadable)`:entry.file,value:entry.file})),select:pickMotion}).openFor(event.currentTarget);}},
+    `Animation: ${motion?motion.file+(motion.available===false?" (unreadable)":""):"none"}`);
+  const status=el("div",{class:"lex-viewport-status","data-anim-status":""},"Loading animation.");
+  const host=el("div",{class:"lex-viewport-host","data-anim-host":"",style:VIEWPORT_STYLE});
   const timeline=el("div",{class:"lex-anim-timeline","data-anim-timeline":""});
-  requestAnimationFrame(()=>{Ds1Anim.mount(host,current.id,motion||null,timeline,status).catch(notify);});
+  requestAnimationFrame(()=>{Ds1Anim.mount(host,current.id,motion||null,timeline,status).catch(failMount(status,"Could not load the animation."));});
   return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,motionPicker),host,timeline,status);
 }
 function renderModel(){
@@ -1032,8 +1033,8 @@ function renderModel(){
       choices:attacks.map(entry=>({label:entry.name,value:entry.id})),select:pickAttack}).openFor(event.currentTarget);}},
     `Attack: ${attack?attack.name:"none"}`);
   const status=el("div",{class:"lex-viewport-status","data-chr-status":""},"Loading model.");
-  const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:"position:relative;width:100%;height:520px;min-height:320px;"});
-  requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(notify);});
+  const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE});
+  requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(failMount(status,"Could not load the model."));});
   return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,attackPicker),host,status);
 }
 function appliedLabel(deploy){

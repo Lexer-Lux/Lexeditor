@@ -124,3 +124,17 @@ def test_binders_rank_variants_and_skip_pairs(tmp_path):
     names = [name for name, _path in anim._binders(game, None, 'c1200')]
     assert names == ['c1200.anibnd.dcx', 'c1200_a00_hi.anibnd.dcx', 'c1200_a0x.anibnd.dcx',
                      'c1200_dlc.anibnd.dcx']
+
+
+def test_list_anims_marks_broken_member(tmp_path):
+    game = tmp_path / 'game'
+    (game / 'chr').mkdir(parents=True)
+    (game / 'chr' / 'c1200.anibnd.dcx').write_bytes(build_anibnd({
+        'Skeleton.hkx': build_tag0(), 'a87_3300.hkx': build_tag0(),
+        'a87_3301.hkx': b'not a havok file'}))
+    listed = anim.list_anims(game, None, 'c1200')
+    broken = next(entry for entry in listed['anims'] if entry['file'] == 'a87_3301.hkx')
+    assert broken['available'] is False
+    assert broken['reason']
+    assert any(entry['file'] == 'a87_3300.hkx' and entry.get('available', True)
+               for entry in listed['anims'])

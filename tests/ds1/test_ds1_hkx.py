@@ -1,4 +1,5 @@
 """Havok TAG0 container, extraction and spline sampling on synthetic files."""
+import struct
 import sys
 from pathlib import Path
 
@@ -7,7 +8,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hkx_fixture import build_tag0
-from plugins.ds1.hkx import HkxDocument, HkxError, sample_frames
+from plugins.ds1.hkx import (ARRAY, FLAG_FORMAT, HkxDocument, HkxError,
+                             _TagReader, _Type, _parse_quat, _parse_vec,
+                             sample_frames)
 
 
 def test_container_reads_skeleton_anim_and_binding():
@@ -73,3 +76,61 @@ def test_float_tracks_refused():
     blob[spline_at + 8:spline_at + 12] = (1).to_bytes(4, 'little')
     with pytest.raises(HkxError, match='float tracks'):
         HkxDocument(bytes(blob))
+
+
+def test_str_source_wrapped():
+    with pytest.raises(HkxError):
+        HkxDocument('not bytes')
+
+
+def test_self_parent_and_cyclic_types_raise():
+    loop = _Type()
+    loop.parent = loop
+    with pytest.raises(HkxError, match='loop back'):
+        loop.resolve_subtype()
+    first, second = _Type(), _Type()
+    first.parent, second.parent = second, first
+    with pytest.raises(HkxError, match='loop back'):
+        first.resolve_subtype()
+    with pytest.raises(HkxError, match='loop back'):
+        first.resolve_size()
+
+
+def test_fixed_array_length_capped():
+    item = _Type()
+    item.flags = FLAG_FORMAT
+    item.format_info = ARRAY | 0x20 | (70000 << 8)
+    reader = _TagReader(b'', 0, [], [])
+    with pytest.raises(HkxError, match='too long'):
+        reader._value(item, 0, 0)
+
+
+def test_binding_past_tracks_refused():
+    doc = HkxDocument(build_tag0())
+    skel = doc.skeletons[0]
+    inter = next(anim for anim in doc.animations if anim['kind'] == 'interleaved')
+    with pytest.raises(HkxError, match='past its tracks'):
+        sample_frames(inter, skel, {'track_to_bone': [1, 0, 0, 0]})
+    spline = next(anim for anim in doc.animations if anim['kind'] == 'spline')
+    with pytest.raises(HkxError, match='past its tracks'):
+        sample_frames(spline, skel, {'track_to_bone': [0, 1, 0]})
+    # A track aimed at no bone just leaves that bone in its reference pose.
+    frames = sample_frames(inter, skel, {'track_to_bone': [0, 99]})
+    assert len(frames) == 2
+
+
+def test_spline_degree_capped():
+    blob = struct.pack('<H', 0) + bytes([5])
+    with pytest.raises(HkxError, match='too complex'):
+        _parse_vec(blob, 0, 0, 1, 0, 0.0)
+    with pytest.raises(HkxError, match='too complex'):
+        _parse_quat(blob, 0, 0, 1, 0)
+
+
+def test_block_offset_out_of_range():
+    doc = HkxDocument(build_tag0())
+    skel = doc.skeletons[0]
+    spline = next(anim for anim in doc.animations if anim['kind'] == 'spline')
+    bad = dict(spline, offsets=[len(spline['data']) + 100])
+    with pytest.raises(HkxError, match='out of range'):
+        sample_frames(bad, skel, doc.bindings[0])

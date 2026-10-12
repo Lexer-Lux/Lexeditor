@@ -136,11 +136,20 @@ class Handler(PluginRequestHandler):
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
                         chars = anim.list_chars(MAPSTORE.game_root, MAPSTORE.project)
                         result['animTabs'].append({'id': 'playback', 'label': 'Playback',
-                                                   'table': 'AnimPlayback', 'count': len(chars)})
+                                                   'table': 'AnimPlayback', 'count': len(chars),
+                                                   'help': 'Watch a character perform its animations. '
+                                                           'Pick a character, then an animation. '
+                                                           'Drag the timeline to scrub through the move. '
+                                                           'Orange ticks mark where events fire.'})
                         monsters = next(entry['count'] for entry in result['enemyTabs']
                                         if entry['id'] == 'monsters')
-                        result['enemyTabs'].append({'id': 'model', 'label': 'Model',
-                                                    'table': 'EnemyModel', 'count': monsters})
+                        result['enemyTabs'].append({'id': 'model', 'label': 'Models',
+                                                    'table': 'EnemyModel', 'count': monsters,
+                                                    'help': 'See enemy bodies, hitboxes and attacks. '
+                                                            'Pick an enemy, then an attack. '
+                                                            'It shows where that swing lands. '
+                                                            'This screen only shows the game data. '
+                                                            'It changes nothing.'})
                     elif path == '/api/data-map':
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True))
                     elif path == '/api/map/view':
