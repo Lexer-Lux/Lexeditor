@@ -17,7 +17,16 @@ def build_msb(parts=(("enemy", 2, 0, 0, 120000), ("player", 4, 0, 1, None), ("pi
         base += struct.pack("<3f", 1.0, 1.0, 1.0) + bytes(32)
         base += struct.pack("<iii", 0, 0, 0)
         entity = bytes(0x18)
-        typedata = struct.pack("<5i", 0, 0, 1000, npc, 111) + bytes(0x40 - 20) if npc is not None else bytes(8)
+        # Blobs match the real sizes per part type, so fixtures duplicate
+        # like real maps; collision and navigation parts keep a stub.
+        if npc is not None:
+            typedata = struct.pack("<5i", 0, 0, 1000, npc, 111) + bytes(0x40 - 20)
+        elif ptype in (1, 9):
+            typedata = bytes(0x18)
+        elif ptype == 4:
+            typedata = bytes(0x10)
+        else:
+            typedata = bytes(8)
         blobs.append((base, "%s%d" % (kind, pid), "s%s%d" % (kind, pid), entity, typedata))
     dirs = [(0, "MODEL_PARAM_ST", len(model_names)), (0, "EVENT_PARAM_ST", 0),
             (0, "POINT_PARAM_ST", 0), (0, "PARTS_PARAM_ST", len(parts))]

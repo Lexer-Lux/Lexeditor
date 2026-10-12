@@ -45,6 +45,28 @@ ATTACK_FIELDS['hitStopTime'] = (
     "How long the victim's animation pauses when hit, in seconds.")
 
 
+def hitbox_slots(document, attack_id):
+    """One attack's four hit slots: radius, model points, and whether
+    the slot strikes. A slot with no radius or no first point is idle;
+    a second point stretches the sphere into a capsule."""
+    slots = []
+    for slot in range(4):
+        radius = document.value('AtkParam_Npc', attack_id, f'hit{slot}_Radius')
+        first = document.value('AtkParam_Npc', attack_id, f'hit{slot}_DmyPoly1')
+        second = document.value('AtkParam_Npc', attack_id, f'hit{slot}_DmyPoly2')
+        active = radius > 0 and first >= 0
+        slots.append({'slot': slot, 'radius': radius, 'first': first, 'second': second,
+                      'active': active, 'shape': 'capsule' if active and second >= 0 else 'sphere'})
+    return slots
+
+
+def body_hitbox(document, npc_id):
+    """The body's own hitbox: radius, height and vertical shift."""
+    return {'radius': document.value('NpcParam', npc_id, 'hitRadius'),
+            'height': document.value('NpcParam', npc_id, 'hitHeight'),
+            'offset': document.value('NpcParam', npc_id, 'hitYOffset')}
+
+
 class AttackReferences:
     def __init__(self, document):
         self.doc = document

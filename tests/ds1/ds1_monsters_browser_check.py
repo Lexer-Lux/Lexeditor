@@ -47,7 +47,8 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     monsters()
-                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(ENEMY_SUBTABS, key=lambda entry: entry[1].lower())]
+                    tabs = ENEMY_SUBTABS + (('model', 'Model', 'EnemyModel'),)
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(tabs, key=lambda entry: entry[1].lower())]
                     # The detail pane opens on Stats; Attacks is its other tab.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['attacks', 'resistances']
                     assert page.evaluate('state.monsterTab') == 'resistances'

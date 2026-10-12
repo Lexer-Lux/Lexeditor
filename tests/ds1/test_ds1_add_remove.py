@@ -184,10 +184,15 @@ def test_msb_add_remove_fixture():
         document.remove_placement([4, 0])
     with pytest.raises(MsbError, match="Select an enemy"):
         document.remove_placement([2, 99])
-    # The fixture chest stores 8 bytes where its kind needs 0x18; the bytes
-    # after it are param names, so the template asserts fail and it refuses.
+    # A chest whose stored blob breaks the template's fixed words refuses
+    # duplication instead of copying values this version does not know.
+    tampered = bytearray(build_msb())
+    chest_at = next(part["type_data"] for part in MsbDocument(bytes(tampered)).parts
+                    if part["type"] == 1)
+    struct.pack_into("<i", tampered, chest_at, 1)
+    tampered_doc = MsbDocument(bytes(tampered))
     with pytest.raises(MsbError, match="does not understand"):
-        document.add_placement([1, 0])
+        tampered_doc.add_placement([1, 0])
 
 
 def MapStore_pending(document):

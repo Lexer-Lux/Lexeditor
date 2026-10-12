@@ -851,6 +851,26 @@
           "name": "TKGP / JKAnderson - SoulsTemplates",
           "role": "Apache-2.0 BND3 and DCX format reference for fixed-size, byte-preserving item edits. No template code is bundled.",
           "url": "https://github.com/JKAnderson/SoulsTemplates"
+        },
+        {
+          "name": "Grimrukh / soulstruct",
+          "role": "GPL-3.0-or-later FLVER2 model format facts behind the model reader; no upstream code is bundled.",
+          "url": "https://github.com/Grimrukh/soulstruct"
+        },
+        {
+          "name": "Three.js authors",
+          "role": "MIT-licensed 3D library vendored for the map viewport (three.module.js, OrbitControls and TransformControls, pinned to r170).",
+          "url": "https://github.com/mrdoob/three.js"
+        },
+        {
+          "name": "Meowmaritus / SoulsAssetPipeline",
+          "role": "GPL-3.0-or-later TAG0 tagfile and spline-animation facts behind the animation reader (commit d11caf9); no upstream code is bundled.",
+          "url": "https://github.com/Meowmaritus/SoulsAssetPipeline"
+        },
+        {
+          "name": "PredatorCZ / HavokLib",
+          "role": "GPL-3.0-or-later spline-decompression facts behind the animation sampler; no upstream code is bundled.",
+          "url": "https://github.com/PredatorCZ/HavokLib"
         }
       ],
       "thanks": [],
