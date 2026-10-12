@@ -399,7 +399,7 @@ function weaponFieldCategory(row){
   }
   const leaf=parts[parts.length-1]||"";
   if(/^UNK_MEMBER_/i.test(leaf)||/^Item \d+$/i.test(leaf))
-    return {key:"unidentified",label:"Unidentified fields",description:"The extracted schema has no reliable name for these values. They remain editable, but Lexeditor does not guess what they do."};
+    return {key:"unidentified",label:"Unidentified fields",description:"The extracted schema has no reliable name for these values. Unknown tags are read-only, and numbered Item rows are known values that stay editable. Lexeditor does not guess what they do."};
   return WEAPON_FIELD_CATEGORIES.find(group=>group.match(path))||
     {key:"identity",label:"Identity, inventory & flags",description:"Record identity, inventory placement, unlock links, stats, weapon class and behavior flags."};
 }

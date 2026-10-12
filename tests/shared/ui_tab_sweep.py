@@ -1,5 +1,28 @@
 """Discover nested read-only tab views without game-specific navigation."""
 import json
+import time
+
+
+def wait_for_loading_clear(evaluate, timeout=20.0):
+    """Wait until no shared loading panel is on screen. Never raises.
+
+    An async tab switch (FF7R text languages, ability tables) renders
+    LexeditorUI.loadingPanel while it loads, which replaces the tab bar
+    the sweep clicks through. Measuring early flags a loading screen as
+    an empty tab and loses the bar the sweep restores afterwards, so the
+    caller settles first and then waits here. A load that never finishes
+    is reported by the probes (empty tab) rather than by this wait.
+    Returns True when the screen cleared, False on timeout.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            if not evaluate("!!document.querySelector('.lex-panel-loading')"):
+                return True
+        except Exception:
+            return True
+        time.sleep(0.25)
+    return False
 
 
 GROUPS = r"""(()=>{

@@ -245,6 +245,7 @@ def test_linked_paths_are_refused_before_read_or_write(project, monkeypatch, tmp
 def test_legacy_native_values_import_without_a_new_balance_preset(project):
     game, mod, store, rules, original = project
     value = {**deepcopy(DEFAULTS), "enabled": False, "encumbranceEnabled": False, "shieldRecovery": 5}
+    del value["levelupGains"]  # legacy files predate level-up gains
     value.update(enabled=True, encumbranceEnabled=True, baseRecovery=72)
     value["bands"], _ = load_bands.split(value["bands"], 1, 12.5)
     value["nextBandId"] = 6
@@ -303,7 +304,9 @@ def test_current_server_keeps_effects_attacks_and_library_tweaks(project, monkey
         assert len(call("/api/table?tab=encumbrance")["rows"])==4
         call("/api/deployment/apply",{})
         assert runtime(game) is not None and image(game)==original
-        call("/api/tweaks/apply",{})
+        before = (game / tweak_mods.RUNTIME_PATCH).read_bytes()
+        call("/api/save",{})
+        assert (game / tweak_mods.RUNTIME_PATCH).read_bytes() == before
         assert tweak_mods.status(game)["project"] is not None
         call("/api/deployment/disable",{})
         assert image(game)==original and runtime(game) is None
@@ -321,6 +324,8 @@ def test_legacy_schema_is_explicit_and_inactive_values_stay_in_the_old_file(proj
     value = ({"enabled": False, "encumbranceEnabled": False, "shieldRecovery": 9,
               **stamina_patch.DEFAULT_RULES} if version == 1 else
              {"enabled": False, "encumbranceEnabled": False, "shieldRecovery": 9, **deepcopy(DEFAULTS)})
+    if version == 2:
+        del value["levelupGains"]  # legacy files predate level-up gains
     value["baseRecovery"] = 99
     raw = json.dumps({"schema": version, "stamina-rebalance": value}).encode()
     (mod / LEGACY_FILE).write_bytes(raw)
@@ -336,6 +341,7 @@ def test_legacy_schema_is_explicit_and_inactive_values_stay_in_the_old_file(proj
 def test_legacy_file_change_before_migration_save_is_not_lost(project):
     game, mod, store, rules, original = project
     value = {**deepcopy(DEFAULTS), "enabled": True, "encumbranceEnabled": False, "shieldRecovery": 5}
+    del value["levelupGains"]  # legacy files predate level-up gains
     old = mod / LEGACY_FILE
     old.write_text(json.dumps({"schema": 2, "stamina-rebalance": value}))
     migrated = NativeRules(game, mod, False)

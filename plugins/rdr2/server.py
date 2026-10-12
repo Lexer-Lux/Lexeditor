@@ -2126,8 +2126,8 @@ def normalize_shop_requirement_groups(raw_groups, item_key):
         if not isinstance(group, dict):
             raise ValueError(f"{item_key}: availability group {group_index} is invalid")
         count = str(group.get("count", "1")).strip()
-        if not re.fullmatch(r"-?\d+", count):
-            raise ValueError(f"{item_key}: availability group {group_index} count must be a whole number")
+        if not re.fullmatch(r"\d+", count):
+            raise ValueError(f"{item_key}: availability group {group_index} count must be a nonnegative whole number")
         raw_requirements = group.get("requirements", [])
         if not isinstance(raw_requirements, list) or len(raw_requirements) > 128:
             raise ValueError(f"{item_key}: availability group {group_index} has too many conditions")
@@ -2142,8 +2142,8 @@ def normalize_shop_requirement_groups(raw_groups, item_key):
             lock = str(lock_value).strip().lower() if not isinstance(lock_value, bool) else ("true" if lock_value else "false")
             if not condition_type or not key:
                 raise ValueError(f"{item_key}: condition {group_index}.{requirement_index} needs a type and key")
-            if not re.fullmatch(r"-?\d+", state):
-                raise ValueError(f"{item_key}: condition {group_index}.{requirement_index} state must be a whole number")
+            if not re.fullmatch(r"\d+", state):
+                raise ValueError(f"{item_key}: condition {group_index}.{requirement_index} state must be a nonnegative whole number")
             if lock not in {"true", "false"}:
                 raise ValueError(f"{item_key}: condition {group_index}.{requirement_index} lock must be true or false")
             requirements.append({"type": condition_type, "key": key, "state": state, "lock": lock})
@@ -3498,8 +3498,12 @@ def _catalog_numeric_edits(edits):
         field = row.get("field")
         if not isinstance(field, str):
             raise ValueError("effect field must be text")
-        if field in {"value", "time", "timeunits"}:
+        if field in {"value", "time"}:
             whole(row, "value", f"effect {field}")
+        elif field == "timeunits":
+            whole(row, "value", "effect timeunits")
+            if row["value"] not in {0, 1, 2, 3}:
+                raise ValueError("Effect time units must be 0, 1, 2 or 3")
         elif field == "percent":
             row["value"] = finite_number(row.get("value"), "Effect percent")
     for row in prepared.get("craft", []):
@@ -4046,6 +4050,8 @@ def apply_loot_edits(name, edits):
                 row[field] = finite_number(row[field], "Loot rate") if field == "rate" else integer_value(row[field], f"Loot {field}")
                 if field == "rate" and row[field] < 0:
                     raise ValueError("Loot rate must be nonnegative")
+                if field in {"min", "max"} and row[field] < 0:
+                    raise ValueError(f"Loot {field} must be nonnegative")
             if row.get("min") not in (None, "") and row.get("max") not in (None, "") and row["min"] > row["max"]:
                 raise ValueError("Loot minimum cannot exceed maximum")
             rows.append(row)

@@ -633,28 +633,29 @@ class FreshChronoTriggerTests(unittest.TestCase):
                     {"token": scripted["token"], "values": {"destinationScene": 3}},
                 ], "en")
 
-    def test_shared_mod_library_reads_chrono_adapter_active_ids(self):
+    def test_shared_mods_tab_lists_chrono_mods_with_their_switches(self):
         from core.desktop_host import HostApi
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             library_root = root / "library"
             mod = library_root / "chrono-trigger" / "Enabled"
             mod.mkdir(parents=True)
-            (mod / "mod.json").write_text('{"name":"Enabled","version":"1"}\n', encoding="utf-8")
+            (mod / "mod.json").write_text('{"name":"Enabled","version":"1","enabled":true}\n', encoding="utf-8")
             calls = []
             adapter = SimpleNamespace(active_mod_ids=lambda game: calls.append(Path(game)) or ["Enabled"])
             host = HostApi.__new__(HostApi)
-            host._plugins = {"chrono-trigger": SimpleNamespace(mod_adapter=adapter, managed_mod=None)}
+            host._plugins = {"chrono-trigger": SimpleNamespace(mod_adapter=adapter, managed_mod=None, lexmod="")}
             host._installations = SimpleNamespace(snapshot=lambda _plugin: {"root": str(root / "game")})
             host.mod_library_status = lambda _plugin: {
                 "root": str(library_root), "verified": False, "canManage": True,
                 "authorTest": True, "message": "fixture", "packageTypes": ["ctp"],
             }
+            host.mod_library_location = lambda: {"root": str(library_root), "move": None}
             host._managed_mod_results = {}
             host._github = SimpleNamespace(visible_repository=lambda _repo: False)
-            result = host.mod_library_entries("chrono-trigger")
-            self.assertEqual(calls, [root / "game"])
-            self.assertEqual([(row["name"], row["enabled"]) for row in result["entries"]],
+            result = host.mods_overview("chrono-trigger")
+            self.assertEqual(calls, [])
+            self.assertEqual([(row["name"], row["enabled"]) for row in result["rows"]],
                              [("Enabled", True)])
 
     def test_real_ctp_extension_import_becomes_editable_project(self):

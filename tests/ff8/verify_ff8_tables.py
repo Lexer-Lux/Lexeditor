@@ -23,7 +23,7 @@ def sheet(text: str) -> tuple[list[str], list[dict]]:
 def main() -> int:
     listing = formats.table_list()["rows"]
     names = [row["name"] for row in listing]
-    assert names == ["items", "names", "wm2field", "weapons"], names
+    assert names == ["items", "names", "wm2field", "weapons", "refine", "shops"], names
     for row in listing:
         assert row["identity"] if "identity" in row else True
         assert row["editable"] and set(row["editable"]).issubset(row["columns"]), row
@@ -118,6 +118,68 @@ def main() -> int:
             weapons_before[target]["ingredients"][0]["quantity"] + 1
         assert weapons_after[target + 1]["ingredients"] == \
             weapons_before[target + 1]["ingredients"]
+
+        # Refine recipes: one recipe's quantities can move together.
+        refine_export = formats.table_csv("refine")
+        refine_header, refine_csv = sheet(refine_export["text"])
+        assert refine_header == ["id", "table", "group", "inputId", "inputQuantity",
+                                 "outputId", "outputQuantity", "text"], refine_header
+        assert refine_export["rows"] == 377, refine_export["rows"]
+        assert refine_csv[0]["id"] == "m000:0"
+        target = next(row for row in refine_csv
+                      if row["table"] == "m000" and int(row["inputQuantity"]) < 255)
+        target["inputQuantity"] = str(int(target["inputQuantity"]) + 1)
+        target["outputQuantity"] = str((int(target["outputQuantity"]) + 1) % 256)
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=refine_header, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(refine_csv)
+        result = formats.import_table_csv("refine", buffer.getvalue())
+        assert result["applied"] == 1 and not result["rejected"], result
+        landed = next(row for row in formats.refine_rows("current")["rows"]
+                      if row["table"] == target["table"]
+                      and f"{row['table']}:{row['id']}" == target["id"])
+        assert landed["inputQuantity"] == int(target["inputQuantity"])
+        assert landed["outputQuantity"] == int(target["outputQuantity"])
+        neighbour = next(row for row in formats.refine_rows("current")["rows"]
+                         if row["table"] == "m004" and row["id"] == 0)
+        assert neighbour["inputQuantity"] == int(next(
+            row["inputQuantity"] for row in refine_csv if row["id"] == "m004:0"))
+
+        # Shop inventories: an item and its rare flag can move together.
+        shop_export = formats.table_csv("shops")
+        shop_header, shop_csv = sheet(shop_export["text"])
+        assert shop_header == ["id", "shop", "shopName", "slot", "itemId", "itemName",
+                               "rare"], shop_header
+        assert len(shop_csv) == shop_export["rows"] == 320, shop_export["rows"]
+        assert shop_csv[0]["id"] == "0:0"
+        shops_before = {(shop["id"], slot["slot"]): (slot["itemId"], slot["rare"])
+                        for shop in formats.shop_rows("current")["rows"]
+                        for slot in shop["slots"]}
+        shop_csv[0]["itemId"] = str((int(shop_csv[0]["itemId"]) + 1) % 200)
+        shop_csv[0]["rare"] = "0" if shop_csv[0]["rare"] == "1" else "1"
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=shop_header, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(shop_csv)
+        result = formats.import_table_csv("shops", buffer.getvalue())
+        assert result["applied"] == 1 and not result["rejected"], result
+        shops_after = {(shop["id"], slot["slot"]): (slot["itemId"], slot["rare"])
+                       for shop in formats.shop_rows("current")["rows"]
+                       for slot in shop["slots"]}
+        assert shops_after[(0, 0)] == (int(shop_csv[0]["itemId"]),
+                                       shop_csv[0]["rare"] == "1")
+        assert [shops_after[key] for key in shops_after if key != (0, 0)] == [
+            shops_before[key] for key in shops_before if key != (0, 0)]
+        # A rare flag outside 0/1 is refused with the rest landing.
+        shop_csv[1]["rare"] = "2"
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=shop_header, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(shop_csv)
+        result = formats.import_table_csv("shops", buffer.getvalue())
+        assert result["applied"] == 0 and len(result["rejected"]) == 1, result
+        assert "0 or 1" in result["rejected"][0]["reason"], result["rejected"]
 
         for bad_name, expected in [("nope", "unknown table"), ("", "unknown table")]:
             try:

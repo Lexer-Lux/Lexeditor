@@ -1252,13 +1252,6 @@ class HostApi:
             os.startfile(f"steam://rungameid/{app_id}")
             return {"running": False, "viaSteam": True, "alreadyRunning": False}
         adapter = self._plugins[plugin_id].mod_adapter
-        if adapter is not None and getattr(adapter, "supports_bundle_components", False):
-            with self._mod_library_lock:
-                manager = self._bundle_manager(plugin_id)
-                if manager.state_path.exists() or manager.journal.exists():
-                    links = manager.snapshot()
-                    if links["recoveryRequired"] or links["inconsistent"]:
-                        raise ValueError("Recover or apply the linked mod selection in Mod library before launching the game")
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
             with self._mod_library_lock:
@@ -1359,13 +1352,11 @@ class HostApi:
         self._add_library_mods(plugin_id, result)
         for row in result["projects"]:
             row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
-            from core.bundled_mods import components
-            try:
-                links = {key for component in components(Path(row["path"])) for key in component["tweaks"]}
-                registry = getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {}
-                row["linkedTweaks"] = [registry[key].name if key in registry else key for key in sorted(links)]
-            except (ValueError, OSError):
-                row["linkedTweaks"] = []
+        marks = {"rows": result["projects"]}
+        self._attach_mod_marks(plugin_id, marks)
+        for key in ("conflictError", "alertsError"):
+            if marks.get(key):
+                result[key] = marks[key]
         return result
 
     def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
@@ -1642,68 +1633,8 @@ class HostApi:
                 state["temporary"].cleanup()
         return {"closed": True}
 
-    def mod_library_entries(self, plugin_id: str) -> dict:
-        from core.mod_library import metadata
-        status = self.mod_library_status(plugin_id)
-        root = Path(status["root"]) / plugin_id
-        game = self._installations.snapshot(plugin_id).get("root")
-        active = []
-        adapter = self._mod_adapter(plugin_id)
-        if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
-            active = list(adapter.active_mod_ids(Path(game)))
-        entries = []
-        has_bundles = (root / '.bundles.json').exists() or (root / '.bundles-pending.json').exists()
-        for child in sorted(root.iterdir()) if root.is_dir() else []:
-            if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
-                try:
-                    info = metadata(child)
-                    has_bundles = has_bundles or info.get('bundle') is not None
-                    policy = self._plugins[plugin_id].managed_mod
-                    locked = bool(policy and child.name == policy.folder_name and
-                                  not self._github.visible_repository(LEXEDITOR_REPOSITORY))
-                    entries.append({"path": str(child), "name": info["name"], "readOnly": locked,
-                                    "version": info["version"], "enabled": child.name in active})
-                except (OSError, ValueError) as error:
-                    entries.append({"path": str(child), "name": child.name, "error": str(error)})
-        result = {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
-        if game and adapter is not None and has_bundles:
-            try:
-                with self._mod_library_lock:
-                    bundles = self._bundle_manager(plugin_id).snapshot()
-                result["bundles"] = bundles
-                for entry in entries:
-                    entry["components"] = [row for row in bundles["components"] if row["parent"] == str(Path(entry["path"]).resolve())]
-                    if entry["components"]:
-                        entry["enabled"] = any(row["enabled"] for row in entry["components"])
-            except (ValueError, OSError) as error:
-                result["bundleError"] = str(error)
-        return result
-
-    def _bundle_manager(self, plugin_id: str):
-        from core.bundled_mods import BundleManager
-        status = self.mod_library_status(plugin_id)
-        game = self._installations.snapshot(plugin_id).get("root")
-        if not game or not status["canManage"]:
-            raise ValueError("Locate the game and enable its mod loader first")
-        return BundleManager(Path(status["root"]) / plugin_id, Path(game),
-                             self._mod_adapter(plugin_id), getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {})
-
-    def set_bundled_tweak(self, plugin_id: str, tweak_id: str, enabled: bool) -> dict:
-        if self.game_process_status(plugin_id).get("running"):
-            raise ValueError("Close the game before changing linked tweaks")
-        with self._mod_library_lock:
-            self._bundle_manager(plugin_id).toggle_tweak(tweak_id, enabled)
-        return self.mod_library_entries(plugin_id)
-
-    def recover_bundled_mods(self, plugin_id: str) -> dict:
-        if self.game_process_status(plugin_id).get("running"):
-            raise ValueError("Close the game before recovering linked mods")
-        with self._mod_library_lock:
-            self._bundle_manager(plugin_id).recover()
-        return self.mod_library_entries(plugin_id)
-
     def update_managed_mod(self, plugin_id: str) -> dict:
-        from core.managed_mods import update_mod, refresh_active_mod
+        from core.managed_mods import update_mod
         from core.mod_library import ModLibrary
         plugin = self._plugins[plugin_id]
         if plugin.managed_mod is None or plugin.mod_adapter is None:
@@ -1719,15 +1650,15 @@ class HostApi:
                 game = self._installations.snapshot(plugin_id).get("root")
                 if not author and game:
                     try:
-                        manager = self._bundle_manager(plugin_id)
-                        if manager.state_path.exists() or manager.journal.exists():
-                            saved = manager.state()
-                            manager.activate(saved["mods"], saved["components"])
+                        from core import mods_service
+                        rows = mods_service.library_rows(self._game_mods(plugin_id))
+                        managed = next((row for row in rows
+                                        if Path(row["path"]).name == plugin.managed_mod.folder_name), None)
+                        if managed is not None and managed["enabled"]:
+                            self._activate_mods(plugin_id, [row["path"] for row in rows if row["enabled"]])
                             result["deploymentRefreshed"] = True
                         else:
-                            result["deploymentRefreshed"] = refresh_active_mod(
-                                ModLibrary(Path(self.mod_library_location()["root"])),
-                                plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
+                            result["deploymentRefreshed"] = False
                     except Exception as error:
                         result["error"] = str(error)
                         result["message"] = (
@@ -1738,7 +1669,9 @@ class HostApi:
         self._managed_mod_results[plugin_id] = result
         return result
 
-    def activate_library_mods(self, plugin_id: str, paths: list[str], components: list[str] | None = None) -> dict:
+    def _activate_mods(self, plugin_id: str, paths: list[str]) -> None:
+        """Deploy exactly these library mods, bundles expanded to their ticks."""
+        from core import bundled_mods
         from core.mod_library import relative_path
         status = self.mod_library_status(plugin_id)
         if not status["canManage"]:
@@ -1753,13 +1686,9 @@ class HostApi:
         roots = [Path(path).resolve() for path in paths]
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
+        adapter = self._mod_adapter(plugin_id)
         with self._mod_library_lock:
-            manager = self._bundle_manager(plugin_id)
-            if manager.catalog() or manager.state_path.exists() or manager.journal.exists():
-                manager.activate([path.name for path in roots], components or [])
-            else:
-                self._mod_adapter(plugin_id).activate(roots, Path(game))
-        return self.mod_library_entries(plugin_id)
+            adapter.activate(bundled_mods.expand_roots(roots, adapter), Path(game))
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1820,31 +1749,40 @@ class HostApi:
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
                   "message": status.get("message", "")}
-        self._attach_conflicts(plugin_id, result)
+        self._attach_mod_marks(plugin_id, result)
         return result
 
-    def _attach_conflicts(self, plugin_id: str, result: dict) -> None:
-        """Mark each switched-on mod whose changes another mod overrides.
+    def _attach_mod_marks(self, plugin_id: str, result: dict) -> None:
+        """Mark each switched-on mod with its loader's flags: conflicts plus alerts.
 
         A game's loader reports, by mod folder, what it cannot combine
-        (adapter.conflicts); the Mods tab shows it on the mod's row. A loader
-        without that report, or a game not located yet, marks nothing.
+        (adapter.conflicts) and what needs attention (adapter.alerts, such as
+        a mod changed since it was last built). The Mods tab and the mod
+        selector show them on the mod's row. A loader without those reports,
+        or a game not located yet, marks nothing.
         """
         adapter = self._mod_adapter(plugin_id)
         game = self._installations.snapshot(plugin_id).get("root") if adapter is not None else ""
-        if not game or not hasattr(adapter, "conflicts"):
+        if not game:
             return
         enabled = [Path(row["path"]) for row in result["rows"] if row.get("enabled")]
+        self._attach_report(result, adapter, enabled, game, "conflicts", "conflictError")
+        self._attach_report(result, adapter, enabled, game, "alerts", "alertsError")
+
+    @staticmethod
+    def _attach_report(result: dict, adapter, enabled: list, game: str, method: str, error_key: str) -> None:
+        if adapter is None or not hasattr(adapter, method):
+            return
         try:
-            found = adapter.conflicts(enabled, Path(game)) if enabled else {}
+            found = getattr(adapter, method)(enabled, Path(game)) if enabled else {}
         except (OSError, ValueError, RuntimeError) as error:
-            result["conflictError"] = str(error)
+            result[error_key] = str(error)
             return
         found = {str(Path(key).resolve()): lines for key, lines in found.items()}
         for row in result["rows"]:
             lines = found.get(str(Path(row["path"]).resolve())) if row.get("enabled") else None
             if lines:
-                row["conflicts"] = list(lines)
+                row[method] = list(lines)
 
     def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
         from core import mod_metadata, mods_service
@@ -1862,7 +1800,7 @@ class HostApi:
         if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
             enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
             try:
-                self.activate_library_mods(plugin_id, enabled_paths, [])
+                self._activate_mods(plugin_id, enabled_paths)
             except Exception:
                 # The switch failed, so the mod keeps its old state. Left
                 # saved, a mod that cannot build stayed on behind an
@@ -1883,9 +1821,20 @@ class HostApi:
         return mods_service.move(self._game_mods(plugin_id), path, delta)
 
     def save_mod_settings(self, plugin_id: str, path: str, values: dict) -> dict:
-        from core import mods_service, script_mods
-        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
-        script_mods.save_values(folder, values)
+        from core import bundled_mods, mods_service, script_mods
+        root = self._game_mods(plugin_id)
+        folder = mods_service.checked_mod(root, path)
+        if bundled_mods.components(folder):
+            bundled_mods.save_values(folder, values)
+            # A component tick deploys at once when its bundle is on, like a
+            # switch: a bundle has no Save-time rebuild the way a tweak mod
+            # does. While the bundle is off the saved tick waits for its switch.
+            if (mods_service.mod_row(folder).get("enabled") and self._mod_adapter(plugin_id) is not None
+                    and self.mod_library_status(plugin_id).get("canManage")):
+                self._activate_mods(plugin_id, [row["path"] for row in mods_service.library_rows(root)
+                                                if row["enabled"]])
+        else:
+            script_mods.save_values(folder, values)
         return mods_service.mod_row(folder)
 
     def activate_enabled_mods(self, plugin_id: str) -> dict:
@@ -1895,7 +1844,7 @@ class HostApi:
         if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
             return {"activated": False}
         enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-        self.activate_library_mods(plugin_id, enabled, [])
+        self._activate_mods(plugin_id, enabled)
         return {"activated": True, "mods": len(enabled)}
 
     def open_lexmod(self, plugin_id: str) -> dict:

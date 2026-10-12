@@ -43,16 +43,16 @@ def main():
             members=set(ItemDocument(archives[RELATIVE]).members)
             assert {row['filename'] for row in rows if row['id'].startswith('param:')}==members
             # Every parameter table, five name tables, ten description tables,
-            # the two native rule rows, one asset row per installed data folder,
+            # the three native rule rows, one asset row per installed data folder,
             # and a missing row per optional table the archive lacks.
             effects_missing = 'SpEffectParam.param' not in members
             curves_missing = 'CalcCorrectGraph.param' not in members
             asset_rows=sum(1 for top in assets.ASSET_ROOTS if (game/top).is_dir())
             assert asset_rows>0
-            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+2+asset_rows+effects_missing+curves_missing
+            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+3+asset_rows+effects_missing+curves_missing
             assert {row['id'] for row in rows if row['id'].startswith('assets:')}=={'assets:'+top for top in assets.ASSET_ROOTS if (game/top).is_dir()}
             assert all(row['target']=='assets' and row['sub']=='game' and row['openable'] for row in rows if row['id'].startswith('assets:'))
-            assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance'}
+            assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance','native-levelup'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
             assert by_file['BehaviorParam.param']['coverage']=='structured'

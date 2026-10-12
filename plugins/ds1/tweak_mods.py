@@ -241,6 +241,82 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
     return specs
 
 
+#: A mod's built native descriptions are small; the Mods tab reads them with
+#: a bound, without running anything.
+MAX_NATIVE_FILES = 64
+MAX_NATIVE_BYTES = 1024 * 1024
+
+
+def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
+    """(start, end) of every address a mod's built native patches claim, by kind.
+
+    Reads the mod's native/*.json as last built, without running its script:
+    a mod that was never built claims nothing here and is still checked when
+    it is enabled. Damaged files are skipped; enabling reports them.
+    """
+    found: dict[str, list[tuple[int, int]]] = {"hooks": [], "state": [], "islands": []}
+    try:
+        files = sorted((Path(folder) / "native").glob("*.json"))
+    except OSError:
+        return found
+    for path in files[:MAX_NATIVE_FILES]:
+        try:
+            if path.is_symlink() or path.stat().st_size > MAX_NATIVE_BYTES:
+                continue
+            spec = exe_patches.validate(json.loads(path.read_text(encoding="utf-8")), owner)
+        except (OSError, ValueError):
+            continue
+        for kind, spans in exe_patches.spans(spec).items():
+            found[kind] += spans
+    return found
+
+
+def build_fingerprint(folder: Path) -> str:
+    """What the last build of one tweak mod saw, hashed together.
+
+    The switch, load order, name, settings, schema, script and built files:
+    anything that changes what the mod builds. The installed record keeps one
+    fingerprint per enabled mod; a mod whose fingerprint differs was changed
+    since the last build and needs rebuilding. Built files are read post-build,
+    so a hand edit to one also asks for a rebuild, which overwrites it from
+    the script.
+    """
+    folder = Path(folder)
+    metadata = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+    parts = {"enabled": metadata.get("enabled") is True, "order": metadata.get("order", 1000),
+             "name": str(metadata.get("name") or "")}
+    for name in (script_mods.VALUES_FILE, script_mods.SCHEMA_FILE):
+        path = folder / name
+        parts[name] = path.read_bytes().hex() if path.is_file() else None
+    scripts = {}
+    script_dir = folder / script_mods.SCRIPT_FOLDER
+    if script_dir.is_dir():
+        for path in sorted(script_dir.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts:
+                continue
+            try:
+                digest = _sha(path.read_bytes())
+            except OSError:
+                continue
+            scripts[path.relative_to(script_dir).as_posix()] = digest
+    parts["scripts"] = scripts
+    outputs = {}
+    for dirname in ALLOWED_ROOTS:
+        out_dir = folder / dirname
+        if not out_dir.is_dir():
+            continue
+        for path in sorted(out_dir.rglob("*.json")):
+            if not path.is_file():
+                continue
+            try:
+                digest = _sha(path.read_bytes())
+            except OSError:
+                continue
+            outputs[path.relative_to(folder).as_posix()] = digest
+    parts["outputs"] = outputs
+    return _sha(json.dumps(parts, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+
+
 STUCK_GAME = ('A closed Dark Souls Remastered is still listed by Windows and keeps DarkSoulsRemastered.exe locked (a crashed game whose process cannot be ended). Close every Lexeditor window; if DarkSoulsRemastered.exe is still in Task Manager after that, restart Windows. Then try again; nothing was lost.')
 
 
@@ -249,6 +325,15 @@ def ensure_game_closed() -> None:
         raise TweakError("Executable tweaks can only be applied on Windows")
     if live_processes([exe_patches.EXECUTABLE]):
         raise TweakError("Close Dark Souls Remastered before changing its executable")
+
+
+def game_closed() -> bool:
+    """True when a tweak install may run now: Windows, and the game shut."""
+    try:
+        ensure_game_closed()
+    except TweakError:
+        return False
+    return True
 
 
 LOCKED_SUFFIX = ".lexeditor-locked"
@@ -558,6 +643,10 @@ def _runtime(game_root: Path) -> dict:
                 or not _digest(record.get("patchSha256")) or not _digest(record.get("dllSha256"))):
             raise TweakError("Lexeditor's loader record is damaged")
         _project(record.get("project"))
+        built = record.get("built")
+        if built is not None and (type(built) is not dict or not all(
+                type(key) is str and _digest(value) for key, value in built.items())):
+            raise TweakError("Lexeditor's loader record is damaged")
     patch = None
     if patch_path.exists():
         if not patch_path.is_file() or patch_path.stat().st_size > MAX_RUNTIME:
@@ -584,7 +673,44 @@ def _runtime_status(game_root: Path) -> dict:
     return result
 
 
-def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project, debug: bool = False) -> None:
+def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
+    """Whether the installed tweaks differ from the library, and which mods changed.
+
+    Save rebuilds only what is installed: with no loader record there is
+    nothing to rebuild (tweaks first install through the Mods tab's switches
+    and Play). Never raises for a damaged record or an unreadable library;
+    that is status()'s problem to report, not staleness.
+    """
+    result: dict = {"needed": False, "stale": [], "debug": False, "set": False}
+    try:
+        runtime = _runtime(checked(Path(game_root)))
+    except (ValueError, OSError):
+        return result
+    record = runtime["record"]
+    if record is None:
+        return result
+    try:
+        rows = [row for row in tweak_rows(root) if row["enabled"]]
+    except (ValueError, OSError):
+        return result
+    built = record.get("built") or {}
+    stale = []
+    for row in rows:
+        try:
+            digest = build_fingerprint(Path(row["path"]))
+        except (ValueError, OSError):
+            digest = None
+        if digest is None or built.get(row["id"]) != digest:
+            stale.append(row["id"])
+    result["stale"] = sorted(stale)
+    result["set"] = set(built) != {row["id"] for row in rows}
+    result["debug"] = debug_mode(root) != (record.get("debug") is True)
+    result["needed"] = bool(stale) or result["set"] or result["debug"]
+    return result
+
+
+def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project, debug: bool = False,
+                   built: dict | None = None) -> None:
     """Install, replace or remove the loader and its patch description.
 
     In debug mode the debug loader goes in even with no tweak to apply."""
@@ -606,7 +732,8 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
                          "remove or rename the other file, then Apply again. Nothing was changed.")
     loader = loader_bytes(debug)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
-              "patchSha256": _sha(patch), "dllSha256": _sha(loader), "debug": bool(debug)}
+              "patchSha256": _sha(patch), "dllSha256": _sha(loader), "debug": bool(debug),
+              "built": dict(built or {})}
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
@@ -631,17 +758,21 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     runtime = _runtime(game_root)
     if runtime["active"]:
         previous = {"mods": list(runtime["record"]["mods"]), "project": runtime["record"].get("project"),
-                    "patch": runtime["patch"], "debug": runtime["record"].get("debug") is True}
+                    "patch": runtime["patch"], "debug": runtime["record"].get("debug") is True,
+                    "built": dict(runtime["record"].get("built") or {})}
     else:
         # Before the loader, an earlier Lexeditor kept this in the executable.
         built_in = _current_manifest(current, manifest)
         previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None,
-                    "debug": False}
+                    "debug": False, "built": {}}
     # A project contribution can depend on verified original instruction bytes.
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
     chosen = _project(chosen)
     native = build_specs(root)
+    # Fingerprinted after the build, so the fingerprint covers the built files too.
+    built = {row["id"]: build_fingerprint(Path(row["path"]))
+             for row in tweak_rows(root) if row["enabled"]}
     layout = layout_specs(root)
     specs = native + ([exe_patches.validate(chosen["spec"], "Project native rules")] if chosen else [])
     try:
@@ -663,10 +794,15 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
+    if patch is None and not debug_mode(root) and any(
+            item.get("managed") is LAYOUT and not LAYOUT.vanilla(item["after"]) for item in files):
+        # No native patches, but the menu layout stays managed: keep an empty
+        # patch and its record, so later changes still ask for a rebuild.
+        patch = b""
     return {"files": files, "executableSha256": _sha(current),
             "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
                         "project": chosen if patch else None, "previous": previous,
-                        "debug": debug_mode(root)}}
+                        "debug": debug_mode(root), "built": built}}
 
 
 def _undo(game_root: Path, done: list[dict]) -> None:
@@ -675,7 +811,7 @@ def _undo(game_root: Path, done: list[dict]) -> None:
         if item.get("managed") is None:
             previous = item["previous"]
             _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"],
-                           previous.get("debug", False))
+                           previous.get("debug", False), previous.get("built"))
             continue
         previous = item["previous"]
         _write(game_root, item["after"], item["before"], previous.get("mods", []),
@@ -698,7 +834,8 @@ def commit(game_root: Path, plan: dict) -> None:
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
-        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("debug", False))
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("debug", False),
+                       runtime.get("built"))
     except Exception:
         try:
             _undo(game_root, done)
@@ -764,7 +901,8 @@ def status(game_root: Path, root: Path | None = None) -> dict:
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
               "pendingRecovery": False, "project": None, "loaderMessage": "",
               "builtIntoExecutable": False, "debugMode": debug_mode(root), "debugInstalled": False,
-              "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root()))}
+              "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root())),
+              "needsRebuild": False, "staleMods": []}
     try:
         result["tweaks"] = tweak_rows(root)
         game_root = Path(game_root)
@@ -787,6 +925,10 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         result["loaderMessage"] = runtime["loaderMessage"]
         result["debugInstalled"] = runtime["debug"]
         result["problem"] = runtime["problem"] or next((item["problem"] for item in files if item["problem"]), "")
+        rebuild = needs_rebuild(game_root, root)
+        names = {row["id"]: row.get("name") or row["id"] for row in result["tweaks"]}
+        result["needsRebuild"] = rebuild["needed"]
+        result["staleMods"] = [names.get(mod_id, mod_id) for mod_id in rebuild["stale"]]
     except (ValueError, OSError) as error:
         result.setdefault("tweaks", [])
         result["problem"] = str(error)

@@ -390,7 +390,9 @@ def save(data: dict, game_root: Path | None = None,
         except Exception:
             pass
         raise
-    return payload(project, saved=1, game_root=game, runtime_root=active_root)
+    result = payload(project, saved=1, game_root=game, runtime_root=active_root)
+    result["ffnxConflicts"] = built["ffnx_conflicts"]
+    return result
 
 
 def ensure(game_root: Path | None = None, project_root: Path | None = None,

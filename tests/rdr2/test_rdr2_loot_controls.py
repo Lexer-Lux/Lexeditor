@@ -26,7 +26,9 @@ def test_loot_drafts_save_type_exact_quantities_and_readonly_controls(tmp_path):
               window.__responses['/api/loot/'+file+'/save']={saved:1};
               window.drawLoot=()=>document.querySelector('#main').replaceChildren(lootDetail(lootTableFixture,file));drawLoot();
             }''')
-            for label, raw in [('Min', '1.5'), ('Max', '1.5'), ('Rate', '-1')]:
+            for label in ['Min', 'Max']:
+                assert page.get_by_role('spinbutton', name=label, exact=True).get_attribute('min') == '0'
+            for label, raw in [('Min', '1.5'), ('Min', '-1'), ('Max', '1.5'), ('Max', '-1'), ('Rate', '-1')]:
                 control = page.get_by_role('spinbutton', name=label, exact=True)
                 control.fill(raw)
                 control.blur()
@@ -39,7 +41,7 @@ def test_loot_drafts_save_type_exact_quantities_and_readonly_controls(tmp_path):
                 assert failure
                 assert page.evaluate('window.__requests.length') == before
                 page.evaluate("()=>{lootTableFixture.entries[0]={name:'CONSUMABLE_RUM',type:'Item',rate:'0.25',min:'1',max:'2'};drawLoot()}")
-            page.get_by_role('spinbutton', name='Min', exact=True).fill('-9007199254740993')
+            page.get_by_role('spinbutton', name='Min', exact=True).fill('9007199254740993')
             page.get_by_role('spinbutton', name='Max', exact=True).fill('9007199254740995')
             page.get_by_role('combobox', name='Drop type', exact=True).select_option('ContinuousLinearDrop')
             page.wait_for_function("lootTableFixture.type==='ContinuousLinearDrop'")
@@ -48,7 +50,7 @@ def test_loot_drafts_save_type_exact_quantities_and_readonly_controls(tmp_path):
             page.wait_for_function("window.__requests.some(r=>r.path==='/api/loot/'+lootFileFixture+'/save')")
             posted = page.evaluate("window.__requests.find(r=>r.path==='/api/loot/'+lootFileFixture+'/save').body.edits[0]")
             assert posted['type'] == 'ContinuousLinearDrop'
-            assert posted['entries'][0]['min'] == '-9007199254740993'
+            assert posted['entries'][0]['min'] == '9007199254740993'
             assert posted['entries'][0]['max'] == '9007199254740995'
             page.evaluate('''()=>{lootTableFixture.readonly=true;
               state.store.vanilla.loot={[lootFileFixture]:{tables:[{...lootTableFixture,type:'AggregateDrop',entries:[{name:'CONSUMABLE_RUM',type:'Item',rate:'1',min:'1',max:'2'}]}]}};

@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from . import deployment, encumbrance, load_bands, load_bands_patch
+from . import deployment, encumbrance, levelup_gains, load_bands, load_bands_patch
 from . import stamina_patch as legacy_native
 from . import tweak_mods
 from .formats import ItemDocument, MAX_ARCHIVE
@@ -20,7 +20,8 @@ from .store import MARKER, RELATIVE
 SETTINGS_FILE = ".lexeditor-ds1-native-rules.json"
 LEGACY_FILE = ".lexeditor-ds1-stamina.json"
 SETTINGS_LIMIT = 32768
-DEFAULTS = {"baseRecovery": 45.0, "nextBandId": 5, **load_bands.project_defaults()}
+DEFAULTS = {"baseRecovery": 45.0, "nextBandId": 5, **load_bands.project_defaults(),
+            "levelupGains": levelup_gains.project_defaults()}
 
 
 def digest(raw):
@@ -28,14 +29,18 @@ def digest(raw):
 
 
 def settings(value):
-    if type(value) is not dict or set(value) != set(DEFAULTS):
+    # Settings saved before level-up gains existed carry every other key;
+    # they load with vanilla gains, which is exactly what they meant.
+    if (type(value) is not dict or set(value) - set(DEFAULTS)
+            or set(DEFAULTS) - set(value) - {"levelupGains"}):
         raise ValueError("Unsupported native-rule settings")
     projection = load_bands.native_projection(value)
     bands = load_bands.validate_bands(value["bands"])
     identity = value["nextBandId"]
     if type(identity) is not int or not max(b["id"] for b in bands) < identity <= 2**31 - 1024:
         raise ValueError("Invalid next load-band identity")
-    return {**projection, "bands": bands, "nextBandId": identity}
+    gains = levelup_gains.validate(value.get("levelupGains", levelup_gains.project_defaults()))
+    return {**projection, "bands": bands, "nextBandId": identity, "levelupGains": gains}
 
 
 def _read_optional(path, limit):
@@ -154,6 +159,10 @@ class NativeRules:
                 "native": dict(self.live), "migration": migration}
 
     def list_rows(self, tab):
+        if tab == "levelup":
+            return [{"id": levelup_gains.ROW_IDS[key], "table": "NativeRules",
+                     "name": label, "values": dict(self.value["levelupGains"][key])}
+                    for key, label in levelup_gains.OUTPUTS]
         if tab == "encumbrance":
             lower, result = 0, []
             for band in self.value["bands"]:
@@ -176,6 +185,10 @@ class NativeRules:
             raise ValueError("Invalid native rule identity")
         if row_id >= 1001:
             return encumbrance.row(row_id - 1000, self.value, read_only=self.read_only)
+        if row_id in levelup_gains.ROW_IDS.values():
+            output = next(key for key, identity in levelup_gains.ROW_IDS.items()
+                          if identity == row_id)
+            return levelup_gains.row(output, self.value, read_only=self.read_only)
         if row_id == 200:
             return encumbrance.overrides(self.value, read_only=self.read_only)
         if row_id == 0:
@@ -195,6 +208,11 @@ class NativeRules:
         updates = {}
         if row_id >= 1001:
             updates["bands"] = load_bands.edit(self.value["bands"], row_id - 1000, key, value)
+        elif row_id in levelup_gains.ROW_IDS.values():
+            output = next(name for name, identity in levelup_gains.ROW_IDS.items()
+                          if identity == row_id)
+            updates["levelupGains"] = levelup_gains.edit(
+                self.value["levelupGains"], output, key, value)
         elif row_id == 200:
             if key == "specialEnabled":
                 if type(value) not in (int, bool) or value not in (0, 1):
@@ -231,7 +249,11 @@ class NativeRules:
 
     def _contribution(self, original):
         self.validate_save()
-        spec = load_bands_patch.patch_spec(original, load_bands.native_projection(self.saved))
+        parts = [load_bands_patch.patch_spec(original, load_bands.native_projection(self.saved)),
+                 levelup_gains.patch_spec(original, self.saved["levelupGains"])]
+        spec = {"version": max(part["version"] for part in parts),
+                "islands": [island for part in parts for island in part["islands"]],
+                "hooks": [hook for part in parts for hook in part["hooks"]]}
         if not spec["hooks"] and not spec["islands"]:
             return None
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
@@ -239,6 +261,7 @@ class NativeRules:
 
     def _needs_native(self):
         return (load_bands.native_projection(self.saved) != load_bands.native_projection(DEFAULTS)
+                or levelup_gains.validate(self.saved["levelupGains"]) != levelup_gains.project_defaults()
                 or any(row["enabled"] for row in tweak_mods.tweak_rows())
                 or any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES))
 
