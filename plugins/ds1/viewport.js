@@ -1,6 +1,9 @@
 "use strict";
-// Read-only 3D map view. Geometries are shared across placements; each
-// part only adds a transform. Mounted by editor.js, which owns the page.
+// 3D map view. Geometries are shared across placements; each part only
+// adds a transform. Clicking a placement selects it, the gizmo drags it,
+// and editor.js commits the move. Collision and navigation parts carry no
+// mesh, so they show as wire markers. Mounted by editor.js, which owns the
+// page and the edit bar.
 window.Ds1Viewport = (() => {
   let session = 0;
   const DEG = Math.PI / 180;
@@ -27,14 +30,21 @@ window.Ds1Viewport = (() => {
       delete host._viewportStop;
     }
   }
-  async function mount(host, mapId, view, status) {
+  // hooks: {readOnly, showCollision, onSelect(key, info|null),
+  // onMove(key, pos), requestMod()}. onMove resolves false when the
+  // commit is refused, and the part snaps back. Returns a controller
+  // with select(key), setShowCollision(bool), moveTo(key, pos) and
+  // dispose(). Selection, moves and markers all update through it, so
+  // the page never remounts the viewport just to reflect a click.
+  async function mount(host, mapId, view, status, hooks = {}) {
     stop(host);
     const mine = ++session;
-    if (!host.isConnected || !view) return;
+    if (!host.isConnected || !view) return null;
     status.textContent = `Loading ${view.parts.length} parts.`;
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
-    if (mine !== session || !host.isConnected) return;
+    const {TransformControls} = await import("three/addons/controls/TransformControls.js");
+    if (mine !== session || !host.isConnected) return null;
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const canvas = renderer.domElement;
@@ -61,9 +71,17 @@ window.Ds1Viewport = (() => {
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
-    const counts = {parts: 0, meshes: 0, tris: 0, missing: 0, sky: 0, effect: 0};
+    // Collision and navigation parts have no model to load; they show
+    // as markers, so they are neither wanted nor missing.
+    const isMarker = part => part.kind === "Collision" || part.kind === "Navigation";
+    const counts = {parts: 0, meshes: 0, tris: 0, missing: 0, sky: 0, effect: 0, collision: 0, navigation: 0};
     const wanted = [];
     for (const part of view.parts) {
+      if (isMarker(part)) {
+        if (part.kind === "Collision") counts.collision++;
+        else counts.navigation++;
+        continue;
+      }
       const info = view.models[part.model];
       if (!info || !info.available) counts.missing++;
       else wanted.push(part.model);
@@ -75,7 +93,7 @@ window.Ds1Viewport = (() => {
       if (!response.ok || data.error) throw new Error(data.error || response.statusText);
       return [name, data];
     }));
-    if (mine !== session || !host.isConnected) { renderer.dispose(); return; }
+    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const geometries = new Map();
     for (const [name, data] of loaded) {
       geometries.set(name, data.meshes.map(mesh => {
@@ -92,15 +110,43 @@ window.Ds1Viewport = (() => {
     }
     const root = new THREE.Group();
     scene.add(root);
-    const skyMeshes = [];
-    for (const part of view.parts) {
-      const geos = geometries.get(part.model);
-      if (!geos) continue;
-      const group = new THREE.Group();
+    const markers = new THREE.Group();
+    markers.visible = hooks.showCollision !== false;
+    root.add(markers);
+    const markerGeo = new THREE.BoxGeometry(1, 1, 1);
+    const markerEdges = new THREE.EdgesGeometry(markerGeo);
+    const collisionMat = new THREE.LineBasicMaterial({color: 0xff9944});
+    const navigationMat = new THREE.LineBasicMaterial({color: 0x44ddff});
+    const groups = new Map();
+    const MOVABLE = new Set([1, 2, 4, 9, 10]);
+    const place = (group, part) => {
       group.position.set(part.pos[0], part.pos[1], part.pos[2]);
       group.rotation.set(part.rot[0] * DEG, part.rot[1] * DEG, part.rot[2] * DEG, ORDER);
       group.scale.set(part.scale[0], part.scale[1], part.scale[2]);
-      group.userData.part = {key: part.key, name: part.name, kind: part.kind, model: part.model};
+      group.userData.part = {key: part.key, name: part.name, kind: part.kind, model: part.model,
+        movable: MOVABLE.has(Number(String(part.key).split(":")[0]))};
+    };
+    const skyMeshes = [];
+    for (const part of view.parts) {
+      if (isMarker(part)) {
+        // A marker shows where the part sits, never its shape: the
+        // collision meshes live in Havok packfiles this version does not
+        // decode. The box follows the part's own scale.
+        const group = new THREE.Group();
+        place(group, part);
+        const box = new THREE.LineSegments(markerEdges,
+          part.kind === "Collision" ? collisionMat : navigationMat);
+        box.userData.marker = true;
+        group.add(box);
+        markers.add(group);
+        groups.set(part.key, group);
+        counts.parts++;
+        continue;
+      }
+      const geos = geometries.get(part.model);
+      if (!geos) continue;
+      const group = new THREE.Group();
+      place(group, part);
       for (const entry of geos) {
         const mesh = new THREE.Mesh(entry.geo, entry.fx ? effect : entry.cull ? front : double);
         mesh.userData.sky = entry.sky;
@@ -111,6 +157,7 @@ window.Ds1Viewport = (() => {
         counts.tris += entry.geo.index.count / 3;
       }
       root.add(group);
+      groups.set(part.key, group);
       counts.parts++;
     }
     root.updateMatrixWorld(true);
@@ -138,8 +185,88 @@ window.Ds1Viewport = (() => {
     resize();
     window.addEventListener("resize", resize);
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    const baseStatus = () => `${mapId}: ${plural(counts.parts, "part", "parts")}, ${plural(unique.length, "model", "models")}, ${plural(Math.round(counts.tris), "triangle", "triangles")}${counts.sky ? `, ${plural(counts.sky, "sky mesh", "sky meshes")}` : ""}${counts.effect ? `, ${plural(counts.effect, "effect", "effects")} transparent` : ""}${counts.missing ? `, ${plural(counts.missing, "part has", "parts have")} no visible mesh` : ""}.`;
-    status.textContent = baseStatus();
+    const short = n => +Number(n).toFixed(3);
+    const baseStatus = () => `${mapId}: ${plural(counts.parts, "part", "parts")}, ${plural(unique.length, "model", "models")}, ${plural(Math.round(counts.tris), "triangle", "triangles")}${counts.sky ? `, ${plural(counts.sky, "sky mesh", "sky meshes")}` : ""}${counts.effect ? `, ${plural(counts.effect, "effect", "effects")} transparent` : ""}${counts.collision ? `, ${plural(counts.collision, "collision marker", "collision markers")}` : ""}${counts.navigation ? `, ${plural(counts.navigation, "navigation marker", "navigation markers")}` : ""}${counts.missing ? `, ${plural(counts.missing, "part has", "parts have")} no visible mesh` : ""}.`;
+    let selected = null, selectedText = "";
+    const showStatus = () => {
+      status.textContent = selectedText ? `${baseStatus()} Selected: ${selectedText}.` : baseStatus();
+    };
+    // The highlight is a box, not a tint: the mesh materials are shared
+    // across placements, so tinting one would tint them all.
+    const highlight = new THREE.BoxHelper(new THREE.Object3D(), 0xffd34d);
+    highlight.visible = false;
+    scene.add(highlight);
+    const gizmo = new TransformControls(camera, canvas);
+    scene.add(gizmo.getHelper());
+    // Test seam: project a world point to page pixels, so drag tests
+    // can grab the gizmo without hunting pixels in screenshots.
+    host._viewportProject = (x, y, z) => {
+      const rect = canvas.getBoundingClientRect();
+      const point = new THREE.Vector3(x, y, z).project(camera);
+      return [rect.left + (point.x + 1) / 2 * rect.width, rect.top + (1 - point.y) / 2 * rect.height];
+    };
+    const readOnly = hooks.readOnly !== false;
+    const describe = group => {
+      const info = group.userData.part;
+      const at = group.position;
+      return `${info.name} (${info.kind}, ${info.model}) at ${short(at.x)}, ${short(at.y)}, ${short(at.z)}`;
+    };
+    const select = key => {
+      selected = key && groups.has(key) ? key : null;
+      const group = selected ? groups.get(selected) : null;
+      if (group && group.userData.part.movable) gizmo.attach(group);
+      else gizmo.detach();
+      if (group) {
+        highlight.setFromObject(group);
+        highlight.visible = true;
+        selectedText = describe(group);
+      } else {
+        highlight.visible = false;
+        selectedText = "";
+      }
+      showStatus();
+      if (hooks.onSelect) hooks.onSelect(selected, group ? {...group.userData.part} : null);
+    };
+    let startPos = null;
+    gizmo.addEventListener("dragging-changed", event => { controls.enabled = !event.value; });
+    gizmo.addEventListener("mouseDown", () => {
+      if (!selected) return;
+      startPos = groups.get(selected).position.clone();
+      if (readOnly && hooks.requestMod) hooks.requestMod();
+    });
+    gizmo.addEventListener("objectChange", () => {
+      if (!selected) return;
+      const group = groups.get(selected);
+      highlight.setFromObject(group);
+      selectedText = describe(group);
+      showStatus();
+    });
+    const snapBack = (group, back) => {
+      group.position.copy(back);
+      highlight.setFromObject(group);
+      selectedText = describe(group);
+      showStatus();
+    };
+    gizmo.addEventListener("mouseUp", () => {
+      if (!selected || !startPos) return;
+      const group = groups.get(selected);
+      const pos = [group.position.x, group.position.y, group.position.z];
+      const moved = pos.some((axis, index) => axis !== startPos.getComponent(index));
+      const back = startPos.clone();
+      startPos = null;
+      if (readOnly) {
+        // Vanilla readers were just offered a mod; nothing is committed,
+        // so the part snaps back to where it stands.
+        snapBack(group, back);
+      } else if (moved && hooks.onMove) {
+        // A refused commit (a second drag mid-save, a failed write)
+        // snaps back too; the page reports why.
+        Promise.resolve(hooks.onMove(selected, pos)).then(ok => {
+          if (ok === false) snapBack(group, back);
+        });
+      }
+    });
+    showStatus();
     const ray = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let down = null;
@@ -150,22 +277,47 @@ window.Ds1Viewport = (() => {
       const rect = canvas.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       ray.setFromCamera(pointer, camera);
-      const hit = ray.intersectObjects(root.children, true)[0];
+      // A released gizmo drag lands here too; the gizmo's own pickers
+      // say whether the pointer was on it.
+      if (gizmo.object && ray.intersectObject(gizmo.getHelper(), true).length) return;
+      const hit = ray.intersectObjects(root.children.filter(obj => obj.visible), true)[0];
       let group = hit ? hit.object : null;
       while (group && !group.userData.part) group = group.parent;
-      const label = group ? `${group.userData.part.name} (${group.userData.part.kind}, ${group.userData.part.model})` : "nothing";
-      status.textContent = `${baseStatus()} Selected: ${label}.`;
+      const key = group ? group.userData.part.key : null;
+      if (key !== selected) select(key);
     });
+    const controller = {
+      select,
+      setShowCollision(shown) { markers.visible = shown !== false; },
+      moveTo(key, pos) {
+        const group = key && groups.get(key);
+        if (!group || !group.userData.part.movable) return;
+        group.position.set(pos[0], pos[1], pos[2]);
+        if (key === selected) {
+          highlight.setFromObject(group);
+          selectedText = describe(group);
+          showStatus();
+        }
+      },
+      dispose() { stop(host); }
+    };
     let frames = 0, live = true;
     host._viewportStop = () => {
       live = false;
+      delete host._viewportProject;
       window.removeEventListener("resize", resize);
       controls.dispose();
+      gizmo.dispose();
       renderer.dispose();
       for (const geos of geometries.values()) for (const entry of geos) entry.geo.dispose();
       front.dispose();
       double.dispose();
       effect.dispose();
+      highlight.dispose();
+      markerGeo.dispose();
+      markerEdges.dispose();
+      collisionMat.dispose();
+      navigationMat.dispose();
     };
     const loop = () => {
       if (!live || mine !== session || !host.isConnected) { stop(host); return; }
@@ -176,6 +328,7 @@ window.Ds1Viewport = (() => {
       requestAnimationFrame(loop);
     };
     loop();
+    return controller;
   }
   // Read-only character view: bind-pose mesh, dummy points, the
   // body's own hitbox, and one attack's hit slots as spheres and

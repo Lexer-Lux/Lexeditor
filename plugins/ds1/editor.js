@@ -6,8 +6,9 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],ro
   monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,
   effectTabs:[],statsTabs:[],areaTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
-  dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null};
-let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null;
+  dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
+  mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false};
+let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
@@ -35,6 +36,9 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
       }
+      // An undone viewport move must move the scene part back too; the
+      // reload re-reads the map and restores the selection and gizmo.
+      if(state.tab==="areas"&&state.sub==="viewport"&&state.mapView)await reloadViewport(state.mapView.map,state.mapSelected);
       render();
     }catch(error){notify(error);}
     finally{this.applying=false;shell.refresh();}
@@ -54,7 +58,7 @@ const shell=LexeditorUI.mountShell({
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops, effects and AI links. Behaviors holds action costs and what each behavior calls. AI holds enemy senses, distances and goals. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
-    {id:"areas",label:"Areas",help:"Move enemy and object placements, and swap which enemy appears. Each placement belongs to one map. The Viewport shows the selected map in 3D. Vanilla is read-only. Save changes the mod project."},
+    {id:"areas",label:"Areas",help:"Move enemy and object placements, and swap which enemy appears. Each placement belongs to one map. The Viewport shows the selected map in 3D: click a placement to select it, drag its arrows to move it, and Duplicate or Remove it from the bar. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements, slot cost and stamina cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
@@ -821,6 +825,119 @@ function renderItems(){
     crumbs.push(el("span",{className:"lex-anim-crumb-sep"}," › "),here);}
   return LexeditorUI.stack(strip,el("div",{className:"lex-anim-crumbs"},...crumbs),view);
 }
+function viewportHooks(){
+  return {readOnly:state.readOnly,showCollision:state.mapCollision,
+    onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();},
+    onMove:(key,pos)=>viewportMove(state.mapView.map,key,pos),
+    requestMod:()=>viewportRequestMod()};
+}
+function viewportMovable(key){return [1,2,4,9,10].includes(Number(String(key||"").split(":")[0]));}
+function refreshViewportBar(){
+  const buttons=[...document.querySelectorAll("[data-viewport-action]")];
+  if(!buttons.length)return;
+  const movable=!!(state.mapInfo&&state.mapInfo.movable);
+  const playerStart=state.mapInfo?.kind==="Player";
+  for(const button of buttons){
+    const action=button.dataset.viewportAction;
+    if(action==="collision"){
+      button.disabled=false;
+      button.setAttribute("aria-pressed",String(state.mapCollision));
+      button.textContent=state.mapCollision?"Hide collision":"Show collision";
+    }else if(action==="duplicate"){
+      button.disabled=state.readOnly||state.mapBusy||!movable;
+      button.title=state.readOnly?"Open a mod project to add placements"
+        :!state.mapSelected?"Select a placement in the viewport first"
+        :!movable?"Only enemy, object and player-start placements can be duplicated"
+        :"Copy this placement under the next free ID";
+    }else if(action==="remove"){
+      button.disabled=state.readOnly||state.mapBusy||!movable||playerStart;
+      button.title=playerStart?"The player start cannot be removed"
+        :state.readOnly?"Open a mod project to remove placements"
+        :!state.mapSelected?"Select a placement in the viewport first"
+        :!movable?"Only enemy, object and player-start placements can be removed"
+        :"Remove this placement from its map";
+    }
+  }
+}
+async function viewportRequestMod(){
+  // The shared shell offers this for its own controls; the canvas is the
+  // plugin's own, so it asks with the shell's own words and call.
+  if(!state.readOnly||state.mapOfferOpen)return;
+  state.mapOfferOpen=true;
+  try{
+    const agreed=await confirmAction({title:"Create a mod to edit?",
+      message:"This is the game's own data, so Lexeditor shows it read-only. Create a mod to make your own editable version.",
+      confirmLabel:"Create a mod",cancelLabel:"Cancel"});
+    if(!agreed)return;
+    await LexeditorUI.createModProject("ds1",{pluginName:"Dark Souls Remastered"});
+  }catch(error){notify(error);}
+  finally{state.mapOfferOpen=false;}
+}
+function viewportMove(map,key,pos){
+  if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
+  const names=["posX","posY","posZ"];
+  const before=state.mapView.parts.find(part=>part.key===key)?.pos||[0,0,0];
+  state.mapBusy=true;state.pending++;shell.refresh();refreshViewportBar();
+  viewportCtl?.moveTo(key,pos);
+  let settle=null;
+  const outcome=new Promise(resolve=>{settle=resolve;});
+  edits=edits.then(async()=>{
+    try{
+      const done=[];
+      let latest=null;
+      for(let index=0;index<3;index++){
+        const result=await api("/api/edit",{table:map,id:key,field:names[index],value:pos[index],sub:state.sub});
+        latest=result;
+        done.push({table:map,id:key,field:names[index],before:before[index],
+          after:result.row.fields.find(item=>item.key===names[index])?.value});
+      }
+      fieldHistory.record({edits:done});
+      state.dirty=latest.dirtyCount;state.changes=latest.changes||state.changes;state.nativeRules=latest.nativeRules||state.nativeRules;
+      const part=state.mapView.parts.find(entry=>entry.key===key);
+      if(part)part.pos=[done[0].after,done[1].after,done[2].after];
+      viewportCtl?.moveTo(key,part?part.pos:pos);
+      settle(true);
+    }catch(error){notify(error);settle(false);}
+    finally{state.pending--;state.mapBusy=false;refreshViewportBar();shell.refresh();}
+  }).catch(notify);
+  return outcome;
+}
+async function reloadViewport(map,selectKey){
+  state.mapView=await api(`/api/map/view?map=${encodeURIComponent(map)}`);
+  state.mapSelected=null;state.mapInfo=null;
+  const host=document.querySelector("[data-viewport-host]");
+  const status=document.querySelector("[data-viewport-status]");
+  if(host&&status&&state.tab==="areas"&&state.sub==="viewport"){
+    viewportCtl=null;
+    viewportCtl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks());
+    if(selectKey&&viewportCtl)viewportCtl.select(selectKey);
+  }
+  refreshViewportBar();
+}
+async function viewportDuplicate(map){
+  if(state.mapBusy||!state.mapSelected||state.readOnly)return;
+  state.mapBusy=true;refreshViewportBar();
+  try{
+    const result=await api("/api/placements/add",{map,id:state.mapSelected});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+    await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
+  }catch(error){notify(error);}
+  finally{state.mapBusy=false;refreshViewportBar();}
+}
+async function viewportRemove(map){
+  if(state.mapBusy||!state.mapSelected||state.readOnly)return;
+  const name=state.mapInfo?.name||"This placement";
+  if(!await confirmAction({title:"Remove this placement?",
+    message:`${name} leaves the map. Its bytes stay in the file, unused.`,
+    confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
+  state.mapBusy=true;refreshViewportBar();
+  try{
+    const result=await api("/api/placements/remove",{map,id:state.mapSelected});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+    await reloadViewport(map,null);
+  }catch(error){notify(error);}
+  finally{state.mapBusy=false;refreshViewportBar();}
+}
 function renderViewport(){
   const strip=subtabBar({tabs:subtabsFor("areas"),active:state.sub,label:"Areas",change:id=>navigate("areas",id)});
   const maps=state.rows.filter(row=>row.table==="MapView");
@@ -828,15 +945,29 @@ function renderViewport(){
   const current=maps.find(row=>key(row)===state.selected)||maps[0];
   // A button, not a select: switching the viewed map edits nothing, and a
   // select would ask Vanilla readers to create a mod before looking around.
-  const choose=async id=>{const row=maps.find(entry=>entry.id===id);if(!row||key(row)===state.selected)return;state.selected=key(row);state.page=0;await loadDetail().catch(notify);render();};
+  const choose=async id=>{const row=maps.find(entry=>entry.id===id);if(!row||key(row)===state.selected)return;state.selected=key(row);state.page=0;state.mapSelected=null;state.mapInfo=null;await loadDetail().catch(notify);render();};
   const picker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Map","aria-haspopup":"listbox",
     onclick:event=>{LexeditorUI.choicePopover({label:"Map",
       choices:maps.map(row=>({label:row.name,value:row.id})),select:choose}).openFor(event.currentTarget);}},
     `Map: ${current.name}`);
+  const collide=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"collision",
+    title:"Show where collision and navigation parts sit. Markers show placement, not shape.",
+    onclick:()=>{state.mapCollision=!state.mapCollision;viewportCtl?.setShowCollision(state.mapCollision);refreshViewportBar();}},"Hide collision");
+  const duplicate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"duplicate",
+    onclick:()=>viewportDuplicate(current.id)},"Duplicate");
+  const remove=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"remove",
+    onclick:()=>viewportRemove(current.id)},"Remove");
   const status=el("div",{class:"lex-viewport-status","data-viewport-status":""},"Loading map.");
   const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:"position:relative;width:100%;height:520px;min-height:320px;"});
-  requestAnimationFrame(()=>{Ds1Viewport.mount(host,current.id,state.mapView,status).catch(notify);});
-  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker),host,status);
+  requestAnimationFrame(()=>{
+    viewportCtl=null;refreshViewportBar();
+    Ds1Viewport.mount(host,current.id,state.mapView,status,viewportHooks()).then(ctl=>{
+      viewportCtl=ctl;
+      if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
+      refreshViewportBar();
+    }).catch(notify);
+  });
+  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,collide,duplicate,remove),host,status);
 }
 function renderPlayback(){
   const strip=subtabBar({tabs:subtabsFor("animations"),active:state.sub,label:"Animations",change:id=>navigate("animations",id)});

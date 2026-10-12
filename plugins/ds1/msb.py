@@ -222,12 +222,16 @@ class MsbDocument:
 
     def view_parts(self):
         """Every part with its model, for the viewport. Collision and
-        navigation parts have no visible mesh; the viewport skips them."""
+        navigation parts have no visible mesh; the viewport marks them."""
         result = []
         for part in self.parts:
             model = self.models[part['model']]
             if part['type'] in TYPE_LABELS:
                 kind = TYPE_LABELS[part['type']]
+            elif part['type'] in (5, 11):
+                kind = 'Collision'
+            elif part['type'] == 8:
+                kind = 'Navigation'
             else:
                 kind = 'Map piece' if part['type'] == 0 else 'Part'
             result.append({'id': part['id'], 'type': part['type'], 'kind': kind,

@@ -56,11 +56,13 @@ No soulstruct code is redistributed: `flver.py` is a from-scratch
 struct reader of the same layout. Verified against all 1752 standalone
 map models in the installed game (13,407 meshes, zero failures).
 
-## Map viewport (viewport.js, three.module.js, orbit-controls.js)
+## Map viewport (viewport.js, three.module.js, orbit-controls.js, transform-controls.js)
 
 The 3D viewport renders with three.js r170 (MIT) by Three.js authors,
 vendored as published (unminified ESM) from
 https://github.com/mrdoob/three.js
+OrbitControls drives the camera and TransformControls drives the
+placement move gizmo.
 
 MIT License
 

@@ -56,3 +56,19 @@ def test_model_geometry_decodes_to_viewport_arrays(tmp_path):
     missing = next(entry for entry in store.get(MAP).models if entry["name"] == "c1200")
     with pytest.raises(FlverError):
         viewport.model_geometry(store.game_root, None, MAP, missing)
+
+
+def test_map_view_labels_collision_and_navigation(tmp_path):
+    game = tmp_path / "game"
+    (game / MAP_DIR).mkdir(parents=True, exist_ok=True)
+    parts = (("enemy", 2, 0, 0, 120000), ("player", 4, 0, 1, None), ("piece", 0, 0, 1, None),
+             ("chest", 1, 0, 1, None), ("wall", 5, 0, 1, None), ("walk", 8, 0, 1, None),
+             ("bridge", 11, 0, 1, None))
+    (game / MAP_DIR / MAP).write_bytes(build_msb(parts=parts))
+    (game / "map" / "test").mkdir(parents=True, exist_ok=True)
+    (game / "map" / "test" / "m10piece.flver").write_bytes(build_flver())
+    view = viewport.map_view(MapStore(game, None, True), MAP)
+    assert [(part["name"], part["kind"]) for part in view["parts"]] == [
+        ("enemy0", "Enemy"), ("player0", "Player"), ("piece0", "Map piece"),
+        ("chest0", "Object"), ("wall0", "Collision"), ("walk0", "Navigation"),
+        ("bridge0", "Collision")]
