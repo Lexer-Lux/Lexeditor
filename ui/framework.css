@@ -8550,3 +8550,51 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-inline-link { display: inline; margin: 0; }
 /* A tweak whose mod is off: its settings wait, readable but not live. */
 .lex-tweak-off .lex-detail-panel-body { opacity: .6; }
+
+/* Hover actions: tools that wait quietly over their host. Invisible until
+   the host is hovered, half-visible then, full under the pointer or
+   keyboard focus. An inline bar sits in the flow instead of overlaying. */
+.lex-hover-actions-host { position:relative; }
+.lex-hover-actions { position:absolute; z-index:5; display:flex; gap:4px; margin:0; padding:0;
+  opacity:0; pointer-events:none; transition:opacity .12s ease; }
+.lex-hover-actions-tr { top:8px; right:8px; }
+.lex-hover-actions-tl { top:8px; left:8px; }
+.lex-hover-actions-br { bottom:8px; right:8px; }
+.lex-hover-actions-bl { bottom:8px; left:8px; }
+.lex-hover-actions-inline { position:static; }
+.lex-hover-actions-host:hover > .lex-hover-actions,
+.lex-hover-actions:focus-within { opacity:.45; pointer-events:auto; }
+.lex-hover-actions-host > .lex-hover-actions:hover { opacity:1; }
+.lex-hover-action { flex:0 0 auto; }
+
+/* A side panel that shrinks to a clickable handle. The handle sits on the
+   inner edge like a divider, with a grip, a chevron and - collapsed - the
+   panel's name running down it. */
+.lex-collapsible-panel { display:flex; min-height:0; min-width:0; }
+.lex-collapsible-left { flex-direction:row; }
+.lex-collapsible-right { flex-direction:row-reverse; }
+.lex-collapsible-body { flex:1 1 auto; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:auto; }
+.lex-collapsible-collapsed > .lex-collapsible-body { display:none; }
+.lex-collapsible-handle { flex:0 0 auto; width:26px; min-height:0; display:flex; flex-direction:column;
+  align-items:center; gap:6px; padding:8px 0; cursor:pointer; color:var(--lex-muted);
+  background:var(--lex-panel-2); border:1px solid var(--lex-border); border-radius:var(--lex-radius); }
+.lex-collapsible-handle:hover { color:var(--lex-text); }
+.lex-collapsible-grip { width:10px; height:18px; flex:0 0 auto;
+  background-image:radial-gradient(circle, currentColor 1px, transparent 1.2px);
+  background-size:5px 5px; background-repeat:repeat; opacity:.6; }
+.lex-collapsible-chevron { font-size:14px; line-height:1; }
+.lex-collapsible-tag { writing-mode:vertical-rl; font-size:11px; letter-spacing:.08em; display:none; }
+.lex-collapsible-collapsed .lex-collapsible-tag { display:block; }
+.lex-collapsible-panes { flex:1 1 auto; min-height:0; overflow:auto; }
+.lex-collapsible-pane[hidden] { display:none; }
+
+/* A tab strip for caller-owned tabs: given order, no shortcuts. Buttons
+   reuse the subtab look. */
+.lex-tabstrip { display:flex; gap:2px; flex-wrap:wrap; flex:0 0 auto; }
+.lex-tabstrip-button.lex-drop-target { outline:2px dashed var(--lex-highlight); outline-offset:-2px; }
+.lex-detail-tabpane[hidden] { display:none; }
+.lex-dragging { opacity:.4; }
+
+/* A dialog that asks for a name. */
+.lex-prompt-dialog .lex-dialog-field { margin:.6em 0; }
+.lex-prompt-dialog input[type="text"] { width:100%; box-sizing:border-box; }
