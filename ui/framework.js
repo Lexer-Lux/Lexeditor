@@ -10740,7 +10740,14 @@ ${contents.path}`});
     // slots) passes order "given" to keep it. Stored like a click, so
     // the first click on Name flips to Z to A instead of re-sorting
     // to the order already shown.
-    if (!keptSort && options.order !== "given") {
+    // Nameless rows have nothing to sort by: stamping the default
+    // anyway would be a no-op today that silently starts sorting the
+    // day a name field appears. Those tables keep their given order.
+    const hasNames = records.some(record => {
+      const name = sortValueOf(record, "name");
+      return name !== undefined && name !== null && name !== "" && name !== "\u2014";
+    });
+    if (!keptSort && options.order !== "given" && hasNames) {
       keptSort = {key: "name", dir: 1,
         compare: (left, right) => compareRecords(left, right, {key: "name"})};
       pagedSortStates.set(rowPreferenceKey, keptSort);

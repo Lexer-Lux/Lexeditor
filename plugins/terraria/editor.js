@@ -285,7 +285,7 @@
     const query=contentQuery.trim().toLocaleLowerCase();
     let rows=contentFiles.filter(row=>!query||`${row.name} ${row.kind} ${row.path}`.toLocaleLowerCase().includes(query));
     rows=sortedRows(rows,contentSort,{name:row=>row.name,kind:row=>row.kind,path:row=>row.path});
-    return pagedListDetail({addDisabledReason:"This lists content Lexeditor manages in your mod; new content arrives through Source files or Assets.",rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
+    return pagedListDetail({order:"given",addDisabledReason:"This lists content Lexeditor manages in your mod; new content arrives through Source files or Assets.",rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
       splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
       search:{key:"terraria-content",value:contentQuery,label:"Search managed Terraria content",placeholder:"Search names, families, or source paths…",change:value=>{contentQuery=value;contentPage=0;render()}},
       sync:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path&&!structuredLoading)void loadStructuredContent(next.selected)},

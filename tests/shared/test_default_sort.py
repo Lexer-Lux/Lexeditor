@@ -17,9 +17,30 @@ def ds1():
 def test_paged_list_defaults_to_name_ascending():
     source = ui()
     assert 'let keptSort = pagedSortStates.get(rowPreferenceKey);' in source
-    assert 'if (!keptSort && options.order !== "given") {' in source
+    assert 'if (!keptSort && options.order !== "given" && hasNames) {' in source
     assert 'keptSort = {key: "name", dir: 1,' in source
     assert 'compareRecords(left, right, {key: "name"})' in source
+    assert 'const hasNames = records.some' in source
+
+
+def test_own_sort_plugins_keep_their_order():
+    exempt = {
+        'plugins/chrono_trigger/editor.js': 'order:"given"',
+        'plugins/ds3/editor.js': 'order:"given"',
+        'plugins/factorio/editor.js': 'order:"given"',
+        'plugins/terraria/editor.js': 'order:"given"',
+        'plugins/stardew_valley/editor.js': 'order: "given"',
+        'plugins/project_zomboid/editor.js': 'order:"given"',
+        'plugins/blank/editor.js': 'order:"given"',
+    }
+    for rel, marker in exempt.items():
+        source = (ROOT / rel).read_text(encoding='utf-8', errors='replace')
+        assert marker in source, rel
+    stardew = (ROOT / 'plugins/stardew_valley/editor.js').read_text(encoding='utf-8', errors='replace')
+    assert 'sort: {key: "name", dir: 1}' in stardew
+    assert 'datasetSort: {key: "name", dir: 1}' in stardew
+    assert 'datasetSort = {key: "name", dir: 1}' in stardew
+    assert '{key: "id", dir: 1}' not in stardew
 
 
 def test_mods_tab_keeps_load_order():
