@@ -4343,7 +4343,6 @@
     const columnCount = length => {
       // The reader's own count, from the COLUMNS control on the divider.
       const chosen=Number(content.closest('[data-lex-detail-columns]')?.dataset.lexDetailColumns)||0;
-      if(options.inline&&chosen>0)return Math.max(1,Math.min(length,chosen));
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
       // Allow room for the shared name, copy button, value and help lanes.
@@ -4355,6 +4354,10 @@
       // narrower column does not shrink it.
       const target=asked||400;
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      root.lexFittedColumns=fit;
+      // A chosen count is a ceiling too: more columns than fit never
+      // render, so the detail panel never grows a horizontal scrollbar.
+      if(options.inline&&chosen>0)return Math.max(1,Math.min(length,chosen,fit));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
       // beside three empty columns. A page never has more columns than cards.
@@ -10647,7 +10650,8 @@ ${contents.path}`});
       columnTally.textContent = String(count);
       columnTally.title = chosenColumns ? "Your column count. Right-click to fit to width again." : "Fitted to width";
       fewerColumns.disabled = count <= 1;
-      moreColumns.disabled = count >= 6;
+      const room=Math.max(0,...[...(detailNode?.querySelectorAll?.(".lex-tweaks-paged")||[])].map(paged=>paged.lexFittedColumns||0));
+      moreColumns.disabled = count >= 6 || (room > 0 && count >= room);
     };
     const changeColumns = requested => {
       chosenColumns = Math.max(0, Math.min(6, Number(requested) || 0));
@@ -13073,13 +13077,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       if(pane&&need>(parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor'))||0))
         pane.style.setProperty('--lex-detail-label-floor',`${need}px`);
     }
-    if (label.classList.contains('lex-detail-field-label') && overflows()) {
-      // At the readable font floor, give wrapped labels space rather than
-      // letting their text consume the gap between adjacent properties.
-      const css=getComputedStyle(label);
-      const height=Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect().height));
-      label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
-    }
+    // A property row never grows for its label. Past the shrinking above,
+    // at the readable font floor, the text clips (framework.css) instead
+    // of taking extra vertical space.
     // A wrapped name's box is as wide as its lane, not its longest line, so
     // in a lane widened for a neighbour the help mark sat far past "Crit /
     // bonus". The box hugs the longest line and the mark follows the name.
