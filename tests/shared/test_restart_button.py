@@ -31,3 +31,10 @@ def test_full_restart_relaunches():
     assert 'def restart_lexeditor(self' in source
     assert 'restart_requested = api._restart_requested' in source
     assert 'DETACHED_PROCESS' in source
+
+def test_exit_without_saving_discards_first():
+    source = ui()
+    assert 'const canDiscard = typeof options.discard === "function";' in source
+    assert 'await options.discard();' in source
+    assert 'could not be discarded. Lexeditor stayed open.' in source
+    assert 'Discarded, but the action did not complete. Try again or cancel.' in source
