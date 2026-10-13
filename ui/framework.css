@@ -472,6 +472,8 @@ button.lex-info-help { cursor: pointer; }
 .lex-info-help.lex-conflict-mark { background:var(--lex-danger, #c0392b); border-color:var(--lex-danger, #c0392b); color:#fff; }
 .lex-project-menu-item-unavailable { opacity:.55; cursor:default; }
 .lex-mods-name { display:inline-flex; align-items:center; gap:6px; min-width:0; }
+.lex-mods-name-text { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lex-mods-name > .lex-conflict-mark { flex:none; }
 .lex-conflict-list { margin:0; padding-inline-start:18px; display:grid; gap:4px; }
 .lex-info-help:focus-visible {
   color: var(--lex-accent-text);
@@ -8568,6 +8570,16 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-hover-actions-br { bottom:8px; right:8px; }
 .lex-hover-actions-bl { bottom:8px; left:8px; }
 .lex-hover-actions-inline { position:static; }
+/* An inline bar sits in the flow at its host's end: the host stacks its
+   children so the bar stays inside the pane, where hovering it hovers
+   the host. Left in block flow under a full-height list, the bar hung
+   below the pane's capped box, clipped and unreachable.
+*/
+.lex-hover-actions-host:has(> .lex-hover-actions-inline) { display:flex; flex-direction:column; }
+.lex-hover-actions-host:has(> .lex-hover-actions-inline) > .lex-barrel-grid {
+  flex:1 1 auto; min-height:0; height:auto;
+}
+.lex-hover-actions-host > .lex-hover-actions-inline { flex:0 0 auto; }
 .lex-hover-actions-host:hover > .lex-hover-actions,
 .lex-hover-actions:focus-within { opacity:.45; pointer-events:auto; }
 .lex-hover-actions-host > .lex-hover-actions:hover { opacity:1; }

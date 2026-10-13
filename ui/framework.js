@@ -863,7 +863,9 @@
         if (popup.contains(event.target)) return;
         // Keyboard focus can scroll the marker - or the bubble itself, which is
         // focusable so its own text can be read - into view after opening help.
-        if (marker.matches(":focus-within") || popup.matches(":focus-within")) position();
+        // A hover can land its own scroll the same way; while the marker is
+        // still under the pointer the bubble follows it instead of dying.
+        if (marker.matches(":hover") || marker.matches(":focus-within") || popup.matches(":focus-within")) position();
         else close();
       };
       popup.addEventListener("pointerenter", cancelClose);
@@ -12866,7 +12868,7 @@ ${contents.path}`});
               render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""},
                 row.remote ? "\u2014" : String(localPaths().indexOf(row.path) + 1))},
             {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
-              row.name, modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
+              element("span", {class: "lex-mods-name-text"}, row.name), modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
             {key: "on", label: "On", sortable: false, render: row => row.remote
               ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,

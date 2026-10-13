@@ -202,6 +202,9 @@ def test_a_mods_settings_and_a_downloadable_module(page):
 def test_the_plus_button_offers_create_and_add(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
+    # The add button waits quietly until its pane is hovered.
+    page.locator(".lex-mods-page .lex-barrelled-master").hover()
+    page.wait_for_function("getComputedStyle(document.querySelector('.lex-mods-page .lex-hover-actions')).pointerEvents === 'auto'")
     page.get_by_role("button", name="Add a mod").click()
     for label in ("Create a new mod", "Add a folder…", "Add a ZIP…", "Cancel"):
         page.get_by_role("button", name=label, exact=True).wait_for()
@@ -359,6 +362,14 @@ def test_a_changed_mod_shows_one_mark_listing_every_flag(page):
     combat = page.locator(".lex-mods-page .lex-column-list-row", has_text="Combat").locator(".lex-conflict-mark")
     assert combat.count() == 1
     assert (combat.get_attribute("aria-label") or "").startswith("Mod warnings"), combat.get_attribute("aria-label")
+    # A squeezed name column truncates the name text; the mark stays
+    # inside its own cell instead of sliding under the next column.
+    inside = combat.evaluate("""mark => {
+      const cell = mark.closest(".lex-column-list-cell").getBoundingClientRect();
+      const box = mark.getBoundingClientRect();
+      return cell.x <= box.x && box.right <= cell.right;
+    }""")
+    assert inside
     combat.hover()
     page.locator(".lex-help-popover .lex-conflict-list li").first.wait_for()
     popover = page.locator(".lex-help-popover").inner_text()
