@@ -395,7 +395,7 @@ function renderStructured(kind){
   if(state.selected&&!rows.some(row=>row.key===state.selected))state.selected=null;
   if(!state.selected&&rows.length)state.selected=rows[0].key;
   const tableSpecs=(tableFieldKeys[kind]||[]).map(key=>config.fields.find(spec=>spec.key===key)).filter(Boolean);
-  const view=LexeditorUI.pagedListDetail({...recordCreationOptions(kind),rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
+  const view=LexeditorUI.pagedListDetail({...recordCreationOptions(kind),order:"given",rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
     search:{key:"project-zomboid-"+kind,value:state.query,label:"Search "+config.title,change:value=>{state.query=value;state.page=0;renderStructured(kind)}},
     sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;renderStructured(kind)},

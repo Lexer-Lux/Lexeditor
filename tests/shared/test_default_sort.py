@@ -25,17 +25,33 @@ def test_paged_list_defaults_to_name_ascending():
 
 def test_own_sort_plugins_keep_their_order():
     exempt = {
-        'plugins/chrono_trigger/editor.js': 'order:"given"',
-        'plugins/ds3/editor.js': 'order:"given"',
-        'plugins/factorio/editor.js': 'order:"given"',
-        'plugins/terraria/editor.js': 'order:"given"',
-        'plugins/stardew_valley/editor.js': 'order: "given"',
-        'plugins/project_zomboid/editor.js': 'order:"given"',
-        'plugins/blank/editor.js': 'order:"given"',
+        'plugins/chrono_trigger/editor.js': ('order:"given"', 1),
+        'plugins/ds3/editor.js': ('order:"given"', 1),
+        'plugins/factorio/editor.js': ('order:"given"', 1),
+        'plugins/terraria/editor.js': ('order:"given"', 4),
+        'plugins/stardew_valley/editor.js': ('order: "given"', 2),
+        'plugins/project_zomboid/editor.js': ('order:"given"', 2),
+        'plugins/blank/editor.js': ('order:"given"', 1),
+        'plugins/ff8/core.js': ('order:"given"', 1),
+        'plugins/ff8/cards_ui.js': ('order:"given"', 1),
+        'plugins/ff7/workspace.js': ('order:"given"', 1),
+        'plugins/ff7r/editor.js': ('order:"given"', 2),
+        'plugins/ff7r2/editor.js': ('order:"given"', 3),
+        'plugins/ff9/editor.js': ('order:"given"', 3),
+        'plugins/ffx_x2/editor.js': ('order:"given"', 2),
+        'plugins/bannerlord/editor_shared.js': ('order:"given"', 1),
+        'plugins/warband/editor.js': ('order:"given"', 2),
+        'plugins/rdr2/ai.js': ('order:"given"', 1),
+        'plugins/rdr2/effects.js': ('order:"given"', 2),
+        'plugins/rdr2/loot.js': ('order:"given"', 1),
+        'plugins/rdr2/mobs.js': ('order:"given"', 1),
+        'plugins/rdr2/crafting.js': ('order:"given"', 1),
+        'plugins/rdr2/challenges.js': ('order:"given"', 1),
     }
-    for rel, marker in exempt.items():
+    for rel, (marker, minimum) in exempt.items():
         source = (ROOT / rel).read_text(encoding='utf-8', errors='replace')
-        assert marker in source, rel
+        found = source.replace('order: "given"', 'order:"given"').count('order:"given"')
+        assert found >= minimum, rel
     stardew = (ROOT / 'plugins/stardew_valley/editor.js').read_text(encoding='utf-8', errors='replace')
     assert 'sort: {key: "name", dir: 1}' in stardew
     assert 'datasetSort: {key: "name", dir: 1}' in stardew

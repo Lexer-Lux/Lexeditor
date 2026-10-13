@@ -99,7 +99,7 @@ async function renderMobModels(){
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
   const ordered=sortedRows("mob-models",rows,getters);
   // names: Observed model identities are fixed game names, not editable labels.
-  m.append(LexeditorUI.pagedListDetail({rows:ordered,key:row=>row.model,selected:f.mobModelSelected||ordered[0].model,renamable:false,page:f.mobModelPage||0,pageSize:15,noun:"observed models",slots:false,splitKey:"rdr2-mobs",
+  m.append(LexeditorUI.pagedListDetail({order:"given",rows:ordered,key:row=>row.model,selected:f.mobModelSelected||ordered[0].model,renamable:false,page:f.mobModelPage||0,pageSize:15,noun:"observed models",slots:false,splitKey:"rdr2-mobs",
     search:{key:"rdr2-mob-models",value:f.mobModelQ||"",label:"Search observed models",change:value=>{f.mobModelQ=value;f.mobModelPage=0;renderMobModels()}},
     sync:view=>{f.mobModelSelected=view.selected;f.mobModelPage=view.page},
     change:next=>{if(next.selected!==null)f.mobModelSelected=next.selected;f.mobModelPage=next.page;renderMobModels()},

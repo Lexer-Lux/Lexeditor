@@ -24,6 +24,7 @@ function renderBehaviors(){
   rows=sortedRows("behaviors",rows,{name:r=>r.name||r.id,id:r=>r.id,used:r=>r.used});
   const m=$("#main");m.innerHTML="";
   m.append(LexeditorUI.pagedListDetail({
+    order:"given",
     modOnly:(()=>{const edited=touchedRecords([state.effectEdits]);
       const ids=new Set(state.catalog.effects.filter(effect=>edited.has(effect.key)).map(effect=>effect.id));
       return {available:!isRO(),value:state.modOnly===true,changed:row=>ids.has(row.id),
@@ -161,7 +162,7 @@ function renderEffects(){
     time:e=>+(state.effectEdits[e.key+"|time"]??e.time),units:e=>+(state.effectEdits[e.key+"|timeunits"]??e.timeunits),
     duration:e=>e.durationcategory,used:e=>(usage[e.key]||[]).length});
   const m=$("#main");m.innerHTML="";
-  m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords([state.effectEdits]);
+  m.append(LexeditorUI.pagedListDetail({order:"given",modOnly:(()=>{const touched=touchedRecords([state.effectEdits]);
       return {available:!isRO(),value:state.modOnly===true,changed:e=>touched.has(e.key),
         change:value=>{state.modOnly=value;f.effectPage=0;renderEffects();}};})(),
     addDisabledReason:"Lexeditor can change existing item effects but cannot create a new effect definition yet.",

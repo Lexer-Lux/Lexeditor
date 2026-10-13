@@ -95,7 +95,7 @@ function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Se
   const available=new Set(prepared.map(keyOf));
   if(selected!==null&&!available.has(selected))selected=prepared.length?keyOf(prepared[0]):null;
   ui.selected=selected;
-  return BLUI.pagedListDetail({add,addDisabled,addDisabledReason:addDisabledReason||"Adding records in this view is not supported yet.",
+  return BLUI.pagedListDetail({order:"given",add,addDisabled,addDisabledReason:addDisabledReason||"Adding records in this view is not supported yet.",
     rows:prepared,key:keyOf,slots:false,page:ui.page,pageSize:ui.pageSize,selected,noun,
     splitKey:`bannerlord-${key}`,
     search:{key:`bannerlord-${key}`,value:ui.query,placeholder,label:`Search ${noun}`,change:value=>{ui.query=value;ui.page=0;render()}},
