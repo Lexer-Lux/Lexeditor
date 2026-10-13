@@ -2257,6 +2257,17 @@
         return;
       }
       const inset = Math.min(3, target.height * .1);
+      if (wideBoolean) {
+        // Wide boolean boxes keep the pin the way every other value box
+        // does: the whole icon inside the box's top-right corner. Aiming
+        // the drawn tip at the corner hung the mark half past the box
+        // edge, where the panel body sliced it off.
+        const boolScale = owner.width / control.offsetWidth || 1;
+        pin.style.setProperty("left", `${(target.right - owner.left - inset - icon.width) / boolScale}px`, "important");
+        pin.style.setProperty("top", `${(target.top - owner.top + inset) / boolScale}px`, "important");
+        pin.style.setProperty("right", "auto", "important");
+        return;
+      }
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
