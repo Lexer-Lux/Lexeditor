@@ -603,7 +603,7 @@ function recordsPanel(kind) {
   if (!sourceReady()) return sourceState();
   if(state.creating?.kind===kind)return creationPanel(kind);
   const rows = sorted(kind, filtered(kind));
-  return pagedListDetail({add:()=>{state.creating={kind,name:"",source:state.data[kind].find(row=>!row.created&&row.name===state.selected[kind])?.name||state.data[kind].find(row=>!row.created)?.name||""};render();},
+  return pagedListDetail({order:"given",add:()=>{state.creating={kind,name:"",source:state.data[kind].find(row=>!row.created&&row.name===state.selected[kind])?.name||state.data[kind].find(row=>!row.created)?.name||""};render();},
     addDisabled:!editingAllowed()||!state.data[kind].some(row=>!row.created),
     addDisabledReason:!editingAllowed()?"Open an editable mod project first.":"Import a prototype dump containing a source template first.",
     modOnly: {

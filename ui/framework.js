@@ -2590,6 +2590,14 @@
     class: ["lex-panel-loading", options.className || ""].filter(Boolean).join(" "),
     role: "status", "aria-label": options.label || "Loading", "aria-busy": "true",
   }, element("span", {class:"lex-plugin-loading-pulse", "aria-hidden":"true"}));
+  // A status bar's loading state: the standard pulse beside its label,
+  // for bars whose text later changes to results or errors. Callers show
+  // it with status.replaceChildren(loadingStatus("Loading map")) and go
+  // back to plain text once loading finishes.
+  const loadingStatus = (label = "Loading") => element("span", {
+    class: "lex-loading-status", role: "status", "aria-busy": "true",
+  }, element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}),
+  element("span", {class: "lex-loading-status-label"}, label));
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
   // A word or two that classifies a record - Project or Vanilla - in a
@@ -10761,7 +10769,25 @@ ${contents.path}`});
     // A column sort belongs to the list, not to the page: a table that holds
     // one page asked for this order, so apply it before the page is cut.
     const rowPreferenceKey = tableRowPreferenceKey(options);
-    const keptSort = pagedSortStates.get(rowPreferenceKey);
+    let keptSort = pagedSortStates.get(rowPreferenceKey);
+    // Every record list sorts by name, A to Z, until the reader picks
+    // a column: the shipped default. A click still wins for that table,
+    // and a page whose order is data (load order, time order, fixed
+    // slots) passes order "given" to keep it. Stored like a click, so
+    // the first click on Name flips to Z to A instead of re-sorting
+    // to the order already shown.
+    // Nameless rows have nothing to sort by: stamping the default
+    // anyway would be a no-op today that silently starts sorting the
+    // day a name field appears. Those tables keep their given order.
+    const hasNames = records.some(record => {
+      const name = sortValueOf(record, "name");
+      return name !== undefined && name !== null && name !== "" && name !== "\u2014";
+    });
+    if (!keptSort && options.order !== "given" && hasNames) {
+      keptSort = {key: "name", dir: 1,
+        compare: (left, right) => compareRecords(left, right, {key: "name"})};
+      pagedSortStates.set(rowPreferenceKey, keptSort);
+    }
     if (keptSort && typeof keptSort.compare === "function") {
       records = [...records].sort((left, right) => keptSort.compare(left, right) * keptSort.dir);
     }
@@ -12819,6 +12845,7 @@ ${contents.path}`});
       const filtered = rows().filter(row => `${row.name} ${row.author || ""}`.toLowerCase().includes(query.toLowerCase()));
       if (!filtered.some(row => keyOf(row) === selected)) selected = filtered[0] ? keyOf(filtered[0]) : null;
       const view = pagedListDetail({className: "lex-mods-page", rows: filtered, key: keyOf, selected, slots: false, noun: "mods",
+        order: "given",
         page, pageSize, defaultSplit: 40, minLeft: 260, minRight: 360, splitKey: `${pluginId}-mods`, rowsKey: `${pluginId}-mods`,
         search: {key: `${pluginId}-mods-search`, value: query, label: "Search mods", change: value => { query = value; page = 0; draw(); }},
         sync: next => { page = next.page; pageSize = next.pageSize; if (next.selected !== selected) { selected = next.selected; draw(); } },
@@ -12829,7 +12856,15 @@ ${contents.path}`});
           rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
           select: row => { select(row); selected = keyOf(row); draw(); },
           decorateRow: decorateModRow,
+          // Load order, lowest first: the server returns it and the page
+          // keeps it (order "given"). The number makes the order visible;
+          // downloadable modules have none until imported.
           columns: [
+            {key: "priority", label: "Priority", width: "max-content", align: "center", numeric: true,
+              help: "Load order: when two switched-on mods change the same thing, the higher number wins. Drag a row to move it.",
+              sortValue: row => row.remote ? Number.MAX_SAFE_INTEGER : localPaths().indexOf(row.path),
+              render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""},
+                row.remote ? "\u2014" : String(localPaths().indexOf(row.path) + 1))},
             {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
               row.name, modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
@@ -13056,7 +13091,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

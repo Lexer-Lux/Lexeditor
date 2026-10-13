@@ -1,4 +1,4 @@
-"""Render and edit the Areas viewport on synthetic map data, never game files.
+"""Render and edit the Maps viewport on synthetic map data, never game files.
 
 Phase one runs read-only with no mod: viewing maps must work for
 Vanilla readers, so the map switcher must not count as an edit attempt,
@@ -44,14 +44,8 @@ def make_game(temp):
 def open_viewport(page, session):
     page.goto(session.url)
     page.wait_for_selector('body[data-ds1-ready="true"]')
-    page.locator('button[data-tab="areas"]').click()
-    page.wait_for_function('state.tab==="areas" && state.sub==="placements" && state.rows.length>0 && !state.error')
-    # State updates before render, so the strip needs its own
-    # wait; the previous tab's strip would pass a bare assert.
-    page.wait_for_selector('[data-subtab="viewport"]')
-    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['placements', 'viewport']
-    page.locator('[data-subtab="viewport"]').click()
-    page.wait_for_function('state.tab==="areas" && state.sub==="viewport" && state.mapView && !state.error')
+    page.locator('button[data-tab="maps"]').click()
+    page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error')
     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
 
 
@@ -96,8 +90,15 @@ def phase_readonly(play, game, output, errors):
             page.wait_for_function('document.querySelector("[data-viewport-status]").textContent.includes("Selected:")',
                                    timeout=30000)
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
-            page.locator('.lex-viewport-picker').first.click()
-            page.locator('.lex-choice-popover button', has_text='test2.msb').click()
+            page.locator('[data-tabstrip-id="maps"]').click()
+            page.wait_for_function('state.mapTab==="maps"')
+            labels = page.locator('[data-maps-side] .lex-column-list-head-cell').evaluate_all(
+                'nodes=>nodes.map(n=>n.textContent)')
+            for want in ('Name', 'Parts', 'Models', 'Collision', 'Navigation'):
+                assert want in ' '.join(labels), labels
+            counts = page.evaluate('state.mapList.find(r=>r.id==="test.msb").values')
+            assert counts['collision'] == 1 and counts['navigation'] == 1, counts
+            page.locator('[data-maps-side] .lex-list-row', has_text='test2.msb').click()
             page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='test2.msb', timeout=30000)
             page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
             rendered_pixels(page, 'test2.msb')

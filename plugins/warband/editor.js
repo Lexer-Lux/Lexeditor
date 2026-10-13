@@ -53,7 +53,7 @@
       detailField({label:typeof column.label==="string"?column.label:column.key,control:LexeditorUI.readonlyField(row[column.key]??"—",{format:false})}))})]})
       :detailPanel({title:"No matching records"});
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({add:options.add,addDisabled:options.addDisabled,
+    $("#main").replaceChildren(pagedListDetail({order:"given",add:options.add,addDisabled:options.addDisabled,
       addDisabledReason:options.addDisabledReason||"Warband's module files can take new records, but Lexeditor only edits existing ones. Adding one is not supported yet.",modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
@@ -129,7 +129,7 @@
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({add:beginItemCreation,
+    $("#main").replaceChildren(pagedListDetail({order:"given",add:beginItemCreation,
       addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!state.items.rows.length,
       addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating an item.":state.build.running?"Wait for the current build to finish.":"A source item is needed as a template.",
       modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,

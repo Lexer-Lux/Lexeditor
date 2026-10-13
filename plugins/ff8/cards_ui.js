@@ -412,7 +412,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               return map?LexeditorUI.hoverable({content:map.name,targetType:'fields',targetId:map.id,targetLabel:map.name,
                 activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}}):member.map}}]}):LexeditorUI.detailNote('No opponent script names this deck directly.')]})]});
     // names: decks are numeric script references and have no stored names.
-    return LexeditorUI.pagedListDetail({rows,key:row=>row.id,selected:deckView.selected,
+    return LexeditorUI.pagedListDetail({order:"given",rows,key:row=>row.id,selected:deckView.selected,
       page:deckView.page,pageSize:40,noun:'decks',maxBarrels:1,slots:true,
       addDisabledReason:'A deck exists only as a number an opponent\'s script names; choose a deck on the opponent instead.',fit:{minRowHeight:28},
       className:'ff8-card-decks',splitKey:'ff8-card-decks',rowsKey:'ff8-card-decks',

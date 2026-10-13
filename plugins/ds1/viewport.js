@@ -39,7 +39,7 @@ window.Ds1Viewport = (() => {
     stop(host);
     const mine = ++session;
     if (!host.isConnected || !view) return null;
-    status.textContent = `Loading ${view.parts.length} parts.`;
+    status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${view.parts.length} parts`));
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     const {TransformControls} = await import("three/addons/controls/TransformControls.js");
@@ -368,7 +368,7 @@ window.Ds1Viewport = (() => {
     const chr = (view.chrs || []).find(entry => entry.available) || (view.chrs || [])[0];
     if (!chr) { status.textContent = `${view.name}: no placed character model.`; return; }
     if (!chr.available) { status.textContent = `${view.name}: ${chr.id} — ${chr.reason || "model unavailable"}.`; return; }
-    status.textContent = `Loading ${chr.id}.`;
+    status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${chr.id}`));
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     if (mine !== session || !host.isConnected) return;

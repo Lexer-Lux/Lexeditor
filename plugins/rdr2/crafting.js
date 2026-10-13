@@ -182,6 +182,7 @@ function renderCrafting() {
   const m=$("#main");m.innerHTML="";
   if(mode==="custom"&&!state.customCrafting.available){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},`Custom crafting runtime files are unavailable for this profile. Expected ${state.customCrafting.customFile||"custom_crafting_recipes.tsv"}.`));return;}
   m.append(LexeditorUI.pagedListDetail({
+    order:"given",
     modOnly:modOnlySpec(touchedRecords([state.craftEdits]),()=>{f.craftPage=0;},renderCrafting),
     addDisabledReason:mode==="custom"?"Custom crafting requires the custom crafting runtime files for this profile.":"This list groups existing recipes by their output item. Use Custom recipes to create a recipe.",
     rows:groups,key:group=>group.key,slots:false,page:f.craftPage,pageSize:f.craftPageSize,selected:f[selectedField],noun:"items",

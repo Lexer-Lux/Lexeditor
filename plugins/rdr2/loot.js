@@ -191,6 +191,7 @@ async function renderLoot() {
   // The shared paged list-detail preset keeps Loot Tables in the same fitted,
   // no-scroll master and fixed-pager contract as Items and Crafting.
   const view=LexeditorUI.pagedListDetail({
+    order:"given",
     modOnly:(()=>{const dirty=state.lootDirty[state.lootFile];
       return {available:!isRO(),value:state.modOnly===true,
         changed:row=>!!dirty&&dirty.has(row.t.key),

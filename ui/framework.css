@@ -212,6 +212,12 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   border-color:color-mix(in srgb,currentColor 30%,transparent);border-right-color:currentColor;
   animation:lex-plugin-loading-spin .75s linear infinite;
 }
+.lex-loading-status { display:inline-flex;align-items:center;gap:.45em;color:var(--lex-loading-color,var(--lex-accent)); }
+.lex-loading-status > .lex-plugin-loading-pulse {
+  position:static;width:1em;height:1em;border-width:2px;
+  border-color:color-mix(in srgb,currentColor 30%,transparent);border-right-color:currentColor;
+  animation:lex-plugin-loading-spin .75s linear infinite;
+}
 
 .lex-ui-symbol {
   font-style: normal;

@@ -137,16 +137,6 @@ class Handler(PluginRequestHandler):
                                       'readOnly': STORE.read_only}
                     elif path == '/api/state':
                         result = STORE.state()
-                        try:
-                            count = len(MAPSTORE.list_rows())
-                        except (MsbError, OSError):
-                            # Broken or missing map data must not take the
-                            # whole editor down; Areas reports it when opened.
-                            count = 0
-                        result['areaTabs'] = [{'id': 'placements', 'label': 'Placements',
-                                               'table': 'Msb', 'count': count},
-                                              {'id': 'viewport', 'label': 'Viewport',
-                                               'table': 'MapView', 'count': len(MAPSTORE.maps())}]
                         result['animTabs'] = [{'id': 'animations', 'label': 'Events',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
                         chars = anim.list_chars(MAPSTORE.game_root, MAPSTORE.project)
@@ -228,11 +218,17 @@ class Handler(PluginRequestHandler):
                             rows = []
                             for name in MAPSTORE.maps():
                                 try:
-                                    parts = MAPSTORE.get(name).view_parts()
+                                    doc = MAPSTORE.get(name)
+                                    parts = doc.view_parts()
+                                    models = len(doc.models)
                                 except (MsbError, OSError):
                                     parts = []
+                                    models = 0
+                                kinds = [part['kind'] for part in parts]
                                 rows.append({'id': name, 'table': 'MapView', 'name': name,
-                                             'values': {'parts': len(parts)}})
+                                             'values': {'parts': len(parts), 'models': models,
+                                                        'collision': sum(1 for kind in kinds if kind == 'Collision'),
+                                                        'navigation': sum(1 for kind in kinds if kind == 'Navigation')}})
                             result = {'rows': rows}
                         elif tab == 'playback':
                             labels = TAESTORE.char_names()

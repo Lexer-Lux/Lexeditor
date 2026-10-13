@@ -4,7 +4,7 @@ from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'levelup':'Level-up gains',
-              'areas':'Areas', 'animations':'Animations', 'world':'World', 'assets':'Assets'}
+              'maps':'Maps', 'animations':'Animations', 'world':'World', 'assets':'Assets'}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -141,13 +141,13 @@ def payload(store, native_rules=None, theme=None):
             'target':key if available else '', 'sub':key, 'controls':label,
             'notes':'Save and Apply with the game closed. Only the fingerprinted build is supported.'
                     if available else 'The installed executable is not the supported build, so these rules cannot be applied.'})
-    # Area data beyond the parameter archive. Maps open the Areas tab;
+    # Area data beyond the parameter archive. Maps open the Maps tab;
     # characters open the Animations tab.
     map_path = store.game_root / 'map'
     if map_path.is_dir():
         rows.append({'id': 'area:maps', 'filename': 'map/', 'path': str(map_path),
             'coverage': 'structured', 'status': 'partial', 'openable': True,
-            'target': 'areas', 'sub': 'placements', 'controls': 'Areas: enemy placements',
+            'target': 'maps', 'sub': 'placements', 'controls': 'Maps: enemy placements',
             'notes': 'Move placements and swap which enemy appears. Anything else in the map is left untouched.'})
     chr_path = store.game_root / 'chr'
     if chr_path.is_dir():

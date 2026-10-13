@@ -55,7 +55,7 @@ def main():
     chest_key = f"{chest['type']}:{chest['partId']}" if chest else None
     expected_options = len(npc_ids) + (0 if enemy["npc"] in npc_ids else 1)
     errors = []
-    with tempfile.TemporaryDirectory(prefix="lexeditor-ds1-areas-") as temp:
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ds1-maps-") as temp:
         game, mod = Path(temp) / "game", Path(temp) / "mod"
         (game / RELATIVE).parent.mkdir(parents=True)
         (game / RELATIVE).write_bytes(raw)
@@ -74,21 +74,25 @@ def main():
                     page.on("pageerror", lambda e: errors.append(str(e)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    page.locator('[data-tab="areas"]').click()
-                    page.wait_for_function("(n) => state.tab==='areas' && state.rows.length===n", arg=len(placements))
+                    page.locator('[data-tab="maps"]').click()
+                    page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
+                    counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
+                    assert set(counts) == {'parts', 'models', 'collision', 'navigation'}, counts
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     if not root:
                         assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == ["chest0", "enemy0", "enemy1", "player0"]
                     else:
                         assert page.evaluate("state.rows.length") > 0
-                    assert page.evaluate("state.areaTabs[0].count") == len(placements)
                     page.get_by_role("searchbox", name="Search placements").fill(enemy["name"])
                     page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.name===e.name",
                                            arg={"key": ":" + key.split(":")[1], "name": enemy["name"]})
+                    page.locator('[data-tabstrip-id="selection"]').click()
                     assert enemy["name"] in page.locator(".lex-detail-panel-title").inner_text()
                     assert page.get_by_text(f"model {enemy['model']}", exact=False).count() >= 1
                     if output:
                         page.wait_for_timeout(250)
-                        page.screenshot(path=str(output / "areas-list.png"))
+                        page.screenshot(path=str(output / "maps-list.png"))
                     field = page.locator('[data-field-key="posX"]:visible')
                     assert field.evaluate("n=>n.tagName") == "INPUT" and field.get_attribute("step") == "any"
                     assert field.get_attribute("min") is None and field.get_attribute("max") is None
@@ -105,24 +109,26 @@ def main():
                     npc.select_option(str(other_npc))
                     page.wait_for_function("(x) => state.pending===0 && state.row.fields.find(f=>f.key==='npcId').value===x", arg=other_npc)
                     if chest is not None:
+                        page.locator('[data-tabstrip-id="placements"]').click()
                         box = page.get_by_role("searchbox", name="Search placements")
                         box.click(); box.press("ControlOrMeta+a"); box.press("Backspace"); box.fill(chest["name"])
                         page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.name===c.name",
                                                arg={"partId": chest["partId"], "name": chest["name"]})
+                        page.locator('[data-tabstrip-id="selection"]').click()
                         assert page.locator('[data-field-key="npcId"]:visible').count() == 0
                         field = page.locator('[data-field-key="posX"]:visible')
                         field.fill(str(chest_pos))
                         field.press("Tab")
                         page.wait_for_function("(x) => state.pending===0 && state.row.fields.find(f=>f.key==='posX').value===x", arg=chest_pos)
                         if output:
-                            page.screenshot(path=str(output / "areas-object.png"))
+                            page.screenshot(path=str(output / "maps-object.png"))
                     if output:
-                        page.screenshot(path=str(output / "areas-detail.png"))
+                        page.screenshot(path=str(output / "maps-detail.png"))
                     page.set_viewport_size({"width": 1000, "height": 700})
                     page.wait_for_timeout(400)
                     assert page.locator('[data-field-key="posX"]').evaluate("n=>n.clientWidth") >= 70
                     if output:
-                        page.screenshot(path=str(output / "areas-small.png"))
+                        page.screenshot(path=str(output / "maps-small.png"))
                     page.set_viewport_size({"width": 1100, "height": 800})
                     page.locator("#global-save").click()
                     page.wait_for_function("state.dirty===0 && state.pending===0")
@@ -157,14 +163,15 @@ def main():
                     session.start()
                     page.goto(session.url + "?lexNoMod=1")
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    page.locator('[data-tab="areas"]').click()
-                    page.wait_for_function("state.tab==='areas' && state.rows.length>0")
+                    page.locator('[data-tab="maps"]').click()
+                    page.wait_for_function("state.tab==='maps' && state.rows.length>0 && !!state.row")
+                    page.locator('[data-tabstrip-id="selection"]').click()
                     control = page.locator('[data-field-key="posX"]:visible')
                     assert control.is_disabled()
                     control.click(force=True)
                     page.get_by_text("Create a mod to edit?", exact=True).wait_for()
                     if output:
-                        page.screenshot(path=str(output / "areas-vanilla-prompt.png"))
+                        page.screenshot(path=str(output / "maps-vanilla-prompt.png"))
                     page.get_by_role("button", name="Cancel", exact=True).click()
                     try:
                         request_json(session.url + "api/edit", {"table": map_name, "id": key, "field": "posX", "value": 1.0})

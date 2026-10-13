@@ -27,7 +27,7 @@ window.Ds1Anim = (() => {
     if (!host.isConnected) return;
     if (!motion) { status.textContent = `${chrId}: no animations found.`; return; }
     if (motion.available === false) { status.textContent = `${motion.file}: ${motion.reason || "unreadable"}.`; return; }
-    status.textContent = `Loading ${motion.file}.`;
+    status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${motion.file}`));
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     if (mine !== session || !host.isConnected) return;
