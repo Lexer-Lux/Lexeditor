@@ -56,14 +56,53 @@ function effectNumberEditor(e,field,currentBehavior){
   const role=field==="value"&&isOuterBar?"Actual outer-bar point change":field==="value"&&isPercentResource?"Inventory/wheel display tier; Percent Override controls the real change":inactive?"Not consumed by this known Value-driven behavior":field==="percent"&&isPercentResource?"Actual refill/loss percentage":field==="value"&&valueDriven?"Active engine magnitude":"Behavior-specific field";
   const expectedTier=isPercentResource&&percentNow!==0?Math.sign(percentNow)*Math.max(1,Math.min(10,Math.round(Math.abs(percentNow)/10))):null;
   const tierMismatch=field==="value"&&expectedTier!==null&&Number(cur)!==expectedTier;
-  const input=el("input",{type:"number",step:field==="percent"?"any":"1",value:field==="percent"?fmtCompactNumber(cur):cur,...(inactive?{readonly:"readonly"}:{}),title:tierMismatch?`${role}. Warning: ${fmtCompactNumber(percentNow)}% normally maps to display tier ${expectedTier}.`:role,
-    class:ek in state.effectEdits?"edited":"",onchange:ev=>{const value=ev.target.value;
-      if(Number(value)===Number(e[field]))delete state.effectEdits[ek];else state.effectEdits[ek]=value;renderEffects();renderToolbarOnly();}});
+  const attrs={"aria-label":`Effect ${field} for ${e.key}`,...(inactive||isRO()?{readonly:"readonly"}:{}),title:tierMismatch?`${role}. Warning: ${fmtCompactNumber(percentNow)}% normally maps to display tier ${expectedTier}.`:role,class:ek in state.effectEdits?"edited":""};
+  const input=field!=="percent"?catalogQuantityInput({...attrs,store:state.effectEdits,key:ek,base:e[field],value:cur})
+    :el("input",{...attrs,type:"number",step:"any",required:true,value:cur,"data-lex-validate-number":"true"});
+  if(field==="percent"){
+    const validate=()=>{input.setCustomValidity(input.value.trim()!==""&&Number.isFinite(Number(input.value))?"":"Enter a finite number.");return input.checkValidity()};
+    input.lexValidateNumber=validate;validate();
+    if(!input.readOnly)input.addEventListener("input",()=>{
+      const raw=input.value;
+      if(validate()&&Number(raw)===Number(e[field]))delete state.effectEdits[ek];else state.effectEdits[ek]=raw;
+      input.classList.toggle("edited",ek in state.effectEdits);renderToolbarOnly();
+    });
+  }
+  input.dataset.rdr2EffectKey=e.key;
   const control=field==="percent"?LexeditorUI.unitField(input,"%")
-    :tierMismatch?LexeditorUI.inlineLabel(input,fieldHelp(`Display tier ${cur} contradicts ${fmtCompactNumber(percentNow)}%; expected tier ${expectedTier}.`)):input;
+    :field==="value"&&isPercentResource?LexeditorUI.inlineLabel(input):input;
+  if(field==="value"&&isPercentResource){
+    input.lexRefreshEffectTier=()=>{
+      const percent=Number(state.effectEdits[e.key+"|percent"]??e.percent);
+      const tier=Number.isFinite(percent)&&percent!==0?Math.sign(percent)*Math.max(1,Math.min(10,Math.round(Math.abs(percent)/10))):null;
+      const mismatch=tier!==null&&Number(input.value)!==tier;
+      input.title=mismatch?`${role}. Warning: ${fmtCompactNumber(percent)}% normally maps to display tier ${tier}.`:role;
+      for(const child of [...control.children])if(child!==input&&!child.contains(input))child.remove();
+      if(mismatch)control.append(fieldHelp(`Display tier ${input.value} contradicts ${fmtCompactNumber(percent)}%; expected tier ${tier}.`));
+    };
+    input.lexRefreshEffectTier();
+  }
+  input.addEventListener("input",()=>{
+    for(const other of document.querySelectorAll("input[data-rdr2-effect-key]"))if(other.dataset.rdr2EffectKey===e.key)other.lexRefreshEffectTier?.();
+  });
   const vEff=state.store.vanilla?.effectByKey?.[e.key],kEff=state.store.kiddos?.effectByKey?.[e.key];
   return refField(control,[["V","vtag",vEff?vEff[field]:null],["K","ktag",kEff?kEff[field]:null]],cur,
     inactive?null:(value,event)=>applyToInput(event,value),value=>(+value%1?(+value).toFixed(2):String(+value)));
+}
+
+function effectTimeUnitsEditor(e){
+  const ek=e.key+"|timeunits",cur=String(isRO()?e.timeunits:(state.effectEdits[ek]??e.timeunits));
+  const unknown=value=>el("option",{value:String(value)},`${value} \u2014 unknown unit`);
+  const select=el("select",{"aria-label":`Effect timeunits for ${e.key}`,value:cur,class:ek in state.effectEdits?"edited":"",title:"Unit for the Time value: seconds, minutes, in-game hours or in-game days.",...(isRO()?{disabled:true}:{}),onchange:event=>{
+    const value=event.target.value;if(value===String(e.timeunits))delete state.effectEdits[ek];else state.effectEdits[ek]=value;select.classList.toggle("edited",ek in state.effectEdits);renderToolbarOnly();
+  }},...EFFECT_TIME_UNIT_OPTIONS.map(option=>el("option",{value:String(option.value),selected:String(option.value)===cur},option.label)));
+  // A hand-edited mod may hold a value outside the proven four. Keep it
+  // visible and let save-time validation refuse it instead of hiding it.
+  if(!EFFECT_TIME_UNIT_OPTIONS.some(option=>String(option.value)===cur)){const extra=unknown(cur);extra.selected=true;select.append(extra);}
+  select.dataset.rdr2EffectKey=e.key;
+  const vEff=state.store.vanilla?.effectByKey?.[e.key],kEff=state.store.kiddos?.effectByKey?.[e.key];
+  return refField(select,[["V","vtag",vEff?vEff.timeunits:null],["K","ktag",kEff?kEff.timeunits:null]],cur,
+    (value,event)=>{if(![...select.options].some(option=>option.value===String(value)))select.append(unknown(value));applyToInput(event,value);},String);
 }
 
 function effectDetail(e,behaviors,used){
@@ -77,7 +116,7 @@ function effectDetail(e,behaviors,used){
     field("Engine value / display tier",effectNumberEditor(e,"value",currentBehavior)),
     field("Percent override",effectNumberEditor(e,"percent",currentBehavior)),
     field("Time",effectNumberEditor(e,"time",currentBehavior)),
-    field("Time units",effectNumberEditor(e,"timeunits",currentBehavior)),
+    field("Time units",effectTimeUnitsEditor(e)),
     field("Duration category",el("span",{class:"cat"},e.durationcategory.replace("EFFECT_DURATION_CATEGORY_",""))));
   body.push(field("Used by",used.length?el("button",{class:"table-link",title:"Show every item using this effect",onclick:()=>showEffectUsage(e,used)},`${used.length} item${used.length===1?"":"s"}`):el("span",{class:"cat"},"No items")));
   return LexeditorUI.detailPanel({title:field("Name",humanNameInput("effects",e.key)),meta:`${e.symbol||e.label?`${e.symbol||e.label} · `:""}${e.key}`,actions:originMarker(e),body});

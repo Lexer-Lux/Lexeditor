@@ -33,8 +33,11 @@ def main():
         edited.edit('EquipParamGoods', 100, 'sellValue', 42)
         (mod / RELATIVE).write_bytes(edited.export())
         original_hash = hashlib.sha256(raw).hexdigest()
+        # Apply combines every enabled library mod; this check's library is empty.
+        (temp / 'library').mkdir()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
-                              'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
+                              'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0',
+                              'LEXEDITOR_DS1_MODS_ROOT': str(temp / 'library')})
         errors = []
         try:
             session.start()
@@ -80,7 +83,7 @@ def main():
 
                     restore_button.click()
                     dialog.wait_for()
-                    assert 'Restore the original installed param archive' in dialog.inner_text()
+                    assert 'Restore the original installed files' in dialog.inner_text()
                     dialog.get_by_role('button', name='Restore original', exact=True).click()
                     page.wait_for_function('state.deployment && state.deployment.enabled===false')
                     assert hashlib.sha256((game / RELATIVE).read_bytes()).hexdigest() == original_hash

@@ -19,7 +19,10 @@ import math
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import struct
 from typing import Any
+
+from core.numeric_values import finite_number, integer_value
 
 from .archive import extract_pair
 from .dataobject import DataObjectPackage
@@ -70,12 +73,39 @@ def _clone_default() -> dict:
 def _finite_number(value: Any, label: str, *, minimum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{label} must be numeric")
-    result = float(value)
+    result = finite_number(value, label)
     if not math.isfinite(result):
         raise ValueError(f"{label} must be finite")
     if minimum is not None and result < minimum:
         raise ValueError(f"{label} must be at least {minimum}")
     return result
+
+
+def _stored_override(value: Any, storage_type: str, label: str) -> int | float:
+    """Validate an override against its proved source field's storage."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be numeric")
+    if storage_type == "INT32":
+        number = integer_value(value, label)
+        if not -2147483648 <= number <= 2147483647:
+            raise ValueError(f"{label} is outside the FF7R INT32 range")
+        return number
+    if storage_type == "FLOAT":
+        number = _finite_number(value, label)
+        try:
+            return struct.unpack("<f", struct.pack("<f", number))[0]
+        except (OverflowError, struct.error) as error:
+            raise ValueError(f"{label} is outside the FF7R float32 range") from error
+    raise ValueError(f"{label} uses unsupported storage type {storage_type}")
+
+
+def _source_property_overrides(storage_type: str) -> dict:
+    bounds = {"INT32": (-2147483648, 2147483647),
+              "FLOAT": (-3.4028234663852886e38, 3.4028234663852886e38)}.get(storage_type)
+    schema = {"type": storage_type, "min": bounds[0] if bounds else None,
+              "max": bounds[1] if bounds else None}
+    return {"VanillaValue": {**schema, "editable": False},
+            "OverrideValue": {**schema, "editable": bounds is not None}}
 
 
 def _numeric_map(value: Any, label: str, *, integers: bool = False) -> dict[str, int | float]:
@@ -346,11 +376,12 @@ def resource_spec(asset: str, game_root: Path, data_root: Path, project_root: Pa
             ],
             "entries": [{
                 "tag": row["key"],
+                "propertyOverrides": _source_property_overrides(row["type"]),
                 "values": {
                     "SourceTag": row["tag"],
                     "SourceProperty": row["property"],
-                    "VanillaValue": float(row["vanilla"]),
-                    "OverrideValue": float(overrides.get(row["key"], row["vanilla"])),
+                    "VanillaValue": row["vanilla"],
+                    "OverrideValue": overrides.get(row["key"], row["vanilla"]),
                 },
             } for row in rows],
         }
@@ -374,9 +405,10 @@ def resource_spec(asset: str, game_root: Path, data_root: Path, project_root: Pa
                     "CharacterRow": row["tag"],
                     "Reaction": row["property"],
                     "Slot": row["index"],
-                    "VanillaValue": float(row["vanilla"]),
-                    "OverrideValue": float(overrides.get(row["key"], row["vanilla"])),
+                    "VanillaValue": row["vanilla"],
+                    "OverrideValue": overrides.get(row["key"], row["vanilla"]),
                 },
+                "propertyOverrides": _source_property_overrides(row["type"]),
             } for row in rows],
         }
 
@@ -418,10 +450,14 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("Each ATB edit must be an object")
-        entry_index = int(edit.get("entry", -1))
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("ATB edit contains unsupported fields")
+        entry_index = integer_value(edit.get("entry", -1), "ATB entry index")
         if entry_index < 0 or entry_index >= len(entries) or "index" in edit:
             raise ValueError("ATB virtual resources accept scalar edits on existing records only")
-        prop = str(edit.get("property", ""))
+        prop = edit.get("property", "")
+        if not isinstance(prop, str):
+            raise TypeError("ATB property must be text")
         marker = (entry_index, prop)
         if marker in seen:
             raise ValueError("Duplicate ATB virtual property edit")
@@ -445,19 +481,17 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
         elif asset == ATB_RESIDENT_ASSET:
             if prop != "OverrideValue":
                 raise ValueError(f"ATB Resident property is read-only or unknown: {prop}")
-            numeric = _finite_number(value, f"resident override {row_tag}")
             source = next(row for row in discover_atb_sources(game_root, data_root, index)["resident"] if row["key"] == row_tag)
-            if source["type"] == "INT32" and int(numeric) != numeric:
-                raise ValueError(f"{row_tag} is an integer ResidentParameter")
+            numeric = _stored_override(value, source["type"], f"resident override {row_tag}")
             if numeric == float(source["vanilla"]):
                 config["residentOverrides"].pop(row_tag, None)
             else:
-                config["residentOverrides"][row_tag] = int(numeric) if source["type"] == "INT32" else numeric
+                config["residentOverrides"][row_tag] = numeric
         elif asset == ATB_GUARD_ASSET:
             if prop != "OverrideValue":
                 raise ValueError(f"ATB Guard property is read-only or unknown: {prop}")
-            numeric = _finite_number(value, f"guard override {row_tag}")
             source = next(row for row in discover_atb_sources(game_root, data_root, index)["guard"] if row["key"] == row_tag)
+            numeric = _stored_override(value, source["type"], f"guard override {row_tag}")
             if numeric == float(source["vanilla"]):
                 config["guardOverrides"].pop(row_tag, None)
             else:
@@ -465,10 +499,7 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
         else:
             if prop != "OverrideATB":
                 raise ValueError(f"ATB Ability property is read-only or unknown: {prop}")
-            numeric = _finite_number(value, f"ability ATB cost {row_tag}")
-            integer = int(numeric)
-            if integer != numeric or integer < -2147483648 or integer > 2147483647:
-                raise ValueError("BattleAbility ATB cost must be an INT32")
+            integer = _stored_override(value, "INT32", f"ability ATB cost {row_tag}")
             source = next(row for row in discover_atb_sources(game_root, data_root, index)["abilities"] if row["key"] == row_tag)
             if integer == int(source["vanilla"]):
                 config["abilityCostOverrides"].pop(row_tag, None)

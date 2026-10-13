@@ -6,9 +6,36 @@ function troopValue(row,key){return troopDraft(row).fields[key]??row.fields[key]
 function setTroopField(row,key,value){
  const recordKey=troopEditKey(row),draft=state.troopEdits[recordKey] ||= newTroopDraft(row);
  if(value===row.fields[key])delete draft.fields[key];else draft.fields[key]=value;
- const kept=Object.keys(draft.fields).length?draft:null;
+ const kept=Object.keys(draft.fields).length||Object.keys(draft.rawStats||{}).length?draft:null;
  if(!kept)delete state.troopEdits[recordKey];
  shell.refresh();return kept;
+}
+function troopStatIssue(raw){
+ const value=Number(raw);
+ return String(raw).trim()===""||!Number.isInteger(value)||value<0||value>255?"Enter a whole number from 0 to 255.":"";
+}
+function setTroopStat(row,key,raw){
+ const recordKey=troopEditKey(row),draft=state.troopEdits[recordKey] ||= newTroopDraft(row);
+ if(draft.statSource===undefined){draft.statSource=troopValue(row,"attributes");draft.statBase={...draft.stats};}
+ draft.rawStats ||= {};
+ const issue=troopStatIssue(raw);
+ if(!issue&&Number(raw)===draft.statBase[key])delete draft.rawStats[key];else draft.rawStats[key]=raw;
+ if(!issue){
+  draft.stats[key]=Number(raw);
+  let expression=draft.statSource;
+  for(const [name,shift] of [["strength",0],["agility",8],["intelligence",16],["charisma",24],["level",32]]){
+   if(draft.stats[name]===undefined||draft.stats[name]===draft.statBase[name])continue;
+   const mask=255n<<BigInt(shift),value=BigInt(draft.stats[name])<<BigInt(shift);
+   expression=`((${expression}) & ~0x${mask.toString(16)}) | 0x${value.toString(16)}`;
+  }
+  setTroopField(row,"attributes",expression);
+ }else shell.refresh();
+ return issue;
+}
+function preflightTroopStats(){
+ for(const draft of Object.values(state.troopEdits))for(const [key,raw] of Object.entries(draft.rawStats||{})){
+  const issue=troopStatIssue(raw);if(issue)throw new Error(`${draft.originalId} / ${key}: ${issue}`);
+ }
 }
 function troopFields(row){
  if(row.problem)return [el("p",{role:"alert"},row.problem)];
@@ -20,12 +47,10 @@ function troopFields(row){
  faction.value=troopValue(row,"faction");body.push(field("Faction",faction));
  for(const [key,shift] of [["strength",0],["agility",8],["intelligence",16],["charisma",24],["level",32]]){
   if(row.stats[key]===undefined)continue;
-  body.push(field(key,el("input",{type:"number",min:0,max:255,step:1,disabled,value:troopDraft(row).stats[key],oninput:e=>{
-   const n=Number(e.target.value);if(!Number.isInteger(n)||n<0||n>255)return;
-   const mask=255n<<BigInt(shift),v=BigInt(n)<<BigInt(shift);
-   const draft=setTroopField(row,"attributes",`((${troopValue(row,"attributes")}) & ~0x${mask.toString(16)}) | 0x${v.toString(16)}`);
-   if(draft)draft.stats[key]=n;
-  }})));
+  const value=troopDraft(row).rawStats?.[key]??troopDraft(row).stats[key];
+  const input=el("input",{type:"number",required:true,min:0,max:255,step:1,disabled,value,
+   "data-lex-validate-number":"true",oninput:e=>{if(!e.target.disabled)e.target.setCustomValidity(setTroopStat(row,key,e.target.value));}});
+  input.setCustomValidity(troopStatIssue(value));body.push(field(key,input));
  }
  if(row.flagValue!==null){
   const setFlag=(mask,on)=>{

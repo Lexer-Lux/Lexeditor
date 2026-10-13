@@ -18,6 +18,7 @@ import re
 import tempfile
 import zipfile
 from typing import Any
+from core.numeric_values import integer_value
 
 
 SUPPORTED_FACTORIO = (2, 1)
@@ -162,6 +163,8 @@ def _positive_number(value: Any, label: str, *, minimum: float = 0.0) -> float:
 
 
 def _uint(value: Any, label: str, maximum: int) -> int:
+    if isinstance(value, str) and maximum > 9_007_199_254_740_991:
+        value = integer_value(value, label, FactorioDataError)
     if isinstance(value, bool) or not isinstance(value, int):
         raise FactorioDataError(f"{label} must be an integer")
     if not 0 <= value <= maximum:
@@ -434,7 +437,8 @@ class PrototypeStore:
                 row.update({
                     "enabled": bool(merged.get("enabled", True)),
                     "prerequisites": merged.get("prerequisites", []),
-                    "unitCount": unit.get("count"),
+                    "unitCount": (str(unit["count"]) if isinstance(unit.get("count"), int)
+                        and abs(unit["count"]) > 9_007_199_254_740_991 else unit.get("count")),
                     "unitCountFormula": unit.get("count_formula"),
                     "unitTime": unit.get("time"),
                     "science": unit.get("ingredients", []),
@@ -508,6 +512,11 @@ class PrototypeStore:
                 value = _uint(changes["unit_count"], "Research unit count", UINT64_MAX)
                 if value < 1:
                     raise FactorioDataError("Research unit count must be > 0")
+                # Lua 5.2 exports doubles: preserve an unchanged inherited
+                # uint64, but never author a count that the game would round.
+                # https://lua-api.factorio.com/latest/concepts/uint64.html
+                if value != source["unit"].get("count") and int(float(value)) != value:
+                    raise FactorioDataError("Factorio's Lua export cannot represent that research count exactly")
                 clean["unit_count"] = value
             if "unit_time" in changes:
                 if not isinstance(source.get("unit"), dict):

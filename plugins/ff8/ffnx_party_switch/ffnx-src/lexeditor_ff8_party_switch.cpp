@@ -209,10 +209,13 @@ void __cdecl finish(std::uint32_t ticket) {
 void __cdecl controller() {
     auto *mode=getmode_cached();
     if(!enable_ff8_party_switch || !mode || mode->driver_mode!=MODE_BATTLE) {
+        if(opened || pending)
+            ffnx_trace("Party Switch: selector state reset by mode exit (opened=%d pending=%d).\n",
+                opened ? 1 : 0, pending ? 1 : 0);
         opened=false; previous=0;
         original(); return;
     }
-    const int active=mem<std::int8_t>(0x1D76844);
+    int active=mem<std::int8_t>(0x1D76844);
     const auto context=mem<std::uint32_t>(0x1D6D490);
     if(!context) { original(); return; }
     // Read exactly the same logical input record as the native controller.
@@ -235,15 +238,37 @@ void __cdecl controller() {
         return;
     }
     if(opened) {
-        if(active!=slot || mem<std::uint16_t>(kActor+slot*0xD0+0x80)&1) {
-            close_menu(); original(); return;
+        // Keep the native command bookkeeping alive while the selector owns
+        // the visible menu. Returning without calling original() starved the
+        // native controller, so the engine-side active slot could flicker and
+        // trip the guard below on the next tick. Suppress only
+        // command-accepting input, the way the pending path already does.
+        const auto held16=mem<std::uint16_t>(context+0x10);
+        const auto edge16=mem<std::uint16_t>(context+0x12);
+        const auto repeat16=mem<std::uint16_t>(context+0x14);
+        mem<std::uint16_t>(context+0x10)=0;
+        mem<std::uint16_t>(context+0x12)=0;
+        mem<std::uint16_t>(context+0x14)=0;
+        original();
+        mem<std::uint16_t>(context+0x10)=held16;
+        mem<std::uint16_t>(context+0x12)=edge16;
+        mem<std::uint16_t>(context+0x14)=repeat16;
+        active=mem<std::int8_t>(0x1D76844);
+        const unsigned ko=mem<std::uint16_t>(kActor+slot*0xD0+0x80)&1;
+        if(active!=slot || ko) {
+            ffnx_trace("Party Switch: selector auto-closed; active=%d slot=%d ko=%u.\n",
+                active,slot,ko);
+            close_menu(); return;
         }
         if(edge&0x10) { close_menu(); ffnx_trace("Party Switch: selector cancelled; turn retained.\n"); return; }
         if(edge&0x1000) chosen=(chosen+count-1)%count;
         if(edge&0x4000) chosen=(chosen+1)%count;
         if(edge&0x40) {
             const int id=choices[chosen];
-            if(!eligible(id)) { close_menu(); return; }
+            if(!eligible(id)) {
+                ffnx_trace("Party Switch: selector closed; reserve %d ineligible.\n",id);
+                close_menu(); return;
+            }
             if(!event_room(1)) return; // retain selector and turn on a full queue
             incoming=id; outgoing=mem<std::uint8_t>(kParty+slot);
             ++generation;
@@ -296,6 +321,9 @@ void lexeditor_ff8_party_switch_tick() {
     if(!ff8 || !original) return;
     const auto *mode=getmode_cached();
     if(!mode || mode->driver_mode!=MODE_BATTLE) {
+        if(opened || pending)
+            ffnx_trace("Party Switch: selector state reset by mode exit (opened=%d pending=%d).\n",
+                opened ? 1 : 0, pending ? 1 : 0);
         if(pending || opened) ++generation;
         opened=false; pending=false; phase=Phase::idle; slot=-1; count=0; previous=0;
         reserve={};

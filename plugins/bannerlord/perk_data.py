@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import re
 import shutil
+from core.numeric_values import integer_value, finite_number
 
 from .paths import contained_project_path
 from .source_revision import (
@@ -65,7 +66,7 @@ def _float_value(token: str) -> float:
 
 
 def _float_literal(value) -> str:
-    number = float(value)
+    number = finite_number(value, "Perk value")
     if not math.isfinite(number):
         raise ValueError("Value must be finite")
     if abs(number) > 1_000_000_000:
@@ -131,7 +132,7 @@ def save_perk_definitions(
     replacements: list[tuple[int, int, str]] = []
     changed_records: set[int] = set()
     for edit in edits:
-        index = int(edit.get("index", -1))
+        index = integer_value(edit.get("index", -1), "Perk index")
         row = by_index.get(index)
         if row is None:
             raise ValueError(f"Perk {index} no longer exists")
@@ -143,7 +144,7 @@ def save_perk_definitions(
         if unknown:
             raise ValueError(f"Unsupported perk fields: {', '.join(sorted(unknown))}")
         if "level" in fields:
-            level = int(fields["level"])
+            level = integer_value(fields["level"], "Perk level")
             if not 0 <= level <= 100:
                 raise ValueError("Perk level must be between 0 and 100")
             if level != row["level"]:
@@ -223,7 +224,7 @@ def save_xp_source_definitions(
     replacements: list[tuple[int, int, str]] = []
     changed_records: set[int] = set()
     for edit in edits:
-        index = int(edit.get("index", -1))
+        index = integer_value(edit.get("index", -1), "XP source index")
         row = by_index.get(index)
         if row is None:
             raise ValueError(f"XP source {index} no longer exists")
@@ -236,7 +237,7 @@ def save_xp_source_definitions(
             raise ValueError(f"Unsupported XP source fields: {', '.join(sorted(unknown))}")
         if "defaultAmount" not in fields:
             continue
-        amount = float(fields["defaultAmount"])
+        amount = finite_number(fields["defaultAmount"], "XP source amount")
         if not math.isfinite(amount) or amount < 0:
             raise ValueError("XP source amount must be a finite non-negative number")
         if amount > 1_000_000_000:

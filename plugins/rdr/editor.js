@@ -207,7 +207,10 @@
     if(!state.settings?.available){$("#main").replaceChildren(unavailable("LexerRDR.ini is missing",state.settings?.reason||"The runtime settings file must be present before its values can be edited."));shell.refresh();return;}
     const sections=state.settings.sections.map(section=>LexeditorUI.detailSection({title:section.name,body:[section.help?LexeditorUI.detailNote(section.help):null,
       ...section.settings.map(setting=>LexeditorUI.detailField({label:setting.key,description:setting.help||"",control:settingControl(section,setting)}))]}));
-    $("#main").replaceChildren(LexeditorUI.settingsColumns(sections));shell.refresh();
+    // The shared Tweaks page: LexerRDR.ini, and ReShade on a subtab of its
+    // own wherever the host offers it.
+    $("#main").replaceChildren(LexeditorUI.tweaksPage({plugin:"rdr",render:renderSettings,
+      pages:[{id:"settings",label:"LexerRDR.ini",body:()=>sections}]}));shell.refresh();
   }
 
   function lootNumber(parent,key,label,step="1",minimum="0",maximum="100000",note=""){

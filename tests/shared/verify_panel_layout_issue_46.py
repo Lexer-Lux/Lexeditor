@@ -2,14 +2,15 @@
 
 import re
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-blank = (ROOT / "plugins" / "blank" / "editor.html").read_text(encoding="utf-8")
+ff8 = plugin_ui("ff8")
+rdr2 = plugin_ui("rdr2")
+blank = plugin_ui("blank")
 
 
 def require(condition: bool, message: str) -> None:
@@ -47,9 +48,10 @@ require("const subtabBar = (options" in framework and "subtabBar," in framework,
         "nested navigation must use one exported shared subtab control")
 require("const tabbedPanel = (options" in framework and "tabbedPanel," in framework,
         "tabbed panels must have one exported shared component")
-require('tabbedPanel({className:"blank-subtab-panel"' in blank,
+subtab = blank.split("function subtabPanel(){",1)[1].split("const TWEAK_GROUPS=",1)[0]
+require('return tabbedPanel({tabs,active:subtab' in subtab,
         "Blank Game must demonstrate the shared tabbed panel")
-require('label:"Tabbed Panel"' in blank,
+require('label:"Blank Game tabbed-panel example"' in subtab,
         "Blank Game must name the tabbed-panel example clearly")
 require(".lex-panel-layout" in css and ".lex-panel-layout-divider" in css,
         "shared CSS must own layout and divider appearance")

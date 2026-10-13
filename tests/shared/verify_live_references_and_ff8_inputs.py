@@ -1,6 +1,7 @@
 """Shared live-reference and FF8 structured-input contracts."""
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -8,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    ff8 = plugin_ui('ff8')
 
     # A shell refresh must update every mounted provenance control. Input and
     # change events must refresh synchronously; a tab rebuild is not allowed.
@@ -16,9 +17,14 @@ def main() -> int:
     refresh_body = framework[framework.index("function refresh() {"):
                              framework.index("function refresh() {") + 900]
     assert refresh_body.index("refreshReferences();") < refresh_body.index("const dirty")
-    assert 'addEventListener?.("input", refresh)' in framework
-    assert 'addEventListener?.("change", refresh)' in framework
-    assert "requestAnimationFrame(refresh)" not in framework
+    provenance = framework[framework.index('const provenanceControl ='):
+                           framework.index('const integrationStatus =')]
+    assert 'addEventListener?.("input", refresh)' in provenance
+    assert 'addEventListener?.("change", refresh)' in provenance
+    # A panel-layout refresh also uses this local name, but its animation
+    # frame does not defer reference updates after an input event.
+    assert "requestAnimationFrame(refresh)" not in provenance
+    assert "requestAnimationFrame(refresh)" not in refresh_body
 
     # Hit rate is one stored byte with two synchronized player-facing inputs.
     assert "function ratio255Control" in ff8

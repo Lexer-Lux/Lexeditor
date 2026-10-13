@@ -851,6 +851,38 @@
           "name": "TKGP / JKAnderson - SoulsTemplates",
           "role": "Apache-2.0 BND3 and DCX format reference for fixed-size, byte-preserving item edits. No template code is bundled.",
           "url": "https://github.com/JKAnderson/SoulsTemplates"
+        },
+        {
+          "name": "Grimrukh / soulstruct",
+          "role": "GPL-3.0-or-later FLVER2 model format facts behind the model reader; no upstream code is bundled.",
+          "url": "https://github.com/Grimrukh/soulstruct"
+        },
+        {
+          "name": "Three.js authors",
+          "role": "MIT-licensed 3D library vendored for the map viewport (three.module.js, OrbitControls and TransformControls, pinned to r170).",
+          "url": "https://github.com/mrdoob/three.js"
+        },
+        {
+          "name": "Meowmaritus / SoulsAssetPipeline",
+          "role": "GPL-3.0-or-later TAG0 tagfile and spline-animation facts behind the animation reader (commit d11caf9); no upstream code is bundled.",
+          "url": "https://github.com/Meowmaritus/SoulsAssetPipeline"
+        },
+        {
+          "name": "PredatorCZ / HavokLib",
+          "role": "GPL-3.0-or-later spline-decompression facts behind the animation sampler; no upstream code is bundled.",
+          "url": "https://github.com/PredatorCZ/HavokLib"
+        },
+        {
+          "name": "Installed Dark Souls Remastered (title art)",
+          "role": "The Title texture from the installed menu/<language>/menu_local.tpf.dcx, rendered to PNG into the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (menu fonts)",
+          "role": "Menu font sources from the installed font/<language>/ folder (DSFont24.ccm.dcx, TalkFont24.ccm.dcx, *.fnt), cached raw in the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (interface sounds)",
+          "role": "Sound inventory from the installed sound/frpg_sm*.fsb banks with their frpg_sm*.fev event projects, cached in the private ds1-theme cache at serve time; never redistributed."
         }
       ],
       "thanks": [],

@@ -7,6 +7,11 @@ const {
 } = LexeditorUI;
 
 const KINDS = ["recipes", "items", "machines", "technologies"];
+const UINT64_MAX = "18446744073709551615";
+function researchCountIssue(value, inherited) {
+  return value !== BigInt(inherited) && BigInt(Number(value)) !== value
+    ? "The game would round this count. Enter an exactly representable whole number." : "";
+}
 const LABELS = {
   recipes: "Recipes",
   items: "Items",
@@ -88,31 +93,44 @@ function inputNumber(value, options, change) {
     type: "number",
     value: value ?? "",
     step: options.step ?? "any",
+    required: true,
+    "data-lex-validate-number": "true",
     "aria-label": options.label,
-    onchange: event => {
-      if (event.target.value === "") {
-        event.target.setCustomValidity("A numeric value is required.");
-        event.target.reportValidity();
-        return;
-      }
-      const number = Number(event.target.value);
-      if (!Number.isFinite(number)) {
-        event.target.setCustomValidity("Enter a finite number.");
-        event.target.reportValidity();
-        return;
-      }
-      const validation = typeof options.validate === "function" ? options.validate(number) : "";
-      if (validation) {
-        event.target.setCustomValidity(validation);
-        event.target.reportValidity();
-        return;
-      }
-      event.target.setCustomValidity("");
-      void change(number);
-    },
   });
   if (options.min !== undefined) input.min = String(options.min);
   if (options.max !== undefined) input.max = String(options.max);
+  const validate = () => {
+    input.setCustomValidity("");
+    if (input.value === "") {
+      input.setCustomValidity("A numeric value is required.");
+      return null;
+    }
+    const number = Number(input.value);
+    if (!Number.isFinite(number)) {
+      input.setCustomValidity("Enter a finite number.");
+      return null;
+    }
+    const validation = options.step === 1 && !Number.isSafeInteger(number)
+      ? "Enter a whole number within the exact integer range."
+      : options.min !== undefined && number < options.min
+        ? `Enter a number of at least ${options.min}.`
+        : options.max !== undefined && number > options.max
+          ? `Enter a number no greater than ${options.max}.`
+          : typeof options.validate === "function" ? options.validate(number) : "";
+    if (validation) {
+      input.setCustomValidity(validation);
+      return null;
+    }
+    return input.checkValidity() ? number : null;
+  };
+  input.lexValidateNumber = () => validate() !== null;
+  input.oninput = validate;
+  input.onchange = () => {
+    const number = validate();
+    if (number === null) { input.reportValidity(); return; }
+    void change(number);
+  };
+  validate();
   return options.unit ? unitField(input, options.unit) : input;
 }
 
@@ -147,32 +165,61 @@ function rowChanges(kind, row) {
     prerequisites: [...(row.prerequisites || [])],
   };
   if (row.unitCount !== null && row.unitCount !== undefined && !row.unitCountFormula)
-    value.unit_count = Number(row.unitCount);
+    value.unit_count = row.unitCount;
   if (row.unitTime !== null && row.unitTime !== undefined)
     value.unit_time = Number(row.unitTime);
   return value;
 }
 
-async function commitRow(kind, row) {
+let rowEditQueue = Promise.resolve();
+let rowRenderPending = false;
+function flushRowRender() {
+  if (!rowRenderPending) return;
+  const main = document.querySelector("#main"), active = document.activeElement;
+  if (main.contains(active) && active.matches("input,select,textarea,[contenteditable=true]") &&
+      !active.disabled && !active.readOnly) return;
+  rowRenderPending = false;
+  void render();
+}
+function requestRowRender() {
+  rowRenderPending = true;
+  flushRowRender();
+}
+function commitRow(kind, row) {
+  const apply = () => applyRowEdit(kind, row);
+  rowEditQueue = rowEditQueue.then(apply, apply);
+  return rowEditQueue;
+}
+
+async function applyRowEdit(kind, row) {
   try {
+    const current = state.data[kind].find(value => value.name === row.name) || row;
+    if (row._changedKey) {
+      const key = row._changedKey;
+      const unchanged = key === "unitCount" ? String(row[key]) === String(current[key])
+        : JSON.stringify(row[key]) === JSON.stringify(current[key]);
+      if (unchanged) return;
+    }
+    const candidate = row._changedKey ? changedCopy(current, row._changedKey, row[row._changedKey]) : row;
     const result = await jsonPost("/api/edit", {
-      kind, name: row.name, changes: rowChanges(kind, row),
+      kind, name: row.name, changes: rowChanges(kind, candidate),
     });
     const rows = state.data[kind];
     const index = rows.findIndex(value => value.name === row.name);
     if (index >= 0) rows[index] = result.row;
     state.config.dirty = result.dirty;
-    render();
+    requestRowRender();
     refreshShell();
   } catch (error) {
     LexeditorUI.showToast?.(error.message, true);
-    render();
+    requestRowRender();
   }
 }
 
 function changedCopy(row, key, value) {
   const copy = LexeditorUI.clone(row);
   copy[key] = value;
+  copy._changedKey = key;
   return copy;
 }
 
@@ -218,7 +265,7 @@ function recipePanel(row) {
 function itemPanel(row) {
   const stack = inputNumber(row.stackSize, {
     label: "Stack size", min: 1, max: 4294967295, step: 1, unit: "items",
-  }, value => commitRow("items", changedCopy(row, "stackSize", Math.trunc(value))));
+  }, value => commitRow("items", changedCopy(row, "stackSize", value)));
   return detailPanel({
     title: row.name, identity: null,
     meta: `${row.prototypeType}${row.modified ? " · modified by this project" : ""}`,
@@ -289,9 +336,11 @@ function technologyPanel(row) {
     ? readonlyField(`Formula: ${row.unitCountFormula}`)
     : row.unitCount === null || row.unitCount === undefined
       ? readonlyField("Trigger-only technology")
-      : inputNumber(row.unitCount, {
-          label: "Research unit count", min: 1, max: Number.MAX_SAFE_INTEGER, step: 1, unit: "units",
-        }, value => commitRow("technologies", changedCopy(row, "unitCount", Math.trunc(value))));
+      : unitField(LexeditorUI.exactIntegerInput({value:row.unitCount,
+          label:"Research unit count", min:1, max:UINT64_MAX,
+          validate:value=>researchCountIssue(value,row.unitCount),
+          change:value=>{void commitRow("technologies",changedCopy(row,"unitCount",value));}
+        }), "units", {boxed:true});
   const time = row.unitTime === null || row.unitTime === undefined
     ? readonlyField("—")
     : inputNumber(row.unitTime, {
@@ -307,8 +356,8 @@ function technologyPanel(row) {
           help: infoHelp("Whether the technology is enabled and available to its normal research conditions.")}),
         detailField({label: "PREREQUISITES", dataType: "REFS", control: prerequisiteControl(row),
           help: infoHelp("A prerequisite must be researched before this technology can be researched, shaping the technology-tree progression.")}),
-        detailField({label: "UNIT COUNT", dataType: row.unitCountFormula ? "FORMULA" : "INT", min: 1, control: count,
-          help: infoHelp("How many research units the technology consumes. Technologies whose cost changes by level keep their authored formula instead of replacing it with a fixed cost.")}),
+        detailField({label: "UNIT COUNT", dataType: row.unitCountFormula ? "FORMULA" : "INT", min: 1, max: UINT64_MAX, control: count,
+          help: infoHelp("How many research units the technology consumes. Technologies whose cost changes by level keep their formula. Very large counts must use values the game can store without rounding.")}),
         detailField({label: "UNIT TIME", dataType: "FLOAT", control: time,
           help: infoHelp("Research time for one unit in a lab running at speed 1. Total research time also depends on the unit count and lab speed.")}),
       ]}),
@@ -363,6 +412,17 @@ function unavailableCellEditor(message, commit) {
 function optionalNumberCellEditor(row, key, commit, options = {}) {
   if (typeof options.available === "function" && !options.available(row))
     return unavailableCellEditor(options.unavailable || "This value is source-controlled.", commit);
+  if (options.exactInteger) {
+    const editor = LexeditorUI.exactIntegerInput({value:row[key],min:options.min,max:options.max,
+      label:options.label||key,validate:options.validate,change:commit});
+    const input = editor.querySelector('input');
+    input.addEventListener('keydown',event=>{
+      if(event.key==='Enter'){event.preventDefault();editor.lexCommitInteger();}
+      if(event.key==='Escape'){event.preventDefault();commit(undefined);}
+    });
+    input.addEventListener('blur',()=>editor.lexCommitInteger());
+    return editor;
+  }
   const input = el("input", {
     type: "number",
     value: row[key] ?? "",
@@ -386,7 +446,11 @@ function numberCellEdit(kind, key, options = {}) {
       LexeditorUI.showToast?.("Enter a finite number.", true);
       return;
     }
-    const next = options.integer ? Math.trunc(number) : number;
+    if (options.integer && !Number.isSafeInteger(number)) {
+      LexeditorUI.showToast?.("Enter a whole number within the exact integer range.", true);
+      return;
+    }
+    const next = number;
     const validation = typeof options.validate === "function" ? options.validate(next) : "";
     if (validation) {
       LexeditorUI.showToast?.(validation, true);
@@ -454,15 +518,12 @@ const columns = {
       editor: (row, commit) => optionalNumberCellEditor(row, "unitCount", commit, {
         available: row => !row.unitCountFormula && row.unitCount !== null && row.unitCount !== undefined,
         unavailable: row?.unitCountFormula ? "Formula-controlled research count." : "Trigger-only technology.",
-        min: 1, max: Number.MAX_SAFE_INTEGER, step: 1, label: "Research unit count",
+        min: 1, max: UINT64_MAX, step: 1, label: "Research unit count", exactInteger:true,
+        validate:value=>researchCountIssue(value,row.unitCount),
       }),
       edit: (row, value) => {
         if (row.unitCountFormula || row.unitCount === null || row.unitCount === undefined) return;
-        numberCellEdit("technologies", "unitCount", {
-          integer: true,
-          validate: number => number >= 1 && number <= Number.MAX_SAFE_INTEGER
-            ? "" : "This UI accepts fixed research counts from 1 through JavaScript's exact integer limit.",
-        })(row, value);
+        void commitRow("technologies", changedCopy(row, "unitCount", String(value)));
       },
     },
     {
@@ -686,6 +747,7 @@ async function renderDataMap() {
 }
 
 async function render() {
+  rowRenderPending = false;
   const main = document.querySelector("#main");
   if (!state.error && state.tab === "datamap" && !state.datamap) {
     main.replaceChildren(loadingState("Loading Data Map…"));
@@ -736,6 +798,17 @@ async function loadRows() {
 }
 
 async function save() {
+  for (const input of document.querySelectorAll('#main input[type="number"],#main input[data-lex-exact-integer]')) {
+    if (input.disabled || input.readOnly || !input.getClientRects().length) continue;
+    const valid = input.lexValidateNumber ? input.lexValidateNumber()
+      : input.lexValidateInteger?.() ?? input.checkValidity();
+    if (!valid) {
+      // The shell releases its busy/inert state before the next frame.
+      requestAnimationFrame(() => { if (input.isConnected) input.reportValidity(); });
+      throw new Error(`Correct ${input.getAttribute('aria-label') || 'the numeric value'} before saving.`);
+    }
+  }
+  await rowEditQueue;
   if (!sourceReady()) return;
   const result = await jsonPost("/api/save", {});
   state.config.dirty = result.dirty;
@@ -743,6 +816,7 @@ async function save() {
 }
 
 async function discard() {
+  await rowEditQueue;
   if (!sourceReady()) return;
   await jsonPost("/api/discard", {});
   state.config = await api("/api/config");
@@ -753,6 +827,7 @@ async function discard() {
 }
 
 async function reopen() {
+  await rowEditQueue;
   document.querySelector("#main").replaceChildren(loadingState("Reopening Factorio project…"));
   refreshShell();
   try {
@@ -818,6 +893,7 @@ async function boot() {
   }
 }
 
+document.querySelector("#main").addEventListener("focusout", () => requestAnimationFrame(flushRowRender));
 document.querySelector("#main").replaceChildren(loadingState());
 refreshShell();
 void boot();

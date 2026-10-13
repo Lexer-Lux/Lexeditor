@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .dataobject import Entry
 from .graphics_tweaks import (
     DEFAULT_GRAPHICS_CONFIG,
@@ -134,9 +136,13 @@ def save_graphics_virtual_package(project_root: Path, *, source_sha256: str,
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("each graphics edit must be an object")
-        if int(edit.get("entry", -1)) != 0 or "index" in edit:
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("Graphics edit contains unsupported fields")
+        if integer_value(edit.get("entry", -1), "Graphics entry index") != 0 or "index" in edit:
             raise ValueError("Graphics Tweaks supports only scalar edits on its single record")
-        prop = str(edit.get("property", ""))
+        prop = edit.get("property", "")
+        if not isinstance(prop, str):
+            raise TypeError("Graphics property must be text")
         if prop != "DisableEyeAdaptation":
             raise ValueError(f"graphics property is read-only or unknown: {prop}")
         if seen:

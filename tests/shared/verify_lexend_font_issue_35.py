@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,10 +56,10 @@ def main() -> int:
     assert 'headingFont"].startswith("Lexend")' in host
 
     # Every current game skin explicitly replaces the neutral typography.
-    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-    rdr = (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
-    warband = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
-    rdr2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+    ff8 = plugin_ui("ff8")
+    rdr = plugin_ui("rdr")
+    warband = plugin_ui("warband")
+    rdr2 = plugin_ui("rdr2")
     assert '--lex-font:"FF8 Menu"' in ff8
     assert "--lex-font:RDRLino" in rdr
     assert '--lex-font:"Segoe UI"' in warband

@@ -166,15 +166,27 @@ def test_writing_validates_and_writes_every_key_once(game):
 
 @pytest.mark.parametrize("changes", [
     {"InjectorSettings": {"MenuScale": 5}},
+    {"InjectorSettings": {"MenuScale": float("nan")}},
+    {"InjectorSettings": {"MenuScale": float("inf")}},
+    {"InjectorSettings": {"MenuScale": "NaN"}},
+    {"InjectorSettings": {"MenuScale": 10 ** 400}},
     {"InjectorSettings": {"InjectorEnabled": "maybe"}},
     {"InjectorSettings": {"OpenMenuKey": 999}},
     {"ShaderDiscovery": {"Mode": 7}},
     {"Nope": {"Nothing": 1}},
 ])
-def test_bad_values_are_refused_before_anything_is_written(game, changes):
+@pytest.mark.parametrize("existing", [False, True])
+def test_bad_values_are_refused_before_anything_is_written(game, changes, existing):
+    path = game / si.INI
+    before = b"[InjectorSettings]\nMenuScale=1.25\n[Custom]\nMine=keep\n"
+    if existing:
+        path.write_bytes(before)
     with pytest.raises(ValueError):
         si.write_settings(game, changes)
-    assert not (game / si.INI).exists()
+    if existing:
+        assert path.read_bytes() == before
+    else:
+        assert not path.exists()
 
 
 def test_a_file_the_injector_would_reject_is_reported(game):

@@ -1,7 +1,93 @@
 // ----- Challenges (goals_sp.meta) -----
+function validateChallengeDrafts(){
+  const data=refStore(state.ds).challenges,vanilla=refStore('vanilla').challenges||data;
+  const goalFor=name=>{const matches=(data?.goals||[]).filter(goal=>goal.name===name);return matches.length===1?matches[0]:null;};
+  const requirementFor=key=>{
+    const cut=key.lastIndexOf('|'),name=key.slice(0,cut),rawIndex=key.slice(cut+1),index=Number(rawIndex);
+    const requirements=(goalFor(name)?.requirements||[]).filter(req=>req.index===index);
+    if(cut<1||!/^(?:0|[1-9]\d*)$/.test(rawIndex)||!Number.isSafeInteger(index)||requirements.length!==1||requirements[0].readonly||dispatchNumericError(requirements[0].value))throw new Error(`${key} is read-only or unavailable.`);
+    return requirements[0];
+  };
+  const exactShape=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+  const sourcePairs=vanilla?.allowedSourcePairs||[];
+  const knownSource=source=>sourcePairs.some(pair=>pair.base===(source.base||'')&&pair.permutation===(source.permutation||''));
+  const removedBranches=new Map();
+  for(const [key,value] of Object.entries(state.challengeEdits)){
+    requirementFor(key);
+    const error=dispatchNumericError(value);if(error)throw new Error(`${key}: ${error}`);
+  }
+  for(const [key,edit] of Object.entries(state.challengeSourceEdits)){
+    const cut=key.lastIndexOf('|'),target=key.slice(0,cut),rawIndex=key.slice(cut+1),index=Number(rawIndex),req=requirementFor(target);
+    const source=req.sources?.[index],remove=edit?.remove===true;
+    if(cut<1||!/^(?:0|[1-9]\d*)$/.test(rawIndex)||!Number.isSafeInteger(index)||!source||source.readonly||!knownSource(source)||
+       !exactShape(edit,remove?['index','remove']:['index','base','permutation'])||edit.index!==index||
+       (!remove&&(typeof edit.base!=='string'||typeof edit.permutation!=='string'||!knownSource(edit))))throw new Error(`${key}: invalid or read-only challenge score source.`);
+    if(remove){
+      const meta=source.removal;
+      if(!meta||![meta.group,meta.branch,meta.count].every(Number.isSafeInteger)||meta.group<0||meta.branch<0||meta.branch>=meta.count||meta.count<2)throw new Error(`${key}: unmodeled challenge score branch.`);
+      const groupKey=`${target}|${meta.group}`,removed=removedBranches.get(groupKey)||{branches:new Set(),count:meta.count};
+      if(removed.branches.has(meta.branch)||removed.count!==meta.count)throw new Error(`${key}: duplicate or ambiguous challenge score branch.`);
+      const members=req.sources.filter(row=>row.removal?.group===meta.group&&row.removal?.branch===meta.branch);
+      if(members.some(row=>row.readonly||!knownSource(row)))throw new Error(`${key}: read-only challenge score branch.`);
+      removed.branches.add(meta.branch);removedBranches.set(groupKey,removed);
+    }
+  }
+  for(const [key,removed] of removedBranches)if(removed.branches.size>=removed.count)throw new Error(`${key}: cannot remove every challenge score branch.`);
+  for(const [key,edit] of Object.entries(state.challengeSourceEdits))if(!edit.remove){
+    const cut=key.lastIndexOf('|'),target=key.slice(0,cut),source=requirementFor(target).sources[edit.index],meta=source.removal;
+    if(meta&&removedBranches.get(`${target}|${meta.group}`)?.branches.has(meta.branch))throw new Error(`${key}: cannot edit a removed challenge score branch.`);
+  }
+  for(const [key,edit] of Object.entries(state.challengeConditionEdits)){
+    if(!exactShape(edit,['goal','index','type','field','value'])||typeof edit.goal!=='string'||!Number.isSafeInteger(edit.index)||edit.index<0||
+       typeof edit.type!=='string'||typeof edit.field!=='string'||typeof edit.value!=='string'||key!==`${edit.goal}|${edit.index}|${edit.field}`)throw new Error(`${key}: invalid challenge condition draft.`);
+    const conditions=(goalFor(edit.goal)?.conditions||[]).filter(condition=>condition.index===edit.index),condition=conditions.length===1?conditions[0]:null;
+    const known=vanilla?.allowedConditionValues?.find(row=>row.type===edit.type&&row.field===edit.field)?.values||[];
+    if(!condition||condition.type!==edit.type||!Object.hasOwn(condition.fields,edit.field)||!known.includes(condition.fields[edit.field])||!known.includes(edit.value))throw new Error(`${key}: invalid or read-only challenge condition.`);
+  }
+  for(const [key,rewards] of Object.entries(state.challengeRewardEdits)){
+    const cut=key.lastIndexOf('|'),name=key.slice(0,cut),rawRank=key.slice(cut+1),rank=Number(rawRank);
+    const strands=(data?.strands||[]).filter(strand=>strand.name===name),ranks=strands.length===1?strands[0].ranks.filter(row=>row.rank===rank):[];
+    const allowed=vanilla?.allowedRewards||[],known=reward=>allowed.some(row=>row.type===reward.type&&row.value===reward.value);
+    if(cut<1||!/^[1-9]\d*$/.test(rawRank)||!Number.isSafeInteger(rank)||ranks.length!==1||ranks[0].rewardsReadonly||!ranks[0].rewards.every(known)||!Array.isArray(rewards))throw new Error(`${key}: read-only or unavailable challenge rewards.`);
+    if(rewards.some(reward=>!exactShape(reward,['type','value'])||typeof reward.type!=='string'||typeof reward.value!=='string'||!known(reward)||reward.value.includes('CHALLENGE_REWARD_TYPE_MONEY_')))throw new Error(`${key}: invalid challenge reward draft.`);
+  }
+  for(const [name,mode] of Object.entries(state.challengeModeEdits)){
+    if(mode!=='series'||(data?.strands||[]).filter(strand=>strand.name===name).length!==1)throw new Error(`${name}: unsupported challenge strand mode.`);
+  }
+}
+function challengeRemovedBranch(req,source,key){
+  const meta=source.removal;
+  return !!meta&&req.sources.some((row,index)=>row.removal?.group===meta.group&&row.removal?.branch===meta.branch&&state.challengeSourceEdits[`${key}|${index}`]?.remove);
+}
+function challengeCanRemoveSource(req,index,key,known){
+  const source=req.sources[index],meta=source.removal;
+  if(!meta||meta.count<2||req.sources.findIndex(row=>row.removal?.group===meta.group&&row.removal?.branch===meta.branch)!==index)return false;
+  const members=req.sources.filter(row=>row.removal?.group===meta.group&&row.removal?.branch===meta.branch);
+  if(members.some(row=>row.readonly||!known.some(pair=>pair.base===(row.base||'')&&pair.permutation===(row.permutation||''))))return false;
+  const removed=new Set(req.sources.filter(row=>row.removal?.group===meta.group&&challengeRemovedBranch(req,row,key)).map(row=>row.removal.branch));
+  return removed.size+1<meta.count;
+}
+function challengeSaveBody(){
+  const keys=new Set([...Object.keys(state.challengeEdits), ...Object.keys(state.challengeSourceEdits).map(key=>key.slice(0,key.lastIndexOf('|')))]);
+  const edits=[...keys].map(key=>{const cut=key.lastIndexOf('|'),name=key.slice(0,cut),index=Number(key.slice(cut+1));
+    const req=refStore(state.ds).challenges.goals.find(goal=>goal.name===name).requirements.find(row=>row.index===index);
+    return {name,index,value:state.challengeEdits[key]??req.value,sources:Object.entries(state.challengeSourceEdits).filter(([sourceKey])=>sourceKey.slice(0,sourceKey.lastIndexOf('|'))===key).map(([,value])=>value)};});
+  const rewards=Object.entries(state.challengeRewardEdits).map(([key,list])=>{const cut=key.lastIndexOf('|'),challenge=key.slice(0,cut),rank=Number(key.slice(cut+1));
+    const rankRow=refStore(state.ds).challenges.strands.find(strand=>strand.name===challenge).ranks.find(row=>row.rank===rank);
+    return {challenge,rank,owner:rankRow.owner,ownerRank:rankRow.ownerRank,rewards:list};});
+  return {edits,rewards,conditions:Object.values(state.challengeConditionEdits),uiEdits:Object.values(state.challengeUiEdits),
+    modes:Object.entries(state.challengeModeEdits).map(([challenge,mode])=>({challenge,mode}))};
+}
+async function preflightChallengeSave(){
+  validateChallengeDrafts();
+  const body=challengeSaveBody();
+  if(Object.values(body).some(rows=>rows.length))await api('/api/challenges/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return body;
+}
 function challengeUiInput(key,base,meta){const cur=state.challengeUiEdits[key]?.value??base;return el("input",{class:"key",value:cur,title:"Localization key, not literal English text. The displayed wording lives in localization resources.",onchange:ev=>{if(ev.target.value===base)delete state.challengeUiEdits[key];else state.challengeUiEdits[key]={...meta,value:ev.target.value};renderToolbarOnly();}});}
 const CHALLENGE_XP_AMOUNTS={FIRST:25,SECOND:50,THIRD:100,FOURTH:150};
 function challengeRewardLabel(reward){
+  if(!reward.value)return reward.type||'(empty reward)';
   const m=reward.value.match(/^CHALLENGE_REWARD_TYPE_XP_(HEALTH|STAMINA|DEADEYE)_(FIRST|SECOND|THIRD|FOURTH)_RANK$/);
   if(m)return `${m[1]==="DEADEYE"?"Dead Eye":m[1][0]+m[1].slice(1).toLowerCase()} XP +${CHALLENGE_XP_AMOUNTS[m[2]]}`;
   return reward.value.replace("CHALLENGE_REWARD_TYPE_","").replaceAll("_"," ");
@@ -65,23 +151,35 @@ async function renderChallenges() {
         const roleLabel=req.role==="exclusion"?"EXCLUSION GUARD — MUST NOT INCREASE":req.role==="condition"?"REQUIRED CONDITION / TRIGGER":req.role==="reset"?"RESET WINDOW / TIME LIMIT":"COUNTS TOWARD GOAL";
         sourceCell.append(el("div",{class:"cat",title:req.behavior||"Primary challenge counter"},roleLabel));
         if(!req.sources.length)sourceCell.append(el("span",{class:"cat"},"Derived condition (not a stat selector)"));
-        const activeSourceCount=req.sources.filter((source,sourceIndex)=>!state.challengeSourceEdits[`${goal.name}|${req.index}|${sourceIndex}`]?.remove).length;
-        req.sources.forEach((source,sourceIndex)=>{const sk=`${goal.name}|${req.index}|${sourceIndex}`,edited=state.challengeSourceEdits[sk]||source;if(edited.remove)return;const current=`${edited.base||""}::${edited.permutation||""}`;
+        req.sources.forEach((source,sourceIndex)=>{const sk=`${goal.name}|${req.index}|${sourceIndex}`,edited=state.challengeSourceEdits[sk]||source;if(edited.remove||challengeRemovedBranch(req,source,ek))return;const current=`${edited.base||""}::${edited.permutation||""}`;
+          const supported=!req.readonly&&!dispatchNumericError(req.value)&&!source.readonly&&sourceValues.some(value=>(value.base||'')===(source.base||'')&&(value.permutation||'')===(source.permutation||''));
+          if(!supported){const locked=LexeditorUI.readonlyField([source.base,source.permutation].filter(Boolean).join(' + ')||'(empty score source)');locked.setAttribute('aria-label',`${goal.name} score source ${sourceIndex}`);sourceCell.append(locked);return;}
           const sel=el("select",{class:"key",onchange:ev=>{const [base,permutation]=ev.target.value.split("::");state.challengeSourceEdits[sk]={index:sourceIndex,base,permutation};renderChallenges();}},
             ...sourceValues.map(v=>{const value=`${v.base||""}::${v.permutation||""}`,label=v.label||[v.base,v.permutation].filter(Boolean).join(" + "),o=el("option",{value,title:value},label);if(value===current)o.selected=true;return o;}));
-          const vsource=vreq?.sources?.[sourceIndex],controls=LexeditorUI.actionRow(sel);if(activeSourceCount>1&&!isRO())controls.append(closeButton({title:"Remove this counter from the summed requirement",onclick:()=>{state.challengeSourceEdits[sk]={index:sourceIndex,remove:true};renderChallenges();}}));sourceCell.append(LexeditorUI.stack({fill:false},controls,vsource&&current!==`${vsource.base||""}::${vsource.permutation||""}`?refLine([["V","vtag",vsource.label||[vsource.base,vsource.permutation].filter(Boolean).join(" + ")]],String):""));});
-        const amount=LexeditorUI.stack({fill:false},el("input",{type:"number",step:"any",value:cur,class:ek in state.challengeEdits?"edited":"",onchange:ev=>{state.challengeEdits[ek]=ev.target.value;renderChallenges();}}));
-        if(vreq&&Number(cur)!==Number(vreq.value)){const vr=el("span",{title:"Vanilla target — click to apply",onclick:()=>{state.challengeEdits[ek]=vreq.value;renderChallenges();}},el("b",{class:"vtag"},"V "),vreq.value);amount.append(el("div",{class:"ref"},vr));}
+          sel.disabled=isRO();
+          sel.setAttribute('aria-label',`${goal.name} score source ${sourceIndex}`);
+          const vsource=vreq?.sources?.[sourceIndex],controls=LexeditorUI.actionRow(sel);if(!isRO()&&challengeCanRemoveSource(req,sourceIndex,ek,sourceValues))controls.append(closeButton({title:"Remove this counter from the summed requirement",onclick:()=>{
+            for(const [index,row] of req.sources.entries())if(row.removal?.group===source.removal.group&&row.removal?.branch===source.removal.branch)delete state.challengeSourceEdits[`${ek}|${index}`];
+            state.challengeSourceEdits[sk]={index:sourceIndex,remove:true};renderChallenges();
+          }}));sourceCell.append(LexeditorUI.stack({fill:false},controls,vsource&&current!==`${vsource.base||""}::${vsource.permutation||""}`?refLine([["V","vtag",vsource.label||[vsource.base,vsource.permutation].filter(Boolean).join(" + ")]],String):""));});
+        const editable=!isRO()&&!req.readonly&&!dispatchNumericError(req.value);
+        const target=dispatchNumericError(req.value)?LexeditorUI.readonlyField(req.value):el("input",{type:"number",step:"any",required:true,disabled:!editable,"data-lex-validate-number":"true",value:cur,class:ek in state.challengeEdits?"edited":"",oninput:ev=>{if(!editable)return;const value=ev.target.value;ev.target.setCustomValidity(dispatchNumericError(value));if(value===String(req.value))delete state.challengeEdits[ek];else state.challengeEdits[ek]=value;renderToolbarOnly();}});
+        target.setAttribute('aria-label',`${goal.name} target ${req.index}`);
+        const amount=LexeditorUI.stack({fill:false},target);
+        if(vreq&&String(cur)!==String(vreq.value)){const vr=el("span",{title:"Vanilla target — click to apply",onclick:()=>{if(!editable)return;state.challengeEdits[ek]=vreq.value;renderChallenges();}},el("b",{class:"vtag"},"V "),vreq.value);amount.append(el("div",{class:"ref"},vr));}
         conditionsBox.append(LexeditorUI.controlGroup([sourceCell,{label:"Target",control:amount}]));});
       for(const condition of goal.conditions||[]){const vg=vanillaGoal[goal.name],vc=vg?.conditions?.find(x=>x.index===condition.index),fields=LexeditorUI.stack({fill:false});
         for(const [field,base] of Object.entries(condition.fields)){const ck=`${goal.name}|${condition.index}|${field}`,cur=state.challengeConditionEdits[ck]?.value??base,known=conditionValues.find(x=>x.type===condition.type&&x.field===field)?.values||[],values=[...new Set([cur,...known])];
           const sel=el("select",{onchange:ev=>{if(ev.target.value===base)delete state.challengeConditionEdits[ck];else state.challengeConditionEdits[ck]={goal:goal.name,index:condition.index,type:condition.type,field,value:ev.target.value};renderToolbarOnly();}},...values.map(value=>{const o=el("option",{value},value);if(value===cur)o.selected=true;return o;}));
+          sel.disabled=isRO()||!known.includes(base);
+          sel.setAttribute('aria-label',`${goal.name} condition ${condition.index} ${field}`);
           fields.append(LexeditorUI.detailField({label:field,control:LexeditorUI.stack({fill:false},sel,refLine([["V","vtag",vc?.fields?.[field]]],String))}));
         }
         conditionsBox.append(LexeditorUI.detailSection({title:challengeConditionLabel(condition),body:fields}));
       }
     });
     const rewardKey=`${strand.name}|${rank.rank}`,rewards=state.challengeRewardEdits[rewardKey]??rank.rewards;
+    const rewardsEditable=!isRO()&&!rank.rewardsReadonly&&rank.rewards.every(reward=>(vanilla.challenges?.allowedRewards||st.challenges.allowedRewards).some(row=>challengeRewardId(row)===challengeRewardId(reward)));
     const vrank=vanilla.challenges?.strands.find(s=>s.name===strand.name)?.ranks.find(r=>r.rank===rank.rank);
     const rewardBox=LexeditorUI.stack({fill:false});
     const rewardControl=(reward,editable)=>{
@@ -91,18 +189,19 @@ async function renderChallenges() {
         const [type,...parts]=event.target.value.split("::");
         mutateChallengeRewards(rewardKey,rank.rewards,next=>{next[index]={type,value:parts.join("::")};});renderChallenges();
       }},...choices.map(row=>{const value=challengeRewardId(row),option=el("option",{value},challengeRewardLabel(row));if(value===current)option.selected=true;return option;}));
+      select.setAttribute('aria-label',`${strand.name} rank ${rank.rank} reward ${index}`);
       if(!editable)select.disabled=true;
       return LexeditorUI.actionRow(select,editable?closeButton({title:"Remove reward",onclick:()=>{
         mutateChallengeRewards(rewardKey,rank.rewards,next=>next.splice(index,1));renderChallenges();
       }}):el("span"));
     };
-    const addReward=isRO()?"":newButton({title:"Add reward",onclick:()=>{
+    const addReward=!rewardsEditable?"":newButton({title:"Add reward",onclick:()=>{
       const fallback=allowedRewards.find(row=>row.type==="CUnlockReward")||allowedRewards[0];
       if(fallback)mutateChallengeRewards(rewardKey,rank.rewards,next=>next.push({...fallback}));renderChallenges();
     }});
     rewardBox.append(multiValueReferences({
       kind:"challenge-rewards",current:rewards,references:vrank?[["V","vtag",vrank.rewards||[]]]:[],
-      keyOf:challengeRewardId,sortKey:challengeRewardLabel,renderCurrent:reward=>rewardControl(reward,!isRO()),
+      keyOf:challengeRewardId,sortKey:challengeRewardLabel,renderCurrent:reward=>rewardControl(reward,rewardsEditable),
       renderGhost:reward=>rewardControl(reward,false),emptyText:"no rewards",
     }));
     if(addReward)rewardBox.append(el("div",{class:"multi-ref-add"},addReward));
@@ -123,13 +222,7 @@ async function renderChallenges() {
 
 async function saveChallenges() {
   if (isRO()) return;
-  const keys=new Set([...Object.keys(state.challengeEdits), ...Object.keys(state.challengeSourceEdits).map(k=>k.split("|").slice(0,2).join("|"))]);
-  const edits=[...keys].map(key=>{const cut=key.lastIndexOf("|"); const name=key.slice(0,cut), index=+key.slice(cut+1); const goal=refStore(state.ds).challenges.goals.find(g=>g.name===name); const req=goal.requirements.find(r=>r.index===index);
-    return {name,index,value:state.challengeEdits[key] ?? req.value,sources:Object.entries(state.challengeSourceEdits).filter(([k])=>k.startsWith(key+"|")).map(([,v])=>v)};});
-  const rewards=Object.entries(state.challengeRewardEdits).map(([key,list])=>{const cut=key.lastIndexOf("|"),challenge=key.slice(0,cut),rank=+key.slice(cut+1),strand=refStore(state.ds).challenges.strands.find(s=>s.name===challenge),rankRow=strand?.ranks.find(r=>r.rank===rank);return{challenge,rank,owner:rankRow?.owner,ownerRank:rankRow?.ownerRank,rewards:list};});
-  const conditions=Object.values(state.challengeConditionEdits);
-  const uiEdits=Object.values(state.challengeUiEdits);
-  const modes=Object.entries(state.challengeModeEdits).map(([challenge,mode])=>({challenge,mode}));
-  const localizedSaved=await saveLocalization();const r=await api("/api/challenges/save", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,rewards,conditions,uiEdits,modes})});
+  const body=await preflightChallengeSave();
+  const localizedSaved=await saveLocalization();const r=await api("/api/challenges/save", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   state.challengeEdits={}; state.challengeSourceEdits={};state.challengeConditionEdits={};state.challengeRewardEdits={};state.challengeUiEdits={};state.challengeModeEdits={}; refStore(state.ds).challenges=null; toast(`Saved ${r.saved} challenge + ${localizedSaved} in-game text field(s)`); renderChallenges();
 }

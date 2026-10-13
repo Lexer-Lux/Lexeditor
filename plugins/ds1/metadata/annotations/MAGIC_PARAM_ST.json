@@ -26,8 +26,8 @@
     },
     {
       "Field": "mp",
-      "Name": "MP Consumption",
-      "Description": "The MP consumption of this spell when triggered."
+      "Name": "Mana cost override",
+      "Description": "Mana this spell costs per cast while the Mana tweak is on. 0 uses the tweak's derived cost from usages instead. The unmodded game ignores this value."
     },
     {
       "Field": "stamina",
@@ -57,7 +57,7 @@
     {
       "Field": "maxQuantity",
       "Name": "Usage Count",
-      "Description": "The number of uses this spell allows when equipped before requiring a bonfire reset."
+      "Description": "The number of uses this spell allows when equipped before requiring a bonfire reset. The Mana tweak derives this spell's default mana cost from it."
     },
     {
       "Field": "heroPoint",
