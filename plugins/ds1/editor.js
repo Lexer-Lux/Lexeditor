@@ -1080,7 +1080,7 @@ function renderViewport(){
     onclick:()=>viewportPaste(current.id)},"Paste");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
     onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
-  const status=el("div",{class:"lex-viewport-status","data-viewport-status":"",style:"flex:0 0 auto"},"Loading map.");
+  const status=el("div",{class:"lex-viewport-status","data-viewport-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading map"));
   const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE});
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
@@ -1112,7 +1112,7 @@ function renderPlayback(){
     onclick:event=>{LexeditorUI.choicePopover({label:"Animation",
       choices:motions.map(entry=>({label:entry.available===false?`${entry.file} (unreadable)`:entry.file,value:entry.file})),select:pickMotion}).openFor(event.currentTarget);}},
     `Animation: ${motion?motion.file+(motion.available===false?" (unreadable)":""):"none"}`);
-  const status=el("div",{class:"lex-viewport-status","data-anim-status":"",style:"flex:0 0 auto"},"Loading animation.");
+  const status=el("div",{class:"lex-viewport-status","data-anim-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading animation"));
   const host=el("div",{class:"lex-viewport-host","data-anim-host":"",style:VIEWPORT_STYLE});
   const timeline=el("div",{class:"lex-anim-timeline","data-anim-timeline":""});
   requestAnimationFrame(()=>{Ds1Anim.mount(host,current.id,motion||null,timeline,status).catch(failMount(status,"Could not load the animation."));});
@@ -1140,7 +1140,7 @@ function renderModel(){
     onclick:event=>{LexeditorUI.choicePopover({label:"Attack",
       choices:attacks.map(entry=>({label:entry.name,value:entry.id})),select:pickAttack}).openFor(event.currentTarget);}},
     `Attack: ${attack?attack.name:"none"}`);
-  const status=el("div",{class:"lex-viewport-status","data-chr-status":"",style:"flex:0 0 auto"},"Loading model.");
+  const status=el("div",{class:"lex-viewport-status","data-chr-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading model"));
   const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE});
   requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(failMount(status,"Could not load the model."));});
   return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,attackPicker),host,status);
