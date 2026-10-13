@@ -70,18 +70,20 @@ HOST = """(options) => {
   }};
   document.body.insertAdjacentHTML('afterbegin', '<div id="shell"></div>');
   window.navigated = [];
+  window.__modsOptions = options;
   window.shell = LexeditorUI.mountShell({host: '#shell', plugin: {id: 'game', name: 'Test Game'},
     tabs: [{id: 'items', label: 'Items'}, {id: 'tweaks', label: 'Tweaks'}],
     activeTab: () => 'items', navigate: tab => { navigated.push(tab); document.querySelector('#main').textContent = 'plugin page ' + tab; },
-    ...(options.vanilla ? {readonly: () => true, projectActiveSource: () => 'vanilla'} : {})});
+    ...(options.vanilla ? {readonly: () => true, projectActiveSource: () => 'vanilla'} : {}),
+    ...(options.save ? {save: async () => { window.saved = true; }, dirtyCount: () => 1} : {})});
   if (options.vanilla) shell.refresh?.();
 }"""
 
 
-def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False):
+def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False):
     framework(page)
     page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
-                       "alerts": alerts, "bundle": bundle})
+                       "alerts": alerts, "bundle": bundle, "save": save})
     page.wait_for_timeout(250)
 
 
@@ -370,3 +372,17 @@ def test_a_bundles_components_are_ordinary_settings_that_save(page):
     page.get_by_role("checkbox", name="Balance", exact=True).check()
     page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_settings')")
     assert calls(page, "save_mod_settings")[-1][1:] == ["C:/lib/game/Collection", {"combat": True, "balance": True}]
+
+def test_saving_clears_a_rebuilt_mods_alert_mark(page):
+    # The save rebuilds the tweaks, so the host stops reporting the alert;
+    # the showing Mods tab re-reads its marks instead of waiting for Play.
+    mount(page, alerts=True, save=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.get_by_role("checkbox", name="Switch Combat").check()
+    page.wait_for_function("document.querySelectorAll('.lex-column-list .lex-conflict-mark').length === 1")
+    page.evaluate("window.__modsOptions.alerts = false")
+    page.evaluate("window.shell.refresh()")
+    page.locator("#global-save").click()
+    page.wait_for_function("window.saved === true")
+    page.wait_for_function("!document.querySelector('.lex-column-list .lex-conflict-mark')")

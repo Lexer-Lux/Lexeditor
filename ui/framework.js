@@ -7979,7 +7979,10 @@ ${contents.path}`});
     save.onclick = async () => {
       if (saveBusy || save.disabled) return;
       setSaveBusy(true);
-      try { await options.save?.(); playThemeSound("save"); }
+      // Saving rebuilds the installed tweaks, which is what the Mods tab
+      // alert marks describe: re-read them so a rebuilt mod clears its
+      // mark at once instead of waiting for Play.
+      try { await options.save?.(); playThemeSound("save"); await mods.refresh(); }
       catch (error) { showToast(error?.message || "Save failed.", true); }
       finally { setSaveBusy(false); }
     };
@@ -12545,6 +12548,14 @@ ${contents.path}`});
       } finally { importing = false; }
     };
     return {
+      async refresh() {
+        // A save rebuilds what the marks describe; a showing tab re-reads
+        // them so a rebuilt mod clears its alert without reopening.
+        // A failed re-read keeps the old rows: the save still succeeded.
+        if (!main?.isConnected) return;
+        try { await load(); } catch (_error) { return; }
+        if (main?.isConnected) draw();
+      },
       async show(target) {
         main = target;
         draw();
