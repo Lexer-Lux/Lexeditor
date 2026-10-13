@@ -243,8 +243,13 @@ class Drb:
         return struct.unpack_from("<i", self.sections["CTRL"][0], node.control)[0], control
 
     def add_sprite(self, dialog: str, name: str, sprite: tuple[str, str], place_like: str, dy: int,
-                   color: str, dx: int = 0, size: list | tuple | None = None) -> None:
-        """A copy of an existing sprite, placed like `place_like` moved by (dx, dy), tinted."""
+                   color: str, dx: int = 0, size: list | tuple | None = None,
+                   uv: list | tuple | None = None) -> None:
+        """A copy of an existing sprite, placed like `place_like` moved by (dx, dy), tinted.
+
+        `uv` [left, top, right, bottom] repoints the copy at another region of
+        the same texture (bytes 16-23), such as an atlas strip no vanilla node
+        draws."""
         self._check_new(dialog, name, dy, dx)
         if not isinstance(color, str) or len(color) != 8:
             raise LayoutError("A sprite colour is eight hex digits: alpha, blue, green, red")
@@ -263,6 +268,8 @@ class Drb:
         shape = bytearray(blob[:SPRITE_SIZE])
         shape[0:8] = self._moved(place_blob[:8], dy, dx, size=size)[0:8]
         shape[SPRITE_COLOUR:SPRITE_SIZE] = tint
+        if uv is not None:
+            struct.pack_into("<4h", shape, 16, *uv)
         sprite_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, sprite_type, bytes(shape), *self._static_control(dialog, place))
 
@@ -416,14 +423,16 @@ def validate(spec: object, owner: str) -> dict:
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
     clone = {"dialog", "name", "clone", "rect"}
     text_keys = (text, text | {"left"}, text | {"dx"}, text | {"left", "dx"})
-    sprite_keys = (sprite, sprite | {"dx"}, sprite | {"size"}, sprite | {"dx", "size"})
+    sprite_keys = tuple(sprite | set(extra) for extra in
+                        ((), ("dx",), ("size",), ("uv",), ("dx", "size"), ("dx", "uv"),
+                         ("size", "uv"), ("dx", "size", "uv")))
     clean = []
     for node in nodes:
         keys = set(node) if isinstance(node, dict) else set()
         if keys not in text_keys + sprite_keys + (clone,):
             raise LayoutError(f"{owner}: a layout node is text "
                               f"({', '.join(sorted(text))}, optional left and dx), "
-                              f"a sprite ({', '.join(sorted(sprite))}, optional dx and size) "
+                              f"a sprite ({', '.join(sorted(sprite))}, optional dx, size and uv) "
                               f"or a clone ({', '.join(sorted(clone))})")
         if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout node names must be text")
@@ -442,6 +451,12 @@ def validate(spec: object, owner: str) -> dict:
         if "size" in node and (not isinstance(node["size"], list) or len(node["size"]) != 2
                                or not all(type(part) is int for part in node["size"])):
             raise LayoutError(f"{owner}: a sprite size is [width, height] as whole numbers")
+        if "uv" in node:
+            uv = node["uv"]
+            if (not isinstance(uv, list) or len(uv) != 4 or any(type(value) is not int for value in uv)
+                    or not all(0 <= value <= 32767 for value in uv) or not uv[0] < uv[2] or not uv[1] < uv[3]):
+                raise LayoutError(f"{owner}: a sprite uv is four whole texture coordinates, "
+                                  "left < right, top < bottom")
         if "dx" in node and type(node["dx"]) is not int:
             raise LayoutError(f"{owner}: dx must be a whole number of layout units")
         clean.append(dict(node))
@@ -480,7 +495,8 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
                 layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"])
             elif "sprite" in node:
                 layout.add_sprite(node["dialog"], node["name"], tuple(node["sprite"]), node["lookLike"],
-                                  node["dy"], node["color"], node.get("dx", 0), node.get("size"))
+                                  node["dy"], node["color"], node.get("dx", 0), node.get("size"),
+                                  node.get("uv"))
             else:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
                                 node.get("left"), node.get("dx", 0))
