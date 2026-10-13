@@ -228,11 +228,17 @@ class Handler(PluginRequestHandler):
                             rows = []
                             for name in MAPSTORE.maps():
                                 try:
-                                    parts = MAPSTORE.get(name).view_parts()
+                                    doc = MAPSTORE.get(name)
+                                    parts = doc.view_parts()
+                                    models = len(doc.models)
                                 except (MsbError, OSError):
                                     parts = []
+                                    models = 0
+                                kinds = [part['kind'] for part in parts]
                                 rows.append({'id': name, 'table': 'MapView', 'name': name,
-                                             'values': {'parts': len(parts)}})
+                                             'values': {'parts': len(parts), 'models': models,
+                                                        'collision': sum(1 for kind in kinds if kind == 'Collision'),
+                                                        'navigation': sum(1 for kind in kinds if kind == 'Navigation')}})
                             result = {'rows': rows}
                         elif tab == 'playback':
                             labels = TAESTORE.char_names()
