@@ -14,7 +14,7 @@ def wrap(plain, header):
     return bytes(result) + compressed
 
 
-def make_effects_archive(*, effect_size=368, version=2):
+def make_effects_archive(*, effect_size=368, version=2, extra_ids=()):
     """Append an independently specified effect table to the existing fixture."""
     source = make_archive()
     document = ItemDocument(source)
@@ -41,7 +41,7 @@ def make_effects_archive(*, effect_size=368, version=2):
         (name, bytes(document.plain[member.offset:member.offset + member.size]))
         for name, member in document.members.items()
     ]
-    ids = [40, 41, 42, 43, 44, *range(1000, 1050), 2013, 3040, 6200, 6201, 6890, 6920, 99001]
+    ids = [40, 41, 42, 43, 44, *range(1000, 1050), 2013, 3040, 6200, 6201, 6890, 6920, 99001, *extra_ids]
     start = 48 + 12 * len(ids)
     effect = bytearray(start + effect_size * len(ids))
     struct.pack_into("<IHhhH", effect, 0, len(effect), start, 0, version, len(ids))

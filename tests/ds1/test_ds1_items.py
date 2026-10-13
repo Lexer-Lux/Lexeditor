@@ -153,3 +153,56 @@ def test_putting_a_float_back_as_shown_leaves_nothing_to_save():
     document.edit(row['table'], row['id'], field['key'], shown)
     assert document.dirty_count == 0
     assert bytes(document.plain) == bytes(document.original_plain)
+
+
+def armor_with_upgrades(rates):
+    """Armor 100 with Armor Rework effects for +0..+3; upgrade rows exist for +0..+2 only."""
+    from ds1_effects_fixture import make_effects_archive
+    from plugins.ds1.formats import write_field
+    base = 30_000_100
+    document = ItemDocument(make_effects_archive(extra_ids=range(base, base + 4)))
+    def put(table, row_id, key, value):
+        _r, start, data = document._row(table, row_id)
+        spec = next(f['spec'] for f in document.schemas[table]['fields'] if f['spec'].key == key)
+        document.plain[start:start + len(data)] = write_field(data, spec, value, '<')
+    put('EquipParamProtector', 100, 'residentSpEffectId3', base)
+    put('EquipParamProtector', 100, 'reinforceTypeId', 100)
+    for row_id, (physics, magic, fire, thunder) in zip((100, 101, 102), rates):
+        for key, value in zip(('physicsDefRate', 'magicDefRate', 'fireDefRate', 'thunderDefRate'),
+                              (physics, magic, fire, thunder)):
+            put('ReinforceParamProtector', row_id, key, value)
+    return document, base
+
+
+def absorbed(document, effect, cut):
+    return (1 - document.value('SpEffectParam', effect, cut)) * 100
+
+
+def test_armor_absorption_scales_by_the_upgrade_table():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1.1, 1.5, 2), (1.5, 1.2, 1.5, 2)])
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 15)
+    # Physical cuts follow physicsDefRate; +3 has no upgrade row, so it is not scaled.
+    got = [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)]
+    assert got == pytest.approx([15, 15.3, 22.5, 15], abs=1e-4)
+    document.edit('EquipParamProtector', 100, 'absorption:magicDamageCutRate', 10)
+    document.edit('EquipParamProtector', 100, 'absorption:fireDamageCutRate', 10)
+    document.edit('EquipParamProtector', 100, 'absorption:thunderDamageCutRate', 10)
+    for cut, expected in (('magicDamageCutRate', [10, 11, 12, 10]), ('fireDamageCutRate', [10, 15, 15, 10]),
+                          ('thunderDamageCutRate', [10, 20, 20, 10])):
+        assert [absorbed(document, base + level, cut) for level in range(4)] == pytest.approx(expected, abs=1e-4)
+    # Every level is recomputed from +0, whatever the rows held before.
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 20)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([20, 20.4, 30, 20], abs=1e-4)
+
+
+def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 0)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([0, 0, 0, 0], abs=1e-4)
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', -5)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([-5, -4.9, -2.5, -5], abs=1e-4)
+    for bad in (-101, 100):
+        with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
