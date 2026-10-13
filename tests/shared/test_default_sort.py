@@ -28,6 +28,13 @@ def test_mods_tab_keeps_load_order():
     assert 'order: "given"' in mods
 
 
+def test_mods_tab_shows_priority_numbers():
+    source = ui()
+    assert '{key: "priority", label: "Priority"' in source
+    assert 'the higher number wins' in source
+    assert 'localPaths().indexOf(row.path) + 1' in source
+
+
 def test_ds1_sorts_by_name_and_exempts_time_order():
     source = ds1()
     assert 'sort:{key:"name",dir:1}' in source

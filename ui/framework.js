@@ -12810,7 +12810,15 @@ ${contents.path}`});
           rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
           select: row => { select(row); selected = keyOf(row); draw(); },
           decorateRow: decorateModRow,
+          // Load order, lowest first: the server returns it and the page
+          // keeps it (order "given"). The number makes the order visible;
+          // downloadable modules have none until imported.
           columns: [
+            {key: "priority", label: "Priority", width: "max-content", align: "center", numeric: true,
+              help: "Load order: when two switched-on mods change the same thing, the higher number wins. Drag a row to move it.",
+              sortValue: row => row.remote ? Number.MAX_SAFE_INTEGER : localPaths().indexOf(row.path),
+              render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""},
+                row.remote ? "\u2014" : String(localPaths().indexOf(row.path) + 1))},
             {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
               row.name, modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
