@@ -12162,7 +12162,9 @@ ${contents.path}`});
       body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
       // A mod's own details pane already names the mod and has its switch.
       if (options.fieldsOnly) return element("div", {class: "lex-tweak-fields"}, ...(blocker ? [detailNote(blocker)] : []), ...body);
-      const panel = tweakPanel(schema.title || row.name.toUpperCase(), schema.help, toggle, body, blocker);
+      // The heading is the mod’s own name, as in the Mods tab: a second
+      // title in the schema always drifts from it.
+      const panel = tweakPanel(row.name, schema.help, toggle, body, blocker);
       if (!row.enabled) panel.classList?.add("lex-tweak-off");
       return panel;
     });
