@@ -7,7 +7,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],ro
   effectTabs:[],statsTabs:[],areaTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
-  mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false};
+  mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -845,6 +845,7 @@ function viewportHooks(){
   return {readOnly:state.readOnly,showCollision:state.mapCollision,
     onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();},
     onMove:(key,pos)=>viewportMove(state.mapView.map,key,pos),
+    onRotate:(key,rot)=>viewportRotate(state.mapView.map,key,rot),
     requestMod:()=>viewportRequestMod()};
 }
 function refreshViewportBar(){
@@ -871,6 +872,28 @@ function refreshViewportBar(){
         :!state.mapSelected?"Select a placement in the viewport first"
         :!movable?"Only enemy, object and player-start placements can be removed"
         :"Remove this placement from its map";
+    }else if(action==="add"){
+      button.disabled=state.readOnly||state.mapBusy;
+      button.title=state.readOnly?"Open a mod project to add placements"
+        :"Place a new copy of one of this map's models where the camera looks";
+    }else if(action==="copy"){
+      button.disabled=state.readOnly||state.mapBusy||!movable;
+      button.title=state.readOnly?"Open a mod project to copy placements"
+        :!state.mapSelected?"Select a placement in the viewport first"
+        :!movable?"Only enemy, object and player-start placements can be copied"
+        :"Copy this placement";
+    }else if(action==="paste"){
+      button.disabled=state.readOnly||state.mapBusy||!state.mapClipboard;
+      button.title=state.readOnly?"Open a mod project to paste placements"
+        :!state.mapClipboard?"Copy a placement first"
+        :"Paste the copied placement where the camera looks";
+    }else if(action==="rotate"){
+      button.disabled=false;
+      const spinning=state.mapGizmo==="rotate";
+      button.setAttribute("aria-pressed",String(spinning));
+      button.textContent=spinning?"Move":"Rotate";
+      button.title=spinning?"Drag the gizmo to move placements"
+        :"Drag the gizmo to turn placements";
     }
   }
 }
@@ -917,6 +940,35 @@ function viewportMove(map,key,pos){
   }).catch(notify);
   return outcome;
 }
+function viewportRotate(map,key,rot){
+  if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
+  const names=["rotX","rotY","rotZ"];
+  const before=state.mapView.parts.find(part=>part.key===key)?.rot||[0,0,0];
+  state.mapBusy=true;state.pending++;shell.refresh();refreshViewportBar();
+  viewportCtl?.turnTo(key,rot);
+  let settle=null;
+  const outcome=new Promise(resolve=>{settle=resolve;});
+  edits=edits.then(async()=>{
+    try{
+      const done=[];
+      let latest=null;
+      for(let index=0;index<3;index++){
+        const result=await api("/api/edit",{table:map,id:key,field:names[index],value:rot[index],sub:state.sub});
+        latest=result;
+        done.push({table:map,id:key,field:names[index],before:before[index],
+          after:result.row.fields.find(item=>item.key===names[index])?.value});
+      }
+      fieldHistory.record({edits:done});
+      state.dirty=latest.dirtyCount;state.changes=latest.changes||state.changes;state.nativeRules=latest.nativeRules||state.nativeRules;
+      const part=state.mapView.parts.find(entry=>entry.key===key);
+      if(part)part.rot=[done[0].after,done[1].after,done[2].after];
+      viewportCtl?.turnTo(key,part?part.rot:rot);
+      settle(true);
+    }catch(error){notify(error);settle(false);}
+    finally{state.pending--;state.mapBusy=false;refreshViewportBar();shell.refresh();}
+  }).catch(notify);
+  return outcome;
+}
 async function reloadViewport(map,selectKey){
   state.mapView=await api(`/api/map/view?map=${encodeURIComponent(map)}`);
   state.mapSelected=null;state.mapInfo=null;
@@ -925,6 +977,7 @@ async function reloadViewport(map,selectKey){
   if(host&&status&&state.tab==="areas"&&state.sub==="viewport"){
     viewportCtl=null;
     viewportCtl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks()).catch(failMount(status,"Could not load the map."));
+    viewportCtl?.setGizmoMode?.(state.mapGizmo);
     if(selectKey&&viewportCtl)viewportCtl.select(selectKey);
   }
   refreshViewportBar();
@@ -953,6 +1006,52 @@ async function viewportRemove(map){
   }catch(error){notify(error);}
   finally{state.mapBusy=false;refreshViewportBar();}
 }
+async function viewportAdd(map,anchor){
+  if(state.readOnly||state.mapBusy||!state.mapView)return;
+  const counts=new Map();
+  for(const part of state.mapView.parts){
+    if(part.kind!=="Enemy"&&part.kind!=="Dummy enemy"&&part.kind!=="Object")continue;
+    if(!part.model)continue;
+    counts.set(part.model,(counts.get(part.model)||0)+1);
+  }
+  const models=[...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  if(!models.length){notify(new Error("This map has no enemy or object models to place."));return;}
+  LexeditorUI.choicePopover({label:"Model",
+    choices:models.map(([name,count])=>({label:`${name} (${count})`,value:name})),
+    select:async model=>{
+      state.mapBusy=true;refreshViewportBar();
+      try{
+        const at=viewportCtl?.aim?.()||[0,0,0];
+        const result=await api("/api/placements/create",{map,model,pos:at,rot:[0,0,0]});
+        state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+        await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
+      }catch(error){notify(error);}
+      finally{state.mapBusy=false;refreshViewportBar();}
+    }}).openFor(anchor);
+}
+async function viewportCopy(map){
+  if(state.readOnly||state.mapBusy||!state.mapSelected)return;
+  state.mapBusy=true;refreshViewportBar();
+  try{
+    const row=(await api(`/api/row?table=${encodeURIComponent(map)}&id=${encodeURIComponent(state.mapSelected)}&sub=viewport`)).row;
+    const at=key=>row.fields.find(item=>item.key===key)?.value??0;
+    state.mapClipboard={model:row.model,pos:[at("posX"),at("posY"),at("posZ")],rot:[at("rotX"),at("rotY"),at("rotZ")],
+      npc:row.fields.find(item=>item.key==="npcId")?.value??null};
+  }catch(error){notify(error);}
+  finally{state.mapBusy=false;refreshViewportBar();}
+}
+async function viewportPaste(map){
+  const clip=state.mapClipboard;
+  if(state.readOnly||state.mapBusy||!clip)return;
+  state.mapBusy=true;refreshViewportBar();
+  try{
+    const at=viewportCtl?.aim?.()||clip.pos;
+    const result=await api("/api/placements/create",{map,model:clip.model,pos:at,rot:clip.rot,npc:clip.npc});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+    await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
+  }catch(error){notify(error);}
+  finally{state.mapBusy=false;refreshViewportBar();}
+}
 const VIEWPORT_STYLE="position:relative;width:100%;height:520px;flex:1 0 auto;min-height:320px;";
 function renderViewport(){
   const strip=subtabBar({tabs:subtabsFor("areas"),active:state.sub,label:"Areas",change:id=>navigate("areas",id)});
@@ -973,17 +1072,26 @@ function renderViewport(){
     onclick:()=>viewportDuplicate(current.id)},"Duplicate");
   const remove=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"remove",
     onclick:()=>viewportRemove(current.id)},"Remove");
+  const add=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"add",
+    onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
+  const copy=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"copy",
+    onclick:()=>viewportCopy(current.id)},"Copy");
+  const paste=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"paste",
+    onclick:()=>viewportPaste(current.id)},"Paste");
+  const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
+    onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
   const status=el("div",{class:"lex-viewport-status","data-viewport-status":"",style:"flex:0 0 auto"},"Loading map.");
   const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE});
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
     Ds1Viewport.mount(host,current.id,state.mapView,status,viewportHooks()).then(ctl=>{
       viewportCtl=ctl;
+      viewportCtl?.setGizmoMode?.(state.mapGizmo);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       refreshViewportBar();
     }).catch(failMount(status,"Could not load the map."));
   });
-  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,collide,duplicate,remove),host,status);
+  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,collide,duplicate,remove,add,copy,paste,rotate),host,status);
 }
 function renderPlayback(){
   const strip=subtabBar({tabs:subtabsFor("animations"),active:state.sub,label:"Animations",change:id=>navigate("animations",id)});

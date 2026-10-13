@@ -129,3 +129,34 @@ def test_malformed_maps_rejected():
     struct.pack_into("<i", raw, doc.parts[0]["base"] + 0x60, 1)
     with pytest.raises(MsbError):
         MsbDocument(bytes(raw))
+
+
+def test_create_placement_from_same_model_template():
+    doc = MsbDocument(build_msb())
+    row = doc.create_placement("c1200", [10.0, 20.0, 30.0], [0.0, 45.0, 0.0])
+    assert row["model"] == "c1200"
+    fields = {item["key"]: item["value"] for item in row["fields"]}
+    assert (fields["posX"], fields["posY"], fields["posZ"]) == (10.0, 20.0, 30.0)
+    assert (fields["rotX"], fields["rotY"], fields["rotZ"]) == (0.0, 45.0, 0.0)
+    assert row["partId"] != 0
+    assert row["think"] == 1000
+    assert fields["npcId"] == 120000
+
+
+def test_create_placement_needs_a_template():
+    doc = MsbDocument(build_msb())
+    with pytest.raises(MsbError):
+        doc.create_placement("nope", [0, 0, 0], [0, 0, 0])
+    single = MsbDocument(build_msb(parts=(("piece", 0, 0, 1, None),)))
+    with pytest.raises(MsbError, match="no enemy or object placement"):
+        single.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
+    player_only = MsbDocument(build_msb(parts=(("player", 4, 0, 1, None),)))
+    with pytest.raises(MsbError, match="no enemy or object placement"):
+        player_only.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
+
+
+def test_create_placement_takes_pasted_enemy_identity():
+    doc = MsbDocument(build_msb())
+    row = doc.create_placement("c1200", [1, 2, 3], [0, 0, 0], npc=120100)
+    fields = {item["key"]: item["value"] for item in row["fields"]}
+    assert fields["npcId"] == 120100

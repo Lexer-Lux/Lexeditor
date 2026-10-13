@@ -82,6 +82,10 @@ def phase_readonly(play, game, output, errors):
             rendered_pixels(page, 'test.msb')
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             assert page.locator('[data-viewport-action="remove"]').is_disabled()
+            assert page.locator('[data-viewport-action="add"]').is_disabled()
+            assert page.locator('[data-viewport-action="copy"]').is_disabled()
+            assert page.locator('[data-viewport-action="paste"]').is_disabled()
+            assert not page.locator('[data-viewport-action="rotate"]').is_disabled()
             toggle = page.locator('[data-viewport-action="collision"]')
             assert toggle.inner_text() == 'Hide collision'
             toggle.click()
@@ -142,6 +146,26 @@ def phase_edit(play, game, mod, output, errors):
             moved = page.evaluate("fetch('/api/row?table=test.msb&id=1:0').then(r=>r.json())"
                                   ".then(d=>d.row.fields.filter(f=>f.key.startsWith('pos')).map(f=>f.value))")
             assert moved == [9.0, 8.0, 7.0], moved
+            page.evaluate("viewportRotate('test.msb','1:0',[0,180,0])")
+            page.wait_for_function("state.pending===0 && state.mapView.parts.find(p=>p.key==='1:0').rot[1]===180",
+                                   timeout=30000)
+            turned = page.evaluate("fetch('/api/row?table=test.msb&id=1:0').then(r=>r.json())"
+                                   ".then(d=>d.row.fields.filter(f=>f.key.startsWith('rot')).map(f=>f.value))")
+            assert turned == [0.0, 180.0, 0.0], turned
+            page.evaluate('viewportCtl.select("1:0")')
+            page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
+            page.locator('[data-viewport-action="copy"]').click()
+            page.wait_for_function('!!state.mapClipboard', timeout=30000)
+            assert not page.locator('[data-viewport-action="paste"]').is_disabled()
+            page.locator('[data-viewport-action="paste"]').click()
+            page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
+            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
+                                   '.includes("6 parts")', timeout=30000)
+            page.evaluate('viewportAdd(\'test.msb\',document.querySelector(\'[data-viewport-action="add"]\'))')
+            page.locator('.lex-choice-popover button', has_text='m10piece').click()
+            page.wait_for_function('state.mapSelected==="1:2"', timeout=30000)
+            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
+                                   '.includes("7 parts")', timeout=30000)
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
             page.wait_for_timeout(1200)
