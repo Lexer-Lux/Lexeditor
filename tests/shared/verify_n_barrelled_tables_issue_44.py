@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 import tempfile
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -92,7 +93,7 @@ def main() -> int:
             "the shared panel composer must consume the barrel-aware split minimum")
     require("fitBarrelTableColumns" in FRAMEWORK,
             "barrel table tracks must fit inside their assigned panel without clipping an edge")
-    require("splitKey:`ff8-${view}`" in (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8"),
+    require("splitKey:`ff8-${view}`" in plugin_ui("ff8"),
             "FF8 must keep a game-and-view-specific preference key")
 
     with tempfile.TemporaryDirectory() as directory:

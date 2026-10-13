@@ -41,7 +41,7 @@ def test_row_pointer_follows_clickable_label(page,with_icon):
 def test_pages_are_alphabetical_whatever_order_they_are_declared_in(page):
     """Lexer: "the tabs aren't alphabetically sorted anymore. wtf? how does this
     keep hapening?" Pages are alphabetical by name; only `order` and the
-    settings/tweaks rule move them.
+    shared leftmost Mods tab and the settings/tweaks rule move them.
     """
     framework(page)
     page.evaluate('''()=>{
@@ -55,7 +55,7 @@ def test_pages_are_alphabetical_whatever_order_they_are_declared_in(page):
     page.wait_for_timeout(300)
     order = page.evaluate('''()=>[...document.querySelectorAll('.lex-shell-header nav button[data-tab]')]
       .map(node=>node.dataset.tab)''')
-    assert order[:3] == ['alpha','middle','zebra'], order
+    assert order == ['mods','alpha','middle','zebra'], order
 
 
 @pytest.mark.parametrize('width',[700,1000,1600])
@@ -112,7 +112,8 @@ def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
     nav=page.locator('.lex-shell-header nav')
     assert nav.locator('button').last.get_attribute('data-tab')=='settings'
     assert nav.locator('button').last.evaluate('n=>getComputedStyle(n).marginLeft')=='0px'
-    # The pointer must fit in the existing page gutter, not indent the row.
+    # The later requirement puts the hand over the tab edge without making
+    # room for it (see test_tab_hand_outside and test_latest_ui_feedback).
     frame=page.locator('.lex-nav-frame')
     assert frame.evaluate('n=>getComputedStyle(n).paddingLeft===getComputedStyle(n).paddingRight')
     boxes=[b.bounding_box() for b in nav.locator('button').all()]
@@ -120,12 +121,19 @@ def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
       (n,i)=>n.classList.toggle('active',i===0))''')
     page.wait_for_timeout(60)
     assert [b.bounding_box() for b in nav.locator('button').all()]==boxes
-    assert nav.locator('button').first.evaluate('''n=>{
+    pointer = nav.locator('button').first.evaluate('''n=>{
       const p=getComputedStyle(n,'::before'),r=n.getBoundingClientRect();
       const left=r.left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left);
       const label=n.querySelector('.lex-tab-label-text'),range=document.createRange();range.selectNodeContents(label);
-      return Math.abs(range.getBoundingClientRect().left-left-parseFloat(p.width)-6)<2;
+      const labelLeft=range.getBoundingClientRect().left;
+      return {gap:labelLeft-left-parseFloat(p.width),labelLeft,markerLeft:left,
+        markerRight:left+parseFloat(p.width),tabLeft:r.left,tabRight:r.right,
+        markerWidth:p.width,position:p.position,z:Number(p.zIndex),content:p.content,
+        fontSize:getComputedStyle(label).fontSize,padding:getComputedStyle(n).paddingLeft};
     }''')
+    page.screenshot(path=str(DEV_CACHE/f'navigation-density-{width}.png'))
+    assert pointer['content']!='none' and pointer['position']=='absolute' and pointer['z']>=5,pointer
+    assert pointer['markerLeft']<pointer['tabLeft']<pointer['markerRight']<pointer['tabRight'],pointer
     brand=page.locator('.lex-brand-button')
     assert brand.evaluate('n=>!n.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true}))')
 

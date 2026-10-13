@@ -6,6 +6,8 @@ FF8GameData.monsterdata.AIData and dat.monsteranalyser.
 
 from __future__ import annotations
 
+from core.numeric_values import integer_value
+
 import json
 from pathlib import Path
 
@@ -88,7 +90,7 @@ def apply_edits(raw: bytearray, start: int, edits: list[dict], schema_root: Path
     for edit in edits:
         kind = str(edit["kind"])
         tier = str(edit.get("tier", ""))
-        slot = int(edit["slot"])
+        slot = integer_value(edit["slot"], "Enemy table slot")
         key = (kind, tier, slot)
         if key in seen:
             raise ValueError("Duplicate enemy table edit")
@@ -96,7 +98,8 @@ def apply_edits(raw: bytearray, start: int, edits: list[dict], schema_root: Path
         if kind == "ability":
             if tier not in TIERS or not 0 <= slot < 16:
                 raise ValueError("Invalid enemy ability slot")
-            type_id, animation, ability_id = (int(edit[name]) for name in ("type", "animation", "abilityId"))
+            type_id, animation, ability_id = (integer_value(edit[name], f"Enemy ability {name}")
+                                               for name in ("type", "animation", "abilityId"))
             valid_ids = ({0} if type_id == 0 else magic_ids if type_id == 2 else item_ids
                          if type_id == 4 else enemy_ability_ids)
             if type_id not in valid_types or ability_id not in valid_ids or not 0 <= animation <= 255:
@@ -106,31 +109,32 @@ def apply_edits(raw: bytearray, start: int, edits: list[dict], schema_root: Path
         elif kind in PAIR_OFFSETS:
             if tier not in TIERS or not 0 <= slot < 4:
                 raise ValueError("Invalid enemy item or Draw slot")
-            value_id, quantity = int(edit["valueId"]), int(edit["quantity"])
+            value_id = integer_value(edit["valueId"], "Enemy table value id")
+            quantity = integer_value(edit["quantity"], "Enemy table quantity")
             valid_ids = magic_ids if kind == "draw" else item_ids
             if value_id not in valid_ids or not 0 <= quantity <= 255:
                 raise ValueError("Invalid enemy item or Draw value")
             offset = start + PAIR_OFFSETS[kind][tier] + slot * 2
             raw[offset:offset + 2] = bytes((value_id, quantity))
         elif kind == "card":
-            card_id = int(edit["cardId"])
+            card_id = integer_value(edit["cardId"], "Enemy card id")
             if not 0 <= slot < 3 or card_id not in card_ids:
                 raise ValueError("Invalid enemy card")
             raw[start + CARD_OFFSET + slot] = card_id
         elif kind == "devour":
-            value = int(edit["devourId"])
+            value = integer_value(edit["devourId"], "Enemy Devour id")
             if not 0 <= slot < 3 or not 0 <= value <= 255:
                 raise ValueError("Invalid enemy Devour value")
             raw[start + DEVOUR_OFFSET + slot] = value
         elif kind == "renzokuken":
-            value = int(edit["value"])
+            value = integer_value(edit["value"], "Renzokuken value")
             if not 0 <= slot < 8 or not 0 <= value <= 65535:
                 raise ValueError("Invalid Renzokuken value")
             offset = start + RENZOKUKEN_OFFSET + slot * 2
             raw[offset:offset + 2] = value.to_bytes(2, "little")
         elif kind in {"elementDefence", "statusDefence"}:
             count = 8 if kind == "elementDefence" else 20
-            stored = int(edit["stored"])
+            stored = integer_value(edit["stored"], "Enemy defence value")
             if not 0 <= slot < count or not 0 <= stored <= 255:
                 raise ValueError("Invalid enemy defence value")
             offset = ELEMENT_DEFENCE_OFFSET if kind == "elementDefence" else STATUS_DEFENCE_OFFSET

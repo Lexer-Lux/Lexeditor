@@ -1128,20 +1128,24 @@ def sfx_audio(sound_id: int, dataset: str = "current") -> tuple[bytes, str]:
 
 def save_sfx(edits: list[dict]) -> dict:
     fmt_entries = _sfx_entries()
-    saved = 0
+    prepared = []
+    seen = set()
     for edit in edits:
+        if not isinstance(edit, dict):
+            raise ValueError("SFX edit must be an object")
         sound_id = edit.get("id")
         if isinstance(sound_id, bool) or not isinstance(sound_id, int):
             raise ValueError("SFX edits need an integer sound ID")
         if not 0 <= sound_id < len(fmt_entries):
             raise ValueError(f"Sound ID must be 0 to {len(fmt_entries) - 1}")
+        if sound_id in seen:
+            raise ValueError("SFX batch repeats a sound ID")
+        seen.add(sound_id)
+        if "revert" in edit and type(edit["revert"]) is not bool:
+            raise ValueError("SFX revert must be a boolean")
         folder = paths.PROJECT_ROOT / "sfx"
-        folder.mkdir(parents=True, exist_ok=True)
-        for stale in folder.glob(f"{sound_id}.*"):
-            if stale.is_file() and stale.suffix.casefold() not in IGNORED_ASSET_SUFFIXES:
-                stale.unlink()
         if edit.get("revert") is True:
-            saved += 1
+            prepared.append((sound_id, None, None))
             continue
         encoded = edit.get("audioBase64")
         extension = str(edit.get("ext", "")).casefold()
@@ -1171,15 +1175,28 @@ def save_sfx(edits: list[dict]) -> dict:
                                               and data[1] & 0xE0 == 0xE0)):
             raise ValueError(f"Sound {sound_id} is not an MP3 file")
         destination = folder / f"{sound_id}{extension}"
-        handle, temporary = tempfile.mkstemp(prefix=f".{sound_id}.", dir=folder)
-        try:
-            with os.fdopen(handle, "wb") as stream:
-                stream.write(data)
-            os.replace(temporary, destination)
-        finally:
-            Path(temporary).unlink(missing_ok=True)
-        saved += 1
-    return {"saved": saved}
+        prepared.append((sound_id, destination, data))
+    for sound_id, destination, data in prepared:
+        if destination is not None:
+            folder.mkdir(parents=True, exist_ok=True)
+            _write_asset(destination, data)
+        for stale in folder.glob(f"{sound_id}.*"):
+            if (stale != destination and stale.is_file()
+                    and stale.suffix.casefold() not in IGNORED_ASSET_SUFFIXES):
+                stale.unlink()
+    return {"saved": len(prepared)}
+
+
+def _write_asset(destination: Path, data: bytes) -> None:
+    """Replace a validated asset before removing any previous alternate format."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
+        os.replace(temporary, destination)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def _battle_archive_index() -> list[dict]:
@@ -1244,6 +1261,30 @@ def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) ->
     return _battle_file_info(filename, data)
 
 
+def _undecoded_layout(data: bytes) -> dict:
+    """What an undecoded battle file provably holds, from its bytes alone.
+
+    A four-byte file is one little-endian number. A file that opens with a
+    part count followed by that many increasing offsets inside the file is a
+    container, listed part by part. Nothing else is claimed: the meaning of
+    the number, or of a part, is not decoded.
+    """
+    import struct
+    if len(data) == 4:
+        return {"value": struct.unpack("<I", data)[0]}
+    if len(data) >= 8:
+        count = struct.unpack_from("<I", data)[0]
+        if 1 <= count <= 64 and 4 + count * 4 <= len(data):
+            offsets = list(struct.unpack_from(f"<{count}I", data, 4))
+            if (offsets[0] >= 4 + count * 4 and offsets == sorted(offsets)
+                    and len(set(offsets)) == count and offsets[-1] < len(data)):
+                ends = offsets[1:] + [len(data)]
+                return {"sections": [{"index": index, "name": f"Part {index + 1}", "offset": start,
+                                      "size": end - start}
+                                     for index, (start, end) in enumerate(zip(offsets, ends))]}
+    return {}
+
+
 def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                mod_only_files: set[str]) -> dict:
     from . import effect_mesh
@@ -1299,12 +1340,27 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
                           "Empty placeholder weapon file shipped by the game.")
         else:
             name, note, _enemy = _model_identity(filename, "unmapped")
-            note = ("These bytes are not a battle-model container; the file "
-                    "can only be replaced or reverted as a whole.")
+            note = ("This file's contents are not decoded. It has no preview "
+                    "here; only whole-file replacement or reversion is supported.")
         row.update(modelKind="locked" if info["sizeBytes"] else "empty",
                    name=name, sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                    enemyId=None, note=note)
+        # Say what the bytes provably hold, so the panel is not empty.
+        if info["sizeBytes"]:
+            try:
+                layout = _undecoded_layout(_model_bytes(filename, dataset)[0])
+            except (OSError, ValueError):
+                layout = {}
+            if "value" in layout:
+                row["storedValue"] = layout["value"]
+                row["note"] = ("This file holds one number. What the game uses it for is "
+                               "not decoded; only whole-file replacement or reversion is supported.")
+            elif layout.get("sections"):
+                row["sections"] = layout["sections"]
+                row["note"] = ("This file is a container of parts, listed below. What each "
+                               "part holds is not decoded; only whole-file replacement or "
+                               "reversion is supported.")
         if summon and info['sizeBytes']:
             row.update(modelKind='effect-data', name=f'Summon data {filename}',
                        note='This file belongs to a summon. Texture previews use upload instructions found in its script. Other contents are not yet decoded.')
@@ -1399,11 +1455,19 @@ def model_dat_bytes(filename: str, dataset: str = "current") -> bytes:
 
 
 def save_models(edits: list[dict]) -> dict:
-    saved = 0
+    prepared = []
+    seen = set()
     for edit in edits:
+        if not isinstance(edit, dict):
+            raise ValueError("Model edit must be an object")
         filename = str(edit.get("file", "")).casefold()
         if not BATTLE_FILENAME.fullmatch(filename):
             raise ValueError(f"{edit.get('file')} is not a battle model filename")
+        if filename in seen:
+            raise ValueError("Model batch repeats a filename")
+        seen.add(filename)
+        if "revert" in edit and type(edit["revert"]) is not bool:
+            raise ValueError("Model revert must be a boolean")
         exists = (_battle_path(filename, 'current').is_file()
                   or any(entry['file'] == filename for entry in _battle_archive_index()))
         original_texture = (_texture_pack_info(_model_bytes(filename, 'current')[0])
@@ -1412,8 +1476,7 @@ def save_models(edits: list[dict]) -> dict:
             raise ValueError('Only supported models and standalone textures can be replaced')
         destination = paths.DIRECT_ROOT / "battle" / filename
         if edit.get("revert") is True:
-            destination.unlink(missing_ok=True)
-            saved += 1
+            prepared.append((destination, None))
             continue
         encoded = edit.get("datBase64")
         if not isinstance(encoded, str) or not encoded:
@@ -1429,17 +1492,13 @@ def save_models(edits: list[dict]) -> dict:
             raise ValueError(f'{filename} needs a complete supported TIM image')
         if original_texture is None and filename.endswith(".dat") and parse_dat_sections(data) is None:
             raise ValueError(f"{filename} is not a battle-model container")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        handle, temporary = tempfile.mkstemp(
-            prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
-        try:
-            with os.fdopen(handle, "wb") as stream:
-                stream.write(data)
-            os.replace(temporary, destination)
-        finally:
-            Path(temporary).unlink(missing_ok=True)
-        saved += 1
-    return {"saved": saved}
+        prepared.append((destination, data))
+    for destination, data in prepared:
+        if data is None:
+            destination.unlink(missing_ok=True)
+        else:
+            _write_asset(destination, data)
+    return {"saved": len(prepared)}
 
 
 def _texture_mod_files(dataset: str) -> list[dict]:

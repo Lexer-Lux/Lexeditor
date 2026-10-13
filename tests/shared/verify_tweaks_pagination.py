@@ -60,7 +60,7 @@ with sync_playwright() as p:
    if not page.get_by_role('button',name='Next page',exact=True).is_enabled():break
    page.get_by_role('button',name='Next page',exact=True).click()
   assert seen==set(range(19)),seen
-  assert labels==EXPECTED,len(labels)
+  assert labels==EXPECTED,(width,height,zoom,'missing',sorted(EXPECTED-labels),'unexpected',sorted(labels-EXPECTED))
   assert page.get_by_label('Setting 0-0-0',exact=True).input_value()=='changed'
   assert not errors,errors
  print('PASS: every group, tall final controls, and pager reachable at four viewport/scale combinations')

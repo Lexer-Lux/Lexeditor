@@ -1,5 +1,6 @@
 """Fixed-size Chrono Trigger Steam area-header editing from CTViewer's PC layout."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
@@ -86,20 +87,28 @@ def load_scenes(store: OverlayStore, source: str = "mine", language: str = "en")
 
 
 def _bounded(name: str, value, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not 0 <= number <= high:
         raise ValueError(f"{name} must be between 0 and {high}")
     return number
 
 
 def save_scene(store: OverlayStore, scene_id: int, expected_sha256: str, values: dict, language: str = "en") -> dict:
-    path = f"Game/field/Mapinfo/mapinfo_{int(scene_id)}.dat"
+    scene_id = integer_value(scene_id, "Steam area ID")
+    if not isinstance(values, dict):
+        raise ValueError("Steam area values must be an object")
+    allowed = {*FIELD_NAMES, "cameraUnbounded", "scrollLeft", "scrollTop", "scrollRight", "scrollBottom"}
+    if set(values) - allowed:
+        raise ValueError("Steam area edit contains unknown or read-only fields")
+    if "cameraUnbounded" in values and type(values["cameraUnbounded"]) is not bool:
+        raise ValueError("Full map must be a boolean")
+    path = f"Game/field/Mapinfo/mapinfo_{scene_id}.dat"
     if not store.archive.has(path):
         raise ValueError(f"Steam area {scene_id} was not found")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
-    current = _decode_scene(int(scene_id), path, payload, "project" if (store.project_root / path).is_file() else "vanilla",
+    current = _decode_scene(scene_id, path, payload, "project" if (store.project_root / path).is_file() else "vanilla",
                             _scene_names(store, language, "mine"))
     output = bytearray(payload)
     u16_values = []
@@ -107,7 +116,7 @@ def save_scene(store: OverlayStore, scene_id: int, expected_sha256: str, values:
         u16_values.append(_bounded(key, values.get(key, current[key]), 0xFFFF))
     # The 10th u16 is PC-only and still unmodelled; always preserve it.
     unknown = current["unknownWord"]
-    unbounded = bool(values.get("cameraUnbounded", current["cameraUnbounded"]))
+    unbounded = values.get("cameraUnbounded", current["cameraUnbounded"])
     left = _bounded("Scroll left", values.get("scrollLeft", current["scrollLeft"]), 0xFF)
     if unbounded:
         left = 0x80
@@ -122,4 +131,4 @@ def save_scene(store: OverlayStore, scene_id: int, expected_sha256: str, values:
     store.write(path, expected_sha256, bytes(output))
     names = _scene_names(store, language, "mine")
     saved, origin = store.read(path, "mine")
-    return _decode_scene(int(scene_id), path, saved, origin, names)
+    return _decode_scene(scene_id, path, saved, origin, names)

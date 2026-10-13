@@ -10,10 +10,13 @@ updated. All other `.uasset` bytes are preserved.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 import hashlib
 from pathlib import Path
 import struct
 from typing import Any
+
+from core.numeric_values import integer_value
 
 
 UNREAL_SIGNATURE = b"\xC1\x83\x2A\x9E"
@@ -108,9 +111,16 @@ def _fstring(value: str) -> bytes:
     try:
         raw = value.encode("ascii")
     except UnicodeEncodeError:
-        raw = value.encode("utf-16-le")
+        try:
+            raw = value.encode("utf-16-le")
+        except UnicodeEncodeError as error:
+            raise ValueError("FF7R text must contain valid Unicode characters") from error
+        if len(raw) + 2 > MAX_STRING_BYTES:
+            raise ValueError("FF7R encoded text exceeds the supported string size")
         units = len(raw) // 2 + 1
         return struct.pack("<i", -units) + raw + b"\0\0"
+    if len(raw) + 1 > MAX_STRING_BYTES:
+        raise ValueError("FF7R encoded text exceeds the supported string size")
     return struct.pack("<i", len(raw) + 1) + raw + b"\0"
 
 
@@ -239,10 +249,16 @@ class TextResourcePackage:
         return {entry.id: entry.text for entry in self.entries if entry.id}
 
     def apply_edits(self, edits: list[dict[str, Any]]) -> None:
+        if not isinstance(edits, list):
+            raise ValueError("Text edits must be an array")
+        pending = []
+        seen = set()
         for edit in edits:
             if not isinstance(edit, dict):
                 raise TypeError("Each text edit must be an object")
-            index = int(edit.get("entry", -1))
+            if set(edit) - {"entry", "text", "subId"}:
+                raise ValueError("Text edit contains unsupported fields")
+            index = integer_value(edit.get("entry", -1), "Text entry index")
             if index < 0 or index >= len(self.entries):
                 raise IndexError(f"Text entry index out of range: {index}")
             value = edit.get("text")
@@ -252,20 +268,40 @@ class TextResourcePackage:
                 raise ValueError("Text values cannot contain NUL characters")
             entry = self.entries[index]
             sub_id = edit.get("subId")
+            if sub_id is not None and not isinstance(sub_id, str):
+                raise TypeError("Text sub-entry ID must be text")
+            identity = (index, sub_id or None)
+            if identity in seen:
+                raise ValueError("Duplicate text edit")
+            seen.add(identity)
             if sub_id in (None, ""):
-                entry.text = value
+                pending.append((index, None, entry, value))
                 continue
             matches = [sub for sub in entry.subentries if sub.id == sub_id]
             if len(matches) != 1:
                 raise KeyError(f"Unknown text sub-entry {sub_id!r} for {entry.id}")
-            matches[0].text = value
-        self._rebuild()
+            pending.append((index, sub_id, matches[0], value))
+
+        entries = copy.deepcopy(self.entries)
+        for index, sub_id, _target, value in pending:
+            target = (entries[index] if sub_id is None else
+                      next(sub for sub in entries[index].subentries if sub.id == sub_id))
+            target.text = value
+        uasset, uexp = self._rebuilt_bytes(entries)
+        for _index, _sub_id, target, value in pending:
+            target.text = value
+        self.uasset_bytes, self.uexp_bytes = uasset, uexp
 
     def _rebuild(self) -> None:
+        self.uasset_bytes, self.uexp_bytes = self._rebuilt_bytes(self.entries)
+
+    def _rebuilt_bytes(self, entries: list[TextEntry]) -> tuple[bytearray, bytearray]:
+        if len(self.uasset_bytes) < TEXT_SERIAL_SIZE_FROM_END:
+            raise TextFormatError(f"{self.uasset_path.name}: too small to contain FF7R text export size")
         output = bytearray(self.head)
         output += _fstring(self.language)
-        output += struct.pack("<iI", 0, len(self.entries))
-        for entry in self.entries:
+        output += struct.pack("<iI", 0, len(entries))
+        for entry in entries:
             output += _fstring(entry.id)
             output += _fstring(entry.text)
             output += struct.pack("<I", len(entry.subentries))
@@ -273,15 +309,16 @@ class TextResourcePackage:
                 output += struct.pack("<Ii", sub.name_index, 0)
                 output += _fstring(sub.text)
         output += UNREAL_SIGNATURE
-        self.uexp_bytes = output
-        if len(self.uasset_bytes) < TEXT_SERIAL_SIZE_FROM_END:
-            raise TextFormatError(f"{self.uasset_path.name}: too small to contain FF7R text export size")
+        if len(output) - len(UNREAL_SIGNATURE) > 0x7FFFFFFF:
+            raise TextFormatError("FF7R text export exceeds its signed 32-bit size field")
+        uasset = bytearray(self.uasset_bytes)
         # Matya's writer updates the FF7R text export serial size 92 bytes from
         # the end of the .uasset. The trailing 4-byte package signature in the
         # .uexp is outside that export's serialized payload.
-        struct.pack_into("<i", self.uasset_bytes,
-                         len(self.uasset_bytes) - TEXT_SERIAL_SIZE_FROM_END,
-                         len(self.uexp_bytes) - len(UNREAL_SIGNATURE))
+        struct.pack_into("<i", uasset,
+                         len(uasset) - TEXT_SERIAL_SIZE_FROM_END,
+                         len(output) - len(UNREAL_SIGNATURE))
+        return uasset, output
 
     def write_pair(self, uasset_target: Path, uexp_target: Path) -> tuple[Path, Path]:
         uasset_target = Path(uasset_target)

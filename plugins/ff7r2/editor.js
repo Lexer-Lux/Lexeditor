@@ -2,11 +2,9 @@
   const {el,columnList,columnPreferences,detailPanel,detailField,readonlyField,infoHelp,detailSection,clone,recordId,pagedListDetail,panelLayout,infoIcon}=LexeditorUI;
   const PLUGIN="ff7r2";
   let tab="characters";
-  // Which presentation tool the Tweaks page shows. One level of subtabs only.
-  let tweakTab="reshade";
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
-  let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
+  const injectorNumericDrafts=new Map();
   let packageBusy=false;
   // What the Data Map shows and where the reader has got to in it.
   const state={dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
@@ -15,21 +13,10 @@
     try{const response=await fetch("/api/game");if(response.ok)game=await response.json()}
     catch(_error){/* the browser preview has no service; the page still renders */}
   }
-  async function loadReshade(){
-    try{reshade=await LexeditorUI.callWindow?.("mod_reshade",PLUGIN)||reshade}
-    catch(_error){/* the browser preview has no desktop host */}
-  }
-  // Every ReShade change answers with the game's fresh ReShade state.
-  async function actReshade(method,...args){
-    try{
-      const value=await LexeditorUI.callWindow?.(method,PLUGIN,...args);
-      if(value&&value.effects)reshade=value;else await loadReshade();
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    render();
-  }
 
   // ---- Shader Injector ------------------------------------------------------
   function acceptInjector(state){
+    injectorNumericDrafts.clear();
     injector=state;
     injectorDraft=state?.settings?clone(state.settings.values):null;
   }
@@ -43,6 +30,10 @@
   }
   async function injectorAction(route,body,done){
     if(injectorBusy)return;
+    if(route==="settings"&&injectorNumericDrafts.size){
+      LexeditorUI.showToast?.(`Correct ${injectorNumericDrafts.values().next().value.label} before saving.`,true);
+      return;
+    }
     injectorBusy=true;render();
     try{
       const response=await fetch(`/api/shader-injector/${route}`,{method:"POST",
@@ -162,11 +153,32 @@
         ...options.map(([code,name])=>{const option=el("option",{value:String(code)},name);option.selected=code===Number(value);return option}));
       return select;
     }
-    const step=setting.kind==="float"?(setting.key==="MenuScale"?0.05:0.01):1;
-    return el("input",{type:"number",value:String(value),step,disabled,"aria-label":label,
-      ...(setting.minimum!==null?{min:setting.minimum}:{}),...(setting.maximum!==null?{max:setting.maximum}:{}),
-      onchange:event=>{const next=Number(event.target.value);if(Number.isFinite(next))set(setting.kind==="float"?next:Math.round(next))}});
+    const key=JSON.stringify([setting.section,setting.key]);
+    const text=injectorNumericDrafts.get(key)?.text??String(value);
+    const commit=next=>{injectorNumericDrafts.delete(key);section[setting.key]=Number(next)};
+    const remember=(input,valid)=>{
+      if(valid)commit(input.value);else injectorNumericDrafts.set(key,{text:input.value,label});
+      refreshInjectorButtons();
+    };
+    if(setting.kind==="int"){
+      const control=LexeditorUI.exactIntegerInput({value:text,min:setting.minimum,max:setting.maximum,label,
+        change:next=>{commit(next);refreshInjectorButtons()}});
+      const input=control.querySelector("input");input.disabled=disabled;
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
+      return control;
+    }
+    const input=el("input",{type:"number",value:text,step:"any",disabled,required:true,"aria-label":label,
+      "data-lex-validate-number":"true",
+      ...(setting.minimum!==null?{min:setting.minimum}:{}),...(setting.maximum!==null?{max:setting.maximum}:{})});
+    const validate=()=>{input.setCustomValidity("");if(input.value===""||!Number.isFinite(Number(input.value)))input.setCustomValidity("Enter a finite number.");return input.checkValidity()};
+    input.lexValidateNumber=validate;
+    input.oninput=()=>remember(input,validate());
+    input.onchange=()=>{if(validate()){commit(input.value);refreshInjectorButtons()}};
+    return input;
   }
+
+  function injectorDirty(){return injectorNumericDrafts.size>0||JSON.stringify(injector?.settings?.values)!==JSON.stringify(injectorDraft)}
+  function refreshInjectorButtons(){for(const button of document.querySelectorAll('[data-injector-draft-action]'))button.disabled=!injectorDirty()||injectorBusy}
 
   function injectorSettingsCard(){
     if(!injector?.available||!injectorDraft)return null;
@@ -179,16 +191,16 @@
       sections.push(detailSection({title:titles[name],body:fields}));
     }
     const saved=injector.settings.values;
-    const dirty=JSON.stringify(saved)!==JSON.stringify(injectorDraft);
+    const dirty=injectorDirty();
     const file=injector.settings;
     const fileRows=[
       detailField({label:"FILE",control:readonlyField(file.exists
         ?file.path:`${file.path} — not created yet. The injector writes it on first start; saving here creates it now.`)}),
       detailField({label:"SAVE",control:el("div",{class:"lex-reshade-actions"},
-        el("button",{type:"button",class:"lex-dialog-action primary",disabled:!dirty||injectorBusy,
+        el("button",{type:"button",class:"lex-dialog-action primary",disabled:!dirty||injectorBusy,"data-injector-draft-action":"save",
           onclick:()=>injectorAction("settings",{changes:injectorDraft},"Saved ShaderInjector.ini. Restart the game to apply.")},"Save settings"),
-        el("button",{type:"button",class:"lex-dialog-action",disabled:!dirty||injectorBusy,
-          onclick:()=>{injectorDraft=clone(saved);render()}},"Revert"))}),
+        el("button",{type:"button",class:"lex-dialog-action",disabled:!dirty||injectorBusy,"data-injector-draft-action":"revert",
+          onclick:()=>{injectorNumericDrafts.clear();injectorDraft=clone(saved);render()}},"Revert"))}),
     ];
     for(const problem of file.problems||[]){
       fileRows.push(detailField({label:"FILE PROBLEM",control:readonlyField(problem),tone:"warning"}));
@@ -213,25 +225,22 @@
     });
   }
 
+  // The shared Tweaks page: Rebirth's own tools as subtabs, and ReShade on
+  // a subtab of its own, which the page loads and drives.
   function tweaks(){
-    const section=LexeditorUI.reshadeSection({snapshot:reshade,act:actReshade});
-    const cards=tweakTab==="injector"
-      ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
-      : tweakTab==="engine"
-      ? [enginePanel.element()]
-      : [section||LexeditorUI.detailNote("ReShade is not set up for this game yet.")];
     // Setup is not finished while the shader cache predates the injector, so
-    // the step and its button sit above both subtabs until it is done.
+    // the step and its button sit above every subtab until it is done.
     const notice=injector?.setupNotice;
     const banner=notice?LexeditorUI.notice({title:notice.title,message:notice.message,
       action:el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
         onclick:clearShaderCache},notice.actionLabel)}):null;
-    return LexeditorUI.settingsColumns(cards,{columnWidth:"520px",notice:banner,
-      tabs:[
-        {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
-        {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
-        {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue."},
-      ],activeTab:tweakTab,tabsLabel:"Presentation tools",changeTab:id=>{tweakTab=id;render()}});
+    return LexeditorUI.tweaksPage({plugin:PLUGIN,render,columnWidth:"520px",notice:banner,tabsLabel:"Presentation tools",
+      pages:[
+        {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders.",
+          body:()=>[injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)},
+        {id:"engine",label:"Engine Config",help:"Unreal Engine.ini settings from the shared catalogue.",
+          body:()=>[enginePanel.element()]},
+      ]});
   }
 
   async function loadDataMap(){
@@ -241,6 +250,7 @@
 
   // ---- PlayerParameter project data ----------------------------------------
   let workspace=null, player=null, savedPlayer=null;
+  let numericDrafts=new WeakMap();
   let playerError="", playerBusy=false, activeSource="mine";
   let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
   let recordSort={key:"key",dir:1};
@@ -259,9 +269,6 @@
 
   const playerValueColumn=(key,label,pinned=true)=>({
     key,label,numeric:true,sortable:true,pinned,
-    editValue:row=>row[key],
-    editor:(row,commit)=>playerCellEditor(row,key,commit),
-    edit:(row,value)=>editPlayerTableValue(row,key,value),
   });
   const PLAYER_COLUMNS=[
     {key:"key",label:"Record",sortable:true,width:"minmax(160px,2fr)"},
@@ -329,6 +336,7 @@
   }
 
   function installPlayer(value){
+    numericDrafts=new WeakMap();
     player=enrichPlayer(value);
     savedPlayer=clone(player);
     playerError="";
@@ -404,36 +412,6 @@
   }
 
   function fieldOf(row,name){return (row?.fields||[]).find(field=>field.name===name)}
-  function playerFieldNumber(field,value){
-    if(!field?.editable||field.kind==="bool"||field.kind==="array"||field.kind==="name"||field.kind==="string")return null;
-    const raw=String(value??"").replaceAll(",","").replace(/\s/g,"");
-    if(raw==="")return null;
-    let next=Number(raw);
-    if(!Number.isFinite(next))return null;
-    if(field.kind!=="float"&&!Number.isInteger(next))return null;
-    if(Number.isSafeInteger(field.minimum)&&next<field.minimum)return null;
-    if(Number.isSafeInteger(field.maximum)&&next>field.maximum)return null;
-    return next;
-  }
-  function editPlayerTableValue(row,key,value){
-    const field=fieldOf(row,key),next=playerFieldNumber(field,value);
-    if(next===null)return;
-    field.value=next;row[key]=next;shell.refresh?.();
-  }
-  function playerCellEditor(row,key,commit){
-    const field=fieldOf(row,key);
-    const attrs={type:"number",value:String(field?.value??""),"aria-label":key+" table value",
-      step:field?.kind==="float"?"any":"1"};
-    if(Number.isSafeInteger(field?.minimum))attrs.min=field.minimum;
-    if(Number.isSafeInteger(field?.maximum))attrs.max=field.maximum;
-    const input=el("input",attrs);
-    input.addEventListener("keydown",event=>{
-      if(event.key==="Enter"){event.preventDefault();const next=playerFieldNumber(field,input.value);if(next!==null)commit(next)}
-      if(event.key==="Escape"){event.preventDefault();commit(undefined)}
-    });
-    input.addEventListener("blur",()=>{const next=playerFieldNumber(field,input.value);commit(next===null?undefined:next)});
-    return input;
-  }
   function savedRow(row){return (savedPlayer?.records||[]).find(item=>item.id===row.id)}
   function savedField(row,field){return fieldOf(savedRow(row),field.name)}
 
@@ -451,19 +429,27 @@
     return result;
   }
 
-  function dirtyCount(){return changedFields().length}
+  function invalidNumericDrafts(){return (player?.records||[]).flatMap(row=>(row.fields||[]).filter(field=>numericDrafts.has(field)).map(field=>({row,field,text:numericDrafts.get(field)})))}
+  function dirtyCount(){return changedFields().length+(activeSource==="mine"?invalidNumericDrafts().filter(({row,field})=>JSON.stringify(savedField(row,field)?.value)===JSON.stringify(field.value)).length:0)}
   function readonlyPlayer(){return playerBusy||activeSource!=="mine"||workspace?.readOnly===true}
 
   function pendingChanges(){
-    return changedFields().map(change=>({
+    return [...changedFields().filter(change=>!numericDrafts.has(change.field)).map(change=>({
       label:change.row.key+" / "+change.field.name,
       before:change.before,
       after:change.after
-    }));
+    })),...invalidNumericDrafts().map(({row,field,text})=>({label:row.key+" / "+field.name,before:savedField(row,field)?.value,after:text}))];
   }
 
   async function savePlayer(){
     if(readonlyPlayer()||!player)return;
+    for(const input of document.querySelectorAll('main input[type="number"],main input[data-lex-exact-integer],main input[data-lex-validate-number]')){
+      if(input.disabled||input.readOnly||!input.getClientRects().length)continue;
+      const valid=input.lexValidateNumber?input.lexValidateNumber():input.lexValidateInteger?.()??input.checkValidity();
+      if(!valid){requestAnimationFrame(()=>{if(input.isConnected)input.reportValidity()});throw new Error(`Correct ${input.getAttribute("aria-label")||"the numeric value"} before saving.`)}
+    }
+    const draft=invalidNumericDrafts()[0];
+    if(draft)throw new Error(`Correct ${draft.field.name} in ${draft.row.key} before saving.`);
     const changes=changedFields().map(change=>({
       nameIndex:change.row.nameIndex,
       nameNumber:change.row.nameNumber,
@@ -571,26 +557,28 @@
         control:el("input",{type:"checkbox",checked:field.value===true,disabled,"aria-label":field.name,
           onchange:event=>{field.value=event.target.checked;row[field.name]=field.value;render();shell.refresh?.()}})};
     }
-    const attrs={type:"number",value:String(field.value),disabled,"aria-label":field.name,
-      step:field.kind==="float"?"any":"1"};
-    if(Number.isSafeInteger(field.minimum))attrs.min=field.minimum;
-    if(Number.isSafeInteger(field.maximum))attrs.max=field.maximum;
-    const captureNumeric=event=>{
-      const raw=String(event.target.value??"").replaceAll(",","").replace(/\s/g,"");
-      if(raw==="")return false;
-      let next=Number(raw);
-      if(!Number.isFinite(next))return false;
-      if(field.kind!=="float"&&!Number.isInteger(next))return false;
-      if(Number.isSafeInteger(field.minimum)&&next<field.minimum)return false;
-      if(Number.isSafeInteger(field.maximum)&&next>field.maximum)return false;
-      field.value=next;row[field.name]=next;shell.refresh?.();return true;
-    };
-    return {dataType:field.kind==="float"?"FLOAT":"INT",min:attrs.min,max:attrs.max,
+    const value=numericDrafts.get(field)??String(field.value);
+    const floating=field.kind==="float";
+    const min=field.minimum??(floating?-3.4028234663852886e38:undefined);
+    const max=field.maximum??(floating?3.4028234663852886e38:undefined);
+    const commit=value=>{numericDrafts.delete(field);field.value=value;row[field.name]=value;shell.refresh?.()};
+    const remember=(input,valid)=>{if(valid)commit(Number(input.value));else{numericDrafts.set(field,input.value);shell.refresh?.()}};
+    let control;
+    if(!floating){
+      control=LexeditorUI.exactIntegerInput({value,min,max,label:field.name,change:text=>{commit(Number(text));render()}});
+      const input=control.querySelector("input");input.disabled=disabled;
+      input.addEventListener("input",()=>remember(input,input.lexValidateInteger()));
+    }else{
+      control=el("input",{type:"number",value,disabled,required:true,min,max,step:"any",
+        "aria-label":field.name,"data-lex-validate-number":"true"});
+      const validate=()=>{control.setCustomValidity("");if(control.value===""||!Number.isFinite(Number(control.value)))control.setCustomValidity("Enter a finite number.");return control.checkValidity()};
+      control.lexValidateNumber=validate;
+      control.oninput=()=>remember(control,validate());
+      control.onchange=()=>{if(validate()){commit(Number(control.value));render()}};
+    }
+    return {dataType:floating?"FLOAT":"INT",min,max,
       help:infoHelp([FIELD_HELP[field.name],field.note].filter(Boolean).join("\n")),
-      control:el("input",{...attrs,
-        oninput:event=>captureNumeric(event),
-        onchange:event=>{if(captureNumeric(event))render();}
-      })};
+      control};
   }
 
   function playerRecordPanel(row){
@@ -646,7 +634,7 @@
     if(!player)return statusPanel("PLAYERPARAMETER NOT LOADED",playerError||"The project has no extracted source asset yet.");
     if(!player.records.length)return statusPanel("EMPTY PLAYERPARAMETER","The DataObject parsed successfully but contains no rows.");
     const rows=playerRows();
-    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
+    return pagedListDetail({order:"given",addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedRecord,page:recordPage,pageSize:recordPageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-player",rowsKey:"ff7r2-player",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-player-search",value:recordQuery,label:"Search PlayerParameter records",
@@ -753,7 +741,7 @@
         detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
       ]})]});
     const rows=battlePlayerRows();
-    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
+    return pagedListDetail({order:"given",addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedBattlePlayerRecord,page:battlePlayerPage,pageSize:battlePlayerPageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-battle-player",rowsKey:"ff7r2-battle-player",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-battle-player-search",value:battlePlayerQuery,label:"Search BattlePlayerParameter records",
@@ -849,7 +837,7 @@
         detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
       ]})]});
     const rows=battleRows();
-    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
+    return pagedListDetail({order:"given",addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedBattleRecord,page:battlePage,pageSize:battlePageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-battle-items",rowsKey:"ff7r2-battle-items",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-battle-search",value:battleQuery,label:"Search BattleItemPossession records",
@@ -974,7 +962,7 @@
   });
 
   (async()=>{
-    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadEngineConfig(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattlePlayer(),loadBattleItem()]);
+    await Promise.all([loadGame(),loadInjector(),loadEngineConfig(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattlePlayer(),loadBattleItem()]);
     render();
     LexeditorUI.finishPluginLoading();
   })();

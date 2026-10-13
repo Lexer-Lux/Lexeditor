@@ -19,6 +19,11 @@ def digest(payload: bytes) -> str:
     return sha256(payload).hexdigest()
 
 
+def validate_edits(edits: list[dict]) -> None:
+    if not isinstance(edits, list):
+        raise ValueError("Chrono Trigger edits must be an array")
+
+
 def validate_resource_path(path: str) -> str:
     normalized = path.replace("\\", "/")
     pure = PurePosixPath(normalized)

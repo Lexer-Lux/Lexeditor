@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import shutil
+from core.numeric_values import finite_number
 
 from . import paths
 from .deploy_data import deploy_target
@@ -26,7 +27,7 @@ def _load_object(path: Path) -> dict:
 
 
 def _finite(value, label: str) -> float:
-    number = float(value)
+    number = finite_number(value, label)
     if not math.isfinite(number):
         raise ValueError(f"{label} must be finite")
     if abs(number) > 1_000_000_000:
@@ -39,6 +40,13 @@ def _xp_amount(value, label: str) -> float:
     if number < 0:
         raise ValueError(f"{label} cannot be negative")
     return number
+
+
+def _override_enabled(edit: dict) -> bool:
+    value = edit.get("overridden", False)
+    if not isinstance(value, bool):
+        raise ValueError("Override enabled must be a boolean")
+    return value
 
 
 def _deployed_module(project: Path, game_root: Path | None = None) -> tuple[str, Path]:
@@ -267,7 +275,7 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
         effect_id = str(edit.get("id") or "")
         if effect_id not in known_effects:
             raise ValueError(f"Unknown runtime effect ID: {effect_id}")
-        if bool(edit.get("overridden")):
+        if _override_enabled(edit):
             value = {
                 "low": _finite(edit.get("low"), f"{effect_id} low"),
                 "high": _finite(edit.get("high"), f"{effect_id} high"),
@@ -283,7 +291,7 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
         source_id = str(edit.get("id") or "")
         if source_id not in known_xp:
             raise ValueError(f"Unknown runtime XP source ID: {source_id}")
-        if bool(edit.get("overridden")):
+        if _override_enabled(edit):
             amount = _xp_amount(edit.get("amount"), source_id)
             if xp_values.get(source_id) != amount:
                 xp_values[source_id] = amount

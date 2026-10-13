@@ -494,6 +494,12 @@
               label:()=>status==="none"?Object.assign(document.createElement("span"),{textContent:"✕"}):dot(status),
               headerTitle:`Open ${name.toLowerCase()} issues. Click a count to list them on GitHub.`,
               sortable:false,render:row=>countCell(row,status,name)})),
+            // Lexer's Mod for the game: a link to its repository, or a dash.
+            {key:"lexmod",label:"LEXMOD?",
+              headerTitle:"Lexer's Mod for this game, set by lexmod in its plugin.json. Click one to open its repository.",
+              render:row=>row.lexmod?link(row.lexmod.replace("https://github.com/",""),()=>window.pywebview.api.open_lexmod(row.id),"Yes")
+                :Object.assign(document.createElement("span"),{textContent:"—",title:"No Lexer's Mod for this game"}),
+              sortValue:row=>row.lexmod?1:0},
             {key:"quotes",label:"QUOTES",numeric:true,
               render:row=>row.quotes??"—",sortValue:row=>row.quotes??-1},
             // Not a numeric column: the cell reads "12 (was 9)", so the
@@ -510,7 +516,7 @@
           // count columns hold one mark or a short number each, and are not
           // sortable: a sort control's padding would add 40px to each.
           template:"minmax(110px,1.1fr)"+" max-content".repeat(DEV_SUBISSUES.length)
-            +" 32px".repeat(DEV_STATUSES.length)+" 64px 96px",
+            +" 32px".repeat(DEV_STATUSES.length)+" 72px 64px 96px",
         }));
       };
       try{

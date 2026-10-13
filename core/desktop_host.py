@@ -631,7 +631,14 @@ class HostApi:
             payload.get("pagerBarHeightPercent"),
             None if "booleanBoxStyle" not in payload else bool(payload["booleanBoxStyle"]),
             show_hover_tooltips=None if "showHoverTooltips" not in payload else bool(payload["showHoverTooltips"]),
+            show_hidden_properties=None if "showHiddenProperties" not in payload else bool(payload["showHiddenProperties"]),
+            trust_warning=None if "trustWarning" not in payload else bool(payload["trustWarning"]),
         )
+        return self.lexeditor_settings()
+
+    def acknowledge_trust_warning(self, mod: str) -> dict:
+        """Remember that the reader accepted the first-enable warning for one mod."""
+        self._settings.acknowledge_trust_warning(mod)
         return self.lexeditor_settings()
 
     def save_developer_setting_defaults(self, values: dict) -> dict:
@@ -700,8 +707,16 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+        # A layout change saves at once, so a fresh owner check per save (a
+        # GitHub CLI round trip, slower while the keyring is busy) queued up
+        # behind every drag and hide. One check holds for five minutes.
+        checked = getattr(self, "_default_view_owner_checked", 0.0)
+        fresh = time.monotonic() - checked > 300
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=fresh):
+            self._default_view_owner_checked = 0.0
             raise PermissionError("Developer Mode requires Lexer's active GitHub account")
+        if fresh:
+            self._default_view_owner_checked = time.monotonic()
         tab_id = str(tab_id).strip()
         token = f"{plugin_id}-{tab_id}"
         if not tab_id or not isinstance(preferences, dict):
@@ -886,14 +901,16 @@ class HostApi:
         for game in games:
             directory = game.pop("directory")
             code = codes.get(directory, {})
+            lexmod = self._plugins[game["id"]].lexmod
             rows.append({"id": game["id"], "game": game["name"], "issueLabel": game["issueLabel"],
+                         "lexmod": f"https://github.com/{lexmod}" if lexmod else "",
                          "quotes": quote_by_dir.get(directory),
                          "copiedLines": code.get("copiedLines") if code else None,
                          "copiedRecorded": code.get("recorded") if code else None,
                          "copiedOver": bool(code.get("over")) if code else False})
         # Global comes first: the shared application's own issues and quotes.
         # It has no plugin subissues or plugin code of its own.
-        global_row = {"id": GLOBAL_ISSUE_LABEL, "game": "Global", "global": True,
+        global_row = {"id": GLOBAL_ISSUE_LABEL, "game": "Global", "global": True, "lexmod": "",
                       "issueLabel": GLOBAL_ISSUE_LABEL,
                       "quotes": quote_counts["global"],
                       "copiedLines": None, "copiedRecorded": None, "copiedOver": False}
@@ -1195,7 +1212,7 @@ class HostApi:
         started game sit invisible behind a Play button while the helper
         manager refused to work because that same process existed.
         """
-        can_launch = getattr(self._plugins[plugin_id], "can_launch", True)
+        can_launch = getattr(self._plugins[plugin_id], "can_launch", True) or bool(self._steam_app_id(plugin_id))
         controller = self._game_controller(plugin_id)
         if controller is not None:
             return {**controller.status(), "canLaunch": can_launch}
@@ -1215,18 +1232,26 @@ class HostApi:
             "canLaunch": can_launch,
         }
 
+    def _steam_app_id(self, plugin_id: str) -> str:
+        spec = getattr(self._plugins[plugin_id], "installation", None)
+        value = str(getattr(spec, "steam_app_id", "") or "")
+        return value if value.isdigit() else ""
+
     def launch_game(self, plugin_id: str) -> dict:
-        """Start the configured game without opening a command window."""
+        """Start the configured game without opening a command window.
+
+        A game that must start through Steam (its executable cannot be run on
+        its own) is asked of Steam instead: the Play button did nothing for
+        Dark Souls Remastered, because its plugin cannot start the executable.
+        """
         if not getattr(self._plugins[plugin_id], "can_launch", True):
-            raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+            app_id = self._steam_app_id(plugin_id)
+            if not app_id or os.name != "nt":
+                raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+            self._deploy_before_launch(plugin_id)
+            os.startfile(f"steam://rungameid/{app_id}")
+            return {"running": False, "viaSteam": True, "alreadyRunning": False}
         adapter = self._plugins[plugin_id].mod_adapter
-        if adapter is not None and getattr(adapter, "supports_bundle_components", False):
-            with self._mod_library_lock:
-                manager = self._bundle_manager(plugin_id)
-                if manager.state_path.exists() or manager.journal.exists():
-                    links = manager.snapshot()
-                    if links["recoveryRequired"] or links["inconsistent"]:
-                        raise ValueError("Recover or apply the linked mod selection in Mod library before launching the game")
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
             with self._mod_library_lock:
@@ -1245,6 +1270,28 @@ class HostApi:
             process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
             self._game_processes[plugin_id] = process
             return {"running": True, "pid": process.pid, "alreadyRunning": False}
+
+    def _deploy_before_launch(self, plugin_id: str) -> None:
+        """Install the enabled mods as they are now, for an adapter that asks.
+
+        Steam starts the game, so nothing else runs between Play and the
+        game reading its files. Without this, a mod whose files changed while
+        it stayed enabled (a rebuilt tweak, edited settings) reached the game
+        only after someone switched mods: DS1 kept loading a stale build.
+        """
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None or not getattr(adapter, "deploys_on_launch", False):
+            return
+        game = self._installations.snapshot(plugin_id).get("root")
+        if not game or self.game_process_status(plugin_id).get("running"):
+            return
+        from core.mod_library import relative_path
+        status = self.mod_library_status(plugin_id)
+        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
+        with self._mod_library_lock:
+            adapter = self._mod_adapter(plugin_id)
+            enabled = [library / name for name in adapter.active_mod_ids(Path(game))]
+            adapter.activate(enabled, Path(game))
 
     def stop_game(self, plugin_id: str) -> dict:
         """Stop this game, including a copy this host did not start.
@@ -1302,15 +1349,14 @@ class HostApi:
     def mod_projects(self, plugin_id: str) -> dict:
         """Return known editable projects for the shared header selector."""
         result = self._projects.snapshot(plugin_id)
+        self._add_library_mods(plugin_id, result)
         for row in result["projects"]:
             row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
-            from core.bundled_mods import components
-            try:
-                links = {key for component in components(Path(row["path"])) for key in component["tweaks"]}
-                registry = getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {}
-                row["linkedTweaks"] = [registry[key].name if key in registry else key for key in sorted(links)]
-            except (ValueError, OSError):
-                row["linkedTweaks"] = []
+        marks = {"rows": result["projects"]}
+        self._attach_mod_marks(plugin_id, marks)
+        for key in ("conflictError", "alertsError"):
+            if marks.get(key):
+                result[key] = marks[key]
         return result
 
     def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
@@ -1336,6 +1382,37 @@ class HostApi:
             target = library.import_mod(plugin_id, source_path, adapter, name, prepare_editable=True)
             project = self._projects.select(plugin_id, str(target))
         return self._restart_for_project(plugin_id, project)
+
+    def _add_library_mods(self, plugin_id: str, result: dict) -> None:
+        """List the same mods as the Mods tab, in its order, with their switch.
+
+        The selector used to know only the mods opened before, so it and the
+        Mods tab showed different lists. Every mod in the game's library is
+        listed now; one the editor cannot open (a tweak mod, which has no
+        game data to edit) is listed as such, not left out.
+        """
+        from core import mods_service
+        try:
+            library = mods_service.library_rows(self._game_mods(plugin_id))
+        except (OSError, ValueError):
+            return
+        _plugin, spec = self._projects._spec(plugin_id)
+        rows = {os.path.normcase(str(Path(row["path"]).resolve())): row for row in result["projects"]}
+        ordered = []
+        for mod in library:
+            key = os.path.normcase(str(Path(mod["path"]).resolve()))
+            row = rows.pop(key, None)
+            if row is None:
+                problems = self._projects._problems(Path(mod["path"]), spec.required_paths, spec.required_any)
+                row = {"path": mod["path"], "name": mod["name"], "version": mod.get("version", ""),
+                       "valid": not problems, "problems": problems, "noMod": False, "current": False}
+                if problems:
+                    row["notEditable"] = ("A tweak mod: it has no game data to edit here. Its settings are in the Tweaks tab."
+                                          if mod.get("script") else "This mod has no files the editor can open.")
+            row["enabled"] = bool(mod.get("enabled"))
+            ordered.append(row)
+        # Vanilla and any mod outside the library keep their place after these.
+        result["projects"] = ordered + list(rows.values())
 
     def mod_library_status(self, plugin_id: str) -> dict:
         from core.mod_library import default_user_library_root
@@ -1487,14 +1564,15 @@ class HostApi:
             Path(source), adapter, data_root, selected)
 
     def import_mod_package(self, plugin_id: str, source: str, name: str,
-                           data_root: str = "", selected: list[str] | None = None) -> dict:
+                           data_root: str = "", selected: list[str] | None = None,
+                           details: dict | None = None) -> dict:
         from core.mod_library import ModLibrary
         adapter = self._mod_adapter(plugin_id)
         if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
             raise ValueError("Mod management is not supported for this game yet")
         with self._mod_library_lock:
             target = ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).import_mod(
-                plugin_id, Path(source), adapter, name, data_root, selected)
+                plugin_id, Path(source), adapter, name, data_root, selected, details=details)
         return {"path": str(target), "name": name}
 
     def choose_mod_package(self, plugin_id: str, kind: str = "folder") -> dict:
@@ -1555,68 +1633,8 @@ class HostApi:
                 state["temporary"].cleanup()
         return {"closed": True}
 
-    def mod_library_entries(self, plugin_id: str) -> dict:
-        from core.mod_library import metadata
-        status = self.mod_library_status(plugin_id)
-        root = Path(status["root"]) / plugin_id
-        game = self._installations.snapshot(plugin_id).get("root")
-        active = []
-        adapter = self._mod_adapter(plugin_id)
-        if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
-            active = list(adapter.active_mod_ids(Path(game)))
-        entries = []
-        has_bundles = (root / '.bundles.json').exists() or (root / '.bundles-pending.json').exists()
-        for child in sorted(root.iterdir()) if root.is_dir() else []:
-            if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
-                try:
-                    info = metadata(child)
-                    has_bundles = has_bundles or info.get('bundle') is not None
-                    policy = self._plugins[plugin_id].managed_mod
-                    locked = bool(policy and child.name == policy.folder_name and
-                                  not self._github.visible_repository(LEXEDITOR_REPOSITORY))
-                    entries.append({"path": str(child), "name": info["name"], "readOnly": locked,
-                                    "version": info["version"], "enabled": child.name in active})
-                except (OSError, ValueError) as error:
-                    entries.append({"path": str(child), "name": child.name, "error": str(error)})
-        result = {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
-        if game and adapter is not None and has_bundles:
-            try:
-                with self._mod_library_lock:
-                    bundles = self._bundle_manager(plugin_id).snapshot()
-                result["bundles"] = bundles
-                for entry in entries:
-                    entry["components"] = [row for row in bundles["components"] if row["parent"] == str(Path(entry["path"]).resolve())]
-                    if entry["components"]:
-                        entry["enabled"] = any(row["enabled"] for row in entry["components"])
-            except (ValueError, OSError) as error:
-                result["bundleError"] = str(error)
-        return result
-
-    def _bundle_manager(self, plugin_id: str):
-        from core.bundled_mods import BundleManager
-        status = self.mod_library_status(plugin_id)
-        game = self._installations.snapshot(plugin_id).get("root")
-        if not game or not status["canManage"]:
-            raise ValueError("Locate the game and enable its mod loader first")
-        return BundleManager(Path(status["root"]) / plugin_id, Path(game),
-                             self._mod_adapter(plugin_id), getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {})
-
-    def set_bundled_tweak(self, plugin_id: str, tweak_id: str, enabled: bool) -> dict:
-        if self.game_process_status(plugin_id).get("running"):
-            raise ValueError("Close the game before changing linked tweaks")
-        with self._mod_library_lock:
-            self._bundle_manager(plugin_id).toggle_tweak(tweak_id, enabled)
-        return self.mod_library_entries(plugin_id)
-
-    def recover_bundled_mods(self, plugin_id: str) -> dict:
-        if self.game_process_status(plugin_id).get("running"):
-            raise ValueError("Close the game before recovering linked mods")
-        with self._mod_library_lock:
-            self._bundle_manager(plugin_id).recover()
-        return self.mod_library_entries(plugin_id)
-
     def update_managed_mod(self, plugin_id: str) -> dict:
-        from core.managed_mods import update_mod, refresh_active_mod
+        from core.managed_mods import update_mod
         from core.mod_library import ModLibrary
         plugin = self._plugins[plugin_id]
         if plugin.managed_mod is None or plugin.mod_adapter is None:
@@ -1632,15 +1650,15 @@ class HostApi:
                 game = self._installations.snapshot(plugin_id).get("root")
                 if not author and game:
                     try:
-                        manager = self._bundle_manager(plugin_id)
-                        if manager.state_path.exists() or manager.journal.exists():
-                            saved = manager.state()
-                            manager.activate(saved["mods"], saved["components"])
+                        from core import mods_service
+                        rows = mods_service.library_rows(self._game_mods(plugin_id))
+                        managed = next((row for row in rows
+                                        if Path(row["path"]).name == plugin.managed_mod.folder_name), None)
+                        if managed is not None and managed["enabled"]:
+                            self._activate_mods(plugin_id, [row["path"] for row in rows if row["enabled"]])
                             result["deploymentRefreshed"] = True
                         else:
-                            result["deploymentRefreshed"] = refresh_active_mod(
-                                ModLibrary(Path(self.mod_library_location()["root"])),
-                                plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
+                            result["deploymentRefreshed"] = False
                     except Exception as error:
                         result["error"] = str(error)
                         result["message"] = (
@@ -1651,7 +1669,9 @@ class HostApi:
         self._managed_mod_results[plugin_id] = result
         return result
 
-    def activate_library_mods(self, plugin_id: str, paths: list[str], components: list[str] | None = None) -> dict:
+    def _activate_mods(self, plugin_id: str, paths: list[str]) -> None:
+        """Deploy exactly these library mods, bundles expanded to their ticks."""
+        from core import bundled_mods
         from core.mod_library import relative_path
         status = self.mod_library_status(plugin_id)
         if not status["canManage"]:
@@ -1666,13 +1686,9 @@ class HostApi:
         roots = [Path(path).resolve() for path in paths]
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
+        adapter = self._mod_adapter(plugin_id)
         with self._mod_library_lock:
-            manager = self._bundle_manager(plugin_id)
-            if manager.catalog() or manager.state_path.exists() or manager.journal.exists():
-                manager.activate([path.name for path in roots], components or [])
-            else:
-                self._mod_adapter(plugin_id).activate(roots, Path(game))
-        return self.mod_library_entries(plugin_id)
+            adapter.activate(bundled_mods.expand_roots(roots, adapter), Path(game))
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1706,13 +1722,195 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, selected)}
 
+    # --- Mods tab, Lexer's Mod and first-run -------------------------------
+
+    def _game_mods(self, plugin_id: str) -> Path:
+        from core import mods_service
+        self._library_plugin(plugin_id)
+        return mods_service.game_library(Path(self.mod_library_location()["root"]), plugin_id)
+
+    def _mods_downloads(self):
+        from core import mods_service
+        if getattr(self, "_downloads", None) is None:
+            self._downloads = mods_service.Downloads()
+        return self._downloads
+
+    def _onboarding(self):
+        from core import mods_service
+        from core.runtime_bootstrap import user_data_dir
+        return mods_service.Onboarding(user_data_dir() / "onboarding.json")
+
+    def mods_overview(self, plugin_id: str) -> dict:
+        """Every mod in this game's library, then Lexer's Mod modules not yet here."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        plugin = self._plugins[plugin_id]
+        result = mods_service.overview(root, plugin.lexmod)
+        status = self.mod_library_status(plugin_id)
+        result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
+                  "message": status.get("message", "")}
+        self._attach_mod_marks(plugin_id, result)
+        return result
+
+    def _attach_mod_marks(self, plugin_id: str, result: dict) -> None:
+        """Mark each switched-on mod with its loader's flags: conflicts plus alerts.
+
+        A game's loader reports, by mod folder, what it cannot combine
+        (adapter.conflicts) and what needs attention (adapter.alerts, such as
+        a mod changed since it was last built). The Mods tab and the mod
+        selector show them on the mod's row. A loader without those reports,
+        or a game not located yet, marks nothing.
+        """
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get("root") if adapter is not None else ""
+        if not game:
+            return
+        enabled = [Path(row["path"]) for row in result["rows"] if row.get("enabled")]
+        self._attach_report(result, adapter, enabled, game, "conflicts", "conflictError")
+        self._attach_report(result, adapter, enabled, game, "alerts", "alertsError")
+
+    @staticmethod
+    def _attach_report(result: dict, adapter, enabled: list, game: str, method: str, error_key: str) -> None:
+        if adapter is None or not hasattr(adapter, method):
+            return
+        try:
+            found = getattr(adapter, method)(enabled, Path(game)) if enabled else {}
+        except (OSError, ValueError, RuntimeError) as error:
+            result[error_key] = str(error)
+            return
+        found = {str(Path(key).resolve()): lines for key, lines in found.items()}
+        for row in result["rows"]:
+            lines = found.get(str(Path(row["path"]).resolve())) if row.get("enabled") else None
+            if lines:
+                row[method] = list(lines)
+
+    def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
+        from core import mod_metadata, mods_service
+        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+        mod_metadata.write(folder, details)
+        return mods_service.mod_row(folder)
+
+    def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
+        """Switch one mod, then let the game's loader take the new set."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        folder = mods_service.checked_mod(root, path)
+        was = bool(mods_service.mod_row(folder).get("enabled"))
+        mods_service.set_enabled(folder, enabled)
+        if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
+            enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+            try:
+                self._activate_mods(plugin_id, enabled_paths)
+            except Exception:
+                # The switch failed, so the mod keeps its old state. Left
+                # saved, a mod that cannot build stayed on behind an
+                # unticked box and failed every later switch of any mod.
+                mods_service.set_enabled(folder, was)
+                raise
+        return mods_service.mod_row(folder)
+
+    def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:
+        """Move one mod within the library's load order, which the Mods tab shows.
+
+        The mod selector lists these same rows in this same order, and the
+        game loaders compose in it, so one persisted order serves every
+        screen. A move only persists: the new order reaches the game with
+        the next activation, as with the selector's own moves.
+        """
+        from core import mods_service
+        return mods_service.move(self._game_mods(plugin_id), path, delta)
+
+    def save_mod_settings(self, plugin_id: str, path: str, values: dict) -> dict:
+        from core import bundled_mods, mods_service, script_mods
+        root = self._game_mods(plugin_id)
+        folder = mods_service.checked_mod(root, path)
+        if bundled_mods.components(folder):
+            bundled_mods.save_values(folder, values)
+            # A component tick deploys at once when its bundle is on, like a
+            # switch: a bundle has no Save-time rebuild the way a tweak mod
+            # does. While the bundle is off the saved tick waits for its switch.
+            if (mods_service.mod_row(folder).get("enabled") and self._mod_adapter(plugin_id) is not None
+                    and self.mod_library_status(plugin_id).get("canManage")):
+                self._activate_mods(plugin_id, [row["path"] for row in mods_service.library_rows(root)
+                                                if row["enabled"]])
+        else:
+            script_mods.save_values(folder, values)
+        return mods_service.mod_row(folder)
+
+    def activate_enabled_mods(self, plugin_id: str) -> dict:
+        """Hand the library's enabled mods to the game's loader, when it has one."""
+        from core import mods_service
+        root = self._game_mods(plugin_id)
+        if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
+            return {"activated": False}
+        enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+        self._activate_mods(plugin_id, enabled)
+        return {"activated": True, "mods": len(enabled)}
+
+    def open_lexmod(self, plugin_id: str) -> dict:
+        """Open only the repository this game's own manifest names."""
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            raise ValueError("This game has no Lexer's mod")
+        url = f"https://github.com/{repository}"
+        return {"opened": bool(webbrowser.open(url, new=2, autoraise=True)), "url": url}
+
+    def lexmod_info(self, plugin_id: str) -> dict:
+        """Lexer's Mod for this game: its link, features and modules, or why not."""
+        from core import mods_service, lexmods
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            return {"available": False, "repository": ""}
+        try:
+            catalog = mods_service.catalog(repository)
+        except lexmods.LexmodError as error:
+            return {"available": False, "repository": repository, "error": str(error)}
+        return {"available": True, "repository": repository, "url": catalog["url"],
+                "version": catalog["version"], "features": catalog["features"],
+                "readmeProblems": catalog["readmeProblems"], "modules": catalog["modules"]}
+
+    def lexmod_download(self, plugin_id: str, modules: list[str] | None = None) -> dict:
+        repository = self._plugins[plugin_id].lexmod
+        if not repository:
+            raise ValueError("This game has no Lexer's mod")
+        if modules is not None and (not isinstance(modules, list) or not all(isinstance(m, str) for m in modules)):
+            raise ValueError("Choose modules by folder name")
+        return self._mods_downloads().start(plugin_id, repository, self._game_mods(plugin_id), modules)
+
+    def lexmod_download_progress(self, plugin_id: str) -> dict:
+        return self._mods_downloads().progress(plugin_id)
+
+    def lexmod_download_cancel(self, plugin_id: str) -> dict:
+        return self._mods_downloads().cancel(plugin_id)
+
+    def lexmod_update(self, plugin_id: str) -> dict:
+        """Keep downloaded Lexer's Mod modules on the latest version."""
+        from core import mods_service, lexmods
+        from core.runtime_bootstrap import user_data_dir
+        repository = self._plugins[plugin_id].lexmod
+        try:
+            return mods_service.update_if_due(repository, self._game_mods(plugin_id),
+                                              user_data_dir() / "lexmod-updates.json")
+        except lexmods.LexmodError as error:
+            return {"updated": False, "error": str(error)}
+
+    def onboarding_status(self, plugin_id: str) -> dict:
+        self._library_plugin(plugin_id)
+        return {"show": not self._onboarding().seen(plugin_id), "game": self._plugins[plugin_id].name}
+
+    def finish_onboarding(self, plugin_id: str) -> dict:
+        self._library_plugin(plugin_id)
+        self._onboarding().finish(plugin_id)
+        return {"show": False}
+
     def _library_plugin(self, plugin_id: str) -> None:
         # The id becomes a folder under the mod library, so only a registered
         # plugin's id may name one; "../x" must never reach mkdir.
         if not isinstance(plugin_id, str) or plugin_id not in self._plugins:
             raise ValueError(f"Unknown plugin: {plugin_id}")
 
-    def create_mod_project(self, plugin_id: str, name: str, parent: str = "") -> dict:
+    def create_mod_project(self, plugin_id: str, name: str, parent: str = "",
+                           details: dict | None = None) -> dict:
         """Clone the plugin's valid starter into the mod library, or `parent`.
 
         Naming a mod is all a reader needs: it lands under this game's own
@@ -1727,7 +1925,14 @@ class HostApi:
         else:
             target_parent = Path(self.mod_library_location()["root"]) / plugin_id
             target_parent.mkdir(parents=True, exist_ok=True)
+        from core import mod_metadata
+        mod_metadata.clean({**(details or {}), "name": name})
         project = self._projects.create(plugin_id, str(target_parent), name)
+        # A new mod is named in its own mod.json, with the author and
+        # description the reader gave, before the editor opens it.
+        mod_metadata.write(Path(project["current"]), {
+            **{key: value for key, value in (details or {}).items() if key in mod_metadata.FIELDS},
+            "name": name})
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, str(target_parent / name))}
 

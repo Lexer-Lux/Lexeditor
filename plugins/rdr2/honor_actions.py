@@ -7,9 +7,10 @@ call sites choose one of these shared tiers, often with the same event hash.
 from __future__ import annotations
 
 import csv
-import os
-import tempfile
+import io
 from pathlib import Path
+from core.numeric_values import integer_value
+from core.plugin_files import atomic_write
 
 
 EVENTS = (
@@ -52,16 +53,31 @@ def _defaults() -> dict:
 def read_honor_actions(path: Path) -> dict:
     data = _defaults()
     if path.exists():
-        rows = list(csv.DictReader(path.open(encoding="utf-8-sig", newline="")))
+        with path.open(encoding="utf-8-sig", newline="") as stream:
+            reader = csv.DictReader(stream)
+            if reader.fieldnames != ['kind', 'id', 'enabled', 'amount']:
+                raise ValueError("Unsupported honor control columns")
+            rows = list(reader)
         event_by_id = {row["id"]: row for row in data["events"]}
         tier_by_id = {row["id"]: row for row in data["tiers"]}
+        seen = set()
         for row in rows:
+            if set(row) != {'kind', 'id', 'enabled', 'amount'} or any(value is None for value in row.values()):
+                raise ValueError("Malformed honor control row")
             target = event_by_id.get(row.get("id")) or tier_by_id.get(row.get("id"))
             if not target:
                 raise ValueError(f"unknown honor control: {row.get('id')!r}")
-            target["enabled"] = row.get("enabled", "1").strip().lower() not in ("0", "false", "no")
+            if row['id'] in seen or row['kind'] != ('tier' if 'amount' in target else 'event'):
+                raise ValueError("Duplicate or unsupported honor control owner")
+            seen.add(row['id'])
+            enabled = row['enabled'].strip().lower()
+            if enabled not in {'0', '1', 'false', 'true', 'no', 'yes'}:
+                raise ValueError("Unsupported honor enable value")
+            target["enabled"] = enabled in {'1', 'true', 'yes'}
             if "amount" in target:
-                target["amount"] = int(row["amount"])
+                target["amount"] = integer_value(row["amount"], 'Honor amount')
+            elif row['amount'].strip():
+                raise ValueError("Honor event has no independent amount")
     data.update({
         "available": True,
         "file": str(path),
@@ -71,12 +87,20 @@ def read_honor_actions(path: Path) -> dict:
     return data
 
 
-def save_honor_actions(path: Path, edits: list[dict]) -> int:
+def prepare_honor_actions(path: Path, edits: list[dict]) -> tuple[int, bytes | None]:
+    if not isinstance(edits, list):
+        raise ValueError("Honor edits must be a list")
+    if not edits:
+        return 0, None
     data = read_honor_actions(path)
     controls = {row["id"]: row for row in data["events"] + data["tiers"]}
     seen = set()
     for edit in edits:
-        key = str(edit.get("id", ""))
+        if not isinstance(edit, dict) or not {'id'} < set(edit) or set(edit) - {'id', 'enabled', 'amount'}:
+            raise ValueError("Honor edits require id and enabled or amount")
+        key = edit['id']
+        if not isinstance(key, str):
+            raise ValueError("Honor control id must be text")
         if key in seen or key not in controls:
             raise ValueError(f"duplicate or unknown honor control: {key!r}")
         seen.add(key); row = controls[key]
@@ -88,19 +112,18 @@ def save_honor_actions(path: Path, edits: list[dict]) -> int:
         if "amount" in edit:
             if "amount" not in row:
                 raise ValueError(f"honor event {key} has no independent amount")
-            row["amount"] = int(edit["amount"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=("kind", "id", "enabled", "amount"))
-        writer.writeheader()
-        for row in data["events"]:
-            writer.writerow({"kind": "event", "id": row["id"], "enabled": int(row["enabled"]), "amount": ""})
-        for row in data["tiers"]:
-            writer.writerow({"kind": "tier", "id": row["id"], "enabled": int(row["enabled"]), "amount": row["amount"]})
-    os.replace(temporary, path)
-    # Strict round trip catches malformed or silently dropped settings.
-    check = read_honor_actions(path)
-    if len(check["events"]) != len(EVENTS) or len(check["tiers"]) != len(TIERS):
-        raise ValueError("honor controls failed round-trip validation")
-    return len(edits)
+            row["amount"] = integer_value(edit["amount"], 'Honor amount')
+    handle = io.StringIO(newline='')
+    writer = csv.DictWriter(handle, fieldnames=("kind", "id", "enabled", "amount"))
+    writer.writeheader()
+    for row in data["events"]:
+        writer.writerow({"kind": "event", "id": row["id"], "enabled": int(row["enabled"]), "amount": ""})
+    for row in data["tiers"]:
+        writer.writerow({"kind": "tier", "id": row["id"], "enabled": int(row["enabled"]), "amount": row["amount"]})
+    return len(edits), handle.getvalue().encode('utf-8')
+
+
+def save_honor_actions(path: Path, edits: list[dict]) -> int:
+    count, payload = prepare_honor_actions(path, edits)
+    if payload is not None:atomic_write(path, payload)
+    return count

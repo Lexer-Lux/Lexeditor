@@ -6,9 +6,10 @@ editability audit lists "archive browse, extract and repack" as Deling's area
 and as a gap here.
 
 This reads the same FS/FI/FL triplets `fs_archive` already parses, and nothing
-else: it lists entries and their stored sizes, it does not read entry contents
-and it never writes to the installation. Extraction and repacking are separate
-jobs and are not claimed here.
+else: it lists entries and their stored sizes, it extracts one entry at a time
+into the project's own extracted/ folder, and it rebuilds a whole triplet under
+repacked/ from the project's direct/ replacements. It never writes to the
+installation.
 """
 
 from __future__ import annotations

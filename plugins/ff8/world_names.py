@@ -62,6 +62,10 @@ def prepare(edits: list[dict]) -> dict[str, str]:
     return names
 
 
+def encoded(names: dict[str, str]) -> bytes:
+    return (json.dumps(_validate(names), ensure_ascii=False, indent=2, sort_keys=True)+'\n').encode('utf-8')
+
+
 def write(names: dict[str, str]) -> Path:
     names = _validate(names)
     destination = paths.PROJECT_ROOT / FILENAME

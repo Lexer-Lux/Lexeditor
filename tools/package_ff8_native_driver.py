@@ -134,7 +134,10 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         shader_files = [p for p in shader_files if p.is_file()]
         shader_digest = hashlib.sha256(''.join(
             f'{p.name} {sha256(p)}\n' for p in shader_files).encode()).hexdigest()
-        recovery = ('The original run compiled and linked successfully, but licence '
+        recovery_notes = [line.removeprefix('Recovery: ') for line in build.splitlines()
+                          if line.startswith('Recovery: ')]
+        recovery = ('\n'.join(recovery_notes) if recovery_notes else
+                    'The original run compiled and linked successfully, but licence '
                     'staging used the wrong filename. The archived DLL/PDB and '
                     'CMake cache were recovered without changing the binary; all '
                     'linked-artifact and package checks were rerun before publication.'
@@ -180,6 +183,10 @@ suppresses native camera-left/right input and the overhead-view toggle at their
 consumers. Battle camera elevation uses FF8's downward-positive Y axis, so
 the floor blocks underground movement and the upper limit allows elevation.
 In-game Time uses the native TIME label instead of PLAY.
+Modern Controls forwards the right-stick press to Enhanced Scan and maps
+the right trigger to Shot's fire input only while Shot is open. Timed Hits
+keeps its Square input. These are compiled input mappings; actual controller
+and in-game behavior still require acceptance.
 Better HP Colors adds optional smooth HP-number colour in battle, shared
 character panels and active/reserve main-menu rows. Native KO and status
 palettes take priority. Interaction Indicators observes the native field target

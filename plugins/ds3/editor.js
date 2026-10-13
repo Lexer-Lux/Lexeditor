@@ -66,6 +66,7 @@
     }
   }
   function fieldControl(table,row,field){
+    if(field.editable===false)return LexeditorUI.readonlyField(field.value,{format:false});
     if(field.type==="bool")return el("input",{type:"checkbox",checked:!!field.value,"aria-label":field.label,
       "data-ds3-field":field.key,onchange:event=>editField(table,row,field,event.target.checked?1:0)});
     if(field.type==="enum"){
@@ -139,7 +140,7 @@
     if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.loadingPanel({label:"Loading records"})]}));return}
     if(!table.rows.length){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("No records were found in this parameter table.")]}));return}
     if(state.creating?.table===id){renderCreation(id);return}
-    const view=pagedListDetail({add:()=>{
+    const view=pagedListDetail({order:"given",add:()=>{
       const source=table.rows.find(row=>row.id===table.selected)||table.rows[0];
       state.creating={table:id,sourceId:source.id,id:Math.min(2147483647,Math.max(...table.rows.map(row=>row.id))+1),name:source.name+' copy'};
       render();

@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+from core.numeric_values import integer_value
 
 from . import paths, runtime_layout
 from .fs_archive import FsArchive
@@ -122,10 +123,7 @@ def parse(raw: bytes) -> dict:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{label} must be a whole number") from error
+    number = integer_value(value, label)
     if not minimum <= number <= maximum:
         raise ValueError(f"{label} must be {minimum} to {maximum}")
     return number
@@ -139,7 +137,7 @@ def apply_edits(raw: bytes, edits: list[dict]) -> bytes:
     seen: set[int] = set()
     for edit in edits:
         try:
-            index = int(edit["id"])
+            index = integer_value(edit["id"], "World-to-field entry ID")
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("A wm2field.tbl edit needs an id") from error
         if index not in known:
