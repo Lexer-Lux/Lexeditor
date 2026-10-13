@@ -111,3 +111,47 @@ def make_text_archive(names=None, descs=None, extra=None):
     header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')
     struct.pack_into('>II', header, 28, len(plain), len(compressed))
     return bytes(header) + compressed
+
+
+def pack_text_members(entries):
+    """entries is [(member_id, name, payload)]: a synthetic DCX+BND3 archive."""
+    encoded = [name.encode('shift_jis') + b'\0' for _, name, _ in entries]
+    directory_end = 32 + len(entries) * 24
+    names_end = directory_end + sum(map(len, encoded))
+    plain = bytearray(names_end)
+    plain[:4] = b'BND3'
+    plain[4:12] = b'TEST0000'
+    plain[12] = 0x74
+    struct.pack_into('<II', plain, 16, len(entries), names_end)
+    name_offset = directory_end
+    for index, ((member_id, _name, payload), name) in enumerate(zip(entries, encoded)):
+        while len(plain) % 16:
+            plain.append(0)
+        struct.pack_into('<6I', plain, 32 + index * 24, 0x40, len(payload), len(plain), member_id, name_offset, len(payload))
+        plain[name_offset:name_offset + len(name)] = name
+        name_offset += len(name)
+        plain.extend(payload)
+    compressed = zlib.compress(plain, 9)
+    header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')
+    struct.pack_into('>II', header, 28, len(plain), len(compressed))
+    return bytes(header) + compressed
+
+
+def make_menu_archive(labels=None, extra=None, omit_labels=False):
+    """A synthetic msg/ENGLISH/menu.msgbnd.dcx: Menu_general_text_ twice
+    (member IDs 76 and 124, as Remastered ships them), holding `labels` by
+    entry ID. `extra` maps an FMG file name to {id: text}, also carried
+    twice."""
+    from plugins.ds1 import texts
+    labels = labels if labels is not None else {102204: 'MagDEF', 102205: 'FireDEF', 102206: 'LitngDEF'}
+    blank = b'\0\0\x01\0' + bytes(4) + b'\x01\0\0\0' + bytes(texts.HEADER - 12)
+    entries = []
+    folder = 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92))
+    for member_id in (76, 124):
+        if not omit_labels:
+            entries.append((member_id, folder + texts.MENU_LABEL_FILE,
+                            texts.build_fmg(blank, [], dict(labels))))
+        for extra_offset, (file_name, contents) in enumerate((extra or {}).items()):
+            entries.append((member_id + 64 + extra_offset, folder + file_name,
+                            texts.build_fmg(blank, [], dict(contents))))
+    return pack_text_members(entries)

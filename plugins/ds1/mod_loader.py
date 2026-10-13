@@ -46,7 +46,7 @@ from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
 from .tae_store import CHR_DIR, MAX_BINDER
 
-FILES = (RELATIVE, texts.RELATIVE)
+FILES = (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE)
 MAX_MAP_FILES = 64
 MAX_ANIBND_FILES = 64
 TABLE_NAMES = {"EquipParamGoods": "Items", "EquipParamWeapon": "Weapons",
@@ -241,6 +241,13 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
         conflicts += result[1]
         if result[0] != vanilla[texts.RELATIVE]:
             files[texts.RELATIVE] = result[0]
+    if texts.MENU_RELATIVE in vanilla:
+        result = _compose_texts(vanilla[texts.MENU_RELATIVE], [(mod.name, mod.files[texts.MENU_RELATIVE])
+                                                              for mod in mods if texts.MENU_RELATIVE in mod.files],
+                                relative=texts.MENU_RELATIVE, document=texts.MenuDocument)
+        conflicts += result[1]
+        if result[0] != vanilla[texts.MENU_RELATIVE]:
+            files[texts.MENU_RELATIVE] = result[0]
     for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
                             if path.suffix == ".msb" and path.parent == MAP_DIR}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
@@ -605,8 +612,9 @@ def _rows_only(vanilla: bytes, data: bytes, spans: list[tuple[int, int, int]]) -
 
 # --- Item text ---------------------------------------------------------------
 
-def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list[Conflict]]:
-    base = texts.TextDocument(vanilla)
+def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]], *, relative=texts.RELATIVE,
+                       document=texts.TextDocument) -> tuple[bytes, list[Conflict]]:
+    base = document(vanilla)
     merged = {position: dict(table[1]) for position, table in base.tables.items()}
     owners: dict[tuple[str, int], str] = {}
     conflicts: dict[tuple[str, int], Conflict] = {}
@@ -617,17 +625,18 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
             continue
         touched.append(name)
         try:
-            document = texts.TextDocument(data)
+            other = document(data)
         except FormatError as error:
-            raise ValueError(f"{name}: its item-name archive cannot be read ({error})") from error
-        if [(entry.member_id, entry.name) for entry in document.entries] != \
+            label = "menu text" if relative == texts.MENU_RELATIVE else "item-name"
+            raise ValueError(f"{name}: its {label} archive cannot be read ({error})") from error
+        if [(entry.member_id, entry.name) for entry in other.entries] != \
                 [(entry.member_id, entry.name) for entry in base.entries]:
             foreign.append((name, data))
             continue
-        for position, entry in enumerate(document.entries):
+        for position, entry in enumerate(other.entries):
             if position in base.tables:
                 file = base._file(position)
-                before, after = base.original_texts[position], document.tables[position][1]
+                before, after = base.original_texts[position], other.tables[position][1]
                 for item in set(before) | set(after):
                     if after.get(item) == before.get(item):
                         continue
@@ -636,7 +645,9 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
                         # Merged-only tables (Place_name_) hold names too.
                         role = ('Name' if file in texts.NAME_TABLES.values() or file in texts.MERGED_TABLES
                                 else 'Full description' if 'long_desc' in file else 'Description')
-                        conflict = conflicts.setdefault(key, Conflict(texts.RELATIVE, f"{role} {item} ({file.removesuffix('_.fmg').replace('_', ' ')})"))
+                        if relative == texts.MENU_RELATIVE:
+                            role = 'Menu label'
+                        conflict = conflicts.setdefault(key, Conflict(relative, f"{role} {item} ({file.removesuffix('_.fmg').replace('_', ' ')})"))
                         conflict.add(owners[key])
                         conflict.add(name)
                     merged[position][item] = after.get(item)
@@ -654,7 +665,8 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
     result = list(conflicts.values())
     if foreign:
         # Only the whole archive can be used: the last mod's, if it is one of these.
-        conflict = Conflict(texts.RELATIVE, "Item text archive (whole file)")
+        title = "Menu text archive (whole file)" if relative == texts.MENU_RELATIVE else "Item text archive (whole file)"
+        conflict = Conflict(relative, title)
         for name in touched:
             conflict.add(name)
         if touched[-1] == foreign[-1][0]:
@@ -665,7 +677,7 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes
         entries[position] = texts.Entry(old.member_id, old.name, old.flags, changes[-1][1])
         changed = True
         if len(changes) > 1:
-            conflict = Conflict(texts.RELATIVE, f"{base._file(position)} (whole text table)")
+            conflict = Conflict(relative, f"{base._file(position)} (whole text table)")
             for name, _data in changes:
                 conflict.add(name)
             result.append(conflict)

@@ -45,7 +45,7 @@ from .tae import CHR_DIR, TaeDocument
 from . import texts
 
 # Each managed file, and the reader that proves a copy of it is sound.
-FILES = ((RELATIVE, ItemDocument), (texts.RELATIVE, texts.TextDocument))
+FILES = ((RELATIVE, ItemDocument), (texts.RELATIVE, texts.TextDocument), (texts.MENU_RELATIVE, texts.MenuDocument))
 
 MOD_ID = "lexeditor-ds1"
 NOTE = (
@@ -532,6 +532,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
                + [(relative, _check_anibnd) for relative in char_targets]
                + [(relative, None) for relative in asset_targets])
     if composed is None and not source.is_file() and not (project_root / texts.RELATIVE).is_file() \
+            and not (project_root / texts.MENU_RELATIVE).is_file() \
             and not any((project_root / relative).is_file() for relative in map_targets + char_targets + asset_targets):
         raise FileNotFoundError("Save the project before applying it; it holds no game files to install.")
     _assert_disjoint(game_root, project_root)

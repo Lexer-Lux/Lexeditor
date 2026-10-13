@@ -39,6 +39,7 @@ SUBTABS = (
     ('keys', 'Key Items', 'EquipParamGoods'), ('spells', 'Spells', 'Magic'),
     ('weapons', 'Weapons', 'EquipParamWeapon'), ('ammo', 'Ammo', 'EquipParamWeapon'),
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
+    ('menu-labels', 'Menu labels', 'MenuText'),
 )
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),
                  ('behaviors', 'Behaviors', 'BehaviorParam'),
@@ -429,6 +430,9 @@ class ItemDocument:
         # The game's own item names (texts.TextDocument), when the store has
         # them; reference names stand in for the rest.
         self.texts = None
+        # The game's own menu text (texts.MenuDocument), when the store
+        # has it; without it the Menu labels subtab is empty.
+        self.menu_texts = None
         # The game's own parameters, when this document is a mod's: each
         # field's vanilla value, for right-click restore. None means this
         # document was read from the game's own file, so its original is vanilla.
@@ -469,7 +473,7 @@ class ItemDocument:
     @property
     def dirty_count(self):
         changes = {self._change_key(*entry) for entry in self.dirty}
-        return len(changes) + len(self._removed_rows) + (len(self.texts.dirty) if self.texts else 0)
+        return len(changes) + len(self._removed_rows) + (len(self.texts.dirty) if self.texts else 0) + (len(self.menu_texts.dirty) if self.menu_texts else 0)
 
     def pending_changes(self, limit=200):
         """What Save would write, one row per change: label, before and after."""
@@ -511,10 +515,22 @@ class ItemDocument:
             from .texts import KIND_LABELS
             for kind, table, item in sorted(self.texts.dirty, key=str)[:limit]:
                 rows.append({'label': f'{KIND_LABELS[kind]} · {table} {item}'})
+        if self.menu_texts:
+            from .texts import MENU_LABELS
+            for key in sorted(self.menu_texts.dirty):
+                display, _text_id = MENU_LABELS[key]
+                rows.append({'label': f'Menu label · {display}',
+                             'before': self.menu_texts.original_label(key) or '',
+                             'after': self.menu_texts.label(key) or ''})
         return rows
 
     def display_name(self, table, row_id, row=None):
         """The item's in-game name, else its reference name, else a number."""
+        if table == 'MenuText':
+            from .texts import MENU_LABELS, MENU_LABEL_IDS
+            if row_id in MENU_LABEL_IDS:
+                return MENU_LABELS[MENU_LABEL_IDS[row_id]][0]
+            return f'Menu label {row_id}'
         named = self.texts.name(table, row_id) if self.texts else None
         if named: return named
         row = row or self.params[table].row(row_id)
@@ -612,6 +628,8 @@ class ItemDocument:
             return self.effect_references().rows(tab)
         if tab in {entry[0] for entry in STATS_SUBTABS}:
             return self._stats_rows(tab)
+        if tab == 'menu-labels':
+            return self._menu_label_rows()
         match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
@@ -654,6 +672,15 @@ class ItemDocument:
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
                            'table': table, 'values': values, 'display': display})
         return result
+
+    def _menu_label_rows(self):
+        """The equipment defense labels as records: fixed names, editable text."""
+        if self.menu_texts is None:
+            return []
+        from .texts import MENU_LABELS
+        return [{'id': text_id, 'table': 'MenuText', 'name': display,
+                 'values': {'label': self.menu_texts.label(key) or ''}, 'display': {}}
+                for key, (display, text_id) in MENU_LABELS.items()]
 
     def is_monster(self, row_id):
         if classified_monster(row_id, self.schemas['NpcParam']['names'].get(row_id),
@@ -717,6 +744,8 @@ class ItemDocument:
         return spans
 
     def read_row(self, table, row_id, only=None):
+        if table == 'MenuText':
+            return self._read_menu_label(row_id, only)
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         row, _, data = self._row(table, row_id)
@@ -790,6 +819,23 @@ class ItemDocument:
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
+    def _read_menu_label(self, row_id, only=None):
+        from .texts import MENU_LABELS, MENU_LABEL_IDS
+        if self.menu_texts is None or row_id not in MENU_LABEL_IDS:
+            raise FormatError('Unknown menu label')
+        key = MENU_LABEL_IDS[row_id]
+        fields = []
+        if only is None or 'label' in only:
+            fields.append({'key': 'label', 'label': 'Menu label',
+                           'description': ('The text the equipment panel shows for this defense. '
+                                           'One line, up to 200 characters.'),
+                           'group': '', 'dtype': 'text', 'value': self.menu_texts.label(key) or '',
+                           'type': 'text', 'minimum': None, 'maximum': None, 'maxLength': 200,
+                           'required': True, 'enum': {}, 'protectedReason': '',
+                           'editable': True, 'vanilla': self.menu_texts.original_label(key) or ''})
+        return {'id': row_id, 'table': 'MenuText', 'name': MENU_LABELS[key][0],
+                'renamable': False, 'fields': fields, 'effectLinks': []}
+
     def _absorption_levels(self, row_id, table='EquipParamProtector'):
         """The record's Armor Rework effects, +0 first, or [] for a record without one."""
         if EFFECT_TABLE not in self.params:
@@ -857,6 +903,16 @@ class ItemDocument:
             if self.texts is None or not self.texts.describable(table):
                 raise FormatError('These records have no in-game description to change.')
             self.texts.set_description(table, row_id, value, long=key == 'longDescription')
+            return self.read_row(table, row_id, only=only)
+        if table == 'MenuText':
+            if key != 'label':
+                raise FormatError('This field is protected')
+            if self.menu_texts is None:
+                raise FormatError('The menu text archive is missing. Menu labels cannot be edited.')
+            from .texts import MENU_LABEL_IDS
+            if row_id not in MENU_LABEL_IDS:
+                raise FormatError('Unknown menu label')
+            self.menu_texts.set_label(MENU_LABEL_IDS[row_id], value)
             return self.read_row(table, row_id, only=only)
         if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
             if table == 'NpcParam' and not self.is_monster(row_id):

@@ -599,7 +599,7 @@ function detail(){
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset";
+  const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
   const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons("placement"):paramRowEarly?rowActionButtons("record"):[];
   if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]});
   let help=state.row.help;

@@ -23,6 +23,8 @@ class ItemStore:
         self.output = self.project / RELATIVE if self.project else None
         # The game's item names live in a second archive the mod also carries.
         self.text_output = self.project / texts.RELATIVE if self.project else None
+        # The equipment defense labels live in a third one.
+        self.menu_output = self.project / texts.MENU_RELATIVE if self.project else None
         self.document = None
 
     def writable(self):
@@ -32,7 +34,7 @@ class ItemStore:
             raise ValueError('The mod project must be outside the game installation.')
         from .tweak_mods import checked
         checked(self.project / MARKER)
-        for output in (self.output, self.text_output):
+        for output in (self.output, self.text_output, self.menu_output):
             resolved_output = checked(output).resolve()
             if self.game_root in resolved_output.parents or self.project not in resolved_output.parents:
                 raise ValueError('The output path leaves the mod project or enters the installed game.')
@@ -63,6 +65,7 @@ class ItemStore:
         self.vanilla_hash = digest(vanilla)
         self.output_hash = digest(self.output) if self.output else None
         self._load_texts(document)
+        self._load_menu_texts(document)
         # A mod's saved archive is not vanilla: read the game's own once, for
         # each field's vanilla value.
         document.vanilla_document = ItemDocument(vanilla.read_bytes()) if source != vanilla else None
@@ -82,6 +85,19 @@ class ItemStore:
         self.text_hash = digest(self.text_source) if self.text_source else None
         self.text_output_hash = digest(self.text_output) if self.text_output else None
         document.texts = texts.TextDocument(self.text_source.read_bytes()) if self.text_source else None
+
+    def _load_menu_texts(self, document):
+        """The mod's menu labels if it has changed any, else the game's own."""
+        from . import deployment
+        try:
+            vanilla = deployment.vanilla_source(self.game_root, texts.MENU_RELATIVE)
+        except RuntimeError:
+            vanilla = None
+        source = self.menu_output if self.menu_output and self.menu_output.is_file() else vanilla
+        self.menu_source = source if source and source.is_file() else None
+        self.menu_hash = digest(self.menu_source) if self.menu_source else None
+        self.menu_output_hash = digest(self.menu_output) if self.menu_output else None
+        document.menu_texts = texts.MenuDocument(self.menu_source.read_bytes()) if self.menu_source else None
 
     def get(self):
         return self.document if self.document is not None else self.load()
@@ -138,6 +154,9 @@ class ItemStore:
         if document.texts and (digest(self.text_source) != self.text_hash
                                or digest(self.text_output) != self.text_output_hash):
             raise ValueError('The item text changed outside Lexeditor. Reopen it before saving.')
+        if document.menu_texts and (digest(self.menu_source) != self.menu_hash
+                                    or digest(self.menu_output) != self.menu_output_hash):
+            raise ValueError('The menu text changed outside Lexeditor. Reopen it before saving.')
         return document
 
     def save(self):
@@ -148,8 +167,11 @@ class ItemStore:
         # mod carries no text archive and the game keeps its own.
         names = document.texts.export() if document.texts and (document.texts.dirty or self.text_output.is_file()) else None
         if names is not None: texts.TextDocument(names)
+        menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or self.menu_output.is_file()) else None
+        if menu is not None: texts.MenuDocument(menu)
         atomic_write(self.output, payload)
         if names is not None: atomic_write(self.text_output, names)
+        if menu is not None: atomic_write(self.menu_output, menu)
         self.load()
         return {'saved': True, 'path': str(self.output), 'dirtyCount': 0}
 

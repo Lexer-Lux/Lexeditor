@@ -29,6 +29,9 @@ def test_all_categories_noop_and_changed_roundtrip():
     allowed = set()
     changed = []
     for tab, _, _ in SUBTABS:
+        # Menu labels are menu text, not parameter rows.
+        if tab == 'menu-labels':
+            continue
         row = document.list_rows(tab)[0]
         fields = document.read_row(row['table'], row['id'])['fields']
         field = next(f for f in fields if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'])
@@ -95,7 +98,7 @@ def test_service_edit_save_and_reload(tmp_path):
         with urlopen(req) as reply: return json.load(reply)
     try:
         session.start()
-        assert len(request('/api/state')['tabs']) == 8
+        assert [tab['id'] for tab in request('/api/state')['tabs']] == [tab for tab, _, _ in SUBTABS]
         assert request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'sellValue', 'value': 42})['dirtyCount'] == 1
         assert request('/api/save', {})['saved']
         request('/api/discard', {})
@@ -132,6 +135,9 @@ def test_putting_a_float_back_as_shown_leaves_nothing_to_save():
     # back the value as shown (seven digits); a float needs up to nine.
     document = ItemDocument(make_archive())
     for tab, _, _ in SUBTABS:
+        # Menu labels are menu text, not parameter rows.
+        if tab == 'menu-labels':
+            continue
         row = document.list_rows(tab)[0]
         fields = [f for f in document.read_row(row['table'], row['id'])['fields']
                   if f['editable'] and f['dtype'] == 'f32' and isinstance(f['value'], float)]
