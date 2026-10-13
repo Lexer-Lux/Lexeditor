@@ -7,7 +7,7 @@ TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effect
               'areas':'Areas', 'animations':'Animations', 'world':'World', 'assets':'Assets'}
 
 
-def payload(store, native_rules=None):
+def payload(store, native_rules=None, theme=None):
     document = store.get()
     item_tables = {}
     for sub, label, table in SUBTABS:
@@ -155,6 +155,22 @@ def payload(store, native_rules=None):
             'coverage': 'structured', 'status': 'partial', 'openable': True,
             'target': 'assets', 'sub': 'game', 'controls': 'Assets: whole-file replacement with texture previews',
             'notes': 'Replace game files with your own. Textures preview; sounds, movies and models replace without one. Files owned by another editor change there instead.'})
+    # The cosmetic theme, drawn from the installed game into a private cache.
+    parts = []
+    if isinstance(theme, dict):
+        if theme.get('title', {}).get('ready'):
+            parts.append('title art active')
+        if theme.get('font', {}).get('recognized'):
+            parts.append(f"{theme['font']['recognized']} font source(s) recognized")
+        if theme.get('sfx', {}).get('recognizedBanks'):
+            parts.append(f"{theme['sfx']['recognizedBanks']} sound bank(s) recognized")
+    rows.append({'id': 'theme:installed-game',
+        'filename': 'menu/ + font/ + sound/ (theme)',
+        'path': str(store.game_root) if store.game_root else '',
+        'coverage': 'game-derived-theme', 'openable': False,
+        'controls': 'Private installed-game theme cache',
+        'notes': '; '.join(parts) or 'Theme extraction falls back safely when cosmetic source assets are unavailable.',
+        'status': 'partial' if isinstance(theme, dict) and theme.get('source') == 'installed-game' else 'not-integrated'})
     # The Data Map names its open buttons from these labels ("Open Effects").
     for row in rows:
         if row.get('target'):

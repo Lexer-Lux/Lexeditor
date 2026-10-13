@@ -9,7 +9,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map
+from . import assets, deployment, data_map, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore
@@ -94,6 +94,21 @@ def _deploy_tweaks_now() -> None:
             raise ValueError(f"Settings saved, but the rebuild failed: {error}") from error
 
 
+THEME_CACHE = theme.cache_root()
+
+
+def theme_status() -> dict:
+    """Cosmetic installed-game theme; never a readiness gate."""
+    if STORE.game_root is None:
+        return theme.fallback("Select the installed game before extracting its theme.")
+    try:
+        return theme.build(THEME_CACHE, Path(STORE.game_root))
+    except (OSError, ValueError) as error:
+        state = theme.fallback("Installed-game theme extraction failed; fallback styling remains active.")
+        state["error"] = str(error)
+        return state
+
+
 class Handler(PluginRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -101,7 +116,7 @@ class Handler(PluginRequestHandler):
         query = parse_qs(parsed.query)
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
-                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames'):
+                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme'):
             try:
                 with LOCK:
                     if path == '/api/assets':
@@ -150,8 +165,12 @@ class Handler(PluginRequestHandler):
                                                             'It shows where that swing lands. '
                                                             'This screen only shows the game data. '
                                                             'It changes nothing.'})
+                        result['theme'] = theme_status()
                     elif path == '/api/data-map':
-                        result = data_map.payload(STORE, RULES.snapshot(refresh=True))
+                        result = data_map.payload(STORE, RULES.snapshot(refresh=True), theme_status())
+                    elif path == '/api/theme':
+                        self.send_json(theme_status())
+                        return
                     elif path == '/api/map/view':
                         result = viewport.map_view(MAPSTORE, query.get('map', [''])[0])
                     elif path == '/api/map/geometry':
@@ -303,6 +322,11 @@ class Handler(PluginRequestHandler):
             elif path == '/shared/distribution-notices.json':
                 self.send_json([])
             else:
+                self.send_json({"error": "Not found"}, 404)
+        elif path.startswith("/theme/"):
+            try:
+                self.send_file(theme.asset_path(THEME_CACHE, path.removeprefix("/theme/")))
+            except FileNotFoundError:
                 self.send_json({"error": "Not found"}, 404)
         else:
             self.send_json({"error": "Not found"}, 404)

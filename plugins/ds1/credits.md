@@ -188,3 +188,22 @@ everyday one. https://github.com/tremwil/dearxan
 
 me3's write-up on Arxan in FromSoftware games described why debuggers and
 breakpoints end the game. https://me3.help/en/latest/blog/posts/arxan-reversing-1/
+
+## Theme (title art, menu fonts, interface sounds)
+
+The editor's Dark Souls look comes from the player's own installation and is
+never redistributed: the `Title` texture from
+`menu/<language>/menu_local.tpf.dcx` (rendered to PNG through the TPF/DDS
+preview pipeline), the menu font sources under `font/<language>/`
+(`DSFont24.ccm.dcx`, `TalkFont24.ccm.dcx` and `*.fnt`), and the interface
+sound banks `sound/frpg_sm*.fsb` with their `frpg_sm*.fev` event projects.
+`plugins/ds1/theme.py` extracts these into a private cache outside the
+checkout at serve time.
+
+The `font/<language>/` layout follows the public ccm-changer notes:
+https://github.com/binamselerimir/ccm-changer
+FSB4 bank inventory (magic, stream count, 80-byte sample headers) was
+measured by read-only inspection of the installed banks; no FMOD code or
+documentation is copied. Bitmap-to-webfont conversion and FSB sample
+decoding are not integrated yet, so headings use an engraved serif fallback
+and the interface stays silent until a proved decoder lands.
