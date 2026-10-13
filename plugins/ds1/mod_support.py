@@ -19,7 +19,7 @@ from . import deployment, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
 
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
-DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold()}
+DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold(), texts.MENU_RELATIVE.as_posix().casefold()}
 MAP_PREFIX = "map/mapstudio/"
 CHR_PREFIX = "chr/"
 
@@ -75,8 +75,8 @@ class Ds1ModAdapter:
                 ignored.append(path.as_posix())
         problems = [] if packages or tweak else [
             f"This folder has no Dark Souls Remastered mod files. A data mod keeps "
-            f"{RELATIVE.as_posix()}, {texts.RELATIVE.as_posix()} and/or map and character files; "
-            f"a tweak mod has a script."]
+            f"{RELATIVE.as_posix()}, {texts.RELATIVE.as_posix()}, {texts.MENU_RELATIVE.as_posix()} "
+            f"and/or map and character files; a tweak mod has a script."]
         return {"valid": not problems, "problems": problems, "packages": sorted(packages),
                 "assets": {}, "notDeployed": sorted(ignored)}
 

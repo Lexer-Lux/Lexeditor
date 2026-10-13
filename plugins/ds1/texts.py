@@ -23,6 +23,14 @@ import zlib
 from .formats import FormatError, MAX_ARCHIVE, inflate
 
 RELATIVE = Path('msg/ENGLISH/item.msgbnd.dcx')
+MENU_RELATIVE = Path('msg/ENGLISH/menu.msgbnd.dcx')
+# The equipment panel's defense labels, in Menu_general_text_.fmg: MagDEF,
+# FireDEF and LitngDEF beside each piece's elemental defense.
+MENU_LABEL_FILE = 'Menu_general_text_.fmg'
+MENU_LABELS = {'magicDefense': ('Magic defense label', 102204),
+               'fireDefense': ('Fire defense label', 102205),
+               'lightningDefense': ('Lightning defense label', 102206)}
+MENU_LABEL_IDS = {text_id: key for key, (_display, text_id) in MENU_LABELS.items()}
 # Tables with no parameter rows behind them that still merge by entry.
 # Place_name_ holds the warp destination (2000-2020) and area (1000-1810)
 # names the bonfire warp menu shows; the editor offers no rename surface
@@ -162,24 +170,31 @@ def build_fmg(original: bytes, groups: list[tuple[int, int, int]], texts: dict[i
 class TextDocument:
     """The item name and description tables of one item.msgbnd.dcx, editable by item."""
 
+    ARCHIVE_LABEL = 'item text archive'
+
+    def _parse_table(self, filename: str) -> bool:
+        wanted = set(NAME_TABLES.values()) | {name for pair in DESC_TABLES.values() for name in pair}
+        return filename in wanted | MERGED_TABLES
+
+    def _required_tables(self) -> set[str]:
+        return set(NAME_TABLES.values()) | {name for pair in DESC_TABLES.values() for name in pair}
+
     def __init__(self, source: bytes):
         if len(source) > MAX_ARCHIVE:
-            raise FormatError('The item text archive is too large.')
+            raise FormatError(f'The {self.ARCHIVE_LABEL} is too large.')
         self.original = source
         self.plain = inflate(source)
         self.entries = bnd3_entries(self.plain)
         self.tables: dict[int, tuple[list, dict]] = {}
         self.original_texts: dict[int, dict] = {}
-        wanted = set(NAME_TABLES.values()) | {filename for pair in DESC_TABLES.values() for filename in pair}
-        known = wanted | MERGED_TABLES
         for position, entry in enumerate(self.entries):
-            if entry.name.replace('\\', '/').rsplit('/', 1)[-1] in known:
+            if self._parse_table(entry.name.replace('\\', '/').rsplit('/', 1)[-1]):
                 groups, texts = parse_fmg(entry.data)
                 self.tables[position] = (groups, texts)
                 self.original_texts[position] = dict(texts)
-        missing = wanted - {self._file(position) for position in self.tables}
+        missing = self._required_tables() - {self._file(position) for position in self.tables}
         if missing:
-            raise FormatError(f'The item text archive has no {", ".join(sorted(missing))}')
+            raise FormatError(f'The {self.ARCHIVE_LABEL} has no {", ".join(sorted(missing))}')
 
     def _file(self, position: int) -> str:
         return self.entries[position].name.replace('\\', '/').rsplit('/', 1)[-1]
@@ -274,3 +289,61 @@ class TextDocument:
         header = bytearray(self.original[:76])
         struct.pack_into('>II', header, 28, len(plain), len(compressed))
         return bytes(header) + compressed
+
+
+class MenuDocument(TextDocument):
+    """One menu.msgbnd.dcx, editable by menu entry. Every FMG member merges
+
+    by entry in the mod loader; the equipment defense labels are editable
+    in Items under Menu labels. Both copies of a table are read and
+    written, as with item text.
+    """
+
+    ARCHIVE_LABEL = 'menu text archive'
+
+    def _parse_table(self, filename: str) -> bool:
+        return filename.endswith('.fmg')
+
+    def _required_tables(self) -> set[str]:
+        return {MENU_LABEL_FILE}
+
+    @staticmethod
+    def _label_entry(key: str) -> tuple[str, int]:
+        try:
+            return MENU_LABELS[key]
+        except KeyError:
+            raise FormatError('Unknown menu label') from None
+
+    def label(self, key: str) -> str | None:
+        _display, text_id = self._label_entry(key)
+        for position in self._copies_of(MENU_LABEL_FILE):
+            text = self.tables[position][1].get(text_id)
+            if text:
+                return text
+        return None
+
+    def original_label(self, key: str) -> str | None:
+        _display, text_id = self._label_entry(key)
+        for position in self._copies_of(MENU_LABEL_FILE):
+            if text_id in self.original_texts[position]:
+                return self.original_texts[position][text_id]
+        return None
+
+    def set_label(self, key: str, value) -> str:
+        _display, text_id = self._label_entry(key)
+        text = str(value).strip()
+        if not text or len(text) > MAX_NAME or any(ord(char) < 32 for char in text):
+            raise FormatError(f'A menu label is 1 to {MAX_NAME} characters on one line.')
+        for position in self._copies_of(MENU_LABEL_FILE):
+            self.tables[position][1][text_id] = text
+        return text
+
+    @property
+    def dirty(self) -> set[str]:
+        changed = set()
+        for key, (_display, text_id) in MENU_LABELS.items():
+            for position in self._copies_of(MENU_LABEL_FILE):
+                texts, before = self.tables[position][1], self.original_texts[position]
+                if texts.get(text_id) != before.get(text_id):
+                    changed.add(key)
+        return changed

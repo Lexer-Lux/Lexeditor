@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from ds1_fixture import make_archive, make_text_archive
+from ds1_fixture import make_archive, make_menu_archive, make_text_archive
 from plugins.ds1 import mod_loader, texts
-from plugins.ds1.formats import ItemDocument, inflate, deflate, members, schema
+from plugins.ds1.formats import FormatError, ItemDocument, inflate, deflate, members, schema
 from plugins.ds1.store import MARKER, RELATIVE
 
 VANILLA = make_archive()
@@ -34,12 +34,14 @@ def renamed(*renames):
     return document.export()
 
 
-def mod(name, params=None, names=None):
+def mod(name, params=None, names=None, menu=None):
     files = {}
     if params is not None:
         files[RELATIVE] = params
     if names is not None:
         files[texts.RELATIVE] = names
+    if menu is not None:
+        files[texts.MENU_RELATIVE] = menu
     return mod_loader.Mod(name, Path(name), files)
 
 
@@ -290,3 +292,98 @@ def test_reinforce_rows_merge_by_field_and_conflict_by_name():
     result = mod_loader.compose(GAME, [a, c])
     assert [(c.part, c.mods) for c in result.conflicts] == [("Weapon upgrades 100, Physical Damage", ["A", "C"])]
     assert ItemDocument(result.files[RELATIVE]).value("ReinforceParamWeapon", 100, "physicsAtkRate") == 4.5
+
+
+MENU = make_menu_archive()
+MENUGAME = {RELATIVE: VANILLA, texts.MENU_RELATIVE: MENU}
+
+
+def relabeled(*edits):
+    document = texts.MenuDocument(MENU)
+    for key, value in edits:
+        document.set_label(key, value)
+    return document.export()
+
+
+def menulabels(archive):
+    """Every copy of Menu_general_text_ in the archive; they must agree."""
+    document = texts.MenuDocument(archive)
+    copies = [document.tables[position][1] for position in document.tables
+              if document._file(position) == texts.MENU_LABEL_FILE]
+    assert copies, "the archive carries no Menu_general_text_ table"
+    assert all(copy == copies[0] for copy in copies), "Menu_general_text_ copies disagree"
+    return copies[0]
+
+
+def test_menu_labels_merge_by_entry_and_conflict_on_the_same_one():
+    a = mod("A", menu=relabeled(("magicDefense", "MagABS"), ("fireDefense", "FireABS")))
+    b = mod("B", menu=relabeled(("lightningDefense", "LitngABS"), ("fireDefense", "FireWard")))
+    result = mod_loader.compose(MENUGAME, [a, b])
+    merged = menulabels(result.files[texts.MENU_RELATIVE])
+    assert merged[102204] == "MagABS" and merged[102206] == "LitngABS"
+    assert merged[102205] == "FireWard"
+    assert [(c.file, c.part, c.mods) for c in result.conflicts] == [
+        (texts.MENU_RELATIVE, "Menu label 102205 (Menu general text)", ["A", "B"])]
+
+
+def test_the_same_menu_label_from_two_mods_is_no_conflict():
+    a = mod("A", menu=relabeled(("magicDefense", "MagABS")))
+    b = mod("B", menu=relabeled(("magicDefense", "MagABS")))
+    assert mod_loader.compose(MENUGAME, [a, b]).conflicts == []
+
+
+def test_menu_label_edits_write_both_copies_and_nothing_else():
+    document = texts.MenuDocument(MENU)
+    assert document.export() == MENU
+    assert document.set_label("magicDefense", "  MagABS  ") == "MagABS"
+    assert document.label("magicDefense") == "MagABS"
+    assert document.original_label("magicDefense") == "MagDEF"
+    assert document.dirty == {"magicDefense"}
+    merged = menulabels(document.export())
+    assert merged[102204] == "MagABS" and merged[102205] == "FireDEF"
+
+
+def test_menu_labels_reject_blank_unknown_and_missing_tables():
+    document = texts.MenuDocument(MENU)
+    for bad in ("", "   ", "two\nlines", "x" * 201):
+        with pytest.raises(FormatError):
+            document.set_label("magicDefense", bad)
+    with pytest.raises(FormatError):
+        document.set_label("noSuchLabel", "X")
+    with pytest.raises(FormatError):
+        document.label("noSuchLabel")
+    with pytest.raises(FormatError):
+        texts.MenuDocument(make_menu_archive(labels=None, extra={'Other_.fmg': {1: 'x'}}, omit_labels=True))
+
+
+def test_menu_labels_list_read_and_edit_as_records():
+    document = ItemDocument(VANILLA)
+    assert document.list_rows("menu-labels") == []
+    document.menu_texts = texts.MenuDocument(MENU)
+    rows = document.list_rows("menu-labels")
+    assert [(row["id"], row["table"], row["name"]) for row in rows] == [
+        (102204, "MenuText", "Magic defense label"),
+        (102205, "MenuText", "Fire defense label"),
+        (102206, "MenuText", "Lightning defense label")]
+    assert rows[0]["values"] == {"label": "MagDEF"}
+    row = document.read_row("MenuText", 102204)
+    assert (row["name"], row["renamable"]) == ("Magic defense label", False)
+    (field,) = row["fields"]
+    assert (field["key"], field["type"], field["value"], field["vanilla"]) == ("label", "text", "MagDEF", "MagDEF")
+    assert field["editable"] and field["maxLength"] == 200
+    assert document.edit("MenuText", 102204, "label", "MagABS")["fields"][0]["value"] == "MagABS"
+    assert document.dirty_count == 1
+    assert document.pending_changes() == [{
+        "label": "Menu label · Magic defense label", "before": "MagDEF", "after": "MagABS"}]
+    document.edit("MenuText", 102204, "label", "MagDEF")
+    assert document.dirty_count == 0 and document.pending_changes() == []
+    with pytest.raises(FormatError):
+        document.edit("MenuText", 102204, "other", "x")
+    with pytest.raises(FormatError):
+        document.edit("MenuText", 999999, "label", "x")
+    with pytest.raises(FormatError):
+        document.read_row("MenuText", 999999)
+    document.menu_texts = None
+    with pytest.raises(FormatError):
+        document.edit("MenuText", 102204, "label", "x")
+

@@ -54,13 +54,13 @@ def _checked(path):
 
 
 def is_owned(relative):
-    """Structured editors own parameters, item text, maps and animations."""
+    """Structured editors own parameters, item and menu text, maps and animations."""
     from .store import RELATIVE
     from . import texts
     from .msb import MAP_DIR
     from .tae_store import CHR_DIR
     text = relative.as_posix()
-    if relative in (RELATIVE, texts.RELATIVE):
+    if relative in (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE):
         return True
     if text.startswith(MAP_DIR.as_posix() + "/") and relative.suffix == ".msb":
         return True

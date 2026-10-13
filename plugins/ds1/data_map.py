@@ -115,6 +115,15 @@ def payload(store, native_rules=None, theme=None):
                 'controls':'Items: '+', '.join(label for _,label in tabs),
                 'notes':f'Edit the {role} in the Description section of each item.' if available
                         else 'The item-text archive is missing. Item descriptions cannot be edited.'})
+    menu_available = document.menu_texts is not None
+    rows.append({'id': 'menu:labels', 'filename': texts.MENU_LABEL_FILE,
+        'path': str(store.menu_source or store.game_root/texts.MENU_RELATIVE),
+        'coverage': 'structured' if menu_available else 'unavailable',
+        'status': 'partial' if menu_available else 'not-integrated', 'openable': menu_available,
+        'target': 'items' if menu_available else '', 'sub': 'menu-labels',
+        'controls': 'Items: Menu labels',
+        'notes': 'Edit the equipment defense labels.' if menu_available
+                else 'The menu-text archive is missing. Menu labels cannot be edited.'})
     if document.texts is not None:
         known = set(texts.NAME_TABLES.values()) | {filename for pair in texts.DESC_TABLES.values() for filename in pair}
         extra = {entry.name.replace('\\','/').rsplit('/',1)[-1] for entry in document.texts.entries} - known
