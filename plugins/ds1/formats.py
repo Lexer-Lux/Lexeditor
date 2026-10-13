@@ -1006,7 +1006,28 @@ class ItemDocument:
         if table == 'NpcParam' and not self.is_monster(row_id):
             raise FormatError('This record is not a reviewed standard monster')
         self._write(table, row_id, key, value)
+        if table == 'ReinforceParamProtector' and key in UPGRADE_MULTIPLIERS.values():
+            self._rescale_absorption(row_id, key)
         return self.read_row(table, row_id, only=only)
+
+    def _rescale_absorption(self, reinforce_id, column):
+        """Rebuild the Armor Rework levels that scale by this upgrade row's column.
+
+        Absorption levels are stored per piece, so a changed multiplier only
+        reaches the game once each piece using that upgrade path is rebuilt
+        from its +0 value (_edit_absorption recomputes every level).
+        """
+        cuts = [cut for cut, multiplier in UPGRADE_MULTIPLIERS.items() if multiplier == column]
+        for armor_id in self._rows_by_id.get('EquipParamProtector', {}):
+            levels = self._absorption_levels(armor_id)
+            if len(levels) < 2:
+                continue
+            kind = self.value('EquipParamProtector', armor_id, 'reinforceTypeId')
+            if not kind < reinforce_id < kind + len(levels):
+                continue
+            for cut in cuts:
+                base = round((1 - self.value(EFFECT_TABLE, levels[0], cut)) * 100, 3)
+                self._edit_absorption(armor_id, cut, min(99.0, max(-100.0, base)))
 
     def _write(self, table, row_id, key, value):
         """Validate and store one field. The caller reads the record back."""

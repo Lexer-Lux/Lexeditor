@@ -256,6 +256,19 @@ def test_slash_strike_thrust_upgrade_independently_of_physical():
     assert level('thrustDamageCutRate') == pytest.approx([10, 15, 15], abs=1e-4)
 
 
+def test_editing_an_upgrade_multiplier_rebuilds_the_armor_using_it():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
+    for cut in ('neutralDamageCutRate', 'slashDamageCutRate'):
+        document.edit('EquipParamProtector', 100, 'absorption:' + cut, 10)
+    # The Armor Upgrades tab: +1's slash multiplier goes to 2.
+    document.edit('ReinforceParamProtector', 101, 'slashDefRate', 2.0)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(3)] == \
+        pytest.approx([10, 20, 15], abs=1e-4)
+    # Physical scales by its own column, untouched.
+    assert [absorbed(document, base + level, 'neutralDamageCutRate') for level in range(3)] == \
+        pytest.approx([10, 10.2, 15], abs=1e-4)
+
+
 def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
     document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 0)
