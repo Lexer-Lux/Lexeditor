@@ -5850,32 +5850,6 @@ ${contents.path}`});
         // path, then the actions lane (warning flags, if any), then the
         // on/off mark. Without the actions lane the mark lands a column
         // early, and a flag pushes the path out of its column.
-        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
-          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
-            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "⚙"),
-            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
-            element("span", {class: "lex-project-menu-path"}, row.path)),
-          element("span", {class: "lex-project-menu-item-actions"},
-            modFlagsMark(row.conflicts, row.alerts)),
-          element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
-              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
-        const select = element("button", {
-        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
-        type: "button", role: "menuitem", title: row.path,
-        onclick: () => {
-          closeMenu();
-          if (row.current && activeSource !== "mine") guarded(async () => {
-            await options.selectProjectSource?.("mine");
-            render(snapshot);
-          });
-          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
-        },
-      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
-      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
-      element("span", {class: "lex-project-menu-path"}, row.path),
-      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
-        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
-        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         const folder = element("button", {
           class: "lex-project-folder", type: "button",
           title: `Open the ${row.name} folder`, "aria-label": `Open the ${row.name} folder`,
@@ -5908,6 +5882,32 @@ ${contents.path}`});
             }
           },
         }, infoIcon());
+        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
+          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
+            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "🔒"),
+            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+            element("span", {class: "lex-project-menu-path"}, row.path)),
+          element("span", {class: "lex-project-menu-item-actions"},
+            folder, about, modFlagsMark(row.conflicts, row.alerts)),
+          element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const select = element("button", {
+        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
+        type: "button", role: "menuitem", title: row.path,
+        onclick: () => {
+          closeMenu();
+          if (row.current && activeSource !== "mine") guarded(async () => {
+            await options.selectProjectSource?.("mine");
+            render(snapshot);
+          });
+          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
+        },
+      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
+      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+      element("span", {class: "lex-project-menu-path"}, row.path),
+      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
           select,
           element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about,
