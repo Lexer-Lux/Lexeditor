@@ -78,8 +78,9 @@ ABSORPTION_CUTS = (('neutralDamageCutRate', 'Physical'), ('slashDamageCutRate', 
                    ('magicDamageCutRate', 'Magic'), ('fireDamageCutRate', 'Fire'),
                    ('thunderDamageCutRate', 'Lightning'))
 # The armor upgrade table column that scales each cut at higher upgrade levels.
-UPGRADE_MULTIPLIERS = {'neutralDamageCutRate': 'physicsDefRate', 'slashDamageCutRate': 'physicsDefRate',
-                       'blowDamageCutRate': 'physicsDefRate', 'thrustDamageCutRate': 'physicsDefRate',
+# Slash, strike and thrust follow their own columns, independent of physical.
+UPGRADE_MULTIPLIERS = {'neutralDamageCutRate': 'physicsDefRate', 'slashDamageCutRate': 'slashDefRate',
+                       'blowDamageCutRate': 'blowDefRate', 'thrustDamageCutRate': 'thrustDefRate',
                        'magicDamageCutRate': 'magicDefRate', 'fireDamageCutRate': 'fireDefRate',
                        'thunderDamageCutRate': 'thunderDefRate'}
 MAX_UPGRADE_LEVEL = 15

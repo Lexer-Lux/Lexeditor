@@ -174,8 +174,9 @@ def armor_with_upgrades(rates):
     put('EquipParamProtector', 100, 'residentSpEffectId3', base)
     put('EquipParamProtector', 100, 'reinforceTypeId', 100)
     for row_id, (physics, magic, fire, thunder) in zip((100, 101, 102), rates):
-        for key, value in zip(('physicsDefRate', 'magicDefRate', 'fireDefRate', 'thunderDefRate'),
-                              (physics, magic, fire, thunder)):
+        for key, value in zip(('physicsDefRate', 'slashDefRate', 'blowDefRate', 'thrustDefRate',
+                               'magicDefRate', 'fireDefRate', 'thunderDefRate'),
+                              (physics, physics, physics, physics, magic, fire, thunder)):
             put('ReinforceParamProtector', row_id, key, value)
     return document, base
 
@@ -187,7 +188,7 @@ def absorbed(document, effect, cut):
 def test_armor_absorption_scales_by_the_upgrade_table():
     document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1.1, 1.5, 2), (1.5, 1.2, 1.5, 2)])
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 15)
-    # Physical cuts follow physicsDefRate; +3 has no upgrade row, so it is not scaled.
+    # Slash follows slashDefRate (set equal to physical here); +3 has no upgrade row, so it is not scaled.
     got = [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)]
     assert got == pytest.approx([15, 15.3, 22.5, 15], abs=1e-4)
     document.edit('EquipParamProtector', 100, 'absorption:magicDamageCutRate', 10)
@@ -200,6 +201,25 @@ def test_armor_absorption_scales_by_the_upgrade_table():
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 20)
     assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
         pytest.approx([20, 20.4, 30, 20], abs=1e-4)
+
+
+def test_slash_strike_thrust_upgrade_independently_of_physical():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.5, 1, 1, 1), (1.5, 1, 1, 1)])
+    from plugins.ds1.formats import write_field
+    def put(key, row_id, value):
+        _r, start, data = document._row('ReinforceParamProtector', row_id)
+        spec = next(f['spec'] for f in document.schemas['ReinforceParamProtector']['fields'] if f['spec'].key == key)
+        document.plain[start:start + len(data)] = write_field(data, spec, value, '<')
+    for row_id in (101, 102):
+        put('slashDefRate', row_id, 1.0)
+        put('blowDefRate', row_id, 2.0)
+    for cut in ('neutralDamageCutRate', 'slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'):
+        document.edit('EquipParamProtector', 100, 'absorption:' + cut, 10)
+    level = lambda cut: [absorbed(document, base + n, cut) for n in range(3)]
+    assert level('neutralDamageCutRate') == pytest.approx([10, 15, 15], abs=1e-4)
+    assert level('slashDamageCutRate') == pytest.approx([10, 10, 10], abs=1e-4)
+    assert level('blowDamageCutRate') == pytest.approx([10, 20, 20], abs=1e-4)
+    assert level('thrustDamageCutRate') == pytest.approx([10, 15, 15], abs=1e-4)
 
 
 def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
