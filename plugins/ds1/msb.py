@@ -444,6 +444,35 @@ class MsbDocument:
             self.dirty.add(((ptype, new_id), field))
         return self.read_placement((ptype, new_id))
 
+    def create_placement(self, model_name, pos, rot, npc=None):
+        """A new placement copied from the map's own bytes: the first
+        enemy or object placement of the named model is the template, so
+        sibling paths, entities and type data stay model-correct. The
+        copy takes the given transform, a fresh identity and a fresh
+        entity; a pasted enemy also takes the copied enemy identity."""
+        index = next((num for num, model in enumerate(self.models)
+                      if model['name'] == model_name), None)
+        if index is None:
+            raise MsbError('That model is not in this map')
+        try:
+            pos, rot = list(pos), list(rot)
+        except TypeError:
+            raise MsbError('A placement needs a position and a rotation') from None
+        if len(pos) != 3 or len(rot) != 3:
+            raise MsbError('A placement needs a position and a rotation')
+        template = next((part for part in self.parts
+                         if part['model'] == index and part['type'] in PLACEMENT_TYPES
+                         and part['type'] != PLAYER_TYPE), None)
+        if template is None:
+            raise MsbError('That model has no enemy or object placement in this map to copy from')
+        row = self.add_placement((template['type'], template['id']))
+        key = (row['type'], row['partId'])
+        for field, value in zip(('posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ'), pos + rot):
+            self.edit(key, field, value)
+        if npc is not None and row['type'] in ENEMY_TYPES:
+            self.edit(key, 'npcId', npc)
+        return self.read_placement(key)
+
     def remove_placement(self, part_key):
         """Drop a placement from the directory. Its bytes stay orphaned."""
         key = tuple(part_key) if isinstance(part_key, list) else part_key

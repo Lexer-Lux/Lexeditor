@@ -334,7 +334,7 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
+            if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
                             '/api/tweaks/save', '/api/tweaks/restore', '/api/tweaks/debug'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
@@ -414,6 +414,13 @@ class Handler(PluginRequestHandler):
                         if key not in payload:
                             raise ValueError('Duplicating a placement needs its map and identity')
                     result = {'row': MAPSTORE.add_placement(payload['map'], payload['id'])}
+                elif path == '/api/placements/create':
+                    for key in ('map', 'model', 'pos', 'rot'):
+                        if key not in payload:
+                            raise ValueError('Placing a model needs its map, model, position and rotation')
+                    result = {'row': MAPSTORE.create_placement(payload['map'], payload['model'],
+                                                               payload['pos'], payload['rot'],
+                                                               payload.get('npc'))}
                 elif path == '/api/placements/remove':
                     for key in ('map', 'id'):
                         if key not in payload:

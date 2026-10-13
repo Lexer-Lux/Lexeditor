@@ -31,11 +31,10 @@ window.Ds1Viewport = (() => {
     }
   }
   // hooks: {readOnly, showCollision, onSelect(key, info|null),
-  // onMove(key, pos), requestMod()}. onMove resolves false when the
-  // commit is refused, and the part snaps back. Returns a controller
-  // with select(key), setShowCollision(bool), moveTo(key, pos) and
-  // dispose(). Selection, moves and markers all update through it, so
-  // the page never remounts the viewport just to reflect a click.
+  // onMove(key, pos), onRotate(key, rot), requestMod()}. Commits resolve
+  // false when refused, and the part snaps back. Returns a controller
+  // with select(key), setShowCollision(bool), moveTo(key, pos),
+  // turnTo(key, rot), setGizmoMode(mode), aim() and dispose().
   async function mount(host, mapId, view, status, hooks = {}) {
     stop(host);
     const mine = ++session;
@@ -227,11 +226,13 @@ window.Ds1Viewport = (() => {
       showStatus();
       if (hooks.onSelect) hooks.onSelect(selected, group ? {...group.userData.part} : null);
     };
-    let startPos = null;
+    let startPos = null, startRot = null, gizmoMode = "translate", spinStart = false;
     gizmo.addEventListener("dragging-changed", event => { controls.enabled = !event.value; });
     gizmo.addEventListener("mouseDown", () => {
       if (!selected) return;
       startPos = groups.get(selected).position.clone();
+      startRot = groups.get(selected).rotation.clone();
+      spinStart = gizmoMode === "rotate";
       if (readOnly && hooks.requestMod) hooks.requestMod();
     });
     gizmo.addEventListener("objectChange", () => {
@@ -241,8 +242,9 @@ window.Ds1Viewport = (() => {
       selectedText = describe(group);
       showStatus();
     });
-    const snapBack = (group, back) => {
+    const snapBack = (group, back, backRot) => {
       group.position.copy(back);
+      if (backRot) group.rotation.copy(backRot);
       highlight.setFromObject(group);
       selectedText = describe(group);
       showStatus();
@@ -250,19 +252,26 @@ window.Ds1Viewport = (() => {
     gizmo.addEventListener("mouseUp", () => {
       if (!selected || !startPos) return;
       const group = groups.get(selected);
-      const pos = [group.position.x, group.position.y, group.position.z];
-      const moved = pos.some((axis, index) => axis !== startPos.getComponent(index));
-      const back = startPos.clone();
-      startPos = null;
+      const spinning = spinStart;
+      const pos = spinning
+        ? [group.rotation.x / DEG, group.rotation.y / DEG, group.rotation.z / DEG]
+        : [group.position.x, group.position.y, group.position.z];
+      const start = spinning ? startRot : startPos;
+      const moved = spinning
+        ? pos.some((axis, index) => axis !== start.getComponent(index) / DEG)
+        : pos.some((axis, index) => axis !== start.getComponent(index));
+      const back = startPos.clone(), backRot = startRot.clone();
+      startPos = null; startRot = null;
+      const commit = spinning ? hooks.onRotate : hooks.onMove;
       if (readOnly) {
         // Vanilla readers were just offered a mod; nothing is committed,
         // so the part snaps back to where it stands.
-        snapBack(group, back);
-      } else if (moved && hooks.onMove) {
+        snapBack(group, back, backRot);
+      } else if (moved && commit) {
         // A refused commit (a second drag mid-save, a failed write)
         // snaps back too; the page reports why.
-        Promise.resolve(hooks.onMove(selected, pos)).then(ok => {
-          if (ok === false) snapBack(group, back);
+        Promise.resolve(commit(selected, pos)).then(ok => {
+          if (ok === false) snapBack(group, back, backRot);
         });
       }
     });
@@ -299,6 +308,21 @@ window.Ds1Viewport = (() => {
           showStatus();
         }
       },
+      turnTo(key, rot) {
+        const group = key && groups.get(key);
+        if (!group || !group.userData.part.movable) return;
+        group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
+        if (key === selected) {
+          highlight.setFromObject(group);
+          selectedText = describe(group);
+          showStatus();
+        }
+      },
+      setGizmoMode(mode) {
+        gizmoMode = mode === "rotate" ? "rotate" : "translate";
+        gizmo.setMode(gizmoMode);
+      },
+      aim() { return [controls.target.x, controls.target.y, controls.target.z]; },
       dispose() { stop(host); }
     };
     let frames = 0, live = true;

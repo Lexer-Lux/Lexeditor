@@ -160,6 +160,12 @@ class MapStore:
         self._npc_models = None
         return self.read(map_name, f"{row['type']}:{row['partId']}")
 
+    def create_placement(self, map_name, model, pos, rot, npc=None):
+        self.writable()
+        row = self.get(map_name).create_placement(model, pos, rot, npc)
+        self._npc_models = None
+        return self.read(map_name, f"{row['type']}:{row['partId']}")
+
     def remove_placement(self, map_name, key):
         self.writable()
         self._npc_models = None
