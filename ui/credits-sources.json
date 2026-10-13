@@ -871,6 +871,18 @@
           "name": "PredatorCZ / HavokLib",
           "role": "GPL-3.0-or-later spline-decompression facts behind the animation sampler; no upstream code is bundled.",
           "url": "https://github.com/PredatorCZ/HavokLib"
+        },
+        {
+          "name": "Installed Dark Souls Remastered (title art)",
+          "role": "The Title texture from the installed menu/<language>/menu_local.tpf.dcx, rendered to PNG into the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (menu fonts)",
+          "role": "Menu font sources from the installed font/<language>/ folder (DSFont24.ccm.dcx, TalkFont24.ccm.dcx, *.fnt), cached raw in the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (interface sounds)",
+          "role": "Sound inventory from the installed sound/frpg_sm*.fsb banks with their frpg_sm*.fev event projects, cached in the private ds1-theme cache at serve time; never redistributed."
         }
       ],
       "thanks": [],
