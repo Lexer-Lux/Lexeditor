@@ -6705,9 +6705,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 /* Shared interaction geometry. */
 
+/* A property row never grows for its label: past the font floor the
+   text clips instead of taking extra vertical space. */
 .lex-detail-field-label-text {
    flex:0 1 auto;min-width:0;
- overflow:visible;
+ overflow:hidden;
 }
 /* Renaming a label in place is a typing job, so the field hands the whole row
    to the input. Lexer: "when i'm double clicking a property name to edit it the
@@ -7092,6 +7094,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* Pagination avoids scrolling when cards fit. A failed fit must still leave
    every setting reachable; clipping is not a substitute for fitting. */
 .lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.lex-master-detail .lex-tweaks-scroll { overflow-x:clip; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
