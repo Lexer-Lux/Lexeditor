@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import struct
 
 from .assets import dds_info, parse_tpf, render_png
@@ -307,6 +308,10 @@ def build(cache_root: Path, game_root: Path | None) -> dict:
         "sfx": _sfx_part(game_root, generation),
     }
     _atomic_json(manifest_path, payload)
+    for sibling in generation.parent.iterdir():
+        if sibling.name == token or not sibling.is_dir():
+            continue
+        shutil.rmtree(sibling, ignore_errors=True)
     return payload
 
 

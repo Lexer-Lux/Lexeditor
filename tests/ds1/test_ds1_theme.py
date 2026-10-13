@@ -262,3 +262,16 @@ def test_theme_provenance_is_recorded():
     assert "menu_local.tpf.dcx" in roles
     assert "DSFont24" in roles
     assert "frpg_sm" in roles
+
+
+def test_theme_build_prunes_old_generations(tmp_path):
+    game = game_root(tmp_path)
+    cache = tmp_path / "cache"
+    first = theme.build(cache, game)
+    old = cache / first["token"]
+    assert old.is_dir()
+    (game / "sound" / "frpg_sm17.fev").write_bytes(b"FEV-PROJECT-CHANGED")
+    second = theme.build(cache, game)
+    assert second["token"] != first["token"]
+    assert not old.exists()
+    assert (cache / second["token"]).is_dir()
