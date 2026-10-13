@@ -74,6 +74,8 @@ def main():
                     page.wait_for_function("state.dirty===0 && state.pending===0")
                     # Maps: duplicate a placement, move it, save, reload, remove.
                     page.locator('[data-tab="maps"]').click()
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
                     page.wait_for_function("document.querySelectorAll('.lex-list-row').length===3")
@@ -89,6 +91,8 @@ def main():
                     page.reload()
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:1") && !state.error')
                     assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 4
@@ -104,6 +108,8 @@ def main():
                     page.reload()
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && !state.rows.some(r=>r.id==="2:1") && !state.error')
                     assert not errors, errors

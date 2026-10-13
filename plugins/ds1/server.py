@@ -137,16 +137,6 @@ class Handler(PluginRequestHandler):
                                       'readOnly': STORE.read_only}
                     elif path == '/api/state':
                         result = STORE.state()
-                        try:
-                            count = len(MAPSTORE.list_rows())
-                        except (MsbError, OSError):
-                            # Broken or missing map data must not take the
-                            # whole editor down; Maps reports it when opened.
-                            count = 0
-                        result['mapTabs'] = [{'id': 'placements', 'label': 'Placements',
-                                               'table': 'Msb', 'count': count},
-                                              {'id': 'viewport', 'label': 'Viewport',
-                                               'table': 'MapView', 'count': len(MAPSTORE.maps())}]
                         result['animTabs'] = [{'id': 'animations', 'label': 'Events',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
                         chars = anim.list_chars(MAPSTORE.game_root, MAPSTORE.project)

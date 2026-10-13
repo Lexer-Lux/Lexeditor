@@ -4,10 +4,10 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
-  effectTabs:[],statsTabs:[],mapTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
-  mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null};
+  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -40,7 +40,7 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       }
       // An undone viewport move must move the scene part back too; the
       // reload re-reads the map and restores the selection and gizmo.
-      if(state.tab==="maps"&&state.sub==="viewport"&&state.mapView)await reloadViewport(state.mapView.map,state.mapSelected);
+      if(state.tab==="maps"&&state.mapView)await reloadViewport(state.mapView.map,state.mapSelected);
       render();
     }catch(error){notify(error);}
     finally{this.applying=false;shell.refresh();}
@@ -60,7 +60,7 @@ const shell=LexeditorUI.mountShell({
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops, effects and AI links. Behaviors holds action costs and what each behavior calls. AI holds enemy senses, distances and goals. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
-    {id:"maps",label:"Maps",help:"Move enemy and object placements, and swap which enemy appears. Each placement belongs to one map. The Viewport shows the selected map in 3D: click a placement to select it, drag its arrows to move it, and Duplicate or Remove it from the bar. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
+    {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling and requirements for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon scaling holds each weapon's stat requirements and scaling multipliers. A weapon's curve assignment stays read-only because its graph choices are not documented. Spell requirements holds each spell's INT and FTH requirements, slot cost and stamina cost. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
@@ -77,7 +77,7 @@ const shell=LexeditorUI.mountShell({
   pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
   save,discard,history:fieldHistory
 });
-const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="maps"?state.mapTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:
   tab==="stats"?state.statsTabs:
   tab==="world"?state.worldTabs:
   tab==="assets"?state.assetTabs:
@@ -85,7 +85,7 @@ const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.atta
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
-  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.mapTabs=result.mapTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.nativeRules=result.nativeRules;
+  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
@@ -170,7 +170,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;state.taeForm=null;
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";
   else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
-  else if(tab==="maps"&&!state.mapTabs.some(entry=>entry.id===sub))sub="placements";
+  else if(tab==="maps")sub="placements";
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
   // Without the curve table, Stats opens on weapon scaling instead of an error.
@@ -185,9 +185,11 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
     if(["items","enemies","attacks","maps","animations","effects","stats","encumbrance","levelup","misc","world","assets"].includes(tab))await loadItems();
+    if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
+    if(tab==="maps"&&selected)state.mapTab="placements";
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
     state.error="";render();
     if(selected)revealSelection();
@@ -231,7 +233,7 @@ async function discard(){
   await edits;state.bandForm=null;state.taeForm=null;
   try{await api("/api/discard",{});attackPreviews.clear();fieldHistory.clear();await refreshState();
     if(["info","tweaks","datamap"].includes(state.tab))await navigate(state.tab);
-    else{await loadItems();render();}}catch(error){notify(error);}
+    else{await loadItems();if(state.tab==="maps")await loadMaps();render();}}catch(error){notify(error);}
 }
 // An item's in-game name lives in the game's text, which the mod carries
 // beside its parameters; the server renames it there.
@@ -530,6 +532,13 @@ function rowActionButtons(kind){
       title:playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`,
       onclick:()=>removeRow(kind)},"Remove")];
 }
+async function refreshMapsAfterStructure(){
+  const current=state.rows.find(row=>key(row)===state.selected);
+  if(current)state.mapId=current.table;
+  state.mapList=(await api("/api/table?tab=viewport")).rows;
+  state.mapView=state.mapId?await api(`/api/map/view?map=${encodeURIComponent(state.mapId)}`):null;
+  clampMapSelection();
+}
 async function duplicateRow(kind){
   if(state.rowBusy||!state.row)return;
   const placement=kind==="placement";
@@ -543,6 +552,7 @@ async function duplicateRow(kind){
     const index=sortedRows().findIndex(row=>key(row)===state.selected);
     if(index>=0)state.page=Math.floor(index/state.pageSize);
     await loadDetail();
+    if(placement&&state.tab==="maps")await refreshMapsAfterStructure();
   }
   catch(error){notify(error);}
   finally{state.rowBusy=false;render();}
@@ -564,6 +574,7 @@ async function removeRow(kind){
     await loadItems();
     state.selected=state.rows[0]?key(state.rows[0]):null;state.row=null;
     await loadDetail();
+    if(placement&&state.tab==="maps")await refreshMapsAfterStructure();
   }
   catch(error){notify(error);}
   finally{state.rowBusy=false;render();}
@@ -642,7 +653,7 @@ function renderTaeForm(){
     oninput:event=>{form.start=event.target.value;}});
   const end=el("input",{type:"number","aria-label":"End (s)","data-tae-input":"end",step:"any",value:form.end,disabled:state.taeBusy,
     oninput:event=>{form.end=event.target.value;}});
-  return detailPanel({title:"Add event",paginate:{inline:true},
+  return detailPanel({title:"Add event",
     actions:[
       el("button",{type:"button",disabled:state.taeBusy,
         onclick:()=>{
@@ -749,7 +760,7 @@ function renderBandForm(){
         detailField({label:"Resulting recovery (%)",control:readonlyField(winner.recovery)}));
     }
   }
-  return detailPanel({title:form.action==="add"?"Add band":"Delete band",paginate:{inline:true},
+  return detailPanel({title:form.action==="add"?"Add band":"Delete band",
     actions:[
       el("button",{type:"button",disabled:state.bandBusy||(form.action==="delete"&&(!form.neighbour||!form.keep)),
         onclick:()=>{
@@ -783,12 +794,12 @@ function submitBandForm(form){
 }
 
 function renderItems(){
-  if(state.tab==="maps"&&state.sub==="viewport")return renderViewport();
+  if(state.tab==="maps")return renderMaps();
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations"&&state.sub==="playback")return renderPlayback();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="maps"?"placements":state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
-  const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="maps"?"Maps":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
+  const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
@@ -844,7 +855,10 @@ function renderItems(){
 }
 function viewportHooks(){
   return {readOnly:state.readOnly,showCollision:state.mapCollision,
-    onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();},
+    onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();
+    if(!key||!state.mapView)return;
+    const placementKey=`${state.mapView.map}:${key}`;
+    if(placementKey!==state.selected)selectPlacement(placementKey,true);},
     onMove:(key,pos)=>viewportMove(state.mapView.map,key,pos),
     onRotate:(key,rot)=>viewportRotate(state.mapView.map,key,rot),
     requestMod:()=>viewportRequestMod()};
@@ -912,6 +926,20 @@ async function viewportRequestMod(){
   }catch(error){notify(error);}
   finally{state.mapOfferOpen=false;}
 }
+// A drag in the picture edits the same rows the side panel shows,
+// so the move lands in the list, the detail and its visible inputs.
+function syncPlacementRow(map,partKey,names,afters){
+  if(state.row&&state.row.table===map&&state.row.id===partKey){
+    for(let i=0;i<3;i++){const field=state.row.fields.find(item=>item.key===names[i]);if(field)field.value=afters[i];}
+  }
+  const entry=state.rows.find(row=>row.table===map&&row.id===partKey);
+  if(entry)for(let i=0;i<3;i++)entry.values[names[i]]=afters[i];
+  if(state.tab!=="maps"||state.mapTab!=="selection")return;
+  for(let i=0;i<3;i++){
+    const input=document.querySelector(`[data-maps-side] [data-field-key="${names[i]}"]`);
+    if(input&&input.isConnected)input.value=String(afters[i]);
+  }
+}
 function viewportMove(map,key,pos){
   if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
   const names=["posX","posY","posZ"];
@@ -935,6 +963,7 @@ function viewportMove(map,key,pos){
       const part=state.mapView.parts.find(entry=>entry.key===key);
       if(part)part.pos=[done[0].after,done[1].after,done[2].after];
       viewportCtl?.moveTo(key,part?part.pos:pos);
+      syncPlacementRow(map,key,names,[done[0].after,done[1].after,done[2].after]);
       settle(true);
     }catch(error){notify(error);settle(false);}
     finally{state.pending--;state.mapBusy=false;refreshViewportBar();shell.refresh();}
@@ -964,6 +993,7 @@ function viewportRotate(map,key,rot){
       const part=state.mapView.parts.find(entry=>entry.key===key);
       if(part)part.rot=[done[0].after,done[1].after,done[2].after];
       viewportCtl?.turnTo(key,part?part.rot:rot);
+      syncPlacementRow(map,key,names,[done[0].after,done[1].after,done[2].after]);
       settle(true);
     }catch(error){notify(error);settle(false);}
     finally{state.pending--;state.mapBusy=false;refreshViewportBar();shell.refresh();}
@@ -972,10 +1002,16 @@ function viewportRotate(map,key,rot){
 }
 async function reloadViewport(map,selectKey){
   state.mapView=await api(`/api/map/view?map=${encodeURIComponent(map)}`);
+  state.mapList=(await api("/api/table?tab=viewport")).rows;
   state.mapSelected=null;state.mapInfo=null;
+  if(selectKey)state.selected=`${map}:${selectKey}`;
+  await loadItems();
+  clampMapSelection();
+  await loadDetail().catch(notify);
+  refreshMapSide();
   const host=document.querySelector("[data-viewport-host]");
   const status=document.querySelector("[data-viewport-status]");
-  if(host&&status&&state.tab==="maps"&&state.sub==="viewport"){
+  if(host&&status&&state.tab==="maps"){
     viewportCtl=null;
     viewportCtl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks()).catch(failMount(status,"Could not load the map."));
     viewportCtl?.setGizmoMode?.(state.mapGizmo);
@@ -1054,18 +1090,98 @@ async function viewportPaste(map){
   finally{state.mapBusy=false;refreshViewportBar();}
 }
 const VIEWPORT_STYLE="position:relative;width:100%;height:520px;flex:1 0 auto;min-height:320px;";
-function renderViewport(){
-  const strip=subtabBar({tabs:subtabsFor("maps"),active:state.sub,label:"Maps",change:id=>navigate("maps",id)});
-  const maps=state.rows.filter(row=>row.table==="MapView");
-  if(!maps.length)return LexeditorUI.stack(strip,LexeditorUI.notice({tone:"warning",message:"No map files found."}));
-  const current=maps.find(row=>key(row)===state.selected)||maps[0];
-  // A button, not a select: switching the viewed map edits nothing, and a
-  // select would ask Vanilla readers to create a mod before looking around.
-  const choose=async id=>{const row=maps.find(entry=>entry.id===id);if(!row||key(row)===state.selected)return;state.selected=key(row);state.page=0;state.mapSelected=null;state.mapInfo=null;await loadDetail().catch(notify);render();};
-  const picker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Map","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Map",
-      choices:maps.map(row=>({label:row.name,value:row.id})),select:choose}).openFor(event.currentTarget);}},
-    `Map: ${current.name}`);
+async function loadMaps(){
+  state.mapList=(await api("/api/table?tab=viewport")).rows;
+  if(!state.mapList.some(row=>row.id===state.mapId))state.mapId=state.mapList[0]?.id||null;
+  state.mapView=state.mapId?await api(`/api/map/view?map=${encodeURIComponent(state.mapId)}`):null;
+  state.mapSelected=null;state.mapInfo=null;
+  clampMapSelection();
+  await loadDetail();
+}
+// The selected placement always belongs to the open map: switching maps,
+// adding or removing placements re-points it instead of stranding it.
+function clampMapSelection(){
+  const here=state.rows.filter(row=>row.table===state.mapId);
+  if(!here.some(row=>key(row)===state.selected))state.selected=here[0]?key(here[0]):null;
+  const row=state.rows.find(row=>key(row)===state.selected);
+  state.mapSelected=row?row.id:null;
+}
+async function chooseMap(id){
+  if(!id||id===state.mapId)return;
+  state.mapId=id;state.mapView=null;state.mapSelected=null;state.mapInfo=null;state.page=0;
+  try{state.mapView=await api(`/api/map/view?map=${encodeURIComponent(id)}`);}
+  catch(error){notify(error);return;}
+  clampMapSelection();
+  await loadDetail().catch(notify);
+  render();
+}
+// Selection never rebuilds the whole screen: a full render remounts the
+// 3D scene, so picking a placement only swaps the side panel's content.
+async function selectPlacement(placementKey,fromCanvas){
+  const row=state.rows.find(row=>key(row)===placementKey);
+  if(!row)return;
+  if(placementKey===state.selected&&state.mapTab==="selection"&&state.row&&key(state.row)===placementKey)return;
+  state.selected=placementKey;state.mapSelected=row.id;state.mapTab="selection";
+  if(!fromCanvas&&viewportCtl)viewportCtl.select(state.mapSelected);
+  await loadDetail().catch(notify);
+  refreshMapSide();
+}
+function refreshMapSide(){
+  if(state.tab!=="maps")return;
+  const side=document.querySelector("[data-maps-side]");
+  if(!side){render();return;}
+  side.replaceChildren(mapsStrip(),mapsPane());
+}
+function mapsStrip(){
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"selection",label:"Selection"}],
+    active:state.mapTab,label:"Map views",change:id=>{state.mapTab=id;refreshMapSide();}});
+}
+function mapsPane(){
+  if(state.mapTab==="placements")return placementsPane();
+  if(state.mapTab==="selection")return detail();
+  return mapsListPane();
+}
+function mapsListPane(){
+  selectVisibleRecord=null;
+  return LexeditorUI.stack(
+    columnList({rows:state.mapList,key:row=>row.id,selected:state.mapId,select:row=>chooseMap(row.id),
+      columns:[
+        {key:"name",label:"Name",sortable:true,grow:1},
+        {key:"parts",label:"Parts",sortable:true,numeric:true,sortValue:row=>row.values.parts,render:row=>String(row.values.parts)},
+        {key:"models",label:"Models",sortable:true,numeric:true,sortValue:row=>row.values.models,render:row=>String(row.values.models)},
+        {key:"collision",label:"Collision",sortable:true,numeric:true,sortValue:row=>row.values.collision,render:row=>String(row.values.collision)},
+        {key:"navigation",label:"Navigation",sortable:true,numeric:true,sortValue:row=>row.values.navigation,render:row=>String(row.values.navigation)}]}));
+}
+function placementsPane(){
+  const here=sortedRows().filter(row=>row.table===state.mapId);
+  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  if(state.page>pages-1)state.page=pages-1;
+  const shown=here.slice(state.page*state.pageSize,(state.page+1)*state.pageSize);
+  const select=(row,event)=>{
+    if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
+    selectPlacement(key(row),false);
+  };
+  selectVisibleRecord=select;
+  return LexeditorUI.stack(
+    LexeditorUI.bottomSearch({key:"maps-placements",value:state.query,label:"Search placements",
+      change:value=>{state.query=value;state.page=0;
+        // Filtering picks its first match, as the old list did, but
+        // stays on this tab: the reader asked to search, not to leave.
+        const matches=sortedRows().filter(row=>row.table===state.mapId);
+        if(matches.length&&!matches.some(row=>key(row)===state.selected)){
+          state.selected=key(matches[0]);state.mapSelected=matches[0].id;
+          if(viewportCtl)viewportCtl.select(state.mapSelected);
+          void loadDetail().catch(notify);
+        }
+        refreshMapSide();}}),
+    columnList({rows:shown,key,selected:state.selected,select,
+      columns:[{key:"name",label:"Name",grow:1}]}),
+    LexeditorUI.pager({pages,page:state.page,total:here.length,pageSize:state.pageSize,
+      change:value=>{state.page=value;refreshMapSide();}}));
+}
+function renderMaps(){
+  if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
+  const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
   const collide=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"collision",
     title:"Show where collision and navigation parts sit. Markers show placement, not shape.",
     onclick:()=>{state.mapCollision=!state.mapCollision;viewportCtl?.setShowCollision(state.mapCollision);refreshViewportBar();}},"Hide collision");
@@ -1092,7 +1208,14 @@ function renderViewport(){
       refreshViewportBar();
     }).catch(failMount(status,"Could not load the map."));
   });
-  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,collide,duplicate,remove,add,copy,paste,rotate),host,status);
+  // The buttons hover over the picture, not in a bar above it. They hang
+  // on a wrapper: mounting clears the host itself for its canvas.
+  const wrap=el("div",{style:"position:relative;min-width:0;"},host);
+  LexeditorUI.hoverActions(wrap,{label:"Map actions",
+    actions:[{node:collide},{node:duplicate},{node:remove},{node:add},{node:copy},{node:paste},{node:rotate}]});
+  const viewPane=el("div",{style:"flex:1 1 65%;min-width:0;display:flex;flex-direction:column;"},wrap,status);
+  const side=el("div",{"data-maps-side":"",style:"flex:0 0 400px;min-width:0;display:flex;flex-direction:column;"},mapsStrip(),mapsPane());
+  return el("div",{style:"display:flex;gap:8px;align-items:flex-start;"},viewPane,side);
 }
 function renderPlayback(){
   const strip=subtabBar({tabs:subtabsFor("animations"),active:state.sub,label:"Animations",change:id=>navigate("animations",id)});
