@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMDEF XmlVersion="0">
+  <ParamType>SP_EFFECT_PARAM_ST</ParamType>
+  <Unk06>1</Unk06>
+  <BigEndian>False</BigEndian>
+  <Unicode>False</Unicode>
+  <Version>104</Version>
+  <Fields>
+    <Field Def="s32 iconId = -1"><Minimum>-1</Minimum><Maximum>999999</Maximum></Field>
+    <Field Def="f32 conditionHp = -1"><Minimum>-1</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="f32 effectEndurance"><Minimum>-1</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="f32 motionInterval"><Minimum>-1</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="f32 maxHpRate = 1"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 maxMpRate = 1"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 maxStaminaRate = 1"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 slashDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 blowDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 thrustDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 neutralDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 magicDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 fireDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 thunderDamageCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 physicsAttackRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 magicAttackRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 fireAttackRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 thunderAttackRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 physicsAttackPowerRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 magicAttackPowerRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 fireAttackPowerRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 thunderAttackPowerRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 physicsAttackPower"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 magicAttackPower"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 fireAttackPower"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 thunderAttackPower"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="f32 physicsDiffenceRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 magicDiffenceRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 fireDiffenceRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 thunderDiffenceRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 physicsDiffence"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 magicDiffence"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 fireDiffence"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 thunderDiffence"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="f32 NoGuardDamageRate = 1"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="f32 vitalSpotChangeRate = -1"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 normalSpotChangeRate = -1"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 maxHpChangeRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 behaviorId = -1"><Minimum>-1</Minimum><Maximum>1E+08</Maximum></Field>
+    <Field Def="f32 changeHpRate"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="s32 changeHpPoint"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="f32 changeMpRate"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="s32 changeMpPoint"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 mpRecoverChangeSpeed"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="f32 changeStaminaRate"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="s32 changeStaminaPoint"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s32 staminaRecoverChangeSpeed"><Minimum>-100</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="f32 magicEffectTimeChange"><Minimum>-999</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="s32 insideDurability"><Minimum>-999</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="s32 maxDurability"><Minimum>0</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="f32 staminaAttackRate = 1"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 poizonAttackPower"><Minimum>-99999</Minimum><Maximum>99999</Maximum></Field>
+    <Field Def="s32 registIllness"><Minimum>-99999</Minimum><Maximum>99999</Maximum></Field>
+    <Field Def="s32 registBlood"><Minimum>-99999</Minimum><Maximum>99999</Maximum></Field>
+    <Field Def="s32 registCurse"><Minimum>-99999</Minimum><Maximum>99999</Maximum></Field>
+    <Field Def="f32 fallDamageRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 soulRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 equipWeightChangeRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 allItemWeightChangeRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 soul"><Minimum>-1E+08</Minimum><Maximum>1E+08</Maximum></Field>
+    <Field Def="s32 animIdOffset"><Minimum>-1E+08</Minimum><Maximum>1E+08</Maximum></Field>
+    <Field Def="f32 haveSoulRate = 1"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 targetPriority"><Minimum>-1</Minimum><Maximum>10</Maximum></Field>
+    <Field Def="s32 sightSearchEnemyCut"><Minimum>0</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="s32 hearingSearchEnemyCut"><Minimum>0</Minimum><Maximum>100</Maximum></Field>
+    <Field Def="f32 grabityRate = 1"><Minimum>0</Minimum><Maximum>1</Maximum></Field>
+    <Field Def="f32 registPoizonChangeRate"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 registIllnessChangeRate"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 registBloodChangeRate"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 registCurseChangeRate"><Minimum>-1</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 soulStealRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 lifeReductionRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 hpRecoverRate"><Minimum>0</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s32 replaceSpEffectId = -1"><Minimum>-1</Minimum><Maximum>1E+09</Maximum></Field>
+    <Field Def="s32 cycleOccurrenceSpEffectId = -1"><Minimum>-1</Minimum><Maximum>1E+09</Maximum></Field>
+    <Field Def="s32 atkOccurrenceSpEffectId = -1"><Minimum>-1</Minimum><Maximum>1E+09</Maximum></Field>
+    <Field Def="f32 guardDefFlickPowerRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="f32 guardStaminaCutRate = 1"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="s16 rayCastPassedTime = -1"><Minimum>-1</Minimum><Maximum>30000</Maximum></Field>
+    <Field Def="s16 changeSuperArmorPoint"><Minimum>-9999</Minimum><Maximum>9999</Maximum></Field>
+    <Field Def="s16 bowDistRate"><Minimum>-100</Minimum><Maximum>999</Maximum></Field>
+    <Field Def="u16 spCategory"><Enum>SP_EFFECT_SPCATEGORY</Enum><Maximum>60000</Maximum></Field>
+    <Field Def="u8 categoryPriority" />
+    <Field Def="s8 saveCategory = -1"><Enum>SP_EFFECT_SAVE_CATEGORY</Enum><Minimum>-1</Minimum></Field>
+    <Field Def="u8 changeMagicSlot"><Maximum>3</Maximum></Field>
+    <Field Def="u8 changeMiracleSlot"><Maximum>3</Maximum></Field>
+    <Field Def="s8 heroPointDamage"><Minimum>-99</Minimum><Maximum>99</Maximum></Field>
+    <Field Def="u8 defFlickPower" />
+    <Field Def="u8 flickDamageCutRate"><Maximum>100</Maximum></Field>
+    <Field Def="u8 bloodDamageRate = 100" />
+    <Field Def="s8 dmgLv_None"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_S"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_M"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_L"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_BlowM"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_Push"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_Strike"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_BlowS"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_Min"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_Uppercut"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_BlowLL"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="s8 dmgLv_Breath"><Enum>ATKPARAM_REP_DMGTYPE</Enum><Minimum>0</Minimum></Field>
+    <Field Def="u8 atkAttribute"><Enum>ATKPARAM_ATKATTR_TYPE</Enum></Field>
+    <Field Def="u8 spAttribute"><Enum>ATKPARAM_SPATTR_TYPE</Enum></Field>
+    <Field Def="u8 stateInfo"><Enum>SP_EFFECT_TYPE</Enum></Field>
+    <Field Def="u8 wepParamChange"><Enum>SP_EFE_WEP_CHANGE_PARAM</Enum></Field>
+    <Field Def="u8 moveType"><Enum>SP_EFFECT_MOVE_TYPE</Enum></Field>
+    <Field Def="u8 lifeReductionType"><Enum>SP_EFFECT_TYPE</Enum></Field>
+    <Field Def="u8 throwCondition"><Enum>SP_EFFECT_THROW_CONDITION_TYPE</Enum></Field>
+    <Field Def="s8 addBehaviorJudgeId_condition = -1"><Minimum>-1</Minimum><Maximum>9</Maximum></Field>
+    <Field Def="u8 addBehaviorJudgeId_add" />
+    <Field Def="u8 effectTargetSelf:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetFriend:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetEnemy:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetPlayer:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetAI:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetLive:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetGhost:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetWhiteGhost:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetBlackGhost:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 effectTargetAttacker:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 dispIconNonactive:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 useSpEffectEffect:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 bAdjustMagicAblity:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 bAdjustFaithAblity:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 bGameClearBonus:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 magParamChange:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 miracleParamChange:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 clearSoul:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestSOS:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestBlackSOS:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestForceJoinBlackSOS:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestKickSession:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestLeaveSession:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestNpcInveda:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 noDead:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 bCurrHPIndependeMaxHP:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 corrosionIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 sightSearchCutIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 hearingSearchCutIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 antiMagicIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 fakeTargetIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 fakeTargetIgnoreUndead:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 fakeTargetIgnoreAnimal:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 grabityIgnore:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 disablePoison:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 disableDisease:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 disableBlood:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 disableCurse:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 enableCharm:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 enableLifeTime:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 hasTarget:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 isFireDamageCancel:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 isExtendSpEffectLife:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 requestLeaveColiseumSession:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="dummy8 pad_2:4" />
+    <Field Def="u8 vowType0:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType1:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType2:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType3:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType4:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType5:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType6:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType7:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType8:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType9:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType10:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType11:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType12:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType13:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType14:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="u8 vowType15:1"><Enum>SP_EFFECT_BOOL</Enum><Maximum>1</Maximum></Field>
+    <Field Def="dummy8 pad1[11]" />
+  </Fields>
+</PARAMDEF>

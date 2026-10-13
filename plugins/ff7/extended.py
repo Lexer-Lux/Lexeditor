@@ -32,8 +32,8 @@ KEY_ITEM_HELP_SECTION = 7
 KEY_ITEM_NAME_SECTION = 15
 KEY_ITEM_SECTIONS = frozenset((KEY_ITEM_HELP_SECTION, KEY_ITEM_NAME_SECTION))
 KEY_ITEM_FIELDS = [
-    text('name', 'Name', size=65535, group='Text'),
-    text('description', 'Description', size=65535, group='Text'),
+    text('name', 'Name', size=65535, group='Text', capacity=None),
+    text('description', 'Description', size=65535, group='Text', capacity=None),
 ]
 
 
@@ -146,7 +146,7 @@ MATERIA_PRIORITY_FIELDS = [number('priority','Menu priority',0,1,group='Menu ord
 AUDIO_FIELDS = [number('volume','Volume',0,4,signed=True,group='Audio mixing'),
                 number('pan','Pan',4,4,signed=True,group='Audio mixing')]
 AP_MULTIPLIER_FIELDS = [number('multiplier','Master Materia sale AP multiplier',0,1,group='Economy')]
-EXE_TEXT_FIELDS = [text('text','Text',size=65535)]
+EXE_TEXT_FIELDS = [text('text','Text',size=65535,capacity=None)]
 PRICE_TABLES = [('Items', 0, 128), ('Weapons', 128, 128), ('Armor', 256, 32),
                 ('Accessories', 288, 32), ('Materia', 384, 96)]
 
@@ -332,6 +332,7 @@ class ShopExecutable:
                 at = spec['offset'] + self.shift
                 rows.append({'id':i, 'name':spec['name'],
                              'description':f'Fixed executable text field; maximum encoded storage is {spec["size"]} bytes. Unchanged padding/control bytes are preserved.',
+                             'byteCapacity':spec['size'] - 1,
                              'values':{'text':read_exe_text(self.data[at:at+spec['size']])}})
             return rows
         if category == 'worldMovement':
@@ -457,7 +458,7 @@ FAMILIES = {
     'scene': {'categories':SCENE_CATEGORIES, 'source':'scene.bin',
               'note':'Enemies, attacks and four formations per scene. AI and field/world encounter placement are preserved. Original block membership is retained; an overflowing edit is refused.'},
     'text': {'categories':{
-                 'texts':{'label':'Text', 'fields':[text('text','Text',size=65535)]},
+                 'texts':{'label':'Text', 'fields':[text('text','Text',size=65535,capacity=None)]},
                  'keyItems':{'label':'Key items', 'fields':KEY_ITEM_FIELDS}},
              'source':'kernel2.bin',
              'note':'All 18 English KERNEL2 text sections are preserved. Key-item names/help are paired semantically; the remaining 16 sections stay in the generic text editor with game-byte escapes and the bounded game buffer.'},

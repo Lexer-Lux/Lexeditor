@@ -1,5 +1,35 @@
-.ds1-items { display:flex; flex-direction:column; height:100%; min-height:0; }
-.ds1-records { flex:1; min-height:0; }
-.ds1-attack-preview dl { display:grid; grid-template-columns:auto auto; gap:.15em 1em; margin:.4em 0; }
-.ds1-attack-preview dd { margin:0; text-align:end; }
-.ds1-attack-preview p { margin:0; }
+/* Dark Souls Remastered, as values: abyss blacks under parchment lettering,
+   bonfire-gold borders and headings, ember-gold marked rows, and the game's
+   own blood red for destructive actions. Headings use an engraved serif
+   stack in place of the installed bitmap menu font, which has no proved
+   webfont conversion yet (see Theme in credits.md). This layers over the
+   shared framework; layout stays shared. */
+:root {--lex-bg:#0d0c0a;--lex-panel:#151310;--lex-panel-2:#1d1a14;--lex-border:#3a332a;
+  --lex-text:#e9e1cf;--lex-muted:#a79b80;--lex-accent:#a4824c;--lex-accent-text:#141210;
+  --lex-highlight:#f6eeda;--lex-danger:#a02622;--lex-skin:on;
+  --lex-shell-header-bg:#080706;--lex-nav-bg:#080706;
+  --lex-command-row-bg:#100e0a;--lex-command-row-border:1px solid;--lex-command-row-border-color:#3a332a;
+  --lex-tab-fg:#d8cdb2;--lex-tab-bg:#1d1a14;
+  --lex-tab-border:1px solid;--lex-tab-border-color:#3a332a;
+  --lex-tab-hover-bg:#2a2419;
+  --lex-tab-active-fg:#ffe9b8;--lex-tab-active-bg:#33291a;--lex-tab-active-border-color:#a4824c;
+  /* Panels, lists and the marked row. */
+  --lex-surface-bg:#151310;--lex-surface-border:1px solid;
+  --lex-surface-border-color:#3a332a;
+  --lex-list-header-fg:#f6eeda;--lex-list-header-bg:#241f15;--lex-list-cell-border:#ffffff1f;
+  --lex-sort-header-fg:#e8c67a;--lex-sort-header-bg:#100e0a;
+  --lex-row-hover-bg:#2a2419;--lex-row-selected-bg:#4a3a20;--lex-row-selected-fg:#ffe9b8;
+  --lex-pager-fg:#e9e1cf;--lex-pager-bg:#100e0a;--lex-pager-border:1px solid;
+  --lex-pager-border-color:#3a332a;--lex-pager-button-fg:#e9e1cf;
+  --lex-pager-button-bg:#241f15;--lex-pager-button-border:1px solid;
+  --lex-pager-button-border-color:#4a4234;--lex-pager-button-radius:3px;
+  /* Every value sits in the window's darker inset. */
+  --lex-input-fg:#e9e1cf;--lex-input-border:1px solid;
+  --lex-input-border-color:#4a4234;--lex-input-radius:3px;
+  --lex-input-bg:#0a0908;--lex-input-shadow:none;
+  --lex-section-title-fg:#e8c67a;--lex-section-title-font:17px/1.2 var(--lex-heading-font);
+  --lex-section-title-border:1px solid #3a332a;
+  --lex-detail-title-fg:#f6eeda;--lex-detail-id-fg:#a79b80;
+  --lex-heading-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-radius:3px;
+  --lex-detail-icon-bg:#241f15;--lex-detail-icon-fg:#e8c67a;
+  --lex-loading-color:#a4824c;}

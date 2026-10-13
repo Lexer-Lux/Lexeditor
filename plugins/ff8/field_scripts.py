@@ -15,6 +15,8 @@ from pathlib import Path
 import re
 import struct
 
+from core.numeric_values import integer_value
+
 
 _SCHEMA = json.loads((Path(__file__).parent / "schema/jsm_opcodes.json").read_text(
     encoding="utf-8"))
@@ -311,12 +313,17 @@ def rebuild(raw: bytes, sym: bytes, documents: list[dict]) -> tuple[bytes, int]:
     by_id = {method["id"]: method for method in parsed["methods"]}
     replacements: dict[int, str] = {}
     for document in documents:
-        method_id = int(document.get("id", -1))
+        if set(document) - {"id", "source"}:
+            raise ValueError("Field JSM document contains an unsupported field")
+        method_id = integer_value(document.get("id", -1), "Field JSM method ID")
         if method_id in replacements or method_id not in by_id:
             raise ValueError("Invalid or duplicate field JSM method document")
         if not by_id[method_id]["editable"]:
             raise ValueError("This field JSM method contains an unsupported instruction")
-        replacements[method_id] = str(document.get("source", ""))
+        source = document.get("source", "")
+        if not isinstance(source, str):
+            raise ValueError("Field JSM source must be a string")
+        replacements[method_id] = source
     compiled = []
     changed = 0
     for method in parsed["methods"]:

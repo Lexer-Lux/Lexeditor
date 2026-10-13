@@ -1,13 +1,15 @@
 """Synthetic DS1-shaped archives; no proprietary game bytes."""
 import struct
 import zlib
-from plugins.ds1.formats import TABLES, schema
+from plugins.ds1.formats import TABLES, OPTIONAL_TABLES, schema
 from plugins.ds3.formats import write_field
 
 
 def make_archive():
     entries = []
     for table, (size, version) in TABLES.items():
+        if table in OPTIONAL_TABLES:
+            continue
         definition = schema(table)
         ids = [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102]
         rows_start = 48 + len(ids) * 12
@@ -54,6 +56,56 @@ def make_archive():
         struct.pack_into('<6I', plain, 32 + index * 24, 0x40, len(payload), data_offset, index, name_offset, len(payload))
         plain[name_offset:name_offset+len(encoded)] = encoded
         name_offset += len(encoded)
+        plain.extend(payload)
+    compressed = zlib.compress(plain, 9)
+    header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')
+    struct.pack_into('>II', header, 28, len(plain), len(compressed))
+    return bytes(header) + compressed
+
+
+def make_text_archive(names=None, descs=None, extra=None):
+    """A synthetic msg/ENGLISH/item.msgbnd.dcx: every name and description
+    table twice (the base and later copies Remastered ships), holding `names`
+    and `descs` by table. `extra` maps an FMG file name to {id: text}, also
+    carried twice."""
+    from plugins.ds1 import texts
+    names = names or {'EquipParamGoods': {100: 'Fixture Stone', 101: 'Fixture Key'},
+                      'EquipParamWeapon': {100: 'Fixture Sword'}}
+    descs = descs or {'EquipParamGoods': {100: ('A stone of safety.', 'A stone that keeps souls safe.\nIt has never broken.')},
+                      'EquipParamWeapon': {100: ('A blade for testing.', 'A blade made for testing.\nIt has never tasted blood.')}}
+    blank = b'\0\0\x01\0' + bytes(4) + b'\x01\0\0\0' + bytes(texts.HEADER - 12)
+    entries = []
+    folder = 'N:/FRPG/data/Msg/Data_ENGLISH/'.replace('/', chr(92))
+    for base in (10, 110):
+        for offset, (table, file_name) in enumerate(texts.NAME_TABLES.items()):
+            payload = texts.build_fmg(blank, [], dict(names.get(table, {})))
+            entries.append((base + offset, folder + file_name, payload))
+        for offset, (table, (short, full)) in enumerate(texts.DESC_TABLES.items()):
+            pair = descs.get(table, {})
+            entries.append((base + 10 + offset * 2, folder + short,
+                            texts.build_fmg(blank, [], {item: text[0] for item, text in pair.items()})))
+            entries.append((base + 11 + offset * 2, folder + full,
+                            texts.build_fmg(blank, [], {item: text[1] for item, text in pair.items()})))
+        # Extra tables (Place_name_ and the like) sit past the name and
+        # description members, which end at base + 19.
+        for extra_offset, (file_name, contents) in enumerate((extra or {}).items()):
+            entries.append((base + 40 + extra_offset, folder + file_name,
+                            texts.build_fmg(blank, [], dict(contents))))
+    encoded = [name.encode('shift_jis') + b'\0' for _, name, _ in entries]
+    directory_end = 32 + len(entries) * 24
+    names_end = directory_end + sum(map(len, encoded))
+    plain = bytearray(names_end)
+    plain[:4] = b'BND3'
+    plain[4:12] = b'TEST0000'
+    plain[12] = 0x74
+    struct.pack_into('<II', plain, 16, len(entries), names_end)
+    name_offset = directory_end
+    for index, ((member_id, _name, payload), name) in enumerate(zip(entries, encoded)):
+        while len(plain) % 16:
+            plain.append(0)
+        struct.pack_into('<6I', plain, 32 + index * 24, 0x40, len(payload), len(plain), member_id, name_offset, len(payload))
+        plain[name_offset:name_offset + len(name)] = name
+        name_offset += len(name)
         plain.extend(payload)
     compressed = zlib.compress(plain, 9)
     header = bytearray.fromhex('44435800000100000000001800000024000000240000002c4443530000000000000000004443500044464c540000002009000000000000000000000000000000000101004443410000000008')

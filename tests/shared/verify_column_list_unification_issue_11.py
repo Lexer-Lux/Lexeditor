@@ -1,13 +1,14 @@
 from pathlib import Path
 import re
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-WARBAND = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
-BLANK = (ROOT / "plugins" / "blank" / "editor.html").read_text(encoding="utf-8")
+RDR2 = plugin_ui('rdr2')
+WARBAND = plugin_ui('warband')
+BLANK = plugin_ui('blank')
 
 
 def require(condition: bool, message: str) -> None:
@@ -24,7 +25,7 @@ require("columnList," in FRAMEWORK_JS,
 exports = FRAMEWORK_JS.rsplit("window.LexeditorUI = {", 1)[1].split("};", 1)[0]
 require("const table = options =>" not in FRAMEWORK_JS and not re.search(r"(?:^|,)\s*table\s*(?:,|$)", exports),
         "the old shared table primitive must be deleted, not deprecated")
-require(".lex-table" not in FRAMEWORK_CSS and "lex-table-wrap" not in FRAMEWORK_CSS,
+require(not re.search(r"\.lex-table(?![\w-])", FRAMEWORK_CSS) and "lex-table-wrap" not in FRAMEWORK_CSS,
         "the old table component CSS must be deleted")
 require("LexeditorUI.table(" not in RDR2 and "craftingOutputTable" not in RDR2,
         "RDR2 must not use the old shared table path")
@@ -32,7 +33,9 @@ require("function effectColumnList(" in RDR2 and "function effectDetail(" in RDR
         "Effects must be a shared column-list master plus detail editor")
 require(RDR2.count("LexeditorUI.pagedListDetail({") >= 5,
         "Effects and Behaviors must join the shared paged list-detail preset")
-require("columnList" in WARBAND and "table" not in WARBAND.split("const {", 1)[1].split("}=LexeditorUI", 1)[0],
+warband_bindings = re.findall(r"const\s*\{([^}]+)\}\s*=\s*LexeditorUI\b", WARBAND)
+require(any(re.search(r"\bcolumnList\b", binding) for binding in warband_bindings)
+        and not any(re.search(r"\btable\b", binding) for binding in warband_bindings),
         "Warband must consume the column-list replacement")
 # The Data Map builds its table inline as the paged list's master rather than
 # assigning it to a const first, and its class is composed with the caller's

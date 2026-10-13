@@ -11,6 +11,7 @@ from io import BytesIO
 import struct
 
 from PIL import Image
+from core.numeric_values import integer_value
 
 
 OLD_MIM_SIZE = 401_408
@@ -173,12 +174,7 @@ def _write_field(output: bytearray, tile: dict, variant: str, field: str,
     limit = _field_limits(variant, field)
     if limit is None:
         raise ValueError(f"Field background {field} is not editable in {variant} MAP tiles")
-    if isinstance(value, bool):
-        raise ValueError(f"Field background {field} must be an integer")
-    try:
-        number = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"Field background {field} must be an integer") from error
+    number = integer_value(value, f"Field background {field}")
     if number != value or not limit[0] <= number <= limit[1]:
         raise ValueError(f"Field background {field} must be {limit[0]} to {limit[1]}")
     if field in {"x", "y"}:
@@ -217,7 +213,7 @@ def apply_edits(map_data: bytes, mim_data: bytes, edits: list[dict]) -> tuple[by
     for edit in edits:
         if not isinstance(edit, dict) or set(edit) - allowed or "tile" not in edit:
             raise ValueError("Field background edit has unsupported fields or no tile ID")
-        tile_id = int(edit["tile"])
+        tile_id = integer_value(edit["tile"], "Field background tile ID")
         if not 0 <= tile_id < parsed["tileCount"]:
             raise ValueError("Field background edit identifies an invalid tile")
         if len(edit) == 1:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-ROOT = Path(r"C:\Lexeditor")
+ROOT = Path(__file__).resolve().parents[2]
 NOTICE = {"title": "Purge the shader cache first",
           "message": "Shader Injector can only replace shaders it watches the game compile.",
           "action": "clear_shader_cache", "actionLabel": "Clear shader cache"}
@@ -52,10 +52,14 @@ with sync_playwright() as play:
     print("buttons:", page.eval_on_selector_all(".dialog-actions button, #dialog-actions button",
                                                 "els=>els.map(e=>e.textContent.trim())"))
     print("opened without asking:", page.evaluate("window.__opened"))
+    assert page.locator("#dialog-title").inner_text() == NOTICE['title']
+    assert page.locator("#dialog-message").inner_text() == NOTICE['message']
+    assert page.evaluate("window.__opened") == 0
     page.get_by_role("button", name="CLEAR SHADER CACHE", exact=True).click()
     page.wait_for_function("window.__actions.length===1")
     page.get_by_role("button", name="OPEN", exact=True).wait_for()
     print("action sent:", page.evaluate("window.__actions"))
+    assert page.evaluate("window.__actions") == [['ff7r2', 'clear_shader_cache']]
     print("after:", page.locator("#dialog-message").inner_text())
     print("after buttons:", page.eval_on_selector_all(".dialog-actions button, #dialog-actions button",
                                                       "els=>els.map(e=>e.textContent.trim())"))
@@ -64,5 +68,7 @@ with sync_playwright() as play:
     page.locator('[data-plugin="ff7r2"]').click()
     page.wait_for_timeout(500)
     print("second click opens the game directly:", page.evaluate("window.__opened"))
+    assert page.evaluate("window.__opened") == 1
     print("page errors:", errors or "none")
+    assert not errors, errors
     browser.close()

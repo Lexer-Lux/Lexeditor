@@ -18,6 +18,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from paged_detail import reveal
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
@@ -167,7 +168,7 @@ def check_finder_icon(button):
 
 def main():
     failures = []
-    shots = Path(tempfile.gettempdir()) / "lexeditor-dev"
+    shots = Path(sys.argv[1]) if len(sys.argv)>1 else Path(tempfile.gettempdir()) / "lexeditor-dev/ff8-encounters"
     shots.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
@@ -312,6 +313,7 @@ def main():
         assert table.locator('.ff8-encounter-rule-input').count()==len(RULES)
         preview=page.locator('.ff8-encounter-group-preview')
         assert preview.locator('.lex-detail-panel-name').inner_text().strip()=='Encounter group'
+        assert preview.locator('.ff8-encounter-initial-chances [data-column-key="chance"]:not(.lex-column-list-head-cell)').all_text_contents()==['100%']
         rows=preview.locator('.ff8-encounter-formation-row')
         assert rows.count()==8
         assert preview.locator('select').count()==0
@@ -323,6 +325,7 @@ def main():
         empty = preview.locator('[data-lex-empty-position]').first
         assert empty.locator('.lex-record-card-title').inner_text() == 'Empty'
         assert empty.locator('.lex-record-card-body').count() == 0
+        reveal(page,rows.first)
         rows.first.locator('.lex-record-card').first.hover()
         page.wait_for_timeout(200)
         check_finder_icon(rows.first.get_by_label('Choose enemy for formation 2 slot 1', exact=True))
@@ -356,6 +359,7 @@ def main():
         assert "Encounter group" in detail.locator(".lex-detail-panel-title").inner_text()
         finders = detail.get_by_label(re.compile(r"^Choose the battle formation for group 2"))
         assert finders.count() == 8, f"eight battle slots, {finders.count()} finders"
+        reveal(page,detail.locator('.ff8-encounter-formation-row').first)
         detail.locator('.ff8-encounter-formation-row').first.hover()
         finders.first.click()
         page.wait_for_timeout(200)
@@ -370,6 +374,7 @@ def main():
         page.mouse.up()
         actual=page.evaluate("state.data.world.rows.find(r=>r.kind==='group'&&r.id===2).encounters")
         assert actual==[5,2,2,2,2,2,2,2],actual
+        assert page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances [data-column-key="chance"]:not(.lex-column-list-head-cell)').all_text_contents()==['14.84375%','85.15625%']
 
         page.evaluate("() => { state.encountersTab='groups'; state.selected.encounterGroups=3;"
                       " renderEncounters(); }")
@@ -381,30 +386,53 @@ def main():
                       " renderEncounters(); }")
         page.wait_for_timeout(200)
         shot("groups")
+        shot('initial-chances')
         assert page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).count() == 1
         assert 'Level byte' not in page.locator('.ff8-encounter-group-detail').inner_text()
+        reveal(page,page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True))
         page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).scroll_into_view_if_needed()
         shot('special-level')
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         assert rows.count()==8
         assert rows.nth(1).locator('[data-lex-battle-position]').count()==7
-        # Each slot says how many of the eight slots hold its formation, so a
-        # repeated formation's larger share is on the page (Lexer, 2026-09-27).
+        # Each slot has a distinct position. Initial probabilities sum the
+        # unequal slot outcomes for each formation, rather than copy counts.
         shares=page.evaluate("""() => {
           const rows=[...document.querySelectorAll('.ff8-encounter-group-detail .ff8-encounter-formation-row')];
           return rows.map(row=>[row.querySelector('.ff8-encounter-formation-link').textContent.replace(/\\D/g,''),
-            row.querySelector('.ff8-encounter-formation-share').textContent]);
+            row.querySelector('.ff8-encounter-formation-position').textContent]);
         }""")
-        for formation,text in shares:
-            count=sum(1 for other,_ in shares if other==formation)
-            assert text==f'{count} of 8',(formation,text,shares)
-        bounds=page.evaluate("""() => {
-          const rows=[...document.querySelectorAll('.ff8-encounter-group-detail .ff8-encounter-formation-row')];
+        for index,(_,text) in enumerate(shares):
+            assert text==f'Slot {index+1}',shares
+        chances=page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances')
+        actual=chances.locator('.lex-column-list-row').evaluate_all("""rows=>rows.map(row=>[
+          row.querySelector('[data-column-key="id"]').textContent,
+          row.querySelector('[data-column-key="chance"]').textContent,
+          row.querySelector('[data-column-key="slots"]').textContent])""")
+        # Group 0 is [0,1,2,3,4,5,0,1]; slot 1 differs from slot 8.
+        assert actual==[['#0','24.21875%','1, 7'],['#1','18.75%','2, 8'],
+                        ['#2','14.453125%','3'],['#3','14.453125%','4'],
+                        ['#4','14.0625%','5'],['#5','14.0625%','6']],actual
+        page.evaluate("state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes=[0,0,0,0,0,0,0,256];renderEncounters()")
+        custom=page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances')
+        assert custom.locator('.lex-column-list-row [data-column-key="chance"]').all_text_contents()==['0%','100%','0%','0%','0%','0%']
+        shot('saved-chances')
+        page.evaluate("delete state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes;renderEncounters()")
+        rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
+        usage=page.locator('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]')
+        reveal(page, usage)
+        assert usage.is_visible()
+        overlap=page.evaluate("""() => {
+          const section=document.querySelector('.ff8-encounter-group-detail .ff8-encounter-formation-row').closest('section');
           const usage=document.querySelector('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]');
-          return {bottom:rows.at(-1).getBoundingClientRect().bottom,usage:usage.getBoundingClientRect().top};
+          if(getComputedStyle(section).visibility==='hidden'||getComputedStyle(section).display==='none')return false;
+          const a=section.getBoundingClientRect(),b=usage.getBoundingClientRect();
+          return Math.min(a.right,b.right)-Math.max(a.left,b.left)>1
+            && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1;
         }""")
-        assert bounds['bottom']<=bounds['usage'],bounds
+        assert not overlap, 'Formation and usage sections overlap on the same page'
         # An enemy cell invokes the enemy finder, including previously empty cells.
+        reveal(page, rows.first)
         rows.first.locator('.lex-record-card').nth(3).hover()
         rows.first.get_by_label('Choose enemy for formation 0 slot 4',exact=True).click()
         page.wait_for_selector('.lex-searcher-bar')

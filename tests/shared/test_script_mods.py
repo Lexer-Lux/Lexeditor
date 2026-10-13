@@ -1,9 +1,8 @@
-"""Tweak mods build only when trusted, and only into their own game files."""
+"""Tweak mods build when enabled, and only into their own game files."""
 from __future__ import annotations
 
 import json
 import hashlib
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -48,9 +47,6 @@ class ScriptModTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.dir = Path(self.temp.name)
-        patcher = mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.dir / "trust.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
         self.addCleanup(self.temp.cleanup)
         self.mod = make_mod(self.dir / "library")
 
@@ -79,22 +75,19 @@ class ScriptModTests(unittest.TestCase):
                 script_mods.save_values(self.mod, bad)
         self.assertEqual(script_mods.values(self.mod)["amount"], 60)
 
-    def test_an_untrusted_mod_never_runs(self):
-        with self.assertRaisesRegex(script_mods.ScriptModError, "not trusted"):
-            self.build()
-        self.assertFalse((self.mod / "hext").exists())
+    def test_a_mod_builds_with_no_trust_step(self):
+        result, seen = self.build()
+        self.assertEqual(seen, [10])
+        self.assertEqual(result["files"], ["hext/ff8/en_nv/patch.txt"])
 
-    def test_editing_the_script_revokes_trust_until_trusted_again(self):
-        self.assertEqual(script_mods.set_trusted(self.mod, True), "trusted")
-        (self.mod / "script" / "helper.py").write_text("line = lambda n: 'changed'\n", encoding="utf-8")
-        self.assertEqual(script_mods.trust_state(self.mod), "changed")
-        with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-            self.build()
-        self.assertEqual(script_mods.set_trusted(self.mod, True), "trusted")
+    def test_editing_the_script_changes_the_next_build(self):
         self.build()
+        self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "00 = 0A")
+        (self.mod / "script" / "helper.py").write_text("line = lambda n: 'changed'\n", encoding="utf-8")
+        self.build()
+        self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "changed")
 
     def test_build_writes_outputs_and_removes_ones_no_longer_produced(self):
-        script_mods.set_trusted(self.mod, True)
         script_mods.save_values(self.mod, {"amount": 60})
         result, seen = self.build()
         self.assertEqual(seen, [60])
@@ -109,7 +102,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertFalse((self.mod / "hext/ff8/en_nv/patch.txt").exists())
 
     def test_a_hand_made_file_is_never_overwritten(self):
-        script_mods.set_trusted(self.mod, True)
         target = self.mod / "hext/ff8/en_nv/patch.txt"
         target.parent.mkdir(parents=True)
         target.write_text("mine", encoding="utf-8")
@@ -118,11 +110,9 @@ class ScriptModTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "mine")
 
     def test_outputs_stay_inside_the_allowed_game_roots(self):
-        script_mods.set_trusted(self.mod, True)
         for bad in ("../escape.txt", "C:/x.txt", "mod.json", "settings.json", "script/tweak.py", "textures/x.png"):
             (self.mod / "script" / "tweak.py").write_text(
                 f"def build(settings, context):\n    return {{{bad!r}: 'x'}}\n", encoding="utf-8")
-            script_mods.set_trusted(self.mod, True)
             with self.assertRaises(script_mods.ScriptModError, msg=bad):
                 self.build()
         self.assertFalse((self.dir / "library" / "escape.txt").exists())
@@ -130,7 +120,6 @@ class ScriptModTests(unittest.TestCase):
     def test_two_mods_with_the_same_module_names_do_not_share_code(self):
         other = make_mod(self.dir / "library", "Other", "line = lambda n: 'other'\n")
         for root in (self.mod, other):
-            script_mods.set_trusted(root, True)
             self.build(root)
         self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "00 = 0A")
         self.assertEqual((other / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "other")
@@ -138,19 +127,17 @@ class ScriptModTests(unittest.TestCase):
     def test_catalog_row_reads_without_running_the_script(self):
         (self.mod / "script" / "tweak.py").write_text("raise SystemExit('ran')\n", encoding="utf-8")
         row = script_mods.catalog_row(self.mod)
-        self.assertEqual(row["trust"], "untrusted")
+        self.assertNotIn("trust", row)
         self.assertEqual(row["schema"]["requires"], ["other"])
         self.assertEqual(row["values"]["amount"], 10)
 
     def test_describe_and_clear(self):
-        script_mods.set_trusted(self.mod, True)
         self.assertEqual(script_mods.describe(self.mod, None), {"amount": 10})
         self.build()
         self.assertEqual(script_mods.clear(self.mod), ["hext/ff8/en_nv/patch.txt"])
         self.assertFalse((self.mod / script_mods.MANIFEST_FILE).exists())
 
     def test_manifest_paths_are_validated_before_any_files_change(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
         original = patch.read_bytes()
@@ -171,7 +158,6 @@ class ScriptModTests(unittest.TestCase):
                 self.assertFalse((self.mod / "direct/extra.bin").exists())
 
     def test_malformed_manifest_is_refused_before_writing(self):
-        script_mods.set_trusted(self.mod, True)
         manifest = self.mod / script_mods.MANIFEST_FILE
         for malformed in (None, [], {}, {"version": 2, "files": {}},
                           {"version": 1, "files": []},
@@ -184,7 +170,6 @@ class ScriptModTests(unittest.TestCase):
             self.assertEqual(json.loads(manifest.read_text()), malformed)
 
     def test_changed_generated_files_are_preserved_on_rebuild_removal_and_clear(self):
-        script_mods.set_trusted(self.mod, True)
         script_mods.save_values(self.mod, {"amount": 60})
         self.build()
         extra = self.mod / "direct/extra.bin"
@@ -212,7 +197,6 @@ class ScriptModTests(unittest.TestCase):
             (self.mod / "hext").symlink_to(outside, target_is_directory=True)
         except OSError:
             self.skipTest("Directory symlinks are unavailable for this account")
-        script_mods.set_trusted(self.mod, True)
         with self.assertRaisesRegex(script_mods.ScriptModError, "outside"):
             self.build()
         target = outside / "keep.txt"
@@ -224,7 +208,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b"keep")
 
     def test_partial_write_failure_restores_files_and_manifest(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
         manifest = self.mod / script_mods.MANIFEST_FILE
@@ -245,7 +228,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertFalse((self.mod / "direct/extra.bin").exists())
 
     def test_partial_removal_failure_restores_removed_files(self):
-        script_mods.set_trusted(self.mod, True)
         script_mods.save_values(self.mod, {"amount": 60})
         self.build()
         extra = self.mod / "direct/extra.bin"
@@ -264,7 +246,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(), "00 = 3C")
 
     def test_failed_rollback_is_reported_with_original_failure(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         script_mods.save_values(self.mod, {"amount": 60})
         write = script_mods.atomic_write

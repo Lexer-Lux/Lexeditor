@@ -8,13 +8,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from core.numeric_values import integer_value
 
 
 RECORD_SIZE = 4
+# mitem.json documents magazines as dead flag data and these special types
+# as overriding the stored flags. Preserve their bytes instead of offering edits.
+IGNORED_USE_FLAG_TYPES = frozenset({9, 12, 13, 14, 15, 19})
 
 
 def _schema(schema_root: Path) -> dict:
-    return json.loads((schema_root / "mitem.json").read_text(encoding="utf-8"))
+    schema = json.loads((schema_root / "mitem.json").read_text(encoding="utf-8"))
+    for item_type in schema["item_type"]:
+        item_type["flagsReadonly"] = int(item_type["id"]) in IGNORED_USE_FLAG_TYPES
+    return schema
 
 
 def read_rows(data: bytes, item_names: dict[int, str], schema_root: Path) -> dict:
@@ -47,25 +54,44 @@ def read_rows(data: bytes, item_names: dict[int, str], schema_root: Path) -> dic
     }
 
 
-def apply_edits(data: bytes, edits: list[dict], schema_root: Path) -> tuple[bytes, int]:
+def apply_edits(data: bytes, edits: list[dict], schema_root: Path,
+                parameter_choices: dict | None = None) -> tuple[bytes, int]:
     if len(data) % RECORD_SIZE:
         raise ValueError("mitem.bin has a partial item record")
-    valid_types = {int(row["id"]) for row in _schema(schema_root)["item_type"]}
+    schema = _schema(schema_root)
+    types = {int(row["id"]): row for row in schema["item_type"]}
+    parameters = {row["name"]: row for row in schema.get("param_type", [])}
     raw = bytearray(data)
     seen: set[int] = set()
     for edit in edits:
-        item_id = int(edit["id"])
+        item_id = integer_value(edit["id"], "Menu item ID")
         if item_id in seen or not 0 <= item_id < len(raw) // RECORD_SIZE:
             raise ValueError(f"Invalid or duplicate menu item id: {item_id}")
         seen.add(item_id)
-        type_id = int(edit["typeId"])
-        flags = int(edit["flags"])
-        param1 = int(edit["param1"])
-        param2 = int(edit["param2"])
-        if type_id not in valid_types:
+        type_id = integer_value(edit["typeId"], "Menu item type ID")
+        flags = integer_value(edit["flags"], "Menu item flags")
+        param1 = integer_value(edit["param1"], "Menu item parameter 1")
+        param2 = integer_value(edit["param2"], "Menu item parameter 2")
+        if type_id not in types:
             raise ValueError(f"Unknown menu item type: {type_id}")
         if any(not 0 <= value <= 255 for value in (flags, param1, param2)):
             raise ValueError("Menu item flags and parameters must be 0 to 255")
         base = item_id * RECORD_SIZE
+        if types[type_id]["flagsReadonly"] and flags != data[base + 1]:
+            raise ValueError("Menu item use flags are read-only for this type")
+        for key, value, offset in (("param1", param1, 2), ("param2", param2, 3)):
+            kind = types[type_id].get(key)
+            meta = parameters.get(kind)
+            if kind is not None and (meta is None or meta.get("widget") == "none"):
+                if value != data[base + offset]:
+                    raise ValueError(f"Menu item {key} is read-only for this type")
+            if meta is not None and meta.get("widget") == "flags":
+                writable = sum(1 << int(row["bit"]) for row in meta["values"] if not row.get("readonly"))
+                if (value ^ data[base + offset]) & ~writable:
+                    raise ValueError(f"Menu item {key} unknown flags are read-only")
+            choices = (parameter_choices or {}).get(kind)
+            if (choices is not None and (type_id != data[base] or value != data[base + offset])
+                    and value not in {int(row["id"]) for row in choices}):
+                raise ValueError(f"Menu item {key} must be a documented {kind} choice")
         raw[base:base + RECORD_SIZE] = bytes((type_id, flags, param1, param2))
     return bytes(raw), len(seen)

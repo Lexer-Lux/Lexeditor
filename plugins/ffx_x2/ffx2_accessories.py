@@ -5,6 +5,7 @@ Lexeditor currently writes only four base ability IDs and the base price; all
 other fields, creature-extension data and trailing strings remain byte-identical.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 import struct
@@ -75,12 +76,7 @@ def parse_accessories(data: bytes) -> tuple[AccessoryRecord, ...]:
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise FFX2AccessoryError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFX2AccessoryError(f"{label} must be an integer") from error
+    parsed = integer_value(value, label, FFX2AccessoryError)
     if not minimum <= parsed <= maximum:
         raise FFX2AccessoryError(f"{label} must be between {minimum} and {maximum}")
     return parsed

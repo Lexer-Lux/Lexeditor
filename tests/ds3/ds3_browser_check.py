@@ -15,6 +15,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 from plugins.ds3.formats import encrypt_regulation
 from core.service_session import LocalPluginSession, request_json
 from test_ds3_plugin import _bnd4, _row_ids
+from ds3_browser_support import reveal_detail_control
 
 
 TABLES = (
@@ -82,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
                 page.wait_for_selector('body[data-ds3-ready="true"]', timeout=20000)
                 page.wait_for_selector(".lex-column-list .lex-list-row", timeout=10000)
 
-                page.wait_for_selector('[data-ds3-field="atkBasePhysics"]', timeout=10000)
+                reveal_detail_control(page, page.locator('[data-ds3-field="atkBasePhysics"]'))
                 if page.locator('input[type="checkbox"][data-ds3-field]').count() < 1:
                     raise RuntimeError("Weapons detail did not render boolean checkboxes")
                 if page.locator("select[data-ds3-field]").count() < 1:
@@ -136,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                 page.screenshot(path=str(output/'create-record.png'),full_page=True)
                 page.get_by_role('button',name='Create record',exact=True).click()
                 page.get_by_role('img',name='Created in this mod',exact=True).wait_for()
-                page.wait_for_selector('[data-ds3-field="atkBasePhysics"]')
+                reveal_detail_control(page, page.locator('[data-ds3-field="atkBasePhysics"]'))
                 assert page.locator('[data-ds3-field="atkBasePhysics"]').input_value()=='321'
                 page.locator('[data-ds3-field="atkBasePhysics"]').fill('432')
                 page.locator('[data-ds3-field="atkBasePhysics"]').press('Tab')

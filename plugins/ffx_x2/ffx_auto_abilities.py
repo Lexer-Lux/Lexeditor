@@ -6,6 +6,7 @@ known low five element bits are writable.  Upper bits and every other field
 remain opaque and are preserved byte-for-byte.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 
@@ -83,12 +84,7 @@ def parse_auto_abilities(data: bytes) -> tuple[FFXAutoAbilityRecord, ...]:
 
 
 def _element_mask(value, label: str) -> int:
-    if isinstance(value, bool):
-        raise FFXAutoAbilityError(f"{label} element mask must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFXAutoAbilityError(f"{label} element mask must be an integer") from error
+    parsed = integer_value(value, f"{label} element mask", FFXAutoAbilityError)
     if not 0 <= parsed <= ELEMENT_MASK:
         raise FFXAutoAbilityError(f"{label} element mask must be between 0 and 31")
     return parsed
@@ -109,10 +105,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> bytes:
             raise FFXAutoAbilityError(
                 "Each FFX auto-ability edit must contain only id, strike, absorb, immune, resist and weak"
             )
-        try:
-            record_id = int(edit["id"])
-        except (TypeError, ValueError) as error:
-            raise FFXAutoAbilityError("FFX auto-ability record ID must be an integer") from error
+        record_id = integer_value(edit["id"], "FFX auto-ability record ID", FFXAutoAbilityError)
         if not table.min_index <= record_id <= table.max_index:
             raise FFXAutoAbilityError(
                 f"FFX auto-ability record ID must be between {table.min_index} and {table.max_index}"

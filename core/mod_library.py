@@ -177,17 +177,25 @@ def relative_path(value: str) -> Path:
 
 
 def metadata(root: Path) -> dict:
+    """Everything in mod.json, with the standard fields read the standard way.
+
+    `name` falls back to the folder name for display; `missing` says when the
+    mod has not actually been named yet (core/mod_metadata.py).
+    """
+    from core import mod_metadata
     path = root / MOD_FILE
-    if not path.exists():
-        return {"name": root.name, "version": ""}
-    value = json.loads(path.read_text(encoding="utf-8-sig"))
-    if not isinstance(value, dict):
-        raise ValueError("mod.json must contain an object")
-    for key in ("name", "version"):
-        if key in value and not isinstance(value[key], str):
-            raise ValueError(f"Mod {key} must be text")
-    return {**value, "name": value.get("name") or root.name,
-            "version": value.get("version", "")}
+    value = {}
+    if path.exists():
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+        if not isinstance(value, dict):
+            raise ValueError("mod.json must contain an object")
+        for key in ("name", "version"):
+            if key in value and not isinstance(value[key], str):
+                raise ValueError(f"Mod {key} must be text")
+    standard = mod_metadata.read(root)
+    return {**value, **{key: standard[key] for key in mod_metadata.FIELDS},
+            "name": standard["displayName"], "version": standard["version"],
+            "missing": standard["missing"]}
 
 
 def digest(path: Path) -> str:
@@ -371,7 +379,7 @@ class ModLibrary:
 
     def import_mod(self, plugin_id: str, source: Path, adapter, name: str,
                    data_root: str = "", selected: list[str] | None = None,
-                   prepare_editable: bool = False) -> Path:
+                   prepare_editable: bool = False, details: dict | None = None) -> Path:
         game = relative_path(plugin_id)
         folder = relative_path(name)
         if len(game.parts) != 1 or len(folder.parts) != 1:
@@ -402,9 +410,15 @@ class ModLibrary:
                     shutil.copyfile(root / path, destination)
                     if digest(root / path) != digest(destination):
                         raise OSError(f"Copy verification failed: {path}")
+                # Every stored mod is named, with the details the reader gave
+                # filling in whatever the package did not say about itself.
+                from core import mod_metadata
                 info = metadata(root)
-                info["name"] = name
                 (staged / MOD_FILE).write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+                standard = {key: info.get(key, "") for key in mod_metadata.FIELDS}
+                standard.update({key: value for key, value in (details or {}).items() if key in mod_metadata.FIELDS})
+                standard["name"] = name
+                mod_metadata.write(staged, standard)
                 if prepare_editable:
                     adapter.prepare_editable(staged)
                 staged.rename(target)

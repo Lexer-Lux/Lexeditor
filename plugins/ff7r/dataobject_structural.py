@@ -17,6 +17,8 @@ from __future__ import annotations
 import struct
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .dataobject import (
     BOOLEAN,
     BOOLEAN_BYTE,
@@ -26,6 +28,7 @@ from .dataobject import (
     INT32,
     MAX_ARRAY_ELEMENTS,
     MAX_ENTRIES,
+    MAX_STRING_BYTES,
     NAME,
     STRING,
     DataObjectPackage,
@@ -67,13 +70,21 @@ def _encode_fstring(value: str) -> bytes:
     try:
         raw = value.encode("ascii")
     except UnicodeEncodeError:
-        raw = value.encode("utf-16-le")
+        try:
+            raw = value.encode("utf-16-le")
+        except UnicodeEncodeError as error:
+            raise ValueError("FF7R DataObject text must contain valid Unicode characters") from error
+        if len(raw) + 2 > MAX_STRING_BYTES:
+            raise ValueError("FF7R DataObject encoded text exceeds the supported string size")
         return struct.pack("<i", -(len(raw) // 2 + 1)) + raw + b"\0\0"
+    if len(raw) + 1 > MAX_STRING_BYTES:
+        raise ValueError("FF7R DataObject encoded text exceeds the supported string size")
     return struct.pack("<i", len(raw) + 1) + raw + b"\0"
 
 
 def _entry_bounds(package: DataObjectPackage, entry_index: int) -> tuple[int, int]:
     """Return the exact serialized byte range for one parsed table row."""
+    entry_index = integer_value(entry_index, "Entry index")
     if entry_index < 0 or entry_index >= len(package.entries):
         raise IndexError(f"Entry index out of range: {entry_index}")
     if not package.properties:
@@ -117,6 +128,7 @@ def insert_array_element(
     ``array_index=None`` appends. Any failure after byte insertion restores the
     complete in-memory package state before re-raising.
     """
+    entry_index = integer_value(entry_index, "Entry index")
     if entry_index < 0 or entry_index >= len(package.entries):
         raise IndexError(f"Entry index out of range: {entry_index}")
     prop = package._property(prop_name)
@@ -132,7 +144,7 @@ def insert_array_element(
     if field.length >= MAX_ARRAY_ELEMENTS:
         raise ValueError(f"{prop_name} is already at the maximum supported array length")
 
-    index = field.length if array_index is None else int(array_index)
+    index = field.length if array_index is None else integer_value(array_index, "Array insertion index")
     if index < 0 or index > field.length:
         raise IndexError(f"Array insertion index out of range for {prop_name}: {index}")
 
@@ -191,6 +203,7 @@ def append_cloned_entry(
     are preserved exactly apart from the new row-tag FName, so variable-width
     fields, arrays and unknown semantic values retain the proved template shape.
     """
+    source_entry_index = integer_value(source_entry_index, "Source entry index")
     if len(package.entries) >= MAX_ENTRIES:
         raise ValueError("DataObject is already at the maximum supported entry count")
     if not isinstance(new_tag, str) or new_tag not in package.uasset.names:
@@ -246,6 +259,7 @@ def replace_scalar_fstring(
     value: str,
 ) -> None:
     """Replace one scalar FString, allowing a size change, then fully reparse."""
+    entry_index = integer_value(entry_index, "Entry index")
     if entry_index < 0 or entry_index >= len(package.entries):
         raise IndexError(f"Entry index out of range: {entry_index}")
     prop = package._property(prop_name)

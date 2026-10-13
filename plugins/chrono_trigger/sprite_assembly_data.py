@@ -7,11 +7,12 @@ does not resize frames or tile lists. The odd stored source bit and all flag
 bits except documented flip-X are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 ASSEMBLY_RE = re.compile(r"^Game/chara/cell/c(\d+)\.cel$", re.IGNORECASE)
@@ -25,7 +26,7 @@ def _signed(value: int) -> int:
 
 
 def _signed_byte(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not -128 <= number <= 127:
         raise ValueError(f"{name} must be between -128 and 127")
     return number & 0xFF
@@ -36,7 +37,7 @@ def _decode_chip(value: int) -> tuple[int, bool]:
 
 
 def _encode_chip(chip: int, weird_bit: bool) -> int:
-    number = int(chip)
+    number = integer_value(chip, "Chip index")
     if not 0 <= number <= MAX_CHIP_INDEX:
         raise ValueError(f"Sprite assembly chip index must be between 0 and {MAX_CHIP_INDEX}")
     return (number & 0x07) | ((number & 0x7FF8) << 1) | (0x08 if weird_bit else 0)
@@ -112,6 +113,7 @@ def load_sprite_assemblies(store: OverlayStore, source: str = "mine") -> dict:
 def save_sprite_assembly(
     store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]
 ) -> dict:
+    validate_edits(edits)
     current = _parse(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -120,17 +122,25 @@ def save_sprite_assembly(
     output = bytearray(payload)
     seen = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Sprite assembly edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Sprite assembly token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate sprite assembly edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Sprite assembly values must be an object")
         unknown = set(values) - {"chipIndex", "x", "y", "flipHorizontal"}
         if unknown:
             raise ValueError(f"Unsupported sprite assembly fields: {', '.join(sorted(unknown))}")
+        if "flipHorizontal" in values and type(values["flipHorizontal"]) is not bool:
+            raise ValueError("Sprite flip must be a boolean")
         raw_chip = _encode_chip(values.get("chipIndex", row["chipIndex"]), row["weirdSourceBit"])
-        flags = row["unknownFlags"] | (0x01 if bool(values.get("flipHorizontal", row["flipHorizontal"])) else 0)
+        flags = row["unknownFlags"] | (0x01 if values.get("flipHorizontal", row["flipHorizontal"]) else 0)
         offset = row["byteOffset"]
         struct.pack_into("<H", output, offset, raw_chip)
         output[offset + 2] = _signed_byte("Sprite X", values.get("x", row["x"]))

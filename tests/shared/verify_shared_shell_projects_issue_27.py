@@ -53,7 +53,10 @@ assert 'status.className = `lex-project-source-status ${selectedSource?.enabled 
 assert '`${selectedSource.readOnly === false ? "📝"' not in framework
 assert 'class: "lex-save-count"' in framework and ".lex-save-count" in css
 assert re.search(r"--lex-command-row-height:\s*9vh;", css)
-assert "height: var(--lex-command-row-height)" in css
+command_row=re.search(r"\.lex-shell-command-row\s*\{([^}]+)\}",css,re.DOTALL)
+assert command_row
+for dimension in ('height','min-height','max-height'):
+    assert re.search(rf"(?<![\w-]){dimension}:\s*calc\(var\(--lex-command-row-height\)\s*\*\s*var\(--lex-ui-scale,\s*1\)\)",command_row[1]), dimension
 assert ".lex-brand-button h1" in css and "margin: 0" in css
 assert 'content: "⌄"' not in css
 assert ".lex-project-select::after" in css and "border-right:" in css and "rotate(45deg)" in css

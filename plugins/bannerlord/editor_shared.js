@@ -85,11 +85,8 @@ function filterSortRows(rows,key){
   const ui=uiState(key),needle=String(ui.query||"").trim().toLocaleLowerCase();
   let out=needle?rows.filter(row=>String(row.searchText||Object.values(row).filter(value=>typeof value!=="object").join(" ")).toLocaleLowerCase().includes(needle)):rows.slice();
   const sortKey=ui.sort?.key,dir=ui.sort?.dir||1;
-  if(sortKey)out=out.map((row,index)=>({row,index})).sort((a,b)=>{
-    const left=a.row[sortKey],right=b.row[sortKey];
-    const result=typeof left==="number"&&typeof right==="number"?left-right:String(left??"").localeCompare(String(right??""),undefined,{numeric:true,sensitivity:"base"});
-    return result?result*dir:a.index-b.index;
-  }).map(item=>item.row);
+  if(sortKey)out=out.map((row,index)=>({row,index})).sort((a,b)=>
+    LexeditorUI.compareRecords(a.row,b.row,{key:sortKey,dir})||a.index-b.index).map(item=>item.row);
   return out;
 }
 function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Search…",selected,setSelected,filters=[],emptyDetail,add,addDisabled,addDisabledReason}){
