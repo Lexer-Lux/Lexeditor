@@ -393,6 +393,23 @@ class CloneTests(unittest.TestCase):
             with self.subTest(spec=spec), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate(spec, "Grid")
 
+    def test_a_text_clone_can_point_at_another_menu_text_entry(self):
+        node = {"dialog": "data_simple_arms", "name": "text_mp", "clone": "text_receive_name",
+                "rect": [364, 292, 481, 320], "textId": 201081}
+        spec = menu_layout.validate({"version": 1, "nodes": [node]}, "Mod")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(dcx(drb()), [spec])))
+        _kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "text_mp").shape)
+        _kind, source = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "text_receive_name").shape)
+        self.assertEqual(struct.unpack_from("<i", blob, 40)[0], 201081)
+        self.assertEqual(struct.unpack_from("<i", source, 40)[0], 102125, "the source keeps its text")
+        # Dynamic text has no entry to repoint, and the id is a number.
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.Drb(drb()).add_clone("data_simple_arms", "x", "text_param_receive",
+                                             [515, 292, 615, 320], 5)
+        for bad in (-1, "201081", True):
+            with self.subTest(bad=bad), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "nodes": [{**node, "textId": bad}]}, "Mod")
+
     def test_compose_merges_clones_and_refuses_overlaps(self):
         original = dcx(drb(CLONES))
         first = menu_layout.validate({"version": 1, "nodes": [

@@ -49,6 +49,7 @@ DLGO_SIZE = 32
 DLG_SIZE = 64
 TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
+TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
 MAX_SIZE = 4096
@@ -288,12 +289,15 @@ class Drb:
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
         self._insert(dialog, name, text_type, bytes(shape), static_type, control)
 
-    def add_clone(self, dialog: str, name: str, source: str, rect) -> None:
+    def add_clone(self, dialog: str, name: str, source: str, rect, text_id: int | None = None) -> None:
         """A copy of an existing node under a new name and rectangle.
 
         The clone shares its source's shape and control bytes (and so a
         Dialog node's content reference): a grid cell copies its row's own
-        cell, never a strip whose reference varies per index.
+        cell, never a strip whose reference varies per index. `text_id`
+        repoints a menu-text node (not dynamic text) at another menu text
+        entry (shape bytes 40-43), such as a template whose <?tag?> the
+        game fills.
         """
         self._check_name(dialog, name)
         if not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect):
@@ -307,6 +311,10 @@ class Drb:
             raise LayoutError(f"{dialog}/{source} has no rectangle to place")
         shape = bytearray(blob)
         struct.pack_into("<4h", shape, 0, left, top, right, bottom)
+        if text_id is not None:
+            if _kind != "Text" or len(blob) < TEXT_ID_AT + 4 or blob[31] == DYNAMIC:
+                raise LayoutError(f"{dialog}/{source} is not a menu-text node, so it has no text id")
+            struct.pack_into("<i", shape, TEXT_ID_AT, text_id)
         shape_type = struct.unpack_from("<i", self.sections["SHAP"][0], node.shape)[0]
         self._insert(dialog, name, shape_type, bytes(shape), *self._static_control(dialog, node))
 
@@ -422,6 +430,7 @@ def validate(spec: object, owner: str) -> dict:
     text = {"dialog", "name", "lookLike", "dy", "length"}
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
     clone = {"dialog", "name", "clone", "rect"}
+    clone_keys = (clone, clone | {"textId"})
     text_keys = (text, text | {"left"}, text | {"dx"}, text | {"left", "dx"})
     sprite_keys = tuple(sprite | set(extra) for extra in
                         ((), ("dx",), ("size",), ("uv",), ("dx", "size"), ("dx", "uv"),
@@ -429,11 +438,11 @@ def validate(spec: object, owner: str) -> dict:
     clean = []
     for node in nodes:
         keys = set(node) if isinstance(node, dict) else set()
-        if keys not in text_keys + sprite_keys + (clone,):
+        if keys not in text_keys + sprite_keys + clone_keys:
             raise LayoutError(f"{owner}: a layout node is text "
                               f"({', '.join(sorted(text))}, optional left and dx), "
                               f"a sprite ({', '.join(sorted(sprite))}, optional dx, size and uv) "
-                              f"or a clone ({', '.join(sorted(clone))})")
+                              f"or a clone ({', '.join(sorted(clone))}, optional textId)")
         if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout node names must be text")
         for key in ("lookLike", "clone"):
@@ -457,6 +466,8 @@ def validate(spec: object, owner: str) -> dict:
                     or not all(0 <= value <= 32767 for value in uv) or not uv[0] < uv[2] or not uv[1] < uv[3]):
                 raise LayoutError(f"{owner}: a sprite uv is four whole texture coordinates, "
                                   "left < right, top < bottom")
+        if "textId" in node and (type(node["textId"]) is not int or not 0 <= node["textId"] <= 0x7FFFFFFF):
+            raise LayoutError(f"{owner}: a clone textId is a menu text entry number")
         if "dx" in node and type(node["dx"]) is not int:
             raise LayoutError(f"{owner}: dx must be a whole number of layout units")
         clean.append(dict(node))
@@ -492,7 +503,8 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
         seen[key] = owner
         try:
             if "clone" in node:
-                layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"])
+                layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"],
+                                 node.get("textId"))
             elif "sprite" in node:
                 layout.add_sprite(node["dialog"], node["name"], tuple(node["sprite"]), node["lookLike"],
                                   node["dy"], node["color"], node.get("dx", 0), node.get("size"),
