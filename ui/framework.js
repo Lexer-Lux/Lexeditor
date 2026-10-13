@@ -471,6 +471,153 @@
     }, element("span", {class: "lex-new-button-plus", "aria-hidden": "true"}, "+"));
   };
 
+  // Actions that wait quietly over their host: invisible until the host is
+  // hovered, half-visible then, and full under the pointer or keyboard
+  // focus. hoverActions(host, {actions, align, label, overlay}) marks the
+  // host, adds the bar and returns it. Each action either builds a square
+  // button ({key, label, title, icon, className, disabled, onClick}) or
+  // adopts a ready-made one ({key, node}). An inline bar sits in the flow
+  // instead of overlaying the host's corner.
+  const HOVER_ALIGN = {"top-left": "lex-hover-actions-tl", "top-right": "lex-hover-actions-tr",
+    "bottom-left": "lex-hover-actions-bl", "bottom-right": "lex-hover-actions-br"};
+  const hoverActions = (host, options = {}) => {
+    const bar = element("div", {
+      class: ["lex-hover-actions", HOVER_ALIGN[options.align] || "lex-hover-actions-tr",
+        options.overlay === false ? "lex-hover-actions-inline" : ""].filter(Boolean).join(" "),
+      role: "toolbar", "aria-label": options.label || "Actions",
+    }, ...(options.actions || []).map(action => {
+      if (action.node instanceof Element) {
+        if (action.key) action.node.dataset.hoverAction = action.key;
+        return action.node;
+      }
+      return element("button", {
+        type: "button", disabled: !!action.disabled,
+        class: ["lex-new-button", "lex-hover-action", action.className || ""].filter(Boolean).join(" "),
+        ...(action.key ? {"data-hover-action": action.key} : {}),
+        title: action.title || action.label || "",
+        "aria-label": action.label || action.title || "Action",
+        onclick: event => action.onClick?.(event),
+      }, action.icon || action.label || "");
+    }));
+    if (host instanceof Element) {
+      host.classList.add("lex-hover-actions-host");
+      host.append(bar);
+    }
+    return bar;
+  };
+
+  // A tab strip for caller-owned tabs (collapsible panels, detail panels):
+  // given order, no shortcuts, optional dev rename. Not subtabBar: that one
+  // sorts, and its rename keys belong to page subtabs.
+  const tabStrip = (options = {}) => {
+    const bar = element("div", {
+      class: ["lex-tabstrip", options.className || ""].filter(Boolean).join(" "),
+      role: "tablist", "aria-label": options.label || "Views",
+    });
+    const buttons = new Map();
+    for (const tab of options.tabs || []) {
+      const on = tab.id === options.active;
+      const button = element("button", {type: "button",
+        class: ["lex-subtab-button", "lex-tabstrip-button", on ? "active" : ""].filter(Boolean).join(" "),
+        role: "tab", "aria-selected": String(on), tabindex: on ? "0" : "-1",
+        "data-tabstrip-id": tab.id,
+        onclick: () => options.change?.(tab.id),
+      }, element("span", {class: "lex-tab-label lex-tabstrip-label"}, tab.label ?? tab.id));
+      if (typeof options.onRename === "function") {
+        button.addEventListener("dblclick", event => {
+          if (!sharedSettingsSnapshot?.developerMode) return;
+          event.preventDefault();
+          event.stopPropagation();
+          options.onRename(tab.id, button);
+        });
+      }
+      if (options.holdToSave) holdToSaveDefaultView(button);
+      bar.append(button);
+      buttons.set(tab.id, button);
+    }
+    bar.setActive = id => {
+      for (const [key, button] of buttons) {
+        const on = key === id;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-selected", String(on));
+        button.tabIndex = on ? 0 : -1;
+      }
+    };
+    bar.setLabel = (id, label) => {
+      buttons.get(id)?.querySelector(".lex-tabstrip-label")?.replaceChildren(label);
+    };
+    return bar;
+  };
+
+  // A side panel that shrinks to a clickable handle and expands pushing its
+  // siblings over. {tabs:[{id,label,content}], active, onChange, side, label,
+  // width, collapsed, viewKey, className, attrs}. Collapse state stays
+  // personal (plain localStorage, never shipped); pass no viewKey for
+  // session-only memory.
+  const collapsiblePanel = (options = {}) => {
+    const side = options.side === "right" ? "right" : "left";
+    const storeKey = options.viewKey ? `lex-collapsible-${options.viewKey}` : null;
+    const stored = name => {
+      try { return storeKey ? localStorage.getItem(`${storeKey}.${name}`) : null; }
+      catch (_error) { return null; }
+    };
+    const remember = (name, value) => {
+      if (!storeKey) return;
+      try { localStorage.setItem(`${storeKey}.${name}`, value); } catch (_error) {}
+    };
+    const tabs = options.tabs || [];
+    const root = element("section", {
+      ...(options.attrs || {}),
+      class: ["lex-collapsible-panel", `lex-collapsible-${side}`, options.className || ""].filter(Boolean).join(" "),
+      "aria-label": options.label || "Side panel",
+    });
+    const panes = new Map();
+    const paneBox = element("div", {class: "lex-collapsible-panes"},
+      ...tabs.map(tab => {
+        const pane = element("div", {class: "lex-collapsible-pane", role: "tabpanel",
+          "data-tabstrip-pane": tab.id}, tab.content || []);
+        panes.set(tab.id, pane);
+        return pane;
+      }));
+    const show = id => {
+      const next = tabs.some(tab => tab.id === id) ? id : tabs[0]?.id;
+      if (next === undefined) return;
+      strip.setActive(next);
+      for (const [key, pane] of panes) pane.hidden = key !== next;
+      remember("tab", next);
+      options.onChange?.(next);
+    };
+    const strip = tabs.length ? tabStrip({tabs, active: stored("tab") || options.active,
+      label: options.label || "Side panel views", className: "lex-collapsible-tabs",
+      change: show, holdToSave: true}) : null;
+    const body = element("div", {class: "lex-collapsible-body"},
+      strip || null, tabs.length ? paneBox : (options.content || []));
+    const chevron = element("span", {class: "lex-collapsible-chevron", "aria-hidden": "true"});
+    const handle = element("button", {type: "button", class: "lex-collapsible-handle",
+      onclick: () => setCollapsed(!root.classList.contains("lex-collapsible-collapsed")),
+    }, element("span", {class: "lex-collapsible-grip", "aria-hidden": "true"}),
+      chevron,
+      element("span", {class: "lex-collapsible-tag", "aria-hidden": "true"}, options.label || ""));
+    const setCollapsed = collapsed => {
+      root.classList.toggle("lex-collapsible-collapsed", collapsed);
+      root.style.width = collapsed ? "" : (options.width || "320px");
+      handle.setAttribute("aria-expanded", String(!collapsed));
+      const name = options.label || "side panel";
+      handle.setAttribute("aria-label", collapsed ? `Expand ${name}` : `Collapse ${name}`);
+      handle.title = collapsed ? `Expand ${name}` : `Collapse ${name}`;
+      const inward = side === "left" ? "\u2039" : "\u203A";
+      const outward = side === "left" ? "\u203A" : "\u2039";
+      chevron.textContent = collapsed ? outward : inward;
+      remember("collapsed", collapsed ? "1" : "0");
+    };
+    root.append(body, handle);
+    if (strip) show(stored("tab") || options.active);
+    setCollapsed(stored("collapsed") !== null ? stored("collapsed") === "1" : !!options.collapsed);
+    root.setCollapsed = setCollapsed;
+    root.showTab = show;
+    return root;
+  };
+
   let infoHelpSequence = 0;
   let activeHelpPopup = null;
 
@@ -1197,6 +1344,222 @@
   const breakableName = value => typeof value !== "string" ? [value]
     : value.split(/(?<=[_./\\])(?=.)/).flatMap((part, index) => index ? [element("wbr"), part] : [part]);
 
+  // Detail tabs a developer arranges: right-click a panel heading to add a
+  // tab, drag properties or whole sections onto tabs. Layouts live under one
+  // localStorage key per page, so the shipped-default flow carries them for
+  // everyone; shapes are hashed, so each distinct panel shape keeps its own.
+  // Panels render one column; nothing paginates anymore.
+  const detailTabsKey = () => `${shellPluginId()}-${activePageTab()}.detailtabs`;
+  const detailNodeKey = (node, seen) => {
+    const base = node.classList.contains("lex-detail-section")
+      ? `s:${node.dataset.lexLayoutSection ?? node.getAttribute("aria-label") ?? node.tagName}`
+      : node.classList.contains("lex-detail-field")
+        ? `f:${node.dataset.lexLayoutField ?? node.tagName}`
+        : `n:${node.tagName}`;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return count > 1 ? `${base}#${count}` : base;
+  };
+  const loadDetailLayouts = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(detailTabsKey()) || "");
+      if (parsed && typeof parsed === "object" && parsed.shapes) return parsed;
+    } catch (_error) {}
+    return {shapes: {}};
+  };
+  const saveDetailLayouts = (shape, layout) => {
+    const all = loadDetailLayouts();
+    all.shapes[shape] = {...layout, updatedAt: Date.now()};
+    const entries = Object.entries(all.shapes).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+    all.shapes = Object.fromEntries(entries.slice(0, 12));
+    try { localStorage.setItem(detailTabsKey(), JSON.stringify(all)); } catch (_error) {}
+  };
+  const detailBody = (bodyClass, body) => {
+    const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
+    const box = element("div", {class: bodyClass}, nodes);
+    const ctx = detailTabsContext(box);
+    box._detailTabs = ctx;
+    ctx.render();
+    return box;
+  };
+  const detailTabsContext = box => {
+    const dev = () => !!sharedSettingsSnapshot?.developerMode;
+    const seen = new Map();
+    const home = [...box.childNodes];
+    const nodeByKey = new Map();
+    const shells = new Map();
+    const fields = new Map();
+    const order = [];
+    const keyNodes = node => {
+      const key = detailNodeKey(node, seen);
+      nodeByKey.set(key, node);
+      return key;
+    };
+    for (const node of home) {
+      if (!(node instanceof Element)) continue;
+      const key = keyNodes(node);
+      order.push(key);
+      if (node.classList.contains("lex-detail-section")) {
+        const content = node.querySelector(":scope > .lex-detail-section-content") || node;
+        const kids = [...content.childNodes];
+        const keys = [];
+        for (const field of content.querySelectorAll(":scope > .lex-detail-field")) {
+          const fkey = keyNodes(field);
+          fields.set(fkey, field);
+          keys.push(fkey);
+        }
+        shells.set(key, {node, content, kids, fields: keys});
+      } else if (node.classList.contains("lex-detail-field")) {
+        fields.set(key, node);
+      }
+    }
+    const shape = textDigest([...nodeByKey.keys()].sort().join("\n"));
+    const stored = loadDetailLayouts().shapes[shape];
+    const layout = stored && Array.isArray(stored.tabs) ? {
+      tabs: stored.tabs.filter(tab => tab && tab.id).map(tab => ({id: String(tab.id), label: tab.label ?? String(tab.id)})),
+      shells: stored.shells || {},
+      fields: stored.fields || {},
+      active: stored.active ?? null,
+    } : {tabs: [], shells: {}, fields: {}, active: null};
+    const persist = () => saveDetailLayouts(shape, layout);
+    const tabIds = () => layout.tabs.map(tab => tab.id);
+    const firstTab = () => layout.tabs[0]?.id;
+    const validTab = id => tabIds().includes(id) ? id : firstTab();
+    const shellTab = key => validTab(layout.shells[key]);
+    const fieldTab = key => {
+      if (layout.fields[key] !== undefined) return validTab(layout.fields[key]);
+      for (const [skey, shell] of shells) if (shell.fields.includes(key)) return shellTab(skey);
+      return firstTab();
+    };
+    let strip = null;
+    const panes = new Map();
+    const show = id => {
+      const next = validTab(id);
+      layout.active = next;
+      persist();
+      strip?.setActive(next);
+      for (const [key, pane] of panes) pane.hidden = key !== next;
+    };
+    const enableDrag = () => {
+      for (const [key, field] of fields) {
+        field.draggable = true;
+        if (field._detailDragKey) continue;
+        field._detailDragKey = key;
+        field.addEventListener("dragstart", event => {
+          if (!dev()) { event.preventDefault(); return; }
+          event.dataTransfer.setData("text/lex-detail-node", JSON.stringify({key: field._detailDragKey, shell: false}));
+          event.dataTransfer.effectAllowed = "move";
+          field.classList.add("lex-dragging");
+        });
+        field.addEventListener("dragend", () => field.classList.remove("lex-dragging"));
+      }
+      for (const [key, shell] of shells) {
+        const title = shell.node.querySelector(":scope > .lex-detail-section-title");
+        if (!title || title._detailDragKey) continue;
+        title.draggable = true;
+        title._detailDragKey = key;
+        title.addEventListener("dragstart", event => {
+          if (!dev()) { event.preventDefault(); return; }
+          event.dataTransfer.setData("text/lex-detail-node", JSON.stringify({key: title._detailDragKey, shell: true}));
+          event.dataTransfer.effectAllowed = "move";
+          shell.node.classList.add("lex-dragging");
+        });
+        title.addEventListener("dragend", () => shell.node.classList.remove("lex-dragging"));
+      }
+    };
+    const render = () => {
+      box.querySelector(":scope > .lex-detail-tabstrip-wrap")?.remove();
+      for (const pane of panes.values()) {
+        while (pane.firstChild) box.append(pane.firstChild);
+        pane.remove();
+      }
+      panes.clear();
+      for (const shell of shells.values()) for (const kid of shell.kids) shell.content.append(kid);
+      for (const node of home) box.append(node);
+      if (!layout.tabs.length) return;
+      const wrap = element("div", {class: "lex-detail-tabstrip-wrap"});
+      strip = tabStrip({tabs: layout.tabs, active: validTab(layout.active), label: "Detail views",
+        className: "lex-detail-tabs", change: show,
+        onRename: async id => {
+          const tab = layout.tabs.find(entry => entry.id === id);
+          const label = await promptText({title: "Rename detail tab", label: "Tab name",
+            value: tab?.label || "", confirmLabel: "Rename"});
+          if (!label) return;
+          tab.label = label;
+          persist();
+          strip.setLabel(id, label);
+        },
+        holdToSave: true});
+      for (const button of strip.querySelectorAll(".lex-tabstrip-button")) {
+        button.addEventListener("dragover", event => {
+          if (!dev() || ![...event.dataTransfer.types].includes("text/lex-detail-node")) return;
+          event.preventDefault();
+          button.classList.add("lex-drop-target");
+        });
+        button.addEventListener("dragleave", () => button.classList.remove("lex-drop-target"));
+        button.addEventListener("drop", event => {
+          button.classList.remove("lex-drop-target");
+          if (!dev()) return;
+          event.preventDefault();
+          let dropped = null;
+          try { dropped = JSON.parse(event.dataTransfer.getData("text/lex-detail-node")); } catch (_error) {}
+          if (!dropped || !tabIds().includes(button.dataset.tabstripId)) return;
+          if (dropped.shell && shells.has(dropped.key)) {
+            layout.shells[dropped.key] = button.dataset.tabstripId;
+            for (const fkey of shells.get(dropped.key).fields) delete layout.fields[fkey];
+          } else if (fields.has(dropped.key)) {
+            layout.fields[dropped.key] = button.dataset.tabstripId;
+          } else {
+            return;
+          }
+          persist();
+          render();
+        });
+      }
+      wrap.append(strip);
+      box.prepend(wrap);
+      for (const tab of layout.tabs) {
+        const pane = element("div", {class: "lex-detail-tabpane", role: "tabpanel",
+          "data-tabstrip-pane": tab.id, hidden: tab.id !== validTab(layout.active)});
+        panes.set(tab.id, pane);
+        box.append(pane);
+      }
+      const dealt = [];
+      for (const key of order) {
+        const node = nodeByKey.get(key);
+        if (!node) continue;
+        if (shells.has(key)) {
+          const here = shellTab(key);
+          const stays = shells.get(key).fields.filter(fkey => fieldTab(fkey) === here);
+          if (!stays.length && shells.get(key).fields.length) continue;
+          panes.get(here)?.append(node);
+          for (const fkey of shells.get(key).fields) {
+            if (fieldTab(fkey) !== here && fields.get(fkey)) dealt.push([fieldTab(fkey), fields.get(fkey)]);
+          }
+        } else {
+          panes.get(fields.has(key) ? fieldTab(key) : firstTab())?.append(node);
+        }
+      }
+      for (const [tab, field] of dealt) panes.get(tab)?.append(field);
+    };
+    const addTab = async () => {
+      const label = await promptText({title: "New detail tab", label: "Tab name", confirmLabel: "Create"});
+      if (!label) return;
+      let id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "tab";
+      if (tabIds().includes(id)) {
+        let serial = 2;
+        while (tabIds().includes(`${id}-${serial}`)) serial++;
+        id = `${id}-${serial}`;
+      }
+      layout.tabs.push({id, label});
+      layout.active = id;
+      persist();
+      render();
+    };
+    enableDrag();
+    return {render, addTab};
+  };
+
   const detailPanel = (options = {}) => {
     options = adoptBodyAudio(options);
     const sound = options.audio?.src ? recordAudio(options.audio) : null;
@@ -1277,10 +1640,16 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
       sound ? sound.scrub : null);
     if (sound && heading) heading.classList.add("lex-audio-heading");
+    const bodyBox = detailBody(bodyClass, options.body);
+    if (heading) heading.addEventListener("contextmenu", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      bodyBox._detailTabs?.addTab();
+    });
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, sectionFlow(bodyClass, options.body, options.paginate));
+    }, heading, bodyBox);
   };
   // Every record pane lays its sections out the same way: in as many columns
   // as the pane is wide, a section too tall for its column going on in the
@@ -4204,6 +4573,41 @@
     backdrop.append(dialog);
     document.body.append(backdrop);
     confirm.focus();
+  });
+
+  // A dialog that asks for a name. Resolves the trimmed answer, or null
+  // when dismissed.
+  const promptText = (options = {}) => new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
+    const input = element("input", {type: "text", class: "lex-dialog-input",
+      value: String(options.value ?? ""), "aria-label": String(options.label || options.title || "Name")});
+    const cancel = element("button", {class: "lex-dialog-action", text: String(options.cancelLabel || "Cancel")});
+    const confirm = element("button", {class: "lex-dialog-action primary",
+      text: String(options.confirmLabel || "Create")});
+    const dialog = element("section", {class: "lex-dialog lex-prompt-dialog", role: "dialog", "aria-modal": "true"},
+      element("h2", {text: String(options.title || "Name")}),
+      options.message ? element("p", {class: "lex-important-message"}, String(options.message)) : null,
+      element("div", {class: "lex-dialog-field"}, input),
+      element("div", {class: "lex-dialog-actions"}, cancel, confirm));
+    const finish = answer => {
+      backdrop.remove();
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus?.();
+      resolve(answer);
+    };
+    const onKey = event => {
+      if (event.key === "Escape") finish(null);
+      else if (event.key === "Enter") finish(input.value.trim() || null);
+    };
+    cancel.onclick = () => finish(null);
+    confirm.onclick = () => finish(input.value.trim() || null);
+    backdrop.onclick = event => { if (event.target === backdrop) finish(null); };
+    document.addEventListener("keydown", onKey);
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    input.focus();
+    input.select();
   });
 
   // One ReShade, managed by Lexeditor; one preset per mod, carried by the mod.
@@ -10764,7 +11168,7 @@ ${contents.path}`});
       event.preventDefault();
       showToast(addWhy);
     }, {capture: true});
-    masterNode.append(tableAdd);
+    hoverActions(masterNode, {label: "Table actions", overlay: false, actions: [{node: tableAdd}]});
     if (emptyRow) {
       const toggle = element("input", {
         type: "checkbox", checked: hideEmpty, "aria-label": "Hide empty slots",
@@ -12612,7 +13016,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
