@@ -386,3 +386,30 @@ def test_saving_clears_a_rebuilt_mods_alert_mark(page):
     page.locator("#global-save").click()
     page.wait_for_function("window.saved === true")
     page.wait_for_function("!document.querySelector('.lex-column-list .lex-conflict-mark')")
+
+
+def test_mods_detail_switch_fits_its_header(page):
+    # The enable switch is square and never outgrows a short header.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    switch = page.get_by_role("checkbox", name="Mine enabled")
+    switch.wait_for()
+    heading = page.locator(".lex-mods-page .lex-detail-panel-heading")
+    page.wait_for_function("""() => {
+      const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
+      const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
+      return box && head && box.getBoundingClientRect().width > 0 && head.getBoundingClientRect().height > 0;
+    }""")
+    for _ in range(2):
+        box, head = switch.bounding_box(), heading.bounding_box()
+        assert box["width"] == box["height"] > 0, box
+        assert box["y"] >= head["y"] - 1 and box["y"] + box["height"] <= head["y"] + head["height"] + 1, (box, head)
+        assert box["x"] >= head["x"] and box["x"] + box["width"] <= head["x"] + head["width"], (box, head)
+        # A short header shrinks the switch instead of clipping it.
+        page.evaluate("""() => {
+          const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
+          head.style.padding = "0";
+          head.querySelector(".lex-detail-panel-title").style.fontSize = "10px";
+        }""")
+        page.wait_for_timeout(150)
+
