@@ -5599,7 +5599,7 @@
     {id: "info", keys: ["F1"], label: "Open or close the information page"},
     {id: "datamap", keys: ["Ctrl", "M"], label: "Open or close the Data Map"},
     {id: "launch", keys: ["Ctrl", "Enter"], label: "Launch the game"},
-    {id: "restart", keys: ["Ctrl", "Shift", "R"], label: "Restart the plugin", developer: true},
+    {id: "restart", keys: ["Ctrl", "Shift", "R"], label: "Restart Lexeditor", developer: true},
   ];
 
   // Matched on event.code, the physical key, so a Dvorak or AZERTY layout gets
@@ -8185,7 +8185,7 @@ ${contents.path}`});
     }, githubLogo());
     const restart = element("button", {
       id: "plugin-restart", class: "lex-window-button",
-      title: "Restart this plugin", "aria-label": "Restart this plugin",
+      title: "Restart Lexeditor", "aria-label": "Restart Lexeditor",
       "data-lex-history-control": true,
     }, restartIcon());
     const projectControl = mountProjectControl(options, context);
@@ -8295,23 +8295,16 @@ ${contents.path}`});
       }
     };
     brand.onclick = () => { playThemeSound("exit"); return returnToMainMenu(options, leaveForMainMenu); };
-    const restartPlugin = async () => {
-      const opened = await callWindow("restart_plugin", options.plugin.id);
-      if (!opened?.url) throw new Error("The desktop host did not return a restart address. Close and reopen Lexeditor if this continues.");
+    const restartLexeditor = async () => {
+      const started = await callWindow("restart_lexeditor");
+      if (!started?.restarting) throw new Error("The desktop host did not restart. Close and reopen Lexeditor if this continues.");
+      // The window is closing and a fresh process is starting; stay marked
+      // navigating so the button never re-arms under the old page.
       window.__lexeditorNavigating = true;
-      // A restart is still a load, so it gets a real loading message rather
-      // than dropping through to the fallback text.
-      const destination = new URL(opened.url, location.href);
-      // The old service has stopped. Navigate immediately; optional quote
-      // retrieval must never keep the discard dialog waiting on another bridge call.
-      destination.searchParams.set("lexTransition", "load");
-      destination.searchParams.set("lexLoadStarted", String(Date.now()));
-      location.href = destination.href;
       return true;
     };
-    // One restart at a time. A second click while the first was still starting
-    // the new service started a third, which shut down the service the page
-    // had just been sent to: "Failed to fetch", and a page left pointing at it.
+    // One restart at a time. A second click while the window is closing is
+    // ignored; the host also refuses a second restart once one is underway.
     let restarting = false;
     restart.onclick = async () => {
       if (restarting) return;
@@ -8319,13 +8312,13 @@ ${contents.path}`});
       restart.disabled = true;
       restart.classList.add("busy");
       try {
-        await confirmUnsavedExit(options, restartPlugin, {
+        await confirmUnsavedExit(options, restartLexeditor, {
           title: "Unsaved changes",
-          question: "Save before restarting this plugin?",
+          question: "Save before restarting Lexeditor?",
           discardLabel: "Restart Without Saving",
           saveLabel: "Save and Restart",
-          exitError: "Could not restart the plugin",
-          pendingLabel: "Restarting plugin…",
+          exitError: "Could not restart Lexeditor",
+          pendingLabel: "Restarting Lexeditor…",
         });
       } finally {
         if (!window.__lexeditorNavigating) {

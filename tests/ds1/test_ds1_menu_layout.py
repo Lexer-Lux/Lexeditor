@@ -476,6 +476,20 @@ class OffsetTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate({"version": 1, "nodes": [bad]}, "Mod")
 
+    def test_sprite_uv_repoints_the_texture_region(self):
+        node = {"dialog": "data_simple_arms", "name": "icon_strip",
+                "sprite": ["list_armor", "icon_tolerance_sa"], "lookLike": "icon_receive",
+                "dy": 30, "color": "ffffffff", "uv": [6, 516, 138, 540]}
+        spec = menu_layout.validate({"version": 1, "nodes": [node]}, "Mod")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(dcx(drb()), [spec])))
+        _kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "icon_strip").shape)
+        _kind, source = layout._blob("SHAP", "SHPR", layout.node("list_armor", "icon_tolerance_sa").shape)
+        self.assertEqual(struct.unpack_from("<4h", blob, 16), (6, 516, 138, 540))
+        self.assertEqual(blob[24:32], source[24:32])
+        for uv in ([6, 516, 138], [138, 516, 6, 540], [6, -1, 138, 540], [6, 516, 138, True], "blue"):
+            with self.subTest(uv=uv), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "nodes": [{**node, "uv": uv}]}, "Mod")
+
 
 if __name__ == "__main__":
     unittest.main()
