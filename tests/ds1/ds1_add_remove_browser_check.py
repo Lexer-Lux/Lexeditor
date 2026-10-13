@@ -72,10 +72,10 @@ def main():
                     page.wait_for_function("!state.rows.some(r=>r.id===103) && !state.rowBusy && !state.error")
                     page.locator("#global-save").click()
                     page.wait_for_function("state.dirty===0 && state.pending===0")
-                    # Areas: duplicate a placement, move it, save, reload, remove.
-                    page.locator('[data-tab="areas"]').click()
+                    # Maps: duplicate a placement, move it, save, reload, remove.
+                    page.locator('[data-tab="maps"]').click()
                     page.wait_for_function(
-                        'state.tab==="areas" && state.rows.some(r=>r.id==="2:0") && !state.error')
+                        'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
                     page.wait_for_function("document.querySelectorAll('.lex-list-row').length===3")
                     page.locator(".lex-list-row", has_text="enemy0").click()
                     page.wait_for_function('state.row?.id==="2:0" && !state.error')
@@ -83,14 +83,14 @@ def main():
                     page.wait_for_function(
                         'state.selected==="m10_00_00_00.msb:2:1" && state.row?.id==="2:1" && !state.rowBusy && !state.error')
                     if output:
-                        page.screenshot(path=str(output / "add-remove-areas.png"))
+                        page.screenshot(path=str(output / "add-remove-maps.png"))
                     page.locator("#global-save").click()
                     page.wait_for_function("state.dirty===0 && state.pending===0")
                     page.reload()
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    page.locator('[data-tab="areas"]').click()
+                    page.locator('[data-tab="maps"]').click()
                     page.wait_for_function(
-                        'state.tab==="areas" && state.rows.some(r=>r.id==="2:1") && !state.error')
+                        'state.tab==="maps" && state.rows.some(r=>r.id==="2:1") && !state.error')
                     assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 4
                     page.wait_for_function("document.querySelectorAll('.lex-list-row').length===4")
                     page.locator(".lex-list-row", has_text="enemy0_1").click()
@@ -103,9 +103,9 @@ def main():
                     page.wait_for_function("state.dirty===0 && state.pending===0")
                     page.reload()
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    page.locator('[data-tab="areas"]').click()
+                    page.locator('[data-tab="maps"]').click()
                     page.wait_for_function(
-                        'state.tab==="areas" && !state.rows.some(r=>r.id==="2:1") && !state.error')
+                        'state.tab==="maps" && !state.rows.some(r=>r.id==="2:1") && !state.error')
                     assert not errors, errors
                 finally:
                     browser.close()

@@ -1,4 +1,4 @@
-"""Data Map opens the Areas and Animations tabs from their folders."""
+"""Data Map opens the Maps and Animations tabs from their folders."""
 from pathlib import Path
 import sys
 
@@ -24,14 +24,14 @@ def test_area_folders_absent_leaves_current_rows(tmp_path):
     assert not [row for row in rows if row['id'].startswith('area:')]
 
 
-def test_maps_open_areas_while_characters_open_animations(tmp_path):
+def test_maps_open_maps_while_characters_open_animations(tmp_path):
     rows = data_map.payload(make_store(tmp_path, ('map', 'chr')))['rows']
     areas = {row['id']: row for row in rows if row['id'].startswith('area:')}
     assert set(areas) == {'area:maps', 'area:characters'}
     maps = areas['area:maps']
     assert maps['coverage'] == 'structured' and maps['status'] == 'partial' and maps['openable']
-    assert (maps['target'], maps['sub']) == ('areas', 'placements')
-    assert maps['targets'] == [{'id': 'areas', 'label': 'Areas'}]
+    assert (maps['target'], maps['sub']) == ('maps', 'placements')
+    assert maps['targets'] == [{'id': 'maps', 'label': 'Maps'}]
     assert 'left untouched' in maps['notes']
     characters = areas['area:characters']
     assert characters['coverage'] == 'structured' and characters['status'] == 'partial'

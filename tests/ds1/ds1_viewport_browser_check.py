@@ -1,4 +1,4 @@
-"""Render and edit the Areas viewport on synthetic map data, never game files.
+"""Render and edit the Maps viewport on synthetic map data, never game files.
 
 Phase one runs read-only with no mod: viewing maps must work for
 Vanilla readers, so the map switcher must not count as an edit attempt,
@@ -44,14 +44,14 @@ def make_game(temp):
 def open_viewport(page, session):
     page.goto(session.url)
     page.wait_for_selector('body[data-ds1-ready="true"]')
-    page.locator('button[data-tab="areas"]').click()
-    page.wait_for_function('state.tab==="areas" && state.sub==="placements" && state.rows.length>0 && !state.error')
+    page.locator('button[data-tab="maps"]').click()
+    page.wait_for_function('state.tab==="maps" && state.sub==="placements" && state.rows.length>0 && !state.error')
     # State updates before render, so the strip needs its own
     # wait; the previous tab's strip would pass a bare assert.
     page.wait_for_selector('[data-subtab="viewport"]')
     assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['placements', 'viewport']
     page.locator('[data-subtab="viewport"]').click()
-    page.wait_for_function('state.tab==="areas" && state.sub==="viewport" && state.mapView && !state.error')
+    page.wait_for_function('state.tab==="maps" && state.sub==="viewport" && state.mapView && !state.error')
     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
 
 

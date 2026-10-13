@@ -141,9 +141,9 @@ class Handler(PluginRequestHandler):
                             count = len(MAPSTORE.list_rows())
                         except (MsbError, OSError):
                             # Broken or missing map data must not take the
-                            # whole editor down; Areas reports it when opened.
+                            # whole editor down; Maps reports it when opened.
                             count = 0
-                        result['areaTabs'] = [{'id': 'placements', 'label': 'Placements',
+                        result['mapTabs'] = [{'id': 'placements', 'label': 'Placements',
                                                'table': 'Msb', 'count': count},
                                               {'id': 'viewport', 'label': 'Viewport',
                                                'table': 'MapView', 'count': len(MAPSTORE.maps())}]
