@@ -10733,7 +10733,18 @@ ${contents.path}`});
     // A column sort belongs to the list, not to the page: a table that holds
     // one page asked for this order, so apply it before the page is cut.
     const rowPreferenceKey = tableRowPreferenceKey(options);
-    const keptSort = pagedSortStates.get(rowPreferenceKey);
+    let keptSort = pagedSortStates.get(rowPreferenceKey);
+    // Every record list sorts by name, A to Z, until the reader picks
+    // a column: the shipped default. A click still wins for that table,
+    // and a page whose order is data (load order, time order, fixed
+    // slots) passes order "given" to keep it. Stored like a click, so
+    // the first click on Name flips to Z to A instead of re-sorting
+    // to the order already shown.
+    if (!keptSort && options.order !== "given") {
+      keptSort = {key: "name", dir: 1,
+        compare: (left, right) => compareRecords(left, right, {key: "name"})};
+      pagedSortStates.set(rowPreferenceKey, keptSort);
+    }
     if (keptSort && typeof keptSort.compare === "function") {
       records = [...records].sort((left, right) => keptSort.compare(left, right) * keptSort.dir);
     }
@@ -12788,6 +12799,7 @@ ${contents.path}`});
       const filtered = rows().filter(row => `${row.name} ${row.author || ""}`.toLowerCase().includes(query.toLowerCase()));
       if (!filtered.some(row => keyOf(row) === selected)) selected = filtered[0] ? keyOf(filtered[0]) : null;
       const view = pagedListDetail({className: "lex-mods-page", rows: filtered, key: keyOf, selected, slots: false, noun: "mods",
+        order: "given",
         page, pageSize, defaultSplit: 40, minLeft: 260, minRight: 360, splitKey: `${pluginId}-mods`, rowsKey: `${pluginId}-mods`,
         search: {key: `${pluginId}-mods-search`, value: query, label: "Search mods", change: value => { query = value; page = 0; draw(); }},
         sync: next => { page = next.page; pageSize = next.pageSize; if (next.selected !== selected) { selected = next.selected; draw(); } },
