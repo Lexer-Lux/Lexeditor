@@ -8847,13 +8847,22 @@ ${contents.path}`});
       : String(a).localeCompare(String(b), undefined, {numeric: true, sensitivity: "base"});
     return result * (sort.dir || 1);
   };
-  const pinnedColumns = owner => owner.store.pinned.map(entry => ({
-    key: `pin:${entry.key}`, label: entry.label, sortable: true, pinnedProperty: entry.key,
-    sortValue: row => pinnedValue(row, entry.key) ?? "",
-    render: row => {
-      const shown = row?.display?.[entry.key] ?? pinnedValue(row, entry.key);
-      return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
-    }}));
+  const pinnedColumns = owner => owner.store.pinned.map(entry => {
+    const described = typeof owner.describe === "function" ? owner.describe(entry.key) : null;
+    const editable = !!described?.editable && typeof owner.commitCell === "function";
+    return {
+      key: `pin:${entry.key}`, label: entry.label, sortable: true, pinnedProperty: entry.key,
+      sortValue: row => pinnedValue(row, entry.key) ?? "",
+      numeric: described?.numeric === true,
+      min: described?.minimum, max: described?.maximum, step: described?.step,
+      choices: described?.choices || null,
+      editValue: row => row?.values?.[entry.key] ?? "",
+      edit: editable ? ((row, value) => owner.commitCell(row, entry.key, value)) : null,
+      render: row => {
+        const shown = row?.display?.[entry.key] ?? pinnedValue(row, entry.key);
+        return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
+      }};
+  });
   const autoPinDetail = (node, owner) => {
     for (const field of node.querySelectorAll(".lex-detail-field[data-lex-layout-field]")) {
       if (field.querySelector(".lex-column-pin")) continue;
@@ -9123,7 +9132,10 @@ ${contents.path}`});
       ? column.editor(row, commit)
       : (() => {
         const current=column.editValue ? column.editValue(row) : (row?.[column.key] ?? "");
-        const input = column.choices ? element("select", {}, ...column.choices.map(value=>element("option",{value},value)))
+        const input = column.choices ? element("select", {}, ...column.choices.map(entry => {
+          const [value, label] = Array.isArray(entry) ? entry : [entry, entry];
+          return element("option", {value: String(value)}, String(label));
+        }))
           : element("input", {type:column.numeric?"number":"text",min:column.min,max:column.max,step:column.step,value:current});
         input.value=String(current);
         if(column.choices)input.addEventListener("change",()=>commit(input.value));
@@ -9401,7 +9413,7 @@ ${contents.path}`});
         },
       }, content), column.key);
     }));
-    if (options.columnPreferences) {
+    if (options.columnPreferences || pinOwner?.move) {
       let drag = null;
       const clearTargets = () => header.querySelectorAll(".drag-target,.dragging")
         .forEach(node => node.classList.remove("drag-target", "dragging"));
@@ -9432,7 +9444,22 @@ ${contents.path}`});
           event.preventDefault();
           event.stopPropagation();
           suppressSortUntil = performance.now() + 250;
-          options.columnPreferences.move(drag.key, drag.target?.dataset.columnKey);
+          if (options.columnPreferences) options.columnPreferences.move(drag.key, drag.target?.dataset.columnKey);
+          else if (pinOwner?.move) {
+            const strip = key => String(key || "").startsWith("pin:") ? String(key).slice(4) : null;
+            const value = strip(drag.key);
+            if (value) {
+              let before = strip(drag.target?.dataset.columnKey);
+              if (before === null) {
+                // Dropped on a fixed column: the dragged pin goes to the
+                // near end of the pinned run, ahead of it when dropped left.
+                const headCells = [...header.querySelectorAll(".lex-column-list-head-cell")];
+                const firstPin = headCells.find(cell => String(cell.dataset.columnKey).startsWith("pin:"));
+                if (firstPin && headCells.indexOf(drag.target) < headCells.indexOf(drag.cell)) before = strip(firstPin.dataset.columnKey);
+              }
+              pinOwner.move(value, before);
+            }
+          }
         }
         clearTargets();
         drag = null;
@@ -9513,6 +9540,29 @@ ${contents.path}`});
     root.lexHeadingKey = JSON.stringify([template, options.class, header.textContent]);
     const cachedHeadingTemplate = columnHeadingWidths.get(root.lexHeadingKey);
     if (cachedHeadingTemplate) root.style.setProperty("--lex-column-list-template", cachedHeadingTemplate);
+    // An edit repaints its pinned cells in place. The rows array is shared
+    // with the plugin, so patched values show without rebuilding the table,
+    // which would steal focus from whatever is edited next.
+    const pinnedRefresh = new Map(columns
+      .filter(column => typeof column?.pinnedProperty === "string" && typeof column?.render === "function")
+      .map(column => [column.key, column]));
+    root.refreshValues = () => {
+      if (!pinnedRefresh.size) return;
+      const listKeyOf = options.key || ((row, index) => row.id ?? row.key ?? index);
+      const records = new Map((options.rows || []).map((row, index) => [String(listKeyOf(row, index)), row]));
+      for (const row of root.querySelectorAll(".lex-column-list-row[data-key]")) {
+        const record = records.get(row.dataset.key);
+        if (!record) continue;
+        for (const cell of row.querySelectorAll(':scope > .lex-column-list-cell[data-column-key^="pin:"]')) {
+          const column = pinnedRefresh.get(cell.dataset.columnKey);
+          const text = cell.querySelector(":scope > .lex-column-cell-content > .lex-column-cell-text");
+          if (!column || !text || cell.classList.contains("lex-cell-editing")) continue;
+          const shown = column.render(record);
+          text.textContent = shown;
+          text.title = String(shown);
+        }
+      }
+    };
     fitColumnHeadings(root);
     document.fonts?.ready.then(() => fitColumnHeadings(root));
     return root;
@@ -10889,7 +10939,18 @@ ${contents.path}`});
     if(!selection.keys.size)selection.keys.add(selected);
     tableSelections.set(selectionKey,selection);
     options.sync?.({page, pageSize, selected, selection: [...selection.keys]});
-    const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),toggle:(key,label)=>{
+    const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),
+      describe:options.describePinnedCell||null,commitCell:options.commitPinnedCell||null,
+      move:(value,before)=>{
+      const pinned=pinOwner.store.pinned,moving=pinned.find(entry=>entry.key===value);
+      if(!moving||value===before)return;
+      const rest=pinned.filter(entry=>entry.key!==value);
+      const index=rest.findIndex(entry=>entry.key===before);
+      if(index<0)rest.push(moving);else rest.splice(index,0,moving);
+      pinOwner.store.pinned=rest;
+      try{localStorage.setItem(pinOwner.store.key,JSON.stringify(rest));}catch(_error){}
+      change("pins",{});
+    },toggle:(key,label)=>{
       const store=pinOwner.store;
       store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label}];
       try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
@@ -10997,57 +11058,60 @@ ${contents.path}`});
     // While the master builds its tables, tell them that this list owns the
     // order: a click on one of their headers re-sorts the list, then the list
     // re-renders through the plugin's own change callback.
-    const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner, outerRenameOwner = pagedRenameOwner;
-    pagedPinOwner = typeof options.change === "function" ? pinOwner : null;
-    pagedRenameOwner = renameOwner;
-    pagedSortOwner = typeof options.change === "function" ? {
-      state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
-      sort: (column, direction, compare) => {
-        pagedSortStates.set(rowPreferenceKey, {key: column.key, dir: direction, compare});
-        change("sort", {});
-      },
-    } : null;
-    try {
-      masterNodes = barrelRows.map((rows, index) => {
-        const node = typeof options.master === "function"
-          ? options.master({rows, selected, select, barrel: index, barrels})
-          : list({...options.list, rows, key: keyOf, selected, select});
-        node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
-          const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
-          row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
-          if(modOnly){
-            const record=rows.find(record=>String(keyOf(record))===row.dataset.key);
-            row.dataset.lexRecordProvenance='';
-            row.refreshRecordProvenance=()=>row.classList.toggle('lex-record-modified',
-              record!==undefined&&modOnly.available!==false&&Boolean(modOnly.changed(record)));
-            row.refreshRecordProvenance();
-          }
+    const buildMasters = () => {
+      const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner, outerRenameOwner = pagedRenameOwner;
+      pagedPinOwner = typeof options.change === "function" ? pinOwner : null;
+      pagedRenameOwner = renameOwner;
+      pagedSortOwner = typeof options.change === "function" ? {
+        state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
+        sort: (column, direction, compare) => {
+          pagedSortStates.set(rowPreferenceKey, {key: column.key, dir: direction, compare});
+          change("sort", {});
+        },
+      } : null;
+      try {
+        return barrelRows.map((rows, index) => {
+          const node = typeof options.master === "function"
+            ? options.master({rows, selected, select, barrel: index, barrels})
+            : list({...options.list, rows, key: keyOf, selected, select});
+          node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
+            const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
+            row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+            if(modOnly){
+              const record=rows.find(record=>String(keyOf(record))===row.dataset.key);
+              row.dataset.lexRecordProvenance='';
+              row.refreshRecordProvenance=()=>row.classList.toggle('lex-record-modified',
+                record!==undefined&&modOnly.available!==false&&Boolean(modOnly.changed(record)));
+              row.refreshRecordProvenance();
+            }
+          });
+          node.setAttribute('aria-multiselectable','true');
+          fitBarrelTableColumns(node);
+          // Filler rows exist to square off a growable list. A slot table shows
+          // one row per real slot, so a short last page simply ends.
+          // Pad to the track count this table actually declares. Padding to the
+          // page size instead put forty rows into a ten-track grid whenever a
+          // table held less than one page: the ten declared tracks collapsed to
+          // zero and every real record painted on top of the others in one band.
+          if (!slotBased) padBarrelTable(node, rowCapacity);
+          node.classList.add("lex-page-sized-table");
+          // The track count is read back from the rows that are really there, so
+          // a padding rule and a capacity rule can never disagree again.
+          node.style.setProperty("--lex-page-row-count",
+            String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
+          node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
+          node.dataset.lexBarrel = String(index + 1);
+          if (index) node.classList.add("lex-fitted-page");
+          return node;
         });
-        node.setAttribute('aria-multiselectable','true');
-        fitBarrelTableColumns(node);
-        // Filler rows exist to square off a growable list. A slot table shows
-        // one row per real slot, so a short last page simply ends.
-        // Pad to the track count this table actually declares. Padding to the
-        // page size instead put forty rows into a ten-track grid whenever a
-        // table held less than one page: the ten declared tracks collapsed to
-        // zero and every real record painted on top of the others in one band.
-        if (!slotBased) padBarrelTable(node, rowCapacity);
-        node.classList.add("lex-page-sized-table");
-        // The track count is read back from the rows that are really there, so
-        // a padding rule and a capacity rule can never disagree again.
-        node.style.setProperty("--lex-page-row-count",
-          String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
-        node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
-        node.dataset.lexBarrel = String(index + 1);
-        if (index) node.classList.add("lex-fitted-page");
-        return node;
-      });
-    } finally {
-      pagedSortOwner = outerSortOwner;
-      pagedPinOwner = outerPinOwner;
-      pagedRenameOwner = outerRenameOwner;
-      if (pinOwner.declined) detailNode?.querySelectorAll?.("[data-lex-auto-pin]").forEach(node => node.remove());
-    }
+      } finally {
+        pagedSortOwner = outerSortOwner;
+        pagedPinOwner = outerPinOwner;
+        pagedRenameOwner = outerRenameOwner;
+        if (pinOwner.declined) detailNode?.querySelectorAll?.("[data-lex-auto-pin]").forEach(node => node.remove());
+      }
+    };
+    masterNodes = buildMasters();
     // The floor belongs to THIS table's record set. Leaving it set made an
     // unrelated table rendered afterwards inherit the padding.
     recordIdFloor = 1;
@@ -11157,6 +11221,19 @@ ${contents.path}`});
       const index = masterNodes.indexOf(event.detail.previous);
       if (index >= 0) masterNodes[index] = event.target;
     });
+    // A pin changes columns, not records: rebuild the master barrels in
+    // place instead of the whole page, leaving the detail pane, its focus
+    // and scroll, and its giant dropdowns, alone.
+    root.refreshMaster = () => {
+      const scrollers = [masterNode, barrelGrid, ...masterNodes];
+      const scroll = scrollers.map(node => [node.scrollTop, node.scrollLeft]);
+      masterNodes = buildMasters();
+      barrelGrid.replaceChildren(...masterNodes);
+      [masterNode, barrelGrid, ...masterNodes].forEach((node, index) => {
+        if (node && scroll[index]) { node.scrollTop = scroll[index][0]; node.scrollLeft = scroll[index][1]; }
+      });
+    };
+    root.refreshValues = () => { for (const node of masterNodes) node.refreshValues?.(); };
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];

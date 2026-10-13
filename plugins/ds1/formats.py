@@ -611,6 +611,16 @@ class ItemDocument:
             values[field.key] = value
             if field.is_bool: display[field.key] = 'Yes' if value else 'No'
             elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
+        if table in ('EquipParamProtector', 'NpcParam'):
+            # Pinned absorption columns read row values, like every other
+            # property: the same share the detail pane shows.
+            levels = self._absorption_levels(row_id, table)
+            if levels:
+                for cut, _kind in ABSORPTION_CUTS:
+                    rate = self.value(EFFECT_TABLE, levels[0], cut)
+                    values['absorption:' + cut] = round((1 - rate) * 100, 3)
+        if table == 'NpcParam':
+            values['effectiveHp'] = self._effective_hp(row_id)
         return values, display
 
     def value(self, table, row_id, key):
@@ -795,6 +805,15 @@ class ItemDocument:
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(NPC_FIELDS)}
             fields.sort(key=lambda field: order[field['key']])
+            hp = next((field for field in fields if field['key'] == 'hp'), None)
+            if hp is not None:
+                fields.insert(fields.index(hp) + 1, {
+                    'key': 'effectiveHp', 'label': 'Effective HP',
+                    'description': ('Health the enemy actually fights with: base HP times its resident HP '
+                                    'effects, as the game uses it. Read-only: change HP or the effects instead.'),
+                    'group': hp['group'], 'dtype': hp['dtype'], 'value': self._effective_hp(row_id),
+                    'type': 'number', 'minimum': 0, 'maximum': None, 'enum': {},
+                    'protectedReason': '', 'editable': False, 'vanilla': None})
         if table in ('AtkParam_Npc', 'AtkParam_Pc'):
             order = {key: index for index, key in enumerate(ATTACK_FIELDS)}
             fields.sort(key=lambda field: order[field['key']])
@@ -855,6 +874,25 @@ class ItemDocument:
             return []
         return [base + level for level in range(MAX_UPGRADE_LEVEL + 1)
                 if base + level in self._rows_by_id[EFFECT_TABLE]]
+
+    def _effective_hp(self, row_id):
+        """Enemy HP as the game uses it: base HP times every resident maxHpRate, rounded.
+
+        Enemies carry level effects (and some a black-phantom effect) that
+        scale health; the wikis list this product, not the stored base.
+        Effects multiply, so two scalings compound.
+        """
+        product = float(self.value('NpcParam', row_id, 'hp'))
+        if EFFECT_TABLE in self.params:
+            effects = self._rows_by_id[EFFECT_TABLE]
+            for index in range(8):
+                effect = self.value('NpcParam', row_id, f'spEffectID{index}')
+                if effect in (-1, 0) or effect not in effects:
+                    continue
+                rate = self.value(EFFECT_TABLE, effect, 'maxHpRate')
+                if math.isfinite(rate):
+                    product *= rate
+        return round(product)
 
     def _absorption_fields(self, row_id, table='EquipParamProtector'):
         levels = self._absorption_levels(row_id, table)

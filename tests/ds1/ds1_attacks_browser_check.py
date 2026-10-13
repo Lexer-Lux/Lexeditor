@@ -154,7 +154,7 @@ def main():
                     assert page.evaluate('state.monsterTab')=='attacks'
                     page.locator('.lex-tabbed-panel [data-subtab="resistances"]').click()
                     page.wait_for_function('state.monsterTab==="resistances"')
-                    assert len(page.evaluate('state.row.fields'))==66  # 21 resistances, 45 reviewed stats
+                    assert len(page.evaluate('state.row.fields'))==67  # 21 resistances, 45 reviewed stats, effective HP
                     assert page.locator('[data-field-key]:visible').count()>0
                     if output: page.screenshot(path=str(output/'monster-resistances.png'))
                     session.stop(); session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(mod),'LEXEDITOR_NO_MOD':'1','LEXEDITOR_MOD_READ_ONLY':'1'})

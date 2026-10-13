@@ -17,7 +17,8 @@ from .msb import MsbError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
-from .formats import FormatError, stats_fields
+from .formats import FormatError, stats_fields, TABLES
+from .effects import TABLE as EFFECT_TABLE
 from .store import ItemStore
 from . import tweak_mods
 from . import data_map
@@ -346,6 +347,7 @@ class Handler(PluginRequestHandler):
             with LOCK:
                 if path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
+                    extra = {}
                     if payload.get('table') == 'NativeRules':
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                     elif str(payload.get('table', '')).endswith('.msb'):
@@ -353,8 +355,21 @@ class Handler(PluginRequestHandler):
                     elif str(payload.get('table', '')).endswith('.anibnd.dcx'):
                         row = TAESTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                     else:
-                        row = STORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'), only=only)
-                    result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
+                        table = payload.get('table')
+                        row = STORE.edit(table, payload.get('id'), payload.get('field'), payload.get('value'), only=only)
+                        # The table's pinned columns read row values, so the
+                        # edit hands back the row's fresh ones; without them
+                        # the table keeps showing what the field just replaced.
+                        if table == 'MenuText':
+                            label = next((field['value'] for field in row['fields']
+                                          if field['key'] == 'label'), None)
+                            if label is not None:
+                                extra = {'values': {'label': label}, 'display': {}}
+                        elif table in TABLES:
+                            values, display = STORE.get().row_values(table, payload.get('id'))
+                            extra = {'values': values, 'display': display,
+                                     'refreshRows': table == EFFECT_TABLE}
+                    result = {'row': row, 'dirtyCount': STORE.get().dirty_count, **extra}
                 elif path == '/api/rename':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)

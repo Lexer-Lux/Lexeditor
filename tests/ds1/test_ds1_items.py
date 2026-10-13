@@ -7,10 +7,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from ds1_fixture import make_archive
+from ds1_fixture import make_archive, make_menu_archive
+from ds1_effects_fixture import make_effects_archive
 from plugins.ds1.formats import ItemDocument, FormatError, SUBTABS, TABLES, inflate
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
+from plugins.ds1 import texts
 
 
 def project(tmp_path):
@@ -105,6 +107,38 @@ def test_service_edit_save_and_reload(tmp_path):
         row = request('/api/row?table=EquipParamGoods&id=100')['row']
         assert next(f['value'] for f in row['fields'] if f['key'] == 'sellValue') == 42
         with pytest.raises(HTTPError): request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'goodsType', 'value': 999})
+    finally:
+        session.stop()
+
+
+def test_service_edit_returns_fresh_row_values(tmp_path):
+    game, mod = tmp_path / 'game', tmp_path / 'mod'
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(make_effects_archive())
+    (game / texts.MENU_RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive())
+    mod.mkdir()
+    (mod / MARKER).touch()
+    session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
+                          'LEXEDITOR_MOD_READ_ONLY': '0', 'LEXEDITOR_NO_MOD': '0'})
+    def request(path, payload=None):
+        req = Request(session.url.rstrip('/') + path, data=None if payload is None else json.dumps(payload).encode(),
+                      headers={'Content-Type': 'application/json'})
+        with urlopen(req) as reply: return json.load(reply)
+    try:
+        session.start()
+        edited = request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'sellValue', 'value': 42})
+        assert edited['values']['sellValue'] == 42
+        assert edited['refreshRows'] is False
+        fresh = {field['key']: field['value']
+                 for field in request('/api/row?table=EquipParamGoods&id=100')['row']['fields']}
+        for key, value in fresh.items():
+            assert edited['values'][key] == value, key
+        effect = request('/api/edit', {'table': 'SpEffectParam', 'id': 40, 'field': 'maxHpRate', 'value': 1.5})
+        assert effect['refreshRows'] is True
+        assert effect['values']['maxHpRate'] == 1.5
+        label = request('/api/edit', {'table': 'MenuText', 'id': 102204, 'field': 'label', 'value': 'Mag DEF!'})
+        assert label['values'] == {'label': 'Mag DEF!'}
     finally:
         session.stop()
 

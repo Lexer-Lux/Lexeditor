@@ -5,6 +5,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
+from ds1_effects_fixture import make_effects_archive
 from plugins.ds1.formats import ItemDocument, FormatError, inflate, SIZES
 from plugins.ds1.monsters import NPC_FIELDS
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
@@ -14,8 +15,11 @@ from plugins.ds3.formats import write_field
 def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     doc = ItemDocument(make_archive())
     assert [row['id'] for row in doc.list_rows('monsters')] == [120000, 120100]
-    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(NPC_FIELDS)
-    assert all(field['editable'] for field in doc.read_row('NpcParam', 120000)['fields'])
+    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(NPC_FIELDS) | {'effectiveHp'}
+    fields = doc.read_row('NpcParam', 120000)['fields']
+    assert all(field['editable'] for field in fields if field['key'] != 'effectiveHp')
+    effective = next(field for field in fields if field['key'] == 'effectiveHp')
+    assert not effective['editable'] and effective['value'] == 0
     # Stray Demon deliberately has type 0, and Egg Carrier shares a monster
     # family name but has type 2. Neither name-only nor type-only filtering works.
     for excluded in (251000, 223000, 321001, 502, 999999):
@@ -94,3 +98,47 @@ def test_project_save_reload_and_readonly_monsters(tmp_path):
     assert fresh.state()['enemyTabs'][0]['id'] == 'monsters'
     assert (game / RELATIVE).read_bytes() == original
     with pytest.raises(PermissionError): ItemStore(game).edit('NpcParam', 120000, 'def_phys', 1)
+
+
+def test_table_values_match_detail_values_for_every_monster_property():
+    """Pinned columns and the detail pane read the same values, always."""
+    base = 40_000_000 + 120000
+    doc = ItemDocument(make_effects_archive(extra_ids=(base,)))
+    doc.edit('SpEffectParam', base, 'neutralDamageCutRate', 0.6)
+    doc.edit('SpEffectParam', base, 'maxHpRate', 1.4)
+    doc.edit('NpcParam', 120000, 'hp', 480)
+    # Armor Rework links live past the slot's UI bounds, like retail data.
+    _row, start, data = doc._row('NpcParam', 120000)
+    spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == 'spEffectID0')
+    doc.plain[start:start + len(data)] = write_field(data, spec, base, '<')
+    for row_id in (120000, 120100):
+        values, _display = doc.row_values('NpcParam', row_id)
+        fields = {field['key']: field['value']
+                  for field in doc.read_row('NpcParam', row_id)['fields']}
+        assert set(fields) <= set(values)
+        for key, value in fields.items():
+            assert values[key] == value, (row_id, key)
+    assert doc.row_values('NpcParam', 120000)[0]['absorption:neutralDamageCutRate'] == 40.0
+    assert doc.row_values('NpcParam', 120000)[0]['effectiveHp'] == 672
+
+
+def test_effective_hp_multiplies_resident_rates_and_skips_the_rest():
+    doc = ItemDocument(make_effects_archive(extra_ids=(7001, 7002)))
+    doc.edit('SpEffectParam', 7001, 'maxHpRate', 1.4)
+    doc.edit('SpEffectParam', 7002, 'maxHpRate', 1.15)
+    doc.edit('NpcParam', 120000, 'hp', 480)
+    assert doc.read_row('NpcParam', 120000)['fields']
+    assert doc._effective_hp(120000) == 480
+    doc.edit('NpcParam', 120000, 'spEffectID0', 7001)
+    assert doc._effective_hp(120000) == 672
+    doc.edit('NpcParam', 120000, 'spEffectID1', 7002)
+    assert doc._effective_hp(120000) == 773
+    # A link to a removed effect, and an empty slot, scale nothing.
+    row, start, data = doc._row('NpcParam', 120000)
+    spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == 'spEffectID2')
+    changed = write_field(data, spec, 99999999, '<')
+    doc.plain[start:start + len(data)] = changed
+    assert doc._effective_hp(120000) == 773
+    with pytest.raises(FormatError, match='protected'):
+        doc.edit('NpcParam', 120000, 'effectiveHp', 10)
+

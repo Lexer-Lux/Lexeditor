@@ -56,9 +56,12 @@ def main():
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))
-                    assert expected == set(NPC_FIELDS)
+                    assert expected == set(NPC_FIELDS) | {'effectiveHp'}
                     seen, edited = set(), set()
+                    saw_effective = False
                     for index in range(12):
+                        if page.locator('input[aria-label="Effective HP"]:disabled').count():
+                            saw_effective = True
                         fields = page.locator('input[data-field-key]:visible')
                         for i in range(fields.count()):
                             field = fields.nth(i)
@@ -85,8 +88,9 @@ def main():
                         for key in options.evaluate_all('nodes=>nodes.map(n=>n.dataset.fieldKey)'):
                             select = page.locator(f'select[data-field-key="{key}"]:visible')
                             seen.add(key)
-                            assert select.locator('option').count() > 1, key
                             select.scroll_into_view_if_needed()
+                            page.wait_for_function('(key)=>document.querySelector("select[data-field-key="+key+"]").options.length>1', arg=key)
+                            assert select.locator('option').count() > 1, key
                             if key in changes:
                                 select.select_option(str(changes[key]))
                                 page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
@@ -96,7 +100,53 @@ def main():
                         following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
                         if not following.count() or not following.is_enabled(): break
                         following.click()
-                    assert seen == expected and edited == changes.keys()
+                    assert seen == expected - {'effectiveHp'} and edited == changes.keys()
+                    assert saw_effective
+                    first = page.locator('.lex-tweaks-pages').get_by_role('button', name='First page', exact=True)
+                    if first.count() and first.is_enabled():
+                        first.click()
+                    for _ in range(12):
+                        if page.locator('.lex-detail-field[data-lex-layout-field="hp"] button.lex-column-pin:visible').count():
+                            break
+                        page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True).click()
+                    else:
+                        raise AssertionError('hp field never shown')
+                    page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe = "1"')
+                    page.locator('.lex-detail-field[data-lex-layout-field="hp"] button.lex-column-pin').click()
+                    page.locator('.lex-detail-field[data-lex-layout-field="mp"] button.lex-column-pin').click()
+                    page.wait_for_selector('.lex-column-list-head-cell[data-column-key="pin:mp"]')
+                    assert page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe') == "1"
+                    order = page.locator('.lex-column-list-head-cell[data-column-key^="pin:"]').evaluate_all("cells=>cells.map(c=>c.dataset.columnKey)")
+                    assert order == ["pin:hp", "pin:mp"], order
+                    head = page.locator('.lex-column-list-head-cell[data-column-key="pin:hp"]')
+                    tail = page.locator('.lex-column-list-head-cell[data-column-key="pin:mp"]')
+                    box, goal = head.bounding_box(), tail.bounding_box()
+                    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                    page.mouse.down()
+                    page.mouse.move(goal["x"] + goal["width"] / 2, goal["y"] + goal["height"] / 2, steps=8)
+                    page.mouse.up()
+                    page.wait_for_function('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:pins:"))))[0].key==="mp"')
+                    order = page.locator('.lex-column-list-head-cell[data-column-key^="pin:"]').evaluate_all("cells=>cells.map(c=>c.dataset.columnKey)")
+                    assert order == ["pin:mp", "pin:hp"], order
+                    stored = page.evaluate('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:pins:"))))')
+                    assert [entry["key"] for entry in stored] == ["mp", "hp"], stored
+                    page.locator('.lex-column-list-row[data-key]').first.click()
+                    page.wait_for_function('state.pending===0 && state.row && (state.row.table+":"+state.row.id)===state.selected')
+                    page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe = "1"')
+                    selected = page.evaluate('state.selected')
+                    cell = page.locator(f'.lex-column-list-row[data-key="{selected}"] .lex-column-list-cell[data-column-key="pin:hp"]')
+                    cell.dblclick()
+                    editor = cell.locator("input")
+                    editor.fill('777')
+                    editor.press('Enter')
+                    page.wait_for_function('state.pending===0 && state.rows.find(r=>r.table==="NpcParam"&&r.id===state.selected.split(":")[1]*1).values.hp===777')
+                    assert "777" in cell.inner_text()
+                    assert page.locator('.lex-detail-field[data-lex-layout-field="hp"] input').input_value() == "777"
+                    assert page.evaluate('state.row.fields.find(f=>f.key==="hp").value') == 777
+                    page.locator('.lex-detail-field[data-lex-layout-field="hp"] button.lex-column-pin').click()
+                    page.locator('.lex-detail-field[data-lex-layout-field="mp"] button.lex-column-pin').click()
+                    page.wait_for_selector('.lex-column-list-head-cell[data-column-key^="pin:"]', state="detached")
+                    assert page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe') == "1"
                     brains = []
                     for sub, table, allowed in [('behaviors', 'BehaviorParam', BEHAVIOR_EDITABLE), ('ai', 'NpcThinkParam', THINK_EDITABLE)]:
                         page.locator(f'[data-subtab="{sub}"]').click()

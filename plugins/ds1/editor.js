@@ -33,11 +33,15 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
     this.applying=true;
     try{
       await edits;
+      let refresh=false;
       for(const edit of entry.edits||[entry]){
         const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side],sub:state.sub});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
+        patchRowValues(edit.table,edit.id,result.values,result.display);
+        refresh=refresh||result.refreshRows===true;
       }
+      if(refresh)await loadItems();
       // An undone viewport move must move the scene part back too; the
       // reload re-reads the map and restores the selection and gizmo.
       if(state.tab==="maps"&&state.mapView)await reloadViewport(state.mapView.map,state.mapSelected);
@@ -250,6 +254,22 @@ function renameRecord(row,name){
     finally{state.pending--;render();}
   });
 }
+function patchRowValues(table,id,values,display){
+  const target=state.rows.find(row=>row.table===table&&row.id===id);
+  if(!target||!values)return;
+  target.values=values;target.display=display||{};
+}function syncDetailControl(propertyKey,value,control){
+  // Computed fields (Effective HP, absorption) move when their inputs do;
+  // their detail controls repaint in place, sliders included.
+  for(const other of state.pagedView?.querySelectorAll(`[data-field-key="${CSS.escape(propertyKey)}"]`)??[]){
+    if(other===control||other===document.activeElement)continue;
+    if(other.type==="checkbox")other.checked=!!value;
+    else if("value" in other){
+      other.value=(other.disabled&&other.readOnly&&typeof value==="number")?LexeditorUI.formatNumber(value):String(value);
+      other.__lexValueSliderPaint?.();
+    }
+  }
+}
 function commit(row,field,value,control){
   if(state.readOnly||!field.editable)return;
   state.pending++;shell.refresh();
@@ -257,35 +277,67 @@ function commit(row,field,value,control){
     // The value before this edit, as the record now stands (an earlier edit
     // may have changed it since the page drew).
     const live=state.row&&key(state.row)===key(row)?state.row:row;
-    const before=live.fields.find(item=>item.key===field.key)?.value;
+    const before=live.fields?.find(item=>item.key===field.key)?.value??live.values?.[field.key];
     try{
       const result=await api("/api/edit",{table:row.table,id:row.id,field:field.key,value,sub:state.sub});
       const after=result.row.fields.find(item=>item.key===field.key)?.value;
       const done=[{table:row.table,id:row.id,field:field.key,before,after}];
       let latest=result;
+      const updates=[{id:row.id,result}];
       // The other selected records of this table get the same value.
       for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
         const id=Number(other.slice(row.table.length+1));
         const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}&sub=${encodeURIComponent(state.sub)}`)).row.fields.find(item=>item.key===field.key)?.value;
         const changed=await api("/api/edit",{table:row.table,id,field:field.key,value,sub:state.sub});
         latest=changed;
+        updates.push({id,result:changed});
         done.push({table:row.table,id,field:field.key,before:prior,after:changed.row.fields.find(item=>item.key===field.key)?.value});
       }
       fieldHistory.record(done.length>1?{edits:done}:done[0]);
       // The count and the list come from the last edit made, which saw them all.
       state.dirty=latest.dirtyCount;state.changes=latest.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;attackPreviews.delete(row.id);
-      if(state.row&&key(state.row)===key(row))state.row=result.row;
+      if(state.row&&key(state.row)===key(row)){
+        const priorValues=new Map(state.row.fields.map(item=>[item.key,item.value]));
+        state.row=result.row;
+        for(const item of result.row.fields){
+          if(item.key===field.key||priorValues.get(item.key)===item.value)continue;
+          syncDetailControl(item.key,item.value,control);
+        }
+      }
       const changed=result.row.fields.find(item=>item.key===field.key);
-      if(control.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
+      if(control?.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
+      syncDetailControl(field.key,changed.value,control);
       if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
-      else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
+      else{
+        for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display);
+        if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
+        else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
+        else if(String(state.sort?.key||"").startsWith("pin:"))render();
+        else state.pagedView?.refreshValues?.();
+      }
     }catch(error){
       notify(error);
       const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(state.sub)}`);
       const original=result.row.fields.find(item=>item.key===field.key);
-      if(control.isConnected){if(field.type==="bool")control.checked=!!original.value;else control.value=String(original.value);}
+      if(control?.isConnected){if(field.type==="bool")control.checked=!!original.value;else control.value=String(original.value);}
     }finally{state.pending--;if(row.table==="NativeRules")render();else shell.refresh();}
   }).catch(notify);
+}
+function describePinnedCell(propertyKey){
+  // Field shape is per table, not per row: effect options are global and
+  // bounds come from the schema, so the open record describes every row.
+  const field=(state.row?.fields||[]).find(item=>item.key===propertyKey);
+  if(!field||!field.editable||field.type==="longtext")return null;
+  const entries=field.type==="enum"?Object.entries(field.enum||{}):null;
+  return {editable:true,type:field.type,numeric:field.type==="number",
+    minimum:field.minimum,maximum:field.maximum,
+    step:field.step??(/^(f|angle)/.test(field.dtype||"")?"any":1),
+    choices:entries&&entries.length?entries:field.type==="bool"?[[1,"Yes"],[0,"No"]]:null};
+}
+function commitPinnedCell(record,propertyKey,value){
+  const meta=(state.row?.fields||[]).find(item=>item.key===propertyKey)||{};
+  const field={key:propertyKey,editable:true,label:meta.label||propertyKey,type:meta.type||"text"};
+  commit({table:record.table,id:record.id},field,field.type==="text"?value:Number(value),null);
 }
 const PERCENT=/\s*\(%\)$/;
 const shownLabel=field=>field.label.replace(PERCENT,"");
@@ -325,9 +377,18 @@ function plainControlFor(row,field){
   if(field.type==="enum"){
     const choices=Object.entries(field.enum);
     if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
-    const control=el("select",{...attrs,onchange:event=>commit(row,field,Number(event.target.value),event.target)},
-      ...choices.map(([value,label])=>el("option",{value,disabled:!(value in field.enum)},label)));
-    control.value=String(field.value);return control;
+    const control=el("select",{...attrs,onchange:event=>commit(row,field,Number(event.target.value),event.target)});
+    const fill=()=>{control.replaceChildren(...choices.map(([value,label])=>el("option",{value,disabled:!(value in field.enum)},label)));const live=state.row?.fields?.find(item=>item.key===field.key)?.value;control.value=String(live??field.value);};
+    if(choices.length>200){
+      // A 4,000-effect dropdown built on every render freezes the pane;
+      // it shows its value now and fills when first scrolled into view.
+      control.replaceChildren(el("option",{value:String(field.value)},field.enum[String(field.value)]||`Unknown (${field.value})`));
+      const show=()=>{fill();observer?.disconnect();};
+      const observer=("IntersectionObserver" in window)?new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))show();}):null;
+      if(observer)observer.observe(control);else fill();
+      control.addEventListener("focus",show,{once:true});
+    }else fill();
+    return control;
   }
   return el("input",{...attrs,type:"number",value:field.value,min:field.minimum,max:field.maximum,
     step:field.step??(/^(f|angle)/.test(field.dtype)?"any":1),onchange:event=>{
@@ -808,7 +869,7 @@ function renderItems(){
       state.page=next.page;state.pageSize=next.pageSize;state.selection=next.selection||[];
       if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}
     },
-    change:next=>{state.page=next.page;state.pageSize=next.pageSize;render();},
+    change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.reason==="pins"&&state.pagedView?.refreshMaster)state.pagedView.refreshMaster();else render();},
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,sortState:state.sort,
@@ -835,7 +896,9 @@ function renderItems(){
     // names: level-up gains cover the game's four fixed defenses, which
     // have no stored names to change.
     renamable:row=>state.tab==="stats"?row.table!=="CalcCorrectGraph":state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
+    describePinnedCell,commitPinnedCell,
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
+  state.pagedView=view;
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.

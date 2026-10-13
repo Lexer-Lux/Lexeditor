@@ -97,7 +97,7 @@ for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic')
 # multipliers state their unchanged baseline of 1, the way effect
 # multipliers do.
 NPC_STATS = {
-    'hp': ('HP', 'Basics', 'Maximum health. The enemy dies at 0.'),
+    'hp': ('HP', 'Basics', 'Maximum health before resident effects scale it; Effective HP shows the result. The enemy dies at 0.'),
     'mp': ('MP', 'Basics', 'Maximum mana.'),
     'stamina': ('Stamina', 'Basics', 'Maximum stamina. Enemies use it when they block.'),
     'staminaRecoverBaseVel': ('Stamina recovery', 'Basics',
