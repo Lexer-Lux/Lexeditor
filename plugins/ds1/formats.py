@@ -17,6 +17,7 @@ from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field
 from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES
 from .attacks import ATTACK_FIELDS, AttackReferences
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys, reference_switches
+from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set, goods_keys
 
 FormatError = DS3FormatError
 GRAPH_TABLE = 'CalcCorrectGraph'
@@ -26,10 +27,11 @@ TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1), 'AtkParam_Pc': (128, 1),
           'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2),
           'ReinforceParamWeapon': (88, 1), 'ReinforceParamProtector': (48, 1),
+          'EquipMtrlSetParam': (32, 1),
           'ItemLotParam': (148, 2), 'ShopLineupParam': (32, 1), 'ObjActParam': (32, 1),
           'NpcThinkParam': (112, 1),
           GRAPH_TABLE: (80, 1)}
-OPTIONAL_TABLES = frozenset({'SpEffectParam', GRAPH_TABLE})
+OPTIONAL_TABLES = frozenset({'SpEffectParam', GRAPH_TABLE, 'EquipMtrlSetParam'})
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -128,11 +130,12 @@ STATS_SUBTABS = (
     ('spell-reqs', 'Spell requirements', 'Magic'),
     ('weapon-upgrades', 'Weapon upgrades', 'ReinforceParamWeapon'),
     ('armor-upgrades', 'Armor upgrades', 'ReinforceParamProtector'),
+    ('upgrade-materials', 'Upgrade materials', 'EquipMtrlSetParam'),
 )
 # The Stats tab shows these properties of records it shares with Items. Curves
 # and upgrade levels show every field, so those tables list their whole
 # schema here.
-STATS_WHOLE_TABLES = (GRAPH_TABLE, 'ReinforceParamWeapon', 'ReinforceParamProtector')
+STATS_WHOLE_TABLES = (GRAPH_TABLE, 'ReinforceParamWeapon', 'ReinforceParamProtector', 'EquipMtrlSetParam')
 STATS_FIELDS = {
     GRAPH_TABLE: ('stageMaxVal0', 'stageMaxVal1', 'stageMaxVal2', 'stageMaxVal3', 'stageMaxVal4',
                   'stageMaxGrowVal0', 'stageMaxGrowVal1', 'stageMaxGrowVal2', 'stageMaxGrowVal3',
@@ -155,6 +158,10 @@ STATS_FIELDS = {
                   'slashDefRate', 'blowDefRate', 'thrustDefRate', 'resistPoisonRate',
                   'resistDiseaseRate', 'resistBloodRate', 'resistCurseRate', 'residentSpEffectId1',
                   'residentSpEffectId2', 'residentSpEffectId3', 'materialSetId'),
+    'EquipMtrlSetParam': ('materialId01', 'materialId02', 'materialId03', 'materialId04', 'materialId05',
+                  'itemNum01', 'itemNum02', 'itemNum03', 'itemNum04', 'itemNum05',
+                  'isDisableDispNum01', 'isDisableDispNum02', 'isDisableDispNum03',
+                  'isDisableDispNum04', 'isDisableDispNum05'),
 }
 
 
@@ -338,6 +345,9 @@ def schema(table):
             label, group, description = ARMOR_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
             label, group, description = MAGIC_FIELDS[key]
+        slot = key[-2:] if table == MATERIAL_TABLE else ''
+        if slot in ('01', '02', '03', '04', '05'):
+            group = f'Material {int(slot)}'
         if table == EFFECT_TABLE:
             label, group, description = presentation(key, label, description)
         enum_name = attrs.get('Enum') or node.findtext('Enum')
@@ -426,6 +436,7 @@ class ItemDocument:
         self.params = {}
         self._rows_by_id = {}
         self._effects = None
+        self._goods = None
         self.schemas = {table: schema(table) for table in TABLES}
         self.dirty = set()
         # Rows this session added (no original bytes) and removed, by identity.
@@ -537,6 +548,8 @@ class ItemDocument:
             if row_id in MENU_LABEL_IDS:
                 return MENU_LABELS[MENU_LABEL_IDS[row_id]][0]
             return f'Menu label {row_id}'
+        if table == MATERIAL_TABLE:
+            return describe_set(self, row_id)
         named = self.texts.name(table, row_id) if self.texts else None
         if named: return named
         row = row or self.params[table].row(row_id)
@@ -566,6 +579,7 @@ class ItemDocument:
         self._row(table, row_id)
         self.texts.rename(table, row_id, name)
         self._effects = None  # effect choices and links are listed by name
+        self._goods = None  # goods picker choices are listed by name
         return self.read_row(table, row_id, only=only)
 
     def _description_fields(self, table, row_id):
@@ -603,6 +617,8 @@ class ItemDocument:
         and what a reader sees for it (an enum's name, Yes or No)."""
         data = self._row(table, row_id)[2]
         values, display = {}, {}
+        linked_effects = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
+        linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if field.padding or field.array_length != 1: continue
@@ -610,6 +626,10 @@ class ItemDocument:
             if isinstance(value, float) and not math.isfinite(value): value = str(value)
             values[field.key] = value
             if field.is_bool: display[field.key] = 'Yes' if value else 'No'
+            elif field.key in linked_effects:
+                display[field.key] = self.effect_references().choices.get(str(value), f'Unknown ({value})')
+            elif field.key in linked_goods:
+                display[field.key] = self.goods_references().choices.get(str(value), f'Unknown ({value})')
             elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
         if table in ('EquipParamProtector', 'NpcParam'):
             # Pinned absorption columns read row values, like every other
@@ -636,6 +656,11 @@ class ItemDocument:
         if self._effects is None:
             self._effects = EffectReferences(self)
         return self._effects
+
+    def goods_references(self):
+        if self._goods is None:
+            self._goods = GoodsReferences(self)
+        return self._goods
 
     def list_rows(self, tab):
         if tab in {entry[0] for entry in EFFECT_SUBTABS}:
@@ -682,6 +707,8 @@ class ItemDocument:
             table = GRAPH_TABLE
         else:
             table = next(entry[2] for entry in STATS_SUBTABS if entry[0] == tab)
+            if table not in self.params:
+                raise FormatError(f'{table}.param is missing. Open a complete Remastered parameter archive.')
         result = []
         for row in self.params[table].rows:
             values, display = self.row_values(table, row.row_id)
@@ -769,6 +796,7 @@ class ItemDocument:
         fields = []
         spans = self._value_spans(table)
         effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
+        linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if table == 'NpcParam' and field.key not in NPC_FIELDS:
@@ -787,14 +815,19 @@ class ItemDocument:
             original = _shown(read_field(vanilla, field, '<'), field) if vanilla is not None else None
             if isinstance(original, float) and not math.isfinite(original):
                 original = None
-            options = self.effect_references().choices if field.key in effect_keys else item['enum']
+            if field.key in effect_keys:
+                options = self.effect_references().choices
+            elif field.key in linked_goods:
+                options = self.goods_references().choices
+            else:
+                options = item['enum']
             # A float the PARAMDEF leaves unbounded shows no range: dtype
             # extremes (±3.4e38) are not bounds the reader can act on.
             unbounded = field.dtype in ('f32', 'f64', 'angle32') and (item['min'], item['max']) in (
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
-                           field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE) else '',
+                           field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE, MATERIAL_TABLE) else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
@@ -995,6 +1028,9 @@ class ItemDocument:
         links_effect = EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id))
         if links_effect and str(int(value)) not in self.effect_references().choices:
             raise FormatError('Choose an existing effect or None')
+        links_goods = GOODS_TABLE in self.params and key in set(goods_keys(self, table, row_id))
+        if links_goods and str(int(value)) not in self.goods_references().choices:
+            raise FormatError('Choose an existing item or None')
         added = (table, row_id) in self._added_rows
         original = None if added else self.original_plain[start:start + len(data)]
         # A value that reads the same as the saved one IS the saved one. The
@@ -1033,6 +1069,7 @@ class ItemDocument:
         self.params[table] = param
         self._rows_by_id[table] = {row.row_id: row for row in param.rows}
         self._effects = None
+        self._goods = None
         self.__dict__.pop('_attack_references', None)
         self.__dict__.get('_spans_cache', {}).pop(table, None)
 

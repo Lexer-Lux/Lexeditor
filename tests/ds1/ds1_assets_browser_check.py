@@ -16,6 +16,9 @@ from playwright.sync_api import sync_playwright
 
 TPF = "chr/c0000/c0000.tpf"
 MOVIE = "movww/intro.wmv"
+MODEL = "chr/c0000/c0000.chrbnd.dcx"
+MUSIC = "sound/frpg_m10.fsb"
+SFX = "sound/frpg_c1000.fsb"
 
 
 def make_dds(width=16, height=16):
@@ -64,6 +67,12 @@ def main():
         (game / TPF).write_bytes(game_tpf)
         (game / MOVIE).parent.mkdir(parents=True)
         (game / MOVIE).write_bytes(b"fake movie bytes")
+        (game / MODEL).parent.mkdir(parents=True, exist_ok=True)
+        (game / MODEL).write_bytes(b"fake model bytes")
+        (game / MUSIC).parent.mkdir(parents=True, exist_ok=True)
+        (game / MUSIC).write_bytes(b"fake music bytes")
+        (game / SFX).parent.mkdir(parents=True, exist_ok=True)
+        (game / SFX).write_bytes(b"fake sfx bytes")
         upload = temp / "replacement.tpf"
         upload.write_bytes(mod_tpf)
         mod.mkdir()
@@ -84,11 +93,21 @@ def main():
                     page.wait_for_selector('[data-subtab="overrides"]')
                     page.wait_for_function('state.tab==="assets" && state.sub==="overrides" && !state.error')
                     assert page.locator("[data-subtab]").evaluate_all(
-                        "nodes=>nodes.map(n=>n.dataset.subtab)") == ["game", "overrides"]
+                        "nodes=>nodes.map(n=>n.dataset.subtab)") == [
+                        "game", "overrides", "models", "textures", "sound", "music", "other"]
                     assert page.evaluate("state.rows.length") == 0
                     page.locator('[data-subtab="game"]').click()
+                    page.wait_for_function('state.sub==="game" && state.rows.length===1 && !state.error')
+                    for kind, wanted in (("models", MODEL), ("textures", TPF), ("sound", SFX),
+                                         ("music", MUSIC), ("other", MOVIE)):
+                        page.locator(f'[data-subtab="{kind}"]').click()
+                        page.wait_for_function(
+                            f'state.assetKind==="{kind}" && state.rows.length===1'
+                            f' && state.rows[0].id==="{wanted}" && !state.error')
+                    page.locator('[data-subtab="textures"]').click()
                     page.wait_for_function(
-                        'state.sub==="game" && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf") && !state.error')
+                        'state.assetKind==="textures"'
+                        ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf") && !state.error')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function(
                         'state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.source==="game"'
@@ -98,18 +117,23 @@ def main():
                     assert preview.evaluate("img=>img.naturalWidth") > 0
                     if output:
                         page.screenshot(path=str(output / "assets-game-preview.png"))
+                    page.locator('[data-subtab="other"]').click()
+                    page.wait_for_function('state.assetKind==="other" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=MOVIE).click()
                     page.wait_for_function(
                         'state.row?.id==="movww/intro.wmv" && state.assetDetail?.source==="game"'
                         ' && state.assetDetail.textures.length===0 && !state.error')
                     assert page.locator("#main img").count() == 0
+                    page.locator('[data-subtab="textures"]').click()
+                    page.wait_for_function('state.assetKind==="textures" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.textures.length===1')
                     # Playwright sets the file behind the hidden picker; the tab
                     # uploads it and lands in Mod files, where it now lives.
                     page.locator('#main input[type="file"]').set_input_files(str(upload))
                     page.wait_for_function(
-                        'state.sub==="overrides" && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf")'
+                        'state.sub==="overrides" && state.assetKind==="textures"'
+                        ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf")'
                         ' && state.assetDetail?.source==="mod"'
                         ' && state.assetDetail.textures[0].name==="c0000_custom.dds" && !state.assetBusy && !state.error')
                     assert (mod / TPF).read_bytes() == mod_tpf

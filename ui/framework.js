@@ -8656,6 +8656,9 @@ ${contents.path}`});
         style: rowStyle,
         title: typeof options.rowTitle === "function" ? options.rowTitle(row) : options.rowTitle,
         "aria-selected": options.select ? String(selected) : null,
+        // A shift-click ranges the selection: swallow the press so the
+        // browser does not also stretch a text selection across the rows.
+        onmousedown: options.select ? event => { if (event.shiftKey) event.preventDefault(); } : null,
         // The clicked row is marked at once, so a caller that keeps the table
         // and only updates what it drives does not have to reach into the
         // list's rows to move the selection itself.
@@ -9456,6 +9459,14 @@ ${contents.path}`});
                 const headCells = [...header.querySelectorAll(".lex-column-list-head-cell")];
                 const firstPin = headCells.find(cell => String(cell.dataset.columnKey).startsWith("pin:"));
                 if (firstPin && headCells.indexOf(drag.target) < headCells.indexOf(drag.cell)) before = strip(firstPin.dataset.columnKey);
+              } else {
+                // Dropped on a pin it takes that slot: dragged rightward
+                // it lands after the target, dragged leftward before it.
+                // Always inserting before made a rightward drop a no-op.
+                const order = pinOwner.store?.pinned || [];
+                const from = order.findIndex(entry => entry.key === value);
+                const to = order.findIndex(entry => entry.key === before);
+                if (from >= 0 && to >= 0 && from < to) before = (order[to + 1] || {}).key ?? null;
               }
               pinOwner.move(value, before);
             }
@@ -10713,7 +10724,6 @@ ${contents.path}`});
         .then(rememberSharedSettings).catch(() => {});
     }
   };
-  const tableCapacityCache = new Map();
   const tableFitCapacityCache = new Map();
   // The table whose row count the reader just typed, so a fit that caps it
   // says why instead of quietly showing fewer rows than asked for.
@@ -10857,12 +10867,9 @@ ${contents.path}`});
     const hasRowOverride = hasTableRowsOverride(rowPreferenceKey);
     const requestedPageSize = readTableRows(rowPreferenceKey, globalPageSize);
     const pageSize = Math.min(requestedPageSize, fitCapacity?.capacity || requestedPageSize);
-    const queryActive = Boolean(String(options.search?.value || "").trim());
-    if (!queryActive) tableCapacityCache.set(rowPreferenceKey, records.length);
-    const stableRecordCount = queryActive
-      ? (tableCapacityCache.get(rowPreferenceKey) ?? pageSize)
-      : records.length;
-    const rowCapacity = Math.max(1, Math.min(pageSize, stableRecordCount || pageSize));
+    // The page always declares a full page of tracks: sizing the tracks to a
+    // short table's own row count stretched its rows to fill the panel.
+    const rowCapacity = Math.max(1, pageSize);
     const maximumBarrels = boundedBarrelCount(options.maxBarrels || 6, 6);
     const preferenceKey = barrelPreferenceKey(options);
     const oldPages = Math.max(1, Math.ceil(records.length / pageSize));
@@ -11095,10 +11102,13 @@ ${contents.path}`});
           // zero and every real record painted on top of the others in one band.
           if (!slotBased) padBarrelTable(node, rowCapacity);
           node.classList.add("lex-page-sized-table");
-          // The track count is read back from the rows that are really there, so
-          // a padding rule and a capacity rule can never disagree again.
+          // The track count never drops below the page's row target: a short
+          // page keeps fitted-height rows with empty tracks below it instead
+          // of stretching its rows to fill the panel. It never drops below
+          // the rows really there either, so padding and capacity cannot
+          // disagree and paint records on top of each other again.
           node.style.setProperty("--lex-page-row-count",
-            String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
+            String(Math.max(rowCapacity, node.querySelectorAll(":scope > .lex-column-list-row").length)));
           node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
           node.dataset.lexBarrel = String(index + 1);
           if (index) node.classList.add("lex-fitted-page");
@@ -11303,7 +11313,7 @@ ${contents.path}`});
       event.preventDefault();
       showToast(addWhy);
     }, {capture: true});
-    hoverActions(masterNode, {label: "Table actions", overlay: false, actions: [{node: tableAdd}]});
+    hoverActions(masterNode, {label: "Table actions", align: "bottom-right", actions: [{node: tableAdd}]});
     if (emptyRow) {
       const toggle = element("input", {
         type: "checkbox", checked: hideEmpty, "aria-label": "Hide empty slots",
@@ -11438,7 +11448,9 @@ ${contents.path}`});
         lists: masterNodes,
         available: root,
         pageSize,
-        fixedRows: fitMinimum ? Math.min(requestedPageSize, Math.max(1, records.length)) :
+        // A short table still declares a full page of fixed rows: capping the
+        // count at its own records stretched its rows to fill the panel.
+        fixedRows: fitMinimum ? requestedPageSize :
           searchActive ? pageSize : (pages === 1 ? Math.max(1, ...barrelRows.map(rows => rows.length)) : pageSize),
         minRowHeight: fitMinimum,
         visibleRows: () => searchActive ? pageSize : Math.max(1, ...barrelRows.map(rows => rows.length)),
@@ -13170,7 +13182,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, tabStrip, promptText};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

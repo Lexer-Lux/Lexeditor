@@ -285,7 +285,7 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
         done = request_json(session, "/api/assets/upload",
                             {"id": "up-1", "relative": TPF.as_posix(), "total": len(blob),
                              "offset": first["received"], "data": encoded[half:], "final": True})
-        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob)}]
+        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob), "kind": "textures"}]
         detail = request_json(session, f"/api/assets?scope=textures&file={TPF.as_posix()}")
         assert detail["source"] == "mod"
         assert [(row["name"], row["width"], row["height"]) for row in detail["textures"]] == [("b_diffuse.dds", 6, 2)]
@@ -321,3 +321,49 @@ def test_service_assets_vanilla_is_read_only(tmp_path):
         assert error.value.code == 403
     finally:
         session.stop()
+
+
+def test_kind_of_sorts_assets_into_models_textures_sound_music_other():
+    assert assets.kind_of("chr/c0000/c0000.chrbnd.dcx") == "models"
+    assert assets.kind_of("obj/o10_00_00_00.objbnd.dcx") == "models"
+    assert assets.kind_of("parts/p10_00_00_00.partsbnd.dcx") == "models"
+    assert assets.kind_of("map/m10_00_00_00.m10_00_00_00.flver.dcx") == "models"
+    assert assets.kind_of("map/m10_00_00_00.m10_00_00_00.hkxbdt.dcx") == "models"
+    assert assets.kind_of("facegen/female.fgbnd.dcx") == "models"
+    assert assets.kind_of("chr/c0000/c0000.tpf") == "textures"
+    assert assets.kind_of("chr/c0000/c0000.tpf.dcx") == "textures"
+    assert assets.kind_of("map/m10/m10.tpfbdt.dcx") == "textures"
+    assert assets.kind_of("other/picture.PNG") == "textures"
+    assert assets.kind_of("font/font16.tpf") == "textures"
+    assert assets.kind_of("sound/frpg_c1000.fsb") == "sound"
+    assert assets.kind_of("sound/frpg_p101000.fev") == "sound"
+    assert assets.kind_of("sound/bank.dcx") == "sound"
+    assert assets.kind_of("sound/frpg_m10.fsb") == "music"
+    assert assets.kind_of("sound/frpg_sm12.itl") == "music"
+    assert assets.kind_of("sound/frpg_mixer.fev") == "music"
+    assert assets.kind_of("sound/frpg_qmain.fsb") == "music"
+    assert assets.kind_of("movww/intro.wmv") == "other"
+    assert assets.kind_of("movie/intro.bik") == "other"
+    assert assets.kind_of("script/m10_00_00_00.luabnd.dcx") == "other"
+    assert assets.kind_of("shader/abs.sdr") == "other"
+    assert assets.kind_of("sfx/sfx999.ffxbnd.dcx") == "other"
+    assert assets.kind_of("mtd/m10.mtdbnd.dcx") == "other"
+    assert assets.kind_of("menu/menu.tpf") == "textures"
+    assert assets.kind_of("menu/layout.drb") == "other"
+
+
+def test_scans_label_every_entry_with_its_kind(tmp_path):
+    game, mod = project(tmp_path)
+    assets.store_bytes(mod, "chr/c0000/c0000.chrbnd.dcx", b"model")
+    assets.store_bytes(mod, TPF.as_posix(), b"pixels")
+    assets.store_bytes(mod, "sound/frpg_m10.fsb", b"music")
+    assets.store_bytes(mod, "sound/frpg_c1000.fsb", b"noise")
+    assets.store_bytes(mod, "movww/intro.wmv", b"movie")
+    assert {row["relative"]: row["kind"] for row in assets.scan_project(mod)} == {
+        "chr/c0000/c0000.chrbnd.dcx": "models", TPF.as_posix(): "textures",
+        "sound/frpg_m10.fsb": "music", "sound/frpg_c1000.fsb": "sound",
+        "movww/intro.wmv": "other"}
+    (game / TPF).parent.mkdir(parents=True)
+    (game / TPF).write_bytes(b"pixels")
+    rows = assets.scan_game(game)
+    assert [row for row in rows if row["relative"] == TPF.as_posix()][0]["kind"] == "textures"

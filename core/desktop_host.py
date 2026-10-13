@@ -1132,8 +1132,9 @@ class HostApi:
     def open_mod_folder(self, plugin_id: str, path: str) -> dict:
         """Open one of this plugin's own mod folders.
 
-        The path is matched against the project list rather than trusted from
-        the page, so this cannot be used to open an arbitrary directory.
+        The path is matched against the project list and the mod library
+        rather than trusted from the page, so this cannot be used to open
+        an arbitrary directory.
         """
         if plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
@@ -1144,7 +1145,15 @@ class HostApi:
             if row.get("path")
         }
         if wanted not in known:
-            raise ValueError("That folder is not one of this plugin's mods")
+            # A library mod the reader never opened for editing is no
+            # project, but its folder still opens: anything directly
+            # inside this game's library counts.
+            try:
+                library = self._game_mods(plugin_id).resolve()
+            except (OSError, ValueError):
+                library = None
+            if library is None or wanted.parent != library:
+                raise ValueError("That folder is not one of this plugin's mods")
         if not wanted.is_dir():
             raise RuntimeError(f"The mod folder is unavailable: {wanted}")
         os.startfile(str(wanted))

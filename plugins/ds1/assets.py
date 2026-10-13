@@ -38,6 +38,34 @@ MAX_UPLOAD_CHUNK = 1024 * 1024
 UPLOAD_PART_PREFIX = ".lexeditor-upload-"
 UPLOAD_ID = re.compile(r"[A-Za-z0-9-]{1,64}\Z")
 
+# Inner extensions (past .dcx) that hold geometry, and ones that hold images.
+MODEL_EXTENSIONS = frozenset({'.flver', '.chrbnd', '.objbnd', '.partsbnd', '.fgbnd',
+                              '.hkx', '.hkxbhd', '.hkxbdt'})
+TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
+SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
+# FMOD bank name tags that mark music: area themes (m), streamed themes
+# (sm) and the mix setup. Every other bank is sound effects.
+MUSIC_TAGS = ('_sm', '_m', 'main', 'mixer', 'multi')
+
+
+def kind_of(relative):
+    """models, textures, sound, music or other, by folder and inner extension."""
+    lowered = str(relative).replace(chr(92), '/').lower()
+    inner = lowered[:-4] if lowered.endswith('.dcx') else lowered
+    leaf = inner.rsplit('/', 1)[-1]
+    extension = '.' + leaf.rsplit('.', 1)[-1] if '.' in leaf else ''
+    if lowered.startswith('sound/'):
+        stem = leaf.split('.')[0]
+        return 'music' if any(tag in stem for tag in MUSIC_TAGS) else 'sound'
+    if extension in MODEL_EXTENSIONS:
+        return 'models'
+    if extension in TEXTURE_EXTENSIONS:
+        return 'textures'
+    if extension in SOUND_EXTENSIONS:
+        return 'sound'
+    return 'other'
+
+
 DXGI_FORMATS = {70: "BC1", 71: "BC1", 72: "BC1", 73: "BC1", 74: "BC2", 75: "BC2",
                 76: "BC2", 77: "BC3", 78: "BC4", 79: "BC4", 80: "BC5", 81: "BC5",
                 83: "BC5", 95: "BC6H", 96: "BC6H", 97: "BC7", 98: "BC7",
@@ -123,7 +151,8 @@ def scan_project(project, strict=True):
                 if strict:
                     raise AssetError("The mod's asset overrides are too large in total")
                 return found
-            found.append({"relative": relative.as_posix(), "size": size})
+            found.append({"relative": relative.as_posix(), "size": size,
+                          "kind": kind_of(relative.as_posix())})
     return found
 
 
@@ -141,7 +170,8 @@ def scan_game(game_root):
             relative = path.relative_to(root)
             if is_owned(relative):
                 continue
-            found.append({"relative": relative.as_posix(), "size": path.stat().st_size})
+            found.append({"relative": relative.as_posix(), "size": path.stat().st_size,
+                          "kind": kind_of(relative.as_posix())})
     return found
 
 

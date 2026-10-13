@@ -1,4 +1,4 @@
-"""Stats tab: scaling curves, weapon scaling and spell requirements."""
+"""Stats tab: curves, scaling, requirements, upgrades and materials."""
 import json
 from pathlib import Path
 import sys
@@ -8,7 +8,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
-from ds1_stats_fixture import make_stats_archive, CURVE_ROWS
+from ds1_stats_fixture import make_stats_archive, CURVE_ROWS, MATERIAL_ROWS
 from plugins.ds1 import data_map
 from plugins.ds1.formats import (
     GRAPH_TABLE, STATS_FIELDS, STATS_SUBTABS, TABLES, FormatError, ItemDocument,
@@ -45,7 +45,8 @@ def test_curve_metadata_matches_vanilla_shape():
 def test_stats_subtabs_list_their_rows():
     document = ItemDocument(make_stats_archive())
     assert [entry[0] for entry in STATS_SUBTABS] == ['curves', 'scaling', 'spell-reqs',
-                                                      'weapon-upgrades', 'armor-upgrades']
+                                                      'weapon-upgrades', 'armor-upgrades',
+                                                      'upgrade-materials']
     curves = document.list_rows('curves')
     assert {row['id'] for row in curves} == set(CURVE_ROWS)
     assert all(row['table'] == GRAPH_TABLE for row in curves)
@@ -67,6 +68,14 @@ def test_stats_subtabs_list_their_rows():
     assert {row['id'] for row in armors} == {100, 101, 102}
     assert all(row['table'] == 'ReinforceParamProtector' for row in armors)
     assert next(row['name'] for row in armors if row['id'] == 100) == 'Armor - Unique +0'
+    materials = document.list_rows('upgrade-materials')
+    assert {row['id'] for row in materials} == set(MATERIAL_ROWS)
+    assert all(row['table'] == 'EquipMtrlSetParam' for row in materials)
+    stone = document.display_name('EquipParamGoods', 100)
+    key = document.display_name('EquipParamGoods', 101)
+    assert next(row['name'] for row in materials if row['id'] == 1) == f'{stone} x 1'
+    assert next(row['name'] for row in materials if row['id'] == 2) == f'{stone} x 2, {key} x 3'
+    assert next(row['name'] for row in materials if row['id'] == 3) == 'Empty set'
 
 
 def test_stats_detail_shows_only_stat_fields():
@@ -77,6 +86,7 @@ def test_stats_detail_shows_only_stat_fields():
     assert stats_fields('curves', GRAPH_TABLE) is None
     assert stats_fields('weapon-upgrades', 'ReinforceParamWeapon') is None
     assert stats_fields('armor-upgrades', 'ReinforceParamProtector') is None
+    assert stats_fields('upgrade-materials', 'EquipMtrlSetParam') is None
     row = document.read_row('EquipParamWeapon', 100, only=STATS_FIELDS['EquipParamWeapon'])
     assert [field['key'] for field in row['fields']] == [
         field['key'] for field in document.read_row('EquipParamWeapon', 100)['fields']
@@ -104,6 +114,21 @@ def test_stats_detail_shows_only_stat_fields():
     armor = document.read_row('ReinforceParamProtector', 100)
     assert {field['key'] for field in armor['fields']} == set(STATS_FIELDS['ReinforceParamProtector'])
     assert all(field['editable'] for field in armor['fields'])
+    sets = document.read_row('EquipMtrlSetParam', 1)
+    assert {field['key'] for field in sets['fields']} == set(STATS_FIELDS['EquipMtrlSetParam'])
+    assert all(field['editable'] for field in sets['fields'])
+    groups = {field['key']: field['group'] for field in sets['fields']}
+    assert groups['materialId01'] == groups['itemNum01'] == groups['isDisableDispNum01'] == 'Material 1'
+    assert groups['isDisableDispNum05'] == 'Material 5'
+    picker = next(field for field in sets['fields'] if field['key'] == 'materialId01')
+    assert picker['type'] == 'enum'
+    assert picker['enum']['-1'] == 'None'
+    assert picker['enum']['100'] == document.display_name('EquipParamGoods', 100)
+    assert set(picker['enum']) == {'-1', '100', '101', '102'}
+    count = next(field for field in sets['fields'] if field['key'] == 'itemNum01')
+    assert count['type'] == 'number' and (count['minimum'], count['maximum']) == (-1, 99)
+    hide = next(field for field in sets['fields'] if field['key'] == 'isDisableDispNum01')
+    assert hide['type'] == 'bool'
 
 
 def test_spell_stamina_cost_edits_roundtrip_and_validate():
@@ -155,6 +180,8 @@ def test_archives_without_curves_fail_with_a_complete_archive_hint():
     assert len(document.list_rows('spell-reqs')) == 3
     assert len(document.list_rows('weapon-upgrades')) == 3
     assert len(document.list_rows('armor-upgrades')) == 3
+    with pytest.raises(FormatError, match='complete Remastered parameter archive'):
+        document.list_rows('upgrade-materials')
 
 
 def test_state_reports_stats_tabs(tmp_path):
@@ -162,12 +189,12 @@ def test_state_reports_stats_tabs(tmp_path):
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 3), ('scaling', 3), ('spell-reqs', 3),
-        ('weapon-upgrades', 3), ('armor-upgrades', 3)]
+        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
     game, mod = project(tmp_path / 'plain', make_archive())
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 0), ('scaling', 3), ('spell-reqs', 3),
-        ('weapon-upgrades', 3), ('armor-upgrades', 3)]
+        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 0)]
 
 
 def test_data_map_points_curves_at_stats(tmp_path):
@@ -200,7 +227,7 @@ def test_service_row_sub_filters_stats_fields(tmp_path):
         assert 'stats' in request('/api/plugin')['capabilities']
         assert [(tab['id'], tab['count']) for tab in request('/api/state')['statsTabs']] == [
             ('curves', 3), ('scaling', 3), ('spell-reqs', 3),
-            ('weapon-upgrades', 3), ('armor-upgrades', 3)]
+            ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
         assert {row['id'] for row in request('/api/table?tab=curves')['rows']} == set(CURVE_ROWS)
         filtered = request('/api/row?table=EquipParamWeapon&id=100&sub=scaling')['row']
         assert {field['key'] for field in filtered['fields']} == set(STATS_FIELDS['EquipParamWeapon'])
@@ -213,6 +240,10 @@ def test_service_row_sub_filters_stats_fields(tmp_path):
         upgrade = request('/api/row?table=ReinforceParamWeapon&id=100&sub=weapon-upgrades')['row']
         assert upgrade['name'] == 'Crystal +0'
         assert {field['key'] for field in upgrade['fields']} == set(STATS_FIELDS['ReinforceParamWeapon'])
+        mats = request('/api/table?tab=upgrade-materials')['rows']
+        assert {row['id'] for row in mats} == {1, 2, 3}
+        picker = request('/api/row?table=EquipMtrlSetParam&id=1&sub=upgrade-materials')['row']
+        assert {field['key'] for field in picker['fields']} == set(STATS_FIELDS['EquipMtrlSetParam'])
     finally:
         session.stop()
         assert session.wait_closed()
@@ -267,3 +298,43 @@ def test_data_map_points_upgrades_at_stats(tmp_path):
     assert weapon['openable'] and weapon['target'] == 'stats' and weapon['sub'] == 'weapon-upgrades'
     armor = next(row for row in rows if row['filename'] == 'ReinforceParamProtector.param')
     assert armor['openable'] and armor['target'] == 'stats' and armor['sub'] == 'armor-upgrades'
+    mats = next(row for row in rows if row['filename'] == 'EquipMtrlSetParam.param')
+    assert mats['openable'] and mats['target'] == 'stats' and mats['sub'] == 'upgrade-materials'
+
+
+def test_material_metadata_matches_vanilla_shape():
+    assert TABLES['EquipMtrlSetParam'] == (32, 1)
+    definition = schema('EquipMtrlSetParam')
+    assert definition['type'] == 'EQUIP_MTRL_SET_PARAM_ST' and definition['size'] == 32
+    assert {item['spec'].key for item in definition['fields'] if item['editable']} == set(
+        STATS_FIELDS['EquipMtrlSetParam'])
+    assert definition['names'] == {}
+    first = next(item for item in definition['fields'] if item['spec'].key == 'materialId01')
+    assert first['spec'].reference == 'EquipParamGoods'
+    assert (first['min'], first['max']) == (-1, 10000000)
+    count = next(item for item in definition['fields'] if item['spec'].key == 'itemNum01')
+    assert (count['min'], count['max']) == (-1, 99)
+    assert next(item for item in definition['fields']
+                if item['spec'].key == 'isDisableDispNum01')['spec'].is_bool
+
+
+def test_material_edits_roundtrip_and_validate():
+    document = ItemDocument(make_stats_archive())
+    document.edit('EquipMtrlSetParam', 1, 'itemNum01', 5)
+    document.edit('EquipMtrlSetParam', 3, 'materialId01', 102)
+    document.edit('EquipMtrlSetParam', 3, 'itemNum01', 4)
+    assert document.value('EquipMtrlSetParam', 1, 'itemNum01') == 5
+    stone = document.display_name('EquipParamGoods', 102)
+    assert next(row['name'] for row in document.list_rows('upgrade-materials')
+                if row['id'] == 3) == f'{stone} x 4'
+    assert document.dirty_count == 3
+    reopened = ItemDocument(document.export())
+    assert reopened.value('EquipMtrlSetParam', 1, 'itemNum01') == 5
+    assert reopened.value('EquipMtrlSetParam', 3, 'materialId01') == 102
+    for key, value in (('itemNum01', -2), ('itemNum01', 100), ('materialId01', 999),
+                       ('materialId01', 1.5), ('itemNum01', float('nan'))):
+        try:
+            document.edit('EquipMtrlSetParam', 1, key, value)
+        except FormatError:
+            continue
+        raise AssertionError(f'material {key}={value} was accepted')

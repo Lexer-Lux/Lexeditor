@@ -67,6 +67,19 @@ def main():
                             assert set(keys) == set(STATS_FIELDS[table]), keys
                             groups = page.evaluate('[...new Set(state.row.fields.map(f=>f.group))]')
                             assert groups == ['Thresholds', 'Growth', 'Curve shape', 'Level-up cost'], groups
+                            assert page.locator('.lex-curve-editor[data-curve-row]').count() == 1
+                            curve = page.evaluate("""() => {
+                                const card = document.querySelector('.lex-curve-editor[data-curve-row]');
+                                const read = key => Number(document.querySelector(`input[data-field-key="${key}"]`).value);
+                                const stages = [0, 1, 2, 3, 4].map(i => read(`stageMaxVal${i}`));
+                                const growth = [0, 1, 2, 3, 4].map(i => read(`stageMaxGrowVal${i}`));
+                                return {at: stages.map(s => card.curveEvaluate(s)), growth,
+                                        mid: card.curveEvaluate((stages[0] + stages[1]) / 2)};
+                            }""")
+                            for value, expected in zip(curve['at'], curve['growth']):
+                                assert abs(value - expected) < 1e-6, (value, expected)
+                            low, high = sorted((curve['growth'][0], curve['growth'][1]))
+                            assert low <= curve['mid'] <= high, curve
                         else:
                             assert set(keys) == set(STATS_FIELDS[table]), keys
                         control = reveal(page, page.locator('input[data-field-key][type="number"]').first)
@@ -88,6 +101,16 @@ def main():
                         changes.append((identity['table'], identity['id'], field, value))
                         if output:
                             page.screenshot(path=str(output / f'stats-{tab}.png'))
+                    # The level-up cost row has no stages to plot: it keeps
+                    # the plain field list instead of a graph.
+                    page.locator('[data-subtab="curves"]').click()
+                    page.wait_for_function('state.sub==="curves" && state.rows.length>0 && !state.error')
+                    page.locator('.lex-list-row[data-key="CalcCorrectGraph:200"]').click()
+                    page.wait_for_function('state.row && state.row.id===200 && !state.error')
+                    assert page.locator('.lex-curve-editor[data-curve-row]').count() == 0
+                    assert {field.get_attribute('data-field-key') for field in
+                            page.locator('input[data-field-key]').all()} == set(
+                        STATS_FIELDS['CalcCorrectGraph'])
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload()

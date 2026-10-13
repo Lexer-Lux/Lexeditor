@@ -55,6 +55,10 @@ def payload(store, native_rules=None, theme=None):
             row.update(coverage='structured',status='partial',openable=True,
                 target='stats',sub='armor-upgrades',controls='Stats: armor upgrade multipliers',
                 notes='Edit every armor upgrade level.')
+        elif table == 'EquipMtrlSetParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='stats',sub='upgrade-materials',controls='Stats: upgrade material sets',
+                notes='Edit the items each upgrade level spends, and how many of each.')
         elif table == 'ItemLotParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='world',sub='drops',controls='World: enemy and corpse drops',

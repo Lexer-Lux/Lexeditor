@@ -1,16 +1,32 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable}=LexeditorUI;
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
+  assetKind:"models",assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
+const assetKinds=[
+  {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Model packages (.chrbnd, .objbnd, .partsbnd), single meshes (.flver) and collision (.hkx)."},
+  {id:"textures",label:"Textures",help:"The images on the models: texture packages (.tpf), single images (.dds, .png) and font faces."},
+  {id:"sound",label:"Sound effects",help:"FMOD sound banks (.fev, .fsb): swings, hits, footsteps, voices, everything audible but the music. The sfx folder holds particle effects, which are visual and live under Other files."},
+  {id:"music",label:"Music",help:"FMOD music banks: area themes and boss music."},
+  {id:"other",label:"Other files",help:"Movies, menu interface, scripts, shaders, materials and visual effects: game files no structured editor owns."}];
+const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.assetKind)
+  .map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size}}));
+async function setAssetKind(id){
+  if(state.assetKind===id)return;
+  state.assetKind=id;state.query="";state.page=0;
+  state.rows=assetRows(state.assetFiles);
+  state.selected=state.rows[0]?key(state.rows[0]):null;
+  await loadDetail().catch(notify);render();
+}
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
@@ -125,7 +141,8 @@ async function loadItems(){
   else if(state.tab==="assets")url="/api/assets?scope="+(sub==="game"?"game":"overrides");
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
-  state.rows=state.tab==="assets"?result.files.map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size}})):result.rows;
+  if(state.tab==="assets"){state.assetFiles=result.files;state.rows=assetRows(result.files);}
+  else state.rows=result.rows;
   state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
   if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
   await loadDetail();
@@ -561,7 +578,8 @@ async function uploadAsset(target,file){
       state.assetUpload={received:offset,total:file.size};render();
     }
     state.assetBusy=false;state.assetUpload=null;
-    if(files)state.rows=files.map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size}}));
+    if(files){state.assetFiles=files;const entry=files.find(file=>file.relative===target);
+      if(entry)state.assetKind=entry.kind||"other";state.rows=assetRows(files);}
     // An upload from Installed game lands in Mod files, where it now lives.
     if(state.sub==="game")state.sub="overrides";
     state.selected=`Asset:${target}`;
@@ -575,7 +593,7 @@ async function removeAssetOverride(target){
   state.assetBusy=true;render();
   try{
     const result=await api("/api/assets/remove",{relative:target});
-    state.rows=result.files.map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size}}));
+    state.assetFiles=result.files;state.rows=assetRows(result.files);
     state.selected=state.rows[0]?key(state.rows[0]):null;state.row=null;state.assetDetail=null;
     await loadDetail();
   }
@@ -640,11 +658,78 @@ async function removeRow(kind){
   catch(error){notify(error);}
   finally{state.rowBusy=false;render();}
 }
+// Between stages the game blends with a power shaped by the left stage's
+// Curve shape value: a positive shape is the exponent, a negative shape
+// inverts it (a fast start instead of a slow one), and 1 draws straight.
+// Zero is plotted straight: the only vanilla zero-shape rows are the
+// level-up cost row, whose stages are unused, and row 150, whose shaping
+// is undocumented. Checked against the published hit-point chart (level
+// 5 vitality reads 471, level 40 reads 1325) within rounding.
+function curveExponent(shape){
+  if(!(shape>0))return shape<0?-1/shape:1;
+  return shape;
+}
+function curveDetail(actions,groups){
+  const row=state.row;
+  const at=key=>Number(row.fields.find(item=>item.key===key)?.value??0);
+  const stages=[0,1,2,3,4].map(i=>at(`stageMaxVal${i}`));
+  if(stages.every(value=>value===0)){
+    // The level-up cost row has no stages to plot, and its soul price
+    // comes from the four cost fields by an undocumented formula, so it
+    // keeps the plain field list.
+    return detailPanel({title:row.name,help:row.help,actions,
+      body:[...groups].map(([title,body])=>detailSection({title,body}))});
+  }
+  const host=el("div",{class:"ds1-curve-host"});
+  let graph=null;
+  const live=key=>{
+    const input=host.querySelector(`input[data-field-key="${key}"]`);
+    const value=input?Number(input.value):NaN;
+    return Number.isFinite(value)?value:at(key);
+  };
+  const evaluate=x=>{
+    const points=[0,1,2,3,4].map(i=>[live(`stageMaxVal${i}`),live(`stageMaxGrowVal${i}`)]);
+    if(!(x>points[0][0]))return points[0][1];
+    for(let i=0;i<4;i++){
+      const [lo,loValue]=points[i],[hi,hiValue]=points[i+1];
+      if(x>hi&&i<3)continue;
+      const raw=hi>lo?(x-lo)/(hi-lo):1;
+      const t=Math.min(1,Math.max(0,raw));
+      return loValue+(hiValue-loValue)*Math.pow(t,curveExponent(live(`adjPt_maxGrowVal${i}`)));
+    }
+    return points[4][1];
+  };
+  const variables=row.fields.map(field=>{
+    const digit=Number(field.key.slice(-1));
+    const short=field.key.startsWith("stageMaxVal")?`T${digit+1}`
+      :field.key.startsWith("stageMaxGrowVal")?`V${digit+1}`
+      :field.key.startsWith("adjPt_maxGrowVal")?`S${digit+1}`
+      :field.key==="init_inclination_soul"?"C1":field.key==="adjustment_value"?"C2"
+      :field.key==="boundry_inclination_soul"?"C3":"C4";
+    const control=plainControlFor(row,field);
+    if(control instanceof Element&&field.label)control.title=field.label;
+    control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
+    return {label:short,control};
+  });
+  const ends=[0,1,2,3,4].map(i=>at(`stageMaxGrowVal${i}`));
+  const floor=Math.min(0,...ends),ceil=Math.max(...ends);
+  graph=curveEditor({title:row.name,overlayExtrema:true,variables,
+    domain:{min:stages[0],max:stages[4]>stages[0]?stages[4]:stages[0]+1},
+    range:{min:floor,max:ceil>floor?ceil:floor+1},
+    graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate});
+  graph.dataset.curveRow=String(row.id);
+  graph.curveEvaluate=evaluate;
+  host.append(graph);
+  return detailPanel({title:row.name,help:row.help,actions,
+    body:[detailSection({title:"GRAPH",
+      help:infoHelp("The line passes exactly through every stage point; between stages it blends with the left stage's Curve shape value. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shaping, C1-C4 the level-up cost fields. Edit every value from the variables drawer over the graph."),
+      body:[host]})]});
+}
 function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing is
   // said under it, never in its place.
-  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="scaling"?"Weapon":state.sub==="spell-reqs"?"Spell":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
+  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="scaling"?"Weapon":state.sub==="spell-reqs"?"Spell":state.sub==="upgrade-materials"?"Material set":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
   const drillRow=state.tab==="animations"&&!state.row?state.rows.find(row=>key(row)===state.selected):null;
   if(drillRow&&isDrillRow(drillRow)){
     const opening=String(drillRow.id).startsWith("char:");
@@ -674,6 +759,7 @@ function detail(){
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
   const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons("placement"):paramRowEarly?rowActionButtons("record"):[];
   if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]});
+  if(state.tab==="stats"&&state.sub==="curves"&&paramRowEarly)return curveDetail(rowActionsEarly,groups);
   let help=state.row.help;
   if(impact){
     const examples=impact.variants.slice(0,3).map(n=>n.name).join(", ");
@@ -859,7 +945,7 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations"&&state.sub==="playback")return renderPlayback();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="scaling"?"weapons":state.sub==="spell-reqs"?"spells":state.sub==="upgrade-materials"?"material sets":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
   const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
@@ -895,7 +981,9 @@ function renderItems(){
     // bytes under a path, never the path itself.
     // names: level-up gains cover the game's four fixed defenses, which
     // have no stored names to change.
-    renamable:row=>state.tab==="stats"?row.table!=="CalcCorrectGraph":state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
+    // names: a material set is named by what it spends; the name follows
+    // the contents, so there is nothing to rename.
+    renamable:row=>state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;
@@ -903,6 +991,8 @@ function renderItems(){
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
   const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,change:id=>navigate(state.tab,id)});
+  if(state.tab==="assets")return LexeditorUI.stack(strip,subtabBar({tabs:assetKinds,active:state.assetKind,
+    label:"Asset kinds",order:"given",shortcuts:false,change:setAssetKind}),view);
   if(state.tab!=="animations"||state.animScope.level==="chars")return LexeditorUI.stack(strip,view);
   const scope=state.animScope;
   const crumbs=[el("button",{type:"button","data-anim-crumb":"chars",
