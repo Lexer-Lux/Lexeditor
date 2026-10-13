@@ -4949,12 +4949,31 @@
     cancel.onclick = dismiss;
     discard.onclick = async () => {
       setBusy(true);
-      status.textContent = copy.pendingLabel || "Please wait…";
+      // "Without saving" still discards first: guarded exits refuse to
+      // run while changes are unsent, so abandoning them is part of the
+      // button, not a skip. A page with no discard hook keeps the old
+      // direct exit.
+      const canDiscard = typeof options.discard === "function";
+      status.textContent = canDiscard ? "Discarding changes…" : (copy.pendingLabel || "Please wait…");
+      let discarded = false;
       try {
+        if (canDiscard) {
+          await options.discard();
+          const remaining = options.dirtyCount?.() || 0;
+          if (remaining) {
+            status.textContent = `${remaining} change${remaining === 1 ? "" : "s"} could not be discarded. Lexeditor stayed open.`;
+            setBusy(false);
+            return;
+          }
+          discarded = true;
+          status.textContent = copy.pendingLabel || "Please wait…";
+        }
         if (await exit()) backdrop.remove();
+        else if (discarded) status.textContent = "Discarded, but the action did not complete. Try again or cancel.";
         else status.textContent = "The action did not complete. Try again or cancel.";
       } catch (error) {
-        status.textContent = `${copy.exitError || "Could not exit"}: ${error.message || error}`;
+        const failed = canDiscard && !discarded ? "Could not discard changes" : (copy.exitError || "Could not exit");
+        status.textContent = `${failed}: ${error.message || error}`;
       } finally {
         setBusy(false);
       }
