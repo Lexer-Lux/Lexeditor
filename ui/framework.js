@@ -2257,6 +2257,17 @@
         return;
       }
       const inset = Math.min(3, target.height * .1);
+      if (wideBoolean) {
+        // Wide boolean boxes keep the pin the way every other value box
+        // does: the whole icon inside the box's top-right corner. Aiming
+        // the drawn tip at the corner hung the mark half past the box
+        // edge, where the panel body sliced it off.
+        const boolScale = owner.width / control.offsetWidth || 1;
+        pin.style.setProperty("left", `${(target.right - owner.left - inset - icon.width) / boolScale}px`, "important");
+        pin.style.setProperty("top", `${(target.top - owner.top + inset) / boolScale}px`, "important");
+        pin.style.setProperty("right", "auto", "important");
+        return;
+      }
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
@@ -5861,32 +5872,6 @@ ${contents.path}`});
         // path, then the actions lane (warning flags, if any), then the
         // on/off mark. Without the actions lane the mark lands a column
         // early, and a flag pushes the path out of its column.
-        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
-          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
-            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "⚙"),
-            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
-            element("span", {class: "lex-project-menu-path"}, row.path)),
-          element("span", {class: "lex-project-menu-item-actions"},
-            modFlagsMark(row.conflicts, row.alerts)),
-          element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
-              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
-        const select = element("button", {
-        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
-        type: "button", role: "menuitem", title: row.path,
-        onclick: () => {
-          closeMenu();
-          if (row.current && activeSource !== "mine") guarded(async () => {
-            await options.selectProjectSource?.("mine");
-            render(snapshot);
-          });
-          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
-        },
-      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
-      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
-      element("span", {class: "lex-project-menu-path"}, row.path),
-      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
-        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
-        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         const folder = element("button", {
           class: "lex-project-folder", type: "button",
           title: `Open the ${row.name} folder`, "aria-label": `Open the ${row.name} folder`,
@@ -5919,6 +5904,32 @@ ${contents.path}`});
             }
           },
         }, infoIcon());
+        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
+          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
+            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "🔒"),
+            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+            element("span", {class: "lex-project-menu-path"}, row.path)),
+          element("span", {class: "lex-project-menu-item-actions"},
+            folder, about, modFlagsMark(row.conflicts, row.alerts)),
+          element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const select = element("button", {
+        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
+        type: "button", role: "menuitem", title: row.path,
+        onclick: () => {
+          closeMenu();
+          if (row.current && activeSource !== "mine") guarded(async () => {
+            await options.selectProjectSource?.("mine");
+            render(snapshot);
+          });
+          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
+        },
+      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
+      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+      element("span", {class: "lex-project-menu-path"}, row.path),
+      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
           select,
           element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about,
@@ -7990,7 +8001,10 @@ ${contents.path}`});
     save.onclick = async () => {
       if (saveBusy || save.disabled) return;
       setSaveBusy(true);
-      try { await options.save?.(); playThemeSound("save"); }
+      // Saving rebuilds the installed tweaks, which is what the Mods tab
+      // alert marks describe: re-read them so a rebuilt mod clears its
+      // mark at once instead of waiting for Play.
+      try { await options.save?.(); playThemeSound("save"); await mods.refresh(); }
       catch (error) { showToast(error?.message || "Save failed.", true); }
       finally { setSaveBusy(false); }
     };
@@ -12559,6 +12573,14 @@ ${contents.path}`});
       } finally { importing = false; }
     };
     return {
+      async refresh() {
+        // A save rebuilds what the marks describe; a showing tab re-reads
+        // them so a rebuilt mod clears its alert without reopening.
+        // A failed re-read keeps the old rows: the save still succeeded.
+        if (!main?.isConnected) return;
+        try { await load(); } catch (_error) { return; }
+        if (main?.isConnected) draw();
+      },
       async show(target) {
         main = target;
         draw();

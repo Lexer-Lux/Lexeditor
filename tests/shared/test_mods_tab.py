@@ -70,18 +70,29 @@ HOST = """(options) => {
   }};
   document.body.insertAdjacentHTML('afterbegin', '<div id="shell"></div>');
   window.navigated = [];
+  window.__modsOptions = options;
+  if (options.projects) window.pywebview.api.mod_projects = async () => ({projects: [
+    {path: "C:/lib/game/Mine", name: "Mine", version: "", valid: true, current: true, enabled: true,
+     conflicts: ["Items 100, Sell value: Combat changes this too and loads later"]},
+    {path: "C:/lib/game/Tweak", name: "Tweak", version: "", valid: false, current: false, enabled: true,
+     notEditable: "A tweak mod: it has no game data to edit here. Its settings are in the Tweaks tab.",
+     alerts: ["This mod changed since the last build."]},
+    {path: "C:/lib/game/Broken", name: "Broken", version: "", valid: false, current: false, enabled: false,
+     notEditable: "This mod has no files the editor can open."},
+  ]});
   window.shell = LexeditorUI.mountShell({host: '#shell', plugin: {id: 'game', name: 'Test Game'},
     tabs: [{id: 'items', label: 'Items'}, {id: 'tweaks', label: 'Tweaks'}],
     activeTab: () => 'items', navigate: tab => { navigated.push(tab); document.querySelector('#main').textContent = 'plugin page ' + tab; },
-    ...(options.vanilla ? {readonly: () => true, projectActiveSource: () => 'vanilla'} : {})});
+    ...(options.vanilla ? {readonly: () => true, projectActiveSource: () => 'vanilla'} : {}),
+    ...(options.save ? {save: async () => { window.saved = true; }, dirtyCount: () => 1} : {})});
   if (options.vanilla) shell.refresh?.();
 }"""
 
 
-def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False):
+def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False, projects=False):
     framework(page)
     page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
-                       "alerts": alerts, "bundle": bundle})
+                       "alerts": alerts, "bundle": bundle, "save": save, "projects": projects})
     page.wait_for_timeout(250)
 
 
@@ -370,3 +381,85 @@ def test_a_bundles_components_are_ordinary_settings_that_save(page):
     page.get_by_role("checkbox", name="Balance", exact=True).check()
     page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_settings')")
     assert calls(page, "save_mod_settings")[-1][1:] == ["C:/lib/game/Collection", {"combat": True, "balance": True}]
+
+def test_saving_clears_a_rebuilt_mods_alert_mark(page):
+    # The save rebuilds the tweaks, so the host stops reporting the alert;
+    # the showing Mods tab re-reads its marks instead of waiting for Play.
+    mount(page, alerts=True, save=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.get_by_role("checkbox", name="Switch Combat").check()
+    page.wait_for_function("document.querySelectorAll('.lex-column-list .lex-conflict-mark').length === 1")
+    page.evaluate("window.__modsOptions.alerts = false")
+    page.evaluate("window.shell.refresh()")
+    page.locator("#global-save").click()
+    page.wait_for_function("window.saved === true")
+    page.wait_for_function("!document.querySelector('.lex-column-list .lex-conflict-mark')")
+
+
+def test_mods_detail_switch_fits_its_header(page):
+    # The enable switch is square and never outgrows a short header.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    switch = page.get_by_role("checkbox", name="Mine enabled")
+    switch.wait_for()
+    heading = page.locator(".lex-mods-page .lex-detail-panel-heading")
+    for _ in range(2):
+        page.wait_for_function("""() => {
+          const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
+          const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
+          return box && head && box.getBoundingClientRect().width > 0 && head.getBoundingClientRect().height > 0;
+        }""")
+        geometry = page.evaluate("""() => {
+          const rect = el => { const b = el.getBoundingClientRect();
+            return {x: b.x, y: b.y, width: b.width, height: b.height}; };
+          return {box: rect(document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]')),
+            head: rect(document.querySelector(".lex-mods-page .lex-detail-panel-heading"))};
+        }""")
+        box, head = geometry["box"], geometry["head"]
+        assert box["width"] == box["height"] > 0, box
+        assert box["y"] >= head["y"] - 1 and box["y"] + box["height"] <= head["y"] + head["height"] + 1, (box, head)
+        assert box["x"] >= head["x"] and box["x"] + box["width"] <= head["x"] + head["width"], (box, head)
+        # A short header shrinks the switch instead of clipping it.
+        page.evaluate("""() => {
+          const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
+          head.style.padding = "0";
+          head.querySelector(".lex-detail-panel-title").style.fontSize = "10px";
+        }""")
+        page.wait_for_timeout(150)
+
+
+def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):
+    mount(page, projects=True)
+    page.locator(".lex-project-select").click()
+    menu = page.locator(".lex-project-menu")
+    menu.wait_for()
+    page.wait_for_function(
+        "document.querySelectorAll(\'.lex-project-menu-item\').length >= 3")
+    page.wait_for_timeout(300)
+    menu.screenshot(path=str(tmp_path / "menu.png"))
+    menu.screenshot(path="C:/Users/Lexer/AppData/Local/Temp/lexeditor-dev/menu.png")
+    rows = page.locator(".lex-project-menu-item")
+    assert rows.count() >= 3
+    tweak = rows.filter(has_text="Tweak").first
+    assert tweak.locator(".lex-project-source-mode").inner_text() == "\U0001f512"
+    assert tweak.locator(".lex-project-folder").count() == 1
+    assert tweak.locator(".lex-project-about").count() == 1
+    assert tweak.locator(".lex-project-rename").count() == 0
+    assert tweak.locator(".lex-conflict-mark").count() == 1
+    broken = rows.filter(has_text="Broken").first
+    assert broken.locator(".lex-project-folder").count() == 1
+    assert broken.locator(".lex-project-about").count() == 1
+    mine = rows.filter(has_text="Mine").first
+    assert mine.locator(".lex-project-rename").count() == 1
+    assert mine.locator(".lex-conflict-mark").count() == 1
+    centers = page.evaluate("""() => {
+      const lanes = [...document.querySelectorAll('.lex-project-menu-item-actions')];
+      return lanes.map(lane => [...lane.children].map(child => {
+        const r = child.getBoundingClientRect();
+        return Math.round((r.y + r.height / 2) * 10) / 10;
+      }));
+    }""")
+    for lane in centers:
+        assert max(lane) - min(lane) <= 1, lane
+

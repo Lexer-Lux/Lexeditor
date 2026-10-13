@@ -1045,6 +1045,19 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 6px;
 }
+/* A header switch tracks its header: full size on a roomy one, shrunk to
+   fit a short one, always square with its padding. A fixed box outgrew
+   short headers and the heading clip cut it.
+   The drawn tick is sized for this range.
+*/
+.lex-detail-panel-actions > input[type="checkbox"] {
+  width:auto;
+  height:18px;
+  max-height:100%;
+  min-height:16px;
+  aspect-ratio:1;
+  margin:0;
+}
 
 /* Multi-select prepends a banner beside the tabbed panel, so the pair below
    gets the same fill treatment an only-child tabbed panel gets. The tabs
