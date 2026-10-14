@@ -297,6 +297,20 @@ window.Ds1Viewport = (() => {
     });
     const controller = {
       select,
+      focus(focusKey) {
+        const group = focusKey && groups.get(focusKey);
+        if (!group) return false;
+        group.updateWorldMatrix(true, false);
+        const target = new THREE.Vector3();
+        group.getWorldPosition(target);
+        const span = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).length() || 4;
+        const offset = camera.position.clone().sub(controls.target);
+        if (!offset.lengthSq()) offset.set(1, 0.7, 1);
+        offset.normalize().multiplyScalar(Math.min(Math.max(span * 2, 8), 24));
+        controls.target.copy(target);
+        camera.position.copy(target).add(offset);
+        return true;
+      },
       setShowCollision(shown) { markers.visible = shown !== false; },
       moveTo(key, pos) {
         const group = key && groups.get(key);

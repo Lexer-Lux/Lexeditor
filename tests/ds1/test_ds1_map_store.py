@@ -36,6 +36,20 @@ def test_list_rows_link_enemy_names_with_unknown_fallback(tmp_path):
     assert dangling.list_rows()[0]["display"]["npcId"] == "Unknown (999001)"
 
 
+def test_list_rows_carry_npc_type_for_the_directory_split(tmp_path):
+    _game, _mod, foes = setup(tmp_path / "foes", npc=120000)
+    assert foes.list_rows()[0]["values"]["npcType"] == 0
+    _game, _mod, friends = setup(tmp_path / "friends", npc=251000)
+    assert friends.list_rows()[0]["values"]["npcType"] == 2
+
+
+def test_locate_drop_finds_first_placement_of_a_dropper(tmp_path):
+    _game, _mod, store = setup(tmp_path)
+    store.item_store.edit("NpcParam", 120000, "itemLotId_1", 100)
+    assert store.locate_drop(100) == {"map": MAP, "key": "2:0"}
+    assert store.locate_drop(9999) is None
+
+
 def test_read_returns_enum_choices_and_vanilla_values(tmp_path):
     _game, _mod, store = setup(tmp_path)
     row = store.read(MAP, "2:0")

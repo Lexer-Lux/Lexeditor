@@ -5,13 +5,16 @@ from plugins.ds1.formats import TABLES, OPTIONAL_TABLES, schema
 from plugins.ds3.formats import write_field
 
 
-def make_archive():
+def make_archive(table_ids=None):
+    """Synthetic GameParam; table_ids overrides row ids per table and can
+    include optional tables the default skips."""
+    table_ids = table_ids or {}
     entries = []
     for table, (size, version) in TABLES.items():
-        if table in OPTIONAL_TABLES:
+        if table in OPTIONAL_TABLES and table not in table_ids:
             continue
         definition = schema(table)
-        ids = [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102]
+        ids = table_ids.get(table, [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102])
         rows_start = 48 + len(ids) * 12
         data = bytearray(rows_start + len(ids) * size)
         struct.pack_into('<IHhhH', data, 0, len(data), rows_start, 0, version, len(ids))

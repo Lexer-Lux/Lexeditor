@@ -49,6 +49,13 @@ def open_viewport(page, session):
     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
 
 
+def viewport_click(page, action):
+    # The map buttons only take clicks while the picture is hovered, as for
+    # a human reader: hovering the button itself never engages them.
+    page.locator('[data-viewport-host]').hover()
+    page.locator(f'[data-viewport-action="{action}"]').click()
+
+
 def rendered_pixels(page, label):
     # A blank canvas is one flat color; a rendered quad
     # adds its face plus antialiased edges.
@@ -82,11 +89,14 @@ def phase_readonly(play, game, output, errors):
             assert not page.locator('[data-viewport-action="rotate"]').is_disabled()
             toggle = page.locator('[data-viewport-action="collision"]')
             assert toggle.inner_text() == 'Hide collision'
-            toggle.click()
+            viewport_click(page, 'collision')
             assert toggle.inner_text() == 'Show collision'
-            toggle.click()
+            viewport_click(page, 'collision')
             assert toggle.inner_text() == 'Hide collision'
-            page.locator('canvas[data-viewport]').click(position={'x': 720, 'y': 380})
+            canvas = page.locator('canvas[data-viewport]')
+            box = canvas.bounding_box()
+            point = page.evaluate('document.querySelector("[data-viewport-host]")._viewportProject(1, 2, 3)')
+            canvas.click(position={'x': point[0] - box['x'], 'y': point[1] - box['y']})
             page.wait_for_function('document.querySelector("[data-viewport-status]").textContent.includes("Selected:")',
                                    timeout=30000)
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
@@ -127,11 +137,12 @@ def phase_edit(play, game, mod, output, errors):
             duplicate = page.locator('[data-viewport-action="duplicate"]')
             remove = page.locator('[data-viewport-action="remove"]')
             assert not duplicate.is_disabled() and not remove.is_disabled()
-            duplicate.click()
+            viewport_click(page, 'duplicate')
             page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
-            assert 'chest0_1' in page.locator('[data-viewport-status]').inner_text()
+            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
+                                   '.includes("chest0_1")', timeout=30000)
             assert '6 parts' in page.locator('[data-viewport-status]').inner_text()
-            remove.click()
+            viewport_click(page, 'remove')
             page.locator('.lex-dialog').get_by_role('button', name='Remove').click()
             # Six view parts: the removed duplicate is gone, and the enemy
             # without a model file never renders, so five parts show.
@@ -155,10 +166,10 @@ def phase_edit(play, game, mod, output, errors):
             assert turned == [0.0, 180.0, 0.0], turned
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
-            page.locator('[data-viewport-action="copy"]').click()
+            viewport_click(page, 'copy')
             page.wait_for_function('!!state.mapClipboard', timeout=30000)
             assert not page.locator('[data-viewport-action="paste"]').is_disabled()
-            page.locator('[data-viewport-action="paste"]').click()
+            viewport_click(page, 'paste')
             page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
             page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
                                    '.includes("6 parts")', timeout=30000)

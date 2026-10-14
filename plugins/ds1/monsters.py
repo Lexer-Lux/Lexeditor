@@ -90,8 +90,7 @@ for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic')
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),
                   ('thrustGuardCutRate', 'Thrust')]:
-    RESISTANCES[key] = (kind + ' (%)', 'Guard absorption',
-        f'Reduces {kind.lower()} damage while this monster guards. This does not apply to an unguarded hit.')
+    RESISTANCES[key] = (kind + ' (%)', 'Blocking', '')
 
 # Reviewed combat stats, drops, passive effects and AI links. Damage
 # multipliers state their unchanged baseline of 1, the way effect
@@ -100,8 +99,8 @@ NPC_STATS = {
     'hp': ('HP', 'Basics', 'Maximum health before resident effects scale it; Effective HP shows the result. The enemy dies at 0.'),
     'mp': ('MP', 'Basics', 'Maximum mana.'),
     'stamina': ('Stamina', 'Basics', 'Maximum stamina. Enemies use it when they block.'),
-    'staminaRecoverBaseVel': ('Stamina recovery', 'Basics',
-        'Speed of stamina recovery. Higher values recover faster.'),
+    'staminaRecoverBaseVel': ('Stamina recovery (stamina/second)', 'Basics',
+        'Stamina points recovered per second. Higher values recover faster.'),
     'superArmorDurability': ('Poise', 'Basics',
         "Poise health. Only works when the enemy's damage level is set."),
     'superArmorRecoverCorrection': ('Poise recovery', 'Basics',
@@ -113,8 +112,7 @@ NPC_STATS = {
     'teamType': ('Team', 'Basics', 'Which side this enemy fights for.'),
     'weakPartsDamageRate': ('Damage taken: weak point', 'Defense',
         'Multiplier on damage the weak point takes. 1 is unchanged.'),
-    'staminaGuardDef': ('Stamina guard (%)', 'Guard absorption',
-        'Reduces stamina damage while this monster guards. This does not apply to an unguarded hit.'),
+    'staminaGuardDef': ('Stamina guard (%)', 'Blocking', ''),
     'hitHeight': ('Body height', 'Defense',
         'Height of the body used for hits. Ignored for ragdoll bodies.'),
     'hitRadius': ('Body radius', 'Defense',
@@ -137,9 +135,7 @@ for index in range(1, 9):
         f'Multiplier on damage body part {index} takes. 1 is unchanged.')
 for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
                   ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
-    NPC_STATS[key] = (f'{kind} guard (%)', 'Guard absorption',
-        f'Reduces {kind.lower()} damage while this monster guards. '
-        'This does not apply to an unguarded hit.')
+    NPC_STATS[key] = (f'{kind} guard (%)', 'Blocking', '')
 for index in range(1, 7):
     NPC_STATS[f'itemLotId_{index}'] = (
         f'Drop table {index}', 'Value & rewards',
