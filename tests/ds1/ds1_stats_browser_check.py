@@ -1,4 +1,4 @@
-"""Render the Stats tab's three lists and edit/save/reload, never game files."""
+"""Render the Stats tab's lists and edit/save/reload, never game files."""
 import hashlib
 import os
 from pathlib import Path
@@ -126,7 +126,7 @@ def main():
         finally:
             session.stop()
             assert session.wait_closed()
-        # Without the curve table, Stats opens on weapon scaling, not an error.
+        # Without the curve table, Stats opens on the first list with rows, not an error.
         plain_game, plain_mod = temp / 'plain-game', temp / 'plain-mod'
         (plain_game / RELATIVE).parent.mkdir(parents=True)
         (plain_game / RELATIVE).write_bytes(make_archive())
@@ -144,14 +144,14 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('button[data-tab="stats"]').click()
-                    page.wait_for_function('state.tab==="stats" && state.sub==="scaling" && state.rows.length>0 && state.rows[0].table==="EquipParamWeapon" && !state.error')
+                    page.wait_for_function('state.tab==="stats" && state.sub==="weapon-upgrades" && state.rows.length>0 && state.rows[0].table==="ReinforceParamWeapon" && !state.error')
                     assert not errors, errors
                 finally:
                     browser.close()
         finally:
             session.stop()
             assert session.wait_closed()
-    print('DS1 Stats lists, filtered details, curve groups, save/reload and missing-curve fallback passed.')
+    print('DS1 Stats lists, details, curve groups, save/reload and missing-curve fallback passed.')
 
 
 if __name__ == '__main__':

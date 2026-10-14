@@ -1,4 +1,4 @@
-"""Stats tab: curves, scaling, requirements, upgrades and materials."""
+"""Stats tab: curves, upgrades and materials."""
 import json
 from pathlib import Path
 import sys
@@ -44,22 +44,13 @@ def test_curve_metadata_matches_vanilla_shape():
 
 def test_stats_subtabs_list_their_rows():
     document = ItemDocument(make_stats_archive())
-    assert [entry[0] for entry in STATS_SUBTABS] == ['curves', 'scaling', 'spell-reqs',
-                                                      'weapon-upgrades', 'armor-upgrades',
-                                                      'upgrade-materials']
+    assert [entry[0] for entry in STATS_SUBTABS] == ['curves', 'weapon-upgrades',
+                                                      'armor-upgrades', 'upgrade-materials']
     curves = document.list_rows('curves')
     assert {row['id'] for row in curves} == set(CURVE_ROWS)
     assert all(row['table'] == GRAPH_TABLE for row in curves)
     assert all(row['values'] and row['display'] is not None for row in curves)
     assert next(row['name'] for row in curves if row['id'] == 100) == 'Max HP (Vitality Stat)'
-    # Weapon scaling covers every weapon record, including ammunition.
-    scaling = document.list_rows('scaling')
-    assert {row['id'] for row in scaling} == {100, 101, 102}
-    assert all(row['table'] == 'EquipParamWeapon' for row in scaling)
-    # Spell requirements are the Magic records, without the inventory items.
-    spells = document.list_rows('spell-reqs')
-    assert {row['id'] for row in spells} == {100, 101, 102}
-    assert all(row['table'] == 'Magic' for row in spells)
     upgrades = document.list_rows('weapon-upgrades')
     assert {row['id'] for row in upgrades} == {100, 101, 102}
     assert all(row['table'] == 'ReinforceParamWeapon' for row in upgrades)
@@ -80,21 +71,23 @@ def test_stats_subtabs_list_their_rows():
 
 def test_stats_detail_shows_only_stat_fields():
     document = ItemDocument(make_stats_archive())
-    assert stats_fields('scaling', 'EquipParamWeapon') == STATS_FIELDS['EquipParamWeapon']
-    assert stats_fields('scaling', 'Magic') is None
     assert stats_fields('weapons', 'EquipParamWeapon') is None
     assert stats_fields('curves', GRAPH_TABLE) is None
     assert stats_fields('weapon-upgrades', 'ReinforceParamWeapon') is None
     assert stats_fields('armor-upgrades', 'ReinforceParamProtector') is None
     assert stats_fields('upgrade-materials', 'EquipMtrlSetParam') is None
-    row = document.read_row('EquipParamWeapon', 100, only=STATS_FIELDS['EquipParamWeapon'])
+    weapon_fields = ('properStrength', 'properAgility', 'properMagic', 'properFaith',
+                     'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
+                     'correctType', 'isLuckCorrect', 'levelSyncCorrectID')
+    row = document.read_row('EquipParamWeapon', 100, only=weapon_fields)
     assert [field['key'] for field in row['fields']] == [
         field['key'] for field in document.read_row('EquipParamWeapon', 100)['fields']
-        if field['key'] in STATS_FIELDS['EquipParamWeapon']]
-    assert {field['key'] for field in row['fields']} == set(STATS_FIELDS['EquipParamWeapon'])
+        if field['key'] in weapon_fields]
+    assert {field['key'] for field in row['fields']} == set(weapon_fields)
     graph = next(field for field in row['fields'] if field['key'] == 'correctType')
     assert not graph['editable']
-    row = document.read_row('Magic', 100, only=STATS_FIELDS['Magic'])
+    row = document.read_row('Magic', 100, only=('requirementIntellect', 'requirementFaith',
+                                                'slotLength', 'stamina'))
     assert {field['key'] for field in row['fields']} == {
         'requirementIntellect', 'requirementFaith', 'slotLength', 'stamina'}
     assert all(field['editable'] for field in row['fields'])
@@ -176,8 +169,6 @@ def test_archives_without_curves_fail_with_a_complete_archive_hint():
     with pytest.raises(FormatError, match='complete Remastered parameter archive'):
         document.read_row(GRAPH_TABLE, 0)
     # The other Stats lists do not need the curve table.
-    assert len(document.list_rows('scaling')) == 3
-    assert len(document.list_rows('spell-reqs')) == 3
     assert len(document.list_rows('weapon-upgrades')) == 3
     assert len(document.list_rows('armor-upgrades')) == 3
     with pytest.raises(FormatError, match='complete Remastered parameter archive'):
@@ -188,12 +179,12 @@ def test_state_reports_stats_tabs(tmp_path):
     game, mod = project(tmp_path)
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
-        ('curves', 3), ('scaling', 3), ('spell-reqs', 3),
+        ('curves', 3),
         ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
     game, mod = project(tmp_path / 'plain', make_archive())
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
-        ('curves', 0), ('scaling', 3), ('spell-reqs', 3),
+        ('curves', 0),
         ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 0)]
 
 
@@ -226,13 +217,14 @@ def test_service_row_sub_filters_stats_fields(tmp_path):
         session.start()
         assert 'stats' in request('/api/plugin')['capabilities']
         assert [(tab['id'], tab['count']) for tab in request('/api/state')['statsTabs']] == [
-            ('curves', 3), ('scaling', 3), ('spell-reqs', 3),
+            ('curves', 3),
             ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
         assert {row['id'] for row in request('/api/table?tab=curves')['rows']} == set(CURVE_ROWS)
-        filtered = request('/api/row?table=EquipParamWeapon&id=100&sub=scaling')['row']
-        assert {field['key'] for field in filtered['fields']} == set(STATS_FIELDS['EquipParamWeapon'])
         full = request('/api/row?table=EquipParamWeapon&id=100')['row']
-        assert len(full['fields']) > len(filtered['fields'])
+        assert {'properStrength', 'properAgility', 'properMagic', 'properFaith',
+                'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
+                'correctType', 'isLuckCorrect', 'levelSyncCorrectID'} <= {
+                    field['key'] for field in full['fields']}
         curves = request(f'/api/row?table={GRAPH_TABLE}&id=100&sub=curves')['row']
         assert curves['name'] == 'Max HP (Vitality Stat)'
         upgrades = request('/api/table?tab=weapon-upgrades')['rows']

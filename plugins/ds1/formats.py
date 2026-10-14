@@ -126,8 +126,6 @@ THINK_EDITABLE = frozenset({
     'enableNaviFlg_Hole', 'enableNaviFlg_Door', 'enableNaviFlg_InSideWall'})
 STATS_SUBTABS = (
     ('curves', 'Scaling curves', GRAPH_TABLE),
-    ('scaling', 'Weapon scaling', 'EquipParamWeapon'),
-    ('spell-reqs', 'Spell requirements', 'Magic'),
     ('weapon-upgrades', 'Weapon upgrades', 'ReinforceParamWeapon'),
     ('armor-upgrades', 'Armor upgrades', 'ReinforceParamProtector'),
     ('upgrade-materials', 'Upgrade materials', 'EquipMtrlSetParam'),
@@ -142,10 +140,6 @@ STATS_FIELDS = {
                   'stageMaxGrowVal4', 'adjPt_maxGrowVal0', 'adjPt_maxGrowVal1', 'adjPt_maxGrowVal2',
                   'adjPt_maxGrowVal3', 'adjPt_maxGrowVal4', 'init_inclination_soul',
                   'adjustment_value', 'boundry_inclination_soul', 'boundry_value'),
-    'EquipParamWeapon': ('properStrength', 'properAgility', 'properMagic', 'properFaith',
-                         'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
-                         'correctType', 'isLuckCorrect', 'levelSyncCorrectID'),
-    'Magic': ('requirementIntellect', 'requirementFaith', 'slotLength', 'stamina'),
     'ReinforceParamWeapon': ('physicsAtkRate', 'magicAtkRate', 'fireAtkRate', 'thunderAtkRate',
                   'staminaAtkRate', 'saWeaponAtkRate', 'saDurabilityRate', 'correctStrengthRate',
                   'correctAgilityRate', 'correctMagicRate', 'correctFaithRate', 'physicsGuardCutRate',
@@ -700,7 +694,7 @@ class ItemDocument:
         return result
 
     def _stats_rows(self, tab):
-        """One Stats subtab: every curve, every weapon's scaling or every spell's requirements."""
+        """One Stats subtab: every curve, upgrade or material-set row."""
         if tab == 'curves':
             if GRAPH_TABLE not in self.params:
                 raise FormatError('CalcCorrectGraph.param is missing. Open a complete Remastered parameter archive.')

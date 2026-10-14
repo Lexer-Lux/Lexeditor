@@ -15,7 +15,7 @@ Verified against the fingerprinted Remastered `GameParam.parambnd.dcx`
   stamina cost (its `tools/spell_stamina_costs.json`, copied from Elden
   Ring's published per-spell values). Elden Ring's pool matches DS1's
   scale, so the values transfer verbatim, and every cost edits in the
-  Spells list and in Stats > Spell requirements.
+  Spells list.
 
 ## NPC mirrors and the uncastable rows
 
