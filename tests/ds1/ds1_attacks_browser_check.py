@@ -106,7 +106,9 @@ def main():
                     open_monster(shared['id'])
                     attack=next(r['id'] for r in refs.list(shared['id'])['rows'] if len(refs.impact(r['id'])['variants'])>1)
                     follow(page.locator(f'.lex-hoverable[data-hover-target-type="ds1-attack"][data-hover-target-id="{attack}"]').first)
-                    page.get_by_text('Shared attack damage',exact=True).wait_for()
+                    page.locator('.lex-detail-panel-title .lex-info-help').wait_for()
+                    assert page.locator('.lex-detail-panel-meta').count() == 0
+                    assert 'changes every use' in (page.locator('.lex-detail-panel-title .lex-info-help').get_attribute('aria-label') or '')
                     page.set_viewport_size({'width':1000,'height':700}); page.wait_for_timeout(400)
                     assert page.locator('[data-field-key="atkPhys"]').evaluate('n=>n.clientWidth')>=70
                     if output: page.screenshot(path=str(output/'attacks-shared-small.png'))
@@ -120,7 +122,9 @@ def main():
                     orphan=next(a for a in sorted(refs.attack_ids,reverse=True) if not refs.impact(a)['variants'])
                     page.get_by_role('searchbox',name='Search attacks').fill(str(orphan))
                     page.wait_for_function('(id)=>state.row?.id===id',arg=orphan)
-                    page.get_by_text('Unresolved attack ownership',exact=True).wait_for()
+                    page.locator('.lex-detail-panel-title .lex-info-help').wait_for()
+                    assert page.locator('.lex-detail-panel-meta').count() == 0
+                    assert 'Ownership is unresolved' in (page.locator('.lex-detail-panel-title .lex-info-help').get_attribute('aria-label') or '')
                     if output: page.screenshot(path=str(output/'attacks-unassigned.png'))
                     page.locator('[data-subtab="player-attacks"]').click()
                     page.wait_for_function('state.sub==="player-attacks" && state.rows.length>0 && state.rows.every(r=>r.table==="AtkParam_Pc")')
@@ -152,11 +156,11 @@ def main():
                         except HTTPError as error: assert error.code==400
                     open_monster(120000,attacks=False)
                     assert page.evaluate('state.monsterTab')=='attacks'
-                    page.locator('.lex-tabbed-panel [data-subtab="resistances"]').click()
-                    page.wait_for_function('state.monsterTab==="resistances"')
+                    page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
+                    page.wait_for_function('state.monsterTab==="defense"')
                     assert len(page.evaluate('state.row.fields'))==67  # 21 resistances, 45 reviewed stats, effective HP
                     assert page.locator('[data-field-key]:visible').count()>0
-                    if output: page.screenshot(path=str(output/'monster-resistances.png'))
+                    if output: page.screenshot(path=str(output/'monster-defense.png'))
                     session.stop(); session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(mod),'LEXEDITOR_NO_MOD':'1','LEXEDITOR_MOD_READ_ONLY':'1'})
                     session.start()
                     page.goto(session.url+'?lexNoMod=1'); page.wait_for_selector('body[data-ds1-ready="true"]'); open_monster(120000,attacks=False)

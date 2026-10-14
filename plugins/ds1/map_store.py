@@ -2,6 +2,7 @@
 edits, one document per map, with the same save/discard/stale rules as the
 parameter archive."""
 import hashlib
+import re
 from pathlib import Path
 
 from core.plugin_files import atomic_write
@@ -10,6 +11,13 @@ from . import deployment
 from .formats import FormatError
 from .msb import ENEMY_TYPES, MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError, PLAYER_TYPE
 from .store import MARKER, digest
+
+
+# A map file carries the areas numbered for it: mAA_BB_*.msb owns the
+# place ids AA*100+BB*10 through +9 (m12_01 owns 1210-1219, the Oolacile
+# set), and the lowest named one is the name on the door. Verified against
+# the shipped Place_name_ table, which holds every map's areas.
+_MAP_AREA = re.compile(r'm(\d{2})_(\d{2})_\d{2}_\d{2}\.msb\Z')
 
 
 def parse_key(key):
@@ -48,6 +56,19 @@ class MapStore:
         if not live.is_dir():
             return []
         return sorted(path.name for path in live.glob("*.msb"))
+
+    def display_name(self, map_id: str) -> str:
+        """'Undead Burg (m10_01_00_00.msb)', or the bare id without area text."""
+        match = _MAP_AREA.match(map_id or '')
+        document = getattr(self.item_store, 'document', None)
+        texts = document.texts if document is not None else None
+        if match and texts is not None:
+            first = int(match.group(1)) * 100 + int(match.group(2)) * 10
+            for area_id in range(first, first + 10):
+                name = texts.place_name(area_id)
+                if name:
+                    return f'{name} ({map_id})'
+        return map_id
 
     def _load(self, map_name):
         from .tweak_mods import checked
@@ -133,6 +154,46 @@ class MapStore:
                 if placement.get("npc") in droppers:
                     return {"map": map_name, "key": f"{placement['type']}:{placement['partId']}"}
         return None
+
+    def lot_maps(self):
+        """Every drop lot with the maps whose placed enemies drop it.
+
+        ItemLotParam rows name no map, but NpcParam rows name their lots
+        and placements name their NPC: the same links as locate_drop,
+        inverted once for the directory's Local filter. Without readable
+        parameters there is nothing to resolve, so the filter finds no lots.
+        """
+        try:
+            document = self.item_store.get() if self.item_store else None
+        except (OSError, FormatError):
+            document = None
+        if document is None or "NpcParam" not in document.params:
+            return {}
+        fields = [f"itemLotId_{index}" for index in range(1, 7)] + ["humanityLotId"]
+        npc_lots = {}
+        for row in document.params["NpcParam"].rows:
+            lots = set()
+            for field in fields:
+                try:
+                    lot = document.value("NpcParam", row.row_id, field)
+                except (FormatError, KeyError, StopIteration):
+                    continue
+                if lot:
+                    lots.add(lot)
+            if lots:
+                npc_lots[row.row_id] = lots
+        if not npc_lots:
+            return {}
+        links = {}
+        for map_name in self.maps():
+            try:
+                placements = self.get(map_name).placements()
+            except (MsbError, OSError):
+                continue
+            for placement in placements:
+                for lot in npc_lots.get(placement.get("npc"), ()):
+                    links.setdefault(lot, set()).add(map_name)
+        return {lot: sorted(maps) for lot, maps in links.items()}
 
     def npc_models(self):
         """Each placed NPC ID with the character models it wears.

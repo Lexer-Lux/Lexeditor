@@ -2445,6 +2445,15 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   overflow:auto;
   align-self:stretch;
 }
+/* A list sharing a stack with a pager fills the leftover height and scrolls
+   inside it, so the pager stays pinned instead of dangling off the panel. */
+.lex-column-list.lex-list-fill {
+  flex:1 1 auto;
+  height:auto;
+  min-height:0;
+  overflow-y:auto;
+  align-self:stretch;
+}
 .lex-column-list.lex-table-fill { flex:1; height:auto; align-self:stretch; grid-template-rows:auto repeat(var(--lex-table-row-count),minmax(32px,1fr)); }
 
 /* Named axes share the table grid so labels and values scroll together. */

@@ -3,14 +3,14 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
+  monsterTab:"basics",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetKind:"models",assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
-  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null,
-  dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,mapFocus:null};
+  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
+  dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -413,10 +413,14 @@ function commitPinnedCell(record,propertyKey,value){
   commit({table:record.table,id:record.id},field,field.type==="text"?value:Number(value),null);
 }
 const PERCENT=/\s*\(%\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"");
+const TIMES=/\s*\(x\)$/;
+const RATE=/\s*\(stamina\/second\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"");
 function controlFor(row,field){
   const plain=plainControlFor(row,field);
-  const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%"):plain;
+  const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
+    :TIMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00d7")
+    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"stamina/second"):plain;
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
   const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));
@@ -577,16 +581,20 @@ function monsterDetail(groups){
     "Attack records reached from this monster's behavior parameters.";
   const effects=groups.get("Linked effects");
   groups.delete("Linked effects");
-  const tabs=[{id:"resistances",label:"Stats"},{id:"attacks",label:"Attacks",help:attackHelp}];
+  // Every section is a tab; the tab is the header, so a section tab
+  // shows its fields with no repeated section title.
+  const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+  const tabs=[...groups].map(([title])=>({id:tabId(title),label:title,
+    help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards. Each value is a percentage off the hit. Nothing here applies to a hit it does not block.":null}));
+  tabs.push({id:"attacks",label:"Attacks",help:attackHelp});
   if(effects)tabs.push({id:"effects",label:"Effects",help:"Effects this monster carries. Changing a shared effect changes every use of it."});
-  const active=state.monsterTab==="effects"&&!effects?"resistances":state.monsterTab;
+  const active=tabs.some(tab=>tab.id===state.monsterTab)?state.monsterTab:tabs[0].id;
+  const section=tabs.find(tab=>tab.id===active);
+  const content=active==="attacks"?monsterAttacksSection()
+    :active==="effects"?[detailSection({title:"Effects",body:effects})]
+    :groups.get(section.label);
   return tabbedPanel({label:"Monster details",active,tabs,paginate:false,
-    change:id=>{state.monsterTab=id;render();},
-    content:active==="attacks"?monsterAttacksSection()
-      :active==="effects"?[detailSection({title:"Effects",body:effects})]
-      :[...groups].map(([title,body])=>detailSection({title,body,
-        help:title==="Blocking"?infoHelp("How much damage and buildup this monster blocks while it guards. "
-          +"Each value is a percentage off the hit. Nothing here applies to a hit it does not block."):null}))});
+    change:id=>{state.monsterTab=id;render();},content});
 }
 function formatAssetSize(size){
   if(!(size>=0))return "Unknown size";
@@ -743,12 +751,14 @@ function rowActionButtons(kind){
       title:"Show where this drops in the map viewport","aria-label":"Show where this drops in the map viewport",
       onclick:()=>goToDrop(state.row.id)},targetIcon())]
     :[];
-  return [...goTo,el("button",{type:"button","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
-      title:state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`,
-      onclick:()=>duplicateRow(kind)},"Duplicate"),
-    el("button",{type:"button","data-row-action":"remove","data-row-kind":kind,disabled:locked||playerStart,
-      title:playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`,
-      onclick:()=>removeRow(kind)},"Remove")];
+  const duplicateTitle=state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`;
+  const removeTitle=playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`;
+  return [...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
+      title:duplicateTitle,"aria-label":duplicateTitle,
+      onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
+    el("button",{type:"button",class:"lex-header-icon","data-row-action":"remove","data-row-kind":kind,disabled:locked||playerStart,
+      title:removeTitle,"aria-label":removeTitle,
+      onclick:()=>removeRow(kind)},"x")];
 }
 async function refreshMapsAfterStructure(){
   const current=state.rows.find(row=>key(row)===state.selected);
@@ -868,8 +878,8 @@ function curveDetail(actions,groups){
 }
 function detail(){
   const impact=state.row?.impact;
-  // A record's heading is its name, on every tab. An attack's sharing is
-  // said under it, never in its place.
+  // A record's heading is its name, on every tab. An attack's sharing
+  // lives in its help bubble, never under it.
   const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
   if(state.tab==="assets")return renderAssetDetail();
   if(!state.row){
@@ -884,7 +894,7 @@ function detail(){
   const title=state.row.name;
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const meta=state.tab==="attacks"&&impact?(impact.variants.length>1?"Shared attack damage":impact.variants.length===0?"Unresolved attack ownership":"Attack damage"):state.tab==="maps"&&state.row&&msbRowEarly?`${state.row.map} Â· model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} Â· ${state.row.tae} Â· ${state.row.animName}`:"";
+  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`${state.row.map} · model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
@@ -1212,7 +1222,7 @@ function renderItems(){
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
-  return {readOnly:state.readOnly,showCollision:state.mapCollision,
+  return {readOnly:state.readOnly,
     onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();
     if(!key||!state.mapView)return;
     const placementKey=`${state.mapView.map}:${key}`;
@@ -1228,11 +1238,7 @@ function refreshViewportBar(){
   const playerStart=state.mapInfo?.kind==="Player";
   for(const button of buttons){
     const action=button.dataset.viewportAction;
-    if(action==="collision"){
-      button.disabled=false;
-      button.setAttribute("aria-pressed",String(state.mapCollision));
-      button.textContent=state.mapCollision?"Hide collision":"Show collision";
-    }else if(action==="duplicate"){
+    if(action==="duplicate"){
       button.disabled=state.readOnly||state.mapBusy||!movable;
       button.title=state.readOnly?"Open a mod project to add placements"
         :!state.mapSelected?"Select a placement in the viewport first"
@@ -1249,17 +1255,6 @@ function refreshViewportBar(){
       button.disabled=state.readOnly||state.mapBusy;
       button.title=state.readOnly?"Open a mod project to add placements"
         :"Place a new copy of one of this map's models where the camera looks";
-    }else if(action==="copy"){
-      button.disabled=state.readOnly||state.mapBusy||!movable;
-      button.title=state.readOnly?"Open a mod project to copy placements"
-        :!state.mapSelected?"Select a placement in the viewport first"
-        :!movable?"Only enemy, object and player-start placements can be copied"
-        :"Copy this placement";
-    }else if(action==="paste"){
-      button.disabled=state.readOnly||state.mapBusy||!state.mapClipboard;
-      button.title=state.readOnly?"Open a mod project to paste placements"
-        :!state.mapClipboard?"Copy a placement first"
-        :"Paste the copied placement where the camera looks";
     }else if(action==="rotate"){
       button.disabled=false;
       const spinning=state.mapGizmo==="rotate";
@@ -1427,29 +1422,6 @@ async function viewportAdd(map,anchor){
       finally{state.mapBusy=false;refreshViewportBar();}
     }}).openFor(anchor);
 }
-async function viewportCopy(map){
-  if(state.readOnly||state.mapBusy||!state.mapSelected)return;
-  state.mapBusy=true;refreshViewportBar();
-  try{
-    const row=(await api(`/api/row?table=${encodeURIComponent(map)}&id=${encodeURIComponent(state.mapSelected)}&sub=viewport`)).row;
-    const at=key=>row.fields.find(item=>item.key===key)?.value??0;
-    state.mapClipboard={model:row.model,pos:[at("posX"),at("posY"),at("posZ")],rot:[at("rotX"),at("rotY"),at("rotZ")],
-      npc:row.fields.find(item=>item.key==="npcId")?.value??null};
-  }catch(error){notify(error);}
-  finally{state.mapBusy=false;refreshViewportBar();}
-}
-async function viewportPaste(map){
-  const clip=state.mapClipboard;
-  if(state.readOnly||state.mapBusy||!clip)return;
-  state.mapBusy=true;refreshViewportBar();
-  try{
-    const at=viewportCtl?.aim?.()||clip.pos;
-    const result=await api("/api/placements/create",{map,model:clip.model,pos:at,rot:clip.rot,npc:clip.npc});
-    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
-    await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
-  }catch(error){notify(error);}
-  finally{state.mapBusy=false;refreshViewportBar();}
-}
 const VIEWPORT_STYLE="position:relative;width:100%;height:520px;flex:1 0 auto;min-height:320px;";
 async function loadMaps(){
   state.mapList=(await api("/api/table?tab=viewport")).rows;
@@ -1514,7 +1486,14 @@ function directoryTabs(){
 }
 function directoryMatches(){
   const query=state.dirQuery.toLowerCase();
-  const filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  // Local keeps only rows from the open map. Placements name their map;
+  // lots resolve through their dropping NPCs. Shop and treasure rows
+  // name no map, so the toggle stays off for them.
+  if(state.dirLocal){
+    if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
+    else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
+  }
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||(a.id>b.id?1:a.id<b.id?-1:0));
 }
 function directoryPane(){
@@ -1533,6 +1512,15 @@ function directoryStrip(){
     void loadDirectory().then(refreshDirectory).catch(notify);
   }});
 }
+function directoryLocalRow(){
+  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||state.dirTab==="drops";
+  return el("label",{class:"lex-dir-local","data-dir-local":"",
+    title:supported?"Show only rows from the open map":"These rows name no map yet, so Local cannot filter them"},
+    el("input",{type:"checkbox",checked:state.dirLocal,disabled:!supported,"data-lex-view-filter":"",
+      "aria-label":"Show only rows from the open map",
+      onchange:event=>{state.dirLocal=event.target.checked;state.dirPage=0;refreshDirectory();}}),
+    "Local?");
+}
 function directoryList(){
   const matches=directoryMatches();
   const pages=Math.max(1,Math.ceil(matches.length/state.pageSize));
@@ -1548,9 +1536,10 @@ function directoryList(){
   if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
   return LexeditorUI.stack(
+    directoryLocalRow(),
     LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
       change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
-    columnList({rows:shown,key,selected:state.selected,select,columns}),
+    columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
     LexeditorUI.pager({inline:true,pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
       change:value=>{state.dirPage=value;refreshDirectory();}}));
 }
@@ -1602,7 +1591,7 @@ function placementsPane(){
           void loadDetail().catch(notify);
         }
         refreshMapSide();}}),
-    columnList({rows:shown,key,selected:state.selected,select,
+    columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
       columns:[{key:"name",label:"Name",grow:1},
         goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row)))]}),
     LexeditorUI.pager({pages,page:state.page,total:here.length,pageSize:state.pageSize,
@@ -1691,10 +1680,10 @@ function animCharsPane(){
   if(state.animCharPage>pages-1)state.animCharPage=pages-1;
   const shown=here.slice(state.animCharPage*state.pageSize,(state.animCharPage+1)*state.pageSize);
   const select=row=>{if(key(row)!==state.animCharId)void chooseAnimChar(row);};
-  return el("div",{"data-anim-chars":""},
+  return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
-    columnList({rows:shown,key,selected:state.animCharId,select,
+    columnList({rows:shown,key,selected:state.animCharId,select,class:"lex-list-fill",
       columns:[{key:"name",label:"Name",grow:1}]}),
     LexeditorUI.pager({pages,page:state.animCharPage,total:here.length,pageSize:state.pageSize,
       change:value=>{state.animCharPage=value;refreshAnimChars();}}));
@@ -1716,7 +1705,7 @@ function animAnimsPane(){
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    columnList({rows:shown,key,selected:state.selected,select,
+    columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
       columns:[{key:"name",label:"Name",grow:1},animEventsCell()]}),
     LexeditorUI.pager({pages,page:state.animPage,total:here.length,pageSize:state.pageSize,
       change:value=>{state.animPage=value;refreshAnimList();}})];
@@ -1742,7 +1731,7 @@ function animEventsPane(){
 }
 function animListPane(){
   const level=state.animScope.level;
-  return el("div",{"data-anim-list":""},...(level==="events"?animEventsPane():animAnimsPane()));
+  return el("div",{"data-anim-list":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},...(level==="events"?animEventsPane():animAnimsPane()));
 }
 function refreshAnimChars(){
   if(state.tab!=="animations")return;
@@ -1759,19 +1748,14 @@ function refreshAnimList(){
 function renderMaps(){
   if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
   const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
-  const collide=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"collision",
-    title:"Show where collision and navigation parts sit. Markers show placement, not shape.",
-    onclick:()=>{state.mapCollision=!state.mapCollision;viewportCtl?.setShowCollision(state.mapCollision);refreshViewportBar();}},"Hide collision");
   const duplicate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"duplicate",
-    onclick:()=>viewportDuplicate(current.id)},"Duplicate");
+    "aria-label":"Duplicate this placement",
+    onclick:()=>viewportDuplicate(current.id)},LexeditorUI.copyIcon());
   const remove=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"remove",
-    onclick:()=>viewportRemove(current.id)},"Remove");
+    "aria-label":"Remove this placement",
+    onclick:()=>viewportRemove(current.id)},"x");
   const add=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"add",
     onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
-  const copy=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"copy",
-    onclick:()=>viewportCopy(current.id)},"Copy");
-  const paste=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"paste",
-    onclick:()=>viewportPaste(current.id)},"Paste");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
     onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
   const status=el("div",{class:"lex-viewport-status","data-viewport-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading map"));
@@ -1792,9 +1776,11 @@ function renderMaps(){
   // on a wrapper: mounting clears the host itself for its canvas.
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
-    actions:[{node:collide},{node:duplicate},{node:remove},{node:add},{node:copy},{node:paste},{node:rotate}]});
+    actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
   const viewPane=el("div",{style:"flex:1 1 auto;min-width:0;display:flex;flex-direction:column;"},wrap,status);
-  const side=el("div",{"data-maps-side":"",style:"flex:0 0 400px;min-width:0;display:flex;flex-direction:column;"},mapsStrip(),mapsPane());
+  // The table sets the floor: headers are never cut off, and the 400px
+  // basis keeps narrower panes (placements, selection) from jumping.
+  const side=el("div",{"data-maps-side":"",style:"flex:0 0 400px;min-width:min-content;display:flex;flex-direction:column;"},mapsStrip(),mapsPane());
   const directory=LexeditorUI.collapsiblePanel({label:"Directory",side:"left",viewKey:"ds1-maps-directory",width:"360px",
     className:"ds1-directory",content:[directoryPane()]});
   return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,viewPane,side);

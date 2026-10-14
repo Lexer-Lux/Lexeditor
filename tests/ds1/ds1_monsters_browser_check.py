@@ -49,59 +49,99 @@ def main():
                     monsters()
                     tabs = ENEMY_SUBTABS + (('model', 'Model', 'EnemyModel'),)
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(tabs, key=lambda entry: entry[1].lower())]
-                    # The detail pane opens on Stats; Attacks is its other tab.
-                    assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['attacks', 'resistances']
-                    assert page.evaluate('state.monsterTab') == 'resistances'
+                    # Every section is a tab; Attacks joins them.
+                    assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [
+                        'attacks', 'basics', 'blocking', 'defense', 'effects-references', 'status-buildup-resistance',
+                        'value-rewards', 'weaknesses']
+                    assert page.evaluate('state.monsterTab') == 'basics'
+                    page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
+                    page.wait_for_function('state.monsterTab==="defense"')
                     assert page.evaluate('state.row.id') == 120000
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))
                     assert expected == set(NPC_FIELDS) | {'effectiveHp'}
+                    units = page.evaluate("""() => {
+                        const out = {};
+                        for (const key of ['weakPartsDamageRate', 'partsDamageRate1', 'partsDamageRate8']) {
+                            const input = document.querySelector(`input[data-field-key="${key}"]`);
+                            const field = input && input.closest('.lex-detail-field');
+                            const unit = field && field.querySelector('.lex-unit');
+                            const label = field && field.querySelector('.lex-detail-field-label-text');
+                            out[key] = [unit && unit.textContent,
+                                        unit && unit.classList.contains('lex-unit-multiplier'),
+                                        label && label.textContent];
+                        }
+                        return out;
+                    }""")
+                    assert units['weakPartsDamageRate'] == ['\u00d7', True, 'Damage taken: weak point'], units
+                    assert units['partsDamageRate1'] == ['\u00d7', True, 'Damage taken: Part 1'], units
+                    assert units['partsDamageRate8'] == ['\u00d7', True, 'Damage taken: Part 8'], units
+                    page.locator('.lex-tabbed-panel [data-subtab="blocking"]').click()
+                    page.wait_for_function('state.monsterTab==="blocking"')
+                    assert page.locator('input[data-field-key="staminaGuardDef"]:visible').count() == 1
+                    assert page.locator('input[data-field-key="hp"]:visible').count() == 0
+                    page.locator('.lex-tabbed-panel [data-subtab="basics"]').click()
+                    page.wait_for_function('state.monsterTab==="basics"')
+                    stamina = page.evaluate("""() => {
+                        const input = document.querySelector('input[data-field-key="staminaRecoverBaseVel"]');
+                        const field = input && input.closest('.lex-detail-field');
+                        const unit = field && field.querySelector('.lex-unit');
+                        const label = field && field.querySelector('.lex-detail-field-label-text');
+                        return [unit && unit.textContent, label && label.textContent];
+                    }""")
+                    assert stamina == ['stamina/second', 'Stamina recovery'], stamina
                     seen, edited = set(), set()
                     saw_effective = False
-                    for index in range(12):
-                        if page.locator('input[aria-label="Effective HP"]:disabled').count():
-                            saw_effective = True
-                        fields = page.locator('input[data-field-key]:visible')
-                        for i in range(fields.count()):
-                            field = fields.nth(i)
-                            key = field.get_attribute('data-field-key')
-                            seen.add(key)
-                            # The weaknesses (Divine, Occult, Abyssal) are flags.
-                            kind = field.get_attribute('type')
-                            assert kind in ('number', 'checkbox', 'text'), (key, kind)
-                            if kind == 'text':
-                                # Grouped thousands: the bounds stay on the control.
-                                assert field.get_attribute('inputmode') in ('numeric', 'decimal'), key
-                            if kind in ('number', 'text'):
-                                assert field.get_attribute('min') is not None and field.get_attribute('max') is not None
-                            field.scroll_into_view_if_needed()
-                            box = field.bounding_box()
-                            assert 0 <= box['y'] and box['y'] + box['height'] <= 800
-                            if key in changes:
-                                field.fill(str(changes[key])); field.press('Tab')
-                                page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
-                                                       arg={'key': key, 'value': changes[key]})
-                                edited.add(key)
-                        # Fresh handle per control: a commit re-renders the pane.
-                        options = page.locator('select[data-field-key]:visible')
-                        for key in options.evaluate_all('nodes=>nodes.map(n=>n.dataset.fieldKey)'):
-                            select = page.locator(f'select[data-field-key="{key}"]:visible')
-                            seen.add(key)
-                            select.scroll_into_view_if_needed()
-                            page.wait_for_function('(key)=>document.querySelector("select[data-field-key="+key+"]").options.length>1', arg=key)
-                            assert select.locator('option').count() > 1, key
-                            if key in changes:
-                                select.select_option(str(changes[key]))
-                                page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
-                                                       arg={'key': key, 'value': changes[key]})
-                                edited.add(key)
-                        if output: page.screenshot(path=str(output / f'monsters-{index}.png'))
-                        following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
-                        if not following.count() or not following.is_enabled(): break
-                        following.click()
+                    tab_ids = page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)')
+                    for tab_id in tab_ids:
+                        page.locator(f'.lex-tabbed-panel [data-subtab="{tab_id}"]').click()
+                        page.wait_for_function(f'state.monsterTab==="{tab_id}"')
+                        for index in range(12):
+                            if page.locator('input[aria-label="Effective HP"]:disabled').count():
+                                saw_effective = True
+                            fields = page.locator('input[data-field-key]:visible')
+                            for i in range(fields.count()):
+                                field = fields.nth(i)
+                                key = field.get_attribute('data-field-key')
+                                seen.add(key)
+                                # The weaknesses (Divine, Occult, Abyssal) are flags.
+                                kind = field.get_attribute('type')
+                                assert kind in ('number', 'checkbox', 'text'), (key, kind)
+                                if kind == 'text':
+                                    # Grouped thousands: the bounds stay on the control.
+                                    assert field.get_attribute('inputmode') in ('numeric', 'decimal'), key
+                                if kind in ('number', 'text'):
+                                    assert field.get_attribute('min') is not None and field.get_attribute('max') is not None
+                                field.scroll_into_view_if_needed()
+                                box = field.bounding_box()
+                                assert 0 <= box['y'] and box['y'] + box['height'] <= 800
+                                if key in changes:
+                                    field.fill(str(changes[key])); field.press('Tab')
+                                    page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
+                                                           arg={'key': key, 'value': changes[key]})
+                                    edited.add(key)
+                            # Fresh handle per control: a commit re-renders the pane.
+                            options = page.locator('select[data-field-key]:visible')
+                            for key in options.evaluate_all('nodes=>nodes.map(n=>n.dataset.fieldKey)'):
+                                select = page.locator(f'select[data-field-key="{key}"]:visible')
+                                seen.add(key)
+                                select.scroll_into_view_if_needed()
+                                page.wait_for_function('(key)=>document.querySelector("select[data-field-key="+key+"]").options.length>1', arg=key)
+                                assert select.locator('option').count() > 1, key
+                                if key in changes:
+                                    select.select_option(str(changes[key]))
+                                    page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
+                                                           arg={'key': key, 'value': changes[key]})
+                                    edited.add(key)
+                            if output: page.screenshot(path=str(output / f'monsters-{tab_id}-{index}.png'))
+                            following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
+                            if not following.count() or not following.is_enabled(): break
+                            following.click()
                     assert seen == expected - {'effectiveHp'} and edited == changes.keys()
                     assert saw_effective
+                    page.locator('.lex-tabbed-panel [data-subtab="basics"]').click()
+                    page.wait_for_function('state.monsterTab==="basics"')
                     first = page.locator('.lex-tweaks-pages').get_by_role('button', name='First page', exact=True)
                     if first.count() and first.is_enabled():
                         first.click()

@@ -222,7 +222,8 @@ class MsbDocument:
 
     def view_parts(self):
         """Every part with its model, for the viewport. Collision and
-        navigation parts have no visible mesh; the viewport marks them."""
+        navigation geometry is world-baked Havok data, so those parts
+        carry counts, never meshes."""
         result = []
         for part in self.parts:
             model = self.models[part['model']]

@@ -104,6 +104,8 @@ def main():
                         assert page.evaluate(
                             'state.dirty+state.pending+(state.tweaksNeedRebuild?1:0)') == 2
                         page.evaluate("""()=>{
+                          window.__dirtySyncs=[];
+                          window.pywebview={api:{set_dirty_count:async(n)=>{window.__dirtySyncs.push(n);}}};
                           window.__exited=false;
                           LexeditorUI.confirmUnsavedExit(
                             {dirtyCount:()=>state.dirty+state.pending+(state.tweaksNeedRebuild?1:0),
@@ -114,6 +116,24 @@ def main():
                                          exact=True).click()
                         page.wait_for_function('window.__exited===true')
                         assert page.get_by_text('could not be discarded').count() == 0
+                        assert page.evaluate('window.__dirtySyncs.slice(-1)')[0] == 0
+                        # The busy state throbs, and the host hears zero before
+                        # the exit runs: a deferred discard holds the dialog open.
+                        page.evaluate("""()=>{
+                          window.__released=false;
+                          window.__exited2=false;
+                          LexeditorUI.confirmUnsavedExit(
+                            {dirtyCount:()=>window.__released?0:1,
+                             save:async()=>{},
+                             discard:()=>new Promise(done=>{window.__release=()=>{window.__released=true;done();}})},
+                            ()=>{window.__exited2=true;return true;});
+                        }""")
+                        page.get_by_role('button', name='Exit Without Saving',
+                                         exact=True).click()
+                        assert page.locator('.lex-exit-dialog .lex-dialog-status .lex-loading-status').count() == 1
+                        page.evaluate('window.__release()')
+                        page.wait_for_function('window.__exited2===true')
+                        assert page.evaluate('window.__dirtySyncs.slice(-1)')[0] == 0
                         assert not errors, errors
                     finally:
                         browser.close()

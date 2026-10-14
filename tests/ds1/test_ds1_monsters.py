@@ -144,13 +144,15 @@ def test_effective_hp_multiplies_resident_rates_and_skips_the_rest():
 
 
 
-def test_defense_block_and_weakness_fields_carry_glyph_kinds():
+def test_defense_block_and_weakness_fields_carry_no_icons():
+    # The hand-drawn glyphs were never game art, so fields ship without
+    # icons until the menu icon atlas is extracted: game art only.
     fields = {field['key']: field.get('icon', '')
               for field in ItemDocument(make_archive()).read_row('NpcParam', 120000)['fields']}
-    assert fields['def_fire'] == 'fire'
-    assert fields['slashGuardCutRate'] == 'slash'
-    assert fields['resist_desease'] == 'toxic'
-    assert fields['isWeakSaint'] == 'divine'
+    assert fields['def_fire'] == ''
+    assert fields['slashGuardCutRate'] == ''
+    assert fields['resist_desease'] == ''
+    assert fields['isWeakSaint'] == ''
     assert fields['staminaGuardDef'] == ''
     assert fields['hp'] == ''
 

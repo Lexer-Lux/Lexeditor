@@ -276,16 +276,18 @@ def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
         with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
 
 
-def test_armor_and_shield_guard_fields_carry_glyph_kinds():
+def test_armor_and_shield_guard_fields_carry_no_icons():
+    # The hand-drawn glyphs were never game art, so fields ship without
+    # icons until the menu icon atlas is extracted: game art only.
     document = ItemDocument(make_archive())
     armor = {field['key']: field.get('icon', '')
              for field in document.read_row('EquipParamProtector', 100)['fields']}
-    assert armor['defenseThunder'] == 'lightning'
-    assert armor['resistBlood'] == 'bleed'
+    assert armor['defenseThunder'] == ''
+    assert armor['resistBlood'] == ''
     guard = {field['key']: field.get('icon', '')
              for field in document.read_row('EquipParamWeapon', 100)['fields']}
-    assert guard['thunGuardCutRate'] == 'lightning'
-    assert guard['curseGuardResist'] == 'curse'
+    assert guard['thunGuardCutRate'] == ''
+    assert guard['curseGuardResist'] == ''
 
 
 def test_weapon_guard_labels_carry_percent_unit():
@@ -296,30 +298,28 @@ def test_weapon_guard_labels_carry_percent_unit():
     assert fields['diseaseGuardResist']['label'] == 'Toxic guard (%)'
     assert fields['bloodGuardResist']['label'] == 'Bleed guard (%)'
     assert fields['curseGuardResist']['label'] == 'Curse guard (%)'
-    assert fields['poisonGuardResist']['icon'] == 'poison'
-    assert fields['diseaseGuardResist']['icon'] == 'toxic'
-    assert fields['bloodGuardResist']['icon'] == 'bleed'
-    assert fields['curseGuardResist']['icon'] == 'curse'
     from plugins.ds1.monsters import NPC_FIELDS
     assert NPC_FIELDS['poisonGuardResist'][0] == 'Poison guard (%)'
 
 
-def test_scaling_and_requirement_fields_carry_stat_glyph_kinds():
+def test_scaling_and_requirement_fields_carry_no_icons():
+    # The hand-drawn glyphs were never game art, so fields ship without
+    # icons until the menu icon atlas is extracted: game art only.
     document = ItemDocument(make_archive())
     weapon = {field['key']: field.get('icon', '')
               for field in document.read_row('EquipParamWeapon', 100)['fields']}
-    assert weapon['correctStrength'] == 'str'
-    assert weapon['correctAgility'] == 'dex'
-    assert weapon['correctMagic'] == 'int'
-    assert weapon['correctFaith'] == 'fth'
-    assert weapon['properStrength'] == 'str'
-    assert weapon['properAgility'] == 'dex'
-    assert weapon['properMagic'] == 'int'
-    assert weapon['properFaith'] == 'fth'
+    assert weapon['correctStrength'] == ''
+    assert weapon['correctAgility'] == ''
+    assert weapon['correctMagic'] == ''
+    assert weapon['correctFaith'] == ''
+    assert weapon['properStrength'] == ''
+    assert weapon['properAgility'] == ''
+    assert weapon['properMagic'] == ''
+    assert weapon['properFaith'] == ''
     magic = {field['key']: field.get('icon', '')
              for field in document.read_row('Magic', 100)['fields']}
-    assert magic['requirementIntellect'] == 'int'
-    assert magic['requirementFaith'] == 'fth'
+    assert magic['requirementIntellect'] == ''
+    assert magic['requirementFaith'] == ''
 
 
 def test_armor_list_rows_carry_absorption_shares_for_pinned_columns(monkeypatch):

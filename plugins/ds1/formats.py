@@ -79,40 +79,6 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
     WEAPON_FIELDS[key] = (f'{kind} guard (%)', 'Defense',
         'The absorption to apply to damage of the specified type when guarding.')
 
-# Damage, status, weakness and stat glyphs, by table and field. The label
-# names the kind; the icon just draws it before the words.
-FIELD_ICONS = {}
-for _table, _entries in [
-    ('NpcParam', [('def_phys', 'physical'), ('def_mag', 'magic'), ('def_fire', 'fire'),
-                 ('def_thunder', 'lightning'), ('def_slash', 'slash'), ('def_blow', 'strike'),
-                 ('def_thrust', 'thrust'), ('resist_poison', 'poison'), ('resist_desease', 'toxic'),
-                 ('resist_blood', 'bleed'), ('resist_curse', 'curse'), ('isWeakSaint', 'divine'),
-                 ('isWeakA', 'occult'), ('isWeakB', 'abyssal'),
-                 ('physGuardCutRate', 'physical'), ('magGuardCutRate', 'magic'),
-                 ('fireGuardCutRate', 'fire'), ('thunGuardCutRate', 'lightning'),
-                 ('slashGuardCutRate', 'slash'), ('blowGuardCutRate', 'strike'),
-                 ('thrustGuardCutRate', 'thrust'), ('poisonGuardResist', 'poison'),
-                 ('diseaseGuardResist', 'toxic'), ('bloodGuardResist', 'bleed'),
-                 ('curseGuardResist', 'curse')]),
-    ('EquipParamProtector', [('defensePhysics', 'physical'), ('defenseMagic', 'magic'),
-                 ('defenseFire', 'fire'), ('defenseThunder', 'lightning'),
-                 ('defenseSlash', 'slash'), ('defenseBlow', 'strike'), ('defenseThrust', 'thrust'),
-                 ('resistPoison', 'poison'), ('resistDisease', 'toxic'),
-                 ('resistBlood', 'bleed'), ('resistCurse', 'curse')]),
-    ('EquipParamWeapon', [('physGuardCutRate', 'physical'), ('magGuardCutRate', 'magic'),
-                 ('fireGuardCutRate', 'fire'), ('thunGuardCutRate', 'lightning'),
-                 ('slashGuardCutRate', 'slash'), ('blowGuardCutRate', 'strike'),
-                 ('thrustGuardCutRate', 'thrust'), ('poisonGuardResist', 'poison'),
-                 ('diseaseGuardResist', 'toxic'), ('bloodGuardResist', 'bleed'),
-                 ('curseGuardResist', 'curse'), ('correctStrength', 'str'),
-                 ('correctAgility', 'dex'), ('correctMagic', 'int'), ('correctFaith', 'fth'),
-                 ('properStrength', 'str'), ('properAgility', 'dex'),
-                 ('properMagic', 'int'), ('properFaith', 'fth')]),
-    ('Magic', [('requirementIntellect', 'int'), ('requirementFaith', 'fth')]),
-]:
-    for _key, _kind in _entries:
-        FIELD_ICONS[(_table, _key)] = _kind
-
 
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
 # Stamina Costs tweak sets each spell's Elden Ring value.
@@ -137,6 +103,12 @@ UPGRADE_MULTIPLIERS = {'neutralDamageCutRate': 'physicsDefRate', 'slashDamageCut
                        'blowDamageCutRate': 'blowDefRate', 'thrustDamageCutRate': 'thrustDefRate',
                        'magicDamageCutRate': 'magicDefRate', 'fireDamageCutRate': 'fireDefRate',
                        'thunderDamageCutRate': 'thunderDefRate'}
+# Slider spans shared by fields with one meaning. Seven defense rates with
+# seven data spans put one value in seven places; one span per group keeps
+# the same value in the same place on every slider.
+SHARED_SPAN_GROUPS = (frozenset(UPGRADE_MULTIPLIERS.values()),
+                      frozenset({'resistPoisonRate', 'resistDiseaseRate',
+                                 'resistBloodRate', 'resistCurseRate'}))
 MAX_UPGRADE_LEVEL = 15
 ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),
                   ('player-attacks', 'Player attacks', 'AtkParam_Pc'),
@@ -910,6 +882,13 @@ class ItemDocument:
             low = min(low, 0)
             high = high + (high - low) * 0.25 if high > low else low + max(1, abs(low))
             spans[key] = (low, high)
+        for group in SHARED_SPAN_GROUPS:
+            present = [spans[key] for key in group if key in spans]
+            if len(present) > 1:
+                shared = (min(low for low, _ in present), max(high for _, high in present))
+                for key in group:
+                    if key in spans:
+                        spans[key] = shared
         cache[table] = spans
         return spans
 
@@ -956,7 +935,6 @@ class ItemDocument:
             unbounded = field.dtype in ('f32', 'f64', 'angle32') and (item['min'], item['max']) in (
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
-                           'icon': FIELD_ICONS.get((table, field.key), ''),
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
                            MATERIAL_TABLE, CHARA_TABLE) else '',
@@ -1074,7 +1052,6 @@ class ItemDocument:
             rate = self.value(EFFECT_TABLE, levels[0], cut)
             original = round((1 - read_field(saved, specs[cut], '<')) * 100, 3)
             fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
-                           'icon': kind.lower(),
                            'description': (f'Share of {kind.lower()} damage this enemy takes off every hit, from its '
                                            'Armor Rework effect. Negative values make it take more damage.'
                                            if table == 'NpcParam' else

@@ -60,6 +60,8 @@ def main():
                     assert chars == ['c1200'], chars
                     motions = page.locator('[data-anim-list] .lex-list-row').evaluate_all(ROWS)
                     assert motions == ['a87_3300.hkx', 'animation 3301'], motions
+                    assert page.locator('[data-anim-chars] .lex-column-list.lex-list-fill').count() == 1
+                    assert page.locator('[data-anim-list] .lex-column-list.lex-list-fill').count() == 1
                     # The motion loads under the standard throbber.
                     page.wait_for_selector('[data-anim-host] .lex-panel-loading', timeout=30000)
                     page.wait_for_selector('[data-anim-host][data-ready="true"]', timeout=30000)

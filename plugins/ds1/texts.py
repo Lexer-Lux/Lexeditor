@@ -216,6 +216,14 @@ class TextDocument:
                 return text
         return None
 
+    def place_name(self, area_id: int) -> str | None:
+        """A place name by area id, or None when the merged table lacks it."""
+        for position in self._copies_of('Place_name_.fmg'):
+            text = self.tables[position][1].get(area_id)
+            if text:
+                return text
+        return None
+
     def renamable(self, table: str) -> bool:
         return bool(self._copies(table))
 

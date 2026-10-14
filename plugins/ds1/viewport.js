@@ -1,9 +1,10 @@
 "use strict";
 // 3D map view. Geometries are shared across placements; each part only
 // adds a transform. Clicking a placement selects it, the gizmo drags it,
-// and editor.js commits the move. Collision and navigation parts carry no
-// mesh, so they show as wire markers. Mounted by editor.js, which owns the
-// page and the edit bar.
+// and editor.js commits the move. Collision and navigation geometry is baked
+// in world space in the Havok packfiles, which this version does not decode,
+// so those parts are counted, never drawn. Mounted by editor.js, which owns
+// the page and the edit bar.
 window.Ds1Viewport = (() => {
   let session = 0;
   const DEG = Math.PI / 180;
@@ -30,11 +31,10 @@ window.Ds1Viewport = (() => {
       delete host._viewportStop;
     }
   }
-  // hooks: {readOnly, showCollision, onSelect(key, info|null),
-  // onMove(key, pos), onRotate(key, rot), requestMod()}. Commits resolve
-  // false when refused, and the part snaps back. Returns a controller
-  // with select(key), setShowCollision(bool), moveTo(key, pos),
-  // turnTo(key, rot), setGizmoMode(mode), aim() and dispose().
+  // hooks: {readOnly, onSelect(key, info|null), onMove(key, pos),
+  // onRotate(key, rot), requestMod()}. Commits resolve false when refused,
+  // and the part snaps back. Returns a controller with select(key),
+  // moveTo(key, pos), turnTo(key, rot), setGizmoMode(mode), aim() and dispose().
   async function mount(host, mapId, view, status, hooks = {}) {
     stop(host);
     const mine = ++session;
@@ -70,8 +70,8 @@ window.Ds1Viewport = (() => {
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
-    // Collision and navigation parts have no model to load; they show
-    // as markers, so they are neither wanted nor missing.
+    // Collision and navigation parts have no model to load and no honest
+    // drawing: their geometry is world-baked Havok data. Counted, not drawn.
     const isMarker = part => part.kind === "Collision" || part.kind === "Navigation";
     const counts = {parts: 0, meshes: 0, tris: 0, missing: 0, sky: 0, effect: 0, collision: 0, navigation: 0};
     const wanted = [];
@@ -109,13 +109,6 @@ window.Ds1Viewport = (() => {
     }
     const root = new THREE.Group();
     scene.add(root);
-    const markers = new THREE.Group();
-    markers.visible = hooks.showCollision !== false;
-    root.add(markers);
-    const markerGeo = new THREE.BoxGeometry(1, 1, 1);
-    const markerEdges = new THREE.EdgesGeometry(markerGeo);
-    const collisionMat = new THREE.LineBasicMaterial({color: 0xff9944});
-    const navigationMat = new THREE.LineBasicMaterial({color: 0x44ddff});
     const groups = new Map();
     const MOVABLE = new Set([1, 2, 4, 9, 10]);
     const place = (group, part) => {
@@ -128,17 +121,6 @@ window.Ds1Viewport = (() => {
     const skyMeshes = [];
     for (const part of view.parts) {
       if (isMarker(part)) {
-        // A marker shows where the part sits, never its shape: the
-        // collision meshes live in Havok packfiles this version does not
-        // decode. The box follows the part's own scale.
-        const group = new THREE.Group();
-        place(group, part);
-        const box = new THREE.LineSegments(markerEdges,
-          part.kind === "Collision" ? collisionMat : navigationMat);
-        box.userData.marker = true;
-        group.add(box);
-        markers.add(group);
-        groups.set(part.key, group);
         counts.parts++;
         continue;
       }
@@ -185,7 +167,7 @@ window.Ds1Viewport = (() => {
     window.addEventListener("resize", resize);
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     const short = n => +Number(n).toFixed(3);
-    const baseStatus = () => `${mapId}: ${plural(counts.parts, "part", "parts")}, ${plural(unique.length, "model", "models")}, ${plural(Math.round(counts.tris), "triangle", "triangles")}${counts.sky ? `, ${plural(counts.sky, "sky mesh", "sky meshes")}` : ""}${counts.effect ? `, ${plural(counts.effect, "effect", "effects")} transparent` : ""}${counts.collision ? `, ${plural(counts.collision, "collision marker", "collision markers")}` : ""}${counts.navigation ? `, ${plural(counts.navigation, "navigation marker", "navigation markers")}` : ""}${counts.missing ? `, ${plural(counts.missing, "part has", "parts have")} no visible mesh` : ""}.`;
+    const baseStatus = () => `${mapId}: ${plural(counts.parts, "part", "parts")}, ${plural(unique.length, "model", "models")}, ${plural(Math.round(counts.tris), "triangle", "triangles")}${counts.sky ? `, ${plural(counts.sky, "sky mesh", "sky meshes")}` : ""}${counts.effect ? `, ${plural(counts.effect, "effect", "effects")} transparent` : ""}${counts.collision ? `, ${plural(counts.collision, "collision part", "collision parts")}` : ""}${counts.navigation ? `, ${plural(counts.navigation, "navigation part", "navigation parts")}` : ""}${counts.missing ? `, ${plural(counts.missing, "part has", "parts have")} no visible mesh` : ""}.`;
     let selected = null, selectedText = "";
     const showStatus = () => {
       status.textContent = selectedText ? `${baseStatus()} Selected: ${selectedText}.` : baseStatus();
@@ -278,17 +260,30 @@ window.Ds1Viewport = (() => {
     showStatus();
     const ray = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    let down = null;
-    canvas.addEventListener("pointerdown", event => { down = [event.clientX, event.clientY]; });
+    let down = null, downPos = null, downRot = null;
+    canvas.addEventListener("pointerdown", event => {
+      down = [event.clientX, event.clientY];
+      const current = selected && groups.get(selected);
+      downPos = current ? current.position.clone() : null;
+      downRot = current ? current.rotation.clone() : null;
+    });
     canvas.addEventListener("pointerup", event => {
       if (!down || Math.hypot(event.clientX - down[0], event.clientY - down[1]) > 4) return;
       down = null;
+      // A released gizmo drag lands here too, but only a drag that
+      // actually moved the part vetoes selection: the gizmo's pickers
+      // keep a constant screen size, so vetoing on them freezes
+      // selection anywhere near the selected part. A plain click on or
+      // beside the handles selects what is under the cursor.
+      const current = selected && groups.get(selected);
+      const settled = !current || !downPos
+        || (current.position.x === downPos.x && current.position.y === downPos.y && current.position.z === downPos.z
+          && current.rotation.x === downRot.x && current.rotation.y === downRot.y && current.rotation.z === downRot.z);
+      downPos = null; downRot = null;
+      if (!settled) return;
       const rect = canvas.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       ray.setFromCamera(pointer, camera);
-      // A released gizmo drag lands here too; the gizmo's own pickers
-      // say whether the pointer was on it.
-      if (gizmo.object && ray.intersectObject(gizmo.getHelper(), true).length) return;
       const hit = ray.intersectObjects(root.children.filter(obj => obj.visible), true)[0];
       let group = hit ? hit.object : null;
       while (group && !group.userData.part) group = group.parent;
@@ -311,7 +306,6 @@ window.Ds1Viewport = (() => {
         camera.position.copy(target).add(offset);
         return true;
       },
-      setShowCollision(shown) { markers.visible = shown !== false; },
       moveTo(key, pos) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
@@ -355,10 +349,6 @@ window.Ds1Viewport = (() => {
       double.dispose();
       effect.dispose();
       highlight.dispose();
-      markerGeo.dispose();
-      markerEdges.dispose();
-      collisionMat.dispose();
-      navigationMat.dispose();
     };
     const loop = () => {
       if (!live || mine !== session || !host.isConnected) { stop(host); return; }

@@ -2,8 +2,10 @@
 
 Phase one runs read-only with no mod: viewing maps must work for
 Vanilla readers, so the map switcher must not count as an edit attempt,
-and Duplicate and Remove stay disabled. Phase two opens a mod project
-and drives Duplicate, Remove and the move commit through the real UI.
+and Duplicate and Remove stay disabled. A click beside the attached
+gizmo must still select what is under the cursor. Phase two opens a mod
+project and drives Duplicate, Remove and the move commit through the
+real UI; a real gizmo drag keeps the dragged part selected.
 """
 import io
 import sys
@@ -15,9 +17,10 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ds1_fixture import make_archive
+from ds1_fixture import make_archive, make_text_archive
 from flver_fixture import build_flver
 from msb_fixture import build_msb
+from plugins.ds1 import texts
 from plugins.ds1.msb import MAP_DIR
 from plugins.ds1.store import MARKER, RELATIVE
 from plugins.ds1.plugin import DS1Session
@@ -34,10 +37,16 @@ def make_game(temp):
     (game / MAP_DIR).mkdir(parents=True)
     (game / MAP_DIR / 'test.msb').write_bytes(build_msb(parts=PARTS))
     (game / MAP_DIR / 'test2.msb').write_bytes(build_msb(parts=PARTS))
+    (game / MAP_DIR / 'm10_01_00_00.msb').write_bytes(build_msb(parts=PARTS))
+    blob = make_text_archive(extra={'Place_name_.fmg': {1010: 'Undead Burg', 1011: 'Undead Parish'}})
+    (game / texts.RELATIVE).parent.mkdir(parents=True)
+    (game / texts.RELATIVE).write_bytes(blob)
     (game / 'map' / 'test').mkdir(parents=True)
     (game / 'map' / 'test' / 'm10piece.flver').write_bytes(build_flver())
     (game / 'map' / 'test2').mkdir(parents=True)
     (game / 'map' / 'test2' / 'm10piece.flver').write_bytes(build_flver())
+    (game / 'map' / 'm10_01_00_00').mkdir(parents=True)
+    (game / 'map' / 'm10_01_00_00' / 'm10piece.flver').write_bytes(build_flver())
     return game
 
 
@@ -76,29 +85,28 @@ def phase_readonly(play, game, output, errors):
             page.on('pageerror', lambda error: errors.append(str(error)))
             open_viewport(page, session)
             status = page.locator('[data-viewport-status]').inner_text()
-            for want in ('test.msb', '5 parts', '6 triangles', '1 collision marker',
-                         '1 navigation marker', '1 part has no visible mesh'):
+            for want in ('m10_01_00_00.msb', '5 parts', '6 triangles', '1 collision part',
+                         '1 navigation part', '1 part has no visible mesh'):
                 assert want in status, status
             assert page.locator('canvas[data-viewport]').count() == 1
-            rendered_pixels(page, 'test.msb')
+            rendered_pixels(page, 'm10_01_00_00.msb')
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             assert page.locator('[data-viewport-action="remove"]').is_disabled()
             assert page.locator('[data-viewport-action="add"]').is_disabled()
-            assert page.locator('[data-viewport-action="copy"]').is_disabled()
-            assert page.locator('[data-viewport-action="paste"]').is_disabled()
+            assert page.locator('[data-viewport-action="copy"]').count() == 0
+            assert page.locator('[data-viewport-action="paste"]').count() == 0
+            assert page.locator('[data-viewport-action="duplicate"] svg').count() == 1
+            assert page.locator('[data-viewport-action="remove"]').inner_text() == 'x'
             assert not page.locator('[data-viewport-action="rotate"]').is_disabled()
-            toggle = page.locator('[data-viewport-action="collision"]')
-            assert toggle.inner_text() == 'Hide collision'
-            viewport_click(page, 'collision')
-            assert toggle.inner_text() == 'Show collision'
-            viewport_click(page, 'collision')
-            assert toggle.inner_text() == 'Hide collision'
+            assert page.locator('[data-viewport-action="collision"]').count() == 0
             canvas = page.locator('canvas[data-viewport]')
             box = canvas.bounding_box()
-            point = page.evaluate('document.querySelector("[data-viewport-host]")._viewportProject(1, 2, 3)')
-            canvas.click(position={'x': point[0] - box['x'], 'y': point[1] - box['y']})
-            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent.includes("Selected:")',
-                                   timeout=30000)
+            # The gizmo on a selected movable part must not swallow the
+            # next click: this stays frozen on 1:0 without the veto fix.
+            page.evaluate('viewportCtl.select("1:0")')
+            page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
+            canvas.click(position={'x': box['width'] / 2, 'y': box['height'] / 2})
+            page.wait_for_function('state.mapSelected==="4:0"', timeout=30000)
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             page.locator('[data-tabstrip-id="maps"]').click()
             page.wait_for_function('state.mapTab==="maps"')
@@ -106,7 +114,14 @@ def phase_readonly(play, game, output, errors):
                 'nodes=>nodes.map(n=>n.textContent)')
             for want in ('Name', 'Parts', 'Models', 'Collision', 'Navigation'):
                 assert want in ' '.join(labels), labels
+            overflow = page.evaluate("""() => {
+                const table = document.querySelector('[data-maps-side] .lex-column-list');
+                return table.scrollWidth - table.clientWidth;
+            }""")
+            assert overflow <= 1, overflow
             counts = page.evaluate('state.mapList.find(r=>r.id==="test.msb").values')
+            named = page.evaluate('state.mapList.find(r=>r.id==="m10_01_00_00.msb").name')
+            assert named == 'Undead Burg (m10_01_00_00.msb)', named
             assert counts['collision'] == 1 and counts['navigation'] == 1, counts
             page.locator('[data-maps-side] .lex-list-row', has_text='test2.msb').click()
             page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='test2.msb', timeout=30000)
@@ -131,6 +146,9 @@ def phase_edit(play, game, mod, output, errors):
             page = browser.new_page(viewport={'width': 1440, 'height': 900})
             page.on('pageerror', lambda error: errors.append(str(error)))
             open_viewport(page, session)
+            page.locator('[data-maps-side] .lex-list-row', has_text='test.msb').click()
+            page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")'
+                                   '?.textContent?.includes(want)', arg='test.msb', timeout=30000)
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
             assert 'chest0' in page.locator('[data-viewport-status]').inner_text()
@@ -164,20 +182,24 @@ def phase_edit(play, game, mod, output, errors):
             turned = page.evaluate("fetch('/api/row?table=test.msb&id=1:0').then(r=>r.json())"
                                    ".then(d=>d.row.fields.filter(f=>f.key.startsWith('rot')).map(f=>f.value))")
             assert turned == [0.0, 180.0, 0.0], turned
+            # A press that moves the part is a drag, not a click: the
+            # release must keep the dragged part selected.
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
-            viewport_click(page, 'copy')
-            page.wait_for_function('!!state.mapClipboard', timeout=30000)
-            assert not page.locator('[data-viewport-action="paste"]').is_disabled()
-            viewport_click(page, 'paste')
+            drag_box = page.locator('canvas[data-viewport]').bounding_box()
+            page.mouse.move(drag_box['x'] + drag_box['width'] / 2, drag_box['y'] + drag_box['height'] / 2)
+            page.mouse.down()
+            page.evaluate("viewportMove('test.msb','1:0',[21,22,23])")
+            page.wait_for_function("state.pending===0 && state.mapView.parts.find(p=>p.key==='1:0').pos[0]===21",
+                                   timeout=30000)
+            page.mouse.up()
+            page.wait_for_function('state.pending===0', timeout=30000)
+            assert page.evaluate('state.mapSelected') == '1:0'
+            page.evaluate('viewportAdd(\'test.msb\',document.querySelector(\'[data-viewport-action="add"]\'))')
+            page.locator('.lex-choice-popover button', has_text='m10piece').click()
             page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
             page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
                                    '.includes("6 parts")', timeout=30000)
-            page.evaluate('viewportAdd(\'test.msb\',document.querySelector(\'[data-viewport-action="add"]\'))')
-            page.locator('.lex-choice-popover button', has_text='m10piece').click()
-            page.wait_for_function('state.mapSelected==="1:2"', timeout=30000)
-            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
-                                   '.includes("7 parts")', timeout=30000)
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
             page.wait_for_timeout(1200)

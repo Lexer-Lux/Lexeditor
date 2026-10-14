@@ -5,10 +5,12 @@ from plugins.ds1.formats import TABLES, OPTIONAL_TABLES, schema
 from plugins.ds3.formats import write_field
 
 
-def make_archive(table_ids=None):
+def make_archive(table_ids=None, field_values=None):
     """Synthetic GameParam; table_ids overrides row ids per table and can
-    include optional tables the default skips."""
+    include optional tables the default skips. field_values maps a table
+    to {row_id: {field: value}} for links the default zero bytes lack."""
     table_ids = table_ids or {}
+    field_values = field_values or {}
     entries = []
     for table, (size, version) in TABLES.items():
         if table in OPTIONAL_TABLES and table not in table_ids:
@@ -40,6 +42,9 @@ def make_archive(table_ids=None):
             elif table == 'Bullet':
                 values = {'atkId_Bullet': [100,101,-1][index], 'HitBulletID': [101,-1,999999][index]}
             for key, value in values.items():
+                field = next(f['spec'] for f in definition['fields'] if f['spec'].key == key)
+                row = write_field(row, field, value, '<')
+            for key, value in field_values.get(table, {}).get(row_id, {}).items():
                 field = next(f['spec'] for f in definition['fields'] if f['spec'].key == key)
                 row = write_field(row, field, value, '<')
             data[rows_start + index * size:rows_start + (index + 1) * size] = row
