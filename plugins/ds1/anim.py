@@ -142,17 +142,34 @@ def list_chars(game_root, project):
     return sorted(stems)
 
 
-def list_anims(game_root, project, chr_id):
+def list_anims(game_root, project, chr_id, tae_store=None):
     """The character's skeleton flag and playable motions: file, binder,
     TAE link, duration and frame count. Members that fail to parse are
     listed as unavailable, with the reason; a character with no binders
-    at all is an error."""
+    at all is an error. With a TAE store, every motion also names its
+    event entry (or none), and event animations no motion plays list
+    under 'orphans'."""
     binders = _binders(game_root, project, chr_id)
     if not binders:
         raise HkxError('No animation binder is installed')
     stamps = tuple((binder, _stamp(path)) for binder, path in binders)
-    return _listed_anims(chr_id, stamps,
-                         tuple(str(path) for _binder, path in binders))
+    listed = _listed_anims(chr_id, stamps,
+                           tuple(str(path) for _binder, path in binders))
+    if tae_store is None:
+        return listed
+    try:
+        taes = tae_store.get(f'{chr_id}.anibnd.dcx')['taes']
+    except (TaeError, ValueError, OSError):
+        taes = {}
+    anims, linked = [], set()
+    for motion in listed['anims']:
+        link = tae_link(taes, chr_id, motion['file']) if motion.get('file') else None
+        if link is not None:
+            linked.add(link)
+        anims.append({**motion, 'tae': link[0] if link else None,
+                      'taeIndex': link[1] if link else None})
+    return {'chr': listed['chr'], 'skeleton': listed['skeleton'],
+            'anims': anims, 'orphans': event_orphans(tae_store, chr_id, linked)}
 
 
 @functools.lru_cache(maxsize=16)
@@ -259,21 +276,18 @@ def _sampled_frames(anim_path, member, anim_stamp, skel_path, skel_member, skel_
                 [c for sample in motion['samples'] for c in sample], 'f')}
 
 
-def anim_events(tae_store, chr_id, binder, member):
-    """The TAE events cueing this motion, or none when the motion has
-    no event file entry."""
+def tae_link(taes, chr_id, member):
+    """The (event file, animation index) cueing a motion, or None.
+
+    A motion aBB_III.hkx takes its events from the animation numbered
+    III in BB.tae. The player banks events per motion set (a00.tae);
+    every other character keeps one file under its own ID.
+    """
     match = ANIM_NAME.match(member or '')
-    if tae_store is None or match is None:
-        return []
-    try:
-        taes = tae_store.get(f'{chr_id}.anibnd.dcx')['taes']
-    except (TaeError, ValueError, OSError):
-        return []
-    # The player banks events per motion set (a00.tae); every other
-    # character keeps one file under its own ID.
+    if match is None:
+        return None
     candidates = [f'{match.group(1)}.tae', f'{chr_id}.tae']
     want = int(match.group(2))
-    found = None
     for name in candidates:
         if name not in taes:
             continue
@@ -283,8 +297,45 @@ def anim_events(tae_store, chr_id, binder, member):
             continue
         index = next((anim['index'] for anim in anims if anim['id'] == want), None)
         if index is not None:
-            found = (name, index)
-            break
+            return (name, index)
+    return None
+
+
+def event_orphans(tae_store, chr_id, linked):
+    """Event animations no motion plays.
+
+    A binder may carry events for motions it does not ship; those
+    animations are still editable, so they list alongside the motions.
+    """
+    try:
+        taes = tae_store.get(f'{chr_id}.anibnd.dcx')['taes']
+    except (TaeError, ValueError, OSError):
+        return []
+    orphans = []
+    for name in sorted(taes):
+        try:
+            anims = taes[name].list_anims()
+        except (TaeError, ValueError):
+            continue
+        for anim in anims:
+            if (name, anim['index']) in linked:
+                continue
+            orphans.append({'file': None, 'name': anim['name'],
+                            'binder': f'{chr_id}.anibnd.dcx', 'tae': name,
+                            'taeIndex': anim['index'], 'events': anim['events']})
+    return orphans
+
+
+def anim_events(tae_store, chr_id, binder, member):
+    """The TAE events cueing this motion, or none when the motion has
+    no event file entry."""
+    if tae_store is None:
+        return []
+    try:
+        taes = tae_store.get(f'{chr_id}.anibnd.dcx')['taes']
+    except (TaeError, ValueError, OSError):
+        return []
+    found = tae_link(taes, chr_id, member)
     if found is None:
         return []
     name, index = found

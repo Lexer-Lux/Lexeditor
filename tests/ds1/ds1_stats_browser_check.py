@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paged_detail import reveal
 from ds1_fixture import make_archive, make_text_archive
 from ds1_stats_fixture import make_stats_archive
-from plugins.ds1 import texts
+from plugins.ds1 import levelup_gains, texts
 from plugins.ds1.charainit import GIFT_FIELDS
 from plugins.ds1.formats import ItemDocument, STATS_FIELDS, STATS_SUBTABS
 from plugins.ds1.store import RELATIVE, MARKER
@@ -41,6 +41,7 @@ def main():
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                               'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
         errors, changes = [], []
+        gains_change = None
         try:
             session.start()
             with sync_playwright() as play:
@@ -83,6 +84,8 @@ def main():
                             assert low <= curve['mid'] <= high, curve
                         elif tab == 'starting-gifts':
                             assert set(keys) == set(GIFT_FIELDS), keys
+                        elif tab == 'levelup':
+                            assert set(keys) == {name for name, _, _ in levelup_gains.INPUTS}, keys
                         else:
                             assert set(keys) == set(STATS_FIELDS[table]), keys
                         control = reveal(page, page.locator('input[data-field-key][type="number"]').first)
@@ -101,7 +104,10 @@ def main():
                         assert next(f['value'] for f in row['fields'] if f['key'] == field) == value
                         # The detail stays filtered after the edit round-trip.
                         assert {f['key'] for f in page.evaluate('state.row.fields')} == set(keys)
-                        changes.append((identity['table'], identity['id'], field, value))
+                        if tab == 'levelup':
+                            gains_change = (identity['id'], field, value)
+                        else:
+                            changes.append((identity['table'], identity['id'], field, value))
                         if output:
                             page.screenshot(path=str(output / f'stats-{tab}.png'))
                     # The level-up cost row has no stages to plot: it keeps
@@ -121,6 +127,10 @@ def main():
                     reopened = ItemDocument((mod / RELATIVE).read_bytes())
                     for table, row_id, field, value in changes:
                         assert reopened.value(table, row_id, field) == value
+                    assert gains_change is not None
+                    row_id, field, value = gains_change
+                    again = request_json(session.url + f"api/row?table=NativeRules&id={row_id}&sub=levelup")['row']
+                    assert next(f['value'] for f in again['fields'] if f['key'] == field) == value
                     assert not errors, errors
                 finally:
                     browser.close()

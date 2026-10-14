@@ -2767,6 +2767,10 @@
     divine: ['#e8c67a', '<ellipse cx="8" cy="8" rx="5" ry="2.4" fill="none" stroke-width="1.8"/>'],
     occult: ['#7a5ac9', '<path d="M11 2a6.5 6.5 0 1 0 0 12 8 8 0 1 1 0-12z"/>'],
     abyssal: ['#a02622', '<circle cx="8" cy="8" r="5" fill="#000" stroke-width="1.5"/>'],
+    str: ['#7fd08a', '<rect x="3" y="3" width="10" height="10" rx="1"/>'],
+    dex: ['#6ad0c9', '<path d="M4 2l6 6-6 6V2z"/><path d="M9 2l6 6-6 6V2z"/>'],
+    int: ['#b48ae0', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/><circle cx="8" cy="8" r="1.6"/>'],
+    fth: ['#e08aa0', '<path d="M8 1l5 7-5 7-5-7z"/>'],
   };
   const typeGlyph = kind => {
     const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];
@@ -2909,6 +2913,7 @@
       "data-lex-layout-field": options.property || pin?.getAttribute?.("data-lex-pin-column") || labelText,
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
+      "data-lex-icon": options.icon || null,
       "data-lex-readonly": String(readOnly),
       // The property name is wrapped so it is a real flex item. Left as a bare
       // text node it was an anonymous item the leader arrow could shrink to
@@ -8917,7 +8922,7 @@ ${contents.path}`});
     const described = typeof owner.describe === "function" ? owner.describe(entry.key) : null;
     const editable = !!described?.editable && typeof owner.commitCell === "function";
     return {
-      key: `pin:${entry.key}`, label: entry.label, sortable: true, pinnedProperty: entry.key,
+      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label"}, typeGlyph(entry.icon), entry.label) : entry.label, sortable: true, pinnedProperty: entry.key,
       sortValue: row => pinnedValue(row, entry.key) ?? "",
       numeric: described?.numeric === true,
       min: described?.minimum, max: described?.maximum, step: described?.step,
@@ -8936,13 +8941,14 @@ ${contents.path}`});
       if (!box) continue;
       const key = field.dataset.lexLayoutField;
       const label = field.querySelector(".lex-detail-field-label-text")?.textContent?.trim() || key;
+      const icon = field.dataset.lexIcon || "";
       const pinned = owner.store.pinned.some(entry => entry.key === key);
       box.append(element("button", {
         type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`, "data-lex-control": "pin", "data-lex-auto-pin": "",
         "data-lex-pin-column": key, "aria-pressed": String(pinned),
         title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
         "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
-        onclick: event => { event.preventDefault(); event.stopPropagation(); owner.toggle(key, label); },
+        onclick: event => { event.preventDefault(); event.stopPropagation(); owner.toggle(key, label, icon); },
       }, pinIcon()));
     }
   };
@@ -9888,8 +9894,14 @@ ${contents.path}`});
     });
     const setSizes = (requested, persist = false) => {
       sizes = sizesWithMinimums(requested);
-      const fitted = fitResponsiveSizes(updateResponsive());
-      if (fitted) sizes = sizesWithMinimums(fitted);
+      // A drag moves the divider every frame; the table and label minima are
+      // remeasured once when it lands instead. Measuring them per frame forced
+      // a synchronous layout of every pane and made the divider lag behind.
+      // The drag-start minima still clamp the move itself, through resizePair.
+      if (!document.body.classList.contains("lex-panel-layout-dragging")) {
+        const fitted = fitResponsiveSizes(updateResponsive());
+        if (fitted) sizes = sizesWithMinimums(fitted);
+      }
       root.style.setProperty("--lex-panel-layout-template", template(sizes));
       updateDividerState();
       const detail = {sizes: [...sizes], split: sizes[0]};
@@ -11020,9 +11032,9 @@ ${contents.path}`});
       pinOwner.store.pinned=rest;
       try{localStorage.setItem(pinOwner.store.key,JSON.stringify(rest));}catch(_error){}
       change("pins",{});
-    },toggle:(key,label)=>{
+    },toggle:(key,label,icon)=>{
       const store=pinOwner.store;
-      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label}];
+      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label,icon:icon||""}];
       try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
       change("pins",{});
     }};

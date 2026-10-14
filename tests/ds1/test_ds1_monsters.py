@@ -153,3 +153,14 @@ def test_defense_block_and_weakness_fields_carry_glyph_kinds():
     assert fields['isWeakSaint'] == 'divine'
     assert fields['staminaGuardDef'] == ''
     assert fields['hp'] == ''
+
+
+
+def test_damage_taken_labels_carry_multiplier_unit():
+    doc = ItemDocument(make_archive())
+    labels = {field['key']: field['label']
+              for field in doc.read_row('NpcParam', 120000)['fields']}
+    assert labels['weakPartsDamageRate'] == 'Damage taken: weak point (x)'
+    for index in range(1, 9):
+        assert labels[f'partsDamageRate{index}'] == f'Damage taken: Part {index} (x)'
+    assert labels['staminaRecoverBaseVel'] == 'Stamina recovery (stamina/second)'

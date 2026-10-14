@@ -295,7 +295,7 @@ class MenuDocument(TextDocument):
     """One menu.msgbnd.dcx, editable by menu entry. Every FMG member merges
 
     by entry in the mod loader; the equipment defense labels are editable
-    in Items under Menu labels. Both copies of a table are read and
+    in the Text tab. Both copies of a table are read and
     written, as with item text.
     """
 

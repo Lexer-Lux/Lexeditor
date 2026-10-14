@@ -46,6 +46,8 @@ SUBTABS = (
     ('keys', 'Key Items', 'EquipParamGoods'), ('spells', 'Spells', 'Magic'),
     ('weapons', 'Weapons', 'EquipParamWeapon'), ('ammo', 'Ammo', 'EquipParamWeapon'),
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
+)
+TEXT_SUBTABS = (
     ('menu-labels', 'Menu labels', 'MenuText'),
 )
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),
@@ -67,7 +69,17 @@ for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defens
         f'Changes this piece\'s physical defense against {kind.lower()} attacks by this percentage: '
         '-100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own.')
 
-# Damage, status and weakness glyphs, by table and field. The label
+# Weapon status guard, said the way the blocking panel uses it. The
+# vendor annotations carry the % inside the label ('Guard Absorption %:
+# X'), which never engages the trailing-(%) unit control, so the
+# override restates them the way NpcParam does.
+WEAPON_FIELDS = {}
+for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
+                  ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
+    WEAPON_FIELDS[key] = (f'{kind} guard (%)', 'Defense',
+        'The absorption to apply to damage of the specified type when guarding.')
+
+# Damage, status, weakness and stat glyphs, by table and field. The label
 # names the kind; the icon just draws it before the words.
 FIELD_ICONS = {}
 for _table, _entries in [
@@ -92,7 +104,11 @@ for _table, _entries in [
                  ('slashGuardCutRate', 'slash'), ('blowGuardCutRate', 'strike'),
                  ('thrustGuardCutRate', 'thrust'), ('poisonGuardResist', 'poison'),
                  ('diseaseGuardResist', 'toxic'), ('bloodGuardResist', 'bleed'),
-                 ('curseGuardResist', 'curse')]),
+                 ('curseGuardResist', 'curse'), ('correctStrength', 'str'),
+                 ('correctAgility', 'dex'), ('correctMagic', 'int'), ('correctFaith', 'fth'),
+                 ('properStrength', 'str'), ('properAgility', 'dex'),
+                 ('properMagic', 'int'), ('properFaith', 'fth')]),
+    ('Magic', [('requirementIntellect', 'int'), ('requirementFaith', 'fth')]),
 ]:
     for _key, _kind in _entries:
         FIELD_ICONS[(_table, _key)] = _kind
@@ -167,12 +183,14 @@ STATS_SUBTABS = (
     ('upgrade-materials', 'Upgrade materials', 'EquipMtrlSetParam'),
     ('starting-classes', 'Starting classes', 'CharaInitParam'),
     ('starting-gifts', 'Starting gifts', 'CharaInitParam'),
+    ('levelup', 'Level-up gains', 'NativeRules'),
 )
 # The Stats tab shows these properties of records it shares with Items. Curves,
-# upgrade levels and starting classes show every field, so those tables list
-# their whole schema here. Gifts show only what they grant (STATS_SUB_FIELDS).
+# upgrade levels, starting classes and level-up gains show every field, so
+# those tables list their whole schema here. Gifts show only what they grant
+# (STATS_SUB_FIELDS).
 STATS_WHOLE_TABLES = (GRAPH_TABLE, 'ReinforceParamWeapon', 'ReinforceParamProtector',
-                      'EquipMtrlSetParam', 'CharaInitParam')
+                      'EquipMtrlSetParam', 'CharaInitParam', 'NativeRules')
 STATS_SUB_FIELDS = {'starting-gifts': GIFT_FIELDS}
 STATS_FIELDS = {
     GRAPH_TABLE: ('stageMaxVal0', 'stageMaxVal1', 'stageMaxVal2', 'stageMaxVal3', 'stageMaxVal4',
@@ -398,6 +416,8 @@ def schema(table):
             label, group, description = ATTACK_FIELDS[key]
         if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
             label, group, description = ARMOR_FIELDS[key]
+        if table == 'EquipParamWeapon' and key in WEAPON_FIELDS:
+            label, group, description = WEAPON_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
             label, group, description = MAGIC_FIELDS[key]
         slot = key[-2:] if table == MATERIAL_TABLE else ''
@@ -608,7 +628,8 @@ class ItemDocument:
         if table == 'MenuText':
             from .texts import MENU_LABELS, MENU_LABEL_IDS
             if row_id in MENU_LABEL_IDS:
-                return MENU_LABELS[MENU_LABEL_IDS[row_id]][0]
+                key = MENU_LABEL_IDS[row_id]
+                return (self.menu_texts.label(key) if self.menu_texts else None) or MENU_LABELS[key][0]
             return f'Menu label {row_id}'
         if table == MATERIAL_TABLE:
             return describe_set(self, row_id)
@@ -714,6 +735,32 @@ class ItemDocument:
         field = next(f['spec'] for f in self.schemas[table]['fields'] if f['spec'].key == key)
         return read_field(self._row(table, row_id)[2], field, '<')
 
+    def part_model(self, table, row_id):
+        """The model a weapon or armor row wears, or why it has none.
+
+        Returns the row's model fields when a parts binder may hold
+        them, else {'available': False, 'reason': ...}. Consumables,
+        rings, faces and hair name no binder, so they explain
+        themselves instead of resolving one.
+        """
+        if table == 'EquipParamGoods':
+            return {'available': False,
+                    'reason': 'Consumables name no model file, so there is nothing to preview.'}
+        if table == 'EquipParamAccessory':
+            return {'available': False,
+                    'reason': 'Rings name no model file, so there is nothing to preview.'}
+        if table not in ('EquipParamWeapon', 'EquipParamProtector'):
+            return {'available': False,
+                    'reason': 'Only weapons and armor have previewable models.'}
+        category = self.value(table, row_id, 'equipModelCategory')
+        if table == 'EquipParamProtector' and category in (3, 4):
+            return {'available': False,
+                    'reason': 'Faces and hair are built by the face generator, not stored as a model file.'}
+        return {'available': True,
+                'model_id': self.value(table, row_id, 'equipModelId'),
+                'category': category,
+                'gender': self.value(table, row_id, 'equipModelGender')}
+
     def row_name(self, table, row_id):
         row = self._rows_by_id.get(table, {}).get(row_id)
         fallback = f'Effect {row_id}' if table == EFFECT_TABLE else f'Item {row_id}'
@@ -797,11 +844,11 @@ class ItemDocument:
         return result
 
     def _menu_label_rows(self):
-        """The equipment defense labels as records: fixed names, editable text."""
+        """The equipment defense labels as records: named by their text."""
         if self.menu_texts is None:
             return []
         from .texts import MENU_LABELS
-        return [{'id': text_id, 'table': 'MenuText', 'name': display,
+        return [{'id': text_id, 'table': 'MenuText', 'name': self.menu_texts.label(key) or display,
                  'values': {'label': self.menu_texts.label(key) or ''}, 'display': {}}
                 for key, (display, text_id) in MENU_LABELS.items()]
 
@@ -976,7 +1023,8 @@ class ItemDocument:
                            'type': 'text', 'minimum': None, 'maximum': None, 'maxLength': 200,
                            'required': True, 'enum': {}, 'protectedReason': '',
                            'editable': True, 'vanilla': self.menu_texts.original_label(key) or ''})
-        return {'id': row_id, 'table': 'MenuText', 'name': MENU_LABELS[key][0],
+        text = next(field['value'] for field in fields if field['key'] == 'label') if fields else ''
+        return {'id': row_id, 'table': 'MenuText', 'name': text or MENU_LABELS[key][0],
                 'renamable': False, 'fields': fields, 'effectLinks': []}
 
     def _absorption_levels(self, row_id, table='EquipParamProtector'):

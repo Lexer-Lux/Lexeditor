@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, TEXT_SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -120,7 +120,9 @@ class ItemStore:
                 'worldTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in WORLD_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
-                         for key, label, table in SUBTABS]}
+                         for key, label, table in SUBTABS],
+                'textTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                             for key, label, table in TEXT_SUBTABS]}
 
     def edit(self, table, row_id, field, value, only=None):
         self.writable()

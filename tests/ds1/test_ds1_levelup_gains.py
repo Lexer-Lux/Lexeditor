@@ -366,8 +366,20 @@ def test_data_map_links_the_tab(tmp_path):
     store = ItemStore(game, mod, False)
     row = next(item for item in data_map.payload(
         store, {"native": {"available": True}})["rows"] if item["id"] == "native-levelup")
-    assert row["target"] == "levelup" and row["sub"] == "levelup" and row["openable"]
-    assert row["targets"] == [{"id": "levelup", "label": "Level-up gains"}]
+    assert row["target"] == "stats" and row["sub"] == "levelup" and row["openable"]
+    assert row["targets"] == [{"id": "stats", "label": "Stats"}]
+    assert row["controls"] == "Stats: level-up defense gains"
     unavailable = next(item for item in data_map.payload(store)["rows"]
                        if item["id"] == "native-levelup")
     assert unavailable["target"] == "" and not unavailable["openable"]
+
+
+def test_gains_live_in_the_stats_subtabs(tmp_path):
+    game, mod = tmp_path / "game", tmp_path / "mod"
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(make_archive())
+    mod.mkdir()
+    (mod / MARKER).touch()
+    tabs = ItemStore(game, mod, False).state()["statsTabs"]
+    gains = next(entry for entry in tabs if entry["id"] == "levelup")
+    assert (gains["label"], gains["table"]) == ("Level-up gains", "NativeRules")

@@ -31,9 +31,6 @@ def test_all_categories_noop_and_changed_roundtrip():
     allowed = set()
     changed = []
     for tab, _, _ in SUBTABS:
-        # Menu labels are menu text, not parameter rows.
-        if tab == 'menu-labels':
-            continue
         row = document.list_rows(tab)[0]
         fields = document.read_row(row['table'], row['id'])['fields']
         field = next(f for f in fields if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'])
@@ -169,9 +166,6 @@ def test_putting_a_float_back_as_shown_leaves_nothing_to_save():
     # back the value as shown (seven digits); a float needs up to nine.
     document = ItemDocument(make_archive())
     for tab, _, _ in SUBTABS:
-        # Menu labels are menu text, not parameter rows.
-        if tab == 'menu-labels':
-            continue
         row = document.list_rows(tab)[0]
         fields = [f for f in document.read_row(row['table'], row['id'])['fields']
                   if f['editable'] and f['dtype'] == 'f32' and isinstance(f['value'], float)]
@@ -291,3 +285,38 @@ def test_armor_and_shield_guard_fields_carry_glyph_kinds():
              for field in document.read_row('EquipParamWeapon', 100)['fields']}
     assert guard['thunGuardCutRate'] == 'lightning'
     assert guard['curseGuardResist'] == 'curse'
+
+
+
+def test_weapon_guard_labels_carry_percent_unit():
+    document = ItemDocument(make_archive())
+    fields = {field['key']: field
+              for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert fields['poisonGuardResist']['label'] == 'Poison guard (%)'
+    assert fields['diseaseGuardResist']['label'] == 'Toxic guard (%)'
+    assert fields['bloodGuardResist']['label'] == 'Bleed guard (%)'
+    assert fields['curseGuardResist']['label'] == 'Curse guard (%)'
+    assert fields['poisonGuardResist']['icon'] == 'poison'
+    assert fields['diseaseGuardResist']['icon'] == 'toxic'
+    assert fields['bloodGuardResist']['icon'] == 'bleed'
+    assert fields['curseGuardResist']['icon'] == 'curse'
+    from plugins.ds1.monsters import NPC_FIELDS
+    assert NPC_FIELDS['poisonGuardResist'][0] == 'Poison guard (%)'
+
+
+def test_scaling_and_requirement_fields_carry_stat_glyph_kinds():
+    document = ItemDocument(make_archive())
+    weapon = {field['key']: field.get('icon', '')
+              for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert weapon['correctStrength'] == 'str'
+    assert weapon['correctAgility'] == 'dex'
+    assert weapon['correctMagic'] == 'int'
+    assert weapon['correctFaith'] == 'fth'
+    assert weapon['properStrength'] == 'str'
+    assert weapon['properAgility'] == 'dex'
+    assert weapon['properMagic'] == 'int'
+    assert weapon['properFaith'] == 'fth'
+    magic = {field['key']: field.get('icon', '')
+             for field in document.read_row('Magic', 100)['fields']}
+    assert magic['requirementIntellect'] == 'int'
+    assert magic['requirementFaith'] == 'fth'

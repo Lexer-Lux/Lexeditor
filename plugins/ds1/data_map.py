@@ -3,8 +3,8 @@ from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
 from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
-              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'levelup':'Level-up gains',
-              'maps':'Maps', 'animations':'Animations', 'assets':'Assets'}
+              'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance',
+              'maps':'Maps', 'animations':'Animations', 'assets':'Assets', 'text':'Text'}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -124,8 +124,8 @@ def payload(store, native_rules=None, theme=None):
         'path': str(store.menu_source or store.game_root/texts.MENU_RELATIVE),
         'coverage': 'structured' if menu_available else 'unavailable',
         'status': 'partial' if menu_available else 'not-integrated', 'openable': menu_available,
-        'target': 'items' if menu_available else '', 'sub': 'menu-labels',
-        'controls': 'Items: Menu labels',
+        'target': 'text' if menu_available else '', 'sub': 'menu-labels',
+        'controls': 'Text: Menu labels',
         'notes': 'Edit the equipment defense labels.' if menu_available
                 else 'The menu-text archive is missing. Menu labels cannot be edited.'})
     if document.texts is not None:
@@ -137,12 +137,12 @@ def payload(store, native_rules=None, theme=None):
                 'controls':'No editor', 'notes':'This message table has no editor. Its original bytes are preserved when item text is saved.'})
     # Values the game keeps in its executable, changed by Lexeditor's native rules.
     available = bool(native_rules and native_rules['native']['available'])
-    for key, label in (('misc', 'Misc.: base stamina regeneration'),
-                       ('encumbrance', 'Encumbrance: load bands, movement profiles and stamina recovery'),
-                       ('levelup', 'Level-up gains: defense growth per stat')):
+    for key, target, label in (('misc', 'misc', 'Misc.: base stamina regeneration'),
+                              ('encumbrance', 'encumbrance', 'Encumbrance: load bands, movement profiles and stamina recovery'),
+                              ('levelup', 'stats', 'Stats: level-up defense gains')):
         rows.append({'id':'native-' + key, 'filename':'DarkSoulsRemastered.exe', 'path':str(store.game_root / 'DarkSoulsRemastered.exe'),
             'coverage':'structured', 'status':'partial', 'openable':available,
-            'target':key if available else '', 'sub':key, 'controls':label,
+            'target':target if available else '', 'sub':key, 'controls':label,
             'notes':'Save and Apply with the game closed. Only the fingerprinted build is supported.'
                     if available else 'The installed executable is not the supported build, so these rules cannot be applied.'})
     # Area data beyond the parameter archive. Maps open the Maps tab;
@@ -160,14 +160,20 @@ def payload(store, native_rules=None, theme=None):
             'target': 'animations', 'sub': 'animations', 'controls': 'Animations: event timing, settings, adding and removing',
             'notes': 'Retime animation events, change their settings, and add or remove documented events. The 3D models themselves stay untouched.'})
     # Whole-file asset overrides: every data folder outside the structured editors.
+    # Weapon and armor models also preview in their Items drawers, so parts/ says so.
     for top in assets.ASSET_ROOTS:
         folder = store.game_root / top
         if not folder.is_dir():
             continue
+        controls = 'Assets: whole-file replacement with texture previews'
+        notes = 'Replace game files with your own. Textures preview; sounds, movies and models replace without one. Files owned by another editor change there instead.'
+        if top == 'parts':
+            controls = 'Assets: whole-file replacement; models preview in Items'
+            notes = ('Replace game files with your own. Textures preview; weapon and armor models preview '
+                     'in their Items detail drawers. Files owned by another editor change there instead.')
         rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
             'coverage': 'structured', 'status': 'partial', 'openable': True,
-            'target': 'assets', 'sub': 'game', 'controls': 'Assets: whole-file replacement with texture previews',
-            'notes': 'Replace game files with your own. Textures preview; sounds, movies and models replace without one. Files owned by another editor change there instead.'})
+            'target': 'assets', 'sub': 'game', 'controls': controls, 'notes': notes})
     # The cosmetic theme, drawn from the installed game into a private cache.
     parts = []
     if isinstance(theme, dict):

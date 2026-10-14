@@ -216,6 +216,104 @@ def chr_dummies(game_root, project, chr_id):
                         for dummy in doc.dummies]}
 
 
+PART_PREFIXES = {1: 'AM', 2: 'BD', 5: 'HD', 6: 'LG'}
+PART_VARIANTS = {0: 'A', 1: 'M', 2: 'F', 4: 'A', 5: 'E'}
+
+
+def part_candidates(table, category, gender, model_id):
+    """Binder stems a row's model may live under: [(stem, variant)],
+    or (None, reason). Weapons share one unisex binder; armor names its
+    piece and fit. Dual-gender armor ships two binders (male first); the
+    reader picks which to preview.
+    """
+    if table == 'EquipParamWeapon':
+        return ([(f'WP_A_{model_id:04d}', None)], None)
+    prefix = PART_PREFIXES.get(category)
+    if prefix is None:
+        return (None, 'this armor piece has no wearable model')
+    if gender == 3:
+        return ([(f'{prefix}_M_{model_id:04d}', 'M'),
+                 (f'{prefix}_F_{model_id:04d}', 'F')], None)
+    variant = PART_VARIANTS.get(gender)
+    if variant is None:
+        return (None, 'this armor piece has no wearable model')
+    return ([(f'{prefix}_{variant}_{model_id:04d}', None)], None)
+
+
+def _part_member(binder, stem):
+    """The binder member holding the model: the stem's own mesh, else
+    the first mesh in the binder.
+    """
+    try:
+        plain = binder.read_bytes()
+    except OSError as error:
+        raise FlverError(f'Cannot read {binder.name}') from error
+    if plain[:4] == b'DCX\0':
+        try:
+            plain = inflate(plain)
+        except FormatError as error:
+            raise FlverError(f'Cannot open {binder.name}') from error
+    try:
+        found = members(plain)
+    except FormatError as error:
+        raise FlverError(f'Cannot open {binder.name}') from error
+    names = list(found) if isinstance(found, dict) else [m.name for m in found]
+    wanted = stem + '.flver'
+    if wanted in names:
+        return wanted
+    meshes = sorted(name for name in names if name.lower().endswith('.flver'))
+    if not meshes:
+        raise FlverError(f'{binder.name} holds no model mesh')
+    return meshes[0]
+
+
+def resolve_part(game_root, project, stem):
+    """Where a weapon or armor model's geometry lives: ('member',
+    binder path, member name), or ('skip', reason). The stem is a bare
+    binder name, so anything outside letters, digits and underscore is
+    rejected.
+    """
+    if not CHR_ID.match(stem or ''):
+        return ('skip', 'unknown part model')
+    relative = Path('parts') / (stem + '.partsbnd.dcx')
+    own = _overlay(project, relative)
+    live = own if own is not None else Path(game_root) / relative
+    if not live.is_file():
+        return ('skip', 'no binder')
+    try:
+        member = _part_member(live, stem)
+    except FlverError as error:
+        return ('skip', str(error))
+    return ('member', live, member)
+
+
+def part_geometry(game_root, project, stem):
+    """Base64 float32 geometry for one weapon or armor model, cached by
+    file stamp.
+    """
+    resolved = resolve_part(game_root, project, stem)
+    if resolved[0] == 'skip':
+        raise FlverError(resolved[1])
+    _kind, location, member = resolved
+    try:
+        stat = Path(location).stat()
+    except OSError as error:
+        raise FlverError(f'Cannot read {Path(location).name}') from error
+    return _cached_geometry('member', str(location), member,
+                            (stat.st_mtime_ns, stat.st_size))
+
+
+def part_view(game_root, project, stem):
+    """Availability and mesh inventory for one weapon or armor model."""
+    resolved = resolve_part(game_root, project, stem)
+    if resolved[0] == 'skip':
+        return {'stem': stem, 'available': False, 'reason': resolved[1]}
+    raw = _read_member(Path(resolved[1]), resolved[2])
+    doc = FlverDocument(raw)
+    return {'stem': stem, 'available': True, 'meshes': len(doc.meshes),
+            'file': Path(resolved[1]).name}
+
+
 def map_view(mapstore, map_name):
     """Placements and model availability for the viewport."""
     doc = mapstore.get(map_name)

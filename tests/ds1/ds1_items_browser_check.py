@@ -1,4 +1,4 @@
-"""Render all nine item lists and edit/save/reload copies, never game files."""
+"""Render all eight item lists and edit/save/reload copies, never game files."""
 import hashlib
 import json
 import os
@@ -41,7 +41,7 @@ def main():
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                               'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
-        errors, changes, counts, menuchanges = [], [], {}, []
+        errors, changes, counts = [], [], {}
         try:
             session.start()
             with sync_playwright() as play:
@@ -61,16 +61,6 @@ def main():
                         counts[tab] = page.evaluate('state.rows.length')
                         assert counts[tab] > 0
                         assert page.locator('.lex-column-list .lex-list-row').count() > 0
-                        if tab == 'menu-labels':
-                            control = page.locator('input[data-field-key="label"][type="text"]')
-                            control.fill('MagABS')
-                            control.press('Tab')
-                            page.wait_for_function('state.pending===0 && state.dirty>0')
-                            row = request_json(session.url + "api/row?table=MenuText&id=102204")["row"]
-                            assert next(f["value"] for f in row["fields"] if f["key"] == "label") == "MagABS"
-                            menuchanges.append("MagABS")
-                            if output: page.screenshot(path=str(output / f'{tab}.png'))
-                            continue
                         control = reveal(page,page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))
@@ -100,8 +90,6 @@ def main():
                     reopened = ItemDocument((mod / RELATIVE).read_bytes())
                     for table, row_id, field, value in changes:
                         assert reopened.value(table, row_id, field) == value
-                    for value in menuchanges:
-                        assert texts.MenuDocument((mod / texts.MENU_RELATIVE).read_bytes()).label("magicDefense") == value
                     # An item is renamed in the table's Name cell, by double-click.
                     page.locator('[data-subtab="consumables"]').click()
                     page.wait_for_function('state.sub==="consumables" && state.row && !state.pending')

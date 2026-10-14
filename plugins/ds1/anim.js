@@ -26,17 +26,19 @@ window.Ds1Anim = (() => {
     const mine = ++session;
     if (!host.isConnected) return;
     if (!motion) { status.textContent = `${chrId}: no animations found.`; return; }
-    if (motion.available === false) { status.textContent = `${motion.file}: ${motion.reason || "unreadable"}.`; return; }
+    if (motion.available === false) { status.textContent = `${motion.file || motion.name}: ${motion.reason || "unreadable"}.`; return; }
     status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${motion.file}`));
+    const overlay = LexeditorUI.loadingPanel({label: `Loading ${motion.file}`});
+    host.append(overlay);
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
-    if (mine !== session || !host.isConnected) return;
+    if (mine !== session || !host.isConnected) { overlay.remove(); return; }
     const [skel, geo, frames] = await Promise.all([
       get(`/api/anim/skeleton?chr=${encodeURIComponent(chrId)}`),
       get(`/api/chr/geometry?chr=${encodeURIComponent(chrId)}&skin=1`),
       get(`/api/anim/frames?chr=${encodeURIComponent(chrId)}&binder=${encodeURIComponent(motion.binder)}&anim=${encodeURIComponent(motion.file)}`),
     ]);
-    if (mine !== session || !host.isConnected) return;
+    if (mine !== session || !host.isConnected) { overlay.remove(); return; }
     // Bones follow the model when it exists, else the Havok skeleton
     // alone (the player base has no visible mesh of its own).
     const names = skel.flver.length ? skel.flver.map(b => b.name) : skel.hka.bones;
@@ -62,6 +64,7 @@ window.Ds1Anim = (() => {
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
     host.append(canvas);
+    overlay.remove();
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
     const controls = new OrbitControls(camera, canvas);
@@ -126,7 +129,9 @@ window.Ds1Anim = (() => {
       camera.updateProjectionMatrix();
     };
     resize();
-    window.addEventListener("resize", resize);
+    const resizer = typeof ResizeObserver === "function" ? new ResizeObserver(() => resize()) : null;
+    if (resizer) resizer.observe(host);
+    else window.addEventListener("resize", resize);
 
     const count = frames.frames, bonesTracked = frames.bones;
     const pos = f32(frames.translations), quat = f32(frames.rotations), scl = f32(frames.scales);
@@ -228,7 +233,8 @@ window.Ds1Anim = (() => {
     let frames2 = 0, liveFlag = true, last = performance.now();
     host._animStop = () => {
       liveFlag = false;
-      window.removeEventListener("resize", resize);
+      if (resizer) resizer.disconnect();
+      else window.removeEventListener("resize", resize);
       controls.dispose();
       renderer.dispose();
       for (const item of trash) item.dispose();

@@ -23,6 +23,8 @@ from plugins.ds1.store import RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
 
+ROWS = ('rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
+
 
 def main():
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
@@ -49,14 +51,19 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
+                    # Characters left, viewport center, animations right; no strip.
                     page.locator('button[data-tab="animations"]').click()
-                    page.wait_for_function('state.tab==="animations" && state.rows.length>0 && !state.error')
-                    page.wait_for_selector('[data-subtab="playback"]')
-                    strip = page.locator('[aria-label="Animations"] [data-subtab]')
-                    assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['animations', 'playback']
-                    page.locator('[data-subtab="playback"]').click()
-                    page.wait_for_function('state.tab==="animations" && state.sub==="playback" && state.animView && !state.error')
+                    page.wait_for_function('state.tab === "animations" && !state.error')
+                    page.wait_for_selector('[data-anim-host]')
+                    assert page.locator('[data-subtab]').count() == 0
+                    chars = page.locator('[data-anim-chars] .lex-list-row').evaluate_all(ROWS)
+                    assert chars == ['c1200'], chars
+                    motions = page.locator('[data-anim-list] .lex-list-row').evaluate_all(ROWS)
+                    assert motions == ['a87_3300.hkx', 'animation 3301'], motions
+                    # The motion loads under the standard throbber.
+                    page.wait_for_selector('[data-anim-host] .lex-panel-loading', timeout=30000)
                     page.wait_for_selector('[data-anim-host][data-ready="true"]', timeout=30000)
+                    page.wait_for_selector('[data-anim-host] .lex-panel-loading', state='detached')
                     status = page.locator('[data-anim-status]').inner_text()
                     assert 'a87_3300.hkx' in status, status
                     assert '4 frames at 30.0 fps' in status, status
@@ -82,6 +89,13 @@ def main():
                     assert page.locator('[data-anim-readout]').inner_text() == frozen
                     page.locator('[data-anim-timeline] input[type="range"]').fill('2')
                     page.wait_for_function('document.querySelector("[data-anim-readout]")?.textContent?.startsWith("2.0")', timeout=10000)
+                    # Switching motions is viewing, not editing: nothing dirties.
+                    page.locator('[data-anim-list] .lex-list-row', has_text='animation 3301').click()
+                    page.wait_for_function(
+                        'document.querySelector("[data-anim-status]")?.textContent?.includes("no playable motion")')
+                    page.locator('[data-anim-list] .lex-list-row', has_text='a87_3300.hkx').click()
+                    page.wait_for_selector('[data-anim-host][data-ready="true"]', timeout=30000)
+                    assert page.evaluate('state.dirty') == 0
                     if output:
                         page.screenshot(path=str(output / 'anim.png'))
                     assert not errors, errors

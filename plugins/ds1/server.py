@@ -14,6 +14,7 @@ from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore
 from .msb import MsbError
+from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
@@ -118,6 +119,7 @@ class Handler(PluginRequestHandler):
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
+                    '/api/parts/view', '/api/parts/geometry',
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme'):
             try:
                 with LOCK:
@@ -139,15 +141,8 @@ class Handler(PluginRequestHandler):
                                       'readOnly': STORE.read_only}
                     elif path == '/api/state':
                         result = STORE.state()
-                        result['animTabs'] = [{'id': 'animations', 'label': 'Events',
+                        result['animTabs'] = [{'id': 'animations', 'label': 'Animations',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
-                        chars = anim.list_chars(MAPSTORE.game_root, MAPSTORE.project)
-                        result['animTabs'].append({'id': 'playback', 'label': 'Playback',
-                                                   'table': 'AnimPlayback', 'count': len(chars),
-                                                   'help': 'Watch a character perform its animations. '
-                                                           'Pick a character, then an animation. '
-                                                           'Drag the timeline to scrub through the move. '
-                                                           'Orange ticks mark where events fire.'})
                         monsters = next(entry['count'] for entry in result['enemyTabs']
                                         if entry['id'] == 'monsters')
                         result['enemyTabs'].append({'id': 'model', 'label': 'Models',
@@ -204,9 +199,50 @@ class Handler(PluginRequestHandler):
                         result = viewport.chr_geometry(MAPSTORE.game_root, MAPSTORE.project,
                                                        query.get('chr', [''])[0],
                                                        query.get('skin', [''])[0] == '1')
+                    elif path == '/api/parts/view':
+                        table = query.get('table', [''])[0]
+                        row_id = int(query.get('id', [''])[0])
+                        info = STORE.get().part_model(table, row_id)
+                        if not info['available']:
+                            result = {'table': table, 'id': row_id, 'available': False,
+                                      'reason': info['reason']}
+                        else:
+                            stems, reason = viewport.part_candidates(
+                                table, info['category'], info['gender'], info['model_id'])
+                            if stems is None:
+                                result = {'table': table, 'id': row_id, 'available': False,
+                                          'reason': reason}
+                            else:
+                                models = []
+                                for stem, variant in stems:
+                                    entry = viewport.part_view(MAPSTORE.game_root,
+                                                             MAPSTORE.project, stem)
+                                    entry['variant'] = variant
+                                    models.append(entry)
+                                result = {'table': table, 'id': row_id, 'models': models,
+                                          'available': any(entry['available'] for entry in models)}
+                                if not result['available']:
+                                    missing = ', '.join(entry['stem'] + '.partsbnd.dcx'
+                                                        for entry in models)
+                                    result['reason'] = (f'The {missing} model file is not in the game or the mod.'
+                                                        if len(models) == 1 else
+                                                        f'Neither model file is installed: {missing}.')
+                    elif path == '/api/parts/geometry':
+                        table = query.get('table', [''])[0]
+                        row_id = int(query.get('id', [''])[0])
+                        want = query.get('variant', ['M'])[0]
+                        info = STORE.get().part_model(table, row_id)
+                        if not info['available']:
+                            raise FlverError(info['reason'])
+                        stems, reason = viewport.part_candidates(
+                            table, info['category'], info['gender'], info['model_id'])
+                        if stems is None:
+                            raise FlverError(reason)
+                        picked = next((stem for stem, variant in stems if variant == want), stems[0][0])
+                        result = viewport.part_geometry(MAPSTORE.game_root, MAPSTORE.project, picked)
                     elif path == '/api/anim/list':
                         result = anim.list_anims(MAPSTORE.game_root, MAPSTORE.project,
-                                                 query.get('chr', [''])[0])
+                                                 query.get('chr', [''])[0], TAESTORE)
                     elif path == '/api/anim/skeleton':
                         result = anim.skeleton(MAPSTORE.game_root, MAPSTORE.project,
                                                query.get('chr', [''])[0])

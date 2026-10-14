@@ -110,7 +110,7 @@ NPC_STATS = {
     'disableRespawn': ('No bonfire reset', 'Basics',
         'When set, this enemy keeps its position and behavior when the player rests at a bonfire.'),
     'teamType': ('Team', 'Basics', 'Which side this enemy fights for.'),
-    'weakPartsDamageRate': ('Damage taken: weak point', 'Defense',
+    'weakPartsDamageRate': ('Damage taken: weak point (x)', 'Defense',
         'Multiplier on damage the weak point takes. 1 is unchanged.'),
     'staminaGuardDef': ('Stamina guard (%)', 'Blocking', ''),
     'hitHeight': ('Body height', 'Defense',
@@ -131,7 +131,7 @@ NPC_STATS = {
 }
 for index in range(1, 9):
     NPC_STATS[f'partsDamageRate{index}'] = (
-        f'Damage taken: Part {index}', 'Defense',
+        f'Damage taken: Part {index} (x)', 'Defense',
         f'Multiplier on damage body part {index} takes. 1 is unchanged.')
 for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
                   ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:

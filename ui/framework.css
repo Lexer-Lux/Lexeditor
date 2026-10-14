@@ -6734,6 +6734,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    text clips instead of taking extra vertical space. */
 .lex-type-glyph{flex:0 0 auto;width:14px;height:14px;display:inline-grid;place-items:center;}
 .lex-type-glyph>svg{width:14px;height:14px;display:block;}
+.lex-pinned-header-label{display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:100%;}
 .lex-detail-field-label-text {
    flex:0 1 auto;min-width:0;
  overflow:hidden;

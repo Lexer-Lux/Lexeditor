@@ -4,13 +4,14 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"resistances",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
-  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],animScope:{level:"chars"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetKind:"models",assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapCollision:true,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapClipboard:null,
   dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,mapFocus:null};
-let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0;
+let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 const assetKinds=[
@@ -44,8 +45,8 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
     this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
     this.redoStack=[];shell.refresh();
   },
-  async undo(){const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,"before");return true;},
-  async redo(){const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,"after");return true;},
+  async undo(){await edits;const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,"before");return true;},
+  async redo(){await edits;const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,"after");return true;},
   async apply(entry,side){
     this.applying=true;
     try{
@@ -71,7 +72,7 @@ document.addEventListener("keydown",event=>{
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
   const pressed=event.key.toLowerCase();
   if(pressed!=="z"&&pressed!=="y")return;
-  if(event.target.closest?.("textarea,input[type=text]:not([data-field-key])"))return;
+  if(pressed==="z"&&!(event.target instanceof HTMLElement&&event.target.matches("input:not([type='checkbox']),textarea,select,[contenteditable='true']")))return;  if(event.target.closest?.("textarea,input[type=text]:not([data-field-key])"))return;
   event.preventDefault();
   document.activeElement?.blur?.();
   setTimeout(()=>pressed==="y"||event.shiftKey?fieldHistory.redo():fieldHistory.undo(),0);
@@ -79,14 +80,14 @@ document.addEventListener("keydown",event=>{
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered",themeName:"ds1",theme:{accent:"#a4824c","accent-text":"#141210"}},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
+    {id:"text",label:"Text",help:"Edit the menu defense labels the equipment panel shows beside armor: MagDEF, FireDEF and LitngDEF."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops, effects and AI links. Behaviors holds action costs and what each behavior calls. AI holds enemy senses, distances and goals. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
-    {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
+    {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
-    {id:"levelup",label:"Level-up gains",help:"Edit what each level-up adds to defense. Each defense grows with your stats and humanity. 0 removes a gain. Vanilla is read-only. Save and Apply to use your values."},
     {id:"assets",label:"Assets",help:"Replace game files with your own: textures, sounds, movies and models. Mod files holds the replacements the mod carries, and Installed game holds the files it can replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
     {id:"misc",label:"Misc."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
@@ -97,47 +98,81 @@ const shell=LexeditorUI.mountShell({
   pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
   save,discard,history:fieldHistory
 });
-const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:
-  tab==="stats"?state.statsTabs:
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
+  tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
   tab==="assets"?state.assetTabs:
-  tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:tab==="levelup"?[{id:"levelup",label:"Gains"}]:state.tabs;
+  tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
-  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.nativeRules=result.nativeRules;
+  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
   const query=state.query.toLowerCase();
   const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
-  if(state.tab==="encumbrance"||state.tab==="levelup"||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
+  if(state.tab==="encumbrance"||(state.tab==="stats"&&state.sub==="levelup")||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
   // The game's own order (by record) breaks ties.
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
 }
-const isDrillRow=row=>state.tab==="animations"&&(String(row.id).startsWith("char:")||String(row.id).startsWith("anim:"));
-async function drillAnimations(row){
-  const previous=state.animScope;
-  if(String(row.id).startsWith("char:")){
-    state.animScope={level:"anims",binder:row.table,charName:row.name};
-  }else{
-    const rest=String(row.id).slice(5),pipe=rest.lastIndexOf("|");
-    state.animScope={level:"events",binder:row.table,tae:rest.slice(0,pipe),anim:rest.slice(pipe+1),
-      charName:state.animScope.charName||row.table,animName:row.name};
-  }
-  state.query="";state.page=0;state.selected=null;state.row=null;
-  try{await loadItems();}
-  catch(error){state.animScope=previous;await loadItems();throw error;}
-  render();
+async function loadAnims(request){
+  if(state.animScope.level==="events"){await loadAnimEvents(request);return;}
+  await loadAnimChars(request);
+}
+async function loadAnimChars(request){
+  const result=await api("/api/table?tab=playback");
+  if(request!==recordsRequest||state.tab!=="animations")return;
+  state.animChars=result.rows;
+  state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+  if(!state.animChars.some(row=>key(row)===state.animCharId))state.animCharId=state.animChars[0]?key(state.animChars[0]):null;
+  await loadAnimView(request);
+}
+async function loadAnimView(request){
+  const row=state.animChars.find(row=>key(row)===state.animCharId);
+  state.animView=null;
+  if(!row){state.rows=[];state.selected=null;state.row=null;return;}
+  const detail=await api(`/api/anim/list?chr=${encodeURIComponent(row.id)}`);
+  if(request!==recordsRequest||state.animCharId!==key(row))return;
+  state.animView=detail;
+  state.animScope={level:"anims",binder:`${row.id}.anibnd.dcx`,charName:row.name};
+  state.rows=animMotionRows(detail);
+  const playable=state.rows.find(row=>row.motion.file)||state.rows[0];
+  state.selected=playable?key(playable):null;
+  state.row=null;
+}
+function animMotionRows(view){
+  const motions=(view.anims||[]).map(motion=>({table:"AnimMotion",
+    id:motion.file||`tae:${motion.tae}|${motion.taeIndex}`,
+    name:motion.file?motion.file+(motion.available===false?" (unreadable)":""):motion.name||"(animation)",
+    values:{},motion}));
+  const orphans=(view.orphans||[]).map(entry=>({table:"AnimMotion",
+    id:`tae:${entry.tae}|${entry.taeIndex}`,name:entry.name,values:{},
+    motion:{file:null,name:entry.name,binder:entry.binder,tae:entry.tae,taeIndex:entry.taeIndex,
+      available:false,reason:"This animation has events but no playable motion."}}));
+  return [...motions,...orphans].sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true,sensitivity:"base"}));
+}
+async function loadAnimEvents(request){
+  const scope=state.animScope;
+  const result=await api(`/api/table?tab=animations&scope=events&binder=${encodeURIComponent(scope.binder||"")}&tae=${encodeURIComponent(scope.tae||"")}&anim=${scope.anim??""}`);
+  if(request!==recordsRequest||state.tab!=="animations")return;
+  state.rows=result.rows;
+  state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+  if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
+  await loadDetail();
+}
+async function reloadAnimRows(){
+  if(state.animScope.level!=="events")return;
+  const scope=state.animScope;
+  const result=await api(`/api/table?tab=animations&scope=events&binder=${encodeURIComponent(scope.binder||"")}&tae=${encodeURIComponent(scope.tae||"")}&anim=${scope.anim??""}`);
+  state.rows=result.rows;
+  state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 async function loadItems(){
   const request=++recordsRequest;
+  if(state.tab==="animations"){await loadAnims(request);return;}
   const sub=state.sub;
   let url="/api/table?tab="+encodeURIComponent(sub);
-  if(state.tab==="animations"&&state.sub!=="playback"){
-    const scope=state.animScope;
-    url=`/api/table?tab=animations&scope=${scope.level}&binder=${encodeURIComponent(scope.binder||"")}&tae=${encodeURIComponent(scope.tae||"")}&anim=${scope.anim??""}`;
-  }
-  else if(state.tab==="assets")url="/api/assets?scope="+(sub==="game"?"game":"overrides");
+  if(state.tab==="assets")url="/api/assets?scope="+(sub==="game"?"game":"overrides");
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
   if(state.tab==="assets"){state.assetFiles=result.files;state.rows=assetRows(result.files);}
@@ -155,7 +190,7 @@ async function loadDetail(){
     row=state.dirRows.find(row=>key(row)===state.selected);
     if(row)sub=state.dirTab;
   }
-  if(!row||isDrillRow(row)){state.row=null;state.monsterAttacks=null;state.assetDetail=null;return;}
+  if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.assetDetail=null;return;}
   if(row.table==="Asset"){
     state.assetDetail=null;
     const detail=await api(`/api/assets?scope=textures&side=${state.sub==="game"?"game":"mod"}&file=${encodeURIComponent(row.id)}`);
@@ -203,14 +238,14 @@ async function navigate(tab,sub=state.sub,selected=null){
   // Without the curve table, Stats opens on the first list with rows instead of an error.
   else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":((state.statsTabs.find(entry=>entry.count)||{}).id||"curves");
   else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
-  else if(tab==="levelup")sub="levelup";
   else if(tab==="misc")sub="misc";
   else if(tab==="assets"&&!state.assetTabs.some(entry=>entry.id===sub))sub="overrides";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
-  if(tab==="animations"&&changedTab)state.animScope={level:"chars"};
+  else if(tab==="text"&&!state.textTabs.some(entry=>entry.id===sub))sub="menu-labels";
+  if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","attacks","maps","animations","effects","stats","encumbrance","levelup","misc","assets"].includes(tab))await loadItems();
+    if(["items","enemies","attacks","maps","animations","effects","stats","encumbrance","misc","assets","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -227,6 +262,16 @@ function revealSelection(){
   if(row&&selectVisibleRecord)selectVisibleRecord(row);
 }
 const openEffect=effect=>navigate("effects","effects-all",`SpEffectParam:${effect.id}`);
+const TEXT_LABEL_LINKS={defenseMagic:102204,defenseFire:102205,defenseThunder:102206};
+const openTextLabel=id=>navigate("text","menu-labels",`MenuText:${id}`);
+const textLabelPreviews=new Map();
+async function textLabelPreview(id){
+  if(!textLabelPreviews.has(id))textLabelPreviews.set(id,api(`/api/row?table=MenuText&id=${id}`).then(result=>result.row,
+    error=>{textLabelPreviews.delete(id);throw error;}));
+  const row=await textLabelPreviews.get(id);
+  const label=row.fields.find(field=>field.key==="label")?.value||"";
+  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},row.name),el("span",{},label||"(empty)"));
+}
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 async function deploymentAction(action){
   if(state.deployBusy)return;
@@ -338,6 +383,7 @@ function commit(row,field,value,control){
       else{
         for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display);
         if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
+        else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
         else if(String(state.sort?.key||"").startsWith("pin:"))render();
         else state.pagedView?.refreshValues?.();
@@ -474,7 +520,11 @@ function fieldSections(row){
       if(link.resolved)control=LexeditorUI.controlGroup([control,el("button",{type:"button",class:"ds1-open-effect",
         title:`Open ${link.name}`,"aria-label":`Open ${link.name}`,onclick:()=>openEffect(link)},"Open")]);
     }
-    groups.get(group).push(detailField({label:shownLabel(field),property:field.key,control,icon:field.icon||null,
+    const shown=shownLabel(field);
+    const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
+    const label=textLink?hoverable({content:shown,targetType:"ds1-text",targetId:textLink,
+      targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)}):shown;
+    groups.get(group).push(detailField({label,property:field.key,control,icon:field.icon||null,
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
       help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
@@ -820,17 +870,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing is
   // said under it, never in its place.
-  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
-  const drillRow=state.tab==="animations"&&!state.row?state.rows.find(row=>key(row)===state.selected):null;
-  if(drillRow&&isDrillRow(drillRow)){
-    const opening=String(drillRow.id).startsWith("char:");
-    const sub=opening?"Character file: "+drillRow.values.binder:`${drillRow.values.tae} · animation ${drillRow.values.animId} · ${drillRow.values.events} events`;
-    return detailPanel({title:drillRow.name,meta:sub,body:[
-      detailSection({title:opening?"CHARACTER":"ANIMATION",body:[
-        detailField({label:opening?"CHARACTER":"ANIMATION",control:el("button",{type:"button","data-anim-open":drillRow.id,
-          onclick:()=>drillAnimations(drillRow).catch(notify)},opening?"Open character":"Open animation"),
-          help:infoHelp(opening?"List this character's animations.":"List this animation's events.")})]})]});
-  }
+  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
   if(state.tab==="assets")return renderAssetDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
@@ -849,7 +889,7 @@ function detail(){
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
   const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons("placement"):paramRowEarly?rowActionButtons("record"):[];
-  if(state.row.table==="NpcParam")return detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]});
+  if(state.row.table==="NpcParam")return armDs1Preview(detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]}),state.row.table,state.row.id);
   if(state.tab==="stats"&&state.sub==="curves"&&paramRowEarly)return curveDetail(rowActionsEarly,groups);
   let help=state.row.help;
   if(impact){
@@ -861,8 +901,90 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  return detailPanel({title,meta,help,actions:rowActionsEarly,
-    body:[...groups].map(([title,body])=>detailSection({title,body}))});
+  return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,
+    body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
+}
+const ds1PreviewAvailability=new Map();
+async function ds1PreviewTarget(table,id){
+  if(table==="NpcParam"){
+    const view=await api(`/api/chr/view?npc=${id}`);
+    const chr=(view.chrs||[]).find(entry=>entry.available);
+    return chr?{kind:"chr",name:`${view.name} model`,
+      url:`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`}
+      :{reason:`${view.name} has no placed character model.`};
+  }
+  if(!["EquipParamWeapon","EquipParamProtector","EquipParamGoods","EquipParamAccessory"].includes(table))return null;
+  const view=await api(`/api/parts/view?table=${encodeURIComponent(table)}&id=${id}`);
+  if(!view.available)return {reason:view.reason||"The model file is not installed."};
+  const models=(view.models||[]).filter(entry=>entry.available);
+  if(!models.length)return {reason:view.reason||"The model file is not installed."};
+  const name=state.row&&state.row.table===table&&Number(state.row.id)===Number(id)?`${state.row.name} model`:"Model";
+  if(models.length>1)return {kind:"parts",name,variants:models,table,id};
+  const solo=models[0];
+  return {kind:"parts",name,stem:solo.stem,
+    url:`/api/parts/geometry?table=${encodeURIComponent(table)}&id=${id}&variant=${encodeURIComponent(solo.variant||"")}`};
+}
+function ds1PreviewReason(panel,reason){
+  const heading=panel.querySelector(':scope > .lex-detail-panel-heading');
+  if(!heading||heading.querySelector('.lex-detail-panel-icon'))return;
+  heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason},
+    LexeditorUI.iconSlot({message:"No model"})));
+  heading.classList.remove("no-icon");
+}
+function ds1PreviewContent(target){
+  const stage=LexeditorUI.modelStage({message:`Loading ${target.name}\u2026`});
+  const message=stage.lexMessage;
+  let controller=null;
+  const show=url=>{
+    message.replaceChildren(`Loading ${target.name}\u2026`);
+    message.className="lex-model-stage-message";
+    window.Ds1Preview.mount(stage,url,{status:text=>{
+      if(!stage.isConnected)return;
+      message.replaceChildren(el("span",{},`Drag to rotate \u00b7 Wheel to zoom \u00b7 ${text}`));
+      message.className="lex-model-stage-hint";
+    }}).then(task=>{
+      controller=task;
+      if(task&&stage.isConnected)window.__lexPreview={target:target.name,canvas:task.canvas};
+    }).catch(error=>{
+      if(stage.isConnected)message.replaceChildren(error.message||String(error));
+    });
+  };
+  if(!target.variants){show(target.url);return stage;}
+  let picked=target.variants[0];
+  const label=picked.variant==="F"?"Female":"Male";
+  const picker=el("button",{type:"button","aria-label":"Model variant","aria-haspopup":"listbox",
+    onclick:event=>{LexeditorUI.choicePopover({label:"Model variant",
+      choices:target.variants.map(entry=>({label:entry.variant==="F"?"Female":"Male",value:entry.variant})),
+      select:value=>{picked=target.variants.find(entry=>entry.variant===value)||picked;
+        picker.replaceChildren(`Model: ${picked.variant==="F"?"Female":"Male"}`);
+        show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
+      }}).openFor(event.currentTarget);}},`Model: ${label}`);
+  const wrap=el("div",{class:"lex-preview-variant-wrap"},picker,stage);
+  show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
+  return wrap;
+}
+function armDs1Preview(panel,table,id){
+  if(!(panel instanceof Element))return panel;
+  const cacheKey=`${table}:${id}`;
+  let entry=ds1PreviewAvailability.get(cacheKey);
+  if(!entry){
+    entry={};
+    entry.promise=ds1PreviewTarget(table,id).then(target=>entry.settled=target,
+      error=>entry.settled={reason:error.message||String(error)});
+    ds1PreviewAvailability.set(cacheKey,entry);
+  }
+  const settle=target=>{
+    if(!panel.isConnected||!target)return;
+    if(target.reason){ds1PreviewReason(panel,target.reason);return;}
+    LexeditorUI.attachModelPreview(panel,{label:target.name,
+      openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
+      content:()=>ds1PreviewContent(target),
+      onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
+  };
+  // Detail panels mount after detail() returns, so a cached answer settles
+  // on a microtask: settling synchronously would find a detached panel.
+  if("settled" in entry)queueMicrotask(()=>settle(entry.settled));else entry.promise.then(()=>settle(entry.settled));
+  return panel;
 }
 function taeActions(){
   const disabled=state.readOnly||state.taeBusy||state.pending>0;
@@ -879,12 +1001,12 @@ async function beginTaeForm(){
   const field=key=>state.row?.fields.find(item=>item.key===key)?.value;
   state.taeForm={binder:scope.binder,tae:scope.tae,anim:scope.anim,type:"66",
     start:String(field("start")??0),end:String(field("end")??1)};
-  render();
+  refreshAnimList();
 }
 function renderTaeForm(){
   const form=state.taeForm;
   const type=el("select",{"aria-label":"Event type","data-tae-input":"type",disabled:state.taeBusy,
-    onchange:event=>{form.type=event.target.value;render();}},
+    onchange:event=>{form.type=event.target.value;refreshAnimList();}},
     ...taeEventTypes.map(entry=>el("option",{value:String(entry.type)},entry.label)));
   type.value=form.type;
   const start=el("input",{type:"number","aria-label":"Start (s)","data-tae-input":"start",step:"any",value:form.start,disabled:state.taeBusy,
@@ -900,7 +1022,7 @@ function renderTaeForm(){
           }
           submitTaeForm(form);
         }},"Create event"),
-      el("button",{type:"button",disabled:state.taeBusy,onclick:()=>{state.taeForm=null;render();}},"Cancel")],
+      el("button",{type:"button",disabled:state.taeBusy,onclick:()=>{state.taeForm=null;refreshAnimList();}},"Cancel")],
     body:[detailSection({title:"Event",body:[
       detailField({label:"Event type",control:type,
         help:infoHelp("Which documented event to add. Its values start at 0, so set them after. Only documented types can be added.")}),
@@ -909,20 +1031,20 @@ function renderTaeForm(){
 }
 function submitTaeForm(form){
   if(state.taeBusy||state.readOnly||state.taeForm!==form)return;
-  state.taeBusy=true;state.pending++;render();
+  state.taeBusy=true;state.pending++;refreshAnimList();
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/tae/add",{table:form.binder,tae:form.tae,anim:form.anim,
         type:Number(form.type),start:Number(form.start),end:Number(form.end)});
       state.rows=result.events;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
-      state.taeForm=null;state.selected=key(result.row);state.query="";
+      state.taeForm=null;state.selected=key(result.row);state.animQuery="";
       await loadItems();
-      const index=sortedRows().findIndex(row=>key(row)===state.selected);
-      state.page=Math.max(0,Math.floor(index/state.pageSize));
+      const index=animListMatches().findIndex(row=>key(row)===state.selected);
+      state.animPage=Math.max(0,Math.floor(index/state.pageSize));
     }catch(error){
       state.taeForm=null;await refreshState();await loadItems();notify(error);
     }finally{
-      state.pending--;state.taeBusy=false;render();revealSelection();
+      state.pending--;state.taeBusy=false;refreshAnimList();revealSelection();
     }
   }).catch(notify);
 }
@@ -932,15 +1054,15 @@ async function removeTaeEvent(){
     message:"The event leaves the animation at once. Save keeps the removal in the mod project.",
     confirmLabel:"Remove event",cancelLabel:"Cancel"});
   if(!ok)return;
-  state.taeBusy=true;state.pending++;render();
+  state.taeBusy=true;state.pending++;refreshAnimList();
   try{
     const [table,id]=[state.row.table,state.row.id];
     const result=await api("/api/tae/remove",{table,id});
     state.rows=result.events;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
-    state.selected=null;state.row=null;state.query="";
+    state.selected=null;state.row=null;state.animQuery="";
     await loadItems();
   }catch(error){await refreshState();await loadItems();notify(error);}
-  finally{state.taeBusy=false;state.pending--;render();revealSelection();}
+  finally{state.taeBusy=false;state.pending--;refreshAnimList();revealSelection();}
 }
 function bandActions(){
   const disabled=state.readOnly||state.bandBusy||state.pending>0;
@@ -1034,10 +1156,10 @@ function submitBandForm(form){
 function renderItems(){
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
-  if(state.tab==="animations"&&state.sub==="playback")return renderPlayback();
+  if(state.tab==="animations")return renderAnimPanels();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="assets"?"files":"items";
-  const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="assets"?"files":"items";
+  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
@@ -1050,7 +1172,7 @@ function renderItems(){
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,sortState:state.sort,
-      sort:column=>{if(encumbrance||state.tab==="levelup")return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
+      sort:column=>{if(encumbrance||(state.tab==="stats"&&state.sub==="levelup"))return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       // The record is fetched first, then the shared list swaps in its detail
       // pane once. It used to draw the pane with the old record, then render
       // the whole page twice more as two loads of the same row came back.
@@ -1076,7 +1198,8 @@ function renderItems(){
     // the contents, so there is nothing to rename.
     // names: starting classes and gifts take fixed reference names;
     // the game stores no name to change.
-    renamable:row=>state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
+    // names: a menu label is named by its text; editing the text renames it.
+    renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;
@@ -1086,18 +1209,7 @@ function renderItems(){
   const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,change:id=>navigate(state.tab,id)});
   if(state.tab==="assets")return LexeditorUI.stack(strip,subtabBar({tabs:assetKinds,active:state.assetKind,
     label:"Asset kinds",order:"given",shortcuts:false,change:setAssetKind}),view);
-  if(state.tab!=="animations"||state.animScope.level==="chars")return LexeditorUI.stack(strip,view);
-  const scope=state.animScope;
-  const crumbs=[el("button",{type:"button","data-anim-crumb":"chars",
-    onclick:async()=>{state.animScope={level:"chars"};state.query="";state.page=0;state.selected=null;state.row=null;await loadItems().catch(notify);render();}},"Characters")];
-  const here=el("span",{className:"lex-anim-crumb-here"});
-  if(scope.level==="anims"){here.textContent=scope.charName||scope.binder||"";
-    crumbs.push(el("span",{className:"lex-anim-crumb-sep"}," › "),here);}
-  else{crumbs.push(el("button",{type:"button","data-anim-crumb":"anims",
-    onclick:async()=>{state.animScope={level:"anims",binder:scope.binder,charName:scope.charName};state.query="";state.page=0;state.selected=null;state.row=null;await loadItems().catch(notify);render();}},scope.charName||scope.binder||""));
-    here.textContent=`${scope.tae||""} · ${scope.animName||""}`;
-    crumbs.push(el("span",{className:"lex-anim-crumb-sep"}," › "),here);}
-  return LexeditorUI.stack(strip,el("div",{className:"lex-anim-crumbs"},...crumbs),view);
+  return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
   return {readOnly:state.readOnly,showCollision:state.mapCollision,
@@ -1496,6 +1608,154 @@ function placementsPane(){
     LexeditorUI.pager({pages,page:state.page,total:here.length,pageSize:state.pageSize,
       change:value=>{state.page=value;refreshMapSide();}}));
 }
+function animCharMatches(){
+  const needle=state.animCharQuery.trim().toLocaleLowerCase();
+  const rows=(state.animChars||[]).filter(row=>!needle||String(row.name||"").toLocaleLowerCase().includes(needle));
+  return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true,sensitivity:"base"}));
+}
+function animListMatches(){
+  const needle=state.animQuery.trim().toLocaleLowerCase();
+  const rows=state.rows.filter(row=>!needle||String(row.name||"").toLocaleLowerCase().includes(needle));
+  if(state.animScope.level==="events")return rows;
+  return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true,sensitivity:"base"}));
+}
+async function chooseAnimChar(row){
+  if(!row||key(row)===state.animCharId)return;
+  state.animCharId=key(row);state.animCharPage=0;state.animQuery="";state.animPage=0;
+  state.animScope={level:"anims"};state.taeForm=null;
+  const request=++recordsRequest;
+  await loadAnimView(request).catch(notify);
+  refreshAnimChars();refreshAnimList();remountAnim();
+}
+async function pickAnimMotion(row){
+  if(!row||key(row)===state.selected)return;
+  state.selected=key(row);
+  refreshAnimList();remountAnim();
+}
+async function pickAnimEvent(row){
+  if(!row||key(row)===state.selected)return;
+  state.selected=key(row);
+  await loadDetail().catch(notify);
+  refreshAnimList();
+}
+async function animDrillEvents(row){
+  const motion=row.motion;
+  if(!motion||!motion.tae)return;
+  state.animScope={level:"events",binder:motion.binder,tae:motion.tae,anim:motion.taeIndex,
+    charName:state.animScope.charName,animName:row.name,motionFile:motion.file||null};
+  state.animQuery="";state.animPage=0;state.selected=null;state.row=null;state.taeForm=null;
+  const request=++recordsRequest;
+  await loadAnimEvents(request).catch(notify);
+  refreshAnimList();
+}
+async function animBackToAnims(){
+  state.animScope={level:"anims",binder:state.animScope.binder,charName:state.animScope.charName};
+  state.animQuery="";state.animPage=0;state.taeForm=null;
+  state.rows=state.animView?animMotionRows(state.animView):[];
+  const playable=state.rows.find(row=>row.motion.file)||state.rows[0];
+  state.selected=playable?key(playable):null;
+  state.row=null;
+  refreshAnimList();
+}
+function currentAnimCharId(){
+  const row=(state.animChars||[]).find(row=>key(row)===state.animCharId);
+  return row?row.id:null;
+}
+function currentAnimMotion(){
+  const scope=state.animScope;
+  if(scope.level==="events"){
+    if(!scope.motionFile)return {file:null,name:scope.animName,available:false,
+      reason:"This animation has events but no playable motion."};
+    return (state.animView?.anims||[]).find(motion=>motion.file===scope.motionFile)||null;
+  }
+  if(scope.level!=="anims")return null;
+  const row=state.rows.find(row=>key(row)===state.selected);
+  return row&&row.table==="AnimMotion"?row.motion:null;
+}
+function remountAnim(){
+  if(state.tab!=="animations")return;
+  const host=document.querySelector("[data-anim-host]");
+  const timeline=document.querySelector("[data-anim-timeline]");
+  const status=document.querySelector("[data-anim-status]");
+  if(!host||!timeline||!status||!host.isConnected){render();return;}
+  const token=++animMount;
+  Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status).catch(error=>{
+    if(token!==animMount)return;
+    host.querySelector(":scope > .lex-panel-loading")?.remove();
+    failMount(status,"Could not load the animation.")(error);
+  });
+}
+function animCharsPane(){
+  const here=animCharMatches();
+  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  if(state.animCharPage>pages-1)state.animCharPage=pages-1;
+  const shown=here.slice(state.animCharPage*state.pageSize,(state.animCharPage+1)*state.pageSize);
+  const select=row=>{if(key(row)!==state.animCharId)void chooseAnimChar(row);};
+  return el("div",{"data-anim-chars":""},
+    LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
+      change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
+    columnList({rows:shown,key,selected:state.animCharId,select,
+      columns:[{key:"name",label:"Name",grow:1}]}),
+    LexeditorUI.pager({pages,page:state.animCharPage,total:here.length,pageSize:state.pageSize,
+      change:value=>{state.animCharPage=value;refreshAnimChars();}}));
+}
+function animEventsCell(){
+  return {key:"events",label:"Events",sortable:false,render:row=>{
+    const motion=row.motion;
+    if(!motion||!motion.tae)return "";
+    return el("button",{type:"button",class:"lex-goto-button","data-anim-events":key(row),
+      title:`Edit events of ${row.name}`,"aria-label":`Edit events of ${row.name}`,
+      onclick:event=>{event.stopPropagation();void animDrillEvents(row);}},targetIcon());}};
+}
+function animAnimsPane(){
+  const here=animListMatches();
+  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  if(state.animPage>pages-1)state.animPage=pages-1;
+  const shown=here.slice(state.animPage*state.pageSize,(state.animPage+1)*state.pageSize);
+  const select=row=>{if(key(row)!==state.selected)void pickAnimMotion(row);};
+  return [
+    LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
+      change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
+    columnList({rows:shown,key,selected:state.selected,select,
+      columns:[{key:"name",label:"Name",grow:1},animEventsCell()]}),
+    LexeditorUI.pager({pages,page:state.animPage,total:here.length,pageSize:state.pageSize,
+      change:value=>{state.animPage=value;refreshAnimList();}})];
+}
+function animEventsPane(){
+  const here=animListMatches();
+  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  if(state.animPage>pages-1)state.animPage=pages-1;
+  const shown=here.slice(state.animPage*state.pageSize,(state.animPage+1)*state.pageSize);
+  const select=row=>{if(key(row)!==state.selected)void pickAnimEvent(row);};
+  selectVisibleRecord=select;
+  const scope=state.animScope;
+  const back=el("button",{type:"button","data-anim-back":"",
+    onclick:()=>animBackToAnims().catch(notify)},`‹ ${scope.animName||"Animations"}`);
+  return [back,
+    LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
+      change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
+    columnList({rows:shown,key,selected:state.selected,select,
+      columns:[{key:"name",label:"Name",grow:1}]}),
+    LexeditorUI.pager({pages,page:state.animPage,total:here.length,pageSize:state.pageSize,
+      change:value=>{state.animPage=value;refreshAnimList();}}),
+    detail()];
+}
+function animListPane(){
+  const level=state.animScope.level;
+  return el("div",{"data-anim-list":""},...(level==="events"?animEventsPane():animAnimsPane()));
+}
+function refreshAnimChars(){
+  if(state.tab!=="animations")return;
+  const pane=document.querySelector("[data-anim-chars]");
+  if(!pane)return;
+  pane.replaceWith(animCharsPane());
+}
+function refreshAnimList(){
+  if(state.tab!=="animations")return;
+  const pane=document.querySelector("[data-anim-list]");
+  if(!pane){render();return;}
+  pane.replaceWith(animListPane());
+}
 function renderMaps(){
   if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
   const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
@@ -1539,30 +1799,28 @@ function renderMaps(){
     className:"ds1-directory",content:[directoryPane()]});
   return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,viewPane,side);
 }
-function renderPlayback(){
-  const strip=subtabBar({tabs:subtabsFor("animations"),active:state.sub,label:"Animations",change:id=>navigate("animations",id)});
-  const cast=state.rows.filter(row=>row.table==="AnimPlayback");
-  if(!cast.length)return LexeditorUI.stack(strip,LexeditorUI.notice({tone:"warning",message:"No animation binders found."}));
-  const current=cast.find(row=>key(row)===state.selected)||cast[0];
-  const choose=async id=>{const row=cast.find(entry=>entry.id===id);if(!row||key(row)===state.selected)return;state.selected=key(row);state.page=0;state.animFile=null;await loadDetail().catch(notify);render();};
-  const picker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Character","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Character",
-      choices:cast.map(row=>({label:row.name,value:row.id})),select:choose}).openFor(event.currentTarget);}},
-    `Character: ${current.name}`);
-  const view=state.animView;
-  const motions=(view&&view.anims)||[];
-  if(!motions.some(motion=>motion.file===state.animFile))state.animFile=motions.length?motions[0].file:null;
-  const motion=motions.find(entry=>entry.file===state.animFile);
-  const pickMotion=id=>{if(id===state.animFile)return;state.animFile=id;render();};
-  const motionPicker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Animation","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Animation",
-      choices:motions.map(entry=>({label:entry.available===false?`${entry.file} (unreadable)`:entry.file,value:entry.file})),select:pickMotion}).openFor(event.currentTarget);}},
-    `Animation: ${motion?motion.file+(motion.available===false?" (unreadable)":""):"none"}`);
+function renderAnimPanels(){
+  const chars=state.animChars||[];
+  if(!chars.length)return LexeditorUI.notice({tone:"warning",message:"No animation binders found."});
   const status=el("div",{class:"lex-viewport-status","data-anim-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading animation"));
-  const host=el("div",{class:"lex-viewport-host","data-anim-host":"",style:VIEWPORT_STYLE});
+  const host=el("div",{class:"lex-viewport-host","data-anim-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"});
   const timeline=el("div",{class:"lex-anim-timeline","data-anim-timeline":""});
-  requestAnimationFrame(()=>{Ds1Anim.mount(host,current.id,motion||null,timeline,status).catch(failMount(status,"Could not load the animation."));});
-  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,motionPicker),host,timeline,status);
+  const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
+  const viewPane=el("div",{style:"flex:1 1 auto;min-width:0;display:flex;flex-direction:column;"},wrap,timeline,status);
+  const token=++animMount;
+  requestAnimationFrame(()=>{
+    if(token!==animMount)return;
+    Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status).catch(error=>{
+      if(token!==animMount)return;
+      host.querySelector(":scope > .lex-panel-loading")?.remove();
+      failMount(status,"Could not load the animation.")(error);
+    });
+  });
+  const characters=LexeditorUI.collapsiblePanel({label:"Characters",side:"left",viewKey:"ds1-anim-characters",width:"300px",
+    className:"ds1-anim-chars",content:[animCharsPane()]});
+  const animations=LexeditorUI.collapsiblePanel({label:"Animations",side:"right",viewKey:"ds1-anim-list",width:"360px",
+    className:"ds1-anim-list",content:[animListPane()]});
+  return el("div",{class:"ds1-anim"},characters,viewPane,animations);
 }
 function renderModel(){
   const strip=subtabBar({tabs:subtabsFor("enemies"),active:state.sub,label:"Enemies",change:id=>navigate("enemies",id)});
