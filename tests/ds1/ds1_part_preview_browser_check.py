@@ -3,6 +3,7 @@
 Runs read-only with no mod: previewing models must work for Vanilla
 readers, and rows without a model say why instead of opening a drawer.
 """
+import base64
 import io
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive, make_menu_archive, make_text_archive
 from flver_fixture import build_flver, make_chrbnd
 from msb_fixture import build_msb
+from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1 import texts
 from plugins.ds1.formats import ItemDocument, write_field
 from plugins.ds1.msb import MAP_DIR
@@ -85,8 +87,10 @@ def main():
         (game / 'chr').mkdir(parents=True)
         (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
         (game / 'parts').mkdir(parents=True)
+        red = make_dds_rgba(4, 4, [(200, 40, 40, 255)] * 16)
         (game / 'parts' / 'WP_A_0100.partsbnd.dcx').write_bytes(
-            make_chrbnd(build_flver(), stem='WP_A_0100'))
+            make_chrbnd(build_flver(), stem='WP_A_0100',
+                        extra=[('WP_A_0100.tpf', make_tpf([('tex0', red)]))]))
         (game / 'parts' / 'BD_M_0200.partsbnd.dcx').write_bytes(
             make_chrbnd(build_flver(), stem='BD_M_0200'))
         (game / 'parts' / 'BD_F_0200.partsbnd.dcx').write_bytes(
@@ -114,7 +118,22 @@ def main():
                     assert page.locator('canvas[data-preview]').count() == 1
                     assert page.evaluate('!!window.__lexPreview'), 'preview hook missing'
                     hint = page.locator('.lex-model-stage-hint').inner_text()
-                    assert '1 mesh' in hint and '2 triangles' in hint, hint
+                    assert hint.startswith('Drag to rotate'), hint
+                    assert 'mesh' not in hint and 'triangle' not in hint, hint
+                    drawer = page.locator('.lex-model-preview-drawer').bounding_box()
+                    stage = page.locator('.lex-model-stage').bounding_box()
+                    assert abs(stage['y'] + stage['height'] - drawer['y'] - drawer['height']) <= 2, (
+                        stage, drawer)
+                    assert drawer['width'] - stage['width'] <= 2, (stage, drawer)
+                    geo = page.evaluate(
+                        "fetch('/api/parts/geometry?table=EquipParamWeapon&id=100&variant=M')"
+                        ".then(r => r.json())")
+                    assert geo['meshes'][0]['map'] == 'tex0', geo['meshes'][0]
+                    assert geo['meshes'][0]['uv'], 'uv missing'
+                    raw = base64.b64decode(geo['textures']['tex0'])
+                    image = Image.open(io.BytesIO(raw))
+                    image.load()
+                    assert image.size == (4, 4), image.size
                     painted(page, 'canvas[data-preview]')
                     if output:
                         page.screenshot(path=str(output / 'parts-weapon.png'))

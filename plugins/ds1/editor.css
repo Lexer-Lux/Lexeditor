@@ -49,6 +49,11 @@
 .lex-dir-local{display:flex;gap:6px;align-items:center;padding:2px 4px;cursor:pointer;}
 .lex-dir-local:has(input:disabled){opacity:.45;cursor:default;}
 .ds1-anim{display:flex;gap:8px;align-items:stretch;}
+/* The variant picker plus its stage fill the drawer like a bare stage:
+   without this the plain div breaks the drawer's flex and the stage sits
+   at its minimum height in a tall empty drawer. */
+.lex-preview-variant-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.lex-preview-variant-wrap>button{align-self:flex-start;}
 .ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
 .lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
 .ds1-finder-face > svg{width:16px;height:16px;flex:0 0 auto;}

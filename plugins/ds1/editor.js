@@ -948,13 +948,12 @@ function ds1PreviewContent(target){
   const show=url=>{
     message.replaceChildren(`Loading ${target.name}\u2026`);
     message.className="lex-model-stage-message";
-    window.Ds1Preview.mount(stage,url,{status:text=>{
-      if(!stage.isConnected)return;
-      message.replaceChildren(el("span",{},`Drag to rotate \u00b7 Wheel to zoom \u00b7 ${text}`));
-      message.className="lex-model-stage-hint";
-    }}).then(task=>{
+    window.Ds1Preview.mount(stage,url).then(task=>{
       controller=task;
-      if(task&&stage.isConnected)window.__lexPreview={target:target.name,canvas:task.canvas};
+      if(!stage.isConnected)return;
+      message.replaceChildren(el("span",{},"Drag to rotate \u00b7 Wheel to zoom"));
+      message.className="lex-model-stage-hint";
+      if(task)window.__lexPreview={target:target.name,canvas:task.canvas};
     }).catch(error=>{
       if(stage.isConnected)message.replaceChildren(error.message||String(error));
     });

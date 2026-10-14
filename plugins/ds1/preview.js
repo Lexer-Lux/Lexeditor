@@ -26,9 +26,9 @@ window.Ds1Preview = (() => {
     }
   }
   // Mounts the geometry at geometryUrl into host and returns a controller
-  // with dispose(). opts.status reports "N meshes, M triangles" once the
-  // mesh lands. A newer mount or a detached host aborts the load.
-  async function mount(host, geometryUrl, opts = {}) {
+  // with dispose() and the canvas. A newer mount or a detached host
+  // aborts the load.
+  async function mount(host, geometryUrl) {
     stop(host);
     const mine = ++session;
     // No connected check here: the drawer appends the stage after its
@@ -58,17 +58,55 @@ window.Ds1Preview = (() => {
     const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
     const double = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.DoubleSide});
     trash.push(front, double);
+    const resize = () => {
+      const width = host.clientWidth || 800, height = host.clientHeight || 520;
+      renderer.setSize(width, height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+    let liveFlag = true;
+    host._previewStop = () => {
+      liveFlag = false;
+      window.removeEventListener("resize", resize);
+      controls.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss();
+      canvas.remove();
+      delete host.dataset.ready;
+      for (const item of trash) item.dispose();
+    };
     const root = new THREE.Group();
     scene.add(root);
-    let tris = 0;
+    const texCache = new Map();
+    const texLoader = new THREE.TextureLoader();
+    const materialFor = async mesh => {
+      const plain = mesh.cull !== false ? front : double;
+      const png = mesh.map && data.textures && data.textures[mesh.map];
+      if (!png || !mesh.uv) return plain;
+      if (!texCache.has(mesh.map)) {
+        try {
+          const tex = await texLoader.loadAsync(`data:image/png;base64,${png}`);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          texCache.set(mesh.map, tex);
+          trash.push(tex);
+        } catch (_error) {
+          return plain;
+        }
+      }
+      const textured = new THREE.MeshStandardMaterial({map: texCache.get(mesh.map),
+        roughness: 0.95, metalness: 0, side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+      trash.push(textured);
+      return textured;
+    };
     for (const mesh of data.meshes) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
       geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+      if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
       geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
       trash.push(geo);
-      root.add(new THREE.Mesh(geo, mesh.cull !== false ? front : double));
-      tris += geo.index.count / 3;
+      root.add(new THREE.Mesh(geo, await materialFor(mesh)));
+      if (mine !== session || !host.isConnected) { stop(host); return null; }
     }
     const box = new THREE.Box3();
     root.traverse(obj => { if (obj.isMesh) box.expandByObject(obj); });
@@ -81,27 +119,9 @@ window.Ds1Preview = (() => {
       controls.target.copy(center);
       controls.update();
     }
-    const resize = () => {
-      const width = host.clientWidth || 800, height = host.clientHeight || 520;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
     resize();
     window.addEventListener("resize", resize);
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    opts.status?.(`${plural(data.meshes.length, "mesh", "meshes")}, ${plural(Math.round(tris), "triangle", "triangles")}`);
-    let frames = 0, liveFlag = true;
-    host._previewStop = () => {
-      liveFlag = false;
-      window.removeEventListener("resize", resize);
-      controls.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss();
-      canvas.remove();
-      delete host.dataset.ready;
-      for (const item of trash) item.dispose();
-    };
+    let frames = 0;
     const loop = () => {
       if (!liveFlag || mine !== session || !host.isConnected) { stop(host); return; }
       controls.update();

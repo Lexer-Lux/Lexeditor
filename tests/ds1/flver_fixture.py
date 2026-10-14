@@ -7,21 +7,28 @@ DCX_HEADER = bytes.fromhex(
     '44464c540000002009000000000000000000000000000000000101004443410000000008')
 
 
-def make_chrbnd(flver_bytes, stem='c1200'):
-    """A synthetic .chrbnd.dcx: one BND3 member holding FLVER bytes."""
-    member = (stem + '.flver').encode('ascii') + b'\0'
-    directory_end = 32 + 24
-    names_end = directory_end + len(member)
+def make_chrbnd(flver_bytes, stem='c1200', extra=()):
+    """A synthetic .chrbnd.dcx: the flver plus extra (name, bytes)
+    members, such as the model's TPF textures."""
+    blobs = [(stem + '.flver', flver_bytes)] + list(extra)
+    directory_end = 32 + 24 * len(blobs)
+    names_end = directory_end + sum(len(name.encode('ascii')) + 1 for name, _ in blobs)
     plain = bytearray(names_end)
     plain[:4] = b'BND3'
     plain[4:12] = b'TEST0000'
     plain[12] = 0x74
-    struct.pack_into('<II', plain, 16, 1, names_end)
+    struct.pack_into('<II', plain, 16, len(blobs), names_end)
     data_offset = len(plain)
-    struct.pack_into('<6I', plain, 32, 0x40, len(flver_bytes), data_offset, 0,
-                     directory_end, len(flver_bytes))
-    plain[directory_end:directory_end + len(member)] = member
-    plain.extend(flver_bytes)
+    name_at = directory_end
+    for index, (name, blob) in enumerate(blobs):
+        member = name.encode('ascii') + bytes((0,))
+        struct.pack_into('<6I', plain, 32 + index * 24, 0x40, len(blob), data_offset, 0,
+                         name_at, len(blob))
+        plain[name_at:name_at + len(member)] = member
+        name_at += len(member)
+        data_offset += len(blob)
+    for _, blob in blobs:
+        plain.extend(blob)
     compressed = zlib.compress(bytes(plain), 9)
     header = bytearray(DCX_HEADER)
     struct.pack_into('>II', header, 28, len(plain), len(compressed))

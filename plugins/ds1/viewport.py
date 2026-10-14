@@ -6,10 +6,12 @@ binders) and serves viewport-ready geometry. Read-only.
 """
 import base64
 import functools
+import io
 import re
 import struct
 from pathlib import Path
 
+from .assets import AssetError, dds_info, parse_tpf
 from .flver import FlverDocument, FlverError
 from .formats import FormatError, inflate, members
 from .msb import MAP_DIR
@@ -85,8 +87,7 @@ def _read_member(binder, member):
     return plain[offset:offset + size]
 
 
-@functools.lru_cache(maxsize=64)
-def _cached_geometry(kind, location, member, stamp, skin=False):
+def _read_flver(kind, location, member):
     if kind == 'piece':
         try:
             raw = Path(location).read_bytes()
@@ -96,7 +97,151 @@ def _cached_geometry(kind, location, member, stamp, skin=False):
         raw = _read_member(Path(location), member)
     if len(raw) > MAX_GEOMETRY:
         raise FlverError('Model file is too large')
-    return _encode(FlverDocument(raw), skin)
+    return raw
+
+
+@functools.lru_cache(maxsize=64)
+def _cached_geometry(kind, location, member, stamp, skin=False):
+    return _encode(FlverDocument(_read_flver(kind, location, member)), skin)
+
+
+DIFFUSE_TYPES = frozenset({'g_diffuse', 'gdiffuse'})
+MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
+TEXTURE_PREVIEW_CAP = 1024
+
+
+def _diffuse_name(material):
+    """The material's diffuse texture stem (LG_M_9240.tga -> LG_M_9240),
+    or None when it names none."""
+    for texture in material.get('textures', []):
+        path = texture.get('path') or ''
+        if texture.get('type', '').lower() in DIFFUSE_TYPES and path:
+            stem = path.replace('\\', '/').rsplit('/', 1)[-1]
+            return stem.rsplit('.', 1)[0] if '.' in stem else stem
+    return None
+
+
+def _tpf_sources(kind, location, member):
+    """(label, TPF bytes) candidates: the binder's same-stem TPF first,
+    then its other TPFs; a standalone flver's same-stem sidecars."""
+    if kind == 'member':
+        try:
+            plain = Path(location).read_bytes()
+        except OSError:
+            return
+        if plain[:4] == b'DCX\0':
+            try:
+                plain = inflate(plain)
+            except FormatError:
+                return
+        try:
+            found = members(plain)
+        except FormatError:
+            return
+        names = found if isinstance(found, dict) else {m.name: m for m in found}
+        stem = Path(member).stem + '.tpf'
+        ordered = ([stem] if stem in names else []) + sorted(
+            name for name in names if name.lower().endswith('.tpf') and name != stem)
+        for name in ordered:
+            entry = names[name]
+            if isinstance(entry, dict):
+                offset, size = entry['offset'], entry['size']
+            else:
+                offset, size = entry.offset, entry.size
+            if offset + size <= len(plain):
+                yield name, plain[offset:offset + size]
+        return
+    name = Path(location).name
+    for tail in ('.flver.dcx', '.flver'):
+        if name.endswith(tail):
+            stem = name[:-len(tail)]
+            break
+    else:
+        stem = Path(location).stem
+    for suffix in ('.tpf.dcx', '.tpf'):
+        sidecar = Path(location).parent / (stem + suffix)
+        if not sidecar.is_file():
+            continue
+        try:
+            blob = sidecar.read_bytes()
+        except OSError:
+            continue
+        if blob[:4] == b'DCX\0':
+            try:
+                blob = inflate(blob)
+            except FormatError:
+                continue
+        yield sidecar.name, blob
+
+
+def _dds_png(blob):
+    """A DDS blob as full-resolution PNG bytes, capped for previews."""
+    info = dds_info(blob)
+    if info['width'] * info['height'] > MAX_TEXTURE_PIXELS:
+        raise AssetError('That texture is too large to preview')
+    from PIL import Image
+    try:
+        with Image.open(io.BytesIO(bytes(blob))) as image:
+            image.load()
+            if max(image.size) > TEXTURE_PREVIEW_CAP:
+                image.thumbnail((TEXTURE_PREVIEW_CAP, TEXTURE_PREVIEW_CAP))
+            out = io.BytesIO()
+            image.save(out, format='PNG')
+            return out.getvalue()
+    except Exception as error:
+        raise AssetError(f'That texture cannot be previewed: {error}') from error
+
+
+def _resolve_textures(kind, location, member, needed):
+    """Diffuse PNGs by material name. Anything missing or undecodable
+    stays out (the mesh renders gray, as before) with a note saying why."""
+    found, notes, missing = {}, [], list(needed)
+    saw = False
+    for label, blob in _tpf_sources(kind, location, member):
+        if not missing:
+            break
+        saw = True
+        try:
+            textures = parse_tpf(blob)
+        except AssetError as error:
+            notes.append(f'{label}: {error}')
+            continue
+        by_name = {}
+        for entry in textures:
+            by_name.setdefault(entry['name'].lower(), entry)
+        for name in list(missing):
+            entry = by_name.get(name.lower())
+            if entry is None:
+                continue
+            try:
+                png = _dds_png(blob[entry['offset']:entry['offset'] + entry['size']])
+            except (AssetError, FlverError, FormatError, ValueError,
+                    struct.error, KeyError, OSError) as error:
+                notes.append(f'{name}: {error}')
+                continue
+            found[name] = base64.b64encode(png).decode('ascii')
+            missing.remove(name)
+    if not saw:
+        notes.append('no texture container found')
+    for name in missing:
+        notes.append(f'{name}: no texture with that name')
+    return found, notes
+
+
+@functools.lru_cache(maxsize=16)
+def _cached_textured(kind, location, member, stamp, skin=False):
+    """Textured geometry for the model drawer: UVs, per-mesh diffuse
+    names and the decoded PNGs. Bounded small against the drawer's
+    one-model-at-a-time use; the map viewport keeps the lean cache."""
+    encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
+    needed = sorted({mesh['map'] for mesh in encoded['meshes'] if mesh.get('map')})
+    if not needed:
+        encoded['textures'] = {}
+        return encoded
+    found, notes = _resolve_textures(kind, location, member, needed)
+    encoded['textures'] = found
+    encoded['notes'].extend(notes)
+    return encoded
 
 
 def _encode_skin(doc, mesh):
@@ -127,7 +272,7 @@ def _encode_skin(doc, mesh):
                 struct.pack('<%df' % len(weights), *weights)).decode('ascii')}
 
 
-def _encode(doc, skin=False):
+def _encode(doc, skin=False, textured=False):
     meshes = []
     for index in range(len(doc.meshes)):
         mesh = doc.mesh_data(index)
@@ -148,6 +293,12 @@ def _encode(doc, skin=False):
             'material': mesh['material'], 'cull': mesh['cull'],
             'mat_def': mesh['mat_def'].rsplit('/', 1)[-1].rsplit('\\', 1)[-1],
         }
+        if textured:
+            uvs = [c for vertex in mesh['uvs'] for c in vertex]
+            ok = bool(uvs) and len(mesh['uvs']) == len(mesh['positions'])
+            packed = struct.pack('<%df' % len(uvs), *uvs) if ok else b''
+            entry['uv'] = base64.b64encode(packed).decode('ascii')
+            entry['map'] = _diffuse_name(doc.meshes[index]['material'])
         if skin:
             entry.update(_encode_skin(doc, mesh))
         meshes.append(entry)
@@ -189,7 +340,8 @@ def resolve_chr(game_root, project, chr_id):
 
 def chr_geometry(game_root, project, chr_id, skin=False):
     """Base64 float32 geometry for one character model, cached by file
-    stamp, with per-vertex skinning when playback needs it."""
+    stamp, with per-vertex skinning when playback needs it and diffuse
+    textures for the drawer."""
     resolved = resolve_chr(game_root, project, chr_id)
     if resolved[0] == 'skip':
         raise FlverError(resolved[1])
@@ -198,7 +350,7 @@ def chr_geometry(game_root, project, chr_id, skin=False):
         stat = Path(location).stat()
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
-    return _cached_geometry('member', str(location), member,
+    return _cached_textured('member', str(location), member,
                             (stat.st_mtime_ns, stat.st_size), skin)
 
 
@@ -289,7 +441,7 @@ def resolve_part(game_root, project, stem):
 
 def part_geometry(game_root, project, stem):
     """Base64 float32 geometry for one weapon or armor model, cached by
-    file stamp.
+    file stamp, with UVs and diffuse textures for the drawer.
     """
     resolved = resolve_part(game_root, project, stem)
     if resolved[0] == 'skip':
@@ -299,7 +451,7 @@ def part_geometry(game_root, project, stem):
         stat = Path(location).stat()
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
-    return _cached_geometry('member', str(location), member,
+    return _cached_textured('member', str(location), member,
                             (stat.st_mtime_ns, stat.st_size))
 
 
