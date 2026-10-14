@@ -269,7 +269,7 @@ class Handler(PluginRequestHandler):
                                     parts = []
                                     models = 0
                                 kinds = [part['kind'] for part in parts]
-                                rows.append({'id': name, 'table': 'MapView', 'name': name,
+                                rows.append({'id': name, 'table': 'MapView', 'name': MAPSTORE.display_name(name),
                                              'values': {'parts': len(parts), 'models': models,
                                                         'collision': sum(1 for kind in kinds if kind == 'Collision'),
                                                         'navigation': sum(1 for kind in kinds if kind == 'Navigation')}})
@@ -305,6 +305,10 @@ class Handler(PluginRequestHandler):
                                 result = {'rows': TAESTORE.list_chars()}
                         else:
                             result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
+                            if tab == 'drops':
+                                links = MAPSTORE.lot_maps()
+                                for row in result['rows']:
+                                    row['values']['maps'] = links.get(row['id'], [])
                     else:
                         table = query.get('table', [''])[0]
                         if table.endswith('.msb'):

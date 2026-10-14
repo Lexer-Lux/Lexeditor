@@ -76,10 +76,12 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
+                    assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
                     counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
                     assert set(counts) == {'parts', 'models', 'collision', 'navigation'}, counts
                     page.locator('[data-tabstrip-id="placements"]').click()
                     page.wait_for_function('state.mapTab==="placements"')
+                    assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
                     if not root:
                         assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == ["chest0", "enemy0", "enemy1", "player0"]
                     else:

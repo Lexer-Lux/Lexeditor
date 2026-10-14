@@ -5437,7 +5437,7 @@
       // button, not a skip. A page with no discard hook keeps the old
       // direct exit.
       const canDiscard = typeof options.discard === "function";
-      status.textContent = canDiscard ? "Discarding changes…" : (copy.pendingLabel || "Please wait…");
+      status.replaceChildren(loadingStatus(canDiscard ? "Discarding changes…" : (copy.pendingLabel || "Please wait…")));
       let discarded = false;
       try {
         if (canDiscard) {
@@ -5449,7 +5449,12 @@
             return;
           }
           discarded = true;
-          status.textContent = copy.pendingLabel || "Please wait…";
+          status.replaceChildren(loadingStatus(copy.pendingLabel || "Please wait…"));
+          // The host guards restart and close on its own dirty count, synced
+          // fire-and-forget while editing. A discard that just reached zero
+          // has not been reported yet, so report it now and wait for the
+          // round trip: exiting first refuses to leave.
+          await callWindow("set_dirty_count", 0).catch(() => {});
         }
         if (await exit()) backdrop.remove();
         else if (discarded) status.textContent = "Discarded, but the action did not complete. Try again or cancel.";
@@ -5463,7 +5468,7 @@
     };
     save.onclick = async () => {
       setBusy(true);
-      status.textContent = "Saving changes…";
+      status.replaceChildren(loadingStatus("Saving changes…"));
       let saved = false;
       try {
         await options.save?.();
@@ -5474,7 +5479,8 @@
           return;
         }
         saved = true;
-        status.textContent = copy.pendingLabel || "Please wait…";
+        status.replaceChildren(loadingStatus(copy.pendingLabel || "Please wait…"));
+        await callWindow("set_dirty_count", 0).catch(() => {});
         if (await exit()) backdrop.remove();
         else status.textContent = "Saved, but the action did not complete. Try again or cancel.";
       } catch (error) {
@@ -5516,7 +5522,7 @@
     discard.onclick = async () => {
       cancel.disabled = true;
       discard.disabled = true;
-      status.textContent = "Restoring the saved state…";
+      status.replaceChildren(loadingStatus("Restoring the saved state…"));
       try {
         await options.discard();
         dismiss();
@@ -10652,6 +10658,8 @@ ${contents.path}`});
     ".lex-dialog-backdrop", ".lex-modal", ".lex-global-settings", ".lex-project-control",
     ".lex-shortcut-panel", ".lex-github-workspace", ".lex-toast-stack", ".lex-data-map",
     ".lex-label-rename", ".lex-help-edit",
+    // View filters narrow a list; they edit no record.
+    "[data-lex-view-filter]",
     // Switching, configuring and downloading mods manages the mod library,
     // which exists whether or not a mod is open for editing.
     ".lex-mods-page", ".lex-first-run", ".lex-tweak-panel",
@@ -13257,7 +13265,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
