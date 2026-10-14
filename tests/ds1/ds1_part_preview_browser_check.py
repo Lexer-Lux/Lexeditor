@@ -50,6 +50,19 @@ def painted(page, locator):
     assert colors is None or len(colors) > 8, f'preview canvas blank ({count} colors)'
 
 
+def icon_left_of_name(page):
+    box = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon').bounding_box()
+    name = page.locator('.lex-detail-panel-heading .lex-detail-panel-identity').bounding_box()
+    assert box and name and box['x'] + box['width'] <= name['x'] + 1, (box, name)
+
+
+def attached_thumb(page):
+    icon = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
+    assert icon.locator('.lex-no-thumbnail').count() == 1
+    assert 'No image' not in icon.inner_text()
+    icon_left_of_name(page)
+
+
 def main():
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     if output:
@@ -95,6 +108,7 @@ def main():
                     page.wait_for_function('state.sub === "weapons" && state.row && !state.error')
                     trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
                     trigger.wait_for()
+                    attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
                     assert page.locator('canvas[data-preview]').count() == 1
@@ -112,6 +126,7 @@ def main():
                     page.wait_for_function('state.sub === "armor" && state.row && !state.error')
                     trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
                     trigger.wait_for()
+                    attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
                     picker = page.locator('button[aria-label="Model variant"]')
@@ -135,6 +150,8 @@ def main():
                     assert 'no model file' in label, label
                     assert page.locator(
                         '.lex-detail-panel-heading .lex-model-preview-trigger').count() == 0
+                    assert reason.get_attribute('data-lex-preview-state') == 'unavailable'
+                    icon_left_of_name(page)
                     # Enemy drawer: the placed character model renders plain.
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')
@@ -150,12 +167,38 @@ def main():
                     page.wait_for_function('state.sub === "monsters" && state.row && !state.error')
                     trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
                     trigger.wait_for()
+                    attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
                     assert page.locator('canvas[data-preview]').count() == 1
                     painted(page, 'canvas[data-preview]')
                     if output:
                         page.screenshot(path=str(output / 'parts-enemy.png'))
+                    thumb = page.evaluate(
+                        "fetch('/api/chr/view?npc=120000&view=thumb').then(r => r.json())")
+                    assert 'attacks' not in thumb and 'body' not in thumb, sorted(thumb)
+                    assert thumb['chrs'] and thumb['name'], thumb
+                    full = page.evaluate(
+                        "fetch('/api/chr/view?npc=120000').then(r => r.json())")
+                    assert 'attacks' in full and 'body' in full, sorted(full)
+                    probe = page.evaluate("""() => {
+                        const ui = window.LexeditorUI;
+                        const before = ui.noThumbnail('__probe__').className;
+                        ui.registerNoThumbnail('__probe__', label => {
+                            const span = document.createElement('span');
+                            span.className = 'lex-probe-art';
+                            span.textContent = label;
+                            return span;
+                        });
+                        const during = ui.noThumbnail('__probe__', 'Probe label').outerHTML;
+                        ui.registerNoThumbnail('__probe__', null);
+                        const after = ui.noThumbnail('__probe__').className;
+                        return {before, during, after};
+                    }""")
+                    assert 'lex-no-thumbnail' in probe['before'], probe
+                    assert 'lex-probe-art' in probe['during'], probe
+                    assert 'Probe label' in probe['during'], probe
+                    assert probe['after'] == probe['before'], probe
                     assert not errors, errors
                 finally:
                     browser.close()

@@ -13,7 +13,7 @@ import struct
 from pathlib import Path
 
 from .formats import FormatError
-from .hkx import HkxDocument, HkxError, sample_frames
+from .hkx import HkxDocument, HkxError, _PeekUnsupported, peek_animation, sample_frames
 from .tae import TaeError
 from .viewport import CHR_ID, _overlay, resolve_chr
 
@@ -144,9 +144,11 @@ def list_chars(game_root, project):
 
 def list_anims(game_root, project, chr_id, tae_store=None):
     """The character's skeleton flag and playable motions: file, binder,
-    TAE link, duration and frame count. Members that fail to parse are
-    listed as unavailable, with the reason; a character with no binders
-    at all is an error. With a TAE store, every motion also names its
+    TAE link, duration and frame count. Headers are peeked, not parsed,
+    so listing never pays for curves; members whose headers fail to read
+    are listed as unavailable, with the reason, and a motion whose curves
+    fail opens loud when sampled. A character with no binders at all is
+    an error. With a TAE store, every motion also names its
     event entry (or none), and event animations no motion plays list
     under 'orphans'."""
     binders = _binders(game_root, project, chr_id)
@@ -172,22 +174,47 @@ def list_anims(game_root, project, chr_id, tae_store=None):
             'anims': anims, 'orphans': event_orphans(tae_store, chr_id, linked)}
 
 
+def _headline(blob):
+    """A motion's list-row headline: peeked scalars, or a full read when
+    the peek cannot map the layout. None when the file holds nothing
+    playable, like the full reader skipping it."""
+    try:
+        return peek_animation(blob)
+    except _PeekUnsupported:
+        pass
+    doc = HkxDocument(blob)
+    if not doc.animations or not doc.bindings:
+        return None
+    anim = doc.animations[0]
+    return {'duration': anim['duration'], 'frames': anim['frames']}
+
+
 @functools.lru_cache(maxsize=16)
 def _listed_anims(chr_id, stamps, paths):
     skeleton, anims, seen = False, [], {}
-    for (binder, stamp), path in zip(stamps, paths):
-        docs, broken = _parsed_binder(path, stamp)
-        for member, doc in sorted(docs.items()):
+    for (binder, _stamp), path in zip(stamps, paths):
+        plain, names = _open(path)
+        for member in sorted(names):
+            if not member.endswith('.hkx'):
+                continue
             if member in SKELETONS:
+                try:
+                    doc = HkxDocument(_entry(plain, names, path, member))
+                except HkxError:
+                    continue
                 skeleton = skeleton or bool(doc.skeletons)
                 continue
-            if not doc.animations or not doc.bindings:
-                continue
-            anim = doc.animations[0]
             match = ANIM_NAME.match(member)
-            entry = {'file': member, 'binder': binder, 'bank': match.group(1) if match else None,
-                     'id': int(match.group(2)) if match else None,
-                     'duration': anim['duration'], 'frames': anim['frames']}
+            base = {'file': member, 'binder': binder, 'bank': match.group(1) if match else None,
+                    'id': int(match.group(2)) if match else None}
+            try:
+                headline = _headline(_entry(plain, names, path, member))
+            except HkxError as error:
+                entry = {**base, 'available': False, 'reason': str(error)}
+            else:
+                if headline is None:
+                    continue
+                entry = {**base, 'duration': headline['duration'], 'frames': headline['frames']}
             if member in seen:
                 if anims[seen[member]].get('available', True):
                     continue
@@ -195,14 +222,6 @@ def _listed_anims(chr_id, stamps, paths):
                 continue
             seen[member] = len(anims)
             anims.append(entry)
-        for member, reason in sorted(broken.items()):
-            if member in SKELETONS or member in seen:
-                continue
-            match = ANIM_NAME.match(member)
-            seen[member] = len(anims)
-            anims.append({'file': member, 'binder': binder, 'bank': match.group(1) if match else None,
-                          'id': int(match.group(2)) if match else None,
-                          'available': False, 'reason': reason})
     return {'chr': chr_id, 'skeleton': skeleton, 'anims': anims}
 
 

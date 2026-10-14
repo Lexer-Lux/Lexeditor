@@ -187,14 +187,21 @@ class Handler(PluginRequestHandler):
                             else:
                                 chrs.append({'id': chr_id, 'available': True, 'meshes': info['meshes'],
                                              'bones': info['bones'], 'dummies': info['dummies']})
-                        attacks = []
-                        for entry in document.attack_references().list(npc)['rows']:
-                            attack = entry['id']
-                            attacks.append({'id': attack, 'name': entry['name'],
-                                            'source': document.value('AtkParam_Npc', attack, 'hitSourceType'),
-                                            'slots': hitbox_slots(document, attack)})
-                        result = {'npc': npc, 'name': document.display_name('NpcParam', npc),
-                                  'body': body_hitbox(document, npc), 'chrs': chrs, 'attacks': attacks}
+                        name = document.display_name('NpcParam', npc)
+                        # The list thumbnail needs only links and a name; attacks and
+                        # hitboxes stay on the full view, so a broken behavior table
+                        # cannot take the thumbnail down with it.
+                        if query.get('view', [''])[0] == 'thumb':
+                            result = {'npc': npc, 'name': name, 'chrs': chrs}
+                        else:
+                            attacks = []
+                            for entry in document.attack_references().list(npc)['rows']:
+                                attack = entry['id']
+                                attacks.append({'id': attack, 'name': entry['name'],
+                                                'source': document.value('AtkParam_Npc', attack, 'hitSourceType'),
+                                                'slots': hitbox_slots(document, attack)})
+                            result = {'npc': npc, 'name': name,
+                                      'body': body_hitbox(document, npc), 'chrs': chrs, 'attacks': attacks}
                     elif path == '/api/chr/geometry':
                         result = viewport.chr_geometry(MAPSTORE.game_root, MAPSTORE.project,
                                                        query.get('chr', [''])[0],

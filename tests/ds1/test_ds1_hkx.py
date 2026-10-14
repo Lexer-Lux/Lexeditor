@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hkx_fixture import build_tag0
 from plugins.ds1.hkx import (ARRAY, FLAG_FORMAT, HkxDocument, HkxError,
                              _TagReader, _Type, _parse_quat, _parse_vec,
-                             sample_frames)
+                             peek_animation, sample_frames)
 
 
 def test_container_reads_skeleton_anim_and_binding():
@@ -134,3 +134,19 @@ def test_block_offset_out_of_range():
     bad = dict(spline, offsets=[len(spline['data']) + 100])
     with pytest.raises(HkxError, match='out of range'):
         sample_frames(bad, skel, doc.bindings[0])
+
+
+def test_peek_animation_reads_first_headline():
+    assert peek_animation(build_tag0()) == {'duration': pytest.approx(0.1), 'frames': 4}
+
+
+def test_peek_animation_agrees_with_full_read():
+    doc = HkxDocument(build_tag0())
+    first = doc.animations[0]
+    assert peek_animation(build_tag0()) == {'duration': pytest.approx(first['duration']),
+                                            'frames': first['frames']}
+
+
+def test_peek_animation_refuses_garbage():
+    with pytest.raises(HkxError):
+        peek_animation(b'not a havok file')

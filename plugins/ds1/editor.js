@@ -907,7 +907,7 @@ function detail(){
 const ds1PreviewAvailability=new Map();
 async function ds1PreviewTarget(table,id){
   if(table==="NpcParam"){
-    const view=await api(`/api/chr/view?npc=${id}`);
+    const view=await api(`/api/chr/view?npc=${id}&view=thumb`);
     const chr=(view.chrs||[]).find(entry=>entry.available);
     return chr?{kind:"chr",name:`${view.name} model`,
       url:`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`}
@@ -927,8 +927,8 @@ async function ds1PreviewTarget(table,id){
 function ds1PreviewReason(panel,reason){
   const heading=panel.querySelector(':scope > .lex-detail-panel-heading');
   if(!heading||heading.querySelector('.lex-detail-panel-icon'))return;
-  heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason},
-    LexeditorUI.iconSlot({message:"No model"})));
+  heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason,
+    "data-lex-preview-state":"unavailable"},LexeditorUI.iconSlot({message:"No model"})));
   heading.classList.remove("no-icon");
 }
 function ds1PreviewContent(target){
@@ -976,7 +976,10 @@ function armDs1Preview(panel,table,id){
   const settle=target=>{
     if(!panel.isConnected||!target)return;
     if(target.reason){ds1PreviewReason(panel,target.reason);return;}
-    LexeditorUI.attachModelPreview(panel,{label:target.name,
+    const stale=panel.querySelector(':scope > .lex-detail-panel-heading > .lex-detail-panel-icon[data-lex-preview-state="unavailable"]');
+    if(stale){stale.removeAttribute("data-lex-preview-state");
+      stale.replaceChildren(LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}));}
+    LexeditorUI.attachModelPreview(panel,{plugin:"ds1",label:target.name,
       openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
       content:()=>ds1PreviewContent(target),
       onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
