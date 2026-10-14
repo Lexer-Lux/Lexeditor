@@ -12,6 +12,11 @@ format, so popular mods keep working as they ship.
   - `name`: required, at most 120 characters.
   - `author`, `description`, `credits`: optional text, may be blank.
   Credits travel with the mod they credit.
+- `requires`: optional list of mod ids that must be installed and switched
+  on. A mod's id is its `mod.json` `id`, or its folder name when it has
+  none; a requirement names that id exactly. Switching on a mod whose needs
+  are unmet is refused, as is switching off a mod a switched-on one needs,
+  and the Mods tab flags whatever is left unmet.
 - Games keep their own keys in the same file (`enabled`, `order`, a tweak's
   `script`, a bundle's components); writing the standard fields keeps them.
 - A mod that arrives without a name is never stored that way: creating a mod

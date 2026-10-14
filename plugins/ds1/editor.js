@@ -1490,8 +1490,10 @@ function renderTweaks(){
   const {panels,bind}=LexeditorUI.tweakModPanels({rows:status.tweaks||[],readOnly:busy,
     change:()=>{const changed=(status.tweaks||[]).find(row=>row.enabled!==row._saved?.enabled||JSON.stringify(row.values)!==JSON.stringify(row._saved?.values));if(changed)save(changed)}});
   for(const row of status.tweaks||[])row._saved={enabled:row.enabled,values:structuredClone(row.values)};
-  const empty=!(status.tweaks||[]).length;
-  const missingMods=empty?LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`}):null;
+  const empty=!panels.length;
+  const missingMods=empty?LexeditorUI.notice({message:!(status.tweaks||[]).length?`No tweak mods are installed. Tweaks live in the mod library (${status.modsRoot}).`
+    :(status.tweaks||[]).some(row=>row.enabled)?"The switched-on tweaks have no settings to change."
+    :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
     help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",

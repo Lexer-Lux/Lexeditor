@@ -98,6 +98,11 @@ def tweak_rows(project_root: Path, mods_root: Path) -> list[dict]:
 
 def build_enabled(project_root: Path, mods_root: Path, game_root: Path, baseline_root: Path) -> dict:
     """Build every enabled tweak mod, or none: the first failure stops it."""
+    from core import mod_requires
+    try:
+        mod_requires.check_enabled(mods_root)
+    except ValueError as error:
+        raise BuildError(str(error)) from error
     rows = [row for row in tweak_rows(project_root, mods_root) if row["enabled"]]
     enabled = {row["id"]: Path(row["path"]) for row in rows}
     context = BuildContext(game_root, baseline_root, enabled)

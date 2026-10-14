@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from core import memory_conflicts, script_mods
+from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
 
 from . import deployment, mod_loader, texts, tweak_mods
@@ -188,12 +188,21 @@ class Ds1ModAdapter:
     ALERT_CHANGED = "This mod changed since the last build."
 
     def alerts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
-        """Each switched-on tweak mod that changed since the last build, by folder."""
+        """Each switched-on mod that changed since the last build, or whose
+        required mods are not installed and on, by folder."""
         wanted = {Path(path).resolve() for path in mods}
         try:
             stale = set(tweak_mods.needs_rebuild(Path(game_root), self._library()).get("stale", []))
             rows = tweak_mods.tweak_rows(self._library()) if stale else []
         except (ValueError, OSError, RuntimeError):
-            return {}
-        return {str(Path(row["path"]).resolve()): [self.ALERT_CHANGED] for row in rows
-                if row["id"] in stale and Path(row["path"]).resolve() in wanted}
+            rows, stale = [], set()
+        lines = {str(Path(row["path"]).resolve()): [self.ALERT_CHANGED] for row in rows
+                 if row["id"] in stale and Path(row["path"]).resolve() in wanted}
+        try:
+            pending = mod_requires.unmet_lines(self._library())
+        except (ValueError, OSError, RuntimeError):
+            pending = {}
+        for folder, need_lines in pending.items():
+            if Path(folder) in wanted:
+                lines.setdefault(folder, []).extend(need_lines)
+        return lines

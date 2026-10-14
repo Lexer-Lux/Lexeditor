@@ -299,6 +299,9 @@ def save(data: dict, game_root: Path | None = None,
     reptile_atb.load(project)
     planned_enabled = {mod_id for mod_id, row in tweak_rows.items()
                        if enabled_changes.get(mod_id, row["enabled"])}
+    if enabled_changes:
+        from core import mod_requires
+        mod_requires.check_changes(mods_root, enabled_changes)
     spellbooks_active = (SPELLBOOKS_MOD in planned_enabled and SINGLE_GF_MOD in planned_enabled
                          and SHARED_MAGIC_MOD not in planned_enabled)
     spellbooks = (gf_spellbooks.load(project) if spellbooks_active

@@ -96,7 +96,9 @@
     const settings=state.data.settings;
     const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,
       sounds:soundEntries,number:numberControl,select:selectControl});
-    if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
+    if(!panels.length)panels.unshift(LexeditorUI.notice({message:!(settings.tweaks||[]).length?`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`
+      :(settings.tweaks||[]).some(row=>row.enabled)?"The switched-on tweaks have no settings to change."
+      :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}));
     const settingsView=LexeditorUI.settingsColumns(panels,tabProps);
     requestAnimationFrame(()=>bind(settingsView));
     return settingsView;

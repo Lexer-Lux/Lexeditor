@@ -8556,8 +8556,6 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-first-run-features { display: table; margin: .4em auto 0; padding-left: 1.3em; text-align: left; }
 .lex-first-run-features li { margin: .2em 0; }
 .lex-inline-link { display: inline; margin: 0; }
-/* A tweak whose mod is off: its settings wait, readable but not live. */
-.lex-tweak-off .lex-detail-panel-body { opacity: .6; }
 
 /* Hover actions: tools that wait quietly over their host. Invisible until
    the host is hovered, half-visible then, full under the pointer or

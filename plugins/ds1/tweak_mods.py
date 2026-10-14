@@ -31,7 +31,7 @@ from pathlib import Path
 import stat
 from typing import Callable
 
-from core import script_mods
+from core import mod_requires, script_mods
 from core.plugin_files import atomic_write
 from core.process_probe import live_processes
 
@@ -175,6 +175,12 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
             raise TweakError(f"{mod_id}: send enabled and values only")
         if "enabled" in change and type(change["enabled"]) is not bool:
             raise TweakError(f"{rows[mod_id]['name']} must be on or off")
+    planned = {mod_id: change["enabled"] for mod_id, change in changes.items() if "enabled" in change}
+    if planned:
+        try:
+            mod_requires.check_changes(root or mods_root(), planned)
+        except ValueError as error:
+            raise TweakError(str(error)) from error
     touched = [Path(rows[mod_id]["path"]) / name for mod_id in changes
                for name in ("mod.json", script_mods.VALUES_FILE)]
     before = {path: path.read_bytes() if path.is_file() else None for path in touched}
@@ -217,6 +223,10 @@ def build_specs(root: Path | None = None) -> list[dict]:
 
     The same build writes any layout/<id>.json; layout_specs reads those.
     """
+    try:
+        mod_requires.check_enabled(root or mods_root())
+    except ValueError as error:
+        raise TweakError(str(error)) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows})
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError)

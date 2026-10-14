@@ -97,6 +97,18 @@ class LoaderTests(unittest.TestCase):
                 tweak_mods.save(bad, self.library)
         self.assertTrue(tweak_mods.tweak_rows(self.library)[0]["enabled"])
 
+    def test_a_switch_that_breaks_a_requirement_saves_nothing(self):
+        alpha = self.library / "Alpha" / "mod.json"
+        data = json.loads(alpha.read_text(encoding="utf-8"))
+        alpha.write_text(json.dumps({**data, "requires": ["beta"]}), encoding="utf-8")
+        with self.assertRaisesRegex(tweak_mods.TweakError, "Alpha requires beta, which is switched off"):
+            self.enable(alpha=True)
+        self.assertFalse(tweak_mods.tweak_rows(self.library)[0]["enabled"])
+        self.enable(alpha=True, beta=True)
+        with self.assertRaisesRegex(tweak_mods.TweakError, "Alpha requires Beta"):
+            self.enable(beta=False)
+        self.assertTrue(tweak_mods.tweak_rows(self.library)[1]["enabled"])
+
     def test_off_tweaks_preserve_game_and_create_only_bounded_lock(self):
         # Reading the catalogue or saving switches does not install anything.
         tweak_mods.status(self.game, self.library)

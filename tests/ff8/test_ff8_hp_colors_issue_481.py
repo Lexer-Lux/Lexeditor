@@ -88,14 +88,16 @@ class BetterHpColorsTests(unittest.TestCase):
             self.assertEqual(disabled.count("enable_ff8_better_hp_colors = false"), 1)
 
     def test_editor_exposes_control_and_semantics(self):
-        # The shared renderer draws schema help and the current mod state.
-        # Enabling the mod belongs to the Mods tab.
+        # Better HP Colors has no settings of its own: it stays out of the
+        # Tweaks page whether off or on. Enabling the mod belongs to the
+        # Mods tab.
         with FixtureLibrary() as fixture:
             fixture.add("better-hp-colors", "Better HP Colors", "enable_ff8_better_hp_colors", HELP)
             row = next(row for row in gameplay_settings.load(fixture.project, fixture.game)["tweaks"]
                        if row["id"] == "better-hp-colors")
             self.assertEqual((row["name"], row["schema"]["title"]), ("Better HP Colors", "BETTER HP COLORS"))
             self.assertIs(row["schema"]["needsDriver"], True)
+            self.assertIn("white at full HP", row["schema"]["help"])
             from playwright.sync_api import sync_playwright
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True)
@@ -106,16 +108,9 @@ class BetterHpColorsTests(unittest.TestCase):
                     page.goto('http://fixture/')
                     page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
                     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
-                    page.evaluate('''row => {
-                        const U=LexeditorUI;
-                        document.querySelector('main').append(...U.tweakModPanels({rows:[row]}).panels);
-                    }''', row)
-                    self.assertIn('BETTER HP COLORS', page.locator('main').inner_text())
-                    self.assertEqual(page.locator('main .lex-badge').inner_text(), 'OFF')
-                    self.assertEqual(page.locator('main input[type="checkbox"]').count(), 0)
-                    page.locator('main .lex-info-help').hover()
-                    page.locator('.lex-help-popover').wait_for(state='visible')
-                    self.assertIn(HELP, page.locator('.lex-help-popover').inner_text())
+                    count = '''row => LexeditorUI.tweakModPanels({rows: [row]}).panels.length'''
+                    self.assertEqual(page.evaluate(count, row), 0)
+                    self.assertEqual(page.evaluate(count, {**row, "enabled": True}), 0)
                 finally:
                     browser.close()
 

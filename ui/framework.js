@@ -12709,12 +12709,14 @@ ${contents.path}`});
     const toggles = new Map();
     const rows = [...(options.rows || [])].sort((a, b) =>
       (a.schema?.title || a.name).localeCompare(b.schema?.title || b.name));
-    const panels = rows.map(row => {
+    // A Tweaks page shows only switched-on mods with something to change:
+    // the Mods tab switches them, and a mod without settings has no panel.
+    // A mod whose settings failed to load still shows its error. The Mods
+    // tab's own settings section keeps every field, on or off.
+    const shown = options.fieldsOnly ? rows : rows.filter(row =>
+      row.enabled && (row.error || (row.schema?.fields || []).some(item => !item.hidden)));
+    const panels = shown.map(row => {
       const schema = row.schema || {fields: []}, blocker = schema.blocker || "";
-      // A tweak is a mod: the Mods tab switches it. Here it only says
-      // whether it is on, so its settings never read as live when it is off.
-      const toggle = row.enabled ? null
-        : badge("OFF", {title: "Switch this mod on in the Mods tab."});
       const body = [];
       if (row.error) body.push(detailNote(row.error));
       body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
@@ -12722,12 +12724,10 @@ ${contents.path}`});
       if (options.fieldsOnly) return element("div", {class: "lex-tweak-fields"}, ...(blocker ? [detailNote(blocker)] : []), ...body);
       // The heading is the mod’s own name, as in the Mods tab: a second
       // title in the schema always drifts from it.
-      const panel = tweakPanel(row.name, schema.help, toggle, body, blocker);
-      if (!row.enabled) panel.classList?.add("lex-tweak-off");
-      return panel;
+      return tweakPanel(row.name, schema.help, null, body, blocker);
     });
     // A tweak another one requires greys out the dependent while it is off.
-    const bind = root => bindSettingDependencies(root, rows.flatMap(row =>
+    const bind = root => bindSettingDependencies(root, shown.flatMap(row =>
       (row.schema?.requires || []).filter(need => toggles.has(need))
         .map(need => ({key: `${need}->${row.id}`, dependency: toggles.get(need), dependent: toggles.get(row.id)}))));
     return {panels, toggles, bind};
@@ -13115,7 +13115,7 @@ ${contents.path}`});
         main = target;
         draw();
         try { await load(); } catch (error) { main.replaceChildren(notice({tone: "warning", message: error.message || String(error)})); return; }
-        if (data.conflictError) showToast?.(`Could not check the mods for conflicts: ${data.conflictError}`, {tone: "warning"});
+        if (data?.conflictError) showToast?.(`Could not check the mods for conflicts: ${data.conflictError}`, {tone: "warning"});
         draw();
         // Downloaded Lexer's Mod modules stay up to date.
         callWindow("lexmod_update", pluginId).then(async result => {

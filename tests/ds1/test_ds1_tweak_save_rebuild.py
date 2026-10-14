@@ -192,6 +192,37 @@ def test_the_adapter_flags_only_the_changed_mod(game, library):
         str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_CHANGED]}
 
 
+def _require(library, folder, *needs):
+    path = Path(library) / folder / "mod.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**data, "requires": list(needs)}), encoding="utf-8")
+
+
+def _switch(library, folder, on):
+    path = Path(library) / folder / "mod.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**data, "enabled": on}), encoding="utf-8")
+
+
+def test_the_adapter_flags_a_mod_whose_requirement_is_off_or_missing(game, library):
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    tweak_mods.apply(game, library)
+    _require(library, "Alpha", "beta", "ghost")
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
+        str((library / "Alpha").resolve()): ["Requires ghost, which is not installed."]}
+    _switch(library, "Beta", False)
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
+        str((library / "Alpha").resolve()): ["Requires beta, which is switched off.",
+                                             "Requires ghost, which is not installed."]}
+
+
+def test_build_refuses_an_unmet_mod_requirement(game, library):
+    _require(library, "Alpha", "ghost")
+    with pytest.raises(tweak_mods.TweakError, match="Alpha requires ghost, which is not installed"):
+        tweak_mods.build_specs(library)
+
+
 def test_save_rebuilds_stale_tweaks(game, library, api):
     post, _store, _saved = api
     tweak_mods.apply(game, library)

@@ -1801,9 +1801,10 @@ class HostApi:
 
     def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
         """Switch one mod, then let the game's loader take the new set."""
-        from core import mods_service
+        from core import mod_requires, mods_service
         root = self._game_mods(plugin_id)
         folder = mods_service.checked_mod(root, path)
+        mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
         was = bool(mods_service.mod_row(folder).get("enabled"))
         mods_service.set_enabled(folder, enabled)
         if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):

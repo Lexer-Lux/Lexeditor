@@ -1,6 +1,7 @@
-"""The DS1 Tweaks tab lists tweak mods without switches of their own (the
-Mods tab enables a mod) and reports the installed executable. Uses its own small tweak-mod library and a
-game folder without an executable, so it never touches real files."""
+"""The DS1 Tweaks tab shows only switched-on tweak mods with settings (the
+Mods tab enables a mod) and reports the installed executable. Uses its own
+small tweak-mod library and a game folder without an executable, so it never
+touches real files."""
 import json
 import os
 from pathlib import Path
@@ -20,12 +21,13 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 TWEAK = 'def build(settings, context):\n    return {}\n'
 
 
-def make(library: Path, mod_id: str, name: str, order: int) -> Path:
+def make(library: Path, mod_id: str, name: str, order: int, fields: list | None = None) -> Path:
     root = library / name
     (root / "script").mkdir(parents=True)
     (root / "script" / "__init__.py").write_text("", encoding="utf-8")
     (root / "script" / "tweak.py").write_text(TWEAK, encoding="utf-8")
-    (root / "settings.schema.json").write_text(json.dumps({"title": name.upper(), "help": f"{name} help."}), encoding="utf-8")
+    (root / "settings.schema.json").write_text(json.dumps(
+        {"title": name.upper(), "help": f"{name} help.", "fields": fields or []}), encoding="utf-8")
     (root / "mod.json").write_text(json.dumps({"id": mod_id, "name": name, "order": order, "enabled": False,
                                                "script": {"version": 1}}), encoding="utf-8")
     return root
@@ -44,7 +46,8 @@ def main():
         (game / RELATIVE).write_bytes(make_archive())
         mod.mkdir()
         (mod / MARKER).touch()
-        equip = make(library, 'equip-load-percentage', 'Equip Load Percentage', 100)
+        equip = make(library, 'equip-load-percentage', 'Equip Load Percentage', 100, [
+            {"key": "step", "label": "Step", "type": "int", "default": 1, "min": 0, "max": 10}])
         make(library, 'later-game-ammunition', 'Later-Game Ammunition', 110)
         env = {'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod), 'LEXEDITOR_NO_MOD': '0',
                'LEXEDITOR_MOD_READ_ONLY': '0', tweak_mods.MODS_ENV: str(library)}
@@ -72,8 +75,14 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="tweaks"]').click()
                     page.wait_for_function('state.tab==="tweaks" && state.tweaks && !state.tweakBusy')
-                    for title in ('INSTALLED GAME', 'EQUIP LOAD PERCENTAGE', 'LATER-GAME AMMUNITION'):
-                        reveal(page, page.get_by_text(title, exact=True))
+                    reveal(page, page.get_by_text('INSTALLED GAME', exact=True))
+                    # Both mods are off, so neither shows a panel: the page
+                    # says to switch one on in the Mods tab.
+                    assert page.get_by_text('Equip Load Percentage', exact=True).count() == 0
+                    assert page.get_by_text('Later-Game Ammunition', exact=True).count() == 0
+                    assert page.locator('.lex-tweak-off').count() == 0
+                    assert page.get_by_role('checkbox', name='Equip Load Percentage').count() == 0
+                    assert page.get_by_text('No tweaks are switched on.', exact=False).is_visible()
                     assert page.evaluate('reshadeCalls') == [['mod_reshade', 'ds1']]
                     # ReShade is not a tweak mod: it has a subtab of its own,
                     # from the shared Tweaks page.
@@ -99,17 +108,9 @@ def main():
                     assert page.get_by_role('button', name='Apply', exact=True).count() == 0
                     # No per-tweak trust button: enabling is the Mods tab's job.
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
-                    # The Tweaks page must stay usable in both window sizes.
-                    for width, height in ((1440, 900), (1000, 700)):
-                        page.set_viewport_size({"width": width, "height": height})
-                        page.get_by_text('EQUIP LOAD PERCENTAGE', exact=True).wait_for(state='visible')
-                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-                        if output:
-                            page.screenshot(path=str(output / f'ds1-tweaks-{width}x{height}.png'))
-                    # A tweak is a mod: the Tweaks tab has no switch, only
-                    # an OFF mark while its mod is disabled.
-                    assert page.get_by_role('checkbox', name='Equip Load Percentage').count() == 0
-                    assert page.locator('.lex-tweak-off').count() == 2
+                    # Switch one on: only it appears, with its settings. The
+                    # other mod has no settings and stays off and hidden; the
+                    # Tweaks tab has no switch of its own.
                     data = json.loads((equip / 'mod.json').read_text(encoding='utf-8'))
                     (equip / 'mod.json').write_text(json.dumps({**data, 'enabled': True}), encoding='utf-8')
                     page.evaluate("sessionStorage.noReshade='1'")
@@ -118,8 +119,20 @@ def main():
                     page.locator('[data-tab="tweaks"]').click()
                     page.wait_for_function('state.tab==="tweaks" && state.tweaks')
                     page.wait_for_function('!state.tweakBusy')
-                    assert page.locator('.lex-tweak-off').count() == 1
+                    reveal(page, page.get_by_text('Equip Load Percentage', exact=True))
+                    assert page.get_by_text('Later-Game Ammunition', exact=True).count() == 0
+                    assert page.get_by_text('No tweaks are switched on.', exact=False).count() == 0
+                    assert page.get_by_role('checkbox', name='Equip Load Percentage').count() == 0
+                    assert page.locator('.lex-tweak-off').count() == 0
+                    assert page.get_by_role('spinbutton', name='Step').is_visible()
                     assert page.get_by_role('button', name='Trust this tweak').count() == 0
+                    # The Tweaks page must stay usable in both window sizes.
+                    for width, height in ((1440, 900), (1000, 700)):
+                        page.set_viewport_size({"width": width, "height": height})
+                        page.get_by_text('Equip Load Percentage', exact=True).wait_for(state='visible')
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                        if output:
+                            page.screenshot(path=str(output / f'ds1-tweaks-{width}x{height}.png'))
                     # With no tweak mods or ReShade, the installed-game status
                     # owns the page instead of becoming one short settings card.
                     page.evaluate('state.tweaks.tweaks=[];render()')
@@ -140,7 +153,7 @@ def main():
                     browser.close()
         finally:
             session.stop()
-    evidence = {'tweakMods': 2, 'noSwitch': True,
+    evidence = {'tweakMods': 2, 'hiddenWhenOff': True, 'noSwitch': True,
                 'missingExecutableReported': True, 'viewports': [[1440, 900], [1000, 700]]}
     if output:
         (output / "ds1-tweak-controls.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")

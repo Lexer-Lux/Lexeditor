@@ -1,4 +1,4 @@
-"""The Tweaks page lists tweak mods from their schemas, edits them and saves them.
+"""The Tweaks page shows switched-on tweak mods with settings, edits them and saves them.
 
 Runs against a temporary project with its own small tweak-mod library, so it
 never reads or changes the reader's real mod library.
@@ -63,16 +63,17 @@ def main(output: Path | None = None) -> int:
                     page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
                     page.wait_for_function("()=>!document.documentElement.classList.contains('lex-loading-live')")
                     page.evaluate("()=>{state.settingsTab='gameplay';navigate('settings')}")
-                    page.get_by_text("BASE TWEAK", exact=True).wait_for()
+                    page.get_by_text("Base Tweak", exact=True).wait_for()
                     # GF Spellbooks and Shared Party Magic Inventory are tweak
                     # mods now, so they are only here when the library has them.
-                    for title in ("DEPENDENT TWEAK", "UNFINISHED TWEAK", "STRANGER TWEAK"):
-                        page.get_by_text(title, exact=True).wait_for()
-                    # A tweak is a mod: the Mods tab switches it, so here
-                    # there is no switch, only an OFF mark on a disabled one.
+                    page.get_by_text("Dependent Tweak", exact=True).wait_for()
+                    # Off mods stay hidden, as does a mod with only hidden
+                    # settings: the Mods tab switches them, and this page only
+                    # changes what is on and settable.
+                    for title in ("Unfinished Tweak", "Stranger Tweak", "GF HP Casting"):
+                        assert page.get_by_text(title, exact=True).count() == 0
                     assert page.get_by_role("checkbox", name="Base Tweak").count() == 0
-                    assert page.locator(".lex-tweak-off").count() == 2
-                    page.get_by_text("NOT AVAILABLE YET").first.wait_for()
+                    assert page.locator(".lex-tweak-off").count() == 0
                     # No per-tweak trust button: enabling is the Mods tab's job.
                     assert page.get_by_role("button", name="Trust this tweak").count() == 0
                     if output:
@@ -89,14 +90,14 @@ def main(output: Path | None = None) -> int:
                     # Vanilla shows the same page, still editable: the
                     # values belong to the library, not the open mod.
                     page.evaluate("()=>{state.activeSource='vanilla';navigate('settings')}")
-                    page.get_by_text("BASE TWEAK", exact=True).wait_for()
+                    page.get_by_text("Base Tweak", exact=True).wait_for()
                     assert page.get_by_role("spinbutton", name="Amount").is_enabled()
                     page.evaluate("()=>{state.activeSource='mine';navigate('settings')}")
                     page.reload()
                     page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
                     page.wait_for_function("()=>!document.documentElement.classList.contains('lex-loading-live')")
                     page.evaluate("()=>{state.settingsTab='gameplay';navigate('settings')}")
-                    page.get_by_text("DEPENDENT TWEAK", exact=True).wait_for()
+                    page.get_by_text("Dependent Tweak", exact=True).wait_for()
                     assert page.get_by_role("spinbutton", name="Amount").input_value() == "12"
                     if output:
                         page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
@@ -130,7 +131,7 @@ def main(output: Path | None = None) -> int:
         assert json.loads((dependent / "mod.json").read_text(encoding="utf-8"))["enabled"] is True
         assert script_mods.values(casting)["costs"][1] == 321
         assert not errors, errors
-    print(json.dumps({"tweakMods": 5, "noSwitch": True, "savedAndRebuilt": True,
+    print(json.dumps({"tweakMods": 5, "visibleTweaks": 2, "noSwitch": True, "savedAndRebuilt": True,
                       "magicCostSavedReloaded": True, "magicCostHiddenWhenDisabled": True}))
     return 0
 
