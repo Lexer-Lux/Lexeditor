@@ -18,7 +18,7 @@
   "soundEnabled": false,
   "soundVolumePercent": 25.0,
   "tableRowsPerPage": 40,
-  "tweakColumnsPerPage": 6,
   "trustWarning": true,
+  "tweakColumnsPerPage": 6,
   "updateCheckFrequency": "monthly"
 }

@@ -1762,11 +1762,12 @@ class HostApi:
         return result
 
     def _attach_mod_marks(self, plugin_id: str, result: dict) -> None:
-        """Mark each switched-on mod with its loader's flags: conflicts plus alerts.
+        """Mark each mod with its loader's flags: conflicts plus alerts.
 
         A game's loader reports, by mod folder, what it cannot combine
-        (adapter.conflicts) and what needs attention (adapter.alerts, such as
-        a mod changed since it was last built). The Mods tab and the mod
+        (adapter.conflicts, only between switched-on mods) and what needs
+        attention (adapter.alerts, such as a mod changed since it was last
+        built, whether the mod is on or off). The Mods tab and the mod
         selector show them on the mod's row. A loader without those reports,
         or a game not located yet, marks nothing.
         """
@@ -1775,21 +1776,25 @@ class HostApi:
         if not game:
             return
         enabled = [Path(row["path"]) for row in result["rows"] if row.get("enabled")]
-        self._attach_report(result, adapter, enabled, game, "conflicts", "conflictError")
-        self._attach_report(result, adapter, enabled, game, "alerts", "alertsError")
+        everyone = [Path(row["path"]) for row in result["rows"]]
+        self._attach_report(result, adapter, enabled, game, "conflicts", "conflictError", True)
+        self._attach_report(result, adapter, everyone, game, "alerts", "alertsError", False)
 
     @staticmethod
-    def _attach_report(result: dict, adapter, enabled: list, game: str, method: str, error_key: str) -> None:
+    def _attach_report(result: dict, adapter, mods: list, game: str, method: str, error_key: str,
+                       only_enabled: bool) -> None:
         if adapter is None or not hasattr(adapter, method):
             return
         try:
-            found = getattr(adapter, method)(enabled, Path(game)) if enabled else {}
+            found = getattr(adapter, method)(mods, Path(game)) if mods else {}
         except (OSError, ValueError, RuntimeError) as error:
             result[error_key] = str(error)
             return
         found = {str(Path(key).resolve()): lines for key, lines in found.items()}
         for row in result["rows"]:
-            lines = found.get(str(Path(row["path"]).resolve())) if row.get("enabled") else None
+            if only_enabled and not row.get("enabled"):
+                continue
+            lines = found.get(str(Path(row["path"]).resolve()))
             if lines:
                 row[method] = list(lines)
 

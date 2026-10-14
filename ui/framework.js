@@ -3005,6 +3005,26 @@
     const shownHigh = Number.isFinite(Number(options.sliderMax ?? NaN)) && Number.isFinite(highBound)
       ? Math.min(highBound, Number(options.sliderMax)) : highBound;
     const [sliderLow, sliderHigh] = shownHigh > shownLow ? [shownLow, shownHigh] : [lowBound, highBound];
+    // Native arrows move by 1 when step is "any": without this, float
+    // fields changed through whole numbers from the keyboard too.
+    if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
+        && (input.step === "any" || !Number.isFinite(Number(input.step)))) {
+      input.addEventListener("keydown", event => {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        const at = readNumeric(input);
+        const base = Number.isFinite(at) ? at : 0;
+        const floor = input.min === "" ? -Infinity : Number(input.min);
+        const ceiling = input.max === "" ? Infinity : Number(input.max);
+        const next = Math.max(Number.isFinite(floor) ? floor : -Infinity,
+          Math.min(Number.isFinite(ceiling) ? ceiling : Infinity,
+            Number((base + (event.key === "ArrowUp" ? 0.1 : -0.1)).toPrecision(12))));
+        if (next === base) return;
+        writeNumeric(input, next);
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+        input.dispatchEvent(new Event("change", {bubbles: true}));
+      });
+    }
     // Wide ranges still have a coarse slider; direct entry retains precise
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
@@ -3028,9 +3048,13 @@
         if (input.disabled || input.readOnly || refusesEdit(input)) return;
         const bounds = box().getBoundingClientRect();
         const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-        const step = Number(input.step) || 1;
+        // A float field's step is "any": snapping to step 1 would drag
+        // it through whole numbers only. Without a usable step the
+        // pointer position stands, rounded past float dust.
+        const declared = Number(input.step);
+        const snap = Number.isFinite(declared) && declared > 0 ? declared : 0;
         const raw = sliderLow + share * (sliderHigh - sliderLow);
-        const snapped = Math.round(raw / step) * step;
+        const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
         const nextValue = Math.max(sliderLow, Math.min(sliderHigh, snapped));
         if (readNumeric(input) === nextValue) return;
         writeNumeric(input, nextValue);

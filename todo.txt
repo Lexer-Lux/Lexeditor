@@ -10,39 +10,22 @@ THIS FILE LITERALLY ONLY GETS LONGER OVER TIME
 
 - Repair the text-clipping detector and fix the remaining clipped text and controls it finds.
     > Per Lexer: the sweep runs on CI at sync; fixes get written against its output. No more local sweeps.
-    > Left: the detector mechanics are fixed (FF7 loading wait, FF7 headers pinned and the dark-on-dark not reproducible, RDR2 Mob pager added, FF7R async settle). Run the sweep and fix what it now finds.
 
 ==================================================================== FF8 - PAGES
 
 World
 - WORLD->field subtab: it should be one one side the map showing the world point, then on the right side an image of the field. the field's name should be on top, a hoverable.
-    > Left: the field side is pinned (hoverable name, picture, arrival point). The world-map side has its trigger pairing measured (every script pairs a world-map cell with a field entry, 56 of 72 entries mapped) but no map UI is built yet. The World Scripts tab shows vehicle warps and siblings; warp cells are editable with merge + save tested.
 
 ==================================================================== FF8 - DATA, MODS, NATIVE, IN-GAME
 
-- Recheck FF8 editability coverage and complete remaining gaps: vehicle records, Wm2field, animation writing, VRAM palette animation, spreadsheet bulk import/export, and archive browsing/repacking.
-    > Scoper rank: switch panel first, then mergers (namedic/msd/toml small, c0m medium), spreadsheet tables, archive note fix (the Data Map row is stale, capability shipped headless), Wm2field trigger hunt, vehicle tier A, animation last. VRAM palette animation: evidence says vestigial in the retail build, confirm close as won't-do?
-    > Done since: spreadsheet refine + shop tables, archive note fix. Animation writing moved to #934; VRAM to #933.
-    > Left: World Scripts tab added, vehicle warp cells decoded with editing + merge + save tested, Shot ammo uses the item select, wm2field field side noted, Wm2field trigger hunt HIT (cell->entry mapping measured, no map UI). Moved out: animation writing (#934), VRAM (#933, won't-do evidence ready for verdict). Still open: Wm2field map UI, spreadsheet bulk import/export, archive browsing/repacking.
-- Deliver the rebuilt FF8 native runtime and prepare in-game acceptance checks for RT-forward/LT-reverse controls, separated XP/HP bars including reserve members, silver top-screen messages, and detailed Shared Magic warnings.
-    > Left: CI, then the in-game checks. Its warning toasts still draw an imitation box; the fix (a Hext patch calling the game's own battle message routine) needs the routine confirmed in a running game, with your OK.
-- FF8: battle music once played at half speed (not reproducible yet). Next time: note if pitch was lower too, then send FFNx.previous.log (kept automatically now).
+- FF8 editability gaps: Wm2field map UI, spreadsheet bulk import/export, archive browsing/repacking.
+- FF8: battle music once played at half speed.
 - ff8: using switch command as squall brings up this panel for a split second which immediately disappears.
-    > Traces on all silent closes plus the likely fix are in (no local rebuild). Left: CI build, then one live repro to name the path.
 
 ==================================================================== DS1
-- DS1 gamepad dead (parked per Lexer, worry later). Ruled out: mods (dead with zero deployed), debug mode (on all night, pad worked earlier). Open: loader dinput8 proxy vs OS/Steam; ~40 zombie game processes noted.
-
-- DS1 mod dropdown: row alignment fixed and pinned by a test. One open question.
-    > Author lock: the bypass exists and works in a shell, so it is failing inside the running app; needs one check: Settings, is Developer Mode on or off?
+- DS1 gamepad dead (parked per Lexer, worry later).
 
 DS1 - ARMOR REWORK (UNFINISHED MOD)
-- Armor Rework is UNFINISHED until this is done: add a Level-up gains tab to the DS1 plugin so level-up stat gains can be edited, then remove the DEF gain from level-ups in Armor Rework.
-    > Left: inputs named from live read + disassembly (VIT/ATT/END/STR/DEX/INT/FAI + humanity@+0x84 capped 99 + RES@+0x88; +0x78/+0x80 unread by the function; all factor addresses dumped). Tab + patch built and tested (tests/ds1/test_ds1_levelup_gains.py, 18 pass). Armor Rework's script now zeroes all 36 level-up gains (78 hooks verified). Left: in-game acceptance (level-ups grant no defense; menus; one armor upgrade).
-- Armor Rework: confirm in-game that upgraded armor uses its per-level absorption effect (the DS3 offset in ReinforceParamProtector; DS1 may ignore it).
-    > In game: upgrade one armor piece once; its absorption number should rise. If it doesn't move, DS1 ignores the mechanism.
-- Armor Rework: check the menus in-game. Built, not yet seen: armor panels (equipment and shop) show each piece's absorption, the equipment panel with a % sign; status screens show your combined absorption from the four armor pieces (whole numbers, no % sign; rings and other effects not counted).
-    > In game: open the equipment, shop and status screens and compare with the description above.
 
 ==================================================================== CI / INTEGRATION
 

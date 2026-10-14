@@ -10,7 +10,7 @@ work, even if your tool does not load skills on its own.
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
-| ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-live-debugging/SKILL.md` |
+| ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-modding/SKILL.md` |
 
 ## Editor UI
 

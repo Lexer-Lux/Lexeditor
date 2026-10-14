@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive, make_menu_archive
 from ds1_effects_fixture import make_effects_archive
-from plugins.ds1.formats import ItemDocument, FormatError, SUBTABS, TABLES, inflate
+from plugins.ds1.formats import ABSORPTION_BASE, EFFECT_TABLE, ItemDocument, FormatError, SUBTABS, TABLES, inflate
+from plugins.ds3.formats import write_field
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 from plugins.ds1 import texts
@@ -287,7 +288,6 @@ def test_armor_and_shield_guard_fields_carry_glyph_kinds():
     assert guard['curseGuardResist'] == 'curse'
 
 
-
 def test_weapon_guard_labels_carry_percent_unit():
     document = ItemDocument(make_archive())
     fields = {field['key']: field
@@ -320,3 +320,25 @@ def test_scaling_and_requirement_fields_carry_stat_glyph_kinds():
              for field in document.read_row('Magic', 100)['fields']}
     assert magic['requirementIntellect'] == 'int'
     assert magic['requirementFaith'] == 'fth'
+
+
+def test_armor_list_rows_carry_absorption_shares_for_pinned_columns(monkeypatch):
+    """A pinned Lightning absorption column reads row values, like the detail pane."""
+    document = ItemDocument(make_effects_archive())
+    document.edit(EFFECT_TABLE, 6890, "thunderDamageCutRate", 0.9)
+    reopened = ItemDocument(document.export())
+    monkeypatch.setattr(reopened, "_absorption_levels",
+                        lambda row_id, table="EquipParamProtector": [6890])
+    listed = next(r for r in reopened.list_rows("armor") if r["id"] == 100)
+    detail = next(f for f in reopened.read_row("EquipParamProtector", 100)["fields"]
+                  if f["key"] == "absorption:thunderDamageCutRate")
+    assert listed["values"]["absorption:thunderDamageCutRate"] == pytest.approx(10.0)
+    assert listed["values"]["absorption:thunderDamageCutRate"] == detail["value"]
+
+
+def test_armor_list_rows_omit_absorption_without_linked_effects():
+    """Vanilla armor carries no absorption keys, effects table or not."""
+    assert "absorption:thunderDamageCutRate" not in \
+        ItemDocument(make_archive()).list_rows("armor")[0]["values"]
+    assert "absorption:thunderDamageCutRate" not in \
+        ItemDocument(make_effects_archive()).list_rows("armor")[0]["values"]

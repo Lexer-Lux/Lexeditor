@@ -188,8 +188,8 @@ class Ds1ModAdapter:
     ALERT_CHANGED = "This mod changed since the last build."
 
     def alerts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
-        """Each switched-on mod that changed since the last build, or whose
-        required mods are not installed and on, by folder."""
+        """Each given mod that changed since the last build, or whose
+        required mods are not installed and on, by folder, on or off."""
         wanted = {Path(path).resolve() for path in mods}
         try:
             stale = set(tweak_mods.needs_rebuild(Path(game_root), self._library()).get("stale", []))
