@@ -26,7 +26,15 @@
  *
  * DirectInput8Create, the one function the game imports from dinput8.dll,
  * is forwarded to the system's own dinput8.dll.
+ *
+ * A game whose code a mod changed must never reach FromSoftware's servers or
+ * other players: their anti-cheat may ban the account. So whenever the patch
+ * file holds any patch, every way the process opens a connection or looks up
+ * a host fails as if there were no network, before anything else happens. An
+ * empty patch file (a tweak that only changes the menu layout) leaves the
+ * game online.
  */
+#include <winsock2.h> /* before windows.h, which would bring in the old winsock.h */
 #include <windows.h>
 #include <tlhelp32.h>
 #include <string.h>
@@ -490,6 +498,69 @@ static void write_log(const char *text)
     ++lines;
 }
 
+/* --- No network ---------------------------------------------------------- */
+
+static int WSAAPI refuse_socket_call(void)
+{
+    SetLastError(WSAENETUNREACH); /* WSASetLastError is SetLastError */
+    return SOCKET_ERROR;
+}
+
+static int WSAAPI refuse_lookup(void)
+{
+    SetLastError(WSAHOST_NOT_FOUND);
+    return WSAHOST_NOT_FOUND;
+}
+
+static void *WSAAPI refuse_host(void)
+{
+    SetLastError(WSAHOST_NOT_FOUND);
+    return NULL;
+}
+
+/* The start of `function` becomes a jump to `replacement`; the original is
+ * never called again, so nothing of it needs keeping. */
+static int redirect(HMODULE module, const char *name, void *replacement)
+{
+    unsigned char *function = (unsigned char *)GetProcAddress(module, name);
+    if (!function)
+        return 1; /* not in this Windows: nothing to block */
+    unsigned char jump[12] = {0x48, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xE0}; /* mov rax, imm64; jmp rax */
+    memcpy(jump + 2, &replacement, sizeof replacement);
+    DWORD protection;
+    if (!VirtualProtect(function, sizeof jump, PAGE_EXECUTE_READWRITE, &protection))
+        return 0;
+    memcpy(function, jump, sizeof jump);
+    VirtualProtect(function, sizeof jump, protection, &protection);
+    FlushInstructionCache(GetCurrentProcess(), function, sizeof jump);
+    return 1;
+}
+
+/* 1 once every way online fails; a second call changes nothing. */
+int lx_block_network(void)
+{
+    static int blocked;
+    if (blocked)
+        return 1;
+    static const char *const sockets[] = {"connect", "WSAConnect", "WSAConnectByNameA", "WSAConnectByNameW",
+                                          "WSAConnectByList", "sendto", "WSASendTo", "WSASendMsg"};
+    static const char *const lookups[] = {"getaddrinfo", "GetAddrInfoW", "GetAddrInfoExA", "GetAddrInfoExW",
+                                          "WSALookupServiceBeginA", "WSALookupServiceBeginW"};
+    static const char *const hosts[] = {"gethostbyname", "gethostbyaddr"};
+    HMODULE ws2 = LoadLibraryW(L"ws2_32.dll");
+    if (!ws2)
+        return 0;
+    int ok = 1;
+    for (size_t i = 0; i < sizeof sockets / sizeof *sockets; ++i)
+        ok &= redirect(ws2, sockets[i], (void *)refuse_socket_call);
+    for (size_t i = 0; i < sizeof lookups / sizeof *lookups; ++i)
+        ok &= redirect(ws2, lookups[i], (void *)refuse_lookup);
+    for (size_t i = 0; i < sizeof hosts / sizeof *hosts; ++i)
+        ok &= redirect(ws2, hosts[i], (void *)refuse_host);
+    blocked = ok;
+    return ok;
+}
+
 static void apply_from_file(void)
 {
     wchar_t path[MAX_PATH * 2];
@@ -506,6 +577,14 @@ static void apply_from_file(void)
         write_log("lexeditor-ds1-patch.bin is empty or too large; nothing was changed");
         return;
     }
+    /* Offline before the first change, and even if the patch then fails:
+     * Lexeditor told the reader the game would be offline. */
+    if (!lx_block_network()) {
+        CloseHandle(file);
+        write_log("The network could not be blocked, so no patch was applied: the game runs as it ships");
+        return;
+    }
+    write_log("Online play is off: mods change the game's code");
     unsigned char *data = (unsigned char *)HeapAlloc(GetProcessHeap(), 0, (size_t)size.QuadPart);
     DWORD read = 0;
     int ok = data && ReadFile(file, data, (DWORD)size.QuadPart, &read, NULL) && read == (DWORD)size.QuadPart;

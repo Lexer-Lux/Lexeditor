@@ -1259,7 +1259,8 @@ class HostApi:
                 raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
             self._deploy_before_launch(plugin_id)
             os.startfile(f"steam://rungameid/{app_id}")
-            return {"running": False, "viaSteam": True, "alreadyRunning": False}
+            return {"running": False, "viaSteam": True, "alreadyRunning": False,
+                    "notice": self._launch_notice(plugin_id)}
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
@@ -1278,7 +1279,23 @@ class HostApi:
             flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
             self._game_processes[plugin_id] = process
-            return {"running": True, "pid": process.pid, "alreadyRunning": False}
+            return {"running": True, "pid": process.pid, "alreadyRunning": False,
+                    "notice": self._launch_notice(plugin_id)}
+
+    def _launch_notice(self, plugin_id: str) -> str:
+        """What Play tells the reader about the game it started, or "".
+
+        A loader that keeps the game offline (DS1 with code-changing mods or
+        debug mode) says so here; Play shows it as a toast.
+        """
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get("root")
+        if adapter is None or not game or not hasattr(adapter, "launch_notice"):
+            return ""
+        try:
+            return str(adapter.launch_notice(Path(game)) or "")
+        except (OSError, ValueError, RuntimeError):
+            return ""
 
     def _deploy_before_launch(self, plugin_id: str) -> None:
         """Install the enabled mods as they are now, for an adapter that asks.

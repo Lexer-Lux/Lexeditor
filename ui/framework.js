@@ -8602,6 +8602,8 @@ ${contents.path}`});
         if (launching) await options.beforeLaunch?.();
         const result = await callWindow(launching ? "launch_game" : "stop_game", options.plugin.id);
         renderGameProcess(result?.running);
+        // The loader may start the game offline (DS1: code-changing mods, debug mode).
+        if (launching && result?.notice) showToast(result.notice, {tone: "warning"});
         if (launching && result?.running) options.afterLaunch?.(result);
       } catch (error) {
         showAlert({title: gameRunning ? "Could not stop the game" : "Could not launch the game", message: error.message || String(error)});
