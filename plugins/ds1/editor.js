@@ -255,6 +255,11 @@ async function discard(){
   try{await api("/api/discard",{});attackPreviews.clear();fieldHistory.clear();await refreshState();
     if(["info","tweaks","datamap"].includes(state.tab))await navigate(state.tab);
     else{await loadItems();if(state.tab==="maps")await loadMaps();render();}}catch(error){notify(error);}
+  // A pending tweak rebuild is deployment drift, not an unsent edit:
+  // it must not keep Exit Without Saving from reaching zero. Every
+  // server reply re-sets it, so this runs after the last one; the
+  // drift itself stays on disk for the next save to rebuild.
+  state.tweaksNeedRebuild=false;
 }
 // An item's in-game name lives in the game's text, which the mod carries
 // beside its parameters; the server renames it there.
