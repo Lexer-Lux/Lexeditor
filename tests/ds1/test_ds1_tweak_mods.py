@@ -394,3 +394,26 @@ class LayoutLoaderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuildContextTests(unittest.TestCase):
+    def test_game_params_is_none_outside_an_apply(self):
+        self.assertIsNone(tweak_mods.BuildContext({}).game_params())
+
+    def test_game_params_combines_active_mods_over_vanilla_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            game = Path(folder)
+            source = game / "param.dcx"
+            source.write_bytes(b"vanilla")
+            mod = mock.Mock(files={"rel": b"mod"})
+            mod.name = "A mod"
+            with mock.patch("plugins.ds1.mod_loader.RELATIVE", "rel"), \
+                 mock.patch("plugins.ds1.deployment.vanilla_source", return_value=source), \
+                 mock.patch("plugins.ds1.mod_loader.active_mods", return_value=[mod]) as active, \
+                 mock.patch("plugins.ds1.mod_loader._compose_params",
+                            return_value=(b"merged", [])) as compose:
+                context = tweak_mods.BuildContext({}, game, game)
+                self.assertEqual(context.game_params(), b"merged")
+                self.assertEqual(context.game_params(), b"merged")
+            compose.assert_called_once_with(b"vanilla", [("A mod", b"mod")])
+            active.assert_called_once_with(game)

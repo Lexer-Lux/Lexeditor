@@ -206,9 +206,32 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
 class BuildContext:
     """What a DS1 tweak script gets from Lexeditor."""
 
-    def __init__(self, enabled: dict[str, Path]):
+    def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
+                 library_root: Path | None = None):
         self._enabled = enabled
+        self._game_root = game_root
+        self._library_root = library_root
+        self._params: bytes | None = None
         self.current = ""
+
+    def game_params(self) -> bytes | None:
+        """The game's GameParam.parambnd.dcx as this Apply deploys it: vanilla
+        with every active data mod combined over it in load order, so a tweak
+        reads what the game will (another mod's curve or cost edits included).
+        None outside an Apply, when no game folder is known."""
+        if self._game_root is None:
+            return None
+        if self._params is None:
+            from . import deployment, mod_loader
+            source = checked(deployment.vanilla_source(Path(self._game_root), mod_loader.RELATIVE))
+            if not source.is_file():
+                return None
+            mods = mod_loader.active_mods(self._library_root or mods_root())
+            self._params = mod_loader._compose_params(
+                source.read_bytes(),
+                [(mod.name, mod.files[mod_loader.RELATIVE]) for mod in mods
+                 if mod_loader.RELATIVE in mod.files])[0]
+        return self._params
 
     def enabled(self, mod_id: str) -> bool:
         return mod_id in self._enabled
@@ -218,7 +241,7 @@ class BuildContext:
         return script_mods.values(root) if root else None
 
 
-def build_specs(root: Path | None = None) -> list[dict]:
+def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
     """Build every enabled tweak mod and read back its executable patches.
 
     The same build writes any layout/<id>.json; layout_specs reads those.
@@ -228,7 +251,7 @@ def build_specs(root: Path | None = None) -> list[dict]:
     except ValueError as error:
         raise TweakError(str(error)) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
-    context = BuildContext({row["id"]: Path(row["path"]) for row in rows})
+    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root)
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError)
     return _built(rows, "native", exe_patches.validate)
 
@@ -779,7 +802,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
     chosen = _project(chosen)
-    native = build_specs(root)
+    native = build_specs(root, game_root)
     # Fingerprinted after the build, so the fingerprint covers the built files too.
     built = {row["id"]: build_fingerprint(Path(row["path"]))
              for row in tweak_rows(root) if row["enabled"]}
