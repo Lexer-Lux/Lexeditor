@@ -74,6 +74,59 @@ def test_conflicts_are_reported_by_mod_folder(setup):
     assert adapter.conflicts([a], game) == {}
 
 
+def test_conflicts_reuse_the_composition_across_a_reorder(setup, monkeypatch):
+    from core import mods_service
+    from plugins.ds1 import mod_loader
+    game, library, adapter = setup
+    a = data_mod(library, "A", 1, ("EquipParamGoods", 100, "sellValue", 1))
+    b = data_mod(library, "B", 2, ("EquipParamGoods", 100, "sellValue", 2))
+    reads = []
+    real_read = mod_loader.read_mod
+
+    def counting(folder, name):
+        reads.append(name)
+        return real_read(folder, name)
+
+    monkeypatch.setattr(mod_loader, "read_mod", counting)
+    first = adapter.conflicts([a, b], game)
+    assert "B changes this too" in first[str(a.resolve())][0]
+    assert len(reads) == 2
+    # Reordering only rewrites mod.json order keys: no file is re-read,
+    # and the winner flips to the mod that now loads later.
+    mods_service.move(library, str(b), -1)
+    second = adapter.conflicts([b, a], game)
+    assert len(reads) == 2
+    assert "A changes this too" in second[str(b.resolve())][0]
+    # The cached lines match a fresh composition exactly.
+    fresh = Ds1ModAdapter()
+    fresh.attach_context(library_root=library, game_root=game)
+    assert fresh.conflicts([b, a], game) == second
+
+
+def test_conflicts_recompute_when_mod_content_changes(setup, monkeypatch):
+    from plugins.ds1 import mod_loader
+    game, library, adapter = setup
+    a = data_mod(library, "A", 1, ("EquipParamGoods", 100, "sellValue", 1))
+    b = data_mod(library, "B", 2, ("EquipParamGoods", 100, "sellValue", 2))
+    reads = []
+    real_read = mod_loader.read_mod
+
+    def counting(folder, name):
+        reads.append(name)
+        return real_read(folder, name)
+
+    monkeypatch.setattr(mod_loader, "read_mod", counting)
+    adapter.conflicts([a, b], game)
+    assert len(reads) == 2
+    assert adapter.conflicts([a, b], game) == adapter.conflicts([a, b], game)
+    assert len(reads) == 2
+    # A new file in a mod is a content change, whatever the clock says.
+    (a / "map").mkdir(exist_ok=True)
+    (a / "map" / "m10_00_00_00.msb").write_bytes(b"map-bytes")
+    adapter.conflicts([a, b], game)
+    assert len(reads) == 4
+
+
 def test_a_folder_without_mod_files_is_refused_on_import(setup):
     _game, library, adapter = setup
     assert not adapter.inspect(library, [])["valid"]

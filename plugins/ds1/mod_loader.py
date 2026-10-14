@@ -96,40 +96,42 @@ class Composition:
                             {mod.name: str(mod.folder) for mod in mods})
 
 
-def read_mod(folder: Path, name: str) -> Mod | None:
-    """A DS1 data mod's saved files, or None for a folder that is not one."""
+def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
+    """(key, disk path) of every file read_mod would read, without reading.
+
+    The conflict cache stamps these instead of hashing their bytes, so an
+    unchanged library costs stats, not reads. Same enumeration, same limits.
+    """
     from .tweak_mods import checked
     folder = checked(Path(folder))
-    if not (folder / MARKER).is_file():
-        return None
-    files = {}
+    found = []
     for relative in FILES:
         path = checked(folder / relative)
         if not path.is_file():
             continue
         if path.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{name}: {path.name} is too large")
-        files[relative] = path.read_bytes()
+        found.append((relative, path))
     maps = checked(folder / MAP_DIR)
     if maps.is_dir():
-        found = sorted(maps.glob("*.msb"))
-        if len(found) > MAX_MAP_FILES:
+        candidates = sorted(maps.glob("*.msb"))
+        if len(candidates) > MAX_MAP_FILES:
             raise ValueError(f"{name}: too many map files")
-        for path in found:
+        for path in candidates:
             checked(path)
             if path.stat().st_size > MAX_MAP:
                 raise ValueError(f"{name}: {path.name} is too large")
-            files[MAP_DIR / path.name.casefold()] = path.read_bytes()
+            found.append((MAP_DIR / path.name.casefold(), path))
     chars = checked(folder / CHR_DIR)
     if chars.is_dir():
-        found = sorted(chars.glob("*.anibnd.dcx"))
-        if len(found) > MAX_ANIBND_FILES:
+        candidates = sorted(chars.glob("*.anibnd.dcx"))
+        if len(candidates) > MAX_ANIBND_FILES:
             raise ValueError(f"{name}: too many character files")
-        for path in found:
+        for path in candidates:
             checked(path)
             if path.stat().st_size > MAX_BINDER:
                 raise ValueError(f"{name}: {path.name} is too large")
-            files[CHR_DIR / path.name.casefold()] = path.read_bytes()
+            found.append((CHR_DIR / path.name.casefold(), path))
     from . import assets
     try:
         carried = assets.scan_project(folder)
@@ -137,7 +139,19 @@ def read_mod(folder: Path, name: str) -> Mod | None:
         raise ValueError(f"{name}: {error}") from error
     for row in carried:
         relative = Path(row["relative"])
-        files[relative] = (folder / relative).read_bytes()
+        found.append((relative, folder / relative))
+    return found
+
+
+def read_mod(folder: Path, name: str) -> Mod | None:
+    """A DS1 data mod's saved files, or None for a folder that is not one."""
+    from .tweak_mods import checked
+    folder = checked(Path(folder))
+    if not (folder / MARKER).is_file():
+        return None
+    files = {}
+    for key, path in content_files(folder, name):
+        files[key] = path.read_bytes()
     return Mod(name, folder, files)
 
 

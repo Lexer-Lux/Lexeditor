@@ -3304,14 +3304,32 @@
   const MOD_ORDER_TYPE = "application/x-lex-mod";
   const modOrderGestures = ({index, movable, move, controls = "input,button"}) => {
     let controlGesture = false;
+    // The row under the pointer shows where the drop lands: a line above
+    // it or below it, the way a dragged header marks its target cell.
+    const showLine = (row, after) => {
+      row.parentElement?.querySelectorAll(".lex-drop-before,.lex-drop-after").forEach(node => {
+        if (node !== row) node.classList.remove("lex-drop-before", "lex-drop-after");
+      });
+      row.classList.toggle("lex-drop-before", !after);
+      row.classList.toggle("lex-drop-after", after);
+    };
+    const clearLines = row => {
+      row.parentElement?.querySelectorAll(".lex-drop-before,.lex-drop-after").forEach(node =>
+        node.classList.remove("lex-drop-before", "lex-drop-after"));
+    };
+    const pastMiddle = event => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      return event.clientY > rect.top + rect.height / 2;
+    };
     return {
       draggable: "true", tabindex: 0,
-      "aria-description": "Drag onto another mod. Alt+Up or Alt+Down moves one place.",
+      "aria-description": "Drag to a new position. Alt+Up or Alt+Down moves one place.",
       onpointerdown: event => { controlGesture = !!event.target.closest(controls); },
       ondragstart: event => {
         if (controlGesture) { event.preventDefault(); return; }
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData(MOD_ORDER_TYPE, String(index));
+        event.currentTarget.classList.add("dragging");
       },
       onkeydown: event => {
         if (event.target !== event.currentTarget || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
@@ -3320,13 +3338,29 @@
         if (movable(index + by)) move(index, by);
       },
       ondragover: event => {
-        if (event.dataTransfer.types.includes(MOD_ORDER_TYPE)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
+        if (event.dataTransfer.types.includes(MOD_ORDER_TYPE)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          showLine(event.currentTarget, pastMiddle(event));
+        }
+      },
+      ondragleave: event => {
+        event.currentTarget.classList.remove("lex-drop-before", "lex-drop-after");
+      },
+      ondragend: event => {
+        event.currentTarget.classList.remove("dragging");
+        clearLines(event.currentTarget);
       },
       ondrop: event => {
+        clearLines(event.currentTarget);
         const from = Number(event.dataTransfer.getData(MOD_ORDER_TYPE));
         if (!Number.isInteger(from) || !movable(from)) return;
         event.preventDefault();
-        if (from !== index) move(from, index - from);
+        // The line says the slot: above the row takes its place, below it
+        // takes the next one. Beside itself both are a no-op.
+        const slot = pastMiddle(event) ? index + 1 : index;
+        const to = slot <= from ? slot : slot - 1;
+        if (to !== from) move(from, to - from);
       },
     };
   };

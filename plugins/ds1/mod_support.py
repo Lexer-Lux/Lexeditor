@@ -9,7 +9,6 @@ written.
 """
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
 from core import memory_conflicts, mod_requires, script_mods
@@ -133,20 +132,62 @@ class Ds1ModAdapter:
         or enabling anything. A mod carrying a native binary is skipped for
         memory: its addresses are unknowable without running it, so its
         schema's declared conflicts still guard it at enable time.
+
+        The composition is cached by content stats, not hashes: which parts
+        clash never depends on load order, only the said winner does, so a
+        reorder re-sorts the cached names instead of re-reading every byte.
         """
+        from core import mods_service
+        game_root = str(Path(game_root).resolve())
+        library = self._library()
+        wanted = {Path(path).resolve() for path in mods}
+        ordered = [(row["name"], Path(row["path"])) for row in mods_service.library_rows(library)
+                   if Path(row["path"]).resolve() in wanted and (Path(row["path"]) / MARKER).is_file()]
+        if len(ordered) < 2:
+            return _merge_marks({}, self._memory_conflicts(mods))
+        try:
+            stamp = tuple(sorted((str(folder), name, self._content_stamp(folder, name))
+                                 for name, folder in ordered))
+        except OSError:
+            stamp = None
+        if stamp is not None and self._cache and self._cache[0] == (game_root, stamp):
+            data_lines = self._lines_for_order(self._cache[1], ordered)
+            if data_lines is not None:
+                return _merge_marks(data_lines, self._memory_conflicts(mods))
         data = self._mods(mods)
-        data_lines: dict[str, list[str]] = {}
-        if len(data) >= 2:
-            key = tuple((str(mod.folder), tuple(sorted((str(name), hashlib.sha256(raw).hexdigest())
-                                                        for name, raw in mod.files.items()))) for mod in data)
-            key += (str(Path(game_root).resolve()),)
-            if self._cache and self._cache[0] == key:
-                data_lines = self._cache[1]
-            else:
-                composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
-                data_lines = composition.by_mod(data)
-                self._cache = (key, data_lines)
+        composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
+        data_lines = composition.by_mod(data)
+        if stamp is not None:
+            self._cache = ((game_root, stamp),
+                           [(conflict.file, conflict.part, tuple(conflict.mods))
+                            for conflict in composition.conflicts])
         return _merge_marks(data_lines, self._memory_conflicts(mods))
+
+    @staticmethod
+    def _content_stamp(folder: Path, name: str) -> tuple:
+        """What a mod holds, cheaply: names, sizes and change times.
+
+        mod.json is not content: reordering rewrites every mod's order key,
+        which must not look like a changed mod.
+        """
+        stamped = []
+        for key, path in mod_loader.content_files(folder, name):
+            stat = path.stat()
+            stamped.append((str(key), stat.st_size, stat.st_mtime_ns))
+        return tuple(sorted(stamped))
+
+    @staticmethod
+    def _lines_for_order(cached, ordered) -> dict[str, list[str]] | None:
+        """Cached conflict parts said in this load order, or None to recompute."""
+        rank = {name: index for index, (name, _) in enumerate(ordered)}
+        conflicts = []
+        for file, part, names in cached:
+            if any(name not in rank for name in names):
+                return None
+            conflicts.append(mod_loader.Conflict(file, part, sorted(names, key=rank.__getitem__)))
+        # by_mod only reads names and folders, never file bytes.
+        shims = [mod_loader.Mod(name, folder, {}) for name, folder in ordered]
+        return mod_loader.Composition({}, conflicts).by_mod(shims)
 
     def _memory_conflicts(self, mods: list[Path]) -> dict[str, list[str]]:
         """Overlapping native addresses between switched-on mods, by folder.

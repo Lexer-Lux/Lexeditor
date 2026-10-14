@@ -188,6 +188,52 @@ def test_mods_reorder_by_dragging_one_row_onto_another(page):
     assert names.index("Combat") < names.index("Mine"), names
 
 
+def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    rows = page.locator(".lex-mods-page .lex-column-list-row")
+    box = rows.nth(1).bounding_box()
+    top = box["y"] + box["height"] * 0.25
+    bottom = box["y"] + box["height"] * 0.75
+    line = page.evaluate("""([top, bottom]) => {
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const data = new DataTransfer();
+      rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
+      const over = y => rows[1].dispatchEvent(new DragEvent('dragover',
+        {bubbles: true, cancelable: true, dataTransfer: data, clientY: y}));
+      over(top);
+      const upper = rows[1].className;
+      over(bottom);
+      const lower = rows[1].className;
+      rows[1].dispatchEvent(new DragEvent('dragleave', {bubbles: true, dataTransfer: data}));
+      const left = rows[1].className;
+      rows[1].dispatchEvent(new DragEvent('drop',
+        {bubbles: true, cancelable: true, dataTransfer: data, clientY: bottom}));
+      const afterDrop = rows[1].className;
+      return {upper, lower, left, afterDrop};
+    }""", [top, bottom])
+    assert "lex-drop-before" in line["upper"] and "lex-drop-after" not in line["upper"], line
+    assert "lex-drop-after" in line["lower"] and "lex-drop-before" not in line["lower"], line
+    assert "lex-drop-before" not in line["left"] and "lex-drop-after" not in line["left"], line
+    assert "lex-drop-before" not in line["afterDrop"] and "lex-drop-after" not in line["afterDrop"], line
+    page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
+    assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Mine", 1]
+    # Dropping a row beside itself lands where it started: no call.
+    box = page.locator(".lex-mods-page .lex-column-list-row").nth(0).bounding_box()
+    bottom = box["y"] + box["height"] * 0.75
+    before = len(calls(page, "move_mod"))
+    page.evaluate("""bottom => {
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const data = new DataTransfer();
+      rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
+      rows[0].dispatchEvent(new DragEvent('drop',
+        {bubbles: true, cancelable: true, dataTransfer: data, clientY: bottom}));
+    }""", bottom)
+    page.wait_for_timeout(200)
+    assert len(calls(page, "move_mod")) == before
+
+
 def test_a_mods_settings_and_a_downloadable_module(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
