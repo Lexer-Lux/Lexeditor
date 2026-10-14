@@ -13,6 +13,7 @@ from paged_detail import reveal
 from ds1_fixture import make_archive, make_text_archive
 from ds1_stats_fixture import make_stats_archive
 from plugins.ds1 import texts
+from plugins.ds1.charainit import GIFT_FIELDS
 from plugins.ds1.formats import ItemDocument, STATS_FIELDS, STATS_SUBTABS
 from plugins.ds1.store import RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
@@ -80,6 +81,8 @@ def main():
                                 assert abs(value - expected) < 1e-6, (value, expected)
                             low, high = sorted((curve['growth'][0], curve['growth'][1]))
                             assert low <= curve['mid'] <= high, curve
+                        elif tab == 'starting-gifts':
+                            assert set(keys) == set(GIFT_FIELDS), keys
                         else:
                             assert set(keys) == set(STATS_FIELDS[table]), keys
                         control = reveal(page, page.locator('input[data-field-key][type="number"]').first)

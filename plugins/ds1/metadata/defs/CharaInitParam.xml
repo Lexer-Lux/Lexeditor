@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMDEF XmlVersion="1">
+  <DataVersion>1</DataVersion>
+  <BigEndian>false</BigEndian>
+  <Unicode>false</Unicode>
+  <FormatVersion>201</FormatVersion>
+  <ParamType>CHARACTER_INIT_PARAM</ParamType>
+  <Fields>
+    <Field Def="f32 baseRec_mp = 0">
+      <Minimum>0</Minimum>
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="f32 baseRec_sp = 0">
+      <Minimum>0</Minimum>
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="f32 red_Falldam = 0">
+      <Minimum>0</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s32 soul = 0">
+      <Minimum>0</Minimum>
+      <Maximum>1E+07</Maximum>
+    </Field>
+    <Field Def="s32 equip_Wep_Right = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Subwep_Right = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Wep_Left = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Subwep_Left = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Helm = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Armer = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Gaunt = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Leg = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Arrow = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Bolt = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_SubArrow = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_SubBolt = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 equip_Accessory01 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Accessory02 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Accessory03 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Accessory04 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Accessory05 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Skill_01 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Skill_02 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Skill_03 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_01 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_02 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_03 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_04 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_05 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_06 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 equip_Spell_07 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 item_01 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_02 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_03 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_04 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_05 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_06 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_07 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_08 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_09 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 item_10 = -1">
+      <Minimum>-1</Minimum>
+      <Maximum>1E+09</Maximum>
+    </Field>
+    <Field Def="s32 npcPlayerFaceGenId">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="s32 npcPlayerThinkId">
+      <Minimum>-1</Minimum>
+      <Maximum>999999</Maximum>
+    </Field>
+    <Field Def="u16 baseHp">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 baseMp">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 baseSp">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 arrowNum">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 boltNum">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 subArrowNum">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="u16 subBoltNum">
+      <Maximum>999</Maximum>
+    </Field>
+    <Field Def="s16 QWC_sb">
+      <Minimum>-1000</Minimum>
+      <Maximum>1000</Maximum>
+    </Field>
+    <Field Def="s16 QWC_mw">
+      <Minimum>-1000</Minimum>
+      <Maximum>1000</Maximum>
+    </Field>
+    <Field Def="s16 QWC_cd">
+      <Minimum>-1000</Minimum>
+      <Maximum>1000</Maximum>
+    </Field>
+    <Field Def="s16 soulLv">
+      <Minimum>0</Minimum>
+      <Maximum>9999</Maximum>
+    </Field>
+    <Field Def="u8 baseVit">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseWil">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseEnd">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseStr">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseDex">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseMag">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseFai">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseLuc">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseHeroPoint">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 baseDurability">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_01">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_02">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_03">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_04">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_05">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_06">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_07">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_08">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_09">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="u8 itemNum_10">
+      <Maximum>99</Maximum>
+    </Field>
+    <Field Def="s8 bodyScaleHead">
+      <Minimum>-100</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s8 bodyScaleBreast">
+      <Minimum>-100</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s8 bodyScaleAbdomen">
+      <Minimum>-100</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s8 bodyScaleArm">
+      <Minimum>-100</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s8 bodyScaleLeg">
+      <Minimum>-100</Minimum>
+      <Maximum>100</Maximum>
+    </Field>
+    <Field Def="s8 gestureId0">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId1">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId2">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId3">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId4">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId5">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="s8 gestureId6">
+      <Minimum>-1</Minimum>
+    </Field>
+    <Field Def="u8 npcPlayerType"></Field>
+    <Field Def="u8 npcPlayerDrawType"></Field>
+    <Field Def="u8 npcPlayerSex">
+      <Maximum>1</Maximum>
+    </Field>
+    <Field Def="u8 vowType:4">
+      <Maximum>15</Maximum>
+    </Field>
+    <Field Def="dummy8 pad:4" />
+    <Field Def="dummy8 pad0[10]" />
+  </Fields>
+</PARAMDEF>

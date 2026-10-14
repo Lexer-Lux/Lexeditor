@@ -53,7 +53,7 @@ TABLE_NAMES = {"EquipParamGoods": "Items", "EquipParamWeapon": "Weapons",
                "EquipParamProtector": "Armor", "EquipParamAccessory": "Rings", "Magic": "Spells",
                "NpcParam": "Enemies", "AtkParam_Npc": "Attacks", "AtkParam_Pc": "Player attacks",
                "ReinforceParamWeapon": "Weapon upgrades", "ReinforceParamProtector": "Armor upgrades",
-               "EquipMtrlSetParam": "Upgrade materials",
+               "EquipMtrlSetParam": "Upgrade materials", "CharaInitParam": "Starting classes",
                "ItemLotParam": "Drops", "ShopLineupParam": "Shops", "ObjActParam": "Treasure",
                "BehaviorParam": "Behaviors", "NpcThinkParam": "AI",
                "SpEffectParam": "Effects", "Bullet": "Projectiles"}

@@ -25,7 +25,7 @@ class GoodsReferences:
 
     def __init__(self, document):
         self.document = document
-        self.choices = {'-1': 'None'}
+        self.choices = {'-1': 'None', '0': 'None'}
         if GOODS_TABLE not in document.params:
             return
         for row in document.params[GOODS_TABLE].rows:

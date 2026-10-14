@@ -413,7 +413,7 @@ function plainControlFor(row,field){
       commit(row,field,Number(input.value),input);
     }});
 }
-const GROUP_ORDER=["Description","Basics","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
+const GROUP_ORDER=["Description","Basics","Starting gear","Starting spells","Starting items","Body & gestures","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
   "Use behavior","Value & rewards","Appearance","Properties"];
 function groupFor(field){
   if(field.group)return field.group;
@@ -729,7 +729,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing is
   // said under it, never in its place.
-  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
+  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?"Placement":state.tab==="animations"?(state.animScope.level==="chars"?"Character":state.animScope.level==="anims"?"Animation":"Event"):state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="levelup"?"Defense":state.tab==="stats"?(state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):state.tab==="world"?(state.sub==="shops"?"Shop entry":state.sub==="treasure"?"Treasure":"Drop"):"Item";
   const drillRow=state.tab==="animations"&&!state.row?state.rows.find(row=>key(row)===state.selected):null;
   if(drillRow&&isDrillRow(drillRow)){
     const opening=String(drillRow.id).startsWith("char:");
@@ -945,7 +945,7 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations"&&state.sub==="playback")return renderPlayback();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="levelup"?"gains":state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="animations"?(state.animScope.level==="chars"?"characters":state.animScope.level==="anims"?"animations":"events"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="stats"?(state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="world"?(state.sub==="shops"?"shop entries":state.sub==="treasure"?"treasure":"drops"):state.tab==="assets"?"files":"items";
   const label=encumbrance?"Encumbrance":state.tab==="levelup"?"Level-up gains":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
@@ -983,7 +983,9 @@ function renderItems(){
     // have no stored names to change.
     // names: a material set is named by what it spends; the name follows
     // the contents, so there is nothing to rename.
-    renamable:row=>state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
+    // names: starting classes and gifts take fixed reference names;
+    // the game stores no name to change.
+    renamable:row=>state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;

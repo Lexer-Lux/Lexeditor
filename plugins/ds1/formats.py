@@ -18,6 +18,9 @@ from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, d
 from .attacks import ATTACK_FIELDS, AttackReferences
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys, reference_switches
 from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set, goods_keys
+from .charainit import (TABLE as CHARA_TABLE, CLASS_ROWS, GIFT_ROWS, TWINS, UNMIRRORED,
+                        GIFT_FIELDS, GROUPS as CHARA_GROUPS, REF_NOUNS as CHARA_REF_NOUNS,
+                        CatalogReferences, catalog_links)
 
 FormatError = DS3FormatError
 GRAPH_TABLE = 'CalcCorrectGraph'
@@ -28,10 +31,12 @@ TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2),
           'ReinforceParamWeapon': (88, 1), 'ReinforceParamProtector': (48, 1),
           'EquipMtrlSetParam': (32, 1),
+          'CharaInitParam': (240, 2),
           'ItemLotParam': (148, 2), 'ShopLineupParam': (32, 1), 'ObjActParam': (32, 1),
           'NpcThinkParam': (112, 1),
           GRAPH_TABLE: (80, 1)}
-OPTIONAL_TABLES = frozenset({'SpEffectParam', GRAPH_TABLE, 'EquipMtrlSetParam'})
+OPTIONAL_TABLES = frozenset({'SpEffectParam', GRAPH_TABLE, 'EquipMtrlSetParam',
+                             'CharaInitParam'})
 SIZES = {'u8': 1, 's8': 1, 'dummy8': 1, 'u16': 2, 's16': 2,
          'u32': 4, 's32': 4, 'b32': 4, 'f32': 4, 'angle32': 4, 'f64': 8}
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -129,11 +134,15 @@ STATS_SUBTABS = (
     ('weapon-upgrades', 'Weapon upgrades', 'ReinforceParamWeapon'),
     ('armor-upgrades', 'Armor upgrades', 'ReinforceParamProtector'),
     ('upgrade-materials', 'Upgrade materials', 'EquipMtrlSetParam'),
+    ('starting-classes', 'Starting classes', 'CharaInitParam'),
+    ('starting-gifts', 'Starting gifts', 'CharaInitParam'),
 )
-# The Stats tab shows these properties of records it shares with Items. Curves
-# and upgrade levels show every field, so those tables list their whole
-# schema here.
-STATS_WHOLE_TABLES = (GRAPH_TABLE, 'ReinforceParamWeapon', 'ReinforceParamProtector', 'EquipMtrlSetParam')
+# The Stats tab shows these properties of records it shares with Items. Curves,
+# upgrade levels and starting classes show every field, so those tables list
+# their whole schema here. Gifts show only what they grant (STATS_SUB_FIELDS).
+STATS_WHOLE_TABLES = (GRAPH_TABLE, 'ReinforceParamWeapon', 'ReinforceParamProtector',
+                      'EquipMtrlSetParam', 'CharaInitParam')
+STATS_SUB_FIELDS = {'starting-gifts': GIFT_FIELDS}
 STATS_FIELDS = {
     GRAPH_TABLE: ('stageMaxVal0', 'stageMaxVal1', 'stageMaxVal2', 'stageMaxVal3', 'stageMaxVal4',
                   'stageMaxGrowVal0', 'stageMaxGrowVal1', 'stageMaxGrowVal2', 'stageMaxGrowVal3',
@@ -156,11 +165,32 @@ STATS_FIELDS = {
                   'itemNum01', 'itemNum02', 'itemNum03', 'itemNum04', 'itemNum05',
                   'isDisableDispNum01', 'isDisableDispNum02', 'isDisableDispNum03',
                   'isDisableDispNum04', 'isDisableDispNum05'),
+    'CharaInitParam': ('baseRec_mp', 'baseRec_sp', 'red_Falldam', 'soul', 'equip_Wep_Right',
+                  'equip_Subwep_Right', 'equip_Wep_Left', 'equip_Subwep_Left', 'equip_Helm',
+                  'equip_Armer', 'equip_Gaunt', 'equip_Leg', 'equip_Arrow', 'equip_Bolt',
+                  'equip_SubArrow', 'equip_SubBolt', 'equip_Accessory01', 'equip_Accessory02',
+                  'equip_Accessory03', 'equip_Accessory04', 'equip_Accessory05',
+                  'equip_Skill_01', 'equip_Skill_02', 'equip_Skill_03', 'equip_Spell_01',
+                  'equip_Spell_02', 'equip_Spell_03', 'equip_Spell_04', 'equip_Spell_05',
+                  'equip_Spell_06', 'equip_Spell_07', 'item_01', 'item_02', 'item_03',
+                  'item_04', 'item_05', 'item_06', 'item_07', 'item_08', 'item_09', 'item_10',
+                  'npcPlayerFaceGenId', 'npcPlayerThinkId', 'baseHp', 'baseMp', 'baseSp',
+                  'arrowNum', 'boltNum', 'subArrowNum', 'subBoltNum', 'QWC_sb', 'QWC_mw',
+                  'QWC_cd', 'soulLv', 'baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex',
+                  'baseMag', 'baseFai', 'baseLuc', 'baseHeroPoint', 'baseDurability',
+                  'itemNum_01', 'itemNum_02', 'itemNum_03', 'itemNum_04', 'itemNum_05',
+                  'itemNum_06', 'itemNum_07', 'itemNum_08', 'itemNum_09', 'itemNum_10',
+                  'bodyScaleHead', 'bodyScaleBreast', 'bodyScaleAbdomen', 'bodyScaleArm',
+                  'bodyScaleLeg', 'gestureId0', 'gestureId1', 'gestureId2', 'gestureId3',
+                  'gestureId4', 'gestureId5', 'gestureId6', 'npcPlayerType',
+                  'npcPlayerDrawType', 'npcPlayerSex', 'vowType',),
 }
 
 
 def stats_fields(sub, table):
     """A Stats subtab's field filter for a record, or None for every field."""
+    if sub in STATS_SUB_FIELDS:
+        return STATS_SUB_FIELDS[sub]
     match = next((entry for entry in STATS_SUBTABS if entry[0] == sub), None)
     if match is None or match[2] != table or table in STATS_WHOLE_TABLES:
         return None
@@ -342,6 +372,8 @@ def schema(table):
         slot = key[-2:] if table == MATERIAL_TABLE else ''
         if slot in ('01', '02', '03', '04', '05'):
             group = f'Material {int(slot)}'
+        if table == CHARA_TABLE and key in CHARA_GROUPS:
+            group = CHARA_GROUPS[key]
         if table == EFFECT_TABLE:
             label, group, description = presentation(key, label, description)
         enum_name = attrs.get('Enum') or node.findtext('Enum')
@@ -349,6 +381,8 @@ def schema(table):
         choices = _enum(enum_name) if enum_name else {}
         if table in ('AtkParam_Npc', 'AtkParam_Pc') and key == 'atkAttribute':
             choices = {**choices, '0': 'Standard'}
+        if table == CHARA_TABLE and key == 'vowType':
+            choices = {code: name for code, name in choices.items() if int(code) <= 9}
         padding = dtype == 'dummy8' or 'Padding' in attrs or key.lower().startswith('pad')
         # Goods and Magic carry sixteen one-bit covenant slots. Their own
         # annotations named them differently (Goods by number only, Magic by
@@ -431,6 +465,7 @@ class ItemDocument:
         self._rows_by_id = {}
         self._effects = None
         self._goods = None
+        self._catalogs = {}
         self.schemas = {table: schema(table) for table in TABLES}
         self.dirty = set()
         # Rows this session added (no original bytes) and removed, by identity.
@@ -475,6 +510,8 @@ class ItemDocument:
 
     def _change_key(self, table, row_id, key):
         """The change a stored field belongs to, as the reader made it."""
+        if table == CHARA_TABLE and row_id in TWINS and row_id not in CLASS_ROWS and row_id not in GIFT_ROWS:
+            return (table, TWINS[row_id], key)
         if table == EFFECT_TABLE and key.endswith('DamageCutRate') and row_id >= ABSORPTION_BASE:
             if row_id >= ENEMY_ABSORPTION_BASE:
                 return ('NpcParam', row_id - ENEMY_ABSORPTION_BASE, 'absorption:' + key)
@@ -574,6 +611,7 @@ class ItemDocument:
         self.texts.rename(table, row_id, name)
         self._effects = None  # effect choices and links are listed by name
         self._goods = None  # goods picker choices are listed by name
+        self._catalogs = {}  # weapon, armor, ring and spell picker choices are listed by name
         return self.read_row(table, row_id, only=only)
 
     def _description_fields(self, table, row_id):
@@ -613,6 +651,7 @@ class ItemDocument:
         values, display = {}, {}
         linked_effects = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
         linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
+        linked_catalogs = catalog_links(self, table)
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if field.padding or field.array_length != 1: continue
@@ -624,6 +663,9 @@ class ItemDocument:
                 display[field.key] = self.effect_references().choices.get(str(value), f'Unknown ({value})')
             elif field.key in linked_goods:
                 display[field.key] = self.goods_references().choices.get(str(value), f'Unknown ({value})')
+            elif field.key in linked_catalogs:
+                catalog = self.catalog_references(linked_catalogs[field.key]).choices
+                display[field.key] = catalog.get(str(value), f'Unknown ({value})')
             elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
         if table in ('EquipParamProtector', 'NpcParam'):
             # Pinned absorption columns read row values, like every other
@@ -655,6 +697,12 @@ class ItemDocument:
         if self._goods is None:
             self._goods = GoodsReferences(self)
         return self._goods
+
+    def catalog_references(self, table):
+        """A linked catalog table as picker choices, read once per document."""
+        if table not in self._catalogs:
+            self._catalogs[table] = CatalogReferences(self, table)
+        return self._catalogs[table]
 
     def list_rows(self, tab):
         if tab in {entry[0] for entry in EFFECT_SUBTABS}:
@@ -694,7 +742,7 @@ class ItemDocument:
         return result
 
     def _stats_rows(self, tab):
-        """One Stats subtab: every curve, upgrade or material-set row."""
+        """One Stats subtab: every curve, upgrade, material-set, class or gift row."""
         if tab == 'curves':
             if GRAPH_TABLE not in self.params:
                 raise FormatError('CalcCorrectGraph.param is missing. Open a complete Remastered parameter archive.')
@@ -703,8 +751,15 @@ class ItemDocument:
             table = next(entry[2] for entry in STATS_SUBTABS if entry[0] == tab)
             if table not in self.params:
                 raise FormatError(f'{table}.param is missing. Open a complete Remastered parameter archive.')
+        wanted = None
+        if tab == 'starting-classes':
+            wanted = set(CLASS_ROWS)
+        elif tab == 'starting-gifts':
+            wanted = set(GIFT_ROWS)
         result = []
         for row in self.params[table].rows:
+            if wanted is not None and row.row_id not in wanted:
+                continue
             values, display = self.row_values(table, row.row_id)
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
                            'table': table, 'values': values, 'display': display})
@@ -791,6 +846,7 @@ class ItemDocument:
         spans = self._value_spans(table)
         effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
         linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
+        linked_catalogs = catalog_links(self, table)
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if table == 'NpcParam' and field.key not in NPC_FIELDS:
@@ -813,6 +869,8 @@ class ItemDocument:
                 options = self.effect_references().choices
             elif field.key in linked_goods:
                 options = self.goods_references().choices
+            elif field.key in linked_catalogs:
+                options = self.catalog_references(linked_catalogs[field.key]).choices
             else:
                 options = item['enum']
             # A float the PARAMDEF leaves unbounded shows no range: dtype
@@ -821,7 +879,8 @@ class ItemDocument:
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
-                           field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE, MATERIAL_TABLE) else '',
+                           field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
+                           MATERIAL_TABLE, CHARA_TABLE) else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
@@ -1002,6 +1061,8 @@ class ItemDocument:
         self._write(table, row_id, key, value)
         if table == 'ReinforceParamProtector' and key in UPGRADE_MULTIPLIERS.values():
             self._rescale_absorption(row_id, key)
+        if table == CHARA_TABLE and row_id in TWINS and key not in UNMIRRORED:
+            self._write(CHARA_TABLE, TWINS[row_id], key, value)
         return self.read_row(table, row_id, only=only)
 
     def _rescale_absorption(self, reinforce_id, column):
@@ -1046,6 +1107,9 @@ class ItemDocument:
         links_goods = GOODS_TABLE in self.params and key in set(goods_keys(self, table, row_id))
         if links_goods and str(int(value)) not in self.goods_references().choices:
             raise FormatError('Choose an existing item or None')
+        links_catalog = catalog_links(self, table).get(key)
+        if links_catalog and str(int(value)) not in self.catalog_references(links_catalog).choices:
+            raise FormatError(f'Choose an existing {CHARA_REF_NOUNS[links_catalog]} or None')
         added = (table, row_id) in self._added_rows
         original = None if added else self.original_plain[start:start + len(data)]
         # A value that reads the same as the saved one IS the saved one. The
@@ -1085,6 +1149,7 @@ class ItemDocument:
         self._rows_by_id[table] = {row.row_id: row for row in param.rows}
         self._effects = None
         self._goods = None
+        self._catalogs = {}
         self.__dict__.pop('_attack_references', None)
         self.__dict__.get('_spans_cache', {}).pop(table, None)
 

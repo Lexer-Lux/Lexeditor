@@ -1,4 +1,4 @@
-"""Stats tab: curves, upgrades and materials."""
+"""Stats tab: curves, upgrades, materials, classes and gifts."""
 import json
 from pathlib import Path
 import sys
@@ -8,7 +8,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
-from ds1_stats_fixture import make_stats_archive, CURVE_ROWS, MATERIAL_ROWS
+from ds1_stats_fixture import make_stats_archive, CURVE_ROWS, MATERIAL_ROWS, CHARA_ROWS
+from plugins.ds1.charainit import GIFT_FIELDS
 from plugins.ds1 import data_map
 from plugins.ds1.formats import (
     GRAPH_TABLE, STATS_FIELDS, STATS_SUBTABS, TABLES, FormatError, ItemDocument,
@@ -45,7 +46,8 @@ def test_curve_metadata_matches_vanilla_shape():
 def test_stats_subtabs_list_their_rows():
     document = ItemDocument(make_stats_archive())
     assert [entry[0] for entry in STATS_SUBTABS] == ['curves', 'weapon-upgrades',
-                                                      'armor-upgrades', 'upgrade-materials']
+                                                      'armor-upgrades', 'upgrade-materials',
+                                                      'starting-classes', 'starting-gifts']
     curves = document.list_rows('curves')
     assert {row['id'] for row in curves} == set(CURVE_ROWS)
     assert all(row['table'] == GRAPH_TABLE for row in curves)
@@ -76,6 +78,8 @@ def test_stats_detail_shows_only_stat_fields():
     assert stats_fields('weapon-upgrades', 'ReinforceParamWeapon') is None
     assert stats_fields('armor-upgrades', 'ReinforceParamProtector') is None
     assert stats_fields('upgrade-materials', 'EquipMtrlSetParam') is None
+    assert stats_fields('starting-classes', 'CharaInitParam') is None
+    assert stats_fields('starting-gifts', 'CharaInitParam') == GIFT_FIELDS
     weapon_fields = ('properStrength', 'properAgility', 'properMagic', 'properFaith',
                      'correctStrength', 'correctAgility', 'correctMagic', 'correctFaith',
                      'correctType', 'isLuckCorrect', 'levelSyncCorrectID')
@@ -117,7 +121,8 @@ def test_stats_detail_shows_only_stat_fields():
     assert picker['type'] == 'enum'
     assert picker['enum']['-1'] == 'None'
     assert picker['enum']['100'] == document.display_name('EquipParamGoods', 100)
-    assert set(picker['enum']) == {'-1', '100', '101', '102'}
+    assert picker['enum']['0'] == 'None'
+    assert set(picker['enum']) == {'-1', '0', '100', '101', '102'}
     count = next(field for field in sets['fields'] if field['key'] == 'itemNum01')
     assert count['type'] == 'number' and (count['minimum'], count['maximum']) == (-1, 99)
     hide = next(field for field in sets['fields'] if field['key'] == 'isDisableDispNum01')
@@ -180,12 +185,14 @@ def test_state_reports_stats_tabs(tmp_path):
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 3),
-        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
+        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3),
+        ('starting-classes', 1), ('starting-gifts', 2)]
     game, mod = project(tmp_path / 'plain', make_archive())
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 0),
-        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 0)]
+        ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 0),
+        ('starting-classes', 0), ('starting-gifts', 0)]
 
 
 def test_data_map_points_curves_at_stats(tmp_path):
@@ -218,7 +225,8 @@ def test_service_row_sub_filters_stats_fields(tmp_path):
         assert 'stats' in request('/api/plugin')['capabilities']
         assert [(tab['id'], tab['count']) for tab in request('/api/state')['statsTabs']] == [
             ('curves', 3),
-            ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3)]
+            ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3),
+            ('starting-classes', 1), ('starting-gifts', 2)]
         assert {row['id'] for row in request('/api/table?tab=curves')['rows']} == set(CURVE_ROWS)
         full = request('/api/row?table=EquipParamWeapon&id=100')['row']
         assert {'properStrength', 'properAgility', 'properMagic', 'properFaith',
@@ -330,3 +338,128 @@ def test_material_edits_roundtrip_and_validate():
         except FormatError:
             continue
         raise AssertionError(f'material {key}={value} was accepted')
+
+
+def test_charainit_metadata_matches_vanilla_shape():
+    assert TABLES['CharaInitParam'] == (240, 2)
+    definition = schema('CharaInitParam')
+    assert definition['type'] == 'CHARACTER_INIT_PARAM' and definition['size'] == 240
+    assert definition['names'][3000] == 'Warrior' and definition['names'][2405] == 'Pendant'
+    by_key = {item['spec'].key: item for item in definition['fields']}
+    assert by_key['soulLv']['min'] == 0 and by_key['soulLv']['max'] == 9999
+    assert by_key['baseVit']['min'] == 0 and by_key['baseVit']['max'] == 99
+    assert by_key['itemNum_01']['max'] == 99
+    assert by_key['baseDurability']['spec'].label == 'Resistance'
+    assert by_key['baseLuc']['spec'].label == 'Unknown value 1'
+    assert not by_key['baseLuc']['editable'] and not by_key['baseHeroPoint']['editable']
+    assert by_key['vowType']['enum'] == {str(code): f'Covenant: {name}' for code, name in {
+        0: 'None', 1: 'Way of White', 2: 'Princess Guard', 3: 'Warrior of Sunlight',
+        4: 'Darkwraith', 5: 'Path of the Dragon', 6: 'Gravelord Servant',
+        7: 'Forest Hunter', 8: 'Blade of the Dark Moon', 9: 'Chaos Servant'}.items()}
+    assert by_key['npcPlayerSex']['enum'] == {'0': 'Female', '1': 'Male'}
+    assert by_key['npcPlayerDrawType']['enum']['4'] == 'Ghoul Body'
+    assert by_key['equip_Wep_Right']['spec'].reference == 'EquipParamWeapon'
+    assert by_key['equip_Helm']['spec'].reference == 'EquipParamProtector'
+    assert by_key['equip_Accessory01']['spec'].reference == 'EquipParamAccessory'
+    assert by_key['equip_Spell_01']['spec'].reference == 'Magic'
+    assert by_key['item_01']['spec'].reference == 'EquipParamGoods'
+
+
+def test_class_lists_show_kits_and_gifts():
+    document = ItemDocument(make_stats_archive())
+    classes = document.list_rows('starting-classes')
+    assert {row['id'] for row in classes} == {3000}
+    assert all(row['table'] == 'CharaInitParam' for row in classes)
+    assert next(row['name'] for row in classes if row['id'] == 3000) == 'Warrior'
+    assert 2000 not in {row['id'] for row in classes}
+    gifts = document.list_rows('starting-gifts')
+    assert {row['id'] for row in gifts} == {2405, 2407}
+    assert next(row['name'] for row in gifts if row['id'] == 2405) == 'Pendant'
+    assert next(row['name'] for row in gifts if row['id'] == 2407) == "Tiny Being's Ring"
+    row = document.read_row('CharaInitParam', 3000)
+    groups = {field['key']: field['group'] for field in row['fields']}
+    assert groups['baseVit'] == 'Basics' and groups['soulLv'] == 'Basics'
+    assert groups['equip_Wep_Right'] == 'Starting gear' and groups['equip_Helm'] == 'Starting gear'
+    assert groups['equip_Spell_01'] == 'Starting spells'
+    assert groups['item_01'] == 'Starting items' and groups['itemNum_01'] == 'Starting items'
+    assert groups['gestureId0'] == 'Body & gestures'
+    assert all(field['editable'] for field in row['fields']
+               if field['key'] not in ('baseLuc', 'baseHeroPoint'))
+
+
+def test_class_edits_mirror_the_twin():
+    document = ItemDocument(make_stats_archive())
+    document.edit('CharaInitParam', 3000, 'baseVit', 12)
+    assert document.value('CharaInitParam', 3000, 'baseVit') == 12
+    assert document.value('CharaInitParam', 2000, 'baseVit') == 12
+    document.edit('CharaInitParam', 3000, 'npcPlayerDrawType', 1)
+    assert document.value('CharaInitParam', 3000, 'npcPlayerDrawType') == 1
+    assert document.value('CharaInitParam', 2000, 'npcPlayerDrawType') == 4
+    assert document.pending_changes() == [
+        {'label': 'Warrior \u00b7 Draw type', 'before': 0, 'after': 1},
+        {'label': 'Warrior \u00b7 Vitality', 'before': 11, 'after': 12}]
+    reopened = ItemDocument(document.export())
+    assert reopened.value('CharaInitParam', 2000, 'baseVit') == 12
+    assert reopened.value('CharaInitParam', 2000, 'npcPlayerDrawType') == 4
+
+
+def test_gifts_show_only_what_they_grant():
+    document = ItemDocument(make_stats_archive())
+    row = document.read_row('CharaInitParam', 2405,
+                            only=stats_fields('starting-gifts', 'CharaInitParam'))
+    assert {field['key'] for field in row['fields']} == set(GIFT_FIELDS)
+    assert all(field['editable'] for field in row['fields'])
+    values, display = document.row_values('CharaInitParam', 2405)
+    assert (values['item_01'], display['item_01'], values['itemNum_01']) == (
+        100, document.display_name('EquipParamGoods', 100), 1)
+    assert display['item_02'] == 'None' and display['equip_Accessory02'] == 'None'
+    values, display = document.row_values('CharaInitParam', 2407)
+    assert (values['equip_Accessory01'], display['equip_Accessory01']) == (
+        100, document.display_name('EquipParamAccessory', 100))
+
+
+def test_gear_pickers_offer_live_names():
+    document = ItemDocument(make_stats_archive())
+    row = document.read_row('CharaInitParam', 3000)
+    by_key = {field['key']: field for field in row['fields']}
+    assert by_key['equip_Wep_Right']['type'] == 'enum'
+    assert set(by_key['equip_Wep_Right']['enum']) >= {'-1', '0', '100', '101', '102'}
+    assert by_key['equip_Wep_Right']['enum']['100'] == document.display_name('EquipParamWeapon', 100)
+    assert set(by_key['equip_Helm']['enum']) >= {'-1', '0', '100', '101', '102'}
+    assert set(by_key['equip_Spell_01']['enum']) >= {'-1', '0', '100', '101', '102'}
+    document.edit('CharaInitParam', 3000, 'equip_Wep_Right', 101)
+    assert document.value('CharaInitParam', 3000, 'equip_Wep_Right') == 101
+    document.edit('CharaInitParam', 3000, 'equip_Wep_Right', -1)
+    for key, noun in (('equip_Wep_Right', 'weapon'), ('equip_Helm', 'armor piece'),
+                      ('equip_Accessory01', 'accessory'), ('equip_Spell_01', 'spell')):
+        try:
+            document.edit('CharaInitParam', 3000, key, 999)
+        except FormatError as error:
+            assert str(error) == f'Choose an existing {noun} or None'
+            continue
+        raise AssertionError(f'class {key}=999 was accepted')
+
+
+def test_classes_need_the_table():
+    document = ItemDocument(make_archive())
+    assert 'CharaInitParam' not in document.params
+    try:
+        document.list_rows('starting-classes')
+    except FormatError as error:
+        assert 'CharaInitParam.param is missing' in str(error)
+    else:
+        raise AssertionError('starting classes listed without their table')
+    try:
+        document.list_rows('starting-gifts')
+    except FormatError:
+        pass
+    else:
+        raise AssertionError('starting gifts listed without their table')
+
+
+def test_data_map_points_classes_at_stats(tmp_path):
+    game, mod = project(tmp_path)
+    rows = data_map.payload(ItemStore(game, mod, False))['rows']
+    chara = next(row for row in rows if row['filename'] == 'CharaInitParam.param')
+    assert chara['coverage'] == 'structured' and chara['status'] == 'partial'
+    assert chara['openable'] and chara['target'] == 'stats' and chara['sub'] == 'starting-classes'

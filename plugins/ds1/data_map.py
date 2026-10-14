@@ -59,6 +59,10 @@ def payload(store, native_rules=None, theme=None):
             row.update(coverage='structured',status='partial',openable=True,
                 target='stats',sub='upgrade-materials',controls='Stats: upgrade material sets',
                 notes='Edit the items each upgrade level spends, and how many of each.')
+        elif table == 'CharaInitParam':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='stats',sub='starting-classes',controls='Stats: starting classes and gifts',
+                notes='Edit starting classes and what each starting gift grants. Other rows in this table stay read-only.')
         elif table == 'ItemLotParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='world',sub='drops',controls='World: enemy and corpse drops',
@@ -81,10 +85,6 @@ def payload(store, native_rules=None, theme=None):
             row.update(coverage='structured',status='partial',openable=True,
                 target='stats',sub='curves',controls='Stats: weapon, level-up and resistance scaling curves',
                 notes=f'{len(editable)} curve properties are editable. The multiplayer level-sync rows keep the game\'s own reference names.')
-        elif table in ('BehaviorParam','Bullet'):
-            row.update(coverage='view',status='partial',openable=True,
-                target='enemies',sub='monsters',controls='Enemies: attack reference paths',
-                notes='These records connect enemies to their attacks. The Enemies view shows those paths; it does not edit these tables.')
         rows.append(row)
     if EFFECT_TABLE not in document.params:
         rows.append({'id':'effects-missing', 'filename':EFFECT_TABLE + '.param', 'path':str(store.source),
