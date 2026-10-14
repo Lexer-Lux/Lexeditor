@@ -452,6 +452,223 @@ def _vec4(entry, what):
     return [float(value) for value in entry]
 
 
+class _PeekUnsupported(Exception):
+    """A layout the scalar peek does not map; the caller reads it fully."""
+
+
+def _peek_tables(data):
+    """Sections, types and item table: the same preamble a full read
+    walks, kept separate so the tested full path stays untouched."""
+    root, _ = _section(data, 0)
+    if root['sig'] != 'TAG0':
+        raise HkxError('Expected a Havok TAG0 file')
+    data_off, types, items = None, None, None
+    for sub in root['subs']:
+        if sub['sig'] == 'SDKV':
+            version = data[sub['pos']:sub['pos'] + 8].decode('ascii', 'replace')
+            if version not in SDK_VERSIONS:
+                raise HkxError(f'A Havok file needs SDK {version}')
+        elif sub['sig'] == 'DATA':
+            data_off = sub['pos']
+        elif sub['sig'] == 'TYPE':
+            types = _read_types(data, sub)
+        elif sub['sig'] == 'INDX':
+            for part in sub['subs']:
+                if part['sig'] == 'ITEM':
+                    items = (part, types)
+                elif part['sig'] != 'PTCH':
+                    raise HkxError(f'A Havok index holds {part["sig"]}')
+        elif sub['sig'] == 'TCRF':
+            raise HkxError('A Havok file needs a type compendium it does not carry')
+        else:
+            raise HkxError(f'A Havok file holds {sub["sig"]}')
+    if data_off is None or types is None or items is None:
+        raise HkxError('A Havok file is missing its data, types or items')
+    entries = _items(data, items[0], data_off, items[1])
+    if len(entries) < 2:
+        raise HkxError('A Havok file names no root object')
+    return entries
+
+
+def _peek_field(node_type, name):
+    for field in node_type.all_fields():
+        if field['name'] == name:
+            return field
+    return None
+
+
+def _peek_scalar(data, field_type, off):
+    """One integer or float where the full reader would walk a value."""
+    form = field_type.kind
+    if form == INT:
+        bits, signed = field_type.bits, field_type.signed
+        if bits not in (8, 16, 32, 64):
+            raise HkxError('A Havok integer has an unknown width')
+        code = {8: 'b', 16: 'h', 32: 'i', 64: 'q'}[bits] if signed else \
+            {8: 'B', 16: 'H', 32: 'I', 64: 'Q'}[bits]
+        size = bits // 8
+        if not 0 <= off <= len(data) - size:
+            raise HkxError('A Havok file ends early')
+        return struct.unpack_from('<' + code, data, off)[0]
+    if form == FLOAT:
+        wide = field_type.float_kind()
+        size = {'half': 2, 'single': 4, 'double': 8}[wide]
+        if not 0 <= off <= len(data) - size:
+            raise HkxError('A Havok file ends early')
+        return struct.unpack_from('<' + {'half': 'e', 'single': 'f', 'double': 'd'}[wide],
+                                  data, off)[0]
+    raise _PeekUnsupported(form)
+
+
+def _peek_ref(data, entries, field_type, off):
+    """An object reference as (type, address, count): pointers hop to
+    their item, dynamic arrays read their item index, fixed arrays and
+    inline objects read in place. A null pointer is None."""
+    form = field_type.kind
+    if form in (PTR, ARRAY) and (form == PTR or not field_type.fixed):
+        at, _ = _i32(data, off)
+        if at == 0:
+            return None
+        if not 0 <= at < len(entries):
+            raise HkxError('A Havok item index is out of range')
+        target = entries[at]
+        if target['type'] is None:
+            return None
+        return target['type'], target['pos'], target['count']
+    if form == ARRAY:
+        sub = field_type.resolve_subtype()
+        if sub is None:
+            raise _PeekUnsupported('untyped-array')
+        if field_type.fixed_size > MAX_COUNT:
+            raise HkxError('A Havok array is too long')
+        return sub, off, field_type.fixed_size
+    if form == CLASS:
+        return field_type, off, 1
+    if form in (VOID, OPAQUE):
+        return None
+    raise _PeekUnsupported(form)
+
+
+def _peek_element(data, entries, ref, num):
+    """One element's (type, address): pointer slots hop per element."""
+    node_type, pos, _count = ref
+    if node_type.kind == PTR:
+        at, _ = _i32(data, pos + num * 4)
+        if at == 0:
+            return None
+        if not 0 <= at < len(entries):
+            raise HkxError('A Havok item index is out of range')
+        target = entries[at]
+        if target['type'] is None:
+            return None
+        return target['type'], target['pos']
+    return node_type, pos + num * node_type.resolve_size()
+
+
+def peek_animation(source):
+    """A motion file's headline (duration, frames) without its curves.
+
+    The motion list only names files; parsing every track array to
+    list them wedged the Animations tab for half a minute on the
+    player's binder. The peek walks to the first animation object and
+    reads its scalar header, never materializing an array, with the
+    same header checks the full reader applies. Files with no
+    animation or no binding are None, skipped like the full reader
+    skips them. A file whose header is sound but whose curves are
+    corrupt lists as playable and fails loudly when sampled.
+    """
+    try:
+        if len(source) > MAX_FILE:
+            raise HkxError('The Havok file is too large')
+        data = bytes(source)
+        entries = _peek_tables(data)
+        root = entries[1]
+        if root['type'] is None or root['type'].name != 'hkRootLevelContainer':
+            raise HkxError('A Havok file has no animation container')
+        field = _peek_field(root['type'], 'namedVariants')
+        if field is None:
+            return None
+        variants = _peek_ref(data, entries, field['type'], root['pos'] + field['offset'])
+        if variants is None:
+            return None
+        first, bound = None, False
+        for num in range(variants[2]):
+            element = _peek_element(data, entries, variants, num)
+            if element is None:
+                continue
+            node_type, addr = element
+            field = _peek_field(node_type, 'variant')
+            if field is None:
+                continue
+            target = _peek_ref(data, entries, field['type'], addr + field['offset'])
+            if target is None:
+                continue
+            container_type, container_addr, _ = target
+            anims_field = _peek_field(container_type, 'animations')
+            binds_field = _peek_field(container_type, 'bindings')
+            if anims_field is None or binds_field is None:
+                continue
+            anims = _peek_ref(data, entries, anims_field['type'],
+                              container_addr + anims_field['offset'])
+            binds = _peek_ref(data, entries, binds_field['type'],
+                              container_addr + binds_field['offset'])
+            if binds is not None and binds[2] > 0:
+                bound = True
+            if first is None and anims is not None and anims[2] > 0:
+                element = _peek_element(data, entries, anims, 0)
+                if element is not None:
+                    first = element
+        if first is None or not bound:
+            return None
+        kind, addr = first[0].name, first[1]
+        fields = {field['name']: field for field in first[0].all_fields()}
+
+        def scalar(name, default):
+            field = fields.get(name)
+            if field is None:
+                return default
+            return _peek_scalar(data, field['type'], addr + field['offset'])
+
+        if kind == 'hkaSplineCompressedAnimation':
+            if scalar('numberOfFloatTracks', 0):
+                raise HkxError('A Havok animation has float tracks, which playback does not read')
+            frames = scalar('numFrames', 0)
+            blocks = scalar('numBlocks', 0)
+            per_block = scalar('maxFramesPerBlock', 0)
+            if frames < 2 or blocks < 1 or per_block < 2:
+                raise HkxError('A Havok animation has no frames to play')
+            tracks = scalar('numberOfTransformTracks', 0)
+            if tracks < 1:
+                raise HkxError('A Havok animation names no tracks')
+            if tracks > MAX_COUNT:
+                raise HkxError('A Havok animation names too many tracks')
+            return {'duration': float(scalar('duration', 0.0)), 'frames': frames}
+        if kind == 'hkaInterleavedUncompressedAnimation':
+            tracks = scalar('numberOfTransformTracks', 0)
+            if tracks > MAX_COUNT:
+                raise HkxError('A Havok animation names too many tracks')
+            count = 0
+            field = fields.get('transforms')
+            if field is not None:
+                ref = _peek_ref(data, entries, field['type'], addr + field['offset'])
+                count = ref[2] if ref is not None else 0
+            frames = count // tracks if tracks else 0
+            if frames < 2 or not tracks:
+                raise HkxError('A Havok animation has no frames to play')
+            return {'duration': float(scalar('duration', 0.0)), 'frames': frames}
+        raise HkxError(f'A Havok animation is {kind}, which playback does not read')
+    except _PeekUnsupported:
+        raise
+    except HkxError:
+        raise
+    except RecursionError:
+        raise HkxError('Havok types loop back on themselves') from None
+    except (IndexError, struct.error, UnicodeDecodeError,
+            ValueError, TypeError, KeyError, AttributeError,
+            MemoryError) as error:
+        raise HkxError(f'A Havok file is malformed: {error}') from error
+
+
 def _skeleton(node):
     bones = [{'name': bone.get('name')} for bone in node.get('bones') or []]
     pose = []

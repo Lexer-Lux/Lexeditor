@@ -32,7 +32,10 @@
   --lex-detail-title-fg:#f6eeda;--lex-detail-id-fg:#a79b80;
   --lex-heading-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-radius:3px;
   --lex-detail-icon-bg:#241f15;--lex-detail-icon-fg:#e8c67a;
-  --lex-loading-color:#a4824c;}
+  --lex-loading-color:#a4824c;
+  /* The record's own picture stays with its name on the header's left,
+     whether or not a model preview is attached. */
+  --lex-preview-icon-side:left;}
 
 .lex-goto-button,.lex-header-icon{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
 .lex-goto-button:hover,.lex-header-icon:hover{opacity:1;}
