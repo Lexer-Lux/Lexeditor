@@ -279,3 +279,15 @@ def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
         pytest.approx([-5, -4.9, -2.5, -5], abs=1e-4)
     for bad in (-101, 100):
         with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
+
+
+def test_armor_and_shield_guard_fields_carry_glyph_kinds():
+    document = ItemDocument(make_archive())
+    armor = {field['key']: field.get('icon', '')
+             for field in document.read_row('EquipParamProtector', 100)['fields']}
+    assert armor['defenseThunder'] == 'lightning'
+    assert armor['resistBlood'] == 'bleed'
+    guard = {field['key']: field.get('icon', '')
+             for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert guard['thunGuardCutRate'] == 'lightning'
+    assert guard['curseGuardResist'] == 'curse'

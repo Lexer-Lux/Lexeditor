@@ -4,7 +4,7 @@ from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance', 'levelup':'Level-up gains',
-              'maps':'Maps', 'animations':'Animations', 'world':'World', 'assets':'Assets'}
+              'maps':'Maps', 'animations':'Animations', 'assets':'Assets'}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -65,16 +65,16 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit starting classes and what each starting gift grants. Other rows in this table stay read-only.')
         elif table == 'ItemLotParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='world',sub='drops',controls='World: enemy and corpse drops',
-                notes='Edit dropped items and their rates. One lot may be shared by several enemies.')
+                target='maps',sub='drops',controls='Maps: enemy and corpse drops',
+                notes='Edit dropped items and their rates in the directory. One lot may be shared by several enemies.')
         elif table == 'ShopLineupParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='world',sub='shops',controls='World: merchant stock and prices',
-                notes='Edit what each merchant sells, and at what price.')
+                target='maps',sub='shops',controls='Maps: merchant stock and prices',
+                notes='Edit what each merchant sells, and at what price, in the directory.')
         elif table == 'ObjActParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='world',sub='treasure',controls='World: treasure and pickup behavior',
-                notes='Edit how treasure chests and pickups behave.')
+                target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',
+                notes='Edit how treasure chests and pickups behave in the directory.')
         elif table == EFFECT_TABLE:
             editable = [f for f in document.schemas.get(table, {}).get('fields', []) if f['editable']]
             row.update(coverage='structured',status='partial',openable=True,

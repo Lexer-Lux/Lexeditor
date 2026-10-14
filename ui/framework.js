@@ -2505,15 +2505,31 @@
     options.footer ? element("div", {class:"lex-stat-card-footer"}, options.footer) : null);
 
   const choicePopover = (options = {}) => {
-    const popup = element("div", {class:"lex-choice-popover",popover:"auto",role:"group",
-      "aria-label":options.label || "Choose a value"}, ...(options.choices || []).map(choice =>
+    const buttons=(options.choices || []).map(choice =>
       element("button", {type:"button","aria-label":choice.label,onclick:()=>{popup.hidePopover();options.select?.(choice.value);}},
-        choice.icon || null, element("span",{},choice.label))));
+        choice.icon || null, element("span",{},choice.label)));
+    const popup = element("div", {class:"lex-choice-popover",popover:"auto",role:"group",
+      "aria-label":options.label || "Choose a value"});
+    // A long choice list filters as the reader types, so a 4,000-effect
+    // picker stays usable where a dropdown would freeze the pane.
+    if (options.search) {
+      const box = element("input", {type:"search", class:"lex-choice-popover-search",
+        placeholder:typeof options.search === "string" ? options.search : "Search",
+        "aria-label":typeof options.search === "string" ? options.search : "Search choices"});
+      box.addEventListener("input", () => {
+        const needle = box.value.trim().toLocaleLowerCase();
+        buttons.forEach((button, index) => {
+          const label = String((options.choices || [])[index]?.label || "");
+          button.hidden = !!needle && !label.toLocaleLowerCase().includes(needle);
+        });
+      });
+      popup.append(box, ...buttons);
+    } else popup.append(...buttons);
     popup.addEventListener("keydown", event => {
       if (!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) return;
       event.preventDefault();
-      const buttons=[...popup.querySelectorAll("button")], step=["ArrowUp","ArrowLeft"].includes(event.key)?-1:1;
-      buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length]?.focus();
+      const live=buttons.filter(button=>!button.hidden), step=["ArrowUp","ArrowLeft"].includes(event.key)?-1:1;
+      live[(live.indexOf(document.activeElement)+step+live.length)%live.length]?.focus();
     });
     popup.openFor = anchor => {
       if (!popup.isConnected) document.body.append(popup);
@@ -2532,7 +2548,7 @@
         }};
         popup.addEventListener("toggle",cleanup);
       }
-      popup.querySelector("button")?.focus();
+      (popup.querySelector(".lex-choice-popover-search") || popup.querySelector("button"))?.focus();
     };
     popup.addEventListener("toggle",event=>{if(event.newState==="closed")popup.remove();});
     return popup;
@@ -2731,6 +2747,39 @@
 
   const controlGroup = (parts, options = {}) => detailParts(parts, options);
 
+  // Small geometric glyphs for damage, status and weakness kinds: a
+  // label about fire carries a flame, one about bleeding a drop. Game art
+  // stays with its own pipeline (FF8 renders its menu icons); these are the
+  // shared fallback wherever a label names a kind. Unknown kinds draw
+  // nothing rather than guessing.
+  const TYPE_GLYPHS = {
+    physical: ['#cfcfcf', '<rect x="7" y="1" width="2" height="9"/><path d="M7 10h2l-1 3z"/><rect x="4.5" y="10.5" width="7" height="1.6"/><rect x="7.4" y="12" width="1.2" height="3"/>'],
+    magic: ['#5aa9ff', '<path d="M8 1l1.6 5.4L15 8l-5.4 1.6L8 15l-1.6-5.4L1 8l5.4-1.6z"/>'],
+    fire: ['#ff7a3c', '<path d="M8 1c2 3 4 5 4 8.5a4 4.5 0 1 1-8 0C4 7 5.5 5.5 6.5 4c.3 1.5 1 2 1.5 2.2C7.6 4.5 7.8 2.5 8 1z"/>'],
+    lightning: ['#ffd94d', '<path d="M9 1l-5 8h3l-1 6 6-8.5H8.8z"/>'],
+    slash: ['#d8d8d8', '<path d="M2 14L11 2h2L4 14z"/>'],
+    strike: ['#b09a7a', '<rect x="4.5" y="1.5" width="7" height="5" rx="1"/><rect x="7.2" y="6" width="1.6" height="9"/>'],
+    thrust: ['#d8d8d8', '<path d="M8 1l2.5 12h-5z"/>'],
+    poison: ['#b06ac9', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    toxic: ['#8a6a2a', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    bleed: ['#d43a3a', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    curse: ['#9aa3ad', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/>'],
+    divine: ['#e8c67a', '<ellipse cx="8" cy="8" rx="5" ry="2.4" fill="none" stroke-width="1.8"/>'],
+    occult: ['#7a5ac9', '<path d="M11 2a6.5 6.5 0 1 0 0 12 8 8 0 1 1 0-12z"/>'],
+    abyssal: ['#a02622', '<circle cx="8" cy="8" r="5" fill="#000" stroke-width="1.5"/>'],
+  };
+  const typeGlyph = kind => {
+    const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];
+    if (!found) return null;
+    const [color, shapes] = found;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('fill', color);
+    svg.setAttribute('stroke', color);
+    svg.innerHTML = shapes;
+    return element('span', {class: 'lex-type-glyph', 'aria-hidden': 'true'}, svg);
+  };
   const detailField = (options = {}) => {
     if (Array.isArray(options.controls)) {
       options = {...options, control: detailParts(options.controls)};
@@ -2866,6 +2915,7 @@
       // nothing, which wrapped "CAN SELL" one letter per line and drove the
       // label fitter down to its six-pixel floor.
       }, element("div", {class: "lex-detail-field-label"},
+      options.icon ? typeGlyph(options.icon) : null,
       labelNode(options),
       helpMarker ? element("span", {class:"lex-field-help"}, helpMarker) : null,
       // The arrow used to live inside the label, which forced a boolean's
@@ -7931,6 +7981,7 @@ ${contents.path}`});
     const before = String(options.value ?? node.textContent ?? "");
     const input = element("input", {type: "text", class: "lex-label-rename",
       value: before, "aria-label": `Rename ${options.label || "this value"}`});
+    copyRenameFace(node, input);
     node.replaceWith(input);
     input.focus();
     input.select();
@@ -7951,10 +8002,22 @@ ${contents.path}`});
     input.addEventListener("blur", () => finish(false));
     return input;
   };
+  // An in-place rename swaps text for an input; the typed text keeps the
+  // fitted size and face of the text it replaces instead of jumping to
+  // the container's inherited font.
+  const copyRenameFace = (node, input) => {
+    const face = getComputedStyle(node);
+    input.style.fontSize = face.fontSize;
+    input.style.fontFamily = face.fontFamily;
+    input.style.fontWeight = face.fontWeight;
+    input.style.lineHeight = face.lineHeight;
+    input.style.letterSpacing = face.letterSpacing;
+  };
   const renameInPlace = (key, tabId, fallback, text) => {
     const before = text.textContent;
     const input = element("input", {type: "text", class: "lex-label-rename",
       value: before, "aria-label": `Rename ${fallback}`});
+    copyRenameFace(text, input);
     text.replaceWith(input);
     input.focus();
     input.select();
@@ -13182,7 +13245,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, tabStrip, promptText};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
@@ -13445,6 +13508,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   document.addEventListener('click', event => {
     const field = event.target.closest?.('.lex-boolean-field');
     if (!field || event.target.closest?.('input,button,a,select,textarea,.lex-info-help,.lex-reference-values,.lex-column-pin')) return;
+    // The label is its own control (double-click renames it in developer
+    // mode); only the value side of the row toggles the box.
+    if (!event.target.closest?.('.lex-detail-field-control,.lex-field-boolean-arrow')) return;
     const input = field.querySelector('.lex-detail-field-control input[type="checkbox"]');
     if (!input || input.disabled) return;
     event.preventDefault();

@@ -1045,6 +1045,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    font-size:clamp(15px,1.45vw,20px);
  color: var(--lex-muted);
  grid-column:1;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
 }
 .lex-detail-panel-actions {
   grid-column:3;
@@ -4325,6 +4328,7 @@ body:has(.lex-data-map-table) #main {
 .lex-choice-popover { position:fixed; inset:auto; margin:0; padding:5px; z-index:1000; width:min(280px,calc(100vw - 8px)); box-sizing:border-box; overflow:auto; border:1px solid var(--lex-border); color:var(--lex-text); background:var(--lex-panel); font:inherit; }
 .lex-choice-popover:popover-open { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px; }
 .lex-choice-popover > button { display:flex; align-items:center; gap:4px; min-width:0; padding:4px; text-align:left; }
+.lex-choice-popover-search { grid-column:1/-1; position:sticky; top:0; width:100%; box-sizing:border-box; }
 .lex-choice-popover > button > span { min-width:0; white-space:normal; overflow-wrap:anywhere; }
 .lex-choice-popover img { width:22px; height:22px; object-fit:contain; }
 .lex-inline-label { display:inline-flex; align-items:center; gap:.3em; min-width:0; max-width:100%; vertical-align:middle; }
@@ -6728,22 +6732,15 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 /* A property row never grows for its label: past the font floor the
    text clips instead of taking extra vertical space. */
+.lex-type-glyph{flex:0 0 auto;width:14px;height:14px;display:inline-grid;place-items:center;}
+.lex-type-glyph>svg{width:14px;height:14px;display:block;}
 .lex-detail-field-label-text {
    flex:0 1 auto;min-width:0;
  overflow:hidden;
 }
-/* Renaming a label in place is a typing job, so the field hands the whole row
-   to the input. Lexer: "when i'm double clicking a property name to edit it the
-   ref rail thing should not show. and the text box should expand to fit
-   available space instead of being this tiny little thing". The input used to
-   be the width of the name lane - a tenth of the row - with the value's
-   reference rail beside it. */
-.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) {
-  grid-template-columns:minmax(0,1fr);
-}
-.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) > .lex-detail-field-control {
-  display:none;
-}
+/* A label renamed in place keeps its row: the input fills the name lane
+   and the value stays where it was, so nothing on the page moves while
+   it is being typed. */
 .lex-toggle {
   display:flex;
   min-width:0;
@@ -7216,6 +7213,16 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-boolean-field .lex-field-boolean-arrow::after { content:none; }
 .lex-boolean-field > .lex-field-boolean-arrow { margin-left:24px; margin-right:10px; }
+/* The reference gutter below the box is always reserved, so a reference that
+   appears after an edit shifts nothing. Without this the name, arrow and box
+   park in the top of the row, reading as misaligned next to gutterless rows.
+   Dropping them half the gutter centres them in the full row; relative shifts
+   and inner padding move nothing in layout, so the row keeps its height. */
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-detail-field-label,
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-field-boolean-arrow,
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+  top:6px;
+}
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { grid-area:1/1; }
 .lex-boolean-field .lex-source-control > input[type="checkbox"] {
   grid-area:1/2;
@@ -8492,6 +8499,10 @@ body { text-shadow: var(--lex-text-shadow, none); }
   padding:0 2px;
   font:inherit;
   text-align:inherit;
+  color:inherit;
+  background:var(--lex-input-bg);
+  border:1px solid var(--lex-input-border-color);
+  border-radius:var(--lex-input-radius,3px);
 }
 
 /* A help bubble being reworded in the developer page: the popover takes the

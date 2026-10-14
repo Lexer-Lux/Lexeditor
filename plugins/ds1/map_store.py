@@ -88,10 +88,51 @@ class MapStore:
         except (OSError, FormatError):
             document = None
         names = {}
+        types = {}
         if document is not None and "NpcParam" in document.params:
             for row in document.params["NpcParam"].rows:
                 names[row.row_id] = document.display_name("NpcParam", row.row_id, row)
-        return set(names), names
+                try:
+                    types[row.row_id] = document.value("NpcParam", row.row_id, "npcType")
+                except (FormatError, KeyError, StopIteration):
+                    continue
+        return set(names), names, types
+
+    def locate_drop(self, lot_id):
+        """The first placement of an enemy dropping this lot, for go-to.
+
+        ItemLotParam rows name no map, but NpcParam rows name their lots,
+        and placements name their NPC. Without readable parameters there is
+        nothing to resolve, so the directory shows no go-to button.
+        """
+        try:
+            document = self.item_store.get() if self.item_store else None
+        except (OSError, FormatError):
+            document = None
+        if document is None or "NpcParam" not in document.params:
+            return None
+        fields = [f"itemLotId_{index}" for index in range(1, 7)] + ["humanityLotId"]
+        droppers = set()
+        for row in document.params["NpcParam"].rows:
+            for field in fields:
+                try:
+                    hit = document.value("NpcParam", row.row_id, field) == lot_id
+                except (FormatError, KeyError, StopIteration):
+                    continue
+                if hit:
+                    droppers.add(row.row_id)
+                    break
+        if not droppers:
+            return None
+        for map_name in self.maps():
+            try:
+                placements = self.get(map_name).placements()
+            except (MsbError, OSError):
+                continue
+            for placement in placements:
+                if placement.get("npc") in droppers:
+                    return {"map": map_name, "key": f"{placement['type']}:{placement['partId']}"}
+        return None
 
     def npc_models(self):
         """Each placed NPC ID with the character models it wears.
@@ -114,7 +155,7 @@ class MapStore:
         return self._npc_models
 
     def list_rows(self):
-        _ids, names = self._npc()
+        _ids, names, types = self._npc()
         rows = []
         for map_name in self.maps():
             for placement in self.get(map_name).placements():
@@ -123,14 +164,14 @@ class MapStore:
                 values = {"map": map_name, "kind": placement["kind"], "model": placement["model"],
                           "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
                           "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
-                          "npcId": npc}
+                          "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
                 display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
                 rows.append({"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
                              "name": placement["name"], "values": values, "display": display})
         return rows
 
     def read(self, map_name, key):
-        _ids, names = self._npc()
+        _ids, names, _types = self._npc()
         part_key = parse_key(key)
         row = self.get(map_name).read_placement(part_key)
         try:
@@ -149,7 +190,7 @@ class MapStore:
 
     def edit(self, map_name, key, field, value):
         self.writable()
-        ids, _names = self._npc()
+        ids, _names, _types = self._npc()
         self.get(map_name).edit(parse_key(key), field, value, ids if field == "npcId" else None)
         self._npc_models = None
         return self.read(map_name, key)
@@ -176,7 +217,7 @@ class MapStore:
         return sum(document.dirty_count for document in self.docs.values())
 
     def pending_changes(self):
-        _ids, names = self._npc()
+        _ids, names, _types = self._npc()
         changes = []
         for map_name, document in self.docs.items():
             known = {(part["type"], part["id"]): part["name"] for part in document.parts}

@@ -1,4 +1,4 @@
-"""World tab: enemy drops, merchant shops and treasure behavior."""
+"""World directory: enemy drops, merchant shops and treasure behavior."""
 from pathlib import Path
 import sys
 
@@ -141,12 +141,12 @@ def test_state_reports_world_tabs(tmp_path):
         ('treasure', 'ObjActParam', 3)]
 
 
-def test_data_map_points_world_at_world(tmp_path):
+def test_data_map_points_world_at_maps(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
     for filename, sub in (('ItemLotParam.param', 'drops'), ('ShopLineupParam.param', 'shops'),
                           ('ObjActParam.param', 'treasure')):
         row = next(entry for entry in rows if entry['filename'] == filename)
         assert row['coverage'] == 'structured' and row['status'] == 'partial'
-        assert row['openable'] and row['target'] == 'world' and row['sub'] == sub
-        assert row['targets'] == [{'id': 'world', 'label': 'World'}]
+        assert row['openable'] and row['target'] == 'maps' and row['sub'] == sub
+        assert row['targets'] == [{'id': 'maps', 'label': 'Maps'}]

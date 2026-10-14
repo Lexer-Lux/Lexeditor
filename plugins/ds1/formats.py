@@ -67,6 +67,37 @@ for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defens
         f'Changes this piece\'s physical defense against {kind.lower()} attacks by this percentage: '
         '-100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own.')
 
+# Damage, status and weakness glyphs, by table and field. The label
+# names the kind; the icon just draws it before the words.
+FIELD_ICONS = {}
+for _table, _entries in [
+    ('NpcParam', [('def_phys', 'physical'), ('def_mag', 'magic'), ('def_fire', 'fire'),
+                 ('def_thunder', 'lightning'), ('def_slash', 'slash'), ('def_blow', 'strike'),
+                 ('def_thrust', 'thrust'), ('resist_poison', 'poison'), ('resist_desease', 'toxic'),
+                 ('resist_blood', 'bleed'), ('resist_curse', 'curse'), ('isWeakSaint', 'divine'),
+                 ('isWeakA', 'occult'), ('isWeakB', 'abyssal'),
+                 ('physGuardCutRate', 'physical'), ('magGuardCutRate', 'magic'),
+                 ('fireGuardCutRate', 'fire'), ('thunGuardCutRate', 'lightning'),
+                 ('slashGuardCutRate', 'slash'), ('blowGuardCutRate', 'strike'),
+                 ('thrustGuardCutRate', 'thrust'), ('poisonGuardResist', 'poison'),
+                 ('diseaseGuardResist', 'toxic'), ('bloodGuardResist', 'bleed'),
+                 ('curseGuardResist', 'curse')]),
+    ('EquipParamProtector', [('defensePhysics', 'physical'), ('defenseMagic', 'magic'),
+                 ('defenseFire', 'fire'), ('defenseThunder', 'lightning'),
+                 ('defenseSlash', 'slash'), ('defenseBlow', 'strike'), ('defenseThrust', 'thrust'),
+                 ('resistPoison', 'poison'), ('resistDisease', 'toxic'),
+                 ('resistBlood', 'bleed'), ('resistCurse', 'curse')]),
+    ('EquipParamWeapon', [('physGuardCutRate', 'physical'), ('magGuardCutRate', 'magic'),
+                 ('fireGuardCutRate', 'fire'), ('thunGuardCutRate', 'lightning'),
+                 ('slashGuardCutRate', 'slash'), ('blowGuardCutRate', 'strike'),
+                 ('thrustGuardCutRate', 'thrust'), ('poisonGuardResist', 'poison'),
+                 ('diseaseGuardResist', 'toxic'), ('bloodGuardResist', 'bleed'),
+                 ('curseGuardResist', 'curse')]),
+]:
+    for _key, _kind in _entries:
+        FIELD_ICONS[(_table, _key)] = _kind
+
+
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
 # Stamina Costs tweak sets each spell's Elden Ring value.
 MAGIC_FIELDS = {
@@ -878,6 +909,7 @@ class ItemDocument:
             unbounded = field.dtype in ('f32', 'f64', 'angle32') and (item['min'], item['max']) in (
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
+                           'icon': FIELD_ICONS.get((table, field.key), ''),
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
                            MATERIAL_TABLE, CHARA_TABLE) else '',
@@ -994,6 +1026,7 @@ class ItemDocument:
             rate = self.value(EFFECT_TABLE, levels[0], cut)
             original = round((1 - read_field(saved, specs[cut], '<')) * 100, 3)
             fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
+                           'icon': kind.lower(),
                            'description': (f'Share of {kind.lower()} damage this enemy takes off every hit, from its '
                                            'Armor Rework effect. Negative values make it take more damage.'
                                            if table == 'NpcParam' else

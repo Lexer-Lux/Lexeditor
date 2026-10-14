@@ -116,6 +116,7 @@ class Handler(PluginRequestHandler):
         path = parsed.path
         query = parse_qs(parsed.query)
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets',
+                    '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme'):
             try:
@@ -162,6 +163,12 @@ class Handler(PluginRequestHandler):
                     elif path == '/api/theme':
                         self.send_json(theme_status())
                         return
+                    elif path == '/api/world/locate':
+                        table = query.get('table', [''])[0]
+                        found = MAPSTORE.locate_drop(int(query.get('id', [''])[0])) \
+                            if table == 'ItemLotParam' else None
+                        result = {'map': found['map'], 'key': found['key']} if found \
+                            else {'map': None, 'key': None}
                     elif path == '/api/map/view':
                         result = viewport.map_view(MAPSTORE, query.get('map', [''])[0])
                     elif path == '/api/map/geometry':
