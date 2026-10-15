@@ -83,14 +83,25 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
                     if not root:
-                        assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == ["chest0", "enemy0", "enemy1", "player0"]
+                        titled = ["Rat \u2014 " + MAP, "Small Rat \u2014 " + MAP,
+                                  "chest0 \u2014 " + MAP, "player0 \u2014 " + MAP]
+                        assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == sorted(titled)
                     else:
                         assert page.evaluate("state.rows.length") > 0
                     page.get_by_role("searchbox", name="Search placements").fill(enemy["name"])
-                    page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.name===e.name",
-                                           arg={"key": ":" + key.split(":")[1], "name": enemy["name"]})
+                    if not root:
+                        page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.name===e.name",
+                                               arg={"key": ":" + key.split(":")[1], "name": "Rat \u2014 " + MAP})
+                    else:
+                        page.wait_for_function("(e) => state.selected.endsWith(e.key) && (state.row?.name||'').includes(e.map)",
+                                               arg={"key": ":" + key.split(":")[1], "map": map_name})
                     page.locator('[data-tabstrip-id="selection"]').click()
-                    assert enemy["name"] in page.locator(".lex-detail-panel-title").inner_text()
+                    title = page.locator(".lex-detail-panel-title").inner_text()
+                    assert ("Rat \u2014 " + MAP) in title if not root else map_name in title
+                    assert page.locator("[data-maps-side] .lex-multi-number").count() == 2
+                    units = page.locator("[data-maps-side] .lex-unit").evaluate_all(
+                        "nodes=>nodes.map(n=>n.textContent)")
+                    assert units == ["\u00b0", "\u00b0", "\u00b0"], units
                     assert page.get_by_text(f"model {enemy['model']}", exact=False).count() >= 1
                     if output:
                         page.wait_for_timeout(250)
@@ -114,8 +125,12 @@ def main():
                         page.locator('[data-tabstrip-id="placements"]').click()
                         box = page.get_by_role("searchbox", name="Search placements")
                         box.click(); box.press("ControlOrMeta+a"); box.press("Backspace"); box.fill(chest["name"])
-                        page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.name===c.name",
-                                               arg={"partId": chest["partId"], "name": chest["name"]})
+                        if not root:
+                            page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.name===c.name",
+                                                   arg={"partId": chest["partId"], "name": "chest0 \u2014 " + MAP})
+                        else:
+                            page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && (state.row?.name||'').includes(c.map)",
+                                                   arg={"partId": chest["partId"], "map": map_name})
                         page.locator('[data-tabstrip-id="selection"]').click()
                         assert page.locator('[data-field-key="npcId"]:visible').count() == 0
                         field = page.locator('[data-field-key="posX"]:visible')

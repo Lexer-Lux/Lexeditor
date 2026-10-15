@@ -58,7 +58,7 @@ def test_part_without_tpf_renders_gray_with_note(tmp_path):
     assert any('tex0' in note for note in geometry['notes'])
 
 
-def test_map_geometry_stays_lean(tmp_path):
+def test_map_geometry_serves_textured_shape(tmp_path):
     game = tmp_path / 'game'
     folder = game / 'map' / 'm99_00_00_00'
     folder.mkdir(parents=True)
@@ -66,5 +66,6 @@ def test_map_geometry_stays_lean(tmp_path):
     geometry = viewport.model_geometry(game, None, 'm99_00_00_00.msb',
                                        {'type': 0, 'name': 'm99piece'})
     mesh = geometry['meshes'][0]
-    assert 'uv' not in mesh and 'map' not in mesh
-    assert 'textures' not in geometry
+    assert mesh['map'] == 'tex0' and mesh['uv']
+    assert geometry['textures'] == {}
+    assert any('tex0' in note for note in geometry['notes'])

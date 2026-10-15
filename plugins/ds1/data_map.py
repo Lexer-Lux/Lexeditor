@@ -4,7 +4,8 @@ from . import assets, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance',
-              'maps':'Maps', 'animations':'Animations', 'assets':'Assets', 'text':'Text'}
+              'maps':'Maps', 'animations':'Animations', 'text':'Text',
+              'npcs':'NPCs', 'shops':'Shops'}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -26,7 +27,7 @@ def payload(store, native_rules=None, theme=None):
         elif table == 'NpcParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='enemies',sub='monsters',controls='Enemies: stats, drops, effects and attack references',
-                notes='Edit reviewed monster stats and follow their attack references. Other properties stay read-only.')
+                notes='Edit reviewed monster stats and follow their attack references. Friendly characters live under NPCs. Other properties stay read-only.')
         elif table == 'BehaviorParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='enemies',sub='behaviors',controls='Enemies: behavior costs and call targets',
@@ -69,8 +70,8 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit dropped items and their rates in the directory. One lot may be shared by several enemies.')
         elif table == 'ShopLineupParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='maps',sub='shops',controls='Maps: merchant stock and prices',
-                notes='Edit what each merchant sells, and at what price, in the directory.')
+                target='shops',sub='shops',controls='Shops: merchant stock and prices',
+                notes='Edit what each merchant sells, and at what price.')
         elif table == 'ObjActParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',

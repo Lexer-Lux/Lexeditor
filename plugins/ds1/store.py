@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, TEXT_SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, TEXT_SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, NPCS_SUBTABS, SHOPS_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -119,6 +119,10 @@ class ItemStore:
                               for key, label, table in STATS_SUBTABS],
                 'worldTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                               for key, label, table in WORLD_SUBTABS],
+                'npcTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                            for key, label, table in NPCS_SUBTABS],
+                'shopTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
+                             for key, label, table in SHOPS_SUBTABS],
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS],
                 'textTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}

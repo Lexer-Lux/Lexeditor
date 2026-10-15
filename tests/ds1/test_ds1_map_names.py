@@ -50,4 +50,4 @@ def test_display_name_falls_back_without_text_or_match(tmp_path):
     assert maps.display_name('m10_01_00_00.msb') == 'm10_01_00_00.msb'
     maps = make_maps(tmp_path / 'named')
     assert maps.display_name('test.msb') == 'test.msb'
-    assert maps.display_name('m99_00_00_00.msb') == 'm99_00_00_00.msb'
+    assert maps.display_name('m99_00_00_00.msb') == 'Test map (m99_00_00_00.msb)'

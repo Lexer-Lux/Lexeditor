@@ -22,7 +22,8 @@ def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     assert not effective['editable'] and effective['value'] == 0
     # Stray Demon deliberately has type 0, and Egg Carrier shares a monster
     # family name but has type 2. Neither name-only nor type-only filtering works.
-    for excluded in (251000, 223000, 321001, 502, 999999):
+    # 251000 and 321001 are friendly (type 2): the NPCs tab reviews them.
+    for excluded in (223000, 502, 999999):
         with pytest.raises(FormatError, match='not a reviewed'):
             doc.read_row('NpcParam', excluded)
         with pytest.raises(FormatError, match='not a reviewed'):
@@ -144,17 +145,19 @@ def test_effective_hp_multiplies_resident_rates_and_skips_the_rest():
 
 
 
-def test_defense_block_and_weakness_fields_carry_no_icons():
-    # The hand-drawn glyphs were never game art, so fields ship without
-    # icons until the menu icon atlas is extracted: game art only.
-    fields = {field['key']: field.get('icon', '')
+def test_defense_fields_carry_game_art_where_it_exists():
+    # Damage and defense labels show the equipment screen's own icons; kinds
+    # the game shows no icon for (subtypes, resistances, weaknesses) ship
+    # with none: game art only, no invented glyphs.
+    fields = {field['key']: field.get('icon')
               for field in ItemDocument(make_archive()).read_row('NpcParam', 120000)['fields']}
-    assert fields['def_fire'] == ''
-    assert fields['slashGuardCutRate'] == ''
-    assert fields['resist_desease'] == ''
-    assert fields['isWeakSaint'] == ''
-    assert fields['staminaGuardDef'] == ''
-    assert fields['hp'] == ''
+    assert fields['def_fire'] == 'fireDef'
+    assert fields['physGuardCutRate'] == 'physicalDef'
+    assert fields['slashGuardCutRate'] is None
+    assert fields['resist_desease'] is None
+    assert fields['isWeakSaint'] is None
+    assert fields['staminaGuardDef'] is None
+    assert fields['hp'] is None
 
 
 

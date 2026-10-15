@@ -58,7 +58,8 @@ class MapStore:
         return sorted(path.name for path in live.glob("*.msb"))
 
     def display_name(self, map_id: str) -> str:
-        """'Undead Burg (m10_01_00_00.msb)', or the bare id without area text."""
+        """'Undead Burg (m10_01_00_00.msb)', 'Test map (...)' for the m99
+        test block without area text, or the bare id otherwise."""
         match = _MAP_AREA.match(map_id or '')
         document = getattr(self.item_store, 'document', None)
         texts = document.texts if document is not None else None
@@ -68,6 +69,8 @@ class MapStore:
                 name = texts.place_name(area_id)
                 if name:
                     return f'{name} ({map_id})'
+        if match and match.group(1) == '99':
+            return f'Test map ({map_id})'
         return map_id
 
     def _load(self, map_name):
@@ -215,6 +218,15 @@ class MapStore:
             self._npc_models = {npc: sorted(models) for npc, models in links.items()}
         return self._npc_models
 
+    def _title(self, map_name, part_name, npc, names):
+        """A placement's title: who stands there and in which map. The
+        bare part name stays pinnable under values, never in the title."""
+        if npc is None:
+            who = part_name
+        else:
+            who = names.get(npc, "") or f"Unknown ({npc})"
+        return f"{who} \u2014 {self.display_name(map_name)}"
+
     def list_rows(self):
         _ids, names, types = self._npc()
         rows = []
@@ -222,13 +234,15 @@ class MapStore:
             for placement in self.get(map_name).placements():
                 npc = placement.get("npc")
                 enemy = names.get(npc, "") if npc is not None else ""
-                values = {"map": map_name, "kind": placement["kind"], "model": placement["model"],
+                values = {"map": map_name, "part": placement["name"], "kind": placement["kind"],
+                          "model": placement["model"],
                           "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
                           "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
                           "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
                 display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
                 rows.append({"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
-                             "name": placement["name"], "values": values, "display": display})
+                             "name": self._title(map_name, placement["name"], npc, names),
+                             "range": placement["name"], "values": values, "display": display})
         return rows
 
     def read(self, map_name, key):
@@ -241,6 +255,8 @@ class MapStore:
         except MsbError:
             originals = {}
         row.update(id=f"{part_key[0]}:{part_key[1]}", table=map_name, map=map_name)
+        npc = next((item["value"] for item in row["fields"] if item["key"] == "npcId"), None)
+        row["name"] = self._title(map_name, row["name"], npc, names)
         for item in row["fields"]:
             if item["key"] in originals:
                 item["vanilla"] = originals[item["key"]]

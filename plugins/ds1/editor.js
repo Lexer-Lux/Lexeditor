@@ -4,31 +4,22 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
-  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],shopTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,
   assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
-  assetKind:"models",assetFiles:[],
+  assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
   dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
-const assetKinds=[
-  {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Model packages (.chrbnd, .objbnd, .partsbnd), single meshes (.flver) and collision (.hkx)."},
-  {id:"textures",label:"Textures",help:"The images on the models: texture packages (.tpf), single images (.dds, .png) and font faces."},
-  {id:"sound",label:"Sound effects",help:"FMOD sound banks (.fev, .fsb): swings, hits, footsteps, voices, everything audible but the music. The sfx folder holds particle effects, which are visual and live under Other files."},
-  {id:"music",label:"Music",help:"FMOD music banks: area themes and boss music."},
-  {id:"other",label:"Other files",help:"Movies, menu interface, scripts, shaders, materials and visual effects: game files no structured editor owns."}];
-const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.assetKind)
-  .map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size}}));
-async function setAssetKind(id){
-  if(state.assetKind===id)return;
-  state.assetKind=id;state.query="";state.page=0;
-  state.rows=assetRows(state.assetFiles);
-  state.selected=state.rows[0]?key(state.rows[0]):null;
-  await loadDetail().catch(notify);render();
-}
+// File tabs share one browser: each tab id is the file kind it lists.
+const ASSET_TABS=new Set(["models","textures","sound","music","other"]);
+const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound effects",music:"Music",other:"Other files"};
+const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.tab)
+  .map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size},
+    created:file.status==="new",modified:file.status==="modified"}));
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
@@ -82,13 +73,19 @@ const shell=LexeditorUI.mountShell({
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"text",label:"Text",help:"Edit the menu defense labels the equipment panel shows beside armor: MagDEF, FireDEF and LitngDEF."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops, effects and AI links. Behaviors holds action costs and what each behavior calls. AI holds enemy senses, distances and goals. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
+    {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Vanilla is read-only. Save changes the mod project."},
+    {id:"shops",label:"Shops",help:"Edit what each merchant sells and at what price. Each row is one item in one shop. Stock of -1 never runs out. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
-    {id:"assets",label:"Assets",help:"Replace game files with your own: textures, sounds, movies and models. Mod files holds the replacements the mod carries, and Installed game holds the files it can replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"textures",label:"Textures",help:"The images on the models. Mod files holds the replacements the mod carries. Installed game holds the files they replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"music",label:"Music",help:"Area themes and boss music. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"other",label:"Other files",help:"Movies, menu interface, scripts and shaders: game files no structured editor owns. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
     {id:"misc",label:"Misc."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -98,14 +95,14 @@ const shell=LexeditorUI.mountShell({
   pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
   save,discard,history:fieldHistory
 });
-const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="npcs"?state.npcTabs:tab==="shops"?state.shopTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
   tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
-  tab==="assets"?state.assetTabs:
+  ASSET_TABS.has(tab)?state.assetTabs:
   tab==="encumbrance"?[{id:"encumbrance",label:"Bands"},{id:"encumbrance-overrides",label:"Overrides"}]:state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.attackTabs=result.attackTabs;
-  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.nativeRules=result.nativeRules;
+  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.npcTabs=result.npcTabs||[];state.shopTabs=result.shopTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
@@ -172,10 +169,10 @@ async function loadItems(){
   if(state.tab==="animations"){await loadAnims(request);return;}
   const sub=state.sub;
   let url="/api/table?tab="+encodeURIComponent(sub);
-  if(state.tab==="assets")url="/api/assets?scope="+(sub==="game"?"game":"overrides");
+  if(ASSET_TABS.has(state.tab))url="/api/assets?scope="+(sub==="game"?"game":"overrides");
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
-  if(state.tab==="assets"){state.assetFiles=result.files;state.rows=assetRows(result.files);}
+  if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);}
   else state.rows=result.rows;
   if(state.tab==="maps")await loadDirectory();
   state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
@@ -216,7 +213,7 @@ async function loadDetail(){
     state.row={table:"AnimPlayback",id:row.id,name:row.name};state.animView=detail;state.monsterAttacks=null;return;
   }
   const [result,attacks]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(sub)}`),
-    row.table==="NpcParam"?api(`/api/attacks?monster=${row.id}`):null]);
+    row.table==="NpcParam"&&state.tab==="enemies"?api(`/api/attacks?monster=${row.id}`):null]);
   if(state.selected!==key(row))return;
   state.row=result.row;state.monsterAttacks=attacks;
 }
@@ -231,6 +228,8 @@ async function navigate(tab,sub=state.sub,selected=null){
   const token=++navigation;await edits;
   const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;state.taeForm=null;
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";
+  else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
+  else if(tab==="shops"&&!state.shopTabs.some(entry=>entry.id===sub))sub="shops";
   else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
   else if(tab==="maps"){if(DIRECTORY_TABS.includes(sub))state.dirTab=sub;sub="placements";}
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
@@ -239,13 +238,13 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":((state.statsTabs.find(entry=>entry.count)||{}).id||"curves");
   else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
   else if(tab==="misc")sub="misc";
-  else if(tab==="assets"&&!state.assetTabs.some(entry=>entry.id===sub))sub="overrides";
+  else if(ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="overrides";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="text"&&!state.textTabs.some(entry=>entry.id===sub))sub="menu-labels";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","attacks","maps","animations","effects","stats","encumbrance","misc","assets","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","shops","attacks","maps","animations","effects","stats","encumbrance","misc","models","textures","sound","music","other","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -420,7 +419,8 @@ function controlFor(row,field){
   const plain=plainControlFor(row,field);
   const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
     :TIMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00d7")
-    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"stamina/second"):plain;
+    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"stamina/second")
+    :row.table&&String(row.table).endsWith(".msb")&&/^Rotation [XYZ]$/.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0"):plain;
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
   const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));
@@ -512,7 +512,25 @@ function fieldSections(row){
   // only links with no editable field on the page are listed separately.
   const links=new Map((row.effectLinks||[]).map(effect=>[effect.field,effect]));
   const shownLinks=new Set();
+  // Placement coordinates ride one row per vector: Position, then
+  // Rotation in degrees. Detection is by field, not by tab, so any
+  // record carrying a coordinate triple renders the same way.
+  const byKey=new Map((row.fields||[]).map(field=>[field.key,field]));
+  const vectored=new Set();
+  for(const [keys,label] of [[["posX","posY","posZ"],"Position"],[["rotX","rotY","rotZ"],"Rotation"]]){
+    if(!keys.every(key=>byKey.has(key)))continue;
+    keys.forEach(key=>vectored.add(key));
+    const entries=keys.map(key=>{
+      const field=byKey.get(key);
+      return {label:key.slice(-1),control:controlFor(row,field),title:field.label,
+        help:field.description&&field.description.trim()?infoHelp(field.description.trim()):null};
+    });
+    const group=groupFor(byKey.get(keys[0]));
+    if(!groups.has(group))groups.set(group,[]);
+    groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3})}));
+  }
   for(const field of row.fields){
+    if(vectored.has(field.key))continue;
     const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
@@ -665,8 +683,7 @@ async function uploadAsset(target,file){
       state.assetUpload={received:offset,total:file.size};render();
     }
     state.assetBusy=false;state.assetUpload=null;
-    if(files){state.assetFiles=files;const entry=files.find(file=>file.relative===target);
-      if(entry)state.assetKind=entry.kind||"other";state.rows=assetRows(files);}
+    if(files){state.assetFiles=files;state.rows=assetRows(files);}
     // An upload from Installed game lands in Mod files, where it now lives.
     if(state.sub==="game")state.sub="overrides";
     state.selected=`Asset:${target}`;
@@ -880,8 +897,8 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
-  const noun=state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
-  if(state.tab==="assets")return renderAssetDetail();
+  const noun=state.tab==="npcs"?"NPC":state.tab==="shops"?"Shop item":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="encumbrance"?"Load band":state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
+  if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
       return detailPanel({title:"Event",actions:taeActions().slice(0,1),
@@ -915,6 +932,44 @@ function detail(){
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }
 const ds1PreviewAvailability=new Map();
+// Label kinds with equipment-screen art (icons.py); anything else keeps the
+// shared fallback glyph.
+const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
+  "physicalDef","magicDef","fireDef","lightningDef",
+  "str","dex","int","faith","weight","durability"]);
+const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
+  "EquipParamGoods","Magic","SpEffectParam"]);
+function ds1LabelArt(panel){
+  if(!(panel instanceof Element))return;
+  for(const field of panel.querySelectorAll("[data-lex-icon]")){
+    const kind=field.getAttribute("data-lex-icon");
+    if(!ds1LabelKinds.has(kind))continue;
+    if(field.querySelector(":scope > .lex-detail-field-label > img.lex-ds1-label-art"))continue;
+    const art=el("img",{class:"lex-ds1-label-art",src:`/api/label?name=${encodeURIComponent(kind)}`,
+      alt:"",draggable:"false","aria-hidden":"true","data-lex-no-image":"off"});
+    art.addEventListener("error",()=>art.remove(),{once:true});
+    const label=field.querySelector(":scope > .lex-detail-field-label");
+    const glyph=label&&label.querySelector(":scope > .lex-type-glyph");
+    if(glyph)glyph.replaceWith(art);
+    else if(label)label.prepend(art);
+  }
+}
+// A model that exists but has no still picture, in Dark Souls dress: UI
+// chrome drawn here, never game art.
+LexeditorUI.registerNoThumbnail("ds1",label=>{
+  const namespace="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(namespace,"svg");
+  svg.setAttribute("viewBox","0 0 24 24");
+  svg.setAttribute("aria-hidden","true");
+  const ring=document.createElementNS(namespace,"circle");
+  ring.setAttribute("cx","12");ring.setAttribute("cy","12");ring.setAttribute("r","8");
+  ring.setAttribute("fill","none");ring.setAttribute("stroke","#8a8f98");ring.setAttribute("stroke-width","2");
+  const slash=document.createElementNS(namespace,"path");
+  slash.setAttribute("d","M6 18L18 6");
+  slash.setAttribute("stroke","#e08a3c");slash.setAttribute("stroke-width","2.4");slash.setAttribute("stroke-linecap","round");
+  svg.append(ring,slash);
+  return el("span",{class:"lex-ds1-no-thumbnail",role:"img","aria-label":label,title:label},svg);
+});
 async function ds1PreviewTarget(table,id){
   if(table==="NpcParam"){
     const view=await api(`/api/chr/view?npc=${id}&view=thumb`);
@@ -934,11 +989,29 @@ async function ds1PreviewTarget(table,id){
   return {kind:"parts",name,stem:solo.stem,
     url:`/api/parts/geometry?table=${encodeURIComponent(table)}&id=${id}&variant=${encodeURIComponent(solo.variant||"")}`};
 }
-function ds1PreviewReason(panel,reason){
+function ds1ThumbUrl(target){
+  if(target.url)return target.url;
+  const first=target.variants&&target.variants[0];
+  if(target.kind!=="parts"||!first)return null;
+  return `/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(first.variant||"")}`;
+}
+function ds1PreviewReason(panel,table,id,reason){
   const heading=panel.querySelector(':scope > .lex-detail-panel-heading');
   if(!heading||heading.querySelector('.lex-detail-panel-icon'))return;
+  // No model to preview, so no magnifier and no drawer: an item shows its
+  // inventory picture, anything else the shared placeholder.
+  let art=LexeditorUI.noThumbnail("ds1");
+  if(ds1IconTables.has(table)){
+    const picture=el("img",{class:"lex-ds1-item-icon",alt:"",
+      src:`/api/icon?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`,
+      draggable:"false","data-lex-no-image":"off"});
+    picture.addEventListener("error",()=>{
+      if(picture.isConnected)picture.replaceWith(LexeditorUI.noThumbnail("ds1"));
+    },{once:true});
+    art=picture;
+  }
   heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason,
-    "data-lex-preview-state":"unavailable"},LexeditorUI.iconSlot({message:"No model"})));
+    "data-lex-preview-state":"unavailable"},LexeditorUI.iconSlot({content:art})));
   heading.classList.remove("no-icon");
 }
 function ds1PreviewContent(target){
@@ -984,10 +1057,19 @@ function armDs1Preview(panel,table,id){
   }
   const settle=target=>{
     if(!panel.isConnected||!target)return;
-    if(target.reason){ds1PreviewReason(panel,target.reason);return;}
-    const stale=panel.querySelector(':scope > .lex-detail-panel-heading > .lex-detail-panel-icon[data-lex-preview-state="unavailable"]');
-    if(stale){stale.removeAttribute("data-lex-preview-state");
-      stale.replaceChildren(LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}));}
+    if(target.reason){ds1PreviewReason(panel,table,id,target.reason);return;}
+    const heading=panel.querySelector(':scope > .lex-detail-panel-heading');
+    const existing=heading&&heading.querySelector('.lex-detail-panel-icon');
+    let art=null;
+    if(existing&&existing.hasAttribute("data-lex-preview-state"))art=existing;
+    if(heading&&!existing){
+      art=el("div",{class:"lex-detail-panel-icon"},LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}));
+      heading.prepend(art);
+      heading.classList.remove("no-icon");
+    }
+    if(art){art.removeAttribute("data-lex-preview-state");
+      const thumb=ds1ThumbUrl(target);
+      art.replaceChildren(LexeditorUI.iconSlot({content:thumb?window.Ds1Preview.thumbnail({url:thumb,label:target.name}):LexeditorUI.noThumbnail("ds1")}));}
     LexeditorUI.attachModelPreview(panel,{plugin:"ds1",label:target.name,
       openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
       content:()=>ds1PreviewContent(target),
@@ -996,6 +1078,7 @@ function armDs1Preview(panel,table,id){
   // Detail panels mount after detail() returns, so a cached answer settles
   // on a microtask: settling synchronously would find a detached panel.
   if("settled" in entry)queueMicrotask(()=>settle(entry.settled));else entry.promise.then(()=>settle(entry.settled));
+  ds1LabelArt(panel);
   return panel;
 }
 function taeActions(){
@@ -1170,8 +1253,8 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations")return renderAnimPanels();
   const encumbrance=state.tab==="encumbrance";
-  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="assets"?"files":"items";
-  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":state.tab==="assets"?"Assets":"Items";
+  const noun=encumbrance?(state.sub==="encumbrance"?"bands":"overrides"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?"NPCs":state.tab==="shops"?"shop items":state.tab==="enemies"?(state.sub==="behaviors"?"behaviors":state.sub==="ai"?"AI records":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const label=encumbrance?"Encumbrance":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="shops"?"Shops":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
@@ -1183,7 +1266,8 @@ function renderItems(){
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.reason==="pins"&&state.pagedView?.refreshMaster)state.pagedView.refreshMaster();else render();},
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
-      return columnList({rows:listed,key,selected,sortState:state.sort,
+      return columnList({rows:listed,key,selected,rowClass:row=>row.modified?"lex-record-modified":"",
+      sortState:state.sort,
       sort:column=>{if(encumbrance||(state.tab==="stats"&&state.sub==="levelup"))return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       // The record is fetched first, then the shared list swaps in its detail
       // pane once. It used to draw the pane with the old record, then render
@@ -1219,8 +1303,6 @@ function renderItems(){
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
   const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,change:id=>navigate(state.tab,id)});
-  if(state.tab==="assets")return LexeditorUI.stack(strip,subtabBar({tabs:assetKinds,active:state.assetKind,
-    label:"Asset kinds",order:"given",shortcuts:false,change:setAssetKind}),view);
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
@@ -1467,8 +1549,8 @@ function refreshMapSide(){
   if(!side){render();return;}
   side.replaceChildren(mapsStrip(),mapsPane());
 }
-const DIRECTORY_PARAM_TABS=new Set(["drops","shops","treasure"]);
-const DIRECTORY_TABS=["drops","shops","treasure","npcs","enemies"];
+const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
+const DIRECTORY_TABS=["drops","treasure","npcs","enemies"];
 const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType!==2;
 const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType===2;
 let dirTabRestored=false;
@@ -1490,8 +1572,8 @@ function directoryMatches(){
   const query=state.dirQuery.toLowerCase();
   let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
   // Local keeps only rows from the open map. Placements name their map;
-  // lots resolve through their dropping NPCs. Shop and treasure rows
-  // name no map, so the toggle stays off for them.
+  // lots resolve through their dropping NPCs. Treasure rows name no
+  // map, so the toggle stays off for them.
   if(state.dirLocal){
     if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
     else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
@@ -1516,12 +1598,13 @@ function directoryStrip(){
 }
 function directoryLocalRow(){
   const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||state.dirTab==="drops";
-  return el("label",{class:"lex-dir-local","data-dir-local":"",
-    title:supported?"Show only rows from the open map":"These rows name no map yet, so Local cannot filter them"},
-    el("input",{type:"checkbox",checked:state.dirLocal,disabled:!supported,"data-lex-view-filter":"",
-      "aria-label":"Show only rows from the open map",
-      onchange:event=>{state.dirLocal=event.target.checked;state.dirPage=0;refreshDirectory();}}),
-    "Local?");
+  const node=LexeditorUI.pagerToggle({label:"Local?",
+    title:supported?"Show only rows from the open map":"These rows name no map yet, so Local cannot filter them",
+    checked:state.dirLocal,disabled:!supported,
+    change:value=>{state.dirLocal=value;state.dirPage=0;refreshDirectory();}});
+  node.setAttribute("data-dir-local","");
+  node.querySelector("input").setAttribute("data-lex-view-filter","");
+  return node;
 }
 function directoryList(){
   const matches=directoryMatches();
@@ -1538,11 +1621,11 @@ function directoryList(){
   if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
   return LexeditorUI.stack(
-    directoryLocalRow(),
     LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
       change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
     columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
-    LexeditorUI.pager({inline:true,pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+      filters:[directoryLocalRow()],
       change:value=>{state.dirPage=value;refreshDirectory();}}));
 }
 async function selectDirectoryParam(row){

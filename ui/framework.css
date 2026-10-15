@@ -6537,6 +6537,23 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   border-top:0;
 }
 .lex-paged-list-detail > .lex-pager-inline { grid-column:1 / -1; grid-row:2; }
+/* A narrow panel stacks its pager: search and filters on the first row,
+   the page controls centered under them, instead of scrolling sideways.
+   The bar keeps its height where one page needs no controls, so crossing
+   the page boundary on a search never jumps the list above it. */
+.lex-pager-inline.lex-pager-stacked {
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-rows:auto auto;
+  height:auto;
+  min-height:calc(var(--lex-pager-bar-height, 6vh) * var(--lex-ui-scale, 1));
+  row-gap:2px;
+}
+.lex-pager-inline.lex-pager-stacked .lex-pager-left { grid-column:1; grid-row:1; }
+.lex-pager-inline.lex-pager-stacked .lex-pager-right { grid-column:2; grid-row:1; }
+.lex-pager-inline.lex-pager-stacked .lex-pager-controls { grid-column:1 / -1; grid-row:2; }
+/* An open side panel insists on the width its contents need rather than
+   scrolling them sideways, up to a viewport guard for pathological rows. */
+.lex-collapsible-panel:not(.lex-collapsible-collapsed) { min-width:min-content; max-width:90vw; }
 .lex-pager > * { min-height:0; }
 .lex-pager > :is(.lex-pager-left,.lex-pager-controls,.lex-pager-right) { height:100%; flex-wrap:nowrap; }
 .lex-pager .lex-action-row { flex-wrap:nowrap; }

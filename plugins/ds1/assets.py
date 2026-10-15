@@ -109,11 +109,15 @@ def check_relative(value):
     return relative
 
 
-def scan_project(project, strict=True):
+def scan_project(project, strict=True, game_root=None):
     """The mod's asset overrides: game-relative paths with sizes.
 
     Soft mode stops at the caps instead of raising, for status checks
     that must report on a project rather than refuse it.
+
+    Against the installed game an override reads 'modified' (it replaces a
+    game file) or 'new' (nothing sits at its path); without the game its
+    status stays unknown. Tweak scripts are code, not overrides.
     """
     from core import script_mods
     from .store import MARKER
@@ -151,13 +155,21 @@ def scan_project(project, strict=True):
                 if strict:
                     raise AssetError("The mod's asset overrides are too large in total")
                 return found
+            if game_root is None:
+                status = None
+            else:
+                status = 'modified' if (Path(game_root) / relative).is_file() else 'new'
             found.append({"relative": relative.as_posix(), "size": size,
-                          "kind": kind_of(relative.as_posix())})
+                          "kind": kind_of(relative.as_posix()), "status": status})
     return found
 
 
-def scan_game(game_root):
-    """Every replaceable installed file: game-relative paths with sizes."""
+def scan_game(game_root, project=None):
+    """Every replaceable installed file: game-relative paths with sizes.
+
+    Game files the mod shadows read 'modified'; without a mod project
+    nothing is marked.
+    """
     root = _checked(game_root)
     found = []
     for top in ASSET_ROOTS:
@@ -170,8 +182,12 @@ def scan_game(game_root):
             relative = path.relative_to(root)
             if is_owned(relative):
                 continue
+            if project is None:
+                status = None
+            else:
+                status = 'modified' if (Path(project) / relative).is_file() else None
             found.append({"relative": relative.as_posix(), "size": path.stat().st_size,
-                          "kind": kind_of(relative.as_posix())})
+                          "kind": kind_of(relative.as_posix()), "status": status})
     return found
 
 
@@ -355,9 +371,10 @@ def list_textures(file_bytes, filename):
             found.append({"member": "", "index": texture["index"], "name": texture["name"],
                           "width": info["width"], "height": info["height"], "format": info["format"]})
     elif lowered.endswith(".tpfbhd") or lowered.endswith(".tpfbdt"):
-        # Split texture archives (BHF3/BDT): their member table is not
-        # decoded yet, so they replace only as whole files.
-        raise AssetError("Split texture archives cannot be previewed yet; they still replace as whole files")
+        # Split texture archives (BHF3/BDT): their members decode for the
+        # map viewport (bhf.py), but the asset browser still replaces them
+        # as whole files.
+        raise AssetError("Split texture archives replace as whole files")
     elif lowered.endswith(".dds"):
         info = dds_info(payload)
         found.append({"member": "", "index": 0, "name": filename.rsplit("/", 1)[-1],
@@ -383,7 +400,7 @@ def texture_png(file_bytes, filename, member="", index=0):
     if lowered.endswith(".tpf"):
         textures = parse_tpf(payload)
     elif lowered.endswith(".tpfbhd") or lowered.endswith(".tpfbdt"):
-        raise AssetError("Split texture archives cannot be previewed yet; they still replace as whole files")
+        raise AssetError("Split texture archives replace as whole files")
     elif lowered.endswith(".dds"):
         return render_png(payload)
     else:
