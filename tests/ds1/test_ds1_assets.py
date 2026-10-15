@@ -215,7 +215,7 @@ def test_tpf_listing_and_png_preview():
 
 def test_split_archives_replace_whole_but_never_preview(tmp_path):
     _, mod = project(tmp_path)
-    with pytest.raises(AssetError, match="cannot be previewed"):
+    with pytest.raises(AssetError, match="replace as whole files"):
         assets.list_textures(b"BHF3" + bytes(200), "x.tpfbhd")
     assets.store_bytes(mod, "chr/c0000/x.tpfbhd", b"BHF3" + bytes(200))
     assert assets.scan_project(mod)[0]["relative"] == "chr/c0000/x.tpfbhd"
@@ -285,7 +285,8 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
         done = request_json(session, "/api/assets/upload",
                             {"id": "up-1", "relative": TPF.as_posix(), "total": len(blob),
                              "offset": first["received"], "data": encoded[half:], "final": True})
-        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob), "kind": "textures"}]
+        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob), "kind": "textures",
+                                    "status": "modified"}]
         detail = request_json(session, f"/api/assets?scope=textures&file={TPF.as_posix()}")
         assert detail["source"] == "mod"
         assert [(row["name"], row["width"], row["height"]) for row in detail["textures"]] == [("b_diffuse.dds", 6, 2)]
@@ -367,3 +368,28 @@ def test_scans_label_every_entry_with_its_kind(tmp_path):
     (game / TPF).write_bytes(b"pixels")
     rows = assets.scan_game(game)
     assert [row for row in rows if row["relative"] == TPF.as_posix()][0]["kind"] == "textures"
+
+
+def test_scan_project_marks_modified_and_new_against_the_game(tmp_path):
+    game, mod = project(tmp_path)
+    (game / TPF).parent.mkdir(parents=True)
+    (game / TPF).write_bytes(b"game pixels")
+    assets.store_bytes(mod, TPF.as_posix(), b"mod pixels")
+    assets.store_bytes(mod, "chr/c9999/new.tpf", b"brand new")
+    statuses = {row["relative"]: row["status"]
+                for row in assets.scan_project(mod, game_root=game)}
+    assert statuses == {TPF.as_posix(): "modified", "chr/c9999/new.tpf": "new"}
+    assert all(row["status"] is None for row in assets.scan_project(mod))
+
+
+def test_scan_game_marks_shadowed_files(tmp_path):
+    game, mod = project(tmp_path)
+    (game / TPF).parent.mkdir(parents=True)
+    (game / TPF).write_bytes(b"game pixels")
+    (game / "chr" / "c0001").mkdir(parents=True)
+    (game / "chr" / "c0001" / "other.tpf").write_bytes(b"untouched")
+    assets.store_bytes(mod, TPF.as_posix(), b"mod pixels")
+    statuses = {row["relative"]: row["status"] for row in assets.scan_game(game, mod)}
+    assert statuses[TPF.as_posix()] == "modified"
+    assert statuses["chr/c0001/other.tpf"] is None
+    assert all(row["status"] is None for row in assets.scan_game(game))

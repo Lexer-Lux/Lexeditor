@@ -70,7 +70,7 @@ def main():
                     page.wait_for_function('state.tab==="maps" && state.rows.length>0 && state.dirRows.length>0 && !state.error')
                     page.wait_for_selector('[data-maps-dir] [data-subtab="treasure"]')
                     assert page.locator('[data-maps-dir] [data-subtab]').evaluate_all(
-                        'nodes=>nodes.map(n=>n.dataset.subtab)') == ['drops', 'enemies', 'npcs', 'shops', 'treasure']
+                        'nodes=>nodes.map(n=>n.dataset.subtab)') == ['drops', 'enemies', 'npcs', 'treasure']
                     # The NPC/enemy split follows the live npcType, not names.
                     page.locator('[data-maps-dir] [data-subtab="npcs"]').click()
                     page.wait_for_function('state.dirTab==="npcs"')

@@ -118,11 +118,14 @@ def test_add_row_npc_monster_gate():
     row = document.add_row("NpcParam", monsters[0])
     assert document.is_monster(row["id"])
     assert document.read_row("NpcParam", row["id"])["id"] == row["id"]
-    assert 251000 in ids and not document.is_monster(251000)
-    with pytest.raises(FormatError, match="reviewed standard monster"):
-        document.add_row("NpcParam", 251000)
+    assert 251000 in ids and document.is_friend(251000)
+    friend = document.add_row("NpcParam", 251000)
+    assert document.is_friend(friend["id"])
+    assert 223000 in ids and not document.is_monster(223000) and not document.is_friend(223000)
+    with pytest.raises(FormatError, match="reviewed monster or NPC"):
+        document.add_row("NpcParam", 223000)
     # A refused duplicate changes nothing.
-    assert [row.row_id for row in document.params["NpcParam"].rows] == ids + [row["id"]]
+    assert [row.row_id for row in document.params["NpcParam"].rows] == ids + [row["id"], friend["id"]]
 
 
 def test_remove_row():
@@ -305,3 +308,11 @@ def test_service_vanilla_refuses_add_remove(tmp_path):
             assert error.value.code == 403
     finally:
         session.stop()
+
+
+def test_added_rows_read_as_created():
+    document = ItemDocument(make_archive())
+    row = document.add_row("EquipParamGoods", 100)
+    rows = {row["id"]: row for row in document.list_rows("consumables")}
+    assert rows[row["id"]]["created"] is True
+    assert rows[100]["created"] is False

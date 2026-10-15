@@ -9,7 +9,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, theme
+from . import assets, deployment, data_map, icons, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore
@@ -25,6 +25,11 @@ from . import tweak_mods
 from . import data_map
 from . import viewport
 
+# Armor shows its male icon; male and female differ only on a few pieces,
+# and the male set is complete.
+_ICON_KEYS = {'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
+              'EquipParamAccessory': 'iconId', 'EquipParamGoods': 'iconId',
+              'Magic': 'iconId', 'SpEffectParam': 'iconId'}
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 LOCK = threading.RLock()
@@ -128,14 +133,15 @@ class Handler(PluginRequestHandler):
                         if scope == 'game':
                             if STORE.game_root is None:
                                 raise ValueError('Select the installed game before browsing its files')
-                            result = {'files': assets.scan_game(STORE.game_root)}
+                            result = {'files': assets.scan_game(STORE.game_root, STORE.project)}
                         elif scope == 'textures':
                             data, source, name = _asset_bytes(query.get('file', [''])[0],
                                                               query.get('side', ['mod'])[0])
                             result = {'file': name, 'source': source, 'size': len(data),
                                       'textures': assets.list_textures(data, name)}
                         else:
-                            result = {'files': assets.scan_project(STORE.project, strict=False)
+                            result = {'files': assets.scan_project(STORE.project, strict=False,
+                                                                    game_root=STORE.game_root)
                                       if STORE.project is not None else [],
                                       'hasProject': STORE.project is not None,
                                       'readOnly': STORE.read_only}
@@ -335,6 +341,33 @@ class Handler(PluginRequestHandler):
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
+        if path in ('/api/icon', '/api/label'):
+            try:
+                with LOCK:
+                    if STORE.game_root is None:
+                        raise ValueError('Select the installed game before showing its icons')
+                    if path == '/api/label':
+                        self.send_bytes(icons.label_png(STORE.game_root, query.get('name', [''])[0]),
+                                        'image/png')
+                    else:
+                        table = query.get('table', [''])[0]
+                        key = _ICON_KEYS.get(table)
+                        if key is None:
+                            raise ValueError('That record has no item picture')
+                        try:
+                            row_id = int(query.get('id', [''])[0])
+                        except ValueError:
+                            raise ValueError('An item picture needs a numeric record') from None
+                        icon_id = STORE.get().value(table, row_id, key)
+                        if not isinstance(icon_id, int) or icon_id <= 0:
+                            raise LookupError('That record has no item picture')
+                        self.send_bytes(icons.icon_png(STORE.game_root, icon_id), 'image/png')
+            except LookupError as error:
+                self.send_json({'error': str(error)}, 404)
+            except (FormatError, icons.IconError, RuntimeError, ValueError, OSError,
+                    KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
         if path == '/api/assets/preview':
             try:
                 with LOCK:
@@ -456,14 +489,16 @@ class Handler(PluginRequestHandler):
                                                   payload['total'], payload['offset'], raw,
                                                   bool(payload.get('final')))
                     result = {'upload': stored,
-                              'files': assets.scan_project(STORE.project, strict=False)}
+                              'files': assets.scan_project(STORE.project, strict=False,
+                                                           game_root=STORE.game_root)}
                 elif path == '/api/assets/remove':
                     if STORE.read_only or STORE.project is None:
                         raise PermissionError('Replacing assets needs a writable mod project')
                     if 'relative' not in payload:
                         raise ValueError('Removing an override needs its file')
                     result = {'removed': assets.remove_override(STORE.project, payload['relative']),
-                              'files': assets.scan_project(STORE.project, strict=False)}
+                              'files': assets.scan_project(STORE.project, strict=False,
+                                                           game_root=STORE.game_root)}
                 elif path == '/api/rows/add':
                     for key in ('table', 'id'):
                         if key not in payload:

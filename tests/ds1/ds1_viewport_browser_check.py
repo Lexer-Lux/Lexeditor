@@ -17,9 +17,11 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bhf_fixture import make_bhf, make_edge
 from ds1_fixture import make_archive, make_text_archive
 from flver_fixture import build_flver
 from msb_fixture import build_msb
+from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1 import texts
 from plugins.ds1.msb import MAP_DIR
 from plugins.ds1.store import MARKER, RELATIVE
@@ -47,6 +49,13 @@ def make_game(temp):
     (game / 'map' / 'test2' / 'm10piece.flver').write_bytes(build_flver())
     (game / 'map' / 'm10_01_00_00').mkdir(parents=True)
     (game / 'map' / 'm10_01_00_00' / 'm10piece.flver').write_bytes(build_flver())
+    red = make_dds_rgba(4, 4, [(220, 30, 30, 255)] * 16)
+    blob = make_edge(make_tpf([('tex0', red)]))
+    area = game / 'map' / 'm10'
+    area.mkdir(parents=True)
+    (area / 'm10_0000.tpfbdt').write_bytes(bytes(16) + blob)
+    (area / 'm10_0000.tpfbhd').write_bytes(
+        make_bhf([(r'\m10\tex0.tpf.dcx', 16, len(blob))]))
     return game
 
 
@@ -74,6 +83,15 @@ def rendered_pixels(page, label):
     assert colors is None or len(colors) > 2, f'{label} canvas blank ({count} colors)'
 
 
+def textured_pixels(page, label):
+    # The m10 piece wears a pure red split-archive texture: a gray
+    # render keeps red at bay, a textured one is full of it.
+    shot = page.locator('canvas[data-viewport]').screenshot()
+    raw = Image.open(io.BytesIO(shot)).convert('RGB').tobytes()
+    red = sum(1 for i in range(0, len(raw), 3)
+              if raw[i] > raw[i + 1] + 30 and raw[i] > raw[i + 2] + 30)
+    assert red > 100, f'{label} map renders gray ({red} red pixels)' 
+
 def phase_readonly(play, game, output, errors):
     session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_NO_MOD': '1',
                           'LEXEDITOR_MOD_READ_ONLY': '1'})
@@ -90,6 +108,7 @@ def phase_readonly(play, game, output, errors):
                 assert want in status, status
             assert page.locator('canvas[data-viewport]').count() == 1
             rendered_pixels(page, 'm10_01_00_00.msb')
+            textured_pixels(page, 'm10_01_00_00.msb')
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             assert page.locator('[data-viewport-action="remove"]').is_disabled()
             assert page.locator('[data-viewport-action="add"]').is_disabled()

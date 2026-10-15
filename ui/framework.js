@@ -10718,7 +10718,7 @@ ${contents.path}`});
         ? `${formatNumber(first)}/${formatNumber(total)}`
         : `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
     return element("div", {
-      class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,
+      class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}${options.stacked === true ? " lex-pager-stacked" : ""}`,
       "aria-label": "Search and pagination",
     }, left, pages === 1 ? null : controls, right);
   };

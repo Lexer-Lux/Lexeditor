@@ -14,6 +14,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from drb_fixture import make_dcx, make_drb, sprite_shape
 from ds1_fixture import make_archive, make_menu_archive, make_text_archive
 from flver_fixture import build_flver, make_chrbnd
 from msb_fixture import build_msb
@@ -58,9 +59,26 @@ def icon_left_of_name(page):
     assert box and name and box['x'] + box['width'] <= name['x'] + 1, (box, name)
 
 
+def loaded_images(page, selector):
+    """Every matching image finished loading with real pixels."""
+    shots = page.locator(selector)
+    assert shots.count() > 0, selector
+    sizes = page.evaluate(
+        """(query) => [...document.querySelectorAll(query)].map(
+            image => [image.naturalWidth, image.naturalHeight])""",
+        selector)
+    assert sizes and all(width > 0 and height > 0 for width, height in sizes), sizes
+    return shots.count()
+
+
 def attached_thumb(page):
     icon = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
-    assert icon.locator('.lex-no-thumbnail').count() == 1
+    img = icon.locator('img.ds1-model-thumbnail')
+    img.wait_for(timeout=30000)
+    page.wait_for_function("document.querySelector('.lex-detail-panel-heading .lex-detail-panel-icon img.ds1-model-thumbnail')?.dataset.modelReady==='true'")
+    src = img.get_attribute('src') or ''
+    assert src.startswith('data:image/png'), src[:40]
+    assert len(src) > 1000, len(src)
     assert 'No image' not in icon.inner_text()
     icon_left_of_name(page)
 
@@ -71,6 +89,7 @@ def main():
         output.mkdir(parents=True, exist_ok=True)
     document = ItemDocument(make_archive())
     put(document, 'EquipParamWeapon', 100, 'equipModelId', 100)
+    put(document, 'EquipParamGoods', 100, 'iconId', 2004)
     put(document, 'EquipParamProtector', 100, 'equipModelId', 200)
     put(document, 'EquipParamProtector', 100, 'equipModelCategory', 2)
     put(document, 'EquipParamProtector', 100, 'equipModelGender', 3)
@@ -95,6 +114,21 @@ def main():
             make_chrbnd(build_flver(), stem='BD_M_0200'))
         (game / 'parts' / 'BD_F_0200.partsbnd.dcx').write_bytes(
             make_chrbnd(build_flver(), stem='BD_F_0200'))
+        (game / 'menu').mkdir(parents=True)
+        quadrants = []
+        for y in range(360):
+            for x in range(320):
+                quadrants.append((255, 0, 0, 255) if x < 160 and y < 180
+                                 else (0, 255, 0, 255) if x >= 160 and y < 180
+                                 else (0, 0, 255, 255) if x < 160
+                                 else (255, 255, 255, 255))
+        (game / 'menu' / 'menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([
+            ('Icon00', make_dds_rgba(320, 360, quadrants)),
+            ('Menu04_2', make_dds_rgba(512, 1024, [(40, 120, 200, 255)] * 512 * 1024)),
+        ])))
+        (game / 'menu' / 'menu.drb').write_bytes(make_drb(['Icon00', 'Menu04_2'], {
+            'Icon': [('EquIcon_2004', sprite_shape((0, 0, 0, 0), (1, 1, 81, 91), 0))],
+        }))
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_NO_MOD': '1',
                               'LEXEDITOR_MOD_READ_ONLY': '1'})
         errors = []
@@ -159,18 +193,42 @@ def main():
                     painted(page, 'canvas[data-preview]')
                     if output:
                         page.screenshot(path=str(output / 'parts-armor.png'))
-                    # Consumables name no model: the icon says why.
+                    # Consumables have no model: the heading shows the item's
+                    # inventory picture with no magnifier and no drawer.
                     navigate(page, '[data-subtab="consumables"]', "EquipParamGoods", 100)
                     page.wait_for_function('state.sub === "consumables" && state.row && !state.error')
                     reason = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
                     reason.wait_for()
-                    assert 'No model' in reason.inner_text()
+                    picture = reason.locator('img.lex-ds1-item-icon')
+                    picture.wait_for()
+                    assert (picture.get_attribute('src') or '').startswith('/api/icon?table='), \
+                        picture.get_attribute('src')
+                    assert page.evaluate(
+                        '(image) => image.naturalWidth > 0', picture.element_handle())
+                    assert 'No model' not in reason.inner_text()
                     label = reason.get_attribute('aria-label') or ''
                     assert 'no model file' in label, label
                     assert page.locator(
                         '.lex-detail-panel-heading .lex-model-preview-trigger').count() == 0
+                    assert page.locator(
+                        '.lex-detail-panel-heading .lex-model-preview-close').count() == 0
                     assert reason.get_attribute('data-lex-preview-state') == 'unavailable'
                     icon_left_of_name(page)
+                    shot = page.evaluate(
+                        "fetch('/api/icon?table=EquipParamGoods&id=100').then(async r => ["
+                        "r.status, r.headers.get('content-type'), (await r.arrayBuffer()).byteLength])")
+                    assert shot[0] == 200 and shot[1] == 'image/png' and shot[2] > 100, shot
+                    missing = page.evaluate(
+                        "fetch('/api/icon?table=NpcParam&id=120000').then(r => r.status)")
+                    assert missing == 400, missing
+                    # Damage, defense and stat labels carry the game's own art.
+                    navigate(page, '[data-subtab="weapons"]', "EquipParamWeapon", 100)
+                    page.wait_for_function('state.sub === "weapons" && state.row && !state.error')
+                    assert loaded_images(page, 'img.lex-ds1-label-art') >= 4
+                    assert page.evaluate(
+                        "fetch('/api/label?name=physical').then(r => r.status)") == 200
+                    assert page.evaluate(
+                        "fetch('/api/label?name=poison').then(r => r.status)") == 400
                     # Enemy drawer: the placed character model renders plain.
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')

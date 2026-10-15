@@ -1,4 +1,4 @@
-"""Render the Assets tab: browse, preview, replace and remove, never game files."""
+"""Render the file tabs: browse, preview, replace and remove, never game files."""
 import os
 from pathlib import Path
 import struct
@@ -89,24 +89,29 @@ def main():
                     page.on("pageerror", lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    page.locator('[data-tab="assets"]').click()
-                    page.wait_for_selector('[data-subtab="overrides"]')
-                    page.wait_for_function('state.tab==="assets" && state.sub==="overrides" && !state.error')
-                    assert page.locator("[data-subtab]").evaluate_all(
-                        "nodes=>nodes.map(n=>n.dataset.subtab)") == [
-                        "game", "overrides", "models", "textures", "sound", "music", "other"]
-                    assert page.evaluate("state.rows.length") == 0
-                    page.locator('[data-subtab="game"]').click()
-                    page.wait_for_function('state.sub==="game" && state.rows.length===1 && !state.error')
-                    for kind, wanted in (("models", MODEL), ("textures", TPF), ("sound", SFX),
-                                         ("music", MUSIC), ("other", MOVIE)):
-                        page.locator(f'[data-subtab="{kind}"]').click()
+                    tabs = page.locator("[data-tab]").evaluate_all(
+                        "nodes=>nodes.map(n=>n.dataset.tab)")
+                    for tab in ("models", "textures", "sound", "music", "other"):
+                        assert tab in tabs, tabs
+                    assert "assets" not in tabs, tabs
+                    for tab, wanted in (("models", MODEL), ("textures", TPF), ("sound", SFX),
+                                        ("music", MUSIC), ("other", MOVIE)):
+                        page.locator(f'[data-tab="{tab}"]').click()
+                        page.wait_for_selector('[data-subtab="overrides"]')
+                        page.locator('[data-subtab="overrides"]').click()
                         page.wait_for_function(
-                            f'state.assetKind==="{kind}" && state.rows.length===1'
+                            f'state.tab==="{tab}" && state.sub==="overrides"'
+                            ' && state.rows.length===0 && !state.error')
+                        assert page.locator("[data-subtab]").evaluate_all(
+                            "nodes=>nodes.map(n=>n.dataset.subtab)") == ["game", "overrides"]
+                        page.locator('[data-subtab="game"]').click()
+                        page.wait_for_function(
+                            f'state.sub==="game" && state.rows.length===1'
                             f' && state.rows[0].id==="{wanted}" && !state.error')
-                    page.locator('[data-subtab="textures"]').click()
+                    page.locator('[data-tab="textures"]').click()
+                    page.locator('[data-subtab="game"]').click()
                     page.wait_for_function(
-                        'state.assetKind==="textures"'
+                        'state.tab==="textures"'
                         ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf") && !state.error')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function(
@@ -117,22 +122,24 @@ def main():
                     assert preview.evaluate("img=>img.naturalWidth") > 0
                     if output:
                         page.screenshot(path=str(output / "assets-game-preview.png"))
-                    page.locator('[data-subtab="other"]').click()
-                    page.wait_for_function('state.assetKind==="other" && state.rows.length===1')
+                    page.locator('[data-tab="other"]').click()
+                    page.locator('[data-subtab="game"]').click()
+                    page.wait_for_function('state.tab==="other" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=MOVIE).click()
                     page.wait_for_function(
                         'state.row?.id==="movww/intro.wmv" && state.assetDetail?.source==="game"'
                         ' && state.assetDetail.textures.length===0 && !state.error')
                     assert page.locator("#main img").count() == 0
-                    page.locator('[data-subtab="textures"]').click()
-                    page.wait_for_function('state.assetKind==="textures" && state.rows.length===1')
+                    page.locator('[data-tab="textures"]').click()
+                    page.locator('[data-subtab="game"]').click()
+                    page.wait_for_function('state.tab==="textures" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.textures.length===1')
                     # Playwright sets the file behind the hidden picker; the tab
                     # uploads it and lands in Mod files, where it now lives.
                     page.locator('#main input[type="file"]').set_input_files(str(upload))
                     page.wait_for_function(
-                        'state.sub==="overrides" && state.assetKind==="textures"'
+                        'state.sub==="overrides" && state.tab==="textures"'
                         ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf")'
                         ' && state.assetDetail?.source==="mod"'
                         ' && state.assetDetail.textures[0].name==="c0000_custom.dds" && !state.assetBusy && !state.error')
@@ -140,6 +147,38 @@ def main():
                     assert page.locator("#main img[alt='c0000_custom.dds']").evaluate("img=>img.naturalWidth") > 0
                     if output:
                         page.screenshot(path=str(output / "assets-override.png"))
+                    # A replaced file reads modified; a file the game lacks
+                    # reads new. The game side marks what the mod shadows.
+                    (mod / "chr" / "c9999").mkdir(parents=True)
+                    (mod / "chr" / "c9999" / "new.tpf").write_bytes(mod_tpf)
+                    page.locator('[data-subtab="overrides"]').click()
+                    page.wait_for_function('state.sub==="overrides" && state.rows.length===2')
+                    assert page.locator(
+                        ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
+                    nib = page.locator(".lex-list-row", has_text="new.tpf").locator(".lex-record-source")
+                    assert nib.count() == 1
+                    assert nib.get_attribute("aria-label") == "Created in this mod"
+                    page.locator('[data-subtab="game"]').click()
+                    page.wait_for_function('state.sub==="game" && state.rows.length===1')
+                    assert page.locator(
+                        ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
+                    page.locator('[data-tab="models"]').click()
+                    page.locator('[data-subtab="game"]').click()
+                    page.wait_for_function('state.tab==="models" && state.rows.length===1')
+                    assert page.locator(
+                        ".lex-list-row.lex-record-modified", has_text=MODEL).count() == 0
+                    assert page.locator(
+                        ".lex-list-row .lex-record-source", has_text=MODEL).count() == 0
+                    page.locator('[data-tab="textures"]').click()
+                    page.locator('[data-subtab="overrides"]').click()
+                    page.wait_for_function('state.rows.length===2')
+                    page.locator(".lex-list-row", has_text="new.tpf").click()
+                    page.wait_for_function('state.row?.id==="chr/c9999/new.tpf"')
+                    page.locator('[data-asset-action="remove"]').click()
+                    page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
+                    page.wait_for_function("state.rows.length===1 && !state.assetBusy && !state.error")
+                    page.locator(".lex-list-row", has_text=TPF).click()
+                    page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf"')
                     page.locator('[data-asset-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
                     page.wait_for_function("state.rows.length===0 && !state.assetBusy && !state.error")
@@ -152,7 +191,7 @@ def main():
         finally:
             session.stop()
             assert session.wait_closed()
-    print("DS1 Assets browse, preview, replace and remove passed.")
+    print("DS1 file tabs browse, preview, replace and remove passed.")
 
 
 if __name__ == "__main__":

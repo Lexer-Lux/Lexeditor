@@ -70,6 +70,43 @@ window.Ds1Viewport = (() => {
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
+    // One texture per diffuse name: the server sends the same bytes for a
+    // name on every model, so loading it once keeps big maps light, and one
+    // material per texture keeps placements sharing materials as before.
+    const texCache = new Map();
+    const matCache = new Map();
+    const texLoader = new THREE.TextureLoader();
+    const disposable = [];
+    const textureFor = async (tex, png) => {
+      if (!texCache.has(tex)) {
+        try {
+          const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
+          image.colorSpace = THREE.SRGBColorSpace;
+          texCache.set(tex, image);
+          disposable.push(image);
+        } catch (_error) {
+          return null;
+        }
+      }
+      return texCache.get(tex);
+    };
+    const materialFor = (mesh, texturesByName, fx) => {
+      const plain = fx ? effect : mesh.cull !== false ? front : double;
+      const png = mesh.map && texturesByName && texturesByName[mesh.map];
+      const image = mesh.map && mesh.uv && png ? texCache.get(mesh.map) : null;
+      if (!image) return plain;
+      const key = `${mesh.map}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}`;
+      if (!matCache.has(key)) {
+        const textured = fx
+          ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
+              side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false})
+          : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
+              side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+        matCache.set(key, textured);
+        disposable.push(textured);
+      }
+      return matCache.get(key);
+    };
     // Collision and navigation parts have no model to load and no honest
     // drawing: their geometry is world-baked Havok data. Counted, not drawn.
     const isMarker = part => part.kind === "Collision" || part.kind === "Navigation";
@@ -93,15 +130,23 @@ window.Ds1Viewport = (() => {
       return [name, data];
     }));
     if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
+    const wantedPngs = new Map();
+    for (const [name, data] of loaded)
+      for (const [tex, png] of Object.entries(data.textures || {}))
+        if (!wantedPngs.has(tex)) wantedPngs.set(tex, png);
+    await Promise.all([...wantedPngs].map(([tex, png]) => textureFor(tex, png)));
+    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const geometries = new Map();
     for (const [name, data] of loaded) {
       geometries.set(name, data.meshes.map(mesh => {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
         geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+        if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
         geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
         geo.computeBoundingSphere();
         const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
+        entry.mat = materialFor(mesh, data.textures, entry.fx);
         if (entry.sky) counts.sky++;
         if (entry.fx) counts.effect++;
         return entry;
@@ -129,7 +174,7 @@ window.Ds1Viewport = (() => {
       const group = new THREE.Group();
       place(group, part);
       for (const entry of geos) {
-        const mesh = new THREE.Mesh(entry.geo, entry.fx ? effect : entry.cull ? front : double);
+        const mesh = new THREE.Mesh(entry.geo, entry.mat);
         mesh.userData.sky = entry.sky;
         mesh.userData.fx = entry.fx;
         group.add(mesh);
@@ -348,6 +393,7 @@ window.Ds1Viewport = (() => {
       front.dispose();
       double.dispose();
       effect.dispose();
+      for (const item of disposable) item.dispose();
       highlight.dispose();
     };
     const loop = () => {
@@ -397,6 +443,27 @@ window.Ds1Viewport = (() => {
     const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
     const double = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.DoubleSide});
     trash.push(front, double);
+    const texCache = new Map();
+    const texLoader = new THREE.TextureLoader();
+    const materialFor = async mesh => {
+      const plain = mesh.cull !== false ? front : double;
+      const png = mesh.map && data.textures && data.textures[mesh.map];
+      if (!png || !mesh.uv) return plain;
+      if (!texCache.has(mesh.map)) {
+        try {
+          const tex = await texLoader.loadAsync(`data:image/png;base64,${png}`);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          texCache.set(mesh.map, tex);
+          trash.push(tex);
+        } catch (_error) {
+          return plain;
+        }
+      }
+      const textured = new THREE.MeshStandardMaterial({map: texCache.get(mesh.map),
+        roughness: 0.95, metalness: 0, side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+      trash.push(textured);
+      return textured;
+    };
     const root = new THREE.Group();
     scene.add(root);
     let tris = 0;
@@ -404,9 +471,10 @@ window.Ds1Viewport = (() => {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
       geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+      if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
       geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
       trash.push(geo);
-      root.add(new THREE.Mesh(geo, mesh.cull !== false ? front : double));
+      root.add(new THREE.Mesh(geo, await materialFor(mesh)));
       tris += geo.index.count / 3;
     }
     const byId = new Map((chr.dummies || []).map(dummy => [dummy.id, new THREE.Vector3(dummy.pos[0], dummy.pos[1], dummy.pos[2])]));

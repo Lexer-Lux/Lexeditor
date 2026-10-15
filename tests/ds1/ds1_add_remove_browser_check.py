@@ -64,8 +64,8 @@ def main():
                         "EquipParamGoods", 103, "sellValue") == ItemDocument(raw).value(
                         "EquipParamGoods", 100, "sellValue")
                     # Consumables shows goods 100 plus the duplicate, ID order.
-                    page.wait_for_function("document.querySelectorAll('.lex-list-row').length===2")
-                    page.locator(".lex-list-row").nth(1).click()
+                    page.wait_for_function("document.querySelectorAll('.lex-list-row:not(.lex-filler-row)').length===2")
+                    page.locator('.lex-list-row[data-key="EquipParamGoods:103"]').click()
                     page.wait_for_function("state.row?.id===103 && !state.error")
                     page.locator('[data-row-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
@@ -78,9 +78,13 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
-                    page.wait_for_function("document.querySelectorAll('.lex-list-row').length===3")
-                    page.locator(".lex-list-row", has_text="enemy0").click()
+                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===3")
+                    first = page.locator('.lex-list-row[data-key="%s:2:0"]' % MAP)
+                    assert "Rat \u2014 " + MAP in first.inner_text()
+                    first.click()
                     page.wait_for_function('state.row?.id==="2:0" && !state.error')
+                    page.locator('[data-tabstrip-id="selection"]').click()
+                    page.wait_for_function('state.mapTab==="selection"')
                     page.locator('[data-row-action="duplicate"]').click()
                     page.wait_for_function(
                         'state.selected==="m10_00_00_00.msb:2:1" && state.row?.id==="2:1" && !state.rowBusy && !state.error')
@@ -96,9 +100,13 @@ def main():
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:1") && !state.error')
                     assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 4
-                    page.wait_for_function("document.querySelectorAll('.lex-list-row').length===4")
-                    page.locator(".lex-list-row", has_text="enemy0_1").click()
+                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===4")
+                    dupe = page.locator('.lex-list-row[data-key="%s:2:1"]' % MAP)
+                    assert "Rat \u2014 " + MAP in dupe.inner_text()
+                    dupe.click()
                     page.wait_for_function('state.row?.id==="2:1" && !state.error')
+                    page.locator('[data-tabstrip-id="selection"]').click()
+                    page.wait_for_function('state.mapTab==="selection"')
                     page.locator('[data-row-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
                     page.wait_for_function(

@@ -80,6 +80,43 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
         'The absorption to apply to damage of the specified type when guarding.')
 
 
+# Label art per field: the damage, defense and stat icons the game's own
+# equipment screen uses (icons.py crops them from Menu04_2). Kinds the game
+# shows no icon for (poison, bleed, divine, occult, slash, strike, thrust)
+# stay unmapped: no invented glyphs.
+_FIELD_ICONS = {}
+for _table, _keys, _kinds in (
+        ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('NpcParam', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('AtkParam_Npc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('AtkParam_Pc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('EquipParamWeapon', ('attackBasePhysics', 'attackBaseMagic', 'attackBaseFire', 'attackBaseThunder'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('EquipParamWeapon', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('EquipParamWeapon', ('properStrength', 'properAgility', 'properMagic', 'properFaith'),
+         ('str', 'dex', 'int', 'faith')),
+        ('EquipParamWeapon', ('correctStrength', 'correctAgility', 'correctMagic', 'correctFaith'),
+         ('str', 'dex', 'int', 'faith')),
+        ('EquipParamWeapon', ('weight',), ('weight',)),
+        ('EquipParamWeapon', ('durability', 'durabilityMax'), ('durability', 'durability')),
+        ('EquipParamProtector', ('defensePhysics', 'defenseMagic', 'defenseFire', 'defenseThunder'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('EquipParamProtector', ('weight',), ('weight',)),
+        ('EquipParamProtector', ('durability', 'durabilityMax'), ('durability', 'durability')),
+        ('Magic', ('requirementIntellect', 'requirementFaith'), ('int', 'faith')),
+):
+    for _key, _kind in zip(_keys, _kinds):
+        _FIELD_ICONS[(_table, _key)] = _kind
+del _table, _keys, _kinds, _key, _kind
+ABSORPTION_ICONS = {'neutralDamageCutRate': 'physicalDef', 'magicDamageCutRate': 'magicDef',
+                    'fireDamageCutRate': 'fireDef', 'thunderDamageCutRate': 'lightningDef'}
+
+
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
 # Stamina Costs tweak sets each spell's Elden Ring value.
 MAGIC_FIELDS = {
@@ -114,8 +151,9 @@ ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),
                   ('player-attacks', 'Player attacks', 'AtkParam_Pc'),
                   ('projectiles', 'Projectiles', 'Bullet'))
 WORLD_SUBTABS = (('drops', 'Drops', 'ItemLotParam'),
-                 ('shops', 'Shops', 'ShopLineupParam'),
                  ('treasure', 'Treasure', 'ObjActParam'))
+NPCS_SUBTABS = (('npcs', 'NPCs', 'NpcParam'),)
+SHOPS_SUBTABS = (('shops', 'Shops', 'ShopLineupParam'),)
 # Reviewed behavior and projectile fields. Costs, call targets and flight
 # physics are safe numbers; identity and judgement fields stay read-only.
 BEHAVIOR_EDITABLE = frozenset({'stamina', 'mp', 'heroPoint', 'category', 'refType', 'refId'})
@@ -464,7 +502,8 @@ def schema(table):
             low = max(low, 0)
         if low > high:
             protected = True
-        fields.append({'spec': field, 'min': low, 'max': high, 'enum': choices, 'editable': not protected, 'protectedReason': reason})
+        fields.append({'spec': field, 'min': low, 'max': high, 'enum': choices, 'editable': not protected, 'protectedReason': reason,
+                       'icon': _FIELD_ICONS.get((table, key))})
         if bits: bit_used += bits
     if offset != TABLES[table][0]:
         raise FormatError(f'{table} definition size {offset} does not match the audited row size')
@@ -763,13 +802,17 @@ class ItemDocument:
             return self._stats_rows(tab)
         if tab == 'menu-labels':
             return self._menu_label_rows()
-        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS if entry[0] == tab), None)
+        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS + SHOPS_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
         result = []
         for row in self.params[table].rows:
-            if table == 'NpcParam' and not self.is_monster(row.row_id):
-                continue
+            if table == 'NpcParam':
+                if tab == 'npcs':
+                    if not self.is_friend(row.row_id):
+                        continue
+                elif not self.is_monster(row.row_id):
+                    continue
             if table == 'EquipParamGoods':
                 category = self.value(table, row.row_id, 'goodsType')
                 if tab != ('keys' if category == 1 else 'upgrades' if category == 2 else 'consumables'):
@@ -780,15 +823,21 @@ class ItemDocument:
                 ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
                 if (tab == 'ammo') != ammo: continue
             values, display = self.row_values(table, row.row_id)
-            result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row), 'table': table,
-                           'values': values, 'display': display})
+            name = self.display_name(table, row.row_id, row)
+            if table == 'ShopLineupParam':
+                merchant = re.match(r'\[(.*?)\]', name or '')
+                values['merchant'] = merchant.group(1) if merchant else ''
+            result.append({'id': row.row_id, 'name': name, 'table': table,
+                           'values': values, 'display': display,
+                           'created': (table, row.row_id) in self._added_rows})
         if tab == 'spells':
             table = 'EquipParamGoods'
             for row in self.params[table].rows:
                 if self.value(table, row.row_id, 'goodsType') in (5, 6, 7):
                     values, display = self.row_values(table, row.row_id)
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
-                                   'values': values, 'display': display})
+                                   'values': values, 'display': display,
+                                   'created': (table, row.row_id) in self._added_rows})
         return result
 
     def _stats_rows(self, tab):
@@ -812,7 +861,8 @@ class ItemDocument:
                 continue
             values, display = self.row_values(table, row.row_id)
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
-                           'table': table, 'values': values, 'display': display})
+                           'table': table, 'values': values, 'display': display,
+                           'created': (table, row.row_id) in self._added_rows})
         return result
 
     def _menu_label_rows(self):
@@ -823,6 +873,13 @@ class ItemDocument:
         return [{'id': text_id, 'table': 'MenuText', 'name': self.menu_texts.label(key) or display,
                  'values': {'label': self.menu_texts.label(key) or ''}, 'display': {}}
                 for key, (display, text_id) in MENU_LABELS.items()]
+
+    def is_friend(self, row_id):
+        """A friendly character: merchants, blacksmiths and quest givers,
+        everyone whose live team is friendly (2). Like monsters, friends
+        open with the reviewed NpcParam fields; bosses and test rows,
+        whose behavior nobody reviewed, stay shut."""
+        return self.value('NpcParam', row_id, 'npcType') == 2
 
     def is_monster(self, row_id):
         if classified_monster(row_id, self.schemas['NpcParam']['names'].get(row_id),
@@ -895,8 +952,8 @@ class ItemDocument:
     def read_row(self, table, row_id, only=None):
         if table == 'MenuText':
             return self._read_menu_label(row_id, only)
-        if table == 'NpcParam' and not self.is_monster(row_id):
-            raise FormatError('This record is not a reviewed standard monster')
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+            raise FormatError('This record is not a reviewed monster or NPC')
         row, _, data = self._row(table, row_id)
         vanilla = self._vanilla_row(table, row_id)
         fields = []
@@ -942,7 +999,7 @@ class ItemDocument:
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
                            'enum': options, 'protectedReason': item.get('protectedReason', ''),
-                           'editable': item['editable'] and finite, 'vanilla': original,
+                           'editable': item['editable'] and finite, 'vanilla': original, 'icon': item.get('icon'),
                            'sliderMin': spans.get(field.key, (None, None))[0],
                            'sliderMax': spans.get(field.key, (None, None))[1]})
         if table == 'NpcParam':
@@ -1060,7 +1117,8 @@ class ItemDocument:
                                            'Upgrade levels scale from this value by the armor upgrade table.'),
                            'group': 'Absorption', 'dtype': 'f32', 'value': round((1 - rate) * 100, 3),
                            'type': 'number', 'minimum': -100.0, 'maximum': 99.0, 'enum': {},
-                           'protectedReason': '', 'editable': True, 'vanilla': original})
+                           'protectedReason': '', 'editable': True, 'vanilla': original,
+                           'icon': ABSORPTION_ICONS.get(cut)})
         return fields
 
     def _edit_absorption(self, row_id, cut, value, table='EquipParamProtector'):
@@ -1110,12 +1168,12 @@ class ItemDocument:
             self.menu_texts.set_label(MENU_LABEL_IDS[row_id], value)
             return self.read_row(table, row_id, only=only)
         if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
-            if table == 'NpcParam' and not self.is_monster(row_id):
-                raise FormatError('This record is not a reviewed standard monster')
+            if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+                raise FormatError('This record is not a reviewed monster or NPC')
             self._row(table, row_id)
             return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
-        if table == 'NpcParam' and not self.is_monster(row_id):
-            raise FormatError('This record is not a reviewed standard monster')
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+            raise FormatError('This record is not a reviewed monster or NPC')
         self._write(table, row_id, key, value)
         if table == 'ReinforceParamProtector' and key in UPGRADE_MULTIPLIERS.values():
             self._rescale_absorption(row_id, key)
@@ -1226,8 +1284,8 @@ class ItemDocument:
             source = view.row(source_id)
         except DS3FormatError:
             raise FormatError(f'Expected one row ID {source_id}; found 0') from None
-        if table == 'NpcParam' and not self.is_monster(source_id):
-            raise FormatError('This record is not a reviewed standard monster')
+        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id)):
+            raise FormatError('This record is not a reviewed monster or NPC')
         if new_id is None:
             new_id = max(row.row_id for row in view.rows) + 1
         if type(new_id) is not int or isinstance(new_id, bool) or not -(2 ** 31) <= new_id < 2 ** 31:

@@ -27,20 +27,24 @@ window.Ds1Preview = (() => {
   }
   // Mounts the geometry at geometryUrl into host and returns a controller
   // with dispose() and the canvas. A newer mount or a detached host
-  // aborts the load.
-  async function mount(host, geometryUrl) {
+  // aborts the load. A snapshot mount ({once:true}) renders one frame
+  // for a thumbnail: it never touches the session, so it cannot steal
+  // the drawer, and reports its canvas through options.onFrame.
+  async function mount(host, geometryUrl, options) {
     stop(host);
-    const mine = ++session;
+    const snapshot = !!options && options.once === true;
+    const mine = snapshot ? 0 : ++session;
+    const stale = () => !snapshot && mine !== session;
     // No connected check here: the drawer appends the stage after its
     // content factory returns, so a synchronous check always fails. The
     // guards after each wait below still abandon a detached host.
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
-    if (mine !== session || !host.isConnected) return null;
+    if (stale() || !host.isConnected) return null;
     const response = await fetch(geometryUrl);
     const data = await response.json();
     if (!response.ok || data.error) throw new Error(data.error || response.statusText);
-    if (mine !== session || !host.isConnected) return null;
+    if (stale() || !host.isConnected) return null;
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const canvas = renderer.domElement;
@@ -106,7 +110,7 @@ window.Ds1Preview = (() => {
       geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
       trash.push(geo);
       root.add(new THREE.Mesh(geo, await materialFor(mesh)));
-      if (mine !== session || !host.isConnected) { stop(host); return null; }
+      if (stale() || !host.isConnected) { stop(host); return null; }
     }
     const box = new THREE.Box3();
     root.traverse(obj => { if (obj.isMesh) box.expandByObject(obj); });
@@ -120,10 +124,17 @@ window.Ds1Preview = (() => {
       controls.update();
     }
     resize();
+    if (snapshot) {
+      if (!host.isConnected) { stop(host); return null; }
+      renderer.render(scene, camera);
+      host.dataset.ready = "true";
+      if (options.onFrame) options.onFrame(canvas);
+      return {dispose: () => stop(host), canvas};
+    }
     window.addEventListener("resize", resize);
     let frames = 0;
     const loop = () => {
-      if (!liveFlag || mine !== session || !host.isConnected) { stop(host); return; }
+      if (!liveFlag || stale() || !host.isConnected) { stop(host); return; }
       controls.update();
       renderer.render(scene, camera);
       if (++frames === 2) host.dataset.ready = "true";
@@ -132,5 +143,88 @@ window.Ds1Preview = (() => {
     loop();
     return {dispose: () => stop(host), canvas};
   }
-  return {mount, stop};
+  // Detail headers share bounded snapshots of the same renderer the
+  // drawer uses. One temporary WebGL context renders at a time; the
+  // cache keys on the geometry URL, like the availability cache, since
+  // model files only change under a mod switch.
+  const thumbCache = new Map(), thumbPending = new Map();
+  let thumbQueue = Promise.resolve();
+  function portrait(canvas) {
+    const copy = document.createElement("canvas");
+    copy.width = canvas.width; copy.height = canvas.height;
+    const ctx = copy.getContext("2d");
+    ctx.drawImage(canvas, 0, 0);
+    const pixels = ctx.getImageData(0, 0, copy.width, copy.height).data;
+    let left = copy.width, top = copy.height, right = -1, bottom = -1;
+    for (let y = 0; y < copy.height; y++) for (let x = 0; x < copy.width; x++) {
+      if (pixels[(y * copy.width + x) * 4 + 3]) {
+        left = Math.min(left, x); right = Math.max(right, x);
+        top = Math.min(top, y); bottom = Math.max(bottom, y);
+      }
+    }
+    if (right < left) throw new Error("The model rendered no visible geometry");
+    const cropped = document.createElement("canvas"), padding = 6;
+    cropped.width = right - left + 1 + padding * 2;
+    cropped.height = bottom - top + 1 + padding * 2;
+    cropped.getContext("2d").drawImage(copy, left, top, right - left + 1, bottom - top + 1,
+      padding, padding, right - left + 1, bottom - top + 1);
+    return cropped.toDataURL("image/png");
+  }
+  async function snapshot(geometryUrl) {
+    let stage, timer;
+    try {
+      return await new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error("Model preview timed out")), 15000);
+        stage = document.createElement("div");
+        stage.style.cssText = "position:fixed;left:-10000px;top:0;width:192px;height:192px;visibility:hidden;pointer-events:none";
+        stage.setAttribute("aria-hidden", "true");
+        document.body.append(stage);
+        mount(stage, geometryUrl, {once: true, onFrame: canvas => resolve(portrait(canvas))})
+          .then(task => { if (!task) reject(new Error("Model preview unavailable")); })
+          .catch(reject);
+      });
+    } finally {
+      clearTimeout(timer);
+      if (stage) { stop(stage); stage.remove(); }
+    }
+  }
+  function thumbnail(options) {
+    const image = document.createElement("img");
+    image.alt = `${options.label} model`;
+    image.className = "ds1-model-thumbnail lex-image-pending";
+    const key = options.url;
+    requestAnimationFrame(async () => {
+      if (!image.isConnected) return;
+      try {
+        let source = thumbCache.get(key);
+        if (source) { thumbCache.delete(key); thumbCache.set(key, source); }
+        else {
+          let job = thumbPending.get(key);
+          if (!job) {
+            job = {images: []};
+            job.promise = thumbQueue.then(async () => {
+              if (!job.images.some(node => node.isConnected)) return null;
+              const result = await snapshot(key);
+              thumbCache.set(key, result);
+              while (thumbCache.size > 32) thumbCache.delete(thumbCache.keys().next().value);
+              return result;
+            }).finally(() => thumbPending.delete(key));
+            thumbQueue = job.promise.catch(() => {});
+            thumbPending.set(key, job);
+          }
+          job.images.push(image);
+          source = await job.promise;
+        }
+        if (image.isConnected && source) {
+          image.src = source;
+          image.dataset.modelReady = "true";
+          image.classList.remove("lex-image-pending");
+        }
+      } catch (_error) {
+        if (image.isConnected) image.replaceWith(window.LexeditorUI.noThumbnail("ds1"));
+      }
+    });
+    return image;
+  }
+  return {mount, stop, thumbnail};
 })();

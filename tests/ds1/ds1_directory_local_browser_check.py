@@ -58,6 +58,8 @@ def main():
                     open_maps(page, session)
                     assert page.evaluate("state.mapId") == MAP_A
                     box = page.locator("[data-dir-local] input")
+                    assert page.locator(".lex-pager [data-dir-local]").count() == 1
+                    assert page.locator("[data-maps-dir] .lex-pager-stacked").count() == 1
                     page.locator("[data-maps-dir] .lex-subtab-button", has_text="Enemies").click()
                     page.wait_for_function('state.dirTab==="enemies"', timeout=30000)
                     page.wait_for_function(
@@ -102,11 +104,24 @@ def main():
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===0",
                         timeout=30000)
                     page.get_by_role("searchbox", name="Search the world").fill("")
-                    for tab in ("Shops", "Treasure"):
+                    for tab in ("Treasure",):
                         page.locator("[data-maps-dir] .lex-subtab-button", has_text=tab).click()
                         page.wait_for_function(f'state.dirTab==="{tab.lower()}"', timeout=30000)
                         page.wait_for_function('document.querySelector("[data-dir-local] input").disabled',
                                                timeout=30000)
+                    # Two rows per page forces the page controls out on three
+                    # rows; the stacked pager still fits the 360px panel.
+                    page.evaluate("state.pageSize=2")
+                    page.evaluate("state.dirPage=0")
+                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
+                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator("[data-dir-local] input").uncheck()
+                    page.wait_for_selector(
+                        "[data-maps-dir] .lex-pager-controls", timeout=30000)
+                    over = page.evaluate(
+                        "document.querySelector('[data-maps-dir]').scrollWidth"
+                        " - document.querySelector('[data-maps-dir]').clientWidth")
+                    assert over <= 1, over
                     assert not errors, errors
                 finally:
                     browser.close()
