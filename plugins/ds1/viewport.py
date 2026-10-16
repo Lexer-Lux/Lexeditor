@@ -135,11 +135,14 @@ def _binder_plain(location):
     return plain
 
 
-def _split_tables(kind, location, member, game_root, project):
+def _split_tables(kind, location, member, game_root, project, area=None):
     """[(label, member table, data path)] plus notes: a character
-    binder's companion archive, or the map area's archives. A
-    companion header without its data file is reported once, here."""
+    binder's companion archive, plus the map area's archives for
+    pieces and for binders placed on a map (objects keep their
+    textures with the map, not in their own binder). A companion
+    header without its data file is reported once, here."""
     tables, notes = [], []
+    areas = []
     if kind == 'member':
         binder = Path(location)
         if binder.name.lower().endswith('.chrbnd.dcx'):
@@ -168,23 +171,47 @@ def _split_tables(kind, location, member, game_root, project):
                         tables.append((wanted, parse_bhf(plain[offset:offset + size]), bdt))
                     except BhfError as error:
                         notes.append(f'{wanted}: {error}')
-        return tables, notes
-    area = Path(location).parent.name.split('_')[0]
+        if area:
+            areas.append(area)
+    else:
+        areas.append(Path(location).parent.name.split('_')[0])
     roots = []
     for root in (project, game_root):
         if root and str(root) not in roots:
             roots.append(str(root))
-    for root in roots:
-        for bhd in sorted((Path(root) / 'map' / area).glob('*.tpfbhd')):
-            bdt = bhd.with_suffix('.tpfbdt')
-            if not bdt.is_file():
-                notes.append(f'{bdt.name}: companion texture archive not found')
-                continue
-            try:
-                tables.append((bhd.name, parse_bhf(bhd.read_bytes()), bdt))
-            except (BhfError, OSError) as error:
-                notes.append(f'{bhd.name}: {error}')
+    for want in areas:
+        for root in roots:
+            for bhd in sorted((Path(root) / 'map' / want).glob('*.tpfbhd')):
+                bdt = bhd.with_suffix('.tpfbdt')
+                if not bdt.is_file():
+                    notes.append(f'{bdt.name}: companion texture archive not found')
+                    continue
+                try:
+                    tables.append((bhd.name, parse_bhf(bhd.read_bytes()), bdt))
+                except (BhfError, OSError) as error:
+                    notes.append(f'{bhd.name}: {error}')
     return tables, notes
+
+
+CHR_STEM = re.compile(r'^c(\d+)', re.IGNORECASE)
+
+
+def _sibling_binder(game_root, project, name):
+    """The binder a cross-referenced character texture names: c2510's
+    cloak texture is c2519's, and c2790's gear textures are c2799's,
+    kept in that character's binder. None when the name does not
+    start with a character stem or its binder is not installed."""
+    match = CHR_STEM.match(name or '')
+    if match is None:
+        return None
+    relative = Path('chr') / ('c' + match.group(1) + '.chrbnd.dcx')
+    for root in (project, game_root):
+        if not root:
+            continue
+        binder = Path(root) / relative
+        if binder.is_file():
+            return binder
+    return None
 
 
 def _tpf_sources(kind, location, member):
@@ -267,24 +294,30 @@ def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
 
 
 def _resolve_textures(kind, location, member, needed, game_root=None, project=None,
-                      cap=TEXTURE_PREVIEW_CAP):
-    """Diffuse PNGs by material name. Anything missing or undecodable
-    stays out (the mesh renders gray, as before) with a note saying why."""
+                      cap=TEXTURE_PREVIEW_CAP, area=None):
+    """Diffuse PNGs by material name: the model's own textures, then
+    its companion and area archives, then a sibling character's
+    binder when the name is a character stem. Anything missing or
+    undecodable stays out (the mesh renders gray, as before) with a
+    note saying why."""
     found, notes, missing = {}, [], list(needed)
     saw = False
-    for label, blob in _tpf_sources(kind, location, member):
-        if not missing:
-            break
+
+    def take(label, blob, names):
+        """Decode the wanted names from one TPF's bytes."""
+        nonlocal saw
+        if not names:
+            return
         saw = True
         try:
             textures = parse_tpf(blob)
         except AssetError as error:
             notes.append(f'{label}: {error}')
-            continue
+            return
         by_name = {}
         for entry in textures:
             by_name.setdefault(entry['name'].lower(), entry)
-        for name in list(missing):
+        for name in list(names):
             entry = by_name.get(name.lower())
             if entry is None:
                 continue
@@ -296,9 +329,31 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
                 continue
             found[name] = png
             missing.remove(name)
+
+    for label, blob in _tpf_sources(kind, location, member):
+        if not missing:
+            break
+        take(label, blob, missing)
     if missing:
-        tables, split_notes = _split_tables(kind, location, member, game_root, project)
+        for name in list(missing):
+            binder = _sibling_binder(game_root, project, name)
+            if binder is None:
+                continue
+            stem = binder.name.split('.')[0]
+            for label, blob in _tpf_sources('member', str(binder), stem + '.flver'):
+                take(f'{binder.name}:{label}', blob, [name])
+                if name in found:
+                    break
+    if missing:
+        tables, split_notes = _split_tables(kind, location, member, game_root, project, area)
         notes.extend(split_notes)
+        for name in list(missing):
+            binder = _sibling_binder(game_root, project, name)
+            if binder is None:
+                continue
+            more, more_notes = _split_tables('member', str(binder), '', game_root, project)
+            notes.extend(more_notes)
+            tables.extend(more)
         if tables:
             saw = True
         inflated = {}
@@ -311,26 +366,12 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
                 try:
                     if key not in inflated:
                         inflated[key] = inflate_member(bdt, slot[0], slot[1])
-                    textures = parse_tpf(inflated[key])
-                except (BhfError, AssetError) as error:
+                except BhfError as error:
                     notes.append(f'{label}: {error}')
                     continue
-                by_name = {}
-                for entry in textures:
-                    by_name.setdefault(entry['name'].lower(), entry)
-                entry = by_name.get(name.lower())
-                if entry is None:
-                    continue
-                blob = inflated[key]
-                try:
-                    png = _dds_png(blob[entry['offset']:entry['offset'] + entry['size']], cap)
-                except (AssetError, FlverError, FormatError, ValueError,
-                        struct.error, KeyError, OSError) as error:
-                    notes.append(f'{name}: {error}')
-                    continue
-                found[name] = png
-                missing.remove(name)
-                break
+                take(label, inflated[key], [name])
+                if name in found:
+                    break
     if not saw:
         notes.append('no texture container found')
     for name in missing:
@@ -338,13 +379,14 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
     return found, notes
 
 
-def _textured(kind, location, member, stamp, skin, game_root, project, cap):
+def _textured(kind, location, member, stamp, skin, game_root, project, cap, area=None):
     encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
     needed = sorted({mesh['map'] for mesh in encoded['meshes'] if mesh.get('map')})
     if not needed:
         encoded['textures'] = {}
         return encoded
-    found, notes = _resolve_textures(kind, location, member, needed, game_root, project, cap)
+    found, notes = _resolve_textures(kind, location, member, needed, game_root, project, cap,
+                                     area)
     encoded['textures'] = found
     encoded['notes'].extend(notes)
     return encoded
@@ -369,11 +411,13 @@ def _cached_textured(kind, location, member, stamp, skin=False, game_root=None, 
 
 
 @functools.lru_cache(maxsize=128)
-def _cached_map(kind, location, member, stamp, game_root=None, project=None):
+def _cached_map(kind, location, member, stamp, game_root=None, project=None, area=None):
     """Textured geometry for the map viewport: room for a map's models
-    at a small texture cap, since maps show acres at a time."""
+    at a small texture cap, since maps show acres at a time. The area
+    is part of the key: one binder's objects wear different textures
+    on different maps."""
     return _textured(kind, location, member, stamp, False, game_root, project,
-                     MAP_TEXTURE_CAP)
+                     MAP_TEXTURE_CAP, area)
 
 
 def _encode_skin(doc, mesh):
@@ -449,8 +493,9 @@ def model_geometry(game_root, project, map_name, model):
         stat = Path(location).stat()
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
+    area = Path(map_name).stem.split('_')[0]
     return _payload(_cached_map(kind, str(location), member, (stat.st_mtime_ns, stat.st_size),
-                                  game_root, project))
+                                  game_root, project, area))
 
 
 CHR_ID = re.compile(r'^[A-Za-z0-9_]+$')

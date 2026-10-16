@@ -78,7 +78,9 @@ def main():
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
                     assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
                     counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
-                    assert set(counts) == {'parts', 'models', 'collision', 'navigation'}, counts
+                    assert set(counts) == {'npcs', 'drops', 'enemies'}, counts
+                    if not root:
+                        assert (counts['npcs'], counts['drops'], counts['enemies']) == (0, 0, 2), counts
                     page.locator('[data-tabstrip-id="placements"]').click()
                     page.wait_for_function('state.mapTab==="placements"')
                     assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
@@ -99,6 +101,12 @@ def main():
                     title = page.locator(".lex-detail-panel-title").inner_text()
                     assert ("Rat \u2014 " + MAP) in title if not root else map_name in title
                     assert page.locator("[data-maps-side] .lex-multi-number").count() == 2
+                    rows = page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
+                        "nodes=>nodes.map(n=>[...n.querySelectorAll('input')].map("
+                        "i=>{const r=i.getBoundingClientRect();return r.top+r.height/2}))")
+                    for tops in rows:
+                        assert len(tops) == 3, tops
+                        assert max(tops) - min(tops) < 4, tops
                     units = page.locator("[data-maps-side] .lex-unit").evaluate_all(
                         "nodes=>nodes.map(n=>n.textContent)")
                     assert units == ["\u00b0", "\u00b0", "\u00b0"], units
@@ -143,7 +151,11 @@ def main():
                         page.screenshot(path=str(output / "maps-detail.png"))
                     page.set_viewport_size({"width": 1000, "height": 700})
                     page.wait_for_timeout(400)
-                    assert page.locator('[data-field-key="posX"]').evaluate("n=>n.clientWidth") >= 70
+                    shown = page.locator("[data-maps-side] .lex-multi-number input").evaluate_all(
+                        "nodes=>nodes.map(n=>({w:n.clientWidth,sw:n.scrollWidth,value:n.value}))")
+                    assert shown, "no coordinate inputs rendered"
+                    for box in shown:
+                        assert box["sw"] <= box["w"] + 1, box
                     if output:
                         page.screenshot(path=str(output / "maps-small.png"))
                     page.set_viewport_size({"width": 1100, "height": 800})

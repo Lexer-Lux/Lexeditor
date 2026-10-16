@@ -2,7 +2,7 @@
 <PARAMMETA XmlVersion="0">
   <Self ConsecutiveIDs="" />
   <Field>
-    <equipId Refs="EquipParamWeapon(equipType=0),EquipParamProtector(equipType=1),EquipParamAccessory(equipType=2),EquipParamGoods(equipType=3)" />
+    <equipId Refs="EquipParamWeapon(equipType=0),EquipParamProtector(equipType=1),EquipParamAccessory(equipType=2),EquipParamGoods(equipType=3),Magic(equipType=4)" />
     <value />
     <mtrlId Refs="EquipMtrlSetParam" />
     <eventFlag FlagAlias="" />

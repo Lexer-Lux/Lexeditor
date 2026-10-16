@@ -1,8 +1,9 @@
 """Render the Text tab and follow armor defense links into it.
 
 Menu labels are menu text with in-game names; armor defense fields link
-to the label that names them. Edits save into the mod project like any
-other record.
+to the label that names them. Every other menu FMG gets its own subtab
+with one record per filled entry. Edits save into the mod project like
+any other record.
 """
 import sys
 from pathlib import Path
@@ -42,7 +43,8 @@ def main():
         (game / RELATIVE).write_bytes(make_archive())
         (game / texts.RELATIVE).parent.mkdir(parents=True)
         (game / texts.RELATIVE).write_bytes(make_text_archive())
-        (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive())
+        (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive(
+            extra={'Dialogue_.fmg': {10: 'Yes.', 11: 'No.\nReally not.'}}))
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
@@ -57,13 +59,21 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    # The Text tab lists the three labels under their text.
+                    # The Text tab opens on the three labels under their text.
                     page.locator('button[data-tab="text"]').click()
                     page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
-                    assert page.locator('[data-subtab]').count() == 0
+                    subs = page.locator('[data-subtab]').evaluate_all(
+                        'nodes => nodes.map(node => node.getAttribute("data-subtab"))')
+                    assert subs == ['fmg-dialogue', 'menu-labels', 'fmg-menu-text'], subs
                     names = page.locator('.lex-column-list .lex-list-row').evaluate_all(
                         'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
                     assert names == ['FireDEF', 'LitngDEF', 'MagDEF'], names
+                    # Every FMG lists its filled entries named by first line.
+                    page.locator('[data-subtab="fmg-dialogue"]').click()
+                    page.wait_for_function('state.sub === "fmg-dialogue" && state.rows.length === 2')
+                    spoken = page.locator('.lex-column-list .lex-list-row').evaluate_all(
+                        'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
+                    assert spoken == ['No.', 'Yes.'], spoken
                     # Every armor defense label links to its menu label.
                     for label, text_id, _text in LINKS:
                         page.locator('button[data-tab="items"]').click()
@@ -87,9 +97,21 @@ def main():
                     preview = page.locator('.lex-hover-preview')
                     preview.wait_for(timeout=5000)
                     assert 'MagDEF' in preview.inner_text()
-                    # Labels edit, save and reload like any other record.
+                    # Dialogue edits in a textarea, saves and reloads.
                     page.locator('button[data-tab="text"]').click()
-                    page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
+                    page.wait_for_function('state.tab === "text" && !state.error')
+                    page.locator('[data-subtab="fmg-dialogue"]').click()
+                    page.wait_for_function('state.sub === "fmg-dialogue" && state.rows.length === 2')
+                    page.locator('.lex-column-list .lex-list-row', has_text='Yes.').click()
+                    pinned(page, 'Dialogue_.fmg', 10)
+                    area = page.locator('textarea[data-field-key="text"]')
+                    assert area.input_value() == 'Yes.'
+                    area.fill('Yes, kindling.')
+                    area.press('Tab')
+                    page.wait_for_function('state.pending === 0 && state.dirty > 0')
+                    # Labels edit, save and reload like any other record.
+                    page.locator('[data-subtab="menu-labels"]').click()
+                    page.wait_for_function('state.sub === "menu-labels" && state.rows.length === 3')
                     page.locator('.lex-column-list .lex-list-row', has_text='MagDEF').click()
                     pinned(page, 'MenuText', 102204)
                     control = page.locator('input[data-field-key="label"][type="text"]')
@@ -107,6 +129,7 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     saved = texts.MenuDocument((mod / texts.MENU_RELATIVE).read_bytes())
                     assert saved.label('magicDefense') == 'MagAbsorb'
+                    assert saved.text('Dialogue_.fmg', 10) == 'Yes, kindling.'
                     assert not errors, errors
                 finally:
                     browser.close()

@@ -13,14 +13,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive, make_menu_archive
 from plugins.ds1 import texts
-from plugins.ds1.formats import ItemDocument, TEXT_SUBTABS, SUBTABS
+from plugins.ds1.formats import ItemDocument, TEXT_SUBTABS, SUBTABS, FMG_SUBTABS, FMG_TABLES
 from plugins.ds1.store import RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 
 
 def test_menu_labels_are_a_text_subtab_not_an_items_one():
     assert [tab for tab, _, _ in SUBTABS if tab == 'menu-labels'] == []
-    assert TEXT_SUBTABS == (('menu-labels', 'Menu labels', 'MenuText'),)
+    assert TEXT_SUBTABS[0] == ('menu-labels', 'Menu labels', 'MenuText')
+    assert TEXT_SUBTABS[1:] == FMG_SUBTABS
+    assert len(FMG_SUBTABS) == 14
+    assert {table for _, _, table in FMG_SUBTABS} == FMG_TABLES
 
 
 def test_menu_label_ids_match_the_three_defense_kinds():
@@ -61,7 +64,9 @@ def test_text_tab_state_and_label_roundtrip(tmp_path):
         state = request('/api/state')
         assert [tab['id'] for tab in state['tabs']] == [tab for tab, _, _ in SUBTABS]
         assert state['textTabs'] == [{'id': 'menu-labels', 'label': 'Menu labels',
-                                      'table': 'MenuText', 'count': 3}]
+                                      'table': 'MenuText', 'count': 3},
+                                     {'id': 'fmg-menu-text', 'label': 'Menu text',
+                                      'table': 'Menu_general_text_.fmg', 'count': 3}]
         edited = request('/api/edit', {'table': 'MenuText', 'id': 102204, 'field': 'label', 'value': 'MagAbsorb'})
         assert edited['values'] == {'label': 'MagAbsorb'}
         row = request('/api/row?table=MenuText&id=102204')['row']
@@ -69,3 +74,64 @@ def test_text_tab_state_and_label_roundtrip(tmp_path):
         assert next(f['value'] for f in row['fields'] if f['key'] == 'label') == 'MagAbsorb'
     finally:
         session.stop()
+
+
+DIALOGUE = {10: 'Yes.', 11: 'No.\nReally not.'}
+
+
+def dialogue_document():
+    from ds1_fixture import make_menu_archive
+    document = ItemDocument(make_archive())
+    document.menu_texts = texts.MenuDocument(
+        make_menu_archive(extra={'Dialogue_.fmg': dict(DIALOGUE)}))
+    return document
+
+
+def test_text_subtabs_follow_the_files_present():
+    document = dialogue_document()
+    assert [entry[0] for entry in document.text_subtabs()] == [
+        'menu-labels', 'fmg-dialogue', 'fmg-menu-text']
+    bare = ItemDocument(make_archive())
+    bare.menu_texts = texts.MenuDocument(make_menu_archive())
+    assert [entry[0] for entry in bare.text_subtabs()] == ['menu-labels', 'fmg-menu-text']
+
+
+def test_fmg_rows_list_every_filled_entry_named_by_text():
+    rows = dialogue_document().list_rows('fmg-dialogue')
+    assert [(row['id'], row['table'], row['name']) for row in rows] == [
+        (10, 'Dialogue_.fmg', 'Yes.'), (11, 'Dialogue_.fmg', 'No.')]
+    assert rows[1]['values'] == {'text': 'No.\nReally not.'}
+
+
+def test_fmg_read_edit_and_dirty_roundtrip():
+    from plugins.ds1.formats import FormatError
+    document = dialogue_document()
+    row = document.read_row('Dialogue_.fmg', 11)
+    assert row['name'] == 'No.'
+    field = next(item for item in row['fields'] if item['key'] == 'text')
+    assert field['type'] == 'longtext' and field['value'] == 'No.\nReally not.'
+    assert document.display_name('Dialogue_.fmg', 10) == 'Yes.'
+    assert document.display_name('Dialogue_.fmg', 999) == 'Dialogue 999'
+    edited = document.edit('Dialogue_.fmg', 11, 'text', 'No.\nNever.')
+    assert edited['fields'][0]['value'] == 'No.\nNever.'
+    assert document.dirty_count == 1
+    assert document.menu_texts.dirty_texts == {('Dialogue_.fmg', 11)}
+    changes = document.pending_changes()
+    assert [change['label'] for change in changes] == ['Dialogue · 11']
+    assert (changes[0]['before'], changes[0]['after']) == ('No.\nReally not.', 'No.\nNever.')
+    rebuilt = texts.MenuDocument(document.menu_texts.export())
+    assert rebuilt.text('Dialogue_.fmg', 11) == 'No.\nNever.'
+    assert rebuilt.label('magicDefense') == 'MagDEF'
+    for bad in ('   ', 'x' * 4001):
+        try:
+            document.edit('Dialogue_.fmg', 11, 'text', bad)
+        except FormatError:
+            pass
+        else:
+            raise AssertionError(f'accepted {bad[:8]!r}')
+    try:
+        document.edit('Dialogue_.fmg', 999, 'text', 'New.')
+    except FormatError:
+        pass
+    else:
+        raise AssertionError('sprouted a new entry')

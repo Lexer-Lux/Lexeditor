@@ -6180,6 +6180,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part:last-child { flex:1 1 auto; }
 .lex-column-list-cell .lex-detail-parts-fixed-first > .lex-detail-part:first-child { flex:none; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
+/* A coordinate triple stays one row even in a narrow pane: X, Y and Z are
+   read as one value, so wrapping them apart reads as three properties. */
+.lex-detail-parts-nowrap { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
+/* The lane keeps its name: with three parts across, the box minimum
+   would otherwise squeeze single-letter names to nothing. */
+.lex-detail-parts-nowrap > .lex-detail-part { grid-template-columns:auto auto minmax(0,1fr); }
+.lex-detail-parts-nowrap { gap:4px; }
+.lex-detail-parts-nowrap > .lex-detail-part { gap:4px; margin-right:0; }
+/* No per-axis copy button: the lane would take a quarter of each
+   box, and coordinates are edited in place, not copied. */
+.lex-detail-parts-nowrap .lex-copy-value { display:none; }
+.lex-detail-parts-nowrap > .lex-detail-part { grid-template-columns:minmax(0,auto) minmax(0,1fr); }
 .lex-detail-parts-bare :is(.lex-detail-part-label,.lex-detail-part-spare) { display:none; }
 .lex-detail-parts-stacked { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
 .lex-detail-parts-stacked > .lex-detail-part { grid-template-columns:minmax(0,1fr); }

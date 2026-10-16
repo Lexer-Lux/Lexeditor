@@ -91,6 +91,9 @@ window.Ds1Preview = (() => {
         try {
           const tex = await texLoader.loadAsync(`data:image/png;base64,${png}`);
           tex.colorSpace = THREE.SRGBColorSpace;
+          // DirectX bytes, as on the map: no GL flip, tiled wrap.
+          tex.flipY = false;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
           texCache.set(mesh.map, tex);
           trash.push(tex);
         } catch (_error) {

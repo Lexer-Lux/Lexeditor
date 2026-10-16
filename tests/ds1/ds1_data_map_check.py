@@ -52,7 +52,12 @@ def main():
             assert asset_rows>0
             assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+1+3+asset_rows+effects_missing+curves_missing+1
             assert {row['id'] for row in rows if row['id'].startswith('assets:')}=={'assets:'+top for top in assets.ASSET_ROOTS if (game/top).is_dir()}
-            assert all(row['target']=='assets' and row['sub']=='game' and row['openable'] for row in rows if row['id'].startswith('assets:'))
+            from plugins.ds1.data_map import ASSET_TARGETS
+            for row in rows:
+                if not row['id'].startswith('assets:'):continue
+                top=row['id'].split(':',1)[1]
+                assert (row['target'],row['sub'])==ASSET_TARGETS[top]
+                assert row['openable'] and row['targets']==[{'id':row['target'],'label':row['targets'][0]['label']}]
             assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance','native-levelup'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
@@ -71,7 +76,7 @@ def main():
                     for filename,target,sub in [('EquipParamWeapon.param','items','weapons'),
                             ('NpcParam.param','enemies','monsters'),('AtkParam_Npc.param','attacks','attacks'),
                             ('CharaInitParam.param','stats','starting-classes'),
-                            ('Accessory_name_.fmg','items','rings')]:
+                            ('Accessory_name_.fmg','items','rings'),('msg/','text','menu-labels')]:
                         page.get_by_role('button',name='Open Dark Souls Data Map',exact=True).click()
                         page.wait_for_selector('.lex-data-map-table')
                         page.evaluate('''filename=>{state.mapQuery=filename;state.mapPage=0;render()}''',filename)

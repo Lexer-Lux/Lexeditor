@@ -61,6 +61,7 @@ KIND_LABELS = {'name': 'Name', 'description': 'Description',
                'longDescription': 'Full description'}
 MAX_DESCRIPTION = 200
 MAX_LONG_DESCRIPTION = 2000
+MAX_FMG_TEXT = 4000
 HEADER = 0x1C
 
 
@@ -286,7 +287,7 @@ class TextDocument:
         return changed
 
     def export(self) -> bytes:
-        if not self.dirty:
+        if not self.dirty and not getattr(self, 'dirty_texts', set()):
             return self.original
         entries = list(self.entries)
         for position, (groups, texts) in self.tables.items():
@@ -363,4 +364,71 @@ class MenuDocument(TextDocument):
                 texts, before = self.tables[position][1], self.original_texts[position]
                 if texts.get(text_id) != before.get(text_id):
                     changed.add(key)
+        return changed
+
+    def files(self) -> list[str]:
+        """Every FMG member, each once, in archive order."""
+        seen = []
+        for position in sorted(self.tables):
+            filename = self._file(position)
+            if filename not in seen:
+                seen.append(filename)
+        return seen
+
+    def file_entries(self, filename: str) -> dict[int, str]:
+        """The filled texts of one FMG, both copies merged, later copy shown."""
+        merged: dict[int, str] = {}
+        for position in self._copies_of(filename):
+            for text_id, text in self.tables[position][1].items():
+                if text_id not in merged and text:
+                    merged[text_id] = text
+        return merged
+
+    def text(self, filename: str, text_id: int) -> str | None:
+        for position in self._copies_of(filename):
+            text = self.tables[position][1].get(text_id)
+            if text:
+                return text
+        return None
+
+    def original_text(self, filename: str, text_id: int) -> str | None:
+        for position in self._copies_of(filename):
+            if text_id in self.original_texts[position]:
+                return self.original_texts[position][text_id]
+        return None
+
+    def set_text(self, filename: str, text_id: int, value) -> str:
+        """Rewrite one FMG entry in both copies. Dialogue carries its own
+        line breaks, so multi-line text is allowed; only entries the archive
+        shipped can change, so a typo cannot sprout new IDs."""
+        if not self._copies_of(filename):
+            raise FormatError(f'The menu archive has no {filename}.')
+        if not any(text_id in self.original_texts[position]
+                   for position in self._copies_of(filename)):
+            raise FormatError(f'{filename} has no text {text_id}.')
+        text = str(value).replace('\r\n', '\n').replace('\r', '\n')
+        if any(ord(char) < 32 and char != '\n' for char in text):
+            raise FormatError('Menu text holds text and line breaks.')
+        if not text.strip():
+            raise FormatError('Menu text cannot be blank; the game shows nothing for it.')
+        if len(text) > MAX_FMG_TEXT:
+            raise FormatError(f'Menu text is up to {MAX_FMG_TEXT} characters.')
+        for position in self._copies_of(filename):
+            self.tables[position][1][text_id] = text
+        return text
+
+    @property
+    def dirty_texts(self) -> set[tuple[str, int]]:
+        """Changed (file, id) pairs outside the three menu labels, which
+        dirty() already counts."""
+        changed = set()
+        label_ids = {text_id for _display, text_id in MENU_LABELS.values()}
+        for position, (groups, texts) in self.tables.items():
+            before = self.original_texts[position]
+            filename = self._file(position)
+            for text_id, text in texts.items():
+                if text_id in label_ids and filename == MENU_LABEL_FILE:
+                    continue
+                if text != before.get(text_id):
+                    changed.add((filename, text_id))
         return changed

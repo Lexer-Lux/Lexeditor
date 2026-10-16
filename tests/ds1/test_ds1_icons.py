@@ -91,6 +91,10 @@ def test_field_icons_follow_damage_defense_and_stats():
     found = formats._FIELD_ICONS
     assert found[('NpcParam', 'def_phys')] == 'physicalDef'
     assert found[('NpcParam', 'physGuardCutRate')] == 'physicalDef'
+    assert found[('NpcParam', 'def_slash')] == 'physicalDef'
+    assert found[('NpcParam', 'blowGuardCutRate')] == 'physicalDef'
+    assert found[('EquipParamWeapon', 'slashGuardCutRate')] == 'physicalDef'
+    assert found[('EquipParamProtector', 'defenseThrust')] == 'physicalDef'
     assert found[('AtkParam_Npc', 'atkThun')] == 'lightning'
     assert found[('EquipParamWeapon', 'attackBasePhysics')] == 'physical'
     assert found[('EquipParamWeapon', 'thunGuardCutRate')] == 'lightningDef'
@@ -102,9 +106,9 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('Magic', 'requirementIntellect')] == 'int'
     assert ('NpcParam', 'resist_poison') not in found
     assert ('NpcParam', 'isWeakSaint') not in found
-    assert ('EquipParamWeapon', 'slashGuardCutRate') not in found
+    assert ('NpcParam', 'staminaGuardDef') not in found
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
-    assert 'slashDamageCutRate' not in formats.ABSORPTION_ICONS
+    assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
 
 
 def test_sheet_bytes_finds_texture_across_archives(tmp_path):

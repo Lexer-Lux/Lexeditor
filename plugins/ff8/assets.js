@@ -83,7 +83,14 @@
   }
 
   function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function heavyLoadingView(label){
+    const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
+    $("#main").replaceChildren(state.heavyError
+      ?el("div",{class:"empty"},`Could not load ${label.toLocaleLowerCase()}: ${state.heavyError}`)
+      :LexeditorUI.loadingPanel({label}));
+  }
   function renderModels(){
+    if(!state.heavyReady?.[assetDataset()]){heavyLoadingView("Loading models");return}
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
       {key:"name",label:"Model",render:row=>assetName(row,modelOverridden(row))},
@@ -262,6 +269,7 @@
   }
 
   function renderTextures(){
+    if(!state.heavyReady?.[assetDataset()]){heavyLoadingView("Loading textures");return}
     const rows=filtered("textures",["name","id","ffnxBase","source"]),columns=[
       {key:"name",label:"Texture",render:row=>assetName(row,textureOverridden(row))},
       {key:"source",label:"Source"},

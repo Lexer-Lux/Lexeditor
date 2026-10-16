@@ -47,14 +47,17 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
         const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side],sub:state.sub});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
-        patchRowValues(edit.table,edit.id,result.values,result.display);
+        patchRowValues(edit.table,edit.id,result.values,result.display,result.name);
         refresh=refresh||result.refreshRows===true;
       }
       if(refresh)await loadItems();
-      // An undone viewport move must move the scene part back too; the
-      // reload re-reads the map and restores the selection and gizmo.
-      if(state.tab==="maps"&&state.mapView)await reloadViewport(state.mapView.map,state.mapSelected);
-      render();
+      if(state.row&&state.row.table==="NpcParam"&&(entry.edits||[entry]).some(edit=>edit.table==="ShopLineupParam"))state.npcShop=await api(`/api/shop?npc=${state.row.id}`);
+      // An undone viewport move moves only its own scene part back.
+      // Re-reading the whole map (and remounting the viewport, which
+      // render would do) for one undone drag is what made undo feel
+      // like a reload.
+      if(state.tab==="maps"&&state.mapView)await refreshMapsAfterUndo(entry);
+      else render();
     }catch(error){notify(error);}
     finally{this.applying=false;shell.refresh();}
   },
@@ -71,7 +74,7 @@ document.addEventListener("keydown",event=>{
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered",themeName:"ds1",theme:{accent:"#a4824c","accent-text":"#141210"}},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
-    {id:"text",label:"Text",help:"Edit the menu defense labels the equipment panel shows beside armor: MagDEF, FireDEF and LitngDEF."},
+    {id:"text",label:"Text",help:"Edit the game's menu text: NPC dialogue, event and system messages, help and menu labels. Item names and descriptions edit on the item."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops, effects and AI links. Behaviors holds action costs and what each behavior calls. AI holds enemy senses, distances and goals. A monster's Attacks tab lists the attack records its parameters reference. Vanilla is read-only. Save changes the mod project."},
     {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Vanilla is read-only. Save changes the mod project."},
     {id:"shops",label:"Shops",help:"Edit what each merchant sells and at what price. Each row is one item in one shop. Stock of -1 never runs out. Vanilla is read-only. Save changes the mod project."},
@@ -187,35 +190,36 @@ async function loadDetail(){
     row=state.dirRows.find(row=>key(row)===state.selected);
     if(row)sub=state.dirTab;
   }
-  if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.assetDetail=null;return;}
+  if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.npcShop=null;state.assetDetail=null;return;}
   if(row.table==="Asset"){
     state.assetDetail=null;
     const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
-    state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;return;
+    state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;return;
   }
   if(row.table==="MapView"){
     state.mapView=null;
     const detail=await api(`/api/map/view?map=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
-    state.row={table:"MapView",id:row.id,name:row.name};state.mapView=detail;state.monsterAttacks=null;return;
+    state.row={table:"MapView",id:row.id,name:row.name};state.mapView=detail;state.monsterAttacks=null;state.npcShop=null;return;
   }
   if(row.table==="EnemyModel"){
     state.chrView=null;
     const detail=await api(`/api/chr/view?npc=${row.id}`);
     if(state.selected!==key(row))return;
-    state.row={table:"EnemyModel",id:row.id,name:row.name};state.chrView=detail;state.monsterAttacks=null;return;
+    state.row={table:"EnemyModel",id:row.id,name:row.name};state.chrView=detail;state.monsterAttacks=null;state.npcShop=null;return;
   }
   if(row.table==="AnimPlayback"){
     state.animView=null;
     const detail=await api(`/api/anim/list?chr=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
-    state.row={table:"AnimPlayback",id:row.id,name:row.name};state.animView=detail;state.monsterAttacks=null;return;
+    state.row={table:"AnimPlayback",id:row.id,name:row.name};state.animView=detail;state.monsterAttacks=null;state.npcShop=null;return;
   }
-  const [result,attacks]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(sub)}`),
-    row.table==="NpcParam"&&state.tab==="enemies"?api(`/api/attacks?monster=${row.id}`):null]);
+  const [result,attacks,shop]=await Promise.all([api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(sub)}`),
+    row.table==="NpcParam"&&state.tab==="enemies"?api(`/api/attacks?monster=${row.id}`):null,
+    row.table==="NpcParam"?api(`/api/shop?npc=${row.id}`):null]);
   if(state.selected!==key(row))return;
-  state.row=result.row;state.monsterAttacks=attacks;
+  state.row=result.row;state.monsterAttacks=attacks;state.npcShop=shop;
 }
 async function loadTweaks(){
   state.tweaks=await api("/api/tweaks");
@@ -373,10 +377,11 @@ function renameRecord(row,name){
     finally{state.pending--;render();}
   });
 }
-function patchRowValues(table,id,values,display){
+function patchRowValues(table,id,values,display,name){
   const target=state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
   if(!target||!values)return;
   target.values=values;target.display=display||{};
+  if(name!==undefined&&name!==null)target.name=name;
 }function syncDetailControl(propertyKey,value,control){
   // Computed fields (Effective HP, absorption) move when their inputs do;
   // their detail controls repaint in place, sliders included.
@@ -435,7 +440,26 @@ function commit(row,field,value,control){
       syncDetailControl(field.key,changed.value,control);
       if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
       else{
-        for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display);
+        for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display,update.result.name);
+        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&["posX","posY","posZ","rotX","rotY","rotZ"].includes(field.key)){
+          // A typed move or turn moves the scene part too; only the
+          // gizmo did, so typed edits left the mesh standing behind.
+          const fresh=updates[updates.length-1].result.values||{};
+          if(row.table===state.mapView.map){
+            const part=state.mapView.parts.find(entry=>entry.key===row.id);
+            const pos=[fresh.posX,fresh.posY,fresh.posZ],rot=[fresh.rotX,fresh.rotY,fresh.rotZ];
+            if(part){part.pos=pos;part.rot=rot;}
+            viewportCtl?.moveTo?.(row.id,pos);
+            viewportCtl?.turnTo?.(row.id,rot);
+          }
+        }
+        if(row.table.endsWith(".msb")&&field.key==="npcId"&&state.tab==="maps"){
+          // An enemy swap can move a placement between the NPC and
+          // enemy directory and change the map\u2019s own counts.
+          state.mapList=(await api("/api/table?tab=viewport")).rows;
+          await loadDirectory().catch(notify);
+          refreshMapSide();refreshDirectory();
+        }
         if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
         else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
@@ -602,7 +626,7 @@ function fieldSections(row){
     });
     const group=groupFor(byKey.get(keys[0]));
     if(!groups.has(group))groups.set(group,[]);
-    groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3})}));
+    groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3,nowrap:true})}));
   }
   for(const field of row.fields){
     if(vectored.has(field.key))continue;
@@ -666,6 +690,36 @@ async function attackPreview(id){
       field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`):LexeditorUI.formatNumber(field.value))})),
     LexeditorUI.detailText(users===1?"Used by 1 NPC variant.":`Shared by ${users} NPC variants.`));
 }
+function shopNumberControl(line,shopKey,label){
+  const input=el("input",{type:"number",value:String(line[shopKey]),"aria-label":`${line.name} ${label}`});
+  input.addEventListener("change",()=>{
+    if(state.readOnly)return;
+    const row={table:"ShopLineupParam",id:line.id,name:line.name,values:{value:line.value,sellQuantity:line.sellQuantity}};
+    commit(row,{key:shopKey,label,editable:true},Number(input.value),input);
+    // The shop list is a cache, not the record: re-read the line once the
+    // edit lands so a rejected value cannot linger here.
+    edits.then(async()=>{
+      try{
+        const fresh=await api(`/api/row?table=ShopLineupParam&id=${line.id}&sub=shops`);
+        for(const item of fresh.row.fields){
+          if(item.key==="value"||item.key==="sellQuantity")line[item.key]=item.value;
+        }
+        if(input.isConnected&&document.activeElement!==input)input.value=String(line[shopKey]);
+      }catch(error){notify(error);}
+    });
+  });
+  return input;
+}
+function npcShopSection(){
+  const lines=state.npcShop.rows.map(line=>detailField({label:hoverable({content:line.name,
+    targetType:"ds1-shoprow",targetId:line.id,targetLabel:`${line.name} in Shops`,
+    preview:()=>el("div",{},"Price "+line.value+" - Stock "+line.sellQuantity),
+    activate:()=>navigate("shops","shops",`ShopLineupParam:${line.id}`)}),
+    control:LexeditorUI.multiNumberRow([
+      {label:"Price",control:shopNumberControl(line,"value","price")},
+      {label:"Stock",control:shopNumberControl(line,"sellQuantity","stock")}],{columns:2,nowrap:true})}));
+  return [detailSection({title:"Stock",body:lines})];
+}
 function monsterAttacksSection(){
   const links=state.monsterAttacks;
   if(!links)return LexeditorUI.loadingPanel({label:"Loading attacks"});
@@ -689,10 +743,12 @@ function monsterDetail(groups){
     help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards. Each value is a percentage off the hit. Nothing here applies to a hit it does not block.":null}));
   tabs.push({id:"attacks",label:"Attacks",help:attackHelp});
   if(effects)tabs.push({id:"effects",label:"Effects",help:"Effects this monster carries. Changing a shared effect changes every use of it."});
+  if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here. -1 stock means unlimited. The item name opens the full shop line for the rest."});
   const active=tabs.some(tab=>tab.id===state.monsterTab)?state.monsterTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
   const content=active==="attacks"?monsterAttacksSection()
     :active==="effects"?[detailSection({title:"Effects",body:effects})]
+    :active==="shop"?npcShopSection()
     :groups.get(section.label);
   return tabbedPanel({label:"Monster details",active,tabs,paginate:false,
     change:id=>{state.monsterTab=id;render();},content});
@@ -1461,6 +1517,38 @@ function syncPlacementRow(map,partKey,names,afters){
     if(input&&input.isConnected)input.value=String(afters[i]);
   }
 }
+async function refreshMapsAfterUndo(entry){
+  const edits=entry.edits||[entry];
+  const moved=new Map();
+  let namesChanged=false;
+  for(const edit of edits){
+    if(!String(edit.table).endsWith(".msb"))continue;
+    if(edit.field==="npcId")namesChanged=true;
+    else if(["posX","posY","posZ","rotX","rotY","rotZ"].includes(edit.field))
+      moved.set(edit.table+":"+edit.id,{map:edit.table,id:edit.id});
+  }
+  for(const {map,id} of moved.values()){
+    const row=state.rows.find(entry=>entry.table===map&&entry.id===id);
+    if(!row)continue;
+    const pos=[row.values.posX,row.values.posY,row.values.posZ];
+    const rot=[row.values.rotX,row.values.rotY,row.values.rotZ];
+    if(state.mapView&&map===state.mapView.map){
+      const part=state.mapView.parts.find(entry=>entry.key===id);
+      if(part){part.pos=pos;part.rot=rot;}
+      viewportCtl?.moveTo?.(id,pos);
+      viewportCtl?.turnTo?.(id,rot);
+    }
+    syncPlacementRow(map,id,["posX","posY","posZ"],pos);
+    syncPlacementRow(map,id,["rotX","rotY","rotZ"],rot);
+  }
+  if(namesChanged){
+    // An enemy swap can move a placement between the NPC and enemy
+    // directory and change the map\u2019s own counts.
+    state.mapList=(await api("/api/table?tab=viewport")).rows;
+    await loadDirectory().catch(notify);
+  }
+  refreshMapSide();refreshDirectory();
+}
 function viewportMove(map,key,pos){
   if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
   const names=["posX","posY","posZ"];
@@ -1733,10 +1821,9 @@ function mapsListPane(){
     columnList({rows:state.mapList,key:row=>row.id,selected:state.mapId,select:row=>chooseMap(row.id),
       columns:[
         {key:"name",label:"Name",sortable:true,grow:1},
-        {key:"parts",label:"Parts",sortable:true,numeric:true,sortValue:row=>row.values.parts,render:row=>String(row.values.parts)},
-        {key:"models",label:"Models",sortable:true,numeric:true,sortValue:row=>row.values.models,render:row=>String(row.values.models)},
-        {key:"collision",label:"Collision",sortable:true,numeric:true,sortValue:row=>row.values.collision,render:row=>String(row.values.collision)},
-        {key:"navigation",label:"Navigation",sortable:true,numeric:true,sortValue:row=>row.values.navigation,render:row=>String(row.values.navigation)}]}));
+        {key:"npcs",label:"NPCs",sortable:true,numeric:true,sortValue:row=>row.values.npcs,render:row=>String(row.values.npcs)},
+        {key:"drops",label:"Drops",sortable:true,numeric:true,sortValue:row=>row.values.drops,render:row=>String(row.values.drops)},
+        {key:"enemies",label:"Enemies",sortable:true,numeric:true,sortValue:row=>row.values.enemies,render:row=>String(row.values.enemies)}]}));
 }
 function placementsPane(){
   const here=sortedRows().filter(row=>row.table===state.mapId);

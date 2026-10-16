@@ -35,7 +35,8 @@ PARTS = (("enemy", 2, 0, 0, 120000), ("player", 4, 0, 1, None), ("piece", 0, 0, 
 def make_game(temp):
     game = temp / 'game'
     (game / RELATIVE).parent.mkdir(parents=True)
-    (game / RELATIVE).write_bytes(make_archive())
+    (game / RELATIVE).write_bytes(make_archive(field_values={
+        'NpcParam': {120000: {'itemLotId_1': 100}}}))
     (game / MAP_DIR).mkdir(parents=True)
     (game / MAP_DIR / 'test.msb').write_bytes(build_msb(parts=PARTS))
     (game / MAP_DIR / 'test2.msb').write_bytes(build_msb(parts=PARTS))
@@ -109,6 +110,8 @@ def phase_readonly(play, game, output, errors):
             assert page.locator('canvas[data-viewport]').count() == 1
             rendered_pixels(page, 'm10_01_00_00.msb')
             textured_pixels(page, 'm10_01_00_00.msb')
+            tex = page.evaluate("document.querySelector('[data-viewport-host]')._viewportTex")
+            assert tex == {'flipY': False, 'wrapS': 1000, 'wrapT': 1000}, tex
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             assert page.locator('[data-viewport-action="remove"]').is_disabled()
             assert page.locator('[data-viewport-action="add"]').is_disabled()
@@ -131,7 +134,7 @@ def phase_readonly(play, game, output, errors):
             page.wait_for_function('state.mapTab==="maps"')
             labels = page.locator('[data-maps-side] .lex-column-list-head-cell').evaluate_all(
                 'nodes=>nodes.map(n=>n.textContent)')
-            for want in ('Name', 'Parts', 'Models', 'Collision', 'Navigation'):
+            for want in ('Name', 'NPCs', 'Drops', 'Enemies'):
                 assert want in ' '.join(labels), labels
             overflow = page.evaluate("""() => {
                 const table = document.querySelector('[data-maps-side] .lex-column-list');
@@ -141,7 +144,7 @@ def phase_readonly(play, game, output, errors):
             counts = page.evaluate('state.mapList.find(r=>r.id==="test.msb").values')
             named = page.evaluate('state.mapList.find(r=>r.id==="m10_01_00_00.msb").name')
             assert named == 'Undead Burg (m10_01_00_00.msb)', named
-            assert counts['collision'] == 1 and counts['navigation'] == 1, counts
+            assert (counts['npcs'], counts['drops'], counts['enemies']) == (0, 1, 1), counts
             page.locator('[data-maps-side] .lex-list-row', has_text='test2.msb').click()
             page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='test2.msb', timeout=30000)
             page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)

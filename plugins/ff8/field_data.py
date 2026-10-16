@@ -24,7 +24,7 @@ from core.numeric_values import integer_value
 from . import (field_background, field_camera, field_dialogue, field_encounters,
                field_movie, field_scripts, field_walkmesh, paths, runtime_layout)
 from .fs_archive import FsArchive
-from .vendor.ff8ue.lzs import Lzs
+from .lzs_decode import decode_lzs
 
 
 FIELD_PREFIX = "field"
@@ -129,7 +129,7 @@ def _memory_extract(fs: bytes, entries: list[dict], basename: str) -> bytes:
         stored = struct.unpack_from("<I", fs, entry["offset"])[0]
         if stored > end - entry["offset"] - 4:
             raise ValueError(f"Nested stored size exceeds extent for {basename}")
-        data = bytes(Lzs().decode(fs[entry["offset"] + 4:entry["offset"] + 4 + stored]))
+        data = decode_lzs(fs[entry["offset"] + 4:entry["offset"] + 4 + stored])
     else:
         data = fs[entry["offset"]:entry["offset"] + entry["unpacked"]]
     if len(data) != entry["unpacked"]:

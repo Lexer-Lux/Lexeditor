@@ -9,7 +9,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, icons, theme
+from . import assets, deployment, data_map, icons, shops, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore
@@ -18,7 +18,7 @@ from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
-from .formats import FormatError, stats_fields, TABLES
+from .formats import FormatError, stats_fields, TABLES, FMG_TABLES
 from .effects import TABLE as EFFECT_TABLE
 from .store import ItemStore
 from . import tweak_mods
@@ -121,7 +121,7 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/data-map', '/api/assets',
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
@@ -271,25 +271,18 @@ class Handler(PluginRequestHandler):
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
                         result['dirtyCount'] = STORE.get().dirty_count
+                    elif path == '/api/shop':
+                        result = {'rows': shops.stock(STORE.get(), query.get('npc', [''])[0])}
                     elif path == '/api/table':
                         tab = query.get('tab', [''])[0]
                         if tab == 'placements':
                             result = {'rows': MAPSTORE.list_rows()}
                         elif tab == 'viewport':
+                            counts = MAPSTORE.map_counts()
                             rows = []
                             for name in MAPSTORE.maps():
-                                try:
-                                    doc = MAPSTORE.get(name)
-                                    parts = doc.view_parts()
-                                    models = len(doc.models)
-                                except (MsbError, OSError):
-                                    parts = []
-                                    models = 0
-                                kinds = [part['kind'] for part in parts]
                                 rows.append({'id': name, 'table': 'MapView', 'name': MAPSTORE.display_name(name),
-                                             'values': {'parts': len(parts), 'models': models,
-                                                        'collision': sum(1 for kind in kinds if kind == 'Collision'),
-                                                        'navigation': sum(1 for kind in kinds if kind == 'Navigation')}})
+                                             'values': counts.get(name, {'npcs': 0, 'drops': 0, 'enemies': 0})})
                             result = {'rows': rows}
                         elif tab == 'playback':
                             labels = TAESTORE.char_names()
@@ -443,6 +436,9 @@ class Handler(PluginRequestHandler):
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                     elif str(payload.get('table', '')).endswith('.msb'):
                         row = MAPSTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
+                        values, display, name = MAPSTORE.row_values(
+                            payload.get('table'), payload.get('id'))
+                        extra = {'values': values, 'display': display, 'name': name}
                     elif str(payload.get('table', '')).endswith('.anibnd.dcx'):
                         row = TAESTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                     else:
@@ -456,6 +452,11 @@ class Handler(PluginRequestHandler):
                                           if field['key'] == 'label'), None)
                             if label is not None:
                                 extra = {'values': {'label': label}, 'display': {}}
+                        elif table in FMG_TABLES:
+                            text = next((field['value'] for field in row['fields']
+                                         if field['key'] == 'text'), None)
+                            if text is not None:
+                                extra = {'values': {'text': text}, 'display': {}}
                         elif table in TABLES:
                             values, display = STORE.get().row_values(table, payload.get('id'))
                             extra = {'values': values, 'display': display,

@@ -95,6 +95,11 @@ def test_shop_and_drop_links_follow_their_category():
     poke(document, 'ShopLineupParam', 100, 'equipId', 100)
     found = links(document, 'ShopLineupParam', 100)
     assert (found['equipId']['kind'], found['equipId']['table']) == ('catalog', 'EquipParamProtector')
+    poke(document, 'ShopLineupParam', 100, 'equipType', 4)
+    poke(document, 'ShopLineupParam', 100, 'equipId', 101)
+    found = links(document, 'ShopLineupParam', 100)
+    assert (found['equipId']['kind'], found['equipId']['table']) == ('catalog', 'Magic')
+    assert found['equipId']['resolved']
 
 
 def test_treasure_links_follow_their_qualified_type():

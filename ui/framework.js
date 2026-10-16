@@ -2764,7 +2764,7 @@
     const switches = list.length > 0 && list.every(part => part instanceof Element && part.matches(".lex-toggle"));
     const columns = Math.max(1, Number(options.columns) || Math.min(3, list.length) || 1);
     return element("div", {
-      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.fixedFirst ? "lex-detail-parts-fixed-first" : "", options.className || ""]
+      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.nowrap ? "lex-detail-parts-nowrap" : "", options.fixedFirst ? "lex-detail-parts-fixed-first" : "", options.className || ""]
         .filter(Boolean).join(" "),
       style: `--lex-part-columns:${columns};--lex-multi-number-columns:${columns}`,
       "data-lex-copy-parts": options.copy ? "" : null,
@@ -3332,7 +3332,7 @@
     // is why one form of the same property had one and another did not.
     entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control,
       title: entry.title, help: entry.help, pin: entry.pin})),
-    {columns: options.columns, stacked: options.stacked, copy: !options.stacked,
+    {columns: options.columns, stacked: options.stacked, nowrap: options.nowrap, copy: !options.stacked,
      className: ["lex-multi-number", options.className || ""].filter(Boolean).join(" ")});
 
   // Nested navigation is a shared control. Plugins provide only labels,
@@ -3493,7 +3493,13 @@
       role: "tab",
       "aria-selected": String(tab.id === options.active),
       tabindex: tab.id === options.active ? "0" : "-1",
-      onclick: () => options.change?.(tab.id),
+      // Clicking the active subtab changes nothing: re-running change
+      // would rebuild the strip (wiping the rename box a double-click
+      // just opened) for no visible effect.
+      onclick: event => {
+        if (event.currentTarget.classList.contains("active")) return;
+        options.change?.(tab.id);
+      },
     }, element("span", {class: "lex-tab-label"}, labelText),
   tab.help ? (() => {
     const help = infoHelp(tab.help);

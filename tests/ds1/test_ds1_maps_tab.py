@@ -38,12 +38,15 @@ def test_maps_layout_uses_shared_components():
 
 def test_maps_table_shows_counts():
     source = editor()
-    for column in ('Parts', 'Models', 'Collision', 'Navigation'):
+    for column in ('NPCs', 'Drops', 'Enemies'):
         assert f'label:"{column}"' in source
+    pane = source[source.index('function mapsListPane(){'):source.index('function placementsPane(){')]
+    for gone in ('Parts', 'Models', 'Collision', 'Navigation'):
+        assert f'label:"{gone}"' not in pane
     rows = server()
-    assert "'collision'" in rows
-    assert "'navigation'" in rows
-    assert "'models'" in rows
+    assert "'npcs'" in rows
+    assert "'drops'" in rows
+    assert "'enemies'" in rows
 
 
 def test_selection_avoids_remount():

@@ -31,7 +31,7 @@ from PIL import Image
 from core.theme_sounds import entry_wav, read_ff8_entries
 
 from . import formats, paths, runtime_layout, world_textures
-from .fs_archive import FsArchive
+from .fs_archive import open_archive
 
 try:
     import tomllib
@@ -144,6 +144,29 @@ def _override_folder(folder: str, dataset: str) -> Path | None:
     raise ValueError(f"Unknown dataset: {dataset}")
 
 
+def _folder_index(folder: Path) -> dict[str, Path]:
+    """Casefolded name-to-path index, cached until the folder changes.
+
+    Battle resolution runs per model row; without this every row scans the
+    override and baseline folders from scratch.
+    """
+    try:
+        stamp = folder.stat().st_mtime_ns
+    except OSError:
+        return {}
+    key = (str(folder), stamp)
+    cached = _FOLDER_INDEX_CACHE.get(key)
+    if cached is None:
+        cached = _FOLDER_INDEX_CACHE[key] = {
+            child.name.casefold(): child
+            for child in folder.iterdir()
+            if child.is_file() and not child.name.startswith('.')}
+    return cached
+
+
+_FOLDER_INDEX_CACHE: dict[tuple, dict[str, Path]] = {}
+
+
 def _battle_path(filename: str, dataset: str) -> Path:
     """Resolve one battle file through override, then baseline."""
     wanted = filename.casefold()
@@ -161,11 +184,9 @@ def _battle_path(filename: str, dataset: str) -> Path:
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
     for folder in candidates:
-        if not folder.is_dir():
-            continue
-        for child in folder.iterdir():
-            if child.is_file() and child.name.casefold() == wanted:
-                return child
+        hit = _folder_index(folder).get(wanted)
+        if hit is not None:
+            return hit
     return paths.BASELINE_ROOT / "battle" / filename
 
 
@@ -185,11 +206,9 @@ def _battle_override(filename: str, dataset: str) -> str | None:
         raise ValueError(f"Unknown dataset: {dataset}")
     wanted = filename.casefold()
     for root, folder in roots:
-        if not folder.is_dir():
-            continue
-        for child in folder.iterdir():
-            if child.is_file() and child.name.casefold() == wanted:
-                return child.relative_to(root).as_posix()
+        hit = _folder_index(folder).get(wanted)
+        if hit is not None:
+            return hit.relative_to(root).as_posix()
     return None
 
 
@@ -215,7 +234,7 @@ def ensure_character_models() -> int:
     prefix = paths.GAME_ROOT / "Data" / "lang-en" / "battle"
     if not prefix.with_suffix(".fl").is_file():
         return 0
-    archive = FsArchive(prefix)
+    archive = open_archive(prefix)
     missing = [entry for entry in archive.entries
                if CHARACTER_MODEL.fullmatch(entry.basename)
                and not (folder / entry.basename).is_file()]
@@ -932,7 +951,7 @@ def _model_bytes(filename: str, dataset: str) -> tuple[bytes, str | None]:
     target = _battle_path(filename, dataset)
     if not target.is_file():
         if BATTLE_FILENAME.fullmatch(filename):
-            archive = FsArchive(paths.GAME_ROOT / 'Data/lang-en/battle')
+            archive = open_archive(paths.GAME_ROOT / 'Data/lang-en/battle')
             return archive.extract(archive.find(filename)), override
         raise ValueError(f"{filename} is not available in this dataset")
     return target.read_bytes(), override
@@ -1256,7 +1275,7 @@ def _texture_pack_info(data: bytes) -> dict | None:
 
 @lru_cache(maxsize=1024)
 def _archive_asset_info(prefix: str, filename: str, size: int, mtime_ns: int) -> dict | None:
-    archive = FsArchive(Path(prefix))
+    archive = open_archive(Path(prefix))
     data = archive.extract(archive.find(filename))
     return _battle_file_info(filename, data)
 

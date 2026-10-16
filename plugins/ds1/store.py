@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 
 from core.plugin_files import atomic_write
-from .formats import ItemDocument, SUBTABS, TEXT_SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, NPCS_SUBTABS, SHOPS_SUBTABS, MAX_ARCHIVE
+from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, NPCS_SUBTABS, SHOPS_SUBTABS, MAX_ARCHIVE
 from . import texts
 
 RELATIVE = Path('param/GameParam/GameParam.parambnd.dcx')
@@ -126,7 +126,7 @@ class ItemStore:
                 'tabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
                          for key, label, table in SUBTABS],
                 'textTabs': [{'id': key, 'label': label, 'table': table, 'count': len(document.list_rows(key))}
-                             for key, label, table in TEXT_SUBTABS]}
+                             for key, label, table in document.text_subtabs()]}
 
     def edit(self, table, row_id, field, value, only=None):
         self.writable()
@@ -173,7 +173,7 @@ class ItemStore:
         # mod carries no text archive and the game keeps its own.
         names = document.texts.export() if document.texts and (document.texts.dirty or self.text_output.is_file()) else None
         if names is not None: texts.TextDocument(names)
-        menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or self.menu_output.is_file()) else None
+        menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or document.menu_texts.dirty_texts or self.menu_output.is_file()) else None
         if menu is not None: texts.MenuDocument(menu)
         atomic_write(self.output, payload)
         if names is not None: atomic_write(self.text_output, names)

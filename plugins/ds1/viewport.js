@@ -82,6 +82,13 @@ window.Ds1Viewport = (() => {
         try {
           const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
           image.colorSpace = THREE.SRGBColorSpace;
+          // DS1 textures are DirectX bytes: v0 is the first stored row,
+          // so the GL flip would stand every texture on its head, and
+          // tiling UVs run far past [0,1], so clamp would smear them.
+          image.flipY = false;
+          image.wrapS = image.wrapT = THREE.RepeatWrapping;
+          // Test seam: the flags the map textures loaded with.
+          host._viewportTex = {flipY: image.flipY, wrapS: image.wrapS, wrapT: image.wrapT};
           texCache.set(tex, image);
           disposable.push(image);
         } catch (_error) {
@@ -453,6 +460,9 @@ window.Ds1Viewport = (() => {
         try {
           const tex = await texLoader.loadAsync(`data:image/png;base64,${png}`);
           tex.colorSpace = THREE.SRGBColorSpace;
+          // DirectX bytes, as on the map: no GL flip, tiled wrap.
+          tex.flipY = false;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
           texCache.set(mesh.map, tex);
           trash.push(tex);
         } catch (_error) {

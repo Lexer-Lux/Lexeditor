@@ -16,6 +16,7 @@ import zlib
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
 from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES
 from .attacks import ATTACK_FIELDS, AttackReferences
+from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
 from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set
 from .charainit import (TABLE as CHARA_TABLE, CLASS_ROWS, GIFT_ROWS, TWINS, UNMIRRORED,
@@ -47,9 +48,27 @@ SUBTABS = (
     ('weapons', 'Weapons', 'EquipParamWeapon'), ('ammo', 'Ammo', 'EquipParamWeapon'),
     ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
 )
+FMG_SUBTABS = (
+    ('fmg-conversation', 'Conversation', 'Conversation_.fmg'),
+    ('fmg-dialogue', 'Dialogue', 'Dialogue_.fmg'),
+    ('fmg-event-text', 'Event text', 'Event_text_.fmg'),
+    ('fmg-blood-writing', 'Blood writing', 'Blood_writing_.fmg'),
+    ('fmg-movie-subtitles', 'Movie subtitles', 'Movie_subtitles_.fmg'),
+    ('fmg-ingame-menu', 'Ingame menu', 'Ingame_menu_.fmg'),
+    ('fmg-menu-text', 'Menu text', 'Menu_general_text_.fmg'),
+    ('fmg-menu-others', 'Other menu text', 'Menu_others_.fmg'),
+    ('fmg-key-guide', 'Key guide', 'Key_guide_.fmg'),
+    ('fmg-single-line-help', 'Single-line help', 'Single_line_help_.fmg'),
+    ('fmg-item-help', 'Item help', 'Item_help_.fmg'),
+    ('fmg-display-tags', 'Display tags', 'Text_display_tag_list_.fmg'),
+    ('fmg-system-tags', 'System tags', 'System_specific_tags_win32_.fmg'),
+    ('fmg-system-messages', 'System messages', 'System_message_win32_.fmg'),
+)
 TEXT_SUBTABS = (
     ('menu-labels', 'Menu labels', 'MenuText'),
-)
+) + FMG_SUBTABS
+FMG_TABLES = frozenset(filename for _tab, _label, filename in FMG_SUBTABS)
+FMG_LABELS = {filename: label for _tab, label, filename in FMG_SUBTABS}
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),
                  ('behaviors', 'Behaviors', 'BehaviorParam'),
                  ('ai', 'AI', 'NpcThinkParam'))
@@ -81,15 +100,24 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
 
 
 # Label art per field: the damage, defense and stat icons the game's own
-# equipment screen uses (icons.py crops them from Menu04_2). Kinds the game
-# shows no icon for (poison, bleed, divine, occult, slash, strike, thrust)
-# stay unmapped: no invented glyphs.
+# equipment screen uses (icons.py crops them from Menu04_2). Slash, strike
+# and thrust have no glyph of their own anywhere in the menu, HUD, font or
+# icon sheets (they are text wherever the game shows them), so they reuse
+# the physical shield: every one of these fields scales physical defense,
+# which is what the shield means. Statuses (poison, toxic, bleed, curse),
+# divine, occult and stamina guard have no icon anywhere either, and stay
+# unmapped: no invented glyphs, and no cure-item icons that would read as
+# the item instead of the status.
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('NpcParam', ('def_slash', 'def_blow', 'def_thrust'),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('NpcParam', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('NpcParam', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('AtkParam_Npc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
          ('physical', 'magic', 'fire', 'lightning')),
         ('AtkParam_Pc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
@@ -98,6 +126,8 @@ for _table, _keys, _kinds in (
          ('physical', 'magic', 'fire', 'lightning')),
         ('EquipParamWeapon', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('EquipParamWeapon', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('EquipParamWeapon', ('properStrength', 'properAgility', 'properMagic', 'properFaith'),
          ('str', 'dex', 'int', 'faith')),
         ('EquipParamWeapon', ('correctStrength', 'correctAgility', 'correctMagic', 'correctFaith'),
@@ -106,6 +136,8 @@ for _table, _keys, _kinds in (
         ('EquipParamWeapon', ('durability', 'durabilityMax'), ('durability', 'durability')),
         ('EquipParamProtector', ('defensePhysics', 'defenseMagic', 'defenseFire', 'defenseThunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('EquipParamProtector', ('defenseSlash', 'defenseBlow', 'defenseThrust'),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('EquipParamProtector', ('weight',), ('weight',)),
         ('EquipParamProtector', ('durability', 'durabilityMax'), ('durability', 'durability')),
         ('Magic', ('requirementIntellect', 'requirementFaith'), ('int', 'faith')),
@@ -126,7 +158,9 @@ for _table, _keys, _kinds in (
         _FIELD_ICONS[(_table, _key)] = _kind
 del _table, _keys, _kinds, _key, _kind
 ABSORPTION_ICONS = {'neutralDamageCutRate': 'physicalDef', 'magicDamageCutRate': 'magicDef',
-                    'fireDamageCutRate': 'fireDef', 'thunderDamageCutRate': 'lightningDef'}
+                    'fireDamageCutRate': 'fireDef', 'thunderDamageCutRate': 'lightningDef',
+                    'slashDamageCutRate': 'physicalDef', 'blowDamageCutRate': 'physicalDef',
+                    'thrustDamageCutRate': 'physicalDef'}
 
 
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
@@ -629,7 +663,9 @@ class ItemDocument:
     @property
     def dirty_count(self):
         changes = {self._change_key(*entry) for entry in self.dirty}
-        return len(changes) + len(self._removed_rows) + (len(self.texts.dirty) if self.texts else 0) + (len(self.menu_texts.dirty) if self.menu_texts else 0)
+        menu = ((len(self.menu_texts.dirty) + len(self.menu_texts.dirty_texts))
+                if self.menu_texts else 0)
+        return len(changes) + len(self._removed_rows) + (len(self.texts.dirty) if self.texts else 0) + menu
 
     def pending_changes(self, limit=200):
         """What Save would write, one row per change: label, before and after."""
@@ -673,6 +709,10 @@ class ItemDocument:
                 rows.append({'label': f'{KIND_LABELS[kind]} · {table} {item}'})
         if self.menu_texts:
             from .texts import MENU_LABELS
+            for filename, text_id in sorted(self.menu_texts.dirty_texts):
+                rows.append({'label': f'{FMG_LABELS.get(filename, filename)} · {text_id}',
+                             'before': self.menu_texts.original_text(filename, text_id) or '',
+                             'after': self.menu_texts.text(filename, text_id) or ''})
             for key in sorted(self.menu_texts.dirty):
                 display, _text_id = MENU_LABELS[key]
                 rows.append({'label': f'Menu label · {display}',
@@ -688,6 +728,9 @@ class ItemDocument:
                 key = MENU_LABEL_IDS[row_id]
                 return (self.menu_texts.label(key) if self.menu_texts else None) or MENU_LABELS[key][0]
             return f'Menu label {row_id}'
+        if table in FMG_TABLES:
+            text = self.menu_texts.text(table, row_id) if self.menu_texts else None
+            return self._fmg_preview(text) if text else f'{FMG_LABELS.get(table, table)} {row_id}'
         if table == MATERIAL_TABLE:
             return describe_set(self, row_id)
         named = self.texts.name(table, row_id) if self.texts else None
@@ -866,6 +909,9 @@ class ItemDocument:
             return self._stats_rows(tab)
         if tab == 'menu-labels':
             return self._menu_label_rows()
+        fmg = next((entry for entry in FMG_SUBTABS if entry[0] == tab), None)
+        if fmg is not None:
+            return self._fmg_rows(fmg[2])
         match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS + SHOPS_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
@@ -873,7 +919,7 @@ class ItemDocument:
         for row in self.params[table].rows:
             if table == 'NpcParam':
                 if tab == 'npcs':
-                    if not self.is_friend(row.row_id):
+                    if not (self.is_friend(row.row_id) or self.is_merchant(row.row_id)):
                         continue
                 elif not self.is_monster(row.row_id):
                     continue
@@ -929,6 +975,42 @@ class ItemDocument:
                            'created': (table, row.row_id) in self._added_rows})
         return result
 
+    def text_subtabs(self):
+        """Menu labels plus every FMG the archive actually carries, so a
+        partial archive shows no empty tables."""
+        files = set(self.menu_texts.files()) if self.menu_texts else set()
+        return [TEXT_SUBTABS[0]] + [entry for entry in FMG_SUBTABS if entry[2] in files]
+
+    @staticmethod
+    def _fmg_preview(text):
+        first = (text or '').split('\n', 1)[0].strip()
+        return first if len(first) <= 80 else first[:77] + '...'
+
+    def _fmg_rows(self, filename):
+        """One record per filled FMG entry, in entry order, named by text."""
+        if self.menu_texts is None:
+            return []
+        return [{'id': text_id, 'table': filename,
+                 'name': self._fmg_preview(text) or f'{filename} {text_id}',
+                 'values': {'text': text}, 'display': {}}
+                for text_id, text in sorted(self.menu_texts.file_entries(filename).items())]
+
+    def _read_fmg(self, filename, row_id, only=None):
+        from .texts import MAX_FMG_TEXT
+        if self.menu_texts is None or self.menu_texts.text(filename, row_id) is None:
+            raise FormatError('Unknown menu text')
+        fields = []
+        if only is None or 'text' in only:
+            fields.append({'key': 'text', 'label': 'Text',
+                           'description': ('The in-game text. Dialogue carries its own '
+                                           'line breaks; blank text is refused.'),
+                           'group': '', 'dtype': 'text', 'value': self.menu_texts.text(filename, row_id),
+                           'type': 'longtext', 'minimum': None, 'maximum': None, 'maxLength': MAX_FMG_TEXT,
+                           'required': True, 'enum': {}, 'protectedReason': '',
+                           'editable': True, 'vanilla': self.menu_texts.original_text(filename, row_id)})
+        return {'id': row_id, 'table': filename, 'name': self.display_name(filename, row_id),
+                'renamable': False, 'fields': fields, 'recordLinks': [], 'dialogLinks': []}
+
     def _menu_label_rows(self):
         """The equipment defense labels as records: named by their text."""
         if self.menu_texts is None:
@@ -944,6 +1026,12 @@ class ItemDocument:
         open with the reviewed NpcParam fields; bosses and test rows,
         whose behavior nobody reviewed, stay shut."""
         return self.value('NpcParam', row_id, 'npcType') == 2
+
+    def is_merchant(self, row_id):
+        """A merchant with a shop: most are not npcType 2 (Griggs, Logan,
+        Quelana and the other sellers the NPCs tab used to hide), so the
+        shop map admits them; they open with the reviewed NPC fields."""
+        return _shops.is_merchant(row_id)
 
     def is_monster(self, row_id):
         if classified_monster(row_id, self.schemas['NpcParam']['names'].get(row_id),
@@ -1016,7 +1104,9 @@ class ItemDocument:
     def read_row(self, table, row_id, only=None):
         if table == 'MenuText':
             return self._read_menu_label(row_id, only)
-        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+        if table in FMG_TABLES:
+            return self._read_fmg(table, row_id, only)
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         row, _, data = self._row(table, row_id)
         vanilla = self._vanilla_row(table, row_id)
@@ -1253,12 +1343,19 @@ class ItemDocument:
                 raise FormatError('Unknown menu label')
             self.menu_texts.set_label(MENU_LABEL_IDS[row_id], value)
             return self.read_row(table, row_id, only=only)
+        if table in FMG_TABLES:
+            if key != 'text':
+                raise FormatError('This field is protected')
+            if self.menu_texts is None:
+                raise FormatError('The menu text archive is missing. Menu text cannot be edited.')
+            self.menu_texts.set_text(table, row_id, value)
+            return self.read_row(table, row_id, only=only)
         if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
-            if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+            if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
                 raise FormatError('This record is not a reviewed monster or NPC')
             self._row(table, row_id)
             return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
-        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id)):
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         self._write(table, row_id, key, value)
         if table == 'ReinforceParamProtector' and key in UPGRADE_MULTIPLIERS.values():
@@ -1367,7 +1464,7 @@ class ItemDocument:
             source = view.row(source_id)
         except DS3FormatError:
             raise FormatError(f'Expected one row ID {source_id}; found 0') from None
-        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id)):
+        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id) or self.is_merchant(source_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         if new_id is None:
             new_id = max(row.row_id for row in view.rows) + 1

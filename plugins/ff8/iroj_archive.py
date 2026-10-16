@@ -13,7 +13,7 @@ import lzma
 from pathlib import Path, PurePosixPath
 import struct
 
-from .vendor.ff8ue.lzs import Lzs
+from .lzs_decode import decode_lzs
 
 
 SIGNATURE = 0x534F5249
@@ -162,12 +162,10 @@ class Archive:
         if compression == 0:
             return stored
         if compression == FLAG_LZS:
-            expanded = bytearray()
-            for value in Lzs().decode(stored):
-                expanded.append(value)
-                if len(expanded) > MAX_EXPANDED_FILE:
-                    raise IrojError(f"IROJ member expands beyond the safety limit: {entry.name}")
-            return bytes(expanded)
+            expanded = decode_lzs(stored)
+            if len(expanded) > MAX_EXPANDED_FILE:
+                raise IrojError(f"IROJ member expands beyond the safety limit: {entry.name}")
+            return expanded
         if len(stored) < 13:
             raise IrojError(f"Compressed IROJ member has no LZMA header: {entry.name}")
         expanded, properties_size = struct.unpack_from("<II", stored)

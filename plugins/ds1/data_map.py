@@ -5,7 +5,22 @@ from . import assets, texts
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance',
               'maps':'Maps', 'animations':'Animations', 'text':'Text',
-              'npcs':'NPCs', 'shops':'Shops'}
+              'npcs':'NPCs', 'shops':'Shops',
+              'models':'Models', 'textures':'Textures', 'sound':'Sound effects',
+              'music':'Music', 'other':'Other files'}
+
+
+# Asset folders open on the file tab that holds their kind. msg/ holds the
+# message archives the Text tab edits; everything else is a whole-file tab.
+ASSET_TARGETS = {'chr': ('models', 'files'), 'event': ('other', 'files'),
+                 'facegen': ('models', 'files'), 'font': ('other', 'files'),
+                 'map': ('models', 'files'), 'menu': ('textures', 'files'),
+                 'movww': ('other', 'files'), 'msg': ('text', 'menu-labels'),
+                 'mtd': ('other', 'files'), 'obj': ('models', 'files'),
+                 'other': ('other', 'files'), 'parts': ('models', 'files'),
+                 'remo': ('other', 'files'), 'script': ('other', 'files'),
+                 'sfx': ('other', 'files'), 'shader': ('other', 'files'),
+                 'sound': ('sound', 'files')}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -71,7 +86,7 @@ def payload(store, native_rules=None, theme=None):
         elif table == 'ShopLineupParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='shops',sub='shops',controls='Shops: merchant stock and prices',
-                notes='Edit what each merchant sells, and at what price.')
+                notes="Edit what each merchant sells, and at what price. Each merchant's NPC page shows only their lines.")
         elif table == 'ObjActParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',
@@ -129,6 +144,19 @@ def payload(store, native_rules=None, theme=None):
         'controls': 'Text: Menu labels',
         'notes': 'Edit the equipment defense labels.' if menu_available
                 else 'The menu-text archive is missing. Menu labels cannot be edited.'})
+    if menu_available:
+        from .formats import FMG_SUBTABS
+        present = set(document.menu_texts.files())
+        for tab_id, label, filename in FMG_SUBTABS:
+            have = filename in present
+            rows.append({'id': f'menu:{tab_id}', 'filename': filename,
+                'path': str(store.menu_source or store.game_root/texts.MENU_RELATIVE),
+                'coverage': 'structured' if have else 'unavailable',
+                'status': 'partial' if have else 'not-integrated', 'openable': have,
+                'target': 'text' if have else '', 'sub': tab_id,
+                'controls': f'Text: {label}',
+                'notes': f'Edit every {label.lower()} line.' if have
+                        else f'The menu archive has no {filename}.'})
     if document.texts is not None:
         known = set(texts.NAME_TABLES.values()) | {filename for pair in texts.DESC_TABLES.values() for filename in pair}
         extra = {entry.name.replace('\\','/').rsplit('/',1)[-1] for entry in document.texts.entries} - known
@@ -174,7 +202,8 @@ def payload(store, native_rules=None, theme=None):
                      'in their Items detail drawers. Files owned by another editor change there instead.')
         rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
             'coverage': 'structured', 'status': 'partial', 'openable': True,
-            'target': 'assets', 'sub': 'game', 'controls': controls, 'notes': notes})
+            'target': ASSET_TARGETS[top][0], 'sub': ASSET_TARGETS[top][1],
+            'controls': controls, 'notes': notes})
     # The cosmetic theme, drawn from the installed game into a private cache.
     parts = []
     if isinstance(theme, dict):
@@ -194,5 +223,7 @@ def payload(store, native_rules=None, theme=None):
     # The Data Map names its open buttons from these labels ("Open Effects").
     for row in rows:
         if row.get('target'):
-            row['targets'] = [{'id':row['target'], 'label':TAB_LABELS[row['target']]}]
+            # A missing label falls back to the tab id: one row must never 400 the map.
+            row['targets'] = [{'id':row['target'],
+                               'label':TAB_LABELS.get(row['target'], row['target'].title())}]
     return {'rows':rows}

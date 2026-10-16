@@ -198,6 +198,37 @@ class MapStore:
                     links.setdefault(lot, set()).add(map_name)
         return {lot: sorted(maps) for lot, maps in links.items()}
 
+    def map_counts(self):
+        """Per-map NPC, enemy and drop counts for the Maps list.
+
+        A placed Enemy of npcType 2 is an NPC; every other placed Enemy
+        is an enemy, mirroring the directory's own predicates. Drops
+        count the lots whose dropping NPCs stand in the map. Unreadable
+        maps report zeros rather than hiding the readable ones.
+        """
+        _ids, _names, types = self._npc()
+        drops: dict[str, int] = {}
+        for maps in self.lot_maps().values():
+            for map_name in maps:
+                drops[map_name] = drops.get(map_name, 0) + 1
+        counts = {}
+        for map_name in self.maps():
+            try:
+                placements = self.get(map_name).placements()
+            except (MsbError, OSError):
+                placements = ()
+            npcs = enemies = 0
+            for placement in placements:
+                if placement.get('kind') not in ('Enemy', 'Dummy enemy'):
+                    continue
+                if types.get(placement.get('npc')) == 2:
+                    npcs += 1
+                else:
+                    enemies += 1
+            counts[map_name] = {'npcs': npcs, 'drops': drops.get(map_name, 0),
+                                'enemies': enemies}
+        return counts
+
     def npc_models(self):
         """Each placed NPC ID with the character models it wears.
 
@@ -227,23 +258,38 @@ class MapStore:
             who = names.get(npc, "") or f"Unknown ({npc})"
         return f"{who} \u2014 {self.display_name(map_name)}"
 
+    def _placement_row(self, map_name, placement, names, types):
+        npc = placement.get("npc")
+        enemy = names.get(npc, "") if npc is not None else ""
+        values = {"map": map_name, "part": placement["name"], "kind": placement["kind"],
+                  "model": placement["model"],
+                  "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
+                  "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
+                  "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
+        display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
+        return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
+                "name": self._title(map_name, placement["name"], npc, names),
+                "range": placement["name"], "values": values, "display": display}
+
     def list_rows(self):
         _ids, names, types = self._npc()
         rows = []
         for map_name in self.maps():
             for placement in self.get(map_name).placements():
-                npc = placement.get("npc")
-                enemy = names.get(npc, "") if npc is not None else ""
-                values = {"map": map_name, "part": placement["name"], "kind": placement["kind"],
-                          "model": placement["model"],
-                          "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
-                          "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
-                          "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
-                display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
-                rows.append({"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
-                             "name": self._title(map_name, placement["name"], npc, names),
-                             "range": placement["name"], "values": values, "display": display})
+                rows.append(self._placement_row(map_name, placement, names, types))
         return rows
+
+    def row_values(self, map_name, key):
+        """One placement's list values, display names and title, fresh after
+        an edit, so undo can patch the lists without re-reading the map."""
+        _ids, names, types = self._npc()
+        part_key = parse_key(key)
+        placement = next((entry for entry in self.get(map_name).placements()
+                          if (entry["type"], entry["partId"]) == part_key), None)
+        if placement is None:
+            raise MsbError("Unknown placement")
+        row = self._placement_row(map_name, placement, names, types)
+        return row["values"], row["display"], row["name"]
 
     def read(self, map_name, key):
         _ids, names, _types = self._npc()
