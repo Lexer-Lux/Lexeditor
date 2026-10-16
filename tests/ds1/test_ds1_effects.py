@@ -272,7 +272,7 @@ def test_damage_and_defense_fields_carry_the_games_icons():
 def test_shown_labels_stay_unique_once_units_move_to_the_control():
     strips = [re.compile(r'\s*\(%\)$'), re.compile(r'\s*\(x\)$'),
               re.compile(r'\s*\([A-Za-z]+/second\)$'), re.compile(r'\s*\(seconds?\)$'),
-              re.compile(r'\s*\(ms\)$')]
+              re.compile(r'\s*\(ms\)$'), re.compile(r'\s*\(points\)$')]
 
     def shown(label):
         for pattern in strips:

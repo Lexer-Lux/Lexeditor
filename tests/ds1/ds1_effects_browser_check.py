@@ -83,7 +83,8 @@ def main():
                         "effects-all","effects-equipment","effects-items","effects-spells"]
                     units = {}
                     for key in ("maxHpRate", "motionInterval", "changeMpRate",
-                                "mpRecoverChangeSpeed", "rayCastPassedTime"):
+                                "mpRecoverChangeSpeed", "rayCastPassedTime",
+                                "poizonAttackPower", "changeMpPoint"):
                         seen = control(key).evaluate("""node => {
                             const field = node.closest('.lex-detail-field');
                             const unit = field && field.querySelector('.lex-unit');
@@ -98,6 +99,8 @@ def main():
                     assert units["changeMpRate"] == ["%", False, "MP damage"], units
                     assert units["mpRecoverChangeSpeed"] == ["MP/second", False, "MP recovery adjustment"], units
                     assert units["rayCastPassedTime"] == ["ms", False, "Raycast Passed Time"], units
+                    assert units["poizonAttackPower"] == ["pts", False, "Inflict: Poison"], units
+                    assert units["changeMpPoint"] == ["pts", False, "Flat MP damage"], units
                     art = control("physicsAttackPower").evaluate(
                         "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')")
                     assert art == "physical", art

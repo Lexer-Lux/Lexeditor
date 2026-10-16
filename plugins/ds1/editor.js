@@ -495,7 +495,8 @@ const TIMES=/\s*\(x\)$/;
 const RATE=/\s*\(([A-Za-z]+\/second)\)$/;
 const SECONDS=/\s*\(seconds?\)$/;
 const MS=/\s*\(ms\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"");
+const POINTS=/\s*\(points\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"");
 function controlFor(row,field){
   const plain=plainControlFor(row,field);
   const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
@@ -503,6 +504,7 @@ function controlFor(row,field){
     :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,field.label.match(RATE)[1])
     :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
     :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
+    :POINTS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"pts")
     :row.table&&String(row.table).endsWith(".msb")&&/^Rotation [XYZ]$/.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0"):plain;
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
