@@ -110,7 +110,25 @@ placement `compose` does not offer (it moves nodes vertically only).
   visibility (both previously noted in `menu-layout.md`).
 - `0x53DC80(msgid)`: `Place_name_` text; the warp draw calls it with
   each vector record's `+8`. Sibling getters `0x53D4C0`/`0x53DB30`
-  serve other FMG banks (`+0x3E0`/`+0x3C0`).
+  serve other FMG banks (`+0x3E0`/`+0x3C0`). Every getter reads one bank
+  pointer from the message repository `[0x1C7E3E8]` and asks the leaf
+  `0x53DF10(bank, id)`, which returns the entry's wide string or 0; the
+  getter itself then builds a `?Bank? ID: %d` fallback on the heap.
+  GoodsName is bank `+0x380` (getter `0x53B650`, whose fallback label is
+  `?GoodsName? ID: %d`). An island wanting a goods name calls the leaf
+  directly and handles 0 itself.
+- `0x66F4A0`: the start-menu root update (category strip, four icons,
+  close on cancel). Its only caller (`0x66EF07`) hands it the `R00-00`
+  dialog, the same object it looks up `R00-00`'s own `plate_black` on,
+  so nodes added to `R00-00` resolve with one `0xED6020` from it. The
+  `category_LR` strip inside it is a sub-dialog instanced by twelve
+  menus; `0xED6020` on a sub-dialog's control does not search inside it.
+- Inventory entries (`player data + 0x280`, layout in
+  `codex/ds1/ammunition-hud.md`) start with a category word,
+  `category << 28`: weapons 0, armour `0x10000000`, rings `0x20000000`,
+  goods `0x40000000` (`0x3F2800` decodes it; `0x6AEAD1` switches on it).
+  The inventory Use `0x6AE920(listDialog, index)` passes goods through
+  its can-use check `0x6AECD0` unconditionally.
 - `0x4F57A0(flagManager, id)`: event-flag test (`0x2C8940` returns the
   manager). The warp builder calls it with each record's `+0`.
 - `0x6612A0(this, direction, fast)`: shared list move. Fields:

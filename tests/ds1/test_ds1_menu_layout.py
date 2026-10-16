@@ -436,6 +436,27 @@ class OffsetTests(unittest.TestCase):
         kind, blob = layout._blob("SHAP", "SHPR", layout.node("data_simple_arms", "icon_moved").shape)
         self.assertEqual(struct.unpack_from("<4h", blob), (312, 292, 340, 320))
 
+    def test_text_can_borrow_a_node_from_another_dialog(self):
+        layout = menu_layout.Drb(drb())
+        source = layout._blob("SHAP", "SHPR", layout.node("list_armor", "text_name").shape)[1]
+        layout.add_text("data_simple_arms", "text_borrowed", "text_name", 100, 24, dx=300,
+                        source_dialog="list_armor")
+        again = menu_layout.Drb(layout.to_bytes())
+        self.assertEqual(again.text("data_simple_arms", "text_borrowed"),
+                         {"rect": [310, 110, 500, 138], "align": source[30], "type": 2, "length": 24})
+        self.assertEqual([node.name for node in again.nodes("list_armor")],
+                         [node.name for node in menu_layout.Drb(drb()).nodes("list_armor")])
+        spec = menu_layout.validate({"version": 1, "nodes": [
+            {"dialog": "data_simple_arms", "name": "text_borrowed", "from": "list_armor",
+             "lookLike": "text_name", "dy": 100, "dx": 300, "length": 24}]}, "Borrow")
+        composed = menu_layout.compose(dcx(drb()), [spec])
+        self.assertEqual(menu_layout.Drb(formats.inflate(composed)).text(
+            "data_simple_arms", "text_borrowed")["rect"], [310, 110, 500, 138])
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_text("data_simple_arms", "text_missing", "text_name", 0, 8)
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.validate({"version": 1, "nodes": [{**spec["nodes"][0], "from": ""}]}, "Bad")
+
     def test_left_applies_after_dx(self):
         layout = menu_layout.Drb(drb())
         layout.add_text("data_simple_arms", "text_wide", "text_param_receive", 30, 32, left=400, dx=50)

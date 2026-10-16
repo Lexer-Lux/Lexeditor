@@ -33,6 +33,10 @@ length to 16 bytes:
 - The game finds a child by name: `0x140ED6020(dialog, wchar_t *name)`. Text
   is set with `0x140EDBD90(node, wchar_t *)` and visibility with
   `0x140EDBDB0(node, bool)`.
+- For a dialog with no text node of its own (the start menu's `R00-00`), a
+  layout text node names a source dialog with `from` and copies that
+  dialog's node bytes, its rectangle moved by `dx`/`dy` into the target's
+  space.
 
 ### Text shapes
 
