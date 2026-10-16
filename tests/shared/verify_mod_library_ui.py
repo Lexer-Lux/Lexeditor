@@ -104,7 +104,7 @@ def main():
                 host._restart_for_project = lambda plugin,project: {"project":project}
                 page.locator('[data-tab="mods"]').click()
                 page.locator(".lex-mods-page .lex-column-list").get_by_text("Imported test").click()
-                page.get_by_role("button", name="Make editable copy…").click()
+                page.get_by_role("button", name="Make an editable copy of Imported test", exact=True).click()
                 page.get_by_text("Managed mods update automatically.", exact=False).wait_for()
                 page.get_by_role("button", name="Make a copy", exact=True).click()
                 page.get_by_label("New mod name").fill("Independent copy")

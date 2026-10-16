@@ -247,3 +247,18 @@ class Ds1ModAdapter:
             if Path(folder) in wanted:
                 lines.setdefault(folder, []).extend(need_lines)
         return lines
+    def describe_changes(self, folder, game_root):
+        """One mod's changed records and loaded files, for its detail panel.
+
+        The records are the mod's parameter rows and text entries against
+        the game's own files; without the game installed there is nothing
+        to compare, but the loaded files (what the loader reads from the
+        folder) never needed it.
+        """
+        loaded = mod_loader.loaded_files(Path(folder))
+        if game_root is None:
+            return {'changes': [], 'loaded': loaded, 'truncated': False,
+                    'note': 'Locate the game to compare records against vanilla.'}
+        result = mod_loader.describe_changes(Path(folder), Path(game_root))
+        result['loaded'] = loaded
+        return result

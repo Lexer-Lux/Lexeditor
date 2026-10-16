@@ -821,3 +821,196 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
             merged[base.offset:base.offset + base.size] = data
         return deflate(vanilla, bytes(merged)), list(conflicts.values())
     return deflate(vanilla, pack(base_plain, items)), list(conflicts.values())
+CHANGE_LIMIT = 1000
+FIELD_LIMIT = 25
+
+
+def _short(text, limit):
+    """One line of a text entry, cut for a list row."""
+    flat = ' '.join(str(text or '').split())
+    return flat if len(flat) <= limit else flat[:limit - 1].rstrip() + '\u2026'
+
+
+def _changed_units(units, old: bytes, new: bytes):
+    """The labels of the fields whose bits differ between two rows."""
+    if len(old) != len(new):
+        return ['(different row size)']
+    fields = []
+    for offset, width, mask, label in units:
+        before = int.from_bytes(old[offset:offset + width], 'little')
+        after = int.from_bytes(new[offset:offset + width], 'little')
+        if (before ^ after) & mask:
+            fields.append(label)
+    return fields[:FIELD_LIMIT]
+
+
+def _param_changes(mod_plain: bytes, vanilla_plain: bytes, labels, notes):
+    """Changed, added and removed parameter rows, in archive order."""
+    changes = []
+    try:
+        mod_members = {name: bytes(mod_plain[member.offset:member.offset + member.size])
+                       for name, member in members(mod_plain).items()}
+        vanilla_members = {name: bytes(vanilla_plain[member.offset:member.offset + member.size])
+                           for name, member in members(vanilla_plain).items()}
+    except FormatError as error:
+        notes.append(f'the parameter archive cannot be read ({error})')
+        return changes
+    units = _Units()
+    for member, vanilla_data in vanilla_members.items():
+        mod_data = mod_members.get(member)
+        if mod_data is None or mod_data == vanilla_data:
+            continue
+        table = member.removesuffix('.param')
+        spans = _row_spans(vanilla_data)
+        base = _table_rows(vanilla_data, spans[0][1] - spans[0][0]) if spans else None
+        spans = _row_spans(mod_data)
+        other = _table_rows(mod_data, spans[0][1] - spans[0][0]) if spans else None
+        if base is None or other is None:
+            notes.append(f'{member} cannot be compared row by row')
+            continue
+        size = len(base[0][2]) if base else 0
+        by_id = {row_id: data for row_id, _name, data in other}
+        fields = units.of(member, size) if size else []
+        for row_id, _name, data in base:
+            mine = by_id.get(row_id)
+            if mine is None:
+                changes.append({'table': table, 'id': row_id, 'label': labels[1](table, row_id),
+                                'fields': [], 'added': False, 'removed': True,
+                                'before': None, 'after': None})
+            elif bytes(mine) != bytes(data):
+                changes.append({'table': table, 'id': row_id, 'label': labels[0](table, row_id),
+                                'fields': _changed_units(fields, bytes(data), bytes(mine)),
+                                'added': False, 'removed': False, 'before': None, 'after': None})
+        known = {row_id for row_id, _name, _data in base}
+        for row_id, _name, _data in other:
+            if row_id not in known:
+                changes.append({'table': table, 'id': row_id, 'label': labels[0](table, row_id),
+                                'fields': [], 'added': True, 'removed': False,
+                                'before': None, 'after': None})
+    return changes
+
+
+def _text_maps(document):
+    """{file name: {id: text}} with later copies winning, like the game."""
+    merged = {}
+    for position, (_groups, mapping) in document.tables.items():
+        merged.setdefault(document._file(position), {}).update(mapping)
+    return merged
+
+
+def _text_changes(mod_doc, vanilla_doc, menu: bool):
+    """Changed, added and removed text entries, by file then id."""
+    changes = []
+    mine, base = _text_maps(mod_doc), _text_maps(vanilla_doc)
+    for file in list(mine) + [name for name in base if name not in mine]:
+        pretty = file.removesuffix('_.fmg').removesuffix('.fmg').replace('_', ' ')
+        table = f'Menu {pretty}' if menu else pretty
+        after, before = mine.get(file, {}), base.get(file, {})
+        for item in sorted(set(after) | set(before)):
+            old, new = before.get(item), after.get(item)
+            if old == new:
+                continue
+            changes.append({'table': table, 'id': item,
+                            'label': _short(new if new is not None else old, 80),
+                            'fields': [], 'added': old is None, 'removed': new is None,
+                            'before': _short(old, 120) if old is not None else None,
+                            'after': _short(new, 120) if new is not None else None})
+    return changes
+
+
+def _labeled(mod_params: bytes | None, vanilla_params: bytes, texts_doc):
+    """Display-name lookups for the changed rows, mod names first."""
+    from .formats import ItemDocument
+    try:
+        mod_doc = ItemDocument(mod_params) if mod_params is not None else None
+        if mod_doc is not None:
+            mod_doc.texts = texts_doc
+    except FormatError:
+        mod_doc = None
+    try:
+        vanilla_doc = ItemDocument(vanilla_params)
+    except FormatError:
+        vanilla_doc = None
+
+    def label(document, table, row_id):
+        if document is not None:
+            try:
+                return document.display_name(table, row_id)
+            except (FormatError, KeyError, StopIteration):
+                pass
+        return f'{table} {row_id}'
+
+    return (lambda table, row_id: label(mod_doc, table, row_id),
+            lambda table, row_id: label(vanilla_doc, table, row_id))
+
+
+def describe_changes(folder: Path, game_root: Path | None):
+    """Every record one mod changes against vanilla: params, then texts.
+
+    Returns {'changes': [...], 'truncated': bool, 'note': str}. Each change
+    carries its table, id, display label, changed field labels (parameters)
+    or before/after text (texts), and added/removed flags. Map, character
+    and asset files are file-level changes; they show under the mod's
+    files, not here. Without the game installed there is no vanilla to
+    compare, so the list stays empty and the note says so.
+    """
+    folder = Path(folder)
+    changes, notes = [], []
+    if game_root is None:
+        notes.append('Locate the game to compare records against vanilla.')
+        return {'changes': changes, 'truncated': False, 'note': ' '.join(notes)}
+    game_root = Path(game_root)
+    mod_params = folder / RELATIVE
+    vanilla_params = game_root / RELATIVE
+    params = (mod_params.read_bytes() if mod_params.is_file() else None,
+              vanilla_params.read_bytes() if vanilla_params.is_file() else None)
+    texts_doc = None
+    for candidate in (folder / texts.RELATIVE, game_root / texts.RELATIVE):
+        if not candidate.is_file():
+            continue
+        try:
+            texts_doc = texts.TextDocument(candidate.read_bytes())
+            break
+        except FormatError as error:
+            notes.append(f'{candidate.name} cannot be read ({error})')
+    if params[0] is not None and params[1] is not None:
+        try:
+            plains = (inflate(params[0]), inflate(params[1]))
+        except FormatError as error:
+            notes.append(f'the parameter archive cannot be read ({error})')
+            plains = None
+        if plains is not None:
+            changes += _param_changes(plains[0], plains[1],
+                                      _labeled(params[0], params[1], texts_doc), notes)
+    for relative, document in ((texts.RELATIVE, texts.TextDocument),
+                               (texts.MENU_RELATIVE, texts.MenuDocument)):
+        mod_file, vanilla_file = folder / relative, game_root / relative
+        if not mod_file.is_file() or not vanilla_file.is_file():
+            continue
+        try:
+            mine, base = document(mod_file.read_bytes()), document(vanilla_file.read_bytes())
+        except FormatError as error:
+            notes.append(f'{relative.name} cannot be read ({error})')
+            continue
+        if mine.plain == base.plain:
+            continue
+        changes += _text_changes(mine, base, menu=document is texts.MenuDocument)
+    truncated = len(changes) > CHANGE_LIMIT
+    return {'changes': changes[:CHANGE_LIMIT], 'truncated': truncated, 'note': ' '.join(notes)}
+
+
+def loaded_files(folder: Path):
+    """Mod-folder-relative files the loader reads, casefolded for matching."""
+    from .tweak_mods import checked
+    folder = checked(Path(folder))
+    try:
+        pairs = content_files(folder, folder.name)
+    except (ValueError, OSError):
+        return []
+    found = set()
+    for _key, disk in pairs:
+        try:
+            found.add(disk.relative_to(folder).as_posix().casefold())
+        except ValueError:
+            continue
+    return sorted(found)

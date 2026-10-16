@@ -81,6 +81,28 @@ def main():
                     open_effect()
                     assert page.locator('[data-subtab]').evaluate_all("nodes=>nodes.map(n=>n.dataset.subtab)") == [
                         "effects-all","effects-equipment","effects-items","effects-spells"]
+                    units = {}
+                    for key in ("maxHpRate", "motionInterval", "changeMpRate",
+                                "mpRecoverChangeSpeed", "rayCastPassedTime"):
+                        seen = control(key).evaluate("""node => {
+                            const field = node.closest('.lex-detail-field');
+                            const unit = field && field.querySelector('.lex-unit');
+                            const label = field && field.querySelector('.lex-detail-field-label-text');
+                            return [unit && unit.textContent,
+                                    unit && unit.classList.contains('lex-unit-multiplier'),
+                                    label && label.textContent];
+                        }""")
+                        units[key] = seen
+                    assert units["maxHpRate"] == ["\u00d7", True, "Maximum HP"], units
+                    assert units["motionInterval"] == ["s", False, "Trigger interval"], units
+                    assert units["changeMpRate"] == ["%", False, "MP damage"], units
+                    assert units["mpRecoverChangeSpeed"] == ["MP/second", False, "MP recovery adjustment"], units
+                    assert units["rayCastPassedTime"] == ["ms", False, "Raycast Passed Time"], units
+                    art = control("physicsAttackPower").evaluate(
+                        "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')")
+                    assert art == "physical", art
+                    assert control("slashDamageCutRate").evaluate(
+                        "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')") is None
                     changes={"effectEndurance":30,"maxHpRate":1.25,RECOVERY_KEY:4,
                              "disablePoison":True,"spCategory":20,"replaceSpEffectId":6920}
                     edit("effectEndurance",30)
@@ -92,7 +114,9 @@ def main():
                     edit("spCategory",20)
                     assert control("spCategory").evaluate("node=>node.tagName")=="SELECT"
                     edit("replaceSpEffectId",6920)
-                    assert "Mask of the Child" in control("replaceSpEffectId").locator('option[value="6920"]').inner_text()
+                    face = page.locator('.ds1-reference-face[data-field-key="replaceSpEffectId"]:visible')
+                    face.wait_for()
+                    assert "Mask of the Child" in face.inner_text()
                     page.screenshot(path=str(output/"effects-links.png"))
                     invalid=control(RECOVERY_KEY)
                     invalid.fill("101");invalid.press("Tab")
@@ -136,7 +160,7 @@ def main():
                     page.locator('[data-subtab="weapons"]').click()
                     page.wait_for_function("state.row?.table==='EquipParamWeapon' && state.row.id===100")
                     # An effect field opens its effect from the Open button beside it.
-                    link=page.get_by_role("button",name="Open Grass Crest Shield",exact=True)
+                    link=page.get_by_role("button",name="Open Grass Crest Shield in Effects",exact=True)
                     for _ in range(60):
                         if link.count() and link.is_visible():break
                         next_page=page.locator(".lex-tweaks-pages").get_by_role("button",name="Next page",exact=True)

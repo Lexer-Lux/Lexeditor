@@ -77,6 +77,38 @@ def mod_row(folder: Path) -> dict:
     return row
 
 
+def _human_size(size: int) -> str:
+    """A file size for a list row: B, KB, MB or GB with one decimal."""
+    value = float(max(size, 0))
+    for unit in ('B', 'KB', 'MB', 'GB'):
+        if value < 1024 or unit == 'GB':
+            text = f'{value:.1f}'.rstrip('0').rstrip('.')
+            return f'{text} {unit}'
+        value /= 1024
+    return f'{size} B'
+
+
+def mod_files(folder: Path) -> dict:
+    """Every file in one mod folder: relative path, size and label.
+
+    Symlinks stay out: a mod that links outside its folder must not make
+    the Mods tab read there. Thousands of files would swamp the detail,
+    so the list stops at two thousand and says so.
+    """
+    found = []
+    for path in sorted(folder.rglob('*')):
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        found.append({'relative': path.relative_to(folder).as_posix(), 'size': size,
+                      'sizeLabel': _human_size(size), 'loaded': False})
+    truncated = len(found) > 2000
+    return {'files': found[:2000], 'truncated': truncated}
+
+
 def _claims_bundle(folder: Path) -> bool:
     """True when the folder's own mod.json declares components.
 

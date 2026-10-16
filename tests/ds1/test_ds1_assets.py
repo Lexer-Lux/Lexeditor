@@ -295,7 +295,9 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
         assert content_type == "image/png"
         assert png[:8] == b"\x89PNG\r\n\x1a\n"
         removed = request_json(session, "/api/assets/remove", {"relative": TPF.as_posix()})
-        assert removed["files"] == []
+        assert removed["files"] == [{"relative": TPF.as_posix(),
+                                      "size": (game / TPF).stat().st_size,
+                                      "kind": "textures", "status": None}]
         detail = request_json(session, f"/api/assets?scope=textures&file={TPF.as_posix()}")
         assert detail["source"] == "game"
         assert [row["name"] for row in detail["textures"]] == ["a_diffuse.dds"]
@@ -393,3 +395,29 @@ def test_scan_game_marks_shadowed_files(tmp_path):
     assert statuses[TPF.as_posix()] == "modified"
     assert statuses["chr/c0001/other.tpf"] is None
     assert all(row["status"] is None for row in assets.scan_game(game))
+
+
+def test_scan_merged_marks_shadowed_new_and_wears_mod_sizes(tmp_path):
+    game, mod = project(tmp_path)
+    (game / TPF).parent.mkdir(parents=True)
+    (game / TPF).write_bytes(b"game pixels")
+    (game / "chr" / "c0001").mkdir(parents=True)
+    (game / "chr" / "c0001" / "other.tpf").write_bytes(b"untouched")
+    assets.store_bytes(mod, TPF.as_posix(), b"mod pixels!")
+    assets.store_bytes(mod, "chr/c9999/new.tpf", b"brand new")
+    rows = {row["relative"]: row for row in assets.scan_merged(game, mod)}
+    assert set(rows) == {TPF.as_posix(), "chr/c0001/other.tpf", "chr/c9999/new.tpf"}
+    assert rows[TPF.as_posix()]["status"] == "modified"
+    assert rows[TPF.as_posix()]["size"] == len(b"mod pixels!")
+    assert rows["chr/c0001/other.tpf"]["status"] is None
+    assert rows["chr/c9999/new.tpf"]["status"] == "new"
+    assert [row["relative"] for row in assets.scan_merged(game, mod)] == sorted(rows)
+
+
+def test_scan_merged_without_the_game_lists_mod_files_unmarked(tmp_path):
+    _game, mod = project(tmp_path)
+    assets.store_bytes(mod, TPF.as_posix(), b"mod pixels")
+    rows = assets.scan_merged(None, mod)
+    assert [row["relative"] for row in rows] == [TPF.as_posix()]
+    assert all(row["status"] is None for row in rows)
+    assert assets.scan_merged(None, None) == []

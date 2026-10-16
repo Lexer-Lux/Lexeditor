@@ -56,9 +56,70 @@ GROUPS = (
 )
 
 
+# Unit-suffixed labels: the trailing marker moves onto the control, so the
+# shown label drops the word it replaces ("Maximum HP (x)" shows "Maximum HP"
+# beside a x control). Every (x) entry is a confirmed multiplier (1 is
+# unchanged); the Defense multipliers keep the word because flat "Defense: X"
+# siblings share their names. guardDefFlickPowerRate's vendor "%" is wrong:
+# its description says multiplier.
+UNITS = {
+    "maxHpRate": "Maximum HP (x)",
+    "maxMpRate": "Maximum MP (x)",
+    "maxStaminaRate": "Maximum stamina (x)",
+    "maxHpChangeRate": "Maximum HP Source (x)",
+    "slashDamageCutRate": "Absorption: Slash (x)",
+    "blowDamageCutRate": "Absorption: Strike (x)",
+    "thrustDamageCutRate": "Absorption: Thrust (x)",
+    "neutralDamageCutRate": "Absorption: Physical (x)",
+    "magicDamageCutRate": "Absorption: Magic (x)",
+    "fireDamageCutRate": "Absorption: Fire (x)",
+    "thunderDamageCutRate": "Absorption: Lightning (x)",
+    "physicsAttackRate": "Post-Defense Attack: Physical (x)",
+    "magicAttackRate": "Post-Defense Attack: Magic (x)",
+    "fireAttackRate": "Post-Defense Attack: Fire (x)",
+    "thunderAttackRate": "Post-Defense Attack: Lightning (x)",
+    "physicsAttackPowerRate": "Attack: Physical (x)",
+    "magicAttackPowerRate": "Attack: Magic (x)",
+    "fireAttackPowerRate": "Attack: Fire (x)",
+    "thunderAttackPowerRate": "Attack: Lightning (x)",
+    "staminaAttackRate": "Stamina Attack (x)",
+    "physicsDiffenceRate": "Defense multiplier: Physical (x)",
+    "magicDiffenceRate": "Defense multiplier: Magic (x)",
+    "fireDiffenceRate": "Defense multiplier: Fire (x)",
+    "thunderDiffenceRate": "Defense multiplier: Lightning (x)",
+    "NoGuardDamageRate": "Damage on Hit: Unguarded (x)",
+    "vitalSpotChangeRate": "Damage on Hit: Weak Point (x)",
+    "normalSpotChangeRate": "Damage on Hit: Standard (x)",
+    "bloodDamageRate": "Bleed Damage Incurred (x)",
+    "registPoizonChangeRate": "Resistance: Poison (x)",
+    "registIllnessChangeRate": "Resistance: Toxic (x)",
+    "registBloodChangeRate": "Resistance: Bleed (x)",
+    "registCurseChangeRate": "Resistance: Curse (x)",
+    "soulRate": "Soul Absorption (x)",
+    "haveSoulRate": "Soul Possession (x)",
+    "equipWeightChangeRate": "Equipment Weight (x)",
+    "allItemWeightChangeRate": "Item Weight (x)",
+    "grabityRate": "Animation Speed (x)",
+    "lifeReductionRate": "Effect Duration Change (x)",
+    "hpRecoverRate": "HP Recovery (x)",
+    "guardStaminaCutRate": "Guard Stability (x)",
+    "guardDefFlickPowerRate": "Guard Defense Repulsion (x)",
+    "sightSearchEnemyCut": "Visual Search Reduction (%)",
+    "hearingSearchEnemyCut": "Auditory Search Reduction (%)",
+    "changeMpRate": "MP damage (%)",
+    "flickDamageCutRate": "Repulsion Damage Absorption (%)",
+    "changeMpPoint": "MP damage (points)",
+    "magicEffectTimeChange": "Magic Effect Duration Change (seconds)",
+    "mpRecoverChangeSpeed": "MP recovery adjustment (MP/second)",
+    "rayCastPassedTime": "Raycast Passed Time (ms)",
+}
+
+
 def presentation(key, label, description):
     """Return one shared label/help definition for each effect property."""
     label, description = OVERRIDES.get(key, (label, description))
+    if key in UNITS:
+        label = UNITS[key]
     if key not in OVERRIDES and ("Multiplies" in description or "Multiplier" in description):
         label = label.replace(" %", " multiplier")
         if "1 =" not in description and "1 mean" not in description and "1 is" not in description:

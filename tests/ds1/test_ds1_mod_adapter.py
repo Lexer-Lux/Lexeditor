@@ -146,3 +146,23 @@ def test_library_message_says_what_switching_does():
     for jargon in ("field by field", "placement by placement",
                    "member by member", "executable", "binder"):
         assert jargon not in message
+
+def test_describe_changes_without_the_game_lists_loaded_files_and_says_so(setup):
+    game, library, adapter = setup
+    folder = data_mod(library, "A", 1, ("EquipParamGoods", 100, "basicPrice", 999))
+    result = adapter.describe_changes(folder, None)
+    assert result["changes"] == [] and result["truncated"] is False
+    assert "Locate the game" in result["note"]
+    assert RELATIVE.as_posix().casefold() in result["loaded"]
+
+
+def test_describe_changes_compares_records_against_the_game(setup):
+    game, library, adapter = setup
+    folder = data_mod(library, "A", 1, ("EquipParamGoods", 100, "basicPrice", 999))
+    result = adapter.describe_changes(folder, game)
+    by_key = {(entry["table"], entry["id"]): entry for entry in result["changes"]}
+    changed = by_key[("EquipParamGoods", 100)]
+    assert changed["added"] is False and changed["removed"] is False
+    assert any("price" in field.lower() for field in changed["fields"])
+    assert ("EquipParamGoods", 101) not in by_key
+    assert RELATIVE.as_posix().casefold() in result["loaded"]

@@ -1,5 +1,6 @@
 """All documented DS1 effect fields use the existing round-trip codecs."""
 import json
+import re
 from pathlib import Path
 import sys
 from urllib.error import HTTPError
@@ -12,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
 from ds1_effects_fixture import make_effects_archive, mutate_effect_header, wrap
 from plugins.ds1.formats import ItemDocument, FormatError, inflate, schema
-from plugins.ds1.effects import TABLE, RECOVERY_KEY
+from plugins.ds1.effects import TABLE, RECOVERY_KEY, UNITS, presentation
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 from plugins.ds1 import deployment
@@ -115,9 +116,9 @@ def test_effect_options_validate_and_reflect_actual_consumers():
     assert not any(u["table"]==TABLE and u["id"]==6890 for u in doc.read_row(TABLE,6920)["effectUsage"])
     users=doc.read_row(TABLE,6890)["effectUsage"]
     assert {(u["table"],u["id"]) for u in users} == {("EquipParamWeapon",100),("EquipParamAccessory",100)}
-    assert not doc.read_row("EquipParamAccessory",101)["effectLinks"]
+    assert not doc.read_row("EquipParamAccessory",101)["recordLinks"]
     doc.edit("EquipParamWeapon",100,"residentSpEffectId",99001)
-    assert next(link["id"] for link in doc.read_row("EquipParamWeapon",100)["effectLinks"]
+    assert next(link["id"] for link in doc.read_row("EquipParamWeapon",100)["recordLinks"]
                 if link["field"] == "residentSpEffectId") == 99001
     assert len(doc.read_row(TABLE,6890)["effectUsage"]) == 1
     doc.edit("EquipParamAccessory",101,"refCategory",2)
@@ -226,3 +227,62 @@ def test_service_effects_and_cross_origin_readonly_validation(tmp_path):
         assert e.value.code==403
     finally:
         session.stop()
+
+
+def effect_specs():
+    return {item['spec'].key: item['spec'] for item in schema('SpEffectParam')['fields']}
+
+
+def test_unit_labels_end_in_a_control_marker_and_keep_their_help():
+    specs = effect_specs()
+    assert len(UNITS) >= 40
+    for key, label in UNITS.items():
+        shown, _group, description = presentation(key, specs[key].label, specs[key].description or '')
+        assert shown == label, key
+        assert description, key
+        if label.endswith('(x)'):
+            assert 'multipl' in (specs[key].description or '').lower(), key
+
+
+def test_damage_and_defense_fields_carry_the_games_icons():
+    items = {item['spec'].key: item for item in schema('SpEffectParam')['fields']}
+    kinds = ['physical', 'magic', 'fire', 'lightning']
+    defs = ['physicalDef', 'magicDef', 'fireDef', 'lightningDef']
+    attack = ('physicsAttackPower', 'magicAttackPower', 'fireAttackPower', 'thunderAttackPower')
+    attack_rate = ('physicsAttackPowerRate', 'magicAttackPowerRate', 'fireAttackPowerRate',
+                   'thunderAttackPowerRate')
+    post = ('physicsAttackRate', 'magicAttackRate', 'fireAttackRate', 'thunderAttackRate')
+    for keys in (attack, attack_rate, post):
+        for key, kind in zip(keys, kinds):
+            assert items[key]['icon'] == kind, key
+    cuts = ('neutralDamageCutRate', 'magicDamageCutRate', 'fireDamageCutRate', 'thunderDamageCutRate')
+    flats = ('physicsDiffence', 'magicDiffence', 'fireDiffence', 'thunderDiffence')
+    rates = ('physicsDiffenceRate', 'magicDiffenceRate', 'fireDiffenceRate', 'thunderDiffenceRate')
+    for keys in (cuts, flats, rates):
+        for key, kind in zip(keys, defs):
+            assert items[key]['icon'] == kind, key
+    # The game draws no glyph for these: slash/strike/thrust, status, humanity.
+    for key in ('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate',
+                'poizonAttackPower', 'registIllness', 'registBlood', 'registCurse',
+                'registPoizonChangeRate', 'registIllnessChangeRate', 'registBloodChangeRate',
+                'registCurseChangeRate', 'heroPointDamage'):
+        assert items[key]['icon'] is None, key
+
+
+def test_shown_labels_stay_unique_once_units_move_to_the_control():
+    strips = [re.compile(r'\s*\(%\)$'), re.compile(r'\s*\(x\)$'),
+              re.compile(r'\s*\([A-Za-z]+/second\)$'), re.compile(r'\s*\(seconds?\)$'),
+              re.compile(r'\s*\(ms\)$')]
+
+    def shown(label):
+        for pattern in strips:
+            label = pattern.sub('', label)
+        return label
+
+    specs = effect_specs()
+    seen = {}
+    for key, spec in specs.items():
+        label = presentation(key, spec.label, spec.description or '')[0]
+        short = shown(label)
+        assert short not in seen, f'{label} collides with {seen[short]}'
+        seen[short] = label

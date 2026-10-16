@@ -73,7 +73,7 @@ def test_world_detail_shows_reviewed_fields():
 
 def test_world_edits_roundtrip_and_validate():
     document = ItemDocument(make_archive())
-    document.edit('ItemLotParam', 100, 'lotItemId01', 400)
+    document.edit('ItemLotParam', 100, 'lotItemId01', 101)
     document.edit('ItemLotParam', 100, 'lotItemCategory01', 268435456)
     document.edit('ItemLotParam', 100, 'lotItemBasePoint01', 500)
     document.edit('ShopLineupParam', 100, 'value', 500)
@@ -82,11 +82,12 @@ def test_world_edits_roundtrip_and_validate():
     document.edit('ObjActParam', 100, 'validDist', 80)
     assert document.dirty_count == 7
     reopened = ItemDocument(document.export())
-    assert reopened.value('ItemLotParam', 100, 'lotItemId01') == 400
+    assert reopened.value('ItemLotParam', 100, 'lotItemId01') == 101
     assert reopened.value('ItemLotParam', 100, 'lotItemCategory01') == 268435456
     assert reopened.value('ShopLineupParam', 100, 'sellQuantity') == 3
     assert reopened.value('ObjActParam', 100, 'validDist') == 80
     for table, key, value in (('ItemLotParam', 'lotItemId01', 1000000001),
+                              ('ItemLotParam', 'lotItemId01', 400),
                               ('ItemLotParam', 'lotItemCategory01', 5),
                               ('ItemLotParam', 'lotItemBasePoint01', 2001),
                               ('ShopLineupParam', 'sellQuantity', 10000),
@@ -120,17 +121,17 @@ def test_world_rows_merge_by_field_and_conflict_by_name():
 
     label = next(item['spec'].label for item in schema('ItemLotParam')['fields']
                  if item['spec'].key == 'lotItemId01')
-    a = mod('A', edited(('ItemLotParam', 100, 'lotItemId01', 400)))
+    a = mod('A', edited(('ItemLotParam', 100, 'lotItemId01', 101)))
     b = mod('B', edited(('ItemLotParam', 100, 'lotItemBasePoint01', 500)))
     result = mod_loader.compose(game, [a, b])
     assert result.conflicts == []
     merged = ItemDocument(result.files[RELATIVE])
-    assert merged.value('ItemLotParam', 100, 'lotItemId01') == 400
+    assert merged.value('ItemLotParam', 100, 'lotItemId01') == 101
     assert merged.value('ItemLotParam', 100, 'lotItemBasePoint01') == 500
-    c = mod('C', edited(('ItemLotParam', 100, 'lotItemId01', 401)))
+    c = mod('C', edited(('ItemLotParam', 100, 'lotItemId01', 102)))
     result = mod_loader.compose(game, [a, c])
     assert [(c.part, c.mods) for c in result.conflicts] == [(f'Drops 100, {label}', ['A', 'C'])]
-    assert ItemDocument(result.files[RELATIVE]).value('ItemLotParam', 100, 'lotItemId01') == 401
+    assert ItemDocument(result.files[RELATIVE]).value('ItemLotParam', 100, 'lotItemId01') == 102
 
 
 def test_state_reports_world_tabs(tmp_path):

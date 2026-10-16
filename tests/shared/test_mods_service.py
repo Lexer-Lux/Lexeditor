@@ -7,12 +7,14 @@ import sys
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lexmods import archive, module  # noqa: E402
 from core import lexmods, mods_service  # noqa: E402
+from core.desktop_host import HostApi  # noqa: E402
 
 REPO = "Lexer-Lux/Lexers-Mod-For-Test"
 
@@ -166,6 +168,120 @@ class ModsServiceTests(unittest.TestCase):
         self.assertTrue(onboarding.seen("ff8"))
         self.assertFalse(onboarding.seen("ds1"))
         self.assertEqual(json.loads((self.temp / "onboarding.json").read_text()), {"done": ["ff8"]})
+
+
+    def test_mod_files_lists_every_file_with_human_sizes(self):
+        mod = self.make("Mine", name="Mine")
+        (mod / "data").mkdir()
+        (mod / "data" / "patch.parambnd").write_bytes(b"x" * 1536)
+        (mod / "notes.txt").write_bytes(b"read me")
+        result = mods_service.mod_files(mod)
+        self.assertFalse(result["truncated"])
+        by_name = {entry["relative"]: entry for entry in result["files"]}
+        self.assertEqual(sorted(by_name), ["data/patch.parambnd", "mod.json", "notes.txt"])
+        self.assertEqual(by_name["data/patch.parambnd"]["size"], 1536)
+        self.assertEqual(by_name["data/patch.parambnd"]["sizeLabel"], "1.5 KB")
+        self.assertEqual(by_name["notes.txt"]["sizeLabel"], "7 B")
+        self.assertTrue(all(entry["loaded"] is False for entry in result["files"]))
+
+    def test_mod_files_skips_symlinks_outside_the_folder(self):
+        mod = self.make("Mine", name="Mine")
+        outside = self.temp / "outside.txt"
+        outside.write_text("elsewhere", encoding="utf-8")
+        try:
+            (mod / "sneaky.txt").symlink_to(outside)
+        except OSError:
+            self.skipTest("symlinks need privileges on this machine")
+        result = mods_service.mod_files(mod)
+        self.assertEqual([entry["relative"] for entry in result["files"]], ["mod.json"])
+
+    def test_mod_files_stops_at_two_thousand(self):
+        mod = self.make("Mine", name="Mine")
+        for index in range(2005):
+            (mod / f"file-{index:04d}.bin").write_bytes(b"x")
+        result = mods_service.mod_files(mod)
+        self.assertTrue(result["truncated"])
+        self.assertEqual(len(result["files"]), 2000)
+
+    def test_human_size_spells_bytes_through_gigabytes(self):
+        sizes = {0: "0 B", 512: "512 B", 1024: "1 KB", 1536: "1.5 KB",
+                 1024 ** 2: "1 MB", 3 * 1024 ** 3: "3 GB"}
+        for size, label in sizes.items():
+            self.assertEqual(mods_service._human_size(size), label)
+
+
+class ModContentsTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.library = Path(temp.name) / "library" / "test"
+        self.library.mkdir(parents=True)
+        self.mod = self.library / "Mine"
+        self.mod.mkdir()
+        (self.mod / "mod.json").write_text(json.dumps({"name": "Mine"}), encoding="utf-8")
+        (self.mod / "data").mkdir()
+        (self.mod / "data" / "patch.parambnd").write_bytes(b"x" * 100)
+
+    def host(self, adapter, game=None):
+        host = HostApi.__new__(HostApi)
+        host._mod_library_lock = threading.RLock()
+        host._game_mods = lambda _plugin: self.library
+        host._mod_adapter = lambda _plugin: adapter
+        root = str(game) if game else ""
+        host._installations = SimpleNamespace(snapshot=lambda _plugin: {"root": root})
+        return host
+
+    def contents(self, adapter, game=None):
+        return HostApi.mod_contents(self.host(adapter, game), "test", str(self.mod))
+
+    def test_files_list_without_a_describing_loader(self):
+        result = self.contents(None)
+        self.assertEqual([entry["relative"] for entry in result["files"]],
+                         ["data/patch.parambnd", "mod.json"])
+        self.assertEqual(result["changes"], [])
+        self.assertFalse(result["canDescribe"])
+        self.assertIn("not available for this game", result["note"])
+
+    def test_loader_without_describe_changes_lists_files_and_says_so(self):
+        result = self.contents(SimpleNamespace())
+        self.assertEqual(len(result["files"]), 2)
+        self.assertFalse(result["canDescribe"])
+        self.assertIn("not available for this game", result["note"])
+
+    def test_describe_marks_loaded_files_and_surfaces_its_note(self):
+        change = {"table": "Items", "id": 100, "label": "Stone", "fields": ["price"],
+                  "added": False, "removed": False}
+        adapter = SimpleNamespace(describe_changes=lambda folder, game: {
+            "changes": [change], "truncated": False, "loaded": ["DATA/PATCH.PARAMBND"],
+            "note": "compared against vanilla"})
+        result = self.contents(adapter, game=self.library)
+        self.assertTrue(result["canDescribe"])
+        self.assertEqual(result["changes"], [change])
+        self.assertFalse(result["changesTruncated"])
+        self.assertEqual(result["note"], "compared against vanilla")
+        by_name = {entry["relative"]: entry for entry in result["files"]}
+        self.assertTrue(by_name["data/patch.parambnd"]["loaded"])
+        self.assertFalse(by_name["mod.json"]["loaded"])
+
+    def test_a_broken_describe_leaves_files_and_reports_the_error(self):
+        def broken(folder, game):
+            raise OSError("the archive cannot be read")
+        result = self.contents(SimpleNamespace(describe_changes=broken), game=self.library)
+        self.assertTrue(result["canDescribe"])
+        self.assertEqual(result["changes"], [])
+        self.assertEqual(result["note"], "the archive cannot be read")
+        self.assertEqual(len(result["files"]), 2)
+
+    def test_truncation_passes_through(self):
+        adapter = SimpleNamespace(describe_changes=lambda folder, game: {
+            "changes": [], "truncated": True, "loaded": [], "note": ""})
+        result = self.contents(adapter, game=self.library)
+        self.assertTrue(result["changesTruncated"])
+        self.assertEqual(result["note"], "")
+
+    def test_a_mod_outside_the_library_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "this game's library"):
+            HostApi.mod_contents(self.host(None), "test", str(self.library.parent))
 
 
 if __name__ == "__main__":

@@ -1798,6 +1798,40 @@ class HostApi:
             if lines:
                 row[method] = list(lines)
 
+    def mod_contents(self, plugin_id: str, path: str) -> dict:
+        """One mod's changed records and files, for its detail panel.
+
+        The files are every file in the folder; the game's loader marks
+        which of them it reads when the mod is on. The changed records
+        come from the loader too (a mod's rows and texts against the
+        game's own files). A game whose loader reports neither still
+        lists its files; the note says what is missing and why.
+        """
+        from core import mods_service
+        folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+        result = mods_service.mod_files(folder)
+        result.update({'changes': [], 'changesTruncated': False, 'canDescribe': False, 'note': ''})
+        adapter = self._mod_adapter(plugin_id)
+        describe = getattr(adapter, 'describe_changes', None)
+        if adapter is None or describe is None:
+            result['note'] = 'Record comparison is not available for this game yet.'
+            return result
+        result['canDescribe'] = True
+        game = self._installations.snapshot(plugin_id).get('root') or None
+        try:
+            reported = describe(folder, Path(game) if game else None)
+        except (OSError, ValueError, RuntimeError) as error:
+            result['note'] = str(error)
+            return result
+        result['changes'] = reported.get('changes', [])
+        result['changesTruncated'] = bool(reported.get('truncated', False))
+        if reported.get('note'):
+            result['note'] = reported['note']
+        loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
+        for entry in result['files']:
+            entry['loaded'] = entry['relative'].casefold() in loaded
+        return result
+
     def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
         from core import mod_metadata, mods_service
         folder = mods_service.checked_mod(self._game_mods(plugin_id), path)

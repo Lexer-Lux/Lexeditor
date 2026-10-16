@@ -41,7 +41,8 @@ def test_drop_import_still_filters_and_lands_in_the_mods_tab():
 
 def test_library_location_and_editable_copies_survive_the_dissolve():
     assert '"Mod library location"' in FRAMEWORK
-    assert FRAMEWORK.count("Make editable copy…") == 1
+    assert "Make an editable copy of" in FRAMEWORK
+    assert "copy_library_mod" in FRAMEWORK
 
 
 def test_the_dialog_backend_is_gone_but_upload_stays():

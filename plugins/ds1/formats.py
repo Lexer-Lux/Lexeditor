@@ -16,11 +16,11 @@ import zlib
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
 from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES
 from .attacks import ATTACK_FIELDS, AttackReferences
-from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_keys, reference_switches
-from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set, goods_keys
+from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
+from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set
 from .charainit import (TABLE as CHARA_TABLE, CLASS_ROWS, GIFT_ROWS, TWINS, UNMIRRORED,
                         GIFT_FIELDS, GROUPS as CHARA_GROUPS, REF_NOUNS as CHARA_REF_NOUNS,
-                        CatalogReferences, catalog_links)
+                        CatalogReferences)
 
 FormatError = DS3FormatError
 GRAPH_TABLE = 'CalcCorrectGraph'
@@ -109,6 +109,18 @@ for _table, _keys, _kinds in (
         ('EquipParamProtector', ('weight',), ('weight',)),
         ('EquipParamProtector', ('durability', 'durabilityMax'), ('durability', 'durability')),
         ('Magic', ('requirementIntellect', 'requirementFaith'), ('int', 'faith')),
+        ('SpEffectParam', ('physicsAttackPower', 'magicAttackPower', 'fireAttackPower', 'thunderAttackPower'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('SpEffectParam', ('physicsAttackPowerRate', 'magicAttackPowerRate', 'fireAttackPowerRate', 'thunderAttackPowerRate'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('SpEffectParam', ('physicsAttackRate', 'magicAttackRate', 'fireAttackRate', 'thunderAttackRate'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('SpEffectParam', ('neutralDamageCutRate', 'magicDamageCutRate', 'fireDamageCutRate', 'thunderDamageCutRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('SpEffectParam', ('physicsDiffence', 'magicDiffence', 'fireDiffence', 'thunderDiffence'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('SpEffectParam', ('physicsDiffenceRate', 'magicDiffenceRate', 'fireDiffenceRate', 'thunderDiffenceRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind
@@ -517,6 +529,40 @@ def _shown(value, field):
     return value
 
 
+LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack'}
+
+
+def field_link(document, table, row_id, spec):
+    """(kind, target table) for one field's live reference, else None.
+
+    A reference names its table outright (replaceItemId names
+    EquipParamGoods) or behind a switch (an accessory's refId names
+    SpEffectParam only when its refCategory is 2); the switch reads
+    from this row, so the same field links differently per record.
+    The first linkable table wins: a projectile's attack falls
+    through its PC entry to the NPC one the Attacks tab shows.
+    Kinds: effect, goods, catalog (equipment and spells), attack.
+    Anything else (projectiles, PC attacks and behaviors) has no
+    picker or tab to open, so it stays a number.
+    """
+    for expression in (spec.reference or '').split(','):
+        match = re.fullmatch(r'(\w+)(?:\((\w+)=(-?\d+)\))?', expression.strip())
+        if not match:
+            continue
+        name, switch, want = match.groups()
+        if switch is not None and document.value(table, row_id, switch) != int(want):
+            continue
+        if name == EFFECT_TABLE:
+            return ('effect', name)
+        if name == GOODS_TABLE:
+            return ('goods', name)
+        if name in CHARA_REF_NOUNS:
+            return ('catalog', name)
+        if name == 'AtkParam_Npc':
+            return ('attack', name)
+    return None
+
+
 class ItemDocument:
     def __init__(self, source):
         self.original = source
@@ -712,9 +758,13 @@ class ItemDocument:
         and what a reader sees for it (an enum's name, Yes or No)."""
         data = self._row(table, row_id)[2]
         values, display = {}, {}
-        linked_effects = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
-        linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
-        linked_catalogs = catalog_links(self, table)
+        links = {}
+        for candidate in self.schemas[table]['fields']:
+            if not candidate['spec'].reference:
+                continue
+            resolved = field_link(self, table, row_id, candidate['spec'])
+            if resolved and (resolved[0] != 'effect' or EFFECT_TABLE in self.params):
+                links[candidate['spec'].key] = resolved
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if field.padding or field.array_length != 1: continue
@@ -722,12 +772,9 @@ class ItemDocument:
             if isinstance(value, float) and not math.isfinite(value): value = str(value)
             values[field.key] = value
             if field.is_bool: display[field.key] = 'Yes' if value else 'No'
-            elif field.key in linked_effects:
-                display[field.key] = self.effect_references().choices.get(str(value), f'Unknown ({value})')
-            elif field.key in linked_goods:
-                display[field.key] = self.goods_references().choices.get(str(value), f'Unknown ({value})')
-            elif field.key in linked_catalogs:
-                catalog = self.catalog_references(linked_catalogs[field.key]).choices
+            elif field.key in links:
+                kind, target = links[field.key]
+                catalog = self.link_choices(kind, target)
                 display[field.key] = catalog.get(str(value), f'Unknown ({value})')
             elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
         if table in ('EquipParamProtector', 'NpcParam'):
@@ -792,6 +839,23 @@ class ItemDocument:
         if table not in self._catalogs:
             self._catalogs[table] = CatalogReferences(self, table)
         return self._catalogs[table]
+
+    def link_choices(self, kind, target):
+        """Picker choices for one resolved reference, by its kind."""
+        if kind == 'effect':
+            return self.effect_references().choices
+        if kind == 'goods':
+            return self.goods_references().choices
+        if kind == 'catalog':
+            return self.catalog_references(target).choices
+        if kind == 'attack':
+            return self.attack_references().choices
+        raise FormatError('Unknown reference kind')
+
+    def link_noun(self, kind, target):
+        if kind == 'catalog':
+            return CHARA_REF_NOUNS[target]
+        return LINK_NOUNS[kind]
 
     def list_rows(self, tab):
         if tab in {entry[0] for entry in EFFECT_SUBTABS}:
@@ -958,9 +1022,13 @@ class ItemDocument:
         vanilla = self._vanilla_row(table, row_id)
         fields = []
         spans = self._value_spans(table)
-        effect_keys = set(reference_keys(self, table, row_id)) if EFFECT_TABLE in self.params else set()
-        linked_goods = set(goods_keys(self, table, row_id)) if GOODS_TABLE in self.params else set()
-        linked_catalogs = catalog_links(self, table)
+        links = {}
+        for candidate in self.schemas[table]['fields']:
+            if not candidate['spec'].reference:
+                continue
+            resolved = field_link(self, table, row_id, candidate['spec'])
+            if resolved and (resolved[0] != 'effect' or EFFECT_TABLE in self.params):
+                links[candidate['spec'].key] = resolved
         for item in self.schemas[table]['fields']:
             field = item['spec']
             if table == 'NpcParam' and field.key not in NPC_FIELDS:
@@ -979,12 +1047,9 @@ class ItemDocument:
             original = _shown(read_field(vanilla, field, '<'), field) if vanilla is not None else None
             if isinstance(original, float) and not math.isfinite(original):
                 original = None
-            if field.key in effect_keys:
-                options = self.effect_references().choices
-            elif field.key in linked_goods:
-                options = self.goods_references().choices
-            elif field.key in linked_catalogs:
-                options = self.catalog_references(linked_catalogs[field.key]).choices
+            if field.key in links:
+                kind, target = links[field.key]
+                options = self.link_choices(kind, target)
             else:
                 options = item['enum']
             # A float the PARAMDEF leaves unbounded shows no range: dtype
@@ -1040,7 +1105,28 @@ class ItemDocument:
         if table == EFFECT_TABLE:
             fields.sort(key=lambda field: EFFECT_GROUPS.index(field['group']))
             result['effectUsage'] = self.effect_references().incoming.get(row_id, [])
-        result['effectLinks'] = self.effect_references().outgoing.get((table, row_id), [])
+        record_links = []
+        for field in fields:
+            if field['key'] not in links:
+                continue
+            kind, target = links[field['key']]
+            choices = self.link_choices(kind, target)
+            current = field['value']
+            if choices.get(str(current)) == 'None':
+                continue
+            noun = self.link_noun(kind, target)
+            record_links.append({'kind': kind, 'table': target, 'id': current,
+                                 'field': field['key'], 'resolved': str(current) in choices,
+                                 'name': choices.get(str(current), f'Missing {noun} {current}')})
+        result['recordLinks'] = record_links
+        dialogs = []
+        if table == 'EquipParamGoods' and self.menu_texts is not None:
+            for field in fields:
+                if field['key'] != 'yesNoDialogMessageId':
+                    continue
+                dialogs.append({'field': field['key'], 'id': field['value'],
+                                'text': self.menu_texts.event_text(field['value']) or ''})
+        result['dialogLinks'] = dialogs
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result
 
@@ -1060,7 +1146,7 @@ class ItemDocument:
                            'editable': True, 'vanilla': self.menu_texts.original_label(key) or ''})
         text = next(field['value'] for field in fields if field['key'] == 'label') if fields else ''
         return {'id': row_id, 'table': 'MenuText', 'name': text or MENU_LABELS[key][0],
-                'renamable': False, 'fields': fields, 'effectLinks': []}
+                'renamable': False, 'fields': fields, 'recordLinks': [], 'dialogLinks': []}
 
     def _absorption_levels(self, row_id, table='EquipParamProtector'):
         """The record's Armor Rework effects, +0 first, or [] for a record without one."""
@@ -1217,15 +1303,12 @@ class ItemDocument:
             raise FormatError(f"{field.label} must be between {item['min']} and {item['max']}")
         if item['enum'] and str(int(value)) not in item['enum']:
             raise FormatError('Choose a listed value')
-        links_effect = EFFECT_TABLE in self.params and key in set(reference_keys(self, table, row_id))
-        if links_effect and str(int(value)) not in self.effect_references().choices:
-            raise FormatError('Choose an existing effect or None')
-        links_goods = GOODS_TABLE in self.params and key in set(goods_keys(self, table, row_id))
-        if links_goods and str(int(value)) not in self.goods_references().choices:
-            raise FormatError('Choose an existing item or None')
-        links_catalog = catalog_links(self, table).get(key)
-        if links_catalog and str(int(value)) not in self.catalog_references(links_catalog).choices:
-            raise FormatError(f'Choose an existing {CHARA_REF_NOUNS[links_catalog]} or None')
+        link = field_link(self, table, row_id, field)
+        links_effect = link is not None and link[0] == 'effect' and EFFECT_TABLE in self.params
+        if link is not None and (link[0] != 'effect' or EFFECT_TABLE in self.params):
+            noun = self.link_noun(*link)
+            if str(int(value)) not in self.link_choices(*link):
+                raise FormatError(f'Choose an existing {noun} or None')
         added = (table, row_id) in self._added_rows
         original = None if added else self.original_plain[start:start + len(data)]
         # A value that reads the same as the saved one IS the saved one. The

@@ -71,6 +71,9 @@ class AttackReferences:
     def __init__(self, document):
         self.doc = document
         self.attack_ids = {r.row_id for r in document.params['AtkParam_Npc'].rows}
+        self.choices = {'-1': 'None'}
+        for row in document.params['AtkParam_Npc'].rows:
+            self.choices[str(row.row_id)] = document.display_name('AtkParam_Npc', row.row_id, row)
         self.bullets = {r.row_id: (document.value('Bullet', r.row_id, 'atkId_Bullet'),
                                   document.value('Bullet', r.row_id, 'HitBulletID'))
                         for r in document.params['Bullet'].rows}

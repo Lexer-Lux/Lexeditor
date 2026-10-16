@@ -343,6 +343,15 @@ EVENT_TYPES = {
 }
 
 
+def _display_name(raw, anim_id):
+    """An animation's list name. Some name offsets point at a sub-table
+    rather than a string (player anims read back a control character), so
+    anything unprintable falls back to the ID."""
+    if raw and raw.strip() and raw.isprintable():
+        return raw
+    return f'animation {anim_id}'
+
+
 def _wstring(data, offset, what):
     """A stored wide string. Display-only names fall back instead of
     failing the file; offsets outside the file fail it."""
@@ -441,7 +450,7 @@ class TaeDocument:
             for slot, field in ((start_off, 'start'), (end_off, 'end')):
                 self._slot_users.setdefault(slot, []).append((index, number, field))
         self.anims.append({'index': index, 'id': anim_id,
-                           'name': anim_name or f'animation {anim_id}',
+                           'name': _display_name(anim_name, anim_id),
                            'reference': ref, 'offset': anim_off,
                            'pool': [t_off + slot * 4 for slot in range(t_n)],
                            'events': events})

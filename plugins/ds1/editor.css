@@ -37,10 +37,10 @@
      whether or not a model preview is attached. */
   --lex-preview-icon-side:left;}
 
-.lex-goto-button,.lex-header-icon{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
-.lex-goto-button:hover,.lex-header-icon:hover{opacity:1;}
-.lex-goto-icon,.lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}
-.lex-header-icon:disabled{opacity:.3;cursor:default;}
+.lex-goto-button{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+.lex-goto-button:hover{opacity:1;}
+.lex-goto-icon{width:16px;height:16px;vertical-align:middle;}
+.lex-goto-button:disabled{opacity:.3;cursor:default;}
 .lex-viewport-picker>svg{width:16px;height:16px;vertical-align:middle;}
 
 .lex-dir-tabs > .lex-subtab-button{flex:0 1 auto;}
@@ -62,4 +62,16 @@
 .lex-preview-variant-wrap>button{align-self:flex-start;}
 .ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
 .lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
-.ds1-finder-face > svg{width:16px;height:16px;flex:0 0 auto;}
+/* A record link is a hoverable face (the linked record's name) plus a
+   finder button (pick another target). The face takes the row; the
+   dialog line beside its number does the same. */
+.ds1-reference-field{display:flex;align-items:center;gap:6px;}
+.ds1-reference-field>*:first-child{flex:1 1 auto;min-width:0;}
+.ds1-reference-face{width:100%;}
+.ds1-reference-face{flex:1 1 auto;min-width:0;display:flex;}
+.ds1-reference-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+.ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+.ds1-find-reference{flex:0 0 auto;}
+.ds1-find-reference>svg{width:16px;height:16px;display:block;}
+.ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}

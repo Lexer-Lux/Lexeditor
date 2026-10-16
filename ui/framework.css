@@ -1056,19 +1056,36 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 6px;
 }
-/* A header switch tracks its header: full size on a roomy one, shrunk to
-   fit a short one, always square with its padding. A fixed box outgrew
-   short headers and the heading clip cut it.
-   The drawn tick is sized for this range.
+/* A header switch fills its header: it stretches to the actions area,
+   staying a centred square with equal margins, so a roomy header gets
+   a roomy switch. A fixed 18px box sat small in every header.
+   Short headers cap it instead of clipping it.
 */
 .lex-detail-panel-actions > input[type="checkbox"] {
+  align-self:stretch;
   width:auto;
-  height:18px;
+  height:auto;
   max-height:100%;
   min-height:16px;
   aspect-ratio:1;
-  margin:0;
+  margin:5px;
 }
+/* Icon buttons in a detail header: quiet until hovered, like the
+   record headers in the game plugins. The mods tab shares them. */
+.lex-header-icon{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+.lex-header-icon:hover{opacity:1;}
+.lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}
+.lex-header-icon:disabled{opacity:.3;cursor:default;}
+/* A mod's changed records and files: compact rows in a capped list,
+   with the loader-read files lit in the accent. */
+.lex-mod-change-list,.lex-mod-file-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:2px;}
+.lex-mod-change{padding:2px 0;}
+.lex-mod-change-label{font-weight:600;}
+.lex-mod-change-meta{opacity:.75;}
+.lex-mod-file{display:flex;gap:8px;align-items:baseline;}
+.lex-mod-file-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lex-mod-file-size{flex:0 0 auto;opacity:.75;}
+.lex-mod-file-loaded>.lex-mod-file-name{color:var(--lex-accent);font-weight:600;}
 
 /* Multi-select prepends a banner beside the tabbed panel, so the pair below
    gets the same fill treatment an only-child tabbed panel gets. The tabs

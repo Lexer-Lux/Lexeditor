@@ -6,7 +6,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],attackTabs:[],ro
   monsterTab:"basics",monsterAttacks:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],shopTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,
-  assetTabs:[{id:"overrides",label:"Mod files"},{id:"game",label:"Installed game"}],assetDetail:null,assetBusy:false,assetUpload:null,
+  assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
@@ -81,11 +81,11 @@ const shell=LexeditorUI.mountShell({
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"encumbrance",label:"Encumbrance",help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."},
-    {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"textures",label:"Textures",help:"The images on the models. Mod files holds the replacements the mod carries. Installed game holds the files they replace. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"music",label:"Music",help:"Area themes and boss music. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"other",label:"Other files",help:"Movies, menu interface, scripts and shaders: game files no structured editor owns. Mod files holds the replacements the mod carries. Installed game holds the files they replace. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"textures",label:"Textures",help:"The images on the models. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"music",label:"Music",help:"Area themes and boss music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"other",label:"Other files",help:"Movies, menu interface, scripts and shaders: game files no structured editor owns. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
     {id:"misc",label:"Misc."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -169,7 +169,7 @@ async function loadItems(){
   if(state.tab==="animations"){await loadAnims(request);return;}
   const sub=state.sub;
   let url="/api/table?tab="+encodeURIComponent(sub);
-  if(ASSET_TABS.has(state.tab))url="/api/assets?scope="+(sub==="game"?"game":"overrides");
+  if(ASSET_TABS.has(state.tab))url="/api/assets?scope=all";
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
   if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);}
@@ -190,7 +190,7 @@ async function loadDetail(){
   if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.assetDetail=null;return;}
   if(row.table==="Asset"){
     state.assetDetail=null;
-    const detail=await api(`/api/assets?scope=textures&side=${state.sub==="game"?"game":"mod"}&file=${encodeURIComponent(row.id)}`);
+    const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
     state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;return;
   }
@@ -238,7 +238,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":((state.statsTabs.find(entry=>entry.count)||{}).id||"curves");
   else if(tab==="encumbrance"&&!["encumbrance","encumbrance-overrides"].includes(sub))sub="encumbrance";
   else if(tab==="misc")sub="misc";
-  else if(ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="overrides";
+  else if(ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="files";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="text"&&!state.textTabs.some(entry=>entry.id===sub))sub="menu-labels";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
@@ -272,6 +272,54 @@ async function textLabelPreview(id){
   return LexeditorUI.stack({fill:false,compact:true},el("strong",{},row.name),el("span",{},label||"(empty)"));
 }
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items"};
+const recordRows=new Map();
+async function recordRow(table,id){
+  const cacheKey=`${table}:${id}`;
+  if(!recordRows.has(cacheKey))recordRows.set(cacheKey,
+    api(`/api/row?table=${encodeURIComponent(table)}&id=${id}`).then(result=>result.row,
+      error=>{recordRows.delete(cacheKey);throw error;}));
+  return recordRows.get(cacheKey);
+}
+function catalogSub(table,row){
+  const value=search=>row.fields?.find(field=>field.key===search)?.value;
+  if(table==="EquipParamGoods"){
+    const category=value("goodsType");
+    return category===1?"keys":category===2?"upgrades":[5,6,7].includes(category)?"spells":"consumables";
+  }
+  if(table==="EquipParamWeapon")return [13,14].includes(value("weaponCategory"))?"ammo":"weapons";
+  if(table==="EquipParamProtector")return "armor";
+  if(table==="EquipParamAccessory")return "rings";
+  if(table==="Magic")return "spells";
+  return "consumables";
+}
+async function openCatalog(table,id){
+  try{
+    const row=await recordRow(table,id);
+    await navigate("items",catalogSub(table,row),`${table}:${id}`);
+  }catch(error){notify(error);}
+}
+function openRecord(link){
+  if(link.kind==="effect")return openEffect(link);
+  if(link.kind==="attack")return openAttack(link.id);
+  return openCatalog(link.table,link.id);
+}
+async function recordPreview(link){
+  const row=await recordRow(link.table,link.id);
+  const parts=[el("strong",{},row.name)];
+  if(ds1IconTables.has(link.table)){
+    const picture=el("img",{src:`/api/icon?table=${encodeURIComponent(link.table)}&id=${encodeURIComponent(link.id)}`,
+      alt:"",draggable:"false",style:"width:40px;height:40px;","data-lex-no-image":"off"});
+    picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+    parts.push(picture);
+  }
+  for(const field of (row.fields||[]).filter(shown=>shown.type!=="longtext"&&shown.key!=="description"&&shown.key!=="longDescription").slice(0,6)){
+    const shown=field.type==="enum"?(field.enum[String(field.value)]||`Unknown (${field.value})`)
+      :typeof field.value==="number"?LexeditorUI.formatNumber(field.value):String(field.value);
+    parts.push(detailField({label:field.label,control:readonlyField(shown,{format:false})}));
+  }
+  return LexeditorUI.stack({fill:false,compact:true},...parts);
+}
 async function deploymentAction(action){
   if(state.deployBusy)return;
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
@@ -334,6 +382,13 @@ function patchRowValues(table,id,values,display){
   // their detail controls repaint in place, sliders included.
   for(const other of state.pagedView?.querySelectorAll(`[data-field-key="${CSS.escape(propertyKey)}"]`)??[]){
     if(other===control||other===document.activeElement)continue;
+    if(other.hasAttribute("data-lex-dialog")){
+      const dialog=(state.row?.dialogLinks||[]).find(entry=>entry.field===propertyKey);
+      const text=dialog?(dialog.text||`(no dialog text ${dialog.id})`):"";
+      if("value" in other)other.value=text;else other.textContent=text;
+      other.title=dialog?.text||"";
+      continue;
+    }
     if(other.type==="checkbox")other.checked=!!value;
     else if("value" in other){
       other.value=(other.disabled&&other.readOnly&&typeof value==="number")?LexeditorUI.formatNumber(value):String(value);
@@ -413,13 +468,17 @@ function commitPinnedCell(record,propertyKey,value){
 }
 const PERCENT=/\s*\(%\)$/;
 const TIMES=/\s*\(x\)$/;
-const RATE=/\s*\(stamina\/second\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"");
+const RATE=/\s*\(([A-Za-z]+\/second)\)$/;
+const SECONDS=/\s*\(seconds?\)$/;
+const MS=/\s*\(ms\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"");
 function controlFor(row,field){
   const plain=plainControlFor(row,field);
   const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
     :TIMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00d7")
-    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"stamina/second")
+    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,field.label.match(RATE)[1])
+    :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
+    :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
     :row.table&&String(row.table).endsWith(".msb")&&/^Rotation [XYZ]$/.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0"):plain;
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
@@ -430,28 +489,42 @@ function controlFor(row,field){
     same:(left,right)=>Number(left)===Number(right),
     apply:value=>commit(row,field,value,input)});
 }
-// A huge choice list (4,000 effects) is a finder, not a dropdown: the
-// face shows the current choice and opens a searchable picker. The face
-// carries a value property like the select it replaces, so commits,
-// provenance and detail sync read and write it the same way.
-function finderControl(row,field,choices,attrs){
-  const labelFor=value=>field.enum[String(value)]||`Unknown (${value})`;
-  const face=el("button",{type:"button",class:"ds1-finder-face",...attrs,
-    style:"width:100%;display:flex;align-items:center;gap:6px;",
-    onclick:event=>{
-      LexeditorUI.choicePopover({label:field.label,search:`Search ${field.label}`,
-        choices:choices.map(([value,label])=>({label,value})),
-        select:picked=>{commit(row,field,Number(picked),face);face.value=String(picked);}}).openFor(face);
-    }});
-  const paint=value=>{face.replaceChildren(el("span",{style:"flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;"},labelFor(value)),LexeditorUI.magnifyIcon());};
+// A record link is a hoverable face: it names the linked record, previews
+// it on hover and opens it on click. The finder button that picks another
+// target joins it outside the provenance wrapper, where the reference
+// rail cannot cover it. The face carries a value property like the select
+// it replaces, so commits, provenance and detail sync treat it the same way.
+function referenceFace(row,field){
+  const face=el("span",{class:"ds1-reference-face","data-field-key":field.key});
+  const paint=()=>{
+    const live=state.row&&key(state.row)===key(row)?state.row:row;
+    const entry=(live.recordLinks||[]).find(item=>item.field===field.key);
+    const value=live.fields?.find(item=>item.key===field.key)?.value??field.value;
+    const label=entry?entry.name:(field.enum[String(value)]||`Unknown (${value})`);
+    face.replaceChildren(entry&&entry.resolved?hoverable({content:label,targetType:`ds1-${entry.kind}`,
+      targetId:entry.id,targetLabel:`${entry.name} in ${LINK_TAB_LABELS[entry.kind]||"Items"}`,
+      preview:()=>recordPreview(entry),activate:()=>openRecord(entry)})
+      :el("span",{class:"lex-readonly-field"},label));
+  };
   let current=String(field.value);
   Object.defineProperty(face,"value",{configurable:true,
     get:()=>current,
-    set:next=>{current=String(next);paint(current);}});
-  paint(current);
+    set:next=>{current=String(next);paint();}});
+  paint();
   const live=state.row?.fields?.find(item=>item.key===field.key)?.value;
   if(live!==undefined&&String(live)!==current)face.value=String(live);
   return face;
+}
+function referencePicker(row,field,face){
+  const choices=Object.entries(field.enum);
+  if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
+  const pick=el("button",{type:"button",class:"ds1-find-reference",title:`Change ${field.label}`,
+    "aria-label":`Change ${field.label}`,disabled:state.readOnly||field.disabled,
+    onclick:()=>{LexeditorUI.choicePopover({label:field.label,search:`Search ${field.label}`,
+      choices:choices.map(([value,label])=>({label,value})),
+      select:picked=>{commit(row,field,Number(picked),face);face.value=String(picked);}}).openFor(pick);}},
+    LexeditorUI.magnifyIcon());
+  return pick;
 }
 function plainControlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
@@ -475,9 +548,10 @@ function plainControlFor(row,field){
       commit(row,field,input.value,input);
     }});
   if(field.type==="enum"){
+    const link=(row.recordLinks||[]).find(entry=>entry.field===field.key);
+    if(link)return referenceFace(row,field);
     const choices=Object.entries(field.enum);
     if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
-    if(choices.length>200)return finderControl(row,field,choices,attrs);
     const control=el("select",{...attrs,onchange:event=>commit(row,field,Number(event.target.value),event.target)});
     control.replaceChildren(...choices.map(([value,label])=>el("option",{value,disabled:!(value in field.enum)},label)));
     const live=state.row?.fields?.find(item=>item.key===field.key)?.value;
@@ -508,9 +582,10 @@ function groupFor(field){
 }
 function fieldSections(row){
   const groups=new Map();
-  // A field that is itself an effect link opens that effect from its own row;
+  // A field that is itself a record link opens that record from its own row;
   // only links with no editable field on the page are listed separately.
-  const links=new Map((row.effectLinks||[]).map(effect=>[effect.field,effect]));
+  const links=new Map((row.recordLinks||[]).map(entry=>[entry.field,entry]));
+  const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
   const shownLinks=new Set();
   // Placement coordinates ride one row per vector: Position, then
   // Rotation in degrees. Detection is by field, not by tab, so any
@@ -539,9 +614,15 @@ function fieldSections(row){
     let control=controlFor(row,field);
     if(link){
       shownLinks.add(field.key);
-      if(link.resolved)control=LexeditorUI.controlGroup([control,el("button",{type:"button",class:"ds1-open-effect",
-        title:`Open ${link.name}`,"aria-label":`Open ${link.name}`,onclick:()=>openEffect(link)},"Open")]);
+      const face=control.matches?.(".ds1-reference-face")?control
+        :control.querySelector?.(".ds1-reference-face")??control;
+      control=el("span",{class:"ds1-reference-field"},control,referencePicker(row,field,face));
     }
+    const dialog=dialogs.get(field.key);
+    if(dialog)control=el("span",{class:"ds1-dialog-row"},control,
+      readonlyField(dialog.text||`(no dialog text ${dialog.id})`,
+        {"aria-label":`${field.label} text`,"data-field-key":field.key,"data-lex-dialog":"",
+          title:dialog.text||"",format:false}));
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
     const label=textLink?hoverable({content:shown,targetType:"ds1-text",targetId:textLink,
@@ -552,12 +633,14 @@ function fieldSections(row){
       help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
       sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
-  const unlisted=(row.effectLinks||[]).filter(effect=>!shownLinks.has(effect.field));
+  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field));
   if(unlisted.length){
-    groups.set("Linked effects",unlisted.map(effect=>detailField({
-      label:row.fields.find(field=>field.key===effect.field)?.label||effect.field,
-      control:effect.resolved?el("button",{type:"button",onclick:()=>openEffect(effect)},effect.name):readonlyField(effect.name),
-      help:infoHelp("Open this item's or ability's referenced effect. Changing a shared effect changes every use of it.")})));
+    groups.set("Linked records",unlisted.map(entry=>detailField({
+      label:row.fields.find(field=>field.key===entry.field)?.label||entry.field,
+      control:entry.resolved?hoverable({content:entry.name,targetType:`ds1-${entry.kind}`,
+        targetId:entry.id,targetLabel:`${entry.name} in ${LINK_TAB_LABELS[entry.kind]||"Items"}`,
+        preview:()=>recordPreview(entry),activate:()=>openRecord(entry)}):readonlyField(entry.name,{format:false}),
+      help:infoHelp("Open this record's linked record. Changing a shared record changes every use of it.")})));
   }
   if(row.effectUsage){
     const usage=row.effectUsage;
@@ -647,13 +730,16 @@ function renderAssetDetail(){
       control:el("img",{src:url,alt:texture.name,style:"max-width:100%;height:auto",loading:"lazy"}),
       help:infoHelp(`${texture.width} by ${texture.height}, ${texture.format}. Preview of the ${fromMod?"mod":"installed game"} file, shrunk to fit.`)});
   });
-  return detailPanel({title:row.name,meta:fromMod?"Mod file":"Installed game file",
+  const firstTexture=(info.textures||[])[0];
+  const thumbUrl=firstTexture?`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(firstTexture.member||"")}&index=${firstTexture.index}`:null;
+  const thumbArt=state.tab==="textures"?(thumbUrl?LexeditorUI.iconSlot({content:el("img",{src:thumbUrl,alt:row.name,loading:"lazy"})}):LexeditorUI.noThumbnail("ds1")):null;
+  return detailPanel({title:row.name,meta:formatAssetSize(info.size),
+    icon:thumbArt,
     help:"Replace carries your file in the mod under this same path; the installed game is untouched until Apply. Remove drops the mod's copy, so the game file shows again. Both save at once.",
     body:[
       detailSection({title:"FILE",body:[
         detailField({label:"SOURCE",control:readonlyField(fromMod?"Mod file":"Installed game file"),
           help:infoHelp(fromMod?"The mod carries this file. The game loads it once the mod is applied.":"No mod file replaces this yet. The game loads its own copy.")}),
-        detailField({label:"SIZE",control:readonlyField(formatAssetSize(info.size))}),
         detailField({label:"ACTIONS",control:LexeditorUI.stack(
           el("span",{style:"display:flex;gap:8px;flex-wrap:wrap"},
             el("button",{type:"button","data-asset-action":"replace",disabled:locked,onclick:()=>picker.click(),
@@ -684,8 +770,6 @@ async function uploadAsset(target,file){
     }
     state.assetBusy=false;state.assetUpload=null;
     if(files){state.assetFiles=files;state.rows=assetRows(files);}
-    // An upload from Installed game lands in Mod files, where it now lives.
-    if(state.sub==="game")state.sub="overrides";
     state.selected=`Asset:${target}`;
     await loadDetail();render();
   }
@@ -698,7 +782,7 @@ async function removeAssetOverride(target){
   try{
     const result=await api("/api/assets/remove",{relative:target});
     state.assetFiles=result.files;state.rows=assetRows(result.files);
-    state.selected=state.rows[0]?key(state.rows[0]):null;state.row=null;state.assetDetail=null;
+    state.selected=`Asset:${target}`;state.row=null;state.assetDetail=null;
     await loadDetail();
   }
   catch(error){notify(error);}

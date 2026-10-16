@@ -52,6 +52,31 @@ HOST = """(options) => {
       record('set_mod_enabled')(plugin, path, enabled);
       const row = rows.find(item => item.path === path); row.enabled = enabled; return JSON.parse(JSON.stringify(row));
     },
+    copy_library_mod: async (plugin, path, name) => {
+      record('copy_library_mod')(plugin, path, name);
+      rows.push({path: path + ' ' + name, folder: name, name, author: '', description: '', credits: '',
+        version: '', missing: [], enabled: false, order: rows.length + 1, lexmod: null, script: null, error: '', remote: false});
+      return {};
+    },
+    remove_mod_project: async (plugin, path) => {
+      record('remove_mod_project')(plugin, path);
+      const at = rows.findIndex(item => item.path === path);
+      if (at >= 0) rows.splice(at, 1);
+      return {};
+    },
+    open_mod_folder: async (...args) => { record('open_mod_folder')(...args); return {}; },
+    mod_contents: async (...args) => {
+      record('mod_contents')(...args);
+      return window.__modContents || {changes: [
+        {table: 'EquipParamGoods', id: 100, label: 'Fixture Stone', fields: ['Basic price'],
+         added: false, removed: false, before: null, after: null},
+        {table: 'Item name', id: 100, label: 'Fixture Stone', fields: [],
+         added: false, removed: false, before: 'Old Stone', after: 'Fixture Stone'},
+      ], files: [
+        {relative: 'param/GameParam/GameParam.parambnd.dcx', size: 12, sizeLabel: '12 B', loaded: true},
+        {relative: 'mod.json', size: 30, sizeLabel: '30 B', loaded: false},
+      ], truncated: false, changesTruncated: false, canDescribe: true, note: ''};
+    },
     move_mod: async (plugin, path, delta) => {
       record('move_mod')(plugin, path, delta);
       const at = rows.findIndex(item => item.path === path);
@@ -193,7 +218,16 @@ def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("textbox", name="Name").wait_for()
     rows = page.locator(".lex-mods-page .lex-column-list-row")
-    box = rows.nth(1).bounding_box()
+    # The detail can paint before the list settles, and a second draw can
+    # land between a wait and its read; a box read mid-draw is None.
+    page.locator(".lex-mods-page .lex-column-list").get_by_text("Extra").wait_for()
+    box = None
+    for _ in range(50):
+        box = rows.nth(1).bounding_box()
+        if box and box["width"] > 0 and box["height"] > 0:
+            break
+        page.wait_for_timeout(100)
+    assert box, "the second mod row never settled"
     top = box["y"] + box["height"] * 0.25
     bottom = box["y"] + box["height"] * 0.75
     line = page.evaluate("""([top, bottom]) => {
@@ -461,7 +495,7 @@ def test_mods_detail_switch_fits_its_header(page):
     switch = page.get_by_role("checkbox", name="Mine enabled")
     switch.wait_for()
     heading = page.locator(".lex-mods-page .lex-detail-panel-heading")
-    for _ in range(2):
+    for short in (False, True):
         page.wait_for_function("""() => {
           const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
           const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
@@ -471,12 +505,19 @@ def test_mods_detail_switch_fits_its_header(page):
           const rect = el => { const b = el.getBoundingClientRect();
             return {x: b.x, y: b.y, width: b.width, height: b.height}; };
           return {box: rect(document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]')),
-            head: rect(document.querySelector(".lex-mods-page .lex-detail-panel-heading"))};
+            head: rect(document.querySelector(".lex-mods-page .lex-detail-panel-heading")),
+            actions: rect(document.querySelector(".lex-mods-page .lex-detail-panel-actions"))};
         }""")
-        box, head = geometry["box"], geometry["head"]
+        box, head, actions = geometry["box"], geometry["head"], geometry["actions"]
         assert box["width"] == box["height"] > 0, box
         assert box["y"] >= head["y"] - 1 and box["y"] + box["height"] <= head["y"] + head["height"] + 1, (box, head)
         assert box["x"] >= head["x"] and box["x"] + box["width"] <= head["x"] + head["width"], (box, head)
+        if not short:
+            # A roomy header gets a roomy switch, not a fixed small box.
+            assert box["height"] >= 21, (box, head)
+            assert abs(actions["height"] - 10 - box["height"]) <= 2, (box, actions)
+            top, bottom = box["y"] - actions["y"], actions["y"] + actions["height"] - box["y"] - box["height"]
+            assert abs(top - bottom) <= 2, (box, actions)
         # A short header shrinks the switch instead of clipping it.
         page.evaluate("""() => {
           const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
@@ -519,4 +560,112 @@ def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):
     }""")
     for lane in centers:
         assert max(lane) - min(lane) <= 1, lane
+
+
+def test_mods_detail_header_has_duplicate_delete_and_open_buttons(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    header = page.locator(".lex-mods-page .lex-detail-panel-actions")
+    header.get_by_role("checkbox", name="Mine enabled").wait_for()
+    buttons = header.get_by_role("button")
+    assert [buttons.nth(index).get_attribute("aria-label") for index in range(buttons.count())] == [
+        "Make an editable copy of Mine", "Remove Mine from the library", "Open Mine's folder"]
+    assert buttons.nth(0).locator("svg").count() == 1
+    assert buttons.nth(1).inner_text() == "x"
+    assert buttons.nth(2).locator("svg").count() == 1
+    assert page.get_by_role("button", name="Open folder", exact=True).count() == 0
+
+
+def test_mods_detail_duplicate_copies_through_the_naming_dialog(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("button", name="Make an editable copy of Mine", exact=True).click()
+    page.get_by_text("Managed mods update automatically.", exact=False).wait_for()
+    page.get_by_role("button", name="Make a copy", exact=True).click()
+    page.get_by_label("New mod name").fill("Mine Again")
+    page.get_by_role("button", name="Create copy", exact=True).click()
+    page.wait_for_function("window.calls.some(c => c[0] === 'copy_library_mod')")
+    assert calls(page, "copy_library_mod")[-1][1:] == ["C:/lib/game/Mine", "Mine Again"]
+
+
+def test_mods_detail_delete_removes_the_library_entry(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("button", name="Remove Mine from the library", exact=True).click()
+    page.get_by_text("Its files stay on disk", exact=False).wait_for()
+    page.get_by_role("button", name="Remove", exact=True).click()
+    page.wait_for_function("window.calls.some(c => c[0] === 'remove_mod_project')")
+    assert calls(page, "remove_mod_project")[-1][1:] == ["C:/lib/game/Mine"]
+    page.wait_for_function(
+        "document.querySelector('.lex-mods-page .lex-detail-panel-title input')?.value === 'Combat'")
+
+
+def test_mods_detail_delete_is_disabled_for_managed_mods(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.get_by_role("checkbox", name="Combat enabled").wait_for()
+    delete = page.get_by_role("button", name="This mod updates automatically, so it cannot be removed from here")
+    assert delete.is_disabled()
+
+
+def test_mods_detail_open_button_opens_the_folder(page):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("button", name="Open Mine's folder", exact=True).click()
+    page.wait_for_function("window.calls.some(c => c[0] === 'open_mod_folder')")
+    assert calls(page, "open_mod_folder")[-1][1:] == ["C:/lib/game/Mine"]
+
+
+def _contents_sections(page):
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("checkbox", name="Mine enabled").wait_for()
+    page.wait_for_function("window.calls.some(c => c[0] === 'mod_contents')")
+    return page.locator(".lex-mods-page .lex-detail-panel")
+
+
+def test_mods_detail_lists_changed_records(page):
+    mount(page)
+    detail = _contents_sections(page)
+    changes = detail.locator(".lex-mod-change")
+    assert changes.count() == 2
+    first = changes.nth(0).inner_text()
+    assert "Fixture Stone" in first
+    assert "EquipParamGoods 100" in first
+    assert "Basic price" in first
+    second = changes.nth(1).inner_text()
+    assert "Old Stone" in second and "Fixture Stone" in second
+
+
+def test_mods_detail_lists_files_with_loader_marks(page):
+    mount(page)
+    detail = _contents_sections(page)
+    files = detail.locator(".lex-mod-file")
+    assert files.count() == 2
+    assert files.nth(0).get_attribute("class") is not None
+    assert "lex-mod-file-loaded" in (files.nth(0).get_attribute("class") or "")
+    assert "lex-mod-file-loaded" not in (files.nth(1).get_attribute("class") or "")
+    assert "12 B" in files.nth(0).inner_text()
+
+
+def test_mods_detail_contents_empty_states(page):
+    mount(page)
+    page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
+                  " changesTruncated: false, canDescribe: false, note: 'Locate the game.'}")
+    detail = _contents_sections(page)
+    assert "Locate the game." in detail.inner_text()
+    assert "This mod has no files." in detail.inner_text()
+    assert "not known for this game" in detail.inner_text()
+
+
+def test_mods_detail_contents_truncation(page):
+    mount(page)
+    page.evaluate("window.__modContents = {changes: [{table: 'T', id: 1, label: 'One', fields: [],"
+                  " added: false, removed: true, before: null, after: null}],"
+                  " files: [{relative: 'a.bin', size: 1, sizeLabel: '1 B', loaded: false}],"
+                  " truncated: true, changesTruncated: true, canDescribe: true, note: ''}")
+    detail = _contents_sections(page)
+    assert "Removed" in detail.locator(".lex-mod-change").first.inner_text()
+    assert "Showing the first 1 changes." in detail.inner_text()
+    assert "Showing the first 1 files." in detail.inner_text()
 

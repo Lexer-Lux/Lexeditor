@@ -27,6 +27,7 @@ MENU_RELATIVE = Path('msg/ENGLISH/menu.msgbnd.dcx')
 # The equipment panel's defense labels, in Menu_general_text_.fmg: MagDEF,
 # FireDEF and LitngDEF beside each piece's elemental defense.
 MENU_LABEL_FILE = 'Menu_general_text_.fmg'
+EVENT_TEXT_FILE = 'Event_text_.fmg'
 MENU_LABELS = {'magicDefense': ('Magic defense label', 102204),
                'fireDefense': ('Fire defense label', 102205),
                'lightningDefense': ('Lightning defense label', 102206)}
@@ -325,6 +326,14 @@ class MenuDocument(TextDocument):
     def label(self, key: str) -> str | None:
         _display, text_id = self._label_entry(key)
         for position in self._copies_of(MENU_LABEL_FILE):
+            text = self.tables[position][1].get(text_id)
+            if text:
+                return text
+        return None
+
+    def event_text(self, text_id: int) -> str | None:
+        """One dialog or event line, for the goods yes/no prompt preview."""
+        for position in self._copies_of(EVENT_TEXT_FILE):
             text = self.tables[position][1].get(text_id)
             if text:
                 return text

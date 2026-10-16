@@ -191,6 +191,27 @@ def scan_game(game_root, project=None):
     return found
 
 
+def scan_merged(game_root, project=None):
+    """One list for the asset tabs: game files plus mod-only extras.
+
+    A game file the mod shadows reads 'modified' and wears the mod
+    file's size (it is what the game loads); a mod file with no game
+    counterpart reads 'new'. Without the installed game only the
+    mod's files list, unmarked. Sorted by path, like each scan.
+    """
+    if game_root is None:
+        return scan_project(project, strict=False) if project is not None else []
+    merged = {entry["relative"]: entry for entry in scan_game(game_root, project)}
+    if project is not None:
+        for entry in scan_project(project, strict=False, game_root=game_root):
+            if entry["relative"] in merged:
+                merged[entry["relative"]] = {**merged[entry["relative"]],
+                                            "size": entry["size"], "status": "modified"}
+            else:
+                merged[entry["relative"]] = entry
+    return [merged[key] for key in sorted(merged)]
+
+
 def store_bytes(project, relative, data):
     """Carry `data` as the mod's override of a game file."""
     relative = check_relative(relative)

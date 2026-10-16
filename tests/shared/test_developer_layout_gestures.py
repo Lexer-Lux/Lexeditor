@@ -143,3 +143,40 @@ def test_right_clicking_the_shortcuts_button_lists_the_developer_gestures(page):
     for gesture in ("Rename the property", "Edit the help bubble's text", "Move the property",
                     "Hide it for readers", "Add a new section below it"):
         assert panel.get_by_text(gesture).count() >= 1, gesture
+
+
+PANEL_TABS = """viewKey => {
+  document.querySelector('main').replaceChildren(LexeditorUI.collapsiblePanel({
+    label: 'Directory', side: 'left', viewKey: viewKey,
+    tabs: [{id: 'treasure', label: 'Treasure', content: 'gold'},
+           {id: 'drops', label: 'Drops', content: 'loot'}]}));
+}"""
+
+
+def test_double_clicking_a_panel_tab_renames_it(page):
+    framework(page)
+    mount_vanilla_shell(page)
+    page.evaluate(PANEL_TABS, 'panel-rename-kept')
+    page.get_by_role('tab', name='Treasure').dblclick()
+    page.get_by_role('heading', name='Rename panel tab').wait_for()
+    page.get_by_label('Tab name').fill('Loot')
+    page.get_by_role('button', name='Rename').click()
+    page.get_by_role('tab', name='Loot').wait_for()
+    assert page.evaluate(
+        "localStorage.getItem('lex-collapsible-panel-rename-kept.label.treasure')") == 'Loot'
+    # A fresh panel wears the stored name.
+    page.evaluate(PANEL_TABS, 'panel-rename-kept')
+    page.get_by_role('tab', name='Loot').wait_for()
+    assert page.get_by_role('tab', name='Treasure').count() == 0
+    assert page.get_by_role('tab', name='Drops').count() == 1
+
+
+def test_a_panel_tab_keeps_its_name_outside_developer_mode(page):
+    framework(page)
+    mount_vanilla_shell(page, developer=False)
+    page.evaluate(PANEL_TABS, 'panel-rename-gated')
+    page.get_by_role('tab', name='Treasure').dblclick()
+    page.wait_for_timeout(400)
+    assert page.locator('.lex-prompt-dialog').count() == 0
+    assert page.evaluate(
+        "localStorage.getItem('lex-collapsible-panel-rename-gated.label.treasure')") is None

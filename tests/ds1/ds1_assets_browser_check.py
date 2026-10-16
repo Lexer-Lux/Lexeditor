@@ -97,19 +97,12 @@ def main():
                     for tab, wanted in (("models", MODEL), ("textures", TPF), ("sound", SFX),
                                         ("music", MUSIC), ("other", MOVIE)):
                         page.locator(f'[data-tab="{tab}"]').click()
-                        page.wait_for_selector('[data-subtab="overrides"]')
-                        page.locator('[data-subtab="overrides"]').click()
                         page.wait_for_function(
-                            f'state.tab==="{tab}" && state.sub==="overrides"'
-                            ' && state.rows.length===0 && !state.error')
-                        assert page.locator("[data-subtab]").evaluate_all(
-                            "nodes=>nodes.map(n=>n.dataset.subtab)") == ["game", "overrides"]
-                        page.locator('[data-subtab="game"]').click()
-                        page.wait_for_function(
-                            f'state.sub==="game" && state.rows.length===1'
-                            f' && state.rows[0].id==="{wanted}" && !state.error')
+                            f'state.tab==="{tab}" && state.sub==="files"'
+                            f' && state.rows.length===1 && state.rows[0].id==="{wanted}" && !state.error')
+                    # One merged list: no source subtabs anywhere.
+                    assert page.locator("[data-subtab]").count() == 0
                     page.locator('[data-tab="textures"]').click()
-                    page.locator('[data-subtab="game"]').click()
                     page.wait_for_function(
                         'state.tab==="textures"'
                         ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf") && !state.error')
@@ -120,18 +113,22 @@ def main():
                     preview = page.locator("#main img[alt='c0000_diffuse.dds']")
                     preview.wait_for()
                     assert preview.evaluate("img=>img.naturalWidth") > 0
+                    thumb = page.locator(".lex-detail-panel-icon img")
+                    assert thumb.count() == 1
+                    assert "/api/assets/preview" in thumb.get_attribute("src")
+                    page.locator(".lex-detail-panel-meta", has_text="1.2 KB").wait_for()
+                    assert page.locator(".lex-detail-field-label-text", has_text="SIZE").count() == 0
                     if output:
                         page.screenshot(path=str(output / "assets-game-preview.png"))
                     page.locator('[data-tab="other"]').click()
-                    page.locator('[data-subtab="game"]').click()
                     page.wait_for_function('state.tab==="other" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=MOVIE).click()
                     page.wait_for_function(
                         'state.row?.id==="movww/intro.wmv" && state.assetDetail?.source==="game"'
                         ' && state.assetDetail.textures.length===0 && !state.error')
                     assert page.locator("#main img").count() == 0
+                    page.locator(".lex-detail-panel-meta", has_text="16 B").wait_for()
                     page.locator('[data-tab="textures"]').click()
-                    page.locator('[data-subtab="game"]').click()
                     page.wait_for_function('state.tab==="textures" && state.rows.length===1')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.textures.length===1')
@@ -139,11 +136,15 @@ def main():
                     # uploads it and lands in Mod files, where it now lives.
                     page.locator('#main input[type="file"]').set_input_files(str(upload))
                     page.wait_for_function(
-                        'state.sub==="overrides" && state.tab==="textures"'
+                        'state.sub==="files" && state.tab==="textures"'
                         ' && state.rows.some(r=>r.id==="chr/c0000/c0000.tpf")'
                         ' && state.assetDetail?.source==="mod"'
                         ' && state.assetDetail.textures[0].name==="c0000_custom.dds" && !state.assetBusy && !state.error')
                     assert (mod / TPF).read_bytes() == mod_tpf
+                    # 16 head + 20 entry + 17 name + 128 DDS head + 768 pixels.
+                    page.locator(".lex-detail-panel-meta", has_text="949 B").wait_for()
+                    assert page.locator(
+                        ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
                     assert page.locator("#main img[alt='c0000_custom.dds']").evaluate("img=>img.naturalWidth") > 0
                     if output:
                         page.screenshot(path=str(output / "assets-override.png"))
@@ -151,26 +152,23 @@ def main():
                     # reads new. The game side marks what the mod shadows.
                     (mod / "chr" / "c9999").mkdir(parents=True)
                     (mod / "chr" / "c9999" / "new.tpf").write_bytes(mod_tpf)
-                    page.locator('[data-subtab="overrides"]').click()
-                    page.wait_for_function('state.sub==="overrides" && state.rows.length===2')
+                    page.locator('[data-tab="models"]').click()
+                    page.locator('[data-tab="textures"]').click()
+                    page.wait_for_function('state.sub==="files" && state.rows.length===2')
                     assert page.locator(
                         ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
                     nib = page.locator(".lex-list-row", has_text="new.tpf").locator(".lex-record-source")
                     assert nib.count() == 1
                     assert nib.get_attribute("aria-label") == "Created in this mod"
-                    page.locator('[data-subtab="game"]').click()
-                    page.wait_for_function('state.sub==="game" && state.rows.length===1')
                     assert page.locator(
                         ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
                     page.locator('[data-tab="models"]').click()
-                    page.locator('[data-subtab="game"]').click()
                     page.wait_for_function('state.tab==="models" && state.rows.length===1')
                     assert page.locator(
                         ".lex-list-row.lex-record-modified", has_text=MODEL).count() == 0
                     assert page.locator(
                         ".lex-list-row .lex-record-source", has_text=MODEL).count() == 0
                     page.locator('[data-tab="textures"]').click()
-                    page.locator('[data-subtab="overrides"]').click()
                     page.wait_for_function('state.rows.length===2')
                     page.locator(".lex-list-row", has_text="new.tpf").click()
                     page.wait_for_function('state.row?.id==="chr/c9999/new.tpf"')
@@ -181,7 +179,10 @@ def main():
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf"')
                     page.locator('[data-asset-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
-                    page.wait_for_function("state.rows.length===0 && !state.assetBusy && !state.error")
+                    page.wait_for_function("state.rows.length===1 && !state.assetBusy && !state.error")
+                    page.wait_for_function('state.assetDetail?.source==="game"'
+                        ' && state.assetDetail.textures.length===1 && !state.error')
+                    assert page.locator(".lex-list-row.lex-record-modified").count() == 0
                     assert not (mod / TPF).exists()
                     assert not errors, errors
                 finally:

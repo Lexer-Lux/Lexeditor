@@ -581,8 +581,10 @@
       if (!storeKey) return;
       try { localStorage.setItem(`${storeKey}.${name}`, value); } catch (_error) {}
     };
-    const tabs = options.tabs || [];
-    const root = element("section", {
+    const tabs = (options.tabs || []).map(tab => ({
+      ...tab,
+      label: stored(`label.${tab.id}`) || tab.label,
+    }));    const root = element("section", {
       ...(options.attrs || {}),
       class: ["lex-collapsible-panel", `lex-collapsible-${side}`, options.className || ""].filter(Boolean).join(" "),
       "aria-label": options.label || "Side panel",
@@ -605,7 +607,16 @@
     };
     const strip = tabs.length ? tabStrip({tabs, active: stored("tab") || options.active,
       label: options.label || "Side panel views", className: "lex-collapsible-tabs",
-      change: show, holdToSave: true}) : null;
+      change: show, holdToSave: true,
+      onRename: async id => {
+        const tab = tabs.find(entry => entry.id === id);
+        const label = await promptText({title: "Rename panel tab", label: "Tab name",
+          value: tab?.label || "", confirmLabel: "Rename"});
+        if (!label) return;
+        tab.label = label;
+        remember(`label.${id}`, label);
+        strip.setLabel(id, label);
+      }}) : null;
     const body = element("div", {class: "lex-collapsible-body"},
       strip || null, tabs.length ? paneBox : (options.content || []));
     const chevron = element("span", {class: "lex-collapsible-chevron", "aria-hidden": "true"});
@@ -13014,6 +13025,36 @@ ${contents.path}`});
         await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
       } catch (error) { button.disabled = false; failure("Could not download the module", error); }
     };
+    const paintModChanges = (fill, result) => {
+      const changes = result.changes || [];
+      if (result.note && !changes.length) { fill.replaceChildren(detailNote(result.note)); return; }
+      if (!changes.length) { fill.replaceChildren(detailNote("No record changes compared to vanilla.")); return; }
+      const rows = changes.map(entry => {
+        const state = entry.added ? "New" : entry.removed ? "Removed" : null;
+        const meta = [state, `${entry.table} ${entry.id}`].filter(Boolean).join(" · ");
+        const extra = (entry.fields || []).length ? entry.fields.join(", ")
+          : entry.before != null || entry.after != null
+            ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
+        return element("div", {class: "lex-mod-change"},
+          element("div", {class: "lex-mod-change-label"}, entry.label),
+          element("div", {class: "lex-mod-change-meta"}, extra ? `${meta} \u00b7 ${extra}` : meta));
+      });
+      if (result.changesTruncated) rows.push(detailNote(`Showing the first ${changes.length} changes.`));
+      if (result.note) rows.push(detailNote(result.note));
+      fill.replaceChildren(element("div", {class: "lex-mod-change-list"}, rows));
+    };
+    const paintModFiles = (fill, result) => {
+      const files = result.files || [];
+      const rows = files.map(entry => element("div",
+        {class: ["lex-mod-file", entry.loaded ? "lex-mod-file-loaded" : ""].filter(Boolean).join(" "),
+          title: entry.loaded ? "The mod loader reads this file when the mod is on" : null},
+        element("span", {class: "lex-mod-file-name"}, entry.relative),
+        element("span", {class: "lex-mod-file-size"}, entry.sizeLabel || "")));
+      if (!files.length) rows.push(detailNote("This mod has no files."));
+      if (result.truncated) rows.push(detailNote(`Showing the first ${files.length} files.`));
+      if (!result.canDescribe) rows.push(detailNote("Which files the loader reads is not known for this game."));
+      fill.replaceChildren(element("div", {class: "lex-mod-file-list"}, rows));
+    };
     const detail = () => {
       const row = rows().find(item => keyOf(item) === selected);
       if (!row) return detailPanel({title: "Mods", body: [detailNote(rows().length
@@ -13033,6 +13074,39 @@ ${contents.path}`});
           try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
           catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
         }});
+      const copyMod = async () => {
+        const agreed = await confirmAction({title: "Create an editable copy?",
+          message: "Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel: "Make a copy"});
+        if (!agreed) return;
+        const named = await askProjectName(pluginName, {value: `${row.name} Copy`,
+          createLabel: "Create copy", description: "Choose a name for your independent editable copy. It will be stored in the mod library."});
+        if (!named) return;
+        try {
+          const result = await callWindow("copy_library_mod", pluginId, row.path, named.name);
+          if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
+        } catch (error) { failure("Could not copy the mod", error); }
+      };
+      const removeMod = async () => {
+        const agreed = await confirmAction({title: `Remove "${row.name}" from the library?`,
+          message: "Its files stay on disk; only the library entry goes. Import it again any time to bring it back.", confirmLabel: "Remove"});
+        if (!agreed) return;
+        try { await callWindow("remove_mod_project", pluginId, row.path); await load(); draw(); }
+        catch (error) { failure("Could not remove the mod", error); }
+      };
+      const duplicateTitle = `Make an editable copy of ${row.name}`;
+      const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
+        : `Remove ${row.name} from the library`;
+      const openTitle = `Open ${row.name}'s folder`;
+      const actions = [toggle,
+        element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
+          "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
+        element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
+          "aria-label": removeTitle, disabled: !!row.lexmod, onclick: removeMod}, "x"),
+        element("button", {type: "button", class: "lex-header-icon", title: openTitle,
+          "aria-label": openTitle,
+          onclick: () => callWindow("open_mod_folder", pluginId, row.path)
+            .catch(error => failure("Could not open the folder", error))}, folderIcon())];
+
       const sections = [];
       const settingsPanels = [];
       if (row.script) {
@@ -13066,26 +13140,31 @@ ${contents.path}`});
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
           ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
           detailField({label: "FOLDER", control: readonlyField(row.path)}),
-          actionRow(
-            element("button", {type: "button", onclick: () => callWindow("open_mod_folder", pluginId, row.path).catch(error => failure("Could not open the folder", error))}, "Open folder"),
-            element("button", {type: "button", onclick: async () => {
-              const agreed = await confirmAction({title: "Create an editable copy?",
-                message: "Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel: "Make a copy"});
-              if (!agreed) return;
-              const named = await askProjectName(pluginName, {value: `${row.name} Copy`,
-                createLabel: "Create copy", description: "Choose a name for your independent editable copy. It will be stored in the mod library."});
-              if (!named) return;
-              try {
-                const result = await callWindow("copy_library_mod", pluginId, row.path, named.name);
-                if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
-              } catch (error) { failure("Could not copy the mod", error); }
-            }}, "Make editable copy…"))]}));
+        ]}));
+      const changesFill = element("div", {class: "lex-mod-contents"}, loadingStatus("Comparing records"));
+      const filesFill = element("div", {class: "lex-mod-contents"}, loadingStatus("Listing files"));
+      sections.push(
+        detailSection({title: "CHANGED RECORDS",
+          help: infoHelp("Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."),
+          body: [changesFill]}),
+        detailSection({title: "FILES",
+          help: infoHelp("Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."),
+          body: [filesFill]}));
+      callWindow("mod_contents", pluginId, row.path).then(result => {
+        if (keyOf(row) !== selected) return;
+        paintModChanges(changesFill, result || {});
+        paintModFiles(filesFill, result || {});
+      }).catch(() => {
+        if (keyOf(row) !== selected) return;
+        changesFill.replaceChildren(detailNote("Could not read the mod's contents."));
+        filesFill.replaceChildren(detailNote("Could not read the mod's contents."));
+      });
       const notes = [row.error ? detailNote(row.error) : null,
         row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
           conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
         ...(row.alerts || []).map(line => detailNote(line)),
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
-      return detailPanel({title: row.name, actions: [toggle], body: [...notes, ...sections], paginate: {inline: true}});
+      return detailPanel({title: row.name, actions, body: [...notes, ...sections], paginate: {inline: true}});
     };
     const draw = () => {
       if (!main) return;

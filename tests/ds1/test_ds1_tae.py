@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tae_fixture import build_tae
-from plugins.ds1.tae import EVENT_TYPES, TaeDocument, TaeError
+from plugins.ds1.tae import EVENT_TYPES, TaeDocument, TaeError, _display_name
 
 
 def test_lists_anims_and_events():
@@ -22,6 +22,21 @@ def test_lists_anims_and_events():
         (1, "Attack"), (66, "Add effect"), (999, "Unknown event 999"), (16, "Unknown event 16")]
     assert [(event["start"], event["end"]) for event in events] == [
         (0.0, 0.5), (0.0, 1.0), (1.5, 1.5), (0.5, 1.0)]
+
+
+def test_control_character_anim_names_fall_back_to_ids():
+    assert _display_name("a00_0000.hkx", 30) == "a00_0000.hkx"
+    assert _display_name("", 30) == "animation 30"
+    assert _display_name("\x01", 30) == "animation 30"
+    assert _display_name("  ", 30) == "animation 30"
+    raw = bytearray(build_tae())
+    garbage_at = len(raw)
+    raw += b"\x01\x00\x00\x00"
+    # Anim 3301's name offset sits 16 bytes before the original end of file.
+    struct.pack_into("<I", raw, garbage_at - 16, garbage_at)
+    struct.pack_into("<I", raw, 12, len(raw))
+    names = [anim["name"] for anim in TaeDocument(bytes(raw), "a87.tae").list_anims()]
+    assert names == ["a87_3300.HKX", "animation 3301"]
 
 
 def test_reads_event_fields_with_vanilla_and_sharing():

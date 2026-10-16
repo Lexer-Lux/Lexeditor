@@ -134,6 +134,10 @@ class Handler(PluginRequestHandler):
                             if STORE.game_root is None:
                                 raise ValueError('Select the installed game before browsing its files')
                             result = {'files': assets.scan_game(STORE.game_root, STORE.project)}
+                        elif scope == 'all':
+                            result = {'files': assets.scan_merged(STORE.game_root, STORE.project),
+                                      'hasProject': STORE.project is not None,
+                                      'readOnly': STORE.read_only}
                         elif scope == 'textures':
                             data, source, name = _asset_bytes(query.get('file', [''])[0],
                                                               query.get('side', ['mod'])[0])
@@ -489,16 +493,14 @@ class Handler(PluginRequestHandler):
                                                   payload['total'], payload['offset'], raw,
                                                   bool(payload.get('final')))
                     result = {'upload': stored,
-                              'files': assets.scan_project(STORE.project, strict=False,
-                                                           game_root=STORE.game_root)}
+                              'files': assets.scan_merged(STORE.game_root, STORE.project)}
                 elif path == '/api/assets/remove':
                     if STORE.read_only or STORE.project is None:
                         raise PermissionError('Replacing assets needs a writable mod project')
                     if 'relative' not in payload:
                         raise ValueError('Removing an override needs its file')
                     result = {'removed': assets.remove_override(STORE.project, payload['relative']),
-                              'files': assets.scan_project(STORE.project, strict=False,
-                                                           game_root=STORE.game_root)}
+                              'files': assets.scan_merged(STORE.game_root, STORE.project)}
                 elif path == '/api/rows/add':
                     for key in ('table', 'id'):
                         if key not in payload:
