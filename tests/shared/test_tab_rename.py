@@ -276,3 +276,49 @@ def test_holding_right_click_on_a_subtab_saves_its_page_view(page):
     plugin, page_tab, preferences = saved[0]
     assert (plugin, page_tab) == ('fixture', 'items'), saved
     assert preferences.get('lexeditor:list-detail:fixture-items') == '40', preferences
+
+
+def mount_rebuilding_subtabs(page):
+    # Like the real app: every change rebuilds the strip from scratch.
+    page.evaluate("""()=>{
+      window.activeSub = 'stats';
+      window.drawSubs = () => document.querySelector('main').replaceChildren(
+        LexeditorUI.subtabBar({label: 'Sections', active: window.activeSub,
+          tabs: [{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+          change: id => { window.activeSub = id; window.drawSubs(); }}));
+      window.drawSubs();
+    }""")
+    page.wait_for_timeout(200)
+
+
+def test_double_clicking_the_active_subtab_renames_it(page):
+    framework(page)
+    mount_shell(page)
+    mount_rebuilding_subtabs(page)
+    span = page.locator('.lex-subtab-button[data-subtab="stats"] .lex-tab-label-text')
+    span.dblclick()
+    field = page.locator('.lex-subtab-button[data-subtab="stats"] .lex-label-rename')
+    field.wait_for(timeout=3000)
+    page.wait_for_timeout(400)
+    assert field.count() == 1, "the rename box was rebuilt away"
+    field.press("Escape")
+    page.wait_for_timeout(200)
+    span.dblclick()
+    field.wait_for(timeout=3000)
+    assert field.count() == 1, "the rename box did not come back"
+
+
+def test_clicking_the_active_subtab_runs_no_change(page):
+    framework(page)
+    mount_shell(page)
+    page.evaluate("""()=>{
+      window.changes = [];
+      document.querySelector('main').replaceChildren(LexeditorUI.subtabBar({
+        label: 'Sections', active: 'stats',
+        tabs: [{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+        change: id => window.changes.push(id)}));
+    }""")
+    page.wait_for_timeout(200)
+    page.locator('.lex-subtab-button[data-subtab="stats"]').click()
+    page.locator('.lex-subtab-button[data-subtab="growth"]').click()
+    assert page.evaluate("window.changes") == ["growth"]

@@ -28,13 +28,18 @@ def test_ff8_numeric_bounds_percentages_and_reference_restore():
               document.querySelector('main').append(field,ratio255Control(hit,value=>hit=value));
             }''')
             page.wait_for_timeout(150)
-            amount=page.get_by_role('textbox',name='Amount',exact=True)
+            amount=page.get_by_role('spinbutton',name='Amount',exact=True)
             amount.fill('65000')
             assert page.evaluate('amount')==65000,amount.input_value()
             amount.press('ArrowUp')
             assert page.evaluate('amount')==65001,amount.input_value()
             amount.blur()
             assert page.evaluate('amount')==65001
+            for draft in ['', '65536', '1.5']:
+                amount.fill(draft)
+                assert amount.input_value()==draft
+                assert page.evaluate('amount')==65001
+                assert not amount.evaluate('n=>n.checkValidity()')
             amount.click(button='right')
             assert page.evaluate('amount')==50000
             assert amount.input_value().replace(',','')=='50000'
@@ -43,7 +48,11 @@ def test_ff8_numeric_bounds_percentages_and_reference_restore():
             assert page.evaluate('hit')==255
             assert page.get_by_role('spinbutton',name='Hit rate percentage',exact=True).input_value()=='100'
             exact.fill('256')
-            assert exact.input_value()=='255' and page.evaluate('hit')==255
+            assert exact.input_value()=='256' and page.evaluate('hit')==255
+            assert not exact.evaluate('n=>n.checkValidity()')
+            assert page.get_by_role('spinbutton',name='Hit rate percentage',exact=True).input_value()=='100'
+            exact.fill('255')
+            assert exact.evaluate('n=>n.checkValidity()')
             # A matching reference must not reserve a hidden wide label inside
             # a narrow numeric control and erase the editable value.
             page.locator('.lex-source-control').evaluate("n=>n.style.width='150px'")

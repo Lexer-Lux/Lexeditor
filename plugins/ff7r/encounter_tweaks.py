@@ -17,6 +17,8 @@ from pathlib import Path, PurePosixPath
 import shutil
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .archive import extract_pair
 from .dataobject import DataObjectPackage
 from .text_storage import resident_text_map
@@ -313,9 +315,11 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("each encounter edit must be an object")
-        if int(edit.get("entry", -1)) != 0 or "index" in edit:
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("Encounter edit contains unsupported fields")
+        if integer_value(edit.get("entry", -1), "Encounter entry index") != 0 or "index" in edit:
             raise ValueError("Encounter Tweaks accepts scalar edits on its single record only")
-        if str(edit.get("property", "")) != "Chapter5SubwayReducedTurret":
+        if edit.get("property", "") != "Chapter5SubwayReducedTurret":
             raise ValueError("encounter property is read-only or unknown")
         if seen:
             raise ValueError("duplicate encounter tweak edit")

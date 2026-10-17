@@ -11,7 +11,7 @@
     effects:null,savedEffects:null,effectIndex:0,
     perks:null,savedPerks:null,perkIndex:0,
     xpSources:null,savedXpSources:null,xpSourceIndex:0,
-    source:null,savedSourceText:null,reshade:null,reshadeLoading:false
+    source:null,savedSourceText:null
   };
 
   async function api(path,options){

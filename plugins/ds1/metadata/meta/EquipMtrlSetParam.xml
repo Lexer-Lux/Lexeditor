@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <materialId01 Refs="EquipParamGoods" />
+    <materialId02 Refs="EquipParamGoods" />
+    <materialId03 Refs="EquipParamGoods" />
+    <materialId04 Refs="EquipParamGoods" />
+    <materialId05 Refs="EquipParamGoods" />
+    <itemNum01 />
+    <itemNum02 />
+    <itemNum03 />
+    <itemNum04 />
+    <itemNum05 />
+    <isDisableDispNum01 />
+    <isDisableDispNum02 />
+    <isDisableDispNum03 />
+    <isDisableDispNum04 />
+    <isDisableDispNum05 />
+  </Field>
+</PARAMMETA>

@@ -23,7 +23,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
@@ -75,6 +74,7 @@ def check(plugin: str) -> dict:
     project = tempfile.TemporaryDirectory(prefix="lexeditor-sound-project-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
+    cdp = None
     try:
         with session_for(plugin, project.name) as session:
             port = free_port()
@@ -92,7 +92,13 @@ def check(plugin: str) -> dict:
                      {"width": 1600, "height": 1000, "deviceScaleFactor": 1, "mobile": False})
             cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": STUB})
             cdp.call("Page.navigate", {"url": session.url})
-            wait_eval(cdp, "typeof state==='undefined'||!state.booting", 90)
+            # An undefined state on the initial about:blank document is not a
+            # loaded plugin. Wait for its framework and actual navigation too.
+            wait_eval(cdp,
+                      "typeof LexeditorUI!=='undefined'"
+                      " && typeof LexeditorUI.configureThemeSounds==='function'"
+                      " && !!document.querySelector('.lex-shell-header nav button[data-tab]')"
+                      " && (typeof state==='undefined'||!state.booting)", 90)
             # finishPluginLoading plays the LAUNCH sound when the plugin has
             # finished opening. Instrumenting before that lands a legitimate
             # launch sound inside the hover measurement and fails this check
@@ -111,29 +117,38 @@ def check(plugin: str) -> dict:
             cdp.eval("window.__sounds=[]")
             hover(cdp, targets)
             cold = json.loads(cdp.eval("JSON.stringify(window.__sounds)"))
-            # A real keyboard move still plays it, which also proves the slot works.
-            # Clicking a tab puts keyboard focus in the tab bar; Tab from there
-            # is a real move between tabs, which is what the sound is for.
-            first = targets[0]
-            for kind, buttons in (("mousePressed", 1), ("mouseReleased", 0)):
-                cdp.call("Input.dispatchMouseEvent", {
-                    "type": kind, "x": first["x"], "y": first["y"],
-                    "button": "left", "buttons": buttons, "clickCount": 1})
-            time.sleep(.5)
+            # Tab outside an editor now cycles panel tabs. A temporary typing
+            # field exercises the retained native focus route into navigation,
+            # without disabling the panel shortcut or invoking its sound hook.
+            assert cdp.eval("""(()=>{
+              const first=document.querySelector('.lex-shell-header nav button[data-tab]');
+              const input=document.createElement('input');input.type='text';
+              input.id='sound-keyboard-probe';input.setAttribute('aria-label','Sound keyboard probe');
+              input.style.cssText='position:fixed;width:1px;height:1px;opacity:0';
+              first.before(input);input.focus();return document.activeElement===input;
+            })()"""), f"{plugin}: typing probe did not receive focus"
             cdp.eval("window.__sounds=[]")
             for kind in ("rawKeyDown", "keyUp"):
                 cdp.call("Input.dispatchKeyEvent",
                          {"type": kind, "windowsVirtualKeyCode": 9, "key": "Tab", "code": "Tab"})
             time.sleep(.5)
+            assert cdp.eval("document.activeElement.matches('.lex-shell-header nav button[data-tab]:focus-visible')"), (
+                f"{plugin}: keyboard probe did not focus navigation")
             keyboard = json.loads(cdp.eval("JSON.stringify(window.__sounds)"))
+            cdp.eval("document.getElementById('sound-keyboard-probe').remove()")
             cdp.eval("window.__sounds=[]")
             hover(cdp, targets)
             warm = json.loads(cdp.eval("JSON.stringify(window.__sounds)"))
             return {"plugin": plugin, "targets": len(targets), "hoverCold": cold,
                     "keyboard": keyboard, "hoverAfterKey": warm}
     finally:
+        if cdp:
+            cdp.close()
         if browser:
             browser.terminate()
+            browser.wait(timeout=10)
+        profile.cleanup()
+        project.cleanup()
 
 
 def main() -> int:
@@ -141,6 +156,7 @@ def main() -> int:
     for plugin in PLUGINS:
         result = check(plugin)
         report.append(result)
+        print(json.dumps(result), flush=True)
         for state in ("hoverCold", "hoverAfterKey"):
             # The launch sound belongs to the loading screen finishing, not to
             # the pointer. FF8 finishes late enough to land inside the hover
@@ -151,7 +167,6 @@ def main() -> int:
             assert not result[state], f"{plugin}: hovering played {result[state]}"
     played = [row for row in report if "slot:move" in row["keyboard"]]
     assert played, "no plugin played the move sound for a keyboard move, so this check proves nothing"
-    print(json.dumps(report))
     print("Hover plays no theme sound in any swept plugin; keyboard moves still do.")
     return 0
 

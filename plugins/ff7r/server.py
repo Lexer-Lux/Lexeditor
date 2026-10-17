@@ -439,6 +439,7 @@ def _semantic_save_from_generic(asset: str, *, source_sha256: str,
     asset_name = Path(asset).name.casefold()
     if asset_name in ECONOMY_TABLE_NAMES and edits and all(
         isinstance(edit, dict)
+        and not (set(edit) - {"entry", "property", "index", "value"})
         and edit.get("property") in ECONOMY_GENERIC_FIELDS
         and "index" not in edit
         for edit in edits
@@ -460,6 +461,7 @@ def _semantic_save_from_generic(asset: str, *, source_sha256: str,
 
     if asset_name == LOOT_TABLE_NAME and edits and all(
         isinstance(edit, dict)
+        and not (set(edit) - {"entry", "property", "index", "value"})
         and edit.get("property") in LOOT_GENERIC_FIELDS
         and "index" in edit
         for edit in edits

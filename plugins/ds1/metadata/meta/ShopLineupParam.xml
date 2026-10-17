@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self ConsecutiveIDs="" />
+  <Field>
+    <equipId Refs="EquipParamWeapon(equipType=0),EquipParamProtector(equipType=1),EquipParamAccessory(equipType=2),EquipParamGoods(equipType=3),Magic(equipType=4)" />
+    <value />
+    <mtrlId Refs="EquipMtrlSetParam" />
+    <eventFlag FlagAlias="" />
+    <qwcId Refs="QwcChangeParam" />
+    <sellQuantity />
+    <shopType Enum="SHOP_LINEUP_SHOPTYPE" />
+    <equipType Enum="SHOP_LINEUP_EQUIPTYPE" />
+    <pad_0 Padding="" />
+  </Field>
+</PARAMMETA>

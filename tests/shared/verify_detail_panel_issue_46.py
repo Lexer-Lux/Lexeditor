@@ -1,12 +1,13 @@
 """Source contract for the composable shared Detail panel."""
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-warband = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
+warband = plugin_ui('warband')
 
 for token in (
     "const detailPanel = (options = {}) =>", "lex-detail-panel-heading",

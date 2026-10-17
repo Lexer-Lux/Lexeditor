@@ -38,6 +38,7 @@ class BuildContext:
         self._executable: Path | None = None
         self.ffnx_keys: dict[str, object] = {}
         self._ffnx_owner: dict[str, str] = {}
+        self._ffnx_claimants: dict[str, list[tuple[str, object]]] = {}
         self.driver = False
         self.current = ""
 
@@ -73,8 +74,10 @@ class BuildContext:
         return script_mods.values(root) if root else None
 
     def ffnx(self, key: str, value) -> None:
-        if key in self.ffnx_keys and self.ffnx_keys[key] != value:
-            raise BuildError(f"{self.current} and {self._ffnx_owner[key]} need different values for {key}")
+        # Each FFNx.toml key is its own merge unit: tweaks setting different
+        # keys compose, and the later tweak wins a key two tweaks disagree on.
+        # The disagreement is reported, not silent and not a failed save.
+        self._ffnx_claimants.setdefault(key, []).append((self.current, value))
         self.ffnx_keys[key] = value
         self._ffnx_owner[key] = self.current
 
@@ -95,8 +98,24 @@ def tweak_rows(project_root: Path, mods_root: Path) -> list[dict]:
 
 def build_enabled(project_root: Path, mods_root: Path, game_root: Path, baseline_root: Path) -> dict:
     """Build every enabled tweak mod, or none: the first failure stops it."""
+    from core import mod_requires
+    try:
+        mod_requires.check_enabled(mods_root)
+    except ValueError as error:
+        raise BuildError(str(error)) from error
     rows = [row for row in tweak_rows(project_root, mods_root) if row["enabled"]]
     enabled = {row["id"]: Path(row["path"]) for row in rows}
     context = BuildContext(game_root, baseline_root, enabled)
     built = script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=BuildError)
-    return {"built": built, "ffnx": context.ffnx_keys, "driver": context.driver}
+    conflicts = []
+    for key, claims in context._ffnx_claimants.items():
+        if len(claims) < 2 or len({repr(value) for _, value in claims}) < 2:
+            continue
+        claimants = []
+        for mod_id, _ in claims:
+            if mod_id not in claimants:
+                claimants.append(mod_id)
+        conflicts.append({"unit": f"FFNx.toml:{key}", "key": key,
+                          "winner": claims[-1][0], "claimants": claimants})
+    return {"built": built, "ffnx": context.ffnx_keys, "driver": context.driver,
+            "ffnx_conflicts": conflicts}

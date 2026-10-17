@@ -10,15 +10,19 @@ import json
 import threading
 import os
 import tempfile
-import shutil
 from pathlib import Path
 
-from . import executable_text
+from . import executable_text, project_files
 
 COUNT = 110
 RECORD_SIZE = 8
 TABLE_OFFSETS = (0x796508, 0x874D00)
 FIELDS = ("top", "bottom", "left", "right", "element", "power")
+OWNER_FIELD = "startingOwner"
+RARE_START = 77
+INITIALIZER = 0x8DFF20
+INITIALIZER_SIZE = 80
+DEFAULT_OWNERS = bytes(range(200, 233))
 ELEMENTS = {0: "None", 1: "Fire", 2: "Ice", 4: "Thunder", 8: "Earth",
             16: "Poison", 32: "Wind", 64: "Water", 128: "Holy"}
 MANIFEST = "lexeditor-cards.json"
@@ -68,8 +72,52 @@ def read_cards(exe: bytes, names: list[str]) -> list[dict]:
     table = read_tables(exe)[0]
     if len(names) != COUNT:
         raise ValueError("Cards require exactly 110 names")
-    return [dict(id=i, name=names[i], **dict(zip(FIELDS, table[i * 8:i * 8 + 6])))
+    return [dict(id=i, name=names[i], **({OWNER_FIELD: DEFAULT_OWNERS[i - RARE_START]}
+                                      if i >= RARE_START else {}),
+                 **dict(zip(FIELDS, table[i * 8:i * 8 + 6])))
             for i in range(COUNT)]
+
+
+def split_edits(edits: list[dict]) -> tuple[list[dict], list[dict]]:
+    properties, owners = [], []
+    for edit in edits:
+        (owners if edit.get("field") == OWNER_FIELD else properties).append(edit)
+    return properties, owners
+
+
+def apply_owner_edits(owners: bytes, edits: list[dict]) -> tuple[bytes, int]:
+    if len(owners) != COUNT - RARE_START:
+        raise ValueError("Starting ownership requires all 33 rare cards")
+    result = bytearray(owners)
+    seen = set()
+    for edit in edits:
+        card_id = _integer(edit.get("id"), "Rare card ID")
+        value = _integer(edit.get("value"), "Starting deck")
+        if (edit.get("field") != OWNER_FIELD or not RARE_START <= card_id < COUNT
+                or not 0 <= value <= 239):
+            raise ValueError("Invalid rare card or starting opponent deck")
+        if card_id in seen:
+            raise ValueError("Duplicate starting deck edit")
+        seen.add(card_id)
+        result[card_id - RARE_START] = value
+    return bytes(result), sum(a != b for a, b in zip(result, owners))
+
+
+def owner_initializer(owners: bytes) -> bytes:
+    """Authored replacement within the original function's 80-byte footprint.
+
+    Clear inventory and seen flags, preserve unrelated flags, initialize RNG,
+    then copy the complete starting-owner map. No code cave or driver needed.
+    """
+    if len(owners) != 33:
+        raise ValueError("Starting ownership requires all 33 rare cards")
+    code = bytes.fromhex(
+        "56 57 BF 38 EF CF 01 31 C0 6A 1B 59 F3 AB 66 AB "
+        "89 07 88 47 04 80 67 05 FE C7 47 0E 01 00 00 00 BE"
+    ) + struct.pack("<I", INITIALIZER + 47) + bytes.fromhex(
+        "83 EF 21 B1 21 F3 A4 5F 5E C3")
+    assert len(code) == 47
+    return code + owners
 
 
 def apply_edits(table: bytes, edits: list[dict]) -> tuple[bytes, int]:
@@ -103,14 +151,17 @@ def apply_edits(table: bytes, edits: list[dict]) -> tuple[bytes, int]:
 
 
 def build_hext(exe: bytes, edits: list[dict]) -> str:
-    """Emit only changed scalar bytes at both resolved runtime addresses.
+    """Emit changed properties and, when needed, the full starting-owner map.
 
     Other mods can change separate fields of the same card without a full
     record write undoing them. Same-field conflicts follow Hext load order.
+    Starting ownership uses one complete initializer, so the last map wins.
     """
     tables = read_tables(exe)
-    modified, changed = apply_edits(tables[0], edits)
-    if not changed:
+    property_edits, owner_edits = split_edits(edits)
+    modified, changed = apply_edits(tables[0], property_edits)
+    owners, owner_changes = apply_owner_edits(DEFAULT_OWNERS, owner_edits)
+    if not changed and not owner_changes:
         return ""
     lines = ["# Triple Triad card properties: menu and minigame tables."]
     for offset, original in zip(TABLE_OFFSETS, tables):
@@ -118,6 +169,13 @@ def build_hext(exe: bytes, edits: list[dict]) -> str:
         for i, (before, after) in enumerate(zip(original, modified)):
             if before != after:
                 lines.append(f"{address + i:X} = {after:02X}")
+    if owner_changes:
+        # Full executable hash validation above guards the overwritten function.
+        # Each mod owns a complete map; higher-priority maps replace lower ones.
+        lines.append("# Starting rare-card map: new games only; last map in load order wins.")
+        patch = owner_initializer(owners)
+        assert len(patch) == INITIALIZER_SIZE
+        lines.append(f"{INITIALIZER:X} = {patch.hex(' ').upper()}")
     return "\n".join(lines) + "\n"
 
 
@@ -167,64 +225,14 @@ def _write(path: Path, data: bytes) -> None:
 
 def _commit_project_files(project: Path, pending: list, original: list) -> None:
     """Keep one bounded recovery set until both files commit or restore."""
-    project = project.resolve()
-    project.mkdir(parents=True, exist_ok=True)
-    stage = project / ".cards-recovery"
-    try:
-        stage.mkdir()
-    except FileExistsError as error:
-        raise OSError(f"Card save has pending recovery at {stage}; resolve it before saving again") from error
-    retain = False
-    installed = []
-    try:
-        records = []
-        for index, ((path, value), (old_path, before)) in enumerate(zip(pending, original)):
-            assert path == old_path
-            relative = path.resolve().relative_to(project)
-            records.append({"path": relative.as_posix(), "before": None if before is None else f"{index}.before"})
-            if before is not None:
-                (stage / f"{index}.before").write_bytes(before)
-            (stage / f"{index}.after").write_bytes(value)
-        (stage / "files.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
-        for path, before in original:
-            if (path.read_bytes() if path.exists() else None) != before:
-                raise ValueError("Card files changed during save; reload before retrying")
-        try:
-            for index, (path, value) in enumerate(pending):
-                before = original[index][1]
-                if (path.read_bytes() if path.exists() else None) != before:
-                    raise ValueError("Card files changed during save; reload before retrying")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(stage / f"{index}.after", path)
-                installed.append(index)
-        except Exception as save_error:
-            failures = []
-            for index in reversed(installed):
-                path, value = pending[index]
-                before = original[index][1]
-                try:
-                    if not path.exists() or path.read_bytes() != value:
-                        raise OSError("File changed after installation; refusing to overwrite it")
-                    if before is None:
-                        path.unlink()
-                    else:
-                        _write(path, before)
-                except Exception as error:
-                    failures.append(str(error))
-            if failures:
-                retain = True
-                raise OSError(f"Card save and restore failed. Originals are retained at {stage}") from save_error
-            raise
-    finally:
-        if not retain:
-            assert stage.resolve().parent == project
-            shutil.rmtree(stage)
+    project_files.commit_files(project, pending, original, label='Card',
+                               recovery_name='.cards-recovery', write=_write)
 
 
 def _project_snapshot(path: Path) -> bytes | None:
     if not path.exists():
         return None
-    # Normalized edits contain at most 660 scalar fields. Do not copy a large,
+    # Normalized edits contain at most 693 scalar fields. Do not copy a large,
     # unrelated file into recovery merely because it has a generated filename.
     limit = 1024 * 1024
     if path.stat().st_size > limit:
@@ -250,17 +258,23 @@ def save_project(project: Path, exe: bytes, edits: list[dict]) -> dict:
         old = [(p, _project_snapshot(p)) for p in targets]
         baseline = read_tables(exe)[0]
         existing = project_edits(project, exe)
-        current = apply_edits(baseline, existing)[0]
-        updated, changed = apply_edits(current, edits)
+        existing_properties, existing_owners = split_edits(existing)
+        property_edits, owner_edits = split_edits(edits)
+        current = apply_edits(baseline, existing_properties)[0]
+        current_owners = apply_owner_edits(DEFAULT_OWNERS, existing_owners)[0]
+        updated, changed = apply_edits(current, property_edits)
+        updated_owners, owner_changes = apply_owner_edits(current_owners, owner_edits)
         normalized = [{"id": i, "field": field, "value": updated[i * 8 + j]}
                       for i in range(COUNT) for j, field in enumerate(FIELDS)
                       if updated[i * 8 + j] != baseline[i * 8 + j]]
+        normalized.extend({"id": i + RARE_START, "field": OWNER_FIELD, "value": value}
+                          for i, value in enumerate(updated_owners) if value != DEFAULT_OWNERS[i])
         manifest = {"version": 1, "executable": executable_text.SUPPORTED_EXE_SHA256,
                     "edits": normalized}
         pending = [(Path(project) / MANIFEST, (json.dumps(manifest, indent=2) + "\n").encode()),
                    (Path(project) / HEXT, build_hext(exe, normalized).encode())]
         _commit_project_files(project, pending, old)
-        return {"saved": changed, "files": [str(p) for p, _ in pending]}
+        return {"saved": changed + owner_changes, "files": [str(p) for p, _ in pending]}
 
 
 def payload(dataset: str = "current") -> dict:

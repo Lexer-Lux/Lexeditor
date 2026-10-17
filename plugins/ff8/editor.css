@@ -169,36 +169,23 @@
 .ff8-encounter-preview-section {--lex-section-content-padding:6px 0 0;}
 /* The formation's name sits above its enemies, which take the whole width;
    beside them, the name's column took half the panel and left it blank. */
-.ff8-encounter-formation-row { display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0; }
-.ff8-encounter-formation-choice { position:relative;display:flex;align-items:stretch;min-width:0; }
-.ff8-encounter-formation-choice > .lex-source-control { display:flex;align-items:stretch;flex:1 1 auto;min-width:0; }
-.ff8-encounter-formation-share { display:flex;align-items:center;flex:0 0 auto;padding:0 10px;white-space:nowrap;color:var(--lex-text);opacity:.75; }
-.ff8-encounter-formation-share:not([data-formation-share="1"]) { opacity:1; }
-.ff8-encounter-formation-link { width:100%; }
-.ff8-encounter-formation-finder { opacity:0; }
-.ff8-encounter-formation-choice:where(:hover,:focus-within) .ff8-encounter-formation-finder { opacity:1; }
+.ff8-encounter-formation-row { --lex-stack-gap:4px; }
+.ff8-encounter-formation-choice { --lex-action-wrap:nowrap;--lex-action-align:stretch;--lex-action-gap:0;--lex-source-display:flex;--lex-source-align:stretch;--lex-source-flex:1 1 auto; }
+.ff8-encounter-formation-share { --lex-action-meta-opacity:.75; }
+.ff8-encounter-formation-share:not([data-formation-share="1"]) { --lex-action-meta-opacity:1; }
 
 /* The world map fills its panel: no band, no heading, just the map. */
 .ff8-world-map-panel {--lex-panel-body-gap:0;}
 /* World -> Field: the field picture fills its tile; the arrival marker canvas
  covers exactly the picture (Lexer, 2026-09-27). */
-.lex-overlay-stack.world-to-field-picture{display:block;width:100%;align-self:start}
-.lex-overlay-stack.world-to-field-picture>.lex-overlay-base{width:100%}
 /* A cell's records in its World panel: one link each, wrapping. */
-.world-cell-links{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}
+.world-cell-links{--lex-toolbar-gap:4px 12px;}
 /* Field picture: layer filters down its left side, state filters down its right,
    inside the one picture panel. */
-.field-preview-sides{position:relative;display:grid;grid-template-columns:minmax(0,1fr);height:100%;min-height:0;min-width:0}
-.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{position:absolute;z-index:2;max-width:36%;min-height:0;max-height:calc(100% - var(--lex-detail-title-size,32px)*1.1 - 20px);overflow:auto}
-.field-preview-sides>.field-preview-layers{left:0}
-.field-preview-sides>.field-preview-states{right:0}
 /* The panel title and help overlay the top of the panel; the side filters start below them. */
-.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px)}
 /* GF abilities, Prereq: the kind menu keeps its word ("Ability" was cut to
    "Abilit") and the value takes the rest of the cell, which follows the panel
    down to a narrow window instead of holding a fixed 232px. */
-.gf-prereq-cell > .lex-detail-part:first-child{flex:none}
 /* A model thumbnail stays unseen until its snapshot is drawn: before that the
    browser painted the image's alt text, in the accent, for a moment (Models:
    "some weird red text that gets quickly replaced"). */
-.ff8-model-thumbnail:not([data-model-ready]){visibility:hidden}

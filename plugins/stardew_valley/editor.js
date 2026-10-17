@@ -10,10 +10,10 @@ const PRICE_MAX = 2147483647;
 const EDIBILITY_MIN = -300;
 const state = {
   tab: "objects", dashboard: null, dataMap: null, objects: null, rows: [], savedRows: [],
-  selected: null, page: 0, pageSize: 30, query: "", sort: {key: "id", dir: 1},
-  mapPage: 0, mapQuery: "", mapStatus: "", mapSort: ["filename", 1], busy: false, error: "",
+  selected: null, page: 0, pageSize: 30, query: "", sort: {key: "name", dir: 1},
+  mapPage: 0, mapQuery: "", mapStatus: "", mapSort: ["filename", 1], busy: false, error: "", loadError: "",
   datasetKey: "objects", dataset: null, datasetRows: [], datasetSavedRows: [], datasetSelected: null,
-  datasetPage: 0, datasetQuery: "", datasetSort: {key: "id", dir: 1},
+  datasetPage: 0, datasetQuery: "", datasetSort: {key: "name", dir: 1},
 };
 
 async function api(path, body) {
@@ -58,9 +58,12 @@ function sortedRows() {
     });
 }
 function installObjects(payload) {
+  if(!payload || !Array.isArray(payload.rows)) throw new Error("The game data response has no record list.");
+  const rows=clone(payload.rows);
+  const savedRows=clone(payload.rows);
   state.objects = payload;
-  state.rows = clone(payload.rows);
-  state.savedRows = clone(payload.rows);
+  state.rows = rows;
+  state.savedRows = savedRows;
   if (!state.rows.some(row => row.id === state.selected)) state.selected = state.rows[0]?.id ?? null;
   return payload;
 }
@@ -332,6 +335,7 @@ function addRecord() {
 function objectsPanel() {
   const records = sortedRows();
   return pagedListDetail({
+    order: "given",
     rows: records, key: row => row.id, slots: false, add: addRecord, addTitle: "Add Data/Objects patch",
     addDisabled: state.busy, selected: state.selected, page: state.page, pageSize: state.pageSize, noun: "objects",
     splitKey: "stardew-objects", rowsKey: "stardew-objects", defaultSplit: 48,
@@ -468,7 +472,7 @@ function datasetPanel() {
   const records = sortedDatasetRows();
   const columns = datasetColumns();
   const prefs = currentDatasetPrefs();
-  return pagedListDetail({addDisabledReason:"Lexeditor edits the entries this data asset already has here; adding one to this asset is not supported yet.",
+  return pagedListDetail({order:"given",addDisabledReason:"Lexeditor edits the entries this data asset already has here; adding one to this asset is not supported yet.",
     rows: records, key: row => row.id, slots: false,
     selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
     noun: state.dataset?.schema?.noun || "records",
@@ -505,7 +509,7 @@ async function openDataset(key) {
   state.busy = true; state.error = ""; shell.refresh();
   try {
     installDataset(await api("/api/datasets/"+encodeURIComponent(key)));
-    state.datasetPage = 0; state.datasetQuery = ""; state.datasetSort = {key: "id", dir: 1};
+    state.datasetPage = 0; state.datasetQuery = ""; state.datasetSort = {key: "name", dir: 1};
     navigate("objects");
   } catch (error) {
     state.error = error.message;
@@ -667,6 +671,12 @@ function mainState(message, error = false) {
   $("#main").replaceChildren(error ? el("p", {class:"lex-notice",role:"alert"},message) : LexeditorUI.loadingPanel({label:message}));
 }
 function render() {
+  if (state.loadError) {
+    $("#main").replaceChildren(LexeditorUI.notice({
+      title:"Could not load Stardew Valley project",message:state.loadError,tone:"warning",
+      action:el("button",{type:"button",onclick:loadProject},"Retry")}));
+    return;
+  }
   if (!state.dashboard) return;
   let content;
   if (state.tab === "datamap") content = dataMapPanel();
@@ -694,8 +704,11 @@ window.addEventListener("focus", () => {
   if (!state.dashboard || state.busy || dirtyCount()) return;
   refresh().then(render).catch(error => { state.error = error.message; render(); });
 });
-mainState("Loading Stardew Valley project…");
-refresh().then(render).then(() => LexeditorUI.finishPluginLoading()).catch(error => {
-  mainState(`Failed to load Stardew Valley project: ${error.message}`, true);
-  LexeditorUI.finishPluginLoading();
-});
+async function loadProject() {
+  state.loadError="";
+  mainState("Loading Stardew Valley project…");
+  try { await refresh(); render(); }
+  catch(error) { state.loadError=error.message; render(); }
+  finally { LexeditorUI.finishPluginLoading(); }
+}
+loadProject();

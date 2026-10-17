@@ -146,9 +146,27 @@ class ProjectManager:
 
     def snapshot(self, plugin_id: str) -> dict:
         plugin, spec = self._spec(plugin_id)
+        missing = ""
         with self._lock:
             payload = self._read()
-        entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+            entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+            # A mod folder deleted outside Lexeditor (Lexer: "i literally cant
+            # delete any mod ever or it just breaks the entire plugin
+            # permanently") leaves the game on its own data, read-only, like a
+            # game with no mod yet. It is not marked removed: if the folder
+            # comes back, it is listed again.
+            selected = entry.get("current")
+            if (not entry.get("vanilla") and isinstance(selected, str) and selected
+                    and not Path(selected).expanduser().exists()):
+                missing = str(Path(selected).expanduser().resolve())
+                key = os.path.normcase(missing)
+                # Remembered until another mod is chosen, so the page can say
+                # what happened even when the host noticed first.
+                entry = {**entry, "current": "", "vanilla": True, "missing": missing,
+                         "known": [value for value in entry.get("known", []) if isinstance(value, str)
+                                   and os.path.normcase(str(Path(value).expanduser().resolve())) != key]}
+                payload[plugin_id] = entry
+                self._write(payload)
         vanilla = bool(entry.get("vanilla"))
         current = (self.path.parent / "vanilla-view" / plugin_id).resolve() if vanilla else Path(entry.get("current") or spec.default_root).expanduser().resolve()
         # This is an absent mod overlay, not a project to create. Never load
@@ -214,6 +232,7 @@ class ProjectManager:
                          "current": key == os.path.normcase(str(current))})
         return {"pluginId": plugin_id, "current": str(current),
                 "environment": spec.root_env, "projects": rows,
+                **({"missingProject": entry["missing"]} if isinstance(entry.get("missing"), str) else {}),
                 "canCreate": spec.template_root.is_dir(),
                 "modSupport": {"verified": bool(getattr(plugin, "mod_adapter", None) and getattr(plugin, "mod_adapter", None).verified),
                     "message": getattr(getattr(plugin, "mod_adapter", None), "message", "Mod management is not supported for this game yet."),

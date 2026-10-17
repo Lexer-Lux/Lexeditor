@@ -99,7 +99,7 @@
       master.classList.add("ff7-compact-master");
       return LexeditorUI.listDetail(master,recordDetail(selected),"ff7-layout ff7-compact-layout",{splitKey:`ff7-${group}`,defaultSplit:42,minLeft:260,minRight:360});
     }
-    return pagedListDetail({addDisabledReason:`Lexeditor preserves the existing ${labels[group].toLowerCase()} IDs and record count when saving. Adding records to this dataset is not supported yet.`,rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},filters:[datasetStatus()],modOnly:modOnlySpec(group),sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
+    return pagedListDetail({order:"given",addDisabledReason:`Lexeditor preserves the existing ${labels[group].toLowerCase()} IDs and record count when saving. Adding records to this dataset is not supported yet.`,rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},filters:[datasetStatus()],modOnly:modOnlySpec(group),sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
   }
   function unresolvedView(){
     const area=state.data.unresolved?.[state.tab];
@@ -143,7 +143,10 @@
       ...(state.platformError?[detailSection({title:"ERROR",body:[detailField({label:"MESSAGE",control:readonlyField(state.platformError)})]})]:[]),
       detailSection({title:"SETTINGS",body:[view]}),
     ]});
-    return tabbedPanel({tabs:[{id:"ffnx",label:"FFNx"}],active:"ffnx",label:"Tweaks sections",change:()=>{},content:panel});
+    // The shared Tweaks page: FFNx, and ReShade on a subtab of its own
+    // wherever the host offers it.
+    return LexeditorUI.tweaksPage({plugin:"ff7",render,tabsLabel:"Tweaks sections",
+      pages:[{id:"ffnx",label:"FFNx",body:()=>[panel]}]});
   }
   function ff7ModLoaderSection(){
     return LexeditorUI.modLoaderSection({

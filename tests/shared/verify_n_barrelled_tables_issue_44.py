@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 import tempfile
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -87,12 +88,12 @@ def main() -> int:
     require("const barrelPanelMinimum =" in FRAMEWORK
             and "minLeft: barrelPanelMinimum" in FRAMEWORK,
             "the table-panel pixel minimum must grow with the barrel count")
-    require("minimumSplit: Math.min(78, 22 * barrels)" in FRAMEWORK
+    require("minimumSplit: Math.min(78, 22 * barrels)" not in FRAMEWORK
             and "minimumFractions" in FRAMEWORK,
-            "the shared panel composer must consume the barrel-aware split minimum")
+            "no window-share floor may stop the list shrinking; the pixel floor plus measured table widths bind")
     require("fitBarrelTableColumns" in FRAMEWORK,
             "barrel table tracks must fit inside their assigned panel without clipping an edge")
-    require("splitKey:`ff8-${view}`" in (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8"),
+    require("splitKey:`ff8-${view}`" in plugin_ui("ff8"),
             "FF8 must keep a game-and-view-specific preference key")
 
     with tempfile.TemporaryDirectory() as directory:

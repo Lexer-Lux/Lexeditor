@@ -21,6 +21,8 @@ import verify_ff7_completion as complete
 import verify_ff7_extended as extended_fixtures
 from plugins.ff7 import extended as ex, ai
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT/'tests/shared'))
+from paged_detail import reveal
 OUT=Path(os.environ.get('FF7_SCREENSHOTS',str(DEV_CACHE / 'ff7-rendered')))
 
 HOST = r'''
@@ -107,7 +109,7 @@ class RenderedTests(unittest.TestCase):
             self.page.get_by_label(f"AI event for {row_name}",exact=True).select_option(key[6:])
             self.page.wait_for_timeout(20)
         name=self.page.evaluate('([group,key])=>{const row=state.records[group].find(r=>r.id===state.selected[group]);return state.data.categories.find(c=>c.id===group).fields.find(f=>f.key===key).label+" for "+row.name}',[group,key])
-        return self.page.get_by_label(name,exact=True).first
+        return reveal(self.page, self.page.get_by_label(name,exact=True))
     def save(self):
         self.page.locator('#global-save').click()
         self.page.wait_for_function('!state.saving && dirtyCount() === 0')

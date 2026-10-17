@@ -1,0 +1,458 @@
+{
+  "Name": "CHARACTER_INIT_PARAM",
+  "Param": "CharaInitParam",
+  "Type": "CHARACTER_INIT_PARAM",
+  "Description": "Determines starting classes and starting gifts.",
+  "Fields": [
+    {
+      "Field": "baseRec_mp",
+      "Name": "MP recovery",
+      "Description": "Seconds to recover 1 MP. Classes store 0."
+    },
+    {
+      "Field": "baseRec_sp",
+      "Name": "Stamina recovery",
+      "Description": "Seconds to recover 1 stamina. Classes store 0."
+    },
+    {
+      "Field": "red_Falldam",
+      "Name": "Fall damage cut",
+      "Description": "Fall damage reduction in percent. Classes store 0."
+    },
+    {
+      "Field": "soul",
+      "Name": "Starting souls",
+      "Description": "Souls the character starts with."
+    },
+    {
+      "Field": "equip_Wep_Right",
+      "Name": "Right-hand weapon",
+      "Description": "Weapon equipped in the right hand. None leaves the hand empty."
+    },
+    {
+      "Field": "equip_Subwep_Right",
+      "Name": "Right-hand spare",
+      "Description": "Second weapon in the right-hand slot. None leaves it empty."
+    },
+    {
+      "Field": "equip_Wep_Left",
+      "Name": "Left-hand weapon",
+      "Description": "Shield or weapon equipped in the left hand. None leaves the hand empty."
+    },
+    {
+      "Field": "equip_Subwep_Left",
+      "Name": "Left-hand spare",
+      "Description": "Second shield or weapon in the left-hand slot. None leaves it empty."
+    },
+    {
+      "Field": "equip_Helm",
+      "Name": "Helm",
+      "Description": "Head armor the character starts wearing. None starts bareheaded."
+    },
+    {
+      "Field": "equip_Armer",
+      "Name": "Armor",
+      "Description": "Body armor the character starts wearing. None starts bare."
+    },
+    {
+      "Field": "equip_Gaunt",
+      "Name": "Gauntlets",
+      "Description": "Arm armor the character starts wearing. None starts barehanded."
+    },
+    {
+      "Field": "equip_Leg",
+      "Name": "Leggings",
+      "Description": "Leg armor the character starts wearing. None starts barefoot."
+    },
+    {
+      "Field": "equip_Arrow",
+      "Name": "Arrows",
+      "Description": "Arrows the character starts with. None starts with none."
+    },
+    {
+      "Field": "equip_Bolt",
+      "Name": "Bolts",
+      "Description": "Bolts the character starts with. None starts with none."
+    },
+    {
+      "Field": "equip_SubArrow",
+      "Name": "Spare arrows",
+      "Description": "Second arrow type the character starts with. None starts with none."
+    },
+    {
+      "Field": "equip_SubBolt",
+      "Name": "Spare bolts",
+      "Description": "Second bolt type the character starts with. None starts with none."
+    },
+    {
+      "Field": "equip_Accessory01",
+      "Name": "Ring 1",
+      "Description": "Ring in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Accessory02",
+      "Name": "Ring 2",
+      "Description": "Ring in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Accessory03",
+      "Name": "Ring 3",
+      "Description": "Ring in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Accessory04",
+      "Name": "Ring 4",
+      "Description": "Ring in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Accessory05",
+      "Name": "Ring 5",
+      "Description": "Ring in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Skill_01",
+      "Name": "Skill 1",
+      "Description": "Unused. Classes store none."
+    },
+    {
+      "Field": "equip_Skill_02",
+      "Name": "Skill 2",
+      "Description": "Unused. Classes store none."
+    },
+    {
+      "Field": "equip_Skill_03",
+      "Name": "Skill 3",
+      "Description": "Unused. Classes store none."
+    },
+    {
+      "Field": "equip_Spell_01",
+      "Name": "Attuned spell 1",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_02",
+      "Name": "Attuned spell 2",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_03",
+      "Name": "Attuned spell 3",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_04",
+      "Name": "Attuned spell 4",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_05",
+      "Name": "Attuned spell 5",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_06",
+      "Name": "Attuned spell 6",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "equip_Spell_07",
+      "Name": "Attuned spell 7",
+      "Description": "Spell attuned in this slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_01",
+      "Name": "Item 1",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_02",
+      "Name": "Item 2",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_03",
+      "Name": "Item 3",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_04",
+      "Name": "Item 4",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_05",
+      "Name": "Item 5",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_06",
+      "Name": "Item 6",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_07",
+      "Name": "Item 7",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_08",
+      "Name": "Item 8",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_09",
+      "Name": "Item 9",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "item_10",
+      "Name": "Item 10",
+      "Description": "Inventory item in this starting slot. None leaves the slot empty."
+    },
+    {
+      "Field": "npcPlayerFaceGenId",
+      "Name": "Face preset",
+      "Description": "Face shape for rows the game draws as bodies. Classes store 0; creation decides the player's face."
+    },
+    {
+      "Field": "npcPlayerThinkId",
+      "Name": "AI",
+      "Description": "The NPC behavior this row uses. Classes store 0."
+    },
+    {
+      "Field": "baseHp",
+      "Name": "Health",
+      "Description": "Maximum health. Classes store 0 and the game computes it from Vitality."
+    },
+    {
+      "Field": "baseMp",
+      "Name": "Mana",
+      "Description": "Maximum mana. Classes store 0 and the game computes it from Attunement."
+    },
+    {
+      "Field": "baseSp",
+      "Name": "Stamina",
+      "Description": "Maximum stamina. Classes store 0 and the game computes it from Endurance."
+    },
+    {
+      "Field": "arrowNum",
+      "Name": "Arrow count",
+      "Description": "How many arrows the character starts with."
+    },
+    {
+      "Field": "boltNum",
+      "Name": "Bolt count",
+      "Description": "How many bolts the character starts with."
+    },
+    {
+      "Field": "subArrowNum",
+      "Name": "Spare arrow count",
+      "Description": "How many spare arrows the character starts with."
+    },
+    {
+      "Field": "subBoltNum",
+      "Name": "Spare bolt count",
+      "Description": "How many spare bolts the character starts with."
+    },
+    {
+      "Field": "QWC_sb",
+      "Name": "World state 1",
+      "Description": "A world-state value the game checks. Always 0 in the game's file."
+    },
+    {
+      "Field": "QWC_mw",
+      "Name": "World state 2",
+      "Description": "A world-state value the game checks. Always 0 in the game's file."
+    },
+    {
+      "Field": "QWC_cd",
+      "Name": "World state 3",
+      "Description": "A world-state value the game checks. Always 0 in the game's file."
+    },
+    {
+      "Field": "soulLv",
+      "Name": "Soul level",
+      "Description": "Starting soul level."
+    },
+    {
+      "Field": "baseVit",
+      "Name": "Vitality",
+      "Description": "Starting Vitality."
+    },
+    {
+      "Field": "baseWil",
+      "Name": "Attunement",
+      "Description": "Starting Attunement."
+    },
+    {
+      "Field": "baseEnd",
+      "Name": "Endurance",
+      "Description": "Starting Endurance."
+    },
+    {
+      "Field": "baseStr",
+      "Name": "Strength",
+      "Description": "Starting Strength."
+    },
+    {
+      "Field": "baseDex",
+      "Name": "Dexterity",
+      "Description": "Starting Dexterity."
+    },
+    {
+      "Field": "baseMag",
+      "Name": "Intelligence",
+      "Description": "Starting Intelligence."
+    },
+    {
+      "Field": "baseFai",
+      "Name": "Faith",
+      "Description": "Starting Faith."
+    },
+    {
+      "Field": "baseLuc",
+      "Name": "Unknown value 1",
+      "Description": "Unknown. Every starting class stores 10 here; its effect is not documented."
+    },
+    {
+      "Field": "baseHeroPoint",
+      "Name": "Unknown value 2",
+      "Description": "Unknown. Every starting class stores 0 here; its effect is not documented."
+    },
+    {
+      "Field": "baseDurability",
+      "Name": "Resistance",
+      "Description": "Starting Resistance."
+    },
+    {
+      "Field": "itemNum_01",
+      "Name": "Item 1 count",
+      "Description": "How many of Item 1 the character starts with."
+    },
+    {
+      "Field": "itemNum_02",
+      "Name": "Item 2 count",
+      "Description": "How many of Item 2 the character starts with."
+    },
+    {
+      "Field": "itemNum_03",
+      "Name": "Item 3 count",
+      "Description": "How many of Item 3 the character starts with."
+    },
+    {
+      "Field": "itemNum_04",
+      "Name": "Item 4 count",
+      "Description": "How many of Item 4 the character starts with."
+    },
+    {
+      "Field": "itemNum_05",
+      "Name": "Item 5 count",
+      "Description": "How many of Item 5 the character starts with."
+    },
+    {
+      "Field": "itemNum_06",
+      "Name": "Item 6 count",
+      "Description": "How many of Item 6 the character starts with."
+    },
+    {
+      "Field": "itemNum_07",
+      "Name": "Item 7 count",
+      "Description": "How many of Item 7 the character starts with."
+    },
+    {
+      "Field": "itemNum_08",
+      "Name": "Item 8 count",
+      "Description": "How many of Item 8 the character starts with."
+    },
+    {
+      "Field": "itemNum_09",
+      "Name": "Item 9 count",
+      "Description": "How many of Item 9 the character starts with."
+    },
+    {
+      "Field": "itemNum_10",
+      "Name": "Item 10 count",
+      "Description": "How many of Item 10 the character starts with."
+    },
+    {
+      "Field": "bodyScaleHead",
+      "Name": "Head scale",
+      "Description": "Body proportion for the head. Classes store 0."
+    },
+    {
+      "Field": "bodyScaleBreast",
+      "Name": "Chest scale",
+      "Description": "Body proportion for the chest. Classes store 0."
+    },
+    {
+      "Field": "bodyScaleAbdomen",
+      "Name": "Abdomen scale",
+      "Description": "Body proportion for the abdomen. Classes store 0."
+    },
+    {
+      "Field": "bodyScaleArm",
+      "Name": "Arm scale",
+      "Description": "Body proportion for the arms. Classes store 0."
+    },
+    {
+      "Field": "bodyScaleLeg",
+      "Name": "Leg scale",
+      "Description": "Body proportion for the legs. Classes store 0."
+    },
+    {
+      "Field": "gestureId0",
+      "Name": "Gesture 1",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId1",
+      "Name": "Gesture 2",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId2",
+      "Name": "Gesture 3",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId3",
+      "Name": "Gesture 4",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId4",
+      "Name": "Gesture 5",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId5",
+      "Name": "Gesture 6",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "gestureId6",
+      "Name": "Gesture 7",
+      "Description": "Gesture in this menu slot, by gesture ID."
+    },
+    {
+      "Field": "npcPlayerType",
+      "Name": "Player type",
+      "Description": "What kind of character this row builds. Classes store 0."
+    },
+    {
+      "Field": "npcPlayerDrawType",
+      "Name": "Draw type",
+      "Description": "How the game tints this body. Classes store None."
+    },
+    {
+      "Field": "npcPlayerSex",
+      "Name": "Sex",
+      "Description": "The sex this row builds."
+    },
+    {
+      "Field": "vowType",
+      "Name": "Starting covenant",
+      "Description": "Covenant the character starts in. Classes store None."
+    }
+  ]
+}

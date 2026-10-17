@@ -377,7 +377,7 @@
     {
       "Field": "correctType",
       "Name": "Damage Correction Graph",
-      "Description": "Determine the calculcation correction graph to use when correcting damage."
+      "Description": "Which scaling graph this weapon uses. It stays read-only because the graph choices are not documented."
     },
     {
       "Field": "spAttribute",

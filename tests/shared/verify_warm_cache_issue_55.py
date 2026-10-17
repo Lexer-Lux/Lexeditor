@@ -109,6 +109,8 @@ def verify_rdr(root: Path) -> None:
     write(data / rdr.TUNING_CACHE_NAME / rdr.KNOWN_TUNING_XML, b"<root/>")
     write(data / rdr.CONTENT_CACHE_NAME / rdr.INVENTORY_XML, b"<inventory/>")
     write(data / rdr.CONTENT_CACHE_NAME / rdr.DLC_INVENTORY_XML, b"<inventory/>")
+    write(data / rdr.CONTENT_CACHE_NAME / 'content/stringtable/fixture.strtbl',
+          b'synthetic string-table cache fixture')
     packed = data / rdr.GRINGO_PACKED_CACHE_NAME / "gringores" / "armadillo.wgd"
     unpacked = data / rdr.GRINGO_UNPACKED_CACHE_NAME / "gringores" / "armadillo.wgd"
     write(packed, b"RSC-packed")
@@ -116,10 +118,10 @@ def verify_rdr(root: Path) -> None:
     sources = {name: rdr._source_record(path) for name, path in archives.items()}
     tool_record = {"path": str(tool), "sha256": rdr.sha256(tool)}
     manifest = {
-        "version": 3,
+        "version": 4,
         "sources": sources,
         "tool": tool_record,
-        "fileCounts": {"tuning": 1000, "inventory": 2,
+        "fileCounts": {"tuning": 1000, "inventory": 2, "stringTables": 1,
                        "gringoPacked": 39, "gringoUnpacked": 39},
     }
     manifest_path = data / "manifest.json"

@@ -14,6 +14,8 @@ from . import paths
 from .deploy_data import sync_project_assets
 from .gauntlet_data import (
     augment_data_map as augment_gauntlet_data_map,
+    create_prefab,
+    duplicate_element,
     list_prefabs,
     read_prefab,
     save_prefab,
@@ -425,6 +427,23 @@ class Handler(PluginRequestHandler):
                         source_hash=source_hash,
                     )
                 )
+            except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path in ("/api/gauntlet/create", "/api/gauntlet/duplicate"):
+            # A new prefab is a copy of an existing one; a new element is a
+            # copy of an existing element, placed right after it.
+            try:
+                payload = self.read_json()
+                if path == "/api/gauntlet/create":
+                    result = create_prefab(PROJECT, str(payload.get("source") or ""), str(payload.get("name") or ""))
+                else:
+                    result = duplicate_element(PROJECT, str(payload.get("path") or ""),
+                                               str(payload.get("elementPath") or ""),
+                                               source_hash=payload.get("sourceHash"))
+                self.send_json(result)
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
