@@ -71,6 +71,7 @@
     {id: "magnifyIcon", level: "atom", summary: "The magnifier glyph that opens a map at full size.", sample: () => UI.magnifyIcon()},
     {id: "settingsIcon", level: "atom", summary: "The settings glyph.", sample: () => UI.settingsIcon()},
     {id: "folderIcon", level: "atom", summary: "The folder glyph.", sample: () => UI.folderIcon()},
+    {id: "removeIcon", level: "atom", summary: "The remove glyph beside the copy icon.", sample: () => UI.removeIcon()},
     {id: "enabledMark", level: "atom", summary: "The mark on the shared list's enabled column.",
       sample: () => UI.enabledMark()},
     {id: "copyText", level: "atom", summary: "Copies a value to the clipboard and says so.",

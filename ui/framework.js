@@ -438,6 +438,23 @@
     return svg;
   };
 
+  // The remove mark beside the copy icon in record headings: the same X
+  // the text button drew, as SVG so it scales with its neighbours.
+  const removeIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "5 5 14 14");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("d", "M8 8l8 8M16 8l-8 8");
+    svg.append(path);
+    return svg;
+  };
+
   // One "no image" mark for every place a picture is missing: a record with
   // no art of its own, or an image that failed to load. It replaces the
   // browser's broken-image glyph and alt text ("[mapid] composed background").
@@ -5328,7 +5345,10 @@
           if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
         }
       }
-      const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
+    // An unpaged flow deals every card into columns on one scrolling
+    // page: the page-break pass below is skipped and no footer renders.
+    if (options.unpaged) { starts = [0]; fittedSize = sizeKey(); return; }
+    const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const available=scroll.clientHeight,loads=Array(count).fill(0),next=[0];
       let orderedLane=0;
       for(let index=0;index<visible.length;index++){
@@ -5409,7 +5429,9 @@
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
       // Embedded property panes need their own footer, not the window's list pager.
-      footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
+      // Unpaged flows render no footer: every card is on the one page.
+      if (options.unpaged) footer.replaceChildren();
+      else footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
         search:options.search, change:turn}));
       if (label && focused?.matches("input")) {
         const replacement = [...footer.querySelectorAll("input")].find(input=>input.getAttribute("aria-label")===label);
@@ -11841,7 +11863,9 @@ ${contents.path}`});
       defaultSplit: options.defaultSplit,
       minLeft: barrelPanelMinimum,
       minRight: options.minRight,
-      minimumSplit: Math.min(78, 22 * barrels),
+      // No fraction floor: barrels stand on the pixel minimum plus the
+      // tables' measured widths. A share of the window only stopped the
+      // panel shrinking on wide screens.
       dividerAccessories: [[barrelControl, columnControl]],
       paneClass: options.paneClass,
     });
@@ -13525,7 +13549,7 @@ ${contents.path}`});
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
-          "aria-label": removeTitle, disabled: !!row.lexmod, onclick: removeMod}, "x"),
+          "aria-label": removeTitle, disabled: !!row.lexmod, onclick: removeMod}, removeIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: openTitle,
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
@@ -13917,7 +13941,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

@@ -1580,6 +1580,27 @@
     "registerNoThumbnail": [
       "ds1"
     ],
+    "removeIcon": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "renameValue": [
       "bannerlord",
       "blank",
@@ -2111,6 +2132,7 @@
     "recordSource",
     "referenceDisplay",
     "refreshReferences",
+    "removeIcon",
     "renameValue",
     "reshadeSection",
     "saveIcon",

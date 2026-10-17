@@ -795,7 +795,7 @@ function monsterThinkSection(){
     const frozen={...state.thinkRow,fields:state.thinkRow.fields.map(item=>({...item,editable:false}))};
     for(const [title,fields] of fieldSections(frozen))body.push(detailSection({title,body:fields}));
   }
-  return [detailPanel({label:"Think record",titleControl:face,actions:[referencePicker(state.row,aiField,face,
+  return [detailPanel({label:"Think record",paginate:{unpaged:true},titleControl:face,actions:[referencePicker(state.row,aiField,face,
     // The panel always swaps the enemy's think record, even when none
     // is assigned yet and the value has no link entry of its own.
     {kind:"ai",table:"NpcThinkParam",field:aiField.key})],body})];
@@ -942,7 +942,7 @@ function renderAssetDetail(){
     fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
     progress?el("span",{role:"status"},progress):null].filter(Boolean);
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
-  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,body});
+  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},body});
 }
 async function uploadAsset(target,file){
   if(state.assetBusy)return;
@@ -1165,7 +1165,7 @@ function rowActionButtons(kind){
       onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
     el("button",{type:"button",class:"lex-header-icon","data-row-action":"remove","data-row-kind":kind,disabled:locked||playerStart,
       title:removeTitle,"aria-label":removeTitle,
-      onclick:()=>removeRow(kind)},"x")];
+      onclick:()=>removeRow(kind)},LexeditorUI.removeIcon())];
 }
 async function refreshMapsAfterStructure(){
   const current=state.rows.find(row=>key(row)===state.selected);
@@ -1235,7 +1235,7 @@ function curveDetail(actions,groups){
     // The level-up cost row has no stages to plot, and its soul price
     // comes from the four cost fields by an undocumented formula, so it
     // keeps the plain field list.
-    return detailPanel({title:row.name,help:row.help,actions,
+    return detailPanel({title:row.name,help:row.help,actions,paginate:{unpaged:true},
       body:[...groups].map(([title,body])=>detailSection({title,body}))});
   }
   const host=el("div",{class:"ds1-curve-host"});
@@ -1278,7 +1278,7 @@ function curveDetail(actions,groups){
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=evaluate;
   host.append(graph);
-  return detailPanel({title:row.name,help:row.help,actions,
+  return detailPanel({title:row.name,help:row.help,actions,paginate:{unpaged:true},
     body:[detailSection({title:"GRAPH",
       help:infoHelp("The line passes exactly through every stage point; between stages it blends with the left stage's Curve shape value. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shaping, C1-C4 the level-up cost fields. Edit every value from the variables drawer over the graph."),
       body:[host]})]});
@@ -1320,7 +1320,7 @@ function detail(){
   }
   if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"))
     return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[itemDetail(groups)]}),state.row.table,state.row.id);
-  return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,
+  return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }
 const ds1PreviewAvailability=new Map();
@@ -1508,7 +1508,7 @@ function renderTaeForm(){
     oninput:event=>{form.start=event.target.value;}});
   const end=el("input",{type:"number","aria-label":"End (s)","data-tae-input":"end",step:"any",value:form.end,disabled:state.taeBusy,
     oninput:event=>{form.end=event.target.value;}});
-  return detailPanel({title:"Add event",
+  return detailPanel({title:"Add event",paginate:{unpaged:true},
     actions:[
       el("button",{type:"button",disabled:state.taeBusy,
         onclick:()=>{
@@ -1615,7 +1615,7 @@ function renderBandForm(){
         detailField({label:"Resulting recovery (%)",control:readonlyField(winner.recovery)}));
     }
   }
-  return detailPanel({title:form.action==="add"?"Add band":"Delete band",
+  return detailPanel({title:form.action==="add"?"Add band":"Delete band",paginate:{unpaged:true},
     actions:[
       el("button",{type:"button",disabled:state.bandBusy||(form.action==="delete"&&(!form.neighbour||!form.keep)),
         onclick:()=>{
@@ -1658,7 +1658,7 @@ function renderItems(){
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
-    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
+    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     // Asset files join the mod through the list's add button: adding at a
     // path the game has replaces it through the loader, so asset tabs
@@ -2309,7 +2309,7 @@ function renderMaps(){
     onclick:()=>viewportDuplicate(current.id)},LexeditorUI.copyIcon());
   const remove=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"remove",
     "aria-label":"Remove this placement",
-    onclick:()=>viewportRemove(current.id)},"x");
+    onclick:()=>viewportRemove(current.id)},LexeditorUI.removeIcon());
   const add=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"add",
     onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
