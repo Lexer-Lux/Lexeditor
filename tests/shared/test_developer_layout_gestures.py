@@ -180,3 +180,43 @@ def test_a_panel_tab_keeps_its_name_outside_developer_mode(page):
     assert page.locator('.lex-prompt-dialog').count() == 0
     assert page.evaluate(
         "localStorage.getItem('lex-collapsible-panel-rename-gated.label.treasure')") is None
+PANEL_TABLE = """() => {
+  const U = LexeditorUI;
+  document.querySelector('main').replaceChildren(U.detailPanel({title: 'Record', body: [
+    U.detailSection({title: 'Referenced', body: [
+      U.columnList({rows: [{key: 'a', name: 'Attack 100'}], key: row => row.key,
+        columns: [{key: 'name', label: 'Attack'}]})]}),
+    U.detailSection({title: 'Notes', body: [U.detailNote('A note with no properties.')]})]}));
+}"""
+
+
+def mount_table(page):
+    mount(page)
+    page.evaluate(PANEL_TABLE)
+    page.wait_for_timeout(300)
+
+
+def test_holding_right_on_a_table_only_heading_removes_it(page):
+    # A section with no property rows (a table, a graph, a note) held
+    # nothing, so the hold did nothing. It removes like any other empty
+    # section, and undo brings it back.
+    mount_table(page)
+    section = page.locator(".lex-detail-section", has=page.locator(
+        ".lex-detail-section-title", has_text="Referenced"))
+    hold_right(page, section.locator(".lex-detail-section-title"))
+    assert section.is_hidden()
+    assert layout_saves(page), "the removal is shared through the default view"
+    page.locator("body").click(position={"x": 2, "y": 2})
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    assert section.is_visible()
+
+
+def test_a_table_only_heading_drags_its_section(page):
+    mount_table(page)
+    titles = lambda: page.locator(".lex-detail-section-title-text").all_text_contents()
+    assert titles() == ["Referenced", "Notes"]
+    page.locator(".lex-detail-section-title", has_text="Notes").drag_to(
+        page.locator(".lex-detail-section-title", has_text="Referenced"), target_position={"x": 10, "y": 2})
+    page.wait_for_timeout(200)
+    assert titles() == ["Notes", "Referenced"]

@@ -224,7 +224,17 @@ def main():
                     # Damage, defense and stat labels carry the game's own art.
                     navigate(page, '[data-subtab="weapons"]', "EquipParamWeapon", 100)
                     page.wait_for_function('state.sub === "weapons" && state.row && !state.error')
-                    assert loaded_images(page, 'img.lex-ds1-label-art') >= 4
+                    total = 0
+                    panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+                    for index in range(panel_tabs.count()):
+                        tab_id = panel_tabs.nth(index).get_attribute('data-subtab')
+                        panel_tabs.nth(index).click()
+                        page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+                        if page.locator('img.lex-ds1-label-art').count():
+                            page.wait_for_function(
+                                "()=>[...document.querySelectorAll('img.lex-ds1-label-art')].every(i=>i.complete&&i.naturalWidth>0)")
+                            total += loaded_images(page, 'img.lex-ds1-label-art')
+                    assert total >= 4, total
                     assert page.evaluate(
                         "fetch('/api/label?name=physical').then(r => r.status)") == 200
                     assert page.evaluate(
@@ -251,6 +261,9 @@ def main():
                     painted(page, 'canvas[data-preview]')
                     if output:
                         page.screenshot(path=str(output / 'parts-enemy.png'))
+                    trigger.click()
+                    page.wait_for_function('window.__lexPreview === undefined')
+                    assert page.locator('canvas[data-preview]').count() == 0
                     thumb = page.evaluate(
                         "fetch('/api/chr/view?npc=120000&view=thumb').then(r => r.json())")
                     assert 'attacks' not in thumb and 'body' not in thumb, sorted(thumb)

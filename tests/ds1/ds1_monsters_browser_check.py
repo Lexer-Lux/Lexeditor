@@ -265,6 +265,22 @@ def main():
                     assert f'Behavior set {variation}' in page.locator('.lex-tabbed-panel').inner_text()
                     moves = page.locator('.lex-tabbed-panel button.lex-hoverable[data-hover-target-type="ds1-behavior"]')
                     assert moves.count() == page.evaluate('state.monsterBehaviors.rows.length')
+                    heads = page.locator('.lex-tabbed-panel .lex-column-list-head-cell').evaluate_all(
+                        'cells=>cells.map(c=>c.innerText.trim())')
+                    assert heads == ['Behavior', 'Calls'], heads
+                    search = page.locator('.lex-tabbed-panel input[data-lex-bottom-search="monster-behaviors"]')
+                    assert search.count() == 1
+                    assert page.locator('.lex-tabbed-panel .lex-pager').count() == 1
+                    first_name = page.evaluate('state.monsterBehaviors.rows[0].name')
+                    search.fill(first_name)
+                    page.wait_for_function('(want)=>state.behaviorQuery===want', arg=first_name)
+                    assert moves.count() >= 1
+                    search.fill('zzz-no-such-behavior')
+                    page.wait_for_function('state.behaviorQuery==="zzz-no-such-behavior"')
+                    assert moves.count() == 0
+                    search.fill('')
+                    page.wait_for_function('state.behaviorQuery===""')
+                    assert moves.count() == page.evaluate('state.monsterBehaviors.rows.length')
                     if moves.count():
                         moves.first.click()
                         page.wait_for_function('state.tab==="ai" && state.sub==="behaviors" && state.row?.table==="BehaviorParam"')

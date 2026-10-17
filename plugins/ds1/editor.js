@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
   actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"basics",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
+  monsterTab:"basics",itemTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],shopTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
   assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
@@ -629,8 +629,16 @@ function plainControlFor(row,field){
 }
 const GROUP_ORDER=["Description","Basics","Starting gear","Starting spells","Starting items","Body & gestures","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
   "Use behavior","Value & rewards","Appearance","Properties"];
-function groupFor(field){
+// Every property that decides what an item becomes as it is reinforced:
+// its upgrade path, materials, reinforcement cost and ascension options.
+// Buffable flags and presentation materials are not upgrades.
+const UPGRADE_KEYS={EquipParamWeapon:new Set(["materialSetId","reinforceTypeId","basicPrice","isCustom","disableBaseChangeReset","baseChangeCategory",
+  ...Array.from({length:16},(_,index)=>index?"originEquipWep"+index:"originEquipWep")]),
+  EquipParamProtector:new Set(["materialSetId","reinforceTypeId","basicPrice",
+  ...Array.from({length:16},(_,index)=>index?"originEquipPro"+index:"originEquipPro")])};
+function groupFor(field,table){
   if(field.group)return field.group;
+  if(table&&UPGRADE_KEYS[table]&&UPGRADE_KEYS[table].has(field.key))return "Upgrades";
   const name=field.key.toLowerCase();
   if(/^weight$|^durability|^sadurability$/.test(name))return "Basics";
   if(/originequip|reinforcetype|materialset/.test(name))return "Upgrades";
@@ -663,13 +671,13 @@ function fieldSections(row){
       return {label:key.slice(-1),control:controlFor(row,field),title:field.label,
         help:field.description&&field.description.trim()?infoHelp(field.description.trim()):null};
     });
-    const group=groupFor(byKey.get(keys[0]));
+    const group=groupFor(byKey.get(keys[0]),row.table);
     if(!groups.has(group))groups.set(group,[]);
     groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3,nowrap:true})}));
   }
   for(const field of row.fields){
     if(vectored.has(field.key))continue;
-    const group=groupFor(field);if(!groups.has(group))groups.set(group,[]);
+    const group=groupFor(field,row.table);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
@@ -789,24 +797,40 @@ function behaviorVariationControl(variation){
   });
   return input;
 }
+function behaviorMatches(){
+  const query=(state.behaviorQuery||"").toLowerCase();
+  const rows=state.monsterBehaviors?.rows||[];
+  if(!query)return rows;
+  return rows.filter(move=>(move.id+" "+move.name+" "+(move.target.name||"")+" "+(move.target.detail||"")).toLowerCase().includes(query));
+}
 function monsterBehaviorsSection(){
   const data=state.monsterBehaviors;
   if(!data)return LexeditorUI.loadingPanel({label:"Loading behaviors"});
-  const lines=[detailField({label:"Behaviors ID",control:behaviorVariationControl(data.variation),
-    help:infoHelp("The behavior set this enemy uses. Every behavior in the set is one move it can choose. Only existing sets are accepted.")})];
-  for(const move of data.rows){
-    const target=move.target;
-    const control=target.table?hoverable({content:target.name,targetType:`ds1-${target.kind}`,targetId:target.id,
-      targetLabel:`${target.name} in ${LINK_TAB_LABELS[target.kind]||"Items"}`,
-      preview:()=>target.kind==="attack"?attackPreview(target.id):recordPreview({kind:target.kind,table:target.table,id:target.id}),
-      activate:()=>target.kind==="attack"?openAttack(target.id):openEffect({id:target.id})})
-      :readonlyField(target.detail,{format:false});
-    lines.push(detailField({label:hoverable({content:move.name,targetType:"ds1-behavior",targetId:move.id,
+  const head=detailField({label:"Behaviors ID",control:behaviorVariationControl(data.variation),
+    help:infoHelp("The behavior set this enemy uses. Every behavior in the set is one move it can choose. Only existing sets are accepted.")});
+  if(!data.rows.length)return [detailSection({title:`Behavior set ${data.variation}`,body:[head,
+    LexeditorUI.detailNote(`Behavior set ${data.variation} holds no behaviors. This enemy cannot act.`)]})];
+  const here=behaviorMatches();
+  const size=state.pageSize;
+  const pages=Math.max(1,Math.ceil(here.length/size));
+  if(state.behaviorPage>pages-1)state.behaviorPage=pages-1;
+  const shown=here.slice(state.behaviorPage*size,(state.behaviorPage+1)*size);
+  const rows=shown.map(move=>({key:String(move.id),
+    behavior:hoverable({content:move.name,targetType:"ds1-behavior",targetId:move.id,
       targetLabel:`${move.name} in AI`,preview:()=>recordPreview({kind:"behavior",table:"BehaviorParam",id:move.id}),
-      activate:()=>openBehavior(move.id)}),control}));
-  }
-  if(!data.rows.length)lines.push(LexeditorUI.detailNote(`Behavior set ${data.variation} holds no behaviors. This enemy cannot act.`));
-  return [detailSection({title:`Behavior set ${data.variation}`,body:lines})];
+      activate:()=>openBehavior(move.id)}),
+    calls:move.target.table?hoverable({content:move.target.name,targetType:`ds1-${move.target.kind}`,targetId:move.target.id,
+      targetLabel:`${move.target.name} in ${LINK_TAB_LABELS[move.target.kind]||"Items"}`,
+      preview:()=>move.target.kind==="attack"?attackPreview(move.target.id):recordPreview({kind:move.target.kind,table:move.target.table,id:move.target.id}),
+      activate:()=>move.target.kind==="attack"?openAttack(move.target.id):openEffect({id:move.target.id})})
+      :move.target.detail}));
+  return [detailSection({title:`Behavior set ${data.variation}`,body:[head,
+    LexeditorUI.bottomSearch({key:"monster-behaviors",value:state.behaviorQuery,label:"Search behaviors",
+      change:value=>{state.behaviorQuery=value;state.behaviorPage=0;render();}}),
+    columnList({rows,key:row=>row.key,
+      columns:[{key:"behavior",label:"Behavior",grow:1},{key:"calls",label:"Calls",grow:1}]}),
+    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.behaviorPage,total:here.length,pageSize:size,
+      change:value=>{state.behaviorPage=value;render();}})]})];
 }
 function monsterAttacksSection(){
   const links=state.monsterAttacks;
@@ -847,6 +871,17 @@ function monsterDetail(groups){
     :groups.get(section.label);
   return tabbedPanel({label:"Monster details",active,tabs,paginate:false,
     change:id=>{state.monsterTab=id;render();},content});
+}
+function itemDetail(groups){
+  // Every section is a tab; the tab is the header, so a section tab
+  // shows its fields with no repeated section title.
+  const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+  const tabs=[...groups].map(([title])=>({id:tabId(title),label:title,
+    help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
+  const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
+  const section=tabs.find(tab=>tab.id===active);
+  return tabbedPanel({label:"Item details",active,tabs,paginate:false,
+    change:id=>{state.itemTab=id;render();},content:groups.get(section.label)});
 }
 function formatAssetSize(size){
   if(!(size>=0))return "Unknown size";
@@ -1146,7 +1181,7 @@ function detail(){
   const title=state.row.name;
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`${state.row.map} · model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
+  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`${state.row.map} Â· model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} Â· ${state.row.tae} Â· ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
@@ -1163,6 +1198,8 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
+  if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"))
+    return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[itemDetail(groups)]}),state.row.table,state.row.id);
   return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }

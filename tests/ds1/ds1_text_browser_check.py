@@ -80,6 +80,8 @@ def main():
                         page.wait_for_function('state.tab === "items" && state.rows.length > 0')
                         page.locator('[data-subtab="armor"]').click()
                         pinned(page, 'EquipParamProtector', 100)
+                        page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
+                        page.wait_for_function('state.itemTab === "defense"')
                         link = page.locator(f'.lex-hoverable[data-hover-target-id="{text_id}"]')
                         assert link.count() == 1, label
                         assert link.inner_text().strip() == label
@@ -93,6 +95,8 @@ def main():
                     page.wait_for_function('state.tab === "items" && state.rows.length > 0')
                     page.locator('[data-subtab="armor"]').click()
                     pinned(page, 'EquipParamProtector', 100)
+                    page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
+                    page.wait_for_function('state.itemTab === "defense"')
                     page.locator('.lex-hoverable[data-hover-target-id="102204"]').hover()
                     preview = page.locator('.lex-hover-preview')
                     preview.wait_for(timeout=5000)

@@ -61,6 +61,14 @@ def main():
                         counts[tab] = page.evaluate('state.rows.length')
                         assert counts[tab] > 0
                         assert page.locator('.lex-column-list .lex-list-row').count() > 0
+                        panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+                        if panel_tabs.count():
+                            for index in range(panel_tabs.count()):
+                                if page.locator('input[data-field-key][type="number"]').count():
+                                    break
+                                tab_id = panel_tabs.nth(index).get_attribute('data-subtab')
+                                panel_tabs.nth(index).click()
+                                page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
                         control = reveal(page,page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))
@@ -76,6 +84,25 @@ def main():
                         assert next(f['value'] for f in row['fields'] if f['key'] == field) == value
                         changes.append((identity['table'], identity['id'], field, value))
                         if output: page.screenshot(path=str(output / f'{tab}.png'))
+                    # Weapons and armor carry their upgrade paths on an Upgrades panel tab.
+                    for tab, owned in (('weapons', True), ('armor', False)):
+                        page.locator(f'[data-subtab="{tab}"]').click()
+                        page.wait_for_function('(tab)=>state.sub===tab && ((tab==="weapons" && state.row?.table==="EquipParamWeapon") || (tab==="armor" && state.row?.table==="EquipParamProtector"))', arg=tab)
+                        page.locator('.lex-tabbed-panel [data-subtab="upgrades"]').click()
+                        page.wait_for_function('state.itemTab==="upgrades"')
+                        keys = page.locator('.lex-tabbed-panel [data-field-key]').evaluate_all(
+                            'nodes=>nodes.map(n=>n.dataset.fieldKey)')
+                        for key in ('materialSetId', 'reinforceTypeId', 'basicPrice'):
+                            assert key in keys, (tab, keys)
+                        assert ('isCustom' in keys) == owned, (tab, keys)
+                        assert ('baseChangeCategory' in keys) == owned, (tab, keys)
+                        assert ('disableBaseChangeReset' in keys) == owned, (tab, keys)
+                        assert any(key.startswith('originEquip') for key in keys), (tab, keys)
+                        if output: page.screenshot(path=str(output / f'{tab}-upgrades.png'))
+                    # Consumables have no upgrade path, so no panel tabs.
+                    page.locator('[data-subtab="consumables"]').click()
+                    page.wait_for_function('state.sub==="consumables" && state.row?.table==="EquipParamGoods"')
+                    assert page.locator('.lex-tabbed-panel').count() == 0
                     # Menu labels is the last subtab and holds one text field;
                     # the enum and checkbox controls live on the param rows.
                     page.locator('[data-subtab="rings"]').click()
@@ -131,22 +158,20 @@ def main():
                     assert page.locator('#main > .lex-stack .lex-column-list').first.is_visible()
                     expected = set(page.evaluate('state.row.fields.filter(f=>f.editable).map(f=>f.key)'))
                     seen = set()
-                    for _ in range(30):
-                        fields = page.locator('.lex-tweaks-paged [data-field-key]:visible')
-                        for index in range(fields.count()):
-                            field = fields.nth(index)
+                    panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+                    assert panel_tabs.count() > 1
+                    for index in range(panel_tabs.count()):
+                        tab_id = panel_tabs.nth(index).get_attribute('data-subtab')
+                        panel_tabs.nth(index).click()
+                        page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+                        fields = page.locator('.lex-tabbed-panel [data-field-key]:visible')
+                        for number in range(fields.count()):
+                            field = fields.nth(number)
                             field.scroll_into_view_if_needed()
                             box = field.bounding_box()
                             assert box['y'] >= 0 and box['y'] + box['height'] <= 700, box
                             seen.add(field.get_attribute('data-field-key'))
-                        pager = page.locator('.lex-tweaks-pages')
-                        box = pager.bounding_box()
-                        assert box['height'] > 0 and box['y'] + box['height'] <= 700, box
-                        next_page = pager.get_by_role('button', name='Next page', exact=True)
-                        if not next_page.is_enabled(): break
-                        next_page.click()
                     assert seen == expected, sorted(expected - seen)
-                    page.locator('.lex-tweaks-pages').get_by_role('button', name='First page', exact=True).click()
                     previous = page.evaluate('state.selected')
                     list_next = page.locator('.lex-pager:not(.lex-pager-inline)').get_by_role('button', name='Next page', exact=True)
                     if list_next.count() and list_next.is_enabled():

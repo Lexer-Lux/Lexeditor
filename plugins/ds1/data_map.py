@@ -36,9 +36,16 @@ def payload(store, native_rules=None, theme=None):
                'controls':'No editor', 'notes':'This table has no editor. Its original bytes are preserved when the archive is saved.'}
         if table in item_tables:
             tabs = item_tables[table]
+            notes = 'Edit the reviewed properties in Items. Unidentified fields stay read-only.'
+            if table == 'EquipParamWeapon':
+                notes = ('Edit the reviewed properties in Items. Upgrade path, materials, reinforcement '
+                         'cost and ascension live under the Upgrades tab. Unidentified fields stay read-only.')
+            elif table == 'EquipParamProtector':
+                notes = ('Edit the reviewed properties in Items. Upgrade path, materials and reinforcement '
+                         'cost live under the Upgrades tab. Unidentified fields stay read-only.')
             row.update(coverage='structured',status='partial',openable=True,
                 target='items',sub=tabs[0][0],controls='Items: '+', '.join(label for _,label in tabs),
-                notes='Edit the reviewed properties in Items. Unidentified fields stay read-only.')
+                notes=notes)
         elif table == 'NpcParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='enemies',sub='monsters',controls='Enemies: stats, drops, effects and attack references',

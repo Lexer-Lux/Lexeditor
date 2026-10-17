@@ -8086,8 +8086,10 @@ ${contents.path}`});
     hideTimer = setTimeout(() => {
       heading.classList.remove("lex-property-holding");
       const fieldInside = root.querySelector(".lex-detail-field[data-lex-layout-field]");
-      if (!fieldInside) return;
-      const state = preparePropertyLayout(propertyRoot(fieldInside));
+      // A section with no property rows (a table, a graph, a note) still
+      // answers the header gesture: its panel, or itself, is the layout
+      // root, so holding removes it and dragging moves it.
+      const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : root);
       hideHeld = true;
       const before = capturePropertyLayout(state);
       const group = [...state.groups.values()].find(entry => entry.node.closest(".lex-detail-section") === section);
@@ -8181,10 +8183,10 @@ ${contents.path}`});
     const heading = event.target.closest?.(".lex-detail-section-title");
     const section = heading && !event.target.closest(".lex-detail-field") && heading.closest(".lex-detail-section");
     if (!section || !sharedSettingsSnapshot?.developerMode) return;
-    const fieldInside = section.closest(".lex-detail-panel")?.querySelector(".lex-detail-field[data-lex-layout-field]");
-    const root = fieldInside && propertyRoot(fieldInside);
-    const state = root && preparePropertyLayout(root);
-    if (!state || ![...state.groups.values()].some(group => layoutSectionOf(group) === section)) { event.preventDefault(); return; }
+    const panel = section.closest(".lex-detail-panel") || section;
+    const fieldInside = panel.querySelector(".lex-detail-field[data-lex-layout-field]");
+    const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : panel);
+    if (![...state.groups.values()].some(group => layoutSectionOf(group) === section)) { event.preventDefault(); return; }
     sectionDrag = {state, section, before: capturePropertyLayout(state)};
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", heading.textContent || "");
