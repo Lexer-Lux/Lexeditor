@@ -29,11 +29,14 @@ def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
         with pytest.raises(FormatError, match='not a reviewed'):
             doc.edit('NpcParam', excluded, 'def_phys', 10)
     others = [f['spec'].key for f in doc.schemas['NpcParam']['fields']
-              if f['spec'].key not in NPC_FIELDS]
-    assert others and 'npcType' in others and 'behaviorVariationId' in others
+              if f['spec'].key not in NPC_FIELDS and f['spec'].key != 'behaviorVariationId']
+    assert others and 'npcType' in others
     for key in others:
         with pytest.raises(FormatError, match='protected'):
             doc.edit('NpcParam', 120000, key, 1)
+    # The behavior set writes through its own validated path, not the field gate.
+    doc.edit('NpcParam', 120000, 'behaviorVariationId', 12010)
+    assert doc.value('NpcParam', 120000, 'behaviorVariationId') == 12010
 
 
 def test_all_stats_roundtrip_only_their_cells_and_revert_exactly():
@@ -46,7 +49,7 @@ def test_all_stats_roundtrip_only_their_cells_and_revert_exactly():
         spec = item['spec']
         start = doc._row('NpcParam', 120000)[1] + spec.offset
         allowed.update(range(start, start + SIZES[spec.dtype]))
-        value = 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
+        value = 101 if key == 'aiThinkId' else 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
         doc.edit('NpcParam', 120000, key, value)
         written[key] = value
     reopened = ItemDocument(doc.export())

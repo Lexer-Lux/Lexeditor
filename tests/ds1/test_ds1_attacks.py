@@ -23,7 +23,8 @@ def test_direct_projectile_child_and_shared_npc_references():
     assert refs.list(120100)['unresolved'] == ['Behavior 102 → Bullet 102 → Bullet 999999 (missing)']
     assert refs.list(120000,True)['rows'][-1]['route'] == 'Not linked'
     assert doc.read_row('AtkParam_Npc',102)['impact']['variants'] == []
-    with pytest.raises(ValueError): refs.list(251000)
+    assert [(r['id'],r['route']) for r in refs.list(251000)['rows']] == [(100,'Direct + projectile'),(101,'Projectile')]
+    with pytest.raises(ValueError): refs.list(223000)
 
 
 def replace(doc, table, row_id, key, value):

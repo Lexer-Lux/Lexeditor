@@ -69,9 +69,9 @@ TEXT_SUBTABS = (
 ) + FMG_SUBTABS
 FMG_TABLES = frozenset(filename for _tab, _label, filename in FMG_SUBTABS)
 FMG_LABELS = {filename: label for _tab, label, filename in FMG_SUBTABS}
-ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),
-                 ('behaviors', 'Behaviors', 'BehaviorParam'),
-                 ('ai', 'AI', 'NpcThinkParam'))
+ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
+AI_SUBTABS = (('ai', 'AI tables', 'NpcThinkParam'),
+              ('behaviors', 'Behaviors', 'BehaviorParam'))
 
 # Armor defense, said the way the game uses it (0x2DC350): physical, magic,
 # fire and lightning are unsigned whole numbers the game reads as 0 or more;
@@ -563,7 +563,7 @@ def _shown(value, field):
     return value
 
 
-LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack'}
+LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'ai': 'AI table'}
 
 
 def field_link(document, table, row_id, spec):
@@ -575,9 +575,10 @@ def field_link(document, table, row_id, spec):
     from this row, so the same field links differently per record.
     The first linkable table wins: a projectile's attack falls
     through its PC entry to the NPC one the Attacks tab shows.
-    Kinds: effect, goods, catalog (equipment and spells), attack.
-    Anything else (projectiles, PC attacks and behaviors) has no
-    picker or tab to open, so it stays a number.
+    Kinds: effect, goods, catalog (equipment and spells), attack,
+    ai (think records). Anything else (projectiles, PC attacks and
+    behavior variations) has no picker or tab to open, so it stays a
+    number.
     """
     for expression in (spec.reference or '').split(','):
         match = re.fullmatch(r'(\w+)(?:\((\w+)=(-?\d+)\))?', expression.strip())
@@ -594,6 +595,8 @@ def field_link(document, table, row_id, spec):
             return ('catalog', name)
         if name == 'AtkParam_Npc':
             return ('attack', name)
+        if name == 'NpcThinkParam':
+            return ('ai', name)
     return None
 
 
@@ -893,6 +896,8 @@ class ItemDocument:
             return self.catalog_references(target).choices
         if kind == 'attack':
             return self.attack_references().choices
+        if kind == 'ai':
+            return self.catalog_references(target).choices
         raise FormatError('Unknown reference kind')
 
     def link_noun(self, kind, target):
@@ -912,7 +917,7 @@ class ItemDocument:
         fmg = next((entry for entry in FMG_SUBTABS if entry[0] == tab), None)
         if fmg is not None:
             return self._fmg_rows(fmg[2])
-        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS + SHOPS_SUBTABS if entry[0] == tab), None)
+        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + AI_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS + SHOPS_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
         result = []
@@ -1357,12 +1362,41 @@ class ItemDocument:
             return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
         if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
+        if table == 'NpcParam' and key == 'behaviorVariationId':
+            return self._write_variation(row_id, value, only=only)
         self._write(table, row_id, key, value)
         if table == 'ReinforceParamProtector' and key in UPGRADE_MULTIPLIERS.values():
             self._rescale_absorption(row_id, key)
         if table == CHARA_TABLE and row_id in TWINS and key not in UNMIRRORED:
             self._write(CHARA_TABLE, TWINS[row_id], key, value)
         return self.read_row(table, row_id, only=only)
+
+    def _write_variation(self, row_id, value, only=None):
+        """Point one enemy at another behavior set. The set must exist:
+        a number with no behavior rows would silently disarm the enemy,
+        so it is refused like a dangling record link."""
+        if type(value) is bool or not isinstance(value, (int, float)) or int(value) != value:
+            raise FormatError('Enter a whole number')
+        variation = int(value)
+        if not any(self.value('BehaviorParam', row.row_id, 'variationId') == variation
+                   for row in self.params['BehaviorParam'].rows):
+            raise FormatError(f'No behavior set {variation} exists')
+        _row, start, data = self._row('NpcParam', row_id)
+        field = next(f['spec'] for f in self.schemas['NpcParam']['fields']
+                     if f['spec'].key == 'behaviorVariationId')
+        replacement = write_field(data, field, variation, '<')
+        self.plain[start:start + len(data)] = replacement
+        dirty_key = ('NpcParam', row_id, 'behaviorVariationId')
+        added = ('NpcParam', row_id) in self._added_rows
+        original = None if added else self.original_plain[start:start + len(data)]
+        if not added and read_field(replacement, field, '<') == read_field(original, field, '<'):
+            self.dirty.discard(dirty_key)
+        else:
+            self.dirty.add(dirty_key)
+            self._edited_at[dirty_key] = len(self._edited_at) + 1
+        self.__dict__.pop('_attack_references', None)
+        self.__dict__.get('_spans_cache', {}).pop('NpcParam', None)
+        return self.read_row('NpcParam', row_id, only=only)
 
     def _rescale_absorption(self, reinforce_id, column):
         """Rebuild the Armor Rework levels that scale by this upgrade row's column.

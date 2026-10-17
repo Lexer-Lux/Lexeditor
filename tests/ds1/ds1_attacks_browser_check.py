@@ -100,7 +100,8 @@ def main():
                     reopened=ItemDocument((mod/RELATIVE).read_bytes())
                     for key,value in changes.items(): assert reopened.value('AtkParam_Npc',first_attack,key)==value
                     open_monster(ranged['id'])
-                    follow(links.filter(has_text='Projectile').first)
+                    ranged_attack = next(r['id'] for r in refs.list(ranged['id'])['rows'] if 'projectile' in r['route'].lower())
+                    follow(page.locator(f'.lex-hoverable[data-hover-target-type="ds1-attack"][data-hover-target-id="{ranged_attack}"]').first)
                     assert any('Bullet' in p for p in page.evaluate('state.row.impact.paths'))
                     if output: page.screenshot(path=str(output/'attacks-projectile.png'))
                     open_monster(shared['id'])

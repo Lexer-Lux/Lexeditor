@@ -2,7 +2,7 @@
 from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
 from . import assets, texts
 
-TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'attacks':'Attacks', 'effects':'Effects',
+TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'ai':'AI', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.', 'encumbrance':'Encumbrance',
               'maps':'Maps', 'animations':'Animations', 'text':'Text',
               'npcs':'NPCs', 'shops':'Shops',
@@ -45,7 +45,7 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit reviewed monster stats and follow their attack references. Friendly characters live under NPCs. Other properties stay read-only.')
         elif table == 'BehaviorParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='enemies',sub='behaviors',controls='Enemies: behavior costs and call targets',
+                target='ai',sub='behaviors',controls='AI: behavior costs and call targets',
                 notes='Edit what behaviors cost and which attack, projectile or effect they call.')
         elif table == 'Bullet':
             row.update(coverage='structured',status='partial',openable=True,
@@ -53,7 +53,7 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit how projectiles fly, what they hit with, and which attack they deal.')
         elif table == 'NpcThinkParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='enemies',sub='ai',controls='Enemies: AI senses, distances and goals',
+                target='ai',sub='ai',controls='AI: senses, distances and goals',
                 notes='Edit how enemies sense, approach and answer the player.')
         elif table == 'AtkParam_Npc':
             row.update(coverage='structured',status='partial',openable=True,

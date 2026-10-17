@@ -51,8 +51,8 @@ def main():
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(tabs, key=lambda entry: entry[1].lower())]
                     # Every section is a tab; Attacks joins them.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [
-                        'attacks', 'basics', 'blocking', 'defense', 'effects-references', 'status-buildup-resistance',
-                        'value-rewards', 'weaknesses']
+                        'ai', 'attacks', 'basics', 'behaviors', 'blocking', 'defense', 'effects-references',
+                        'value-rewards']
                     assert page.evaluate('state.monsterTab') == 'basics'
                     page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
                     page.wait_for_function('state.monsterTab==="defense"')
@@ -188,8 +188,13 @@ def main():
                     page.wait_for_selector('.lex-column-list-head-cell[data-column-key^="pin:"]', state="detached")
                     assert page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe') == "1"
                     brains = []
+                    page.locator('[data-tab="ai"]').click()
+                    page.wait_for_function('state.tab==="ai" && state.sub==="ai" && state.row?.table==="NpcThinkParam" && !state.error')
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['ai', 'behaviors']
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar .lex-tab-label-text').evaluate_all(
+                        'n=>n.map(x=>x.textContent)') == ['AI tables', 'Behaviors']
                     for sub, table, allowed in [('behaviors', 'BehaviorParam', BEHAVIOR_EDITABLE), ('ai', 'NpcThinkParam', THINK_EDITABLE)]:
-                        page.locator(f'[data-subtab="{sub}"]').click()
+                        page.locator(f'#main > .lex-stack > .lex-subtab-bar [data-subtab="{sub}"]').click()
                         page.wait_for_function('(want)=>state.sub===want.sub && state.rows.length>0 && state.row && state.row.table===want.table && !state.error', arg={'sub': sub, 'table': table})
                         assert {field['key'] for field in page.evaluate('state.row.fields')} == set(allowed)
                         control = page.locator('input[data-field-key][type="number"][min]:visible').first
@@ -212,9 +217,101 @@ def main():
                     reopened = ItemDocument((mod / RELATIVE).read_bytes())
                     for key, value in changes.items(): assert reopened.value('NpcParam', 120000, key) == value
                     for table, identity, key, value in brains: assert reopened.value(table, identity, key) == value
+                    # Think, behavior and attack panels on the enemy.
+                    if not real:
+                        page.evaluate('navigate("enemies","monsters","NpcParam:120000")')
+                        page.wait_for_function('state.row?.table==="NpcParam" && state.row?.id===120000 && state.monsterBehaviors')
+                    mid = page.evaluate('state.row.id')
+                    panel = lambda tab: (page.locator(f'.lex-tabbed-panel [data-subtab="{tab}"]').click(),
+                                         page.wait_for_function(f'state.monsterTab==="{tab}"'))
+                    panel('attacks')
+                    attack_rows = page.evaluate('state.monsterAttacks.rows.length')
+                    if attack_rows:
+                        heads = page.locator('.lex-tabbed-panel .lex-column-list-head-cell').evaluate_all(
+                            'cells=>cells.map(c=>c.innerText.trim())')
+                        assert heads == ['Attack', 'Route'], heads
+                        first = page.locator('.lex-tabbed-panel .lex-column-list-row button.lex-hoverable').first
+                        assert first.get_attribute('data-hover-target-type') == 'ds1-attack'
+                        first.click()
+                        page.wait_for_function('state.tab==="attacks" && state.row?.table==="AtkParam_Npc"')
+                        page.evaluate(f'navigate("enemies","monsters","NpcParam:{mid}")')
+                        page.wait_for_function('state.row?.table==="NpcParam" && state.monsterBehaviors')
+                    else:
+                        assert 'lists every attack record' in page.locator('.lex-tabbed-panel').inner_text()
+                    panel('behaviors')
+                    variation = page.evaluate('state.monsterBehaviors.variation')
+                    assert f'Behavior set {variation}' in page.locator('.lex-tabbed-panel').inner_text()
+                    moves = page.locator('.lex-tabbed-panel button.lex-hoverable[data-hover-target-type="ds1-behavior"]')
+                    assert moves.count() == page.evaluate('state.monsterBehaviors.rows.length')
+                    if moves.count():
+                        moves.first.click()
+                        page.wait_for_function('state.tab==="ai" && state.sub==="behaviors" && state.row?.table==="BehaviorParam"')
+                        page.evaluate(f'navigate("enemies","monsters","NpcParam:{mid}")')
+                        page.wait_for_function('state.row?.table==="NpcParam" && state.monsterBehaviors')
+                        panel('behaviors')
+                    table = request_json(session.url + 'api/table?tab=monsters')['rows']
+                    other_variation = None
+                    for r in table:
+                        if r['id'] == mid:
+                            continue
+                        candidate = request_json(session.url + f'api/behaviors?monster={r["id"]}')['variation']
+                        if candidate != variation:
+                            other_variation = candidate
+                            break
+                    assert other_variation is not None
+                    field = page.locator('.lex-tabbed-panel input[aria-label="Behaviors ID"]')
+                    assert field.input_value() == str(variation)
+                    field.fill(str(other_variation)); field.press('Tab')
+                    page.wait_for_function('(want)=>state.pending===0 && state.monsterBehaviors.variation===want',
+                                           arg=other_variation)
+                    assert page.evaluate('state.monsterAttacks.variation') == other_variation
+                    assert page.evaluate('state.dirty') == 1
+                    page.evaluate('fieldHistory.undo()')
+                    page.wait_for_function('(want)=>state.pending===0 && state.monsterBehaviors.variation===want && state.dirty===0',
+                                           arg=variation)
+                    field = page.locator('.lex-tabbed-panel input[aria-label="Behaviors ID"]')
+                    field.fill('99999'); field.press('Tab')
+                    page.wait_for_function('state.pending===0')
+                    page.wait_for_selector('.lex-important-dialog')
+                    assert page.locator('.lex-important-message').inner_text() == 'No behavior set 99999 exists'
+                    page.locator('.lex-important-dialog .lex-dialog-action').click()
+                    page.wait_for_selector('.lex-important-dialog', state='detached')
+                    page.wait_for_function('(want)=>document.querySelector(\'.lex-tabbed-panel input[aria-label="Behaviors ID"]\').value===String(want)',
+                                           arg=variation)
+                    assert page.evaluate('state.monsterBehaviors.variation') == variation
+                    assert page.evaluate('state.dirty') == 0
+                    panel('ai')
+                    think_id = page.evaluate('state.row.fields.find(f=>f.key==="aiThinkId").value')
+                    if think_id and think_id > 0:
+                        title = page.locator('.lex-tabbed-panel .lex-detail-panel-title button.lex-hoverable')
+                        assert title.get_attribute('data-hover-target-type') == 'ds1-ai'
+                        title.click()
+                        page.wait_for_function('(want)=>state.tab==="ai" && state.sub==="ai" && state.row?.table==="NpcThinkParam" && state.row?.id===want',
+                                               arg=think_id)
+                        page.evaluate(f'navigate("enemies","monsters","NpcParam:{mid}")')
+                        page.wait_for_function('state.row?.table==="NpcParam" && state.monsterBehaviors')
+                        panel('ai')
+                    thinks = request_json(session.url + 'api/table?tab=ai')['rows']
+                    target = next(r for r in thinks if r['id'] != think_id)
+                    page.locator('.lex-tabbed-panel button.ds1-find-reference:visible').click()
+                    search = page.locator('.lex-choice-popover-search'); search.wait_for()
+                    search.fill(target['name'])
+                    page.locator('.lex-choice-popover > button:not([hidden])').first.click()
+                    page.wait_for_function('(want)=>state.pending===0 && state.row.fields.find(f=>f.key==="aiThinkId").value===want && state.thinkRow?.id===want',
+                                           arg=target['id'])
+                    assert page.evaluate('state.dirty') == 1
+                    page.evaluate('fieldHistory.undo()')
+                    page.wait_for_function('(want)=>state.pending===0 && state.row.fields.find(f=>f.key==="aiThinkId").value===want',
+                                           arg=think_id)
+                    page.evaluate('fieldHistory.redo()')
+                    page.wait_for_function('(want)=>state.pending===0 && state.row.fields.find(f=>f.key==="aiThinkId").value===want && state.thinkRow?.id===want',
+                                           arg=target['id'])
+                    page.evaluate('fieldHistory.undo()')
+                    page.wait_for_function('(want)=>state.pending===0 && state.dirty===0 && state.row.fields.find(f=>f.key==="aiThinkId").value===want',
+                                           arg=think_id)
                     page.locator('[data-tab="items"]').click()
                     page.wait_for_function('state.tab==="items" && state.row?.table==="EquipParamGoods"')
-                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 9
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 8
                     monsters()
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     search = page.get_by_role('searchbox', name='Search monsters')

@@ -1,4 +1,4 @@
-"""Enemies tab behaviors/AI and Attacks tab projectiles: curated brains."""
+"""AI tab think records/behaviors and Attacks tab projectiles: curated brains."""
 from pathlib import Path
 import sys
 
@@ -8,8 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
 from plugins.ds1 import data_map, mod_loader
 from plugins.ds1.formats import (
-    ATTACK_SUBTABS, BEHAVIOR_EDITABLE, BULLET_EDITABLE, ENEMY_SUBTABS,
-    TABLES, THINK_EDITABLE, FormatError, ItemDocument, schema,
+    AI_SUBTABS, ATTACK_SUBTABS, BEHAVIOR_EDITABLE, BULLET_EDITABLE, ENEMY_SUBTABS,
+    TABLES, THINK_EDITABLE, FormatError, ItemDocument, field_link, schema,
 )
 from plugins.ds1.store import MARKER, RELATIVE, ItemStore
 
@@ -48,7 +48,9 @@ def test_brains_metadata_matches_vanilla_shape():
 
 
 def test_brains_subtabs_list_their_rows():
-    assert [entry[0] for entry in ENEMY_SUBTABS] == ['monsters', 'behaviors', 'ai']
+    assert [entry[0] for entry in ENEMY_SUBTABS] == ['monsters']
+    assert [(entry[0], entry[1], entry[2]) for entry in AI_SUBTABS] == [
+        ('ai', 'AI tables', 'NpcThinkParam'), ('behaviors', 'Behaviors', 'BehaviorParam')]
     assert [entry[0] for entry in ATTACK_SUBTABS] == ['attacks', 'player-attacks', 'projectiles']
     document = ItemDocument(make_archive())
     behaviors = document.list_rows('behaviors')
@@ -86,7 +88,7 @@ def test_brains_edits_roundtrip_and_validate():
              ('BehaviorParam', 100, 'refType', 2),
              ('BehaviorParam', 100, 'refId', 105),
              ('Bullet', 100, 'life', 5.0),
-             ('Bullet', 100, 'atkId_Bullet', 107),
+             ('Bullet', 100, 'atkId_Bullet', 101),
              ('Bullet', 100, 'launchConditionType', 1),
              ('NpcThinkParam', 100, 'backhomeDist', 30.0),
              ('NpcThinkParam', 100, 'goalAction_ToCaution', 3),
@@ -134,12 +136,12 @@ def test_brains_rows_merge_by_field_and_conflict_by_name():
     label = next(item['spec'].label for item in schema('BehaviorParam')['fields']
                  if item['spec'].key == 'stamina')
     a = mod('A', edited(('BehaviorParam', 100, 'stamina', 12)))
-    b = mod('B', edited(('BehaviorParam', 100, 'refId', 105)))
+    b = mod('B', edited(('BehaviorParam', 100, 'refId', 101)))
     result = mod_loader.compose(game, [a, b])
     assert result.conflicts == []
     merged = ItemDocument(result.files[RELATIVE])
     assert merged.value('BehaviorParam', 100, 'stamina') == 12
-    assert merged.value('BehaviorParam', 100, 'refId') == 105
+    assert merged.value('BehaviorParam', 100, 'refId') == 101
     c = mod('C', edited(('BehaviorParam', 100, 'stamina', 14)))
     result = mod_loader.compose(game, [a, c])
     assert [(c.part, c.mods) for c in result.conflicts] == [(f'Behaviors 100, {label}', ['A', 'C'])]
@@ -149,19 +151,60 @@ def test_brains_rows_merge_by_field_and_conflict_by_name():
 def test_state_reports_brains_tabs(tmp_path):
     game, mod = project(tmp_path)
     state = ItemStore(game, mod, False).state()
-    enemies = {tab['id']: tab for tab in state['enemyTabs']}
-    assert [(enemies[key]['table'], enemies[key]['count']) for key in ('behaviors', 'ai')] == [
-        ('BehaviorParam', 3), ('NpcThinkParam', 3)]
+    assert [tab['id'] for tab in state['enemyTabs']] == ['monsters']
+    ai = {tab['id']: tab for tab in state['aiTabs']}
+    assert [(ai[key]['table'], ai[key]['count']) for key in ('ai', 'behaviors')] == [
+        ('NpcThinkParam', 3), ('BehaviorParam', 3)]
     attacks = {tab['id']: tab for tab in state['attackTabs']}
     assert (attacks['projectiles']['table'], attacks['projectiles']['count']) == ('Bullet', 3)
 
 
-def test_data_map_points_brains_at_enemies_and_attacks(tmp_path):
+def test_data_map_points_brains_at_ai_and_attacks(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
-    for filename, target, sub in (('BehaviorParam.param', 'enemies', 'behaviors'),
-                                  ('NpcThinkParam.param', 'enemies', 'ai'),
+    for filename, target, sub in (('BehaviorParam.param', 'ai', 'behaviors'),
+                                  ('NpcThinkParam.param', 'ai', 'ai'),
                                   ('Bullet.param', 'attacks', 'projectiles')):
         row = next(entry for entry in rows if entry['filename'] == filename)
         assert row['coverage'] == 'structured' and row['status'] == 'partial'
         assert row['openable'] and row['target'] == target and row['sub'] == sub
+
+
+def test_ai_think_id_links_to_its_think_record():
+    document = ItemDocument(make_archive())
+    schemas = {item['spec'].key: item['spec'] for item in schema('NpcParam')['fields']}
+    assert field_link(document, 'NpcParam', 120000, schemas['aiThinkId']) == ('ai', 'NpcThinkParam')
+    field = next(item for item in document.read_row('NpcParam', 120000)['fields']
+                 if item['key'] == 'aiThinkId')
+    assert field['type'] == 'enum' and field['enum']['101'] == document.display_name('NpcThinkParam', 101)
+    document.edit('NpcParam', 120000, 'aiThinkId', 101)
+    assert document.value('NpcParam', 120000, 'aiThinkId') == 101
+    with pytest.raises(FormatError, match='existing AI table'):
+        document.edit('NpcParam', 120000, 'aiThinkId', 999)
+
+
+def test_moves_resolve_each_behavior_call_target():
+    document = ItemDocument(make_archive())
+    moves = document.attack_references().moves(12000)
+    assert [move['id'] for move in moves] == [100, 101]
+    direct, projectile = (move['target'] for move in moves)
+    assert (direct['kind'], direct['table'], direct['id'], direct['projectile']) == (
+        'attack', 'AtkParam_Npc', 100, False)
+    assert (projectile['kind'], projectile['table'], projectile['projectile']) == (
+        'attack', 'AtkParam_Npc', True)
+    assert document.attack_references().moves(99999) == []
+
+
+def test_variation_write_validates_and_refreshes():
+    document = ItemDocument(make_archive())
+    assert document.value('NpcParam', 120000, 'behaviorVariationId') == 12000
+    document.edit('NpcParam', 120000, 'behaviorVariationId', 12010)
+    assert document.value('NpcParam', 120000, 'behaviorVariationId') == 12010
+    assert sorted(document.attack_references().variants[12010]) == [120000, 120100]
+    assert document.dirty_count == 1
+    with pytest.raises(FormatError, match='No behavior set 99999 exists'):
+        document.edit('NpcParam', 120000, 'behaviorVariationId', 99999)
+    with pytest.raises(FormatError, match='whole number'):
+        document.edit('NpcParam', 120000, 'behaviorVariationId', 12010.5)
+    document.edit('NpcParam', 120000, 'behaviorVariationId', 12000)
+    assert document.dirty_count == 0

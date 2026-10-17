@@ -63,7 +63,7 @@ def main():
                     # Scoped to the Enemies strip: the monster detail pane
                     # carries its own subtabs further down the page.
                     strip = page.locator('[aria-label="Enemies"] [data-subtab]')
-                    assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['ai', 'behaviors', 'model', 'monsters']
+                    assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['model', 'monsters']
                     page.locator('[data-subtab="model"]').click()
                     page.wait_for_function('state.tab==="enemies" && state.sub==="model" && state.chrView && !state.error')
                     page.wait_for_selector('[data-chr-host][data-ready="true"]', timeout=30000)

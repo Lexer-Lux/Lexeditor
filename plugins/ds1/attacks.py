@@ -117,8 +117,9 @@ class AttackReferences:
                                        'path': path, 'projectile': projectile})
 
     def list(self, monster_id, all_records=False):
-        if not self.doc.is_monster(monster_id):
-            raise ValueError('Select a reviewed monster')
+        if not (self.doc.is_monster(monster_id) or self.doc.is_friend(monster_id)
+                or self.doc.is_merchant(monster_id)):
+            raise ValueError('Select a reviewed monster or NPC')
         variation = self.doc.value('NpcParam', monster_id, 'behaviorVariationId')
         rows = []
         for attack in sorted(self.attack_ids):
@@ -131,6 +132,52 @@ class AttackReferences:
                          or f'Attack {attack}', 'route': route})
         return {'rows': rows, 'variation': variation, 'behaviorCount': len(self.by_variation[variation]),
                 'unresolved': self.issues[variation]}
+
+    def moves(self, variation):
+        """One behavior set's moves: each row with the attack, projectile
+        or effect it calls."""
+        rows = []
+        for behavior in sorted(self.by_variation[variation]):
+            kind = self.doc.value('BehaviorParam', behavior, 'refType')
+            target = self.doc.value('BehaviorParam', behavior, 'refId')
+            rows.append({'id': behavior, 'table': 'BehaviorParam',
+                         'name': self.doc.display_name('BehaviorParam', behavior),
+                         'target': self._move_target(kind, target)})
+        return rows
+
+    def _move_target(self, kind, target):
+        if kind == 0:
+            if target in self.attack_ids:
+                return {'kind': 'attack', 'table': 'AtkParam_Npc', 'id': target,
+                        'name': self.doc.display_name('AtkParam_Npc', target),
+                        'projectile': False}
+            return {'kind': 'missing', 'detail': f'Attack {target} is not in the parameters'}
+        if kind == 1:
+            path, visited = f'Bullet {target}', set()
+            while target >= 0:
+                if target in visited:
+                    return {'kind': 'missing', 'detail': path + ' (cycle)'}
+                if target not in self.bullets:
+                    return {'kind': 'missing', 'detail': path + ' (missing)'}
+                visited.add(target)
+                attack, target = self.bullets[target]
+                if attack >= 0:
+                    if attack in self.attack_ids:
+                        return {'kind': 'attack', 'table': 'AtkParam_Npc', 'id': attack,
+                                'name': self.doc.display_name('AtkParam_Npc', attack),
+                                'projectile': True, 'path': path}
+                    return {'kind': 'missing', 'detail': path + f' -> Attack {attack} (missing)'}
+                path += f' -> Bullet {target}'
+            return {'kind': 'missing', 'detail': path + ' (no attack)'}
+        if kind == 2:
+            params = self.doc.params.get('SpEffectParam')
+            effect_ids = {row.row_id for row in params.rows} if params is not None else set()
+            if target in effect_ids:
+                return {'kind': 'effect', 'table': 'SpEffectParam', 'id': target,
+                        'name': self.doc.display_name('SpEffectParam', target),
+                        'projectile': False}
+            return {'kind': 'missing', 'detail': f'Effect {target} is not in the parameters'}
+        return {'kind': 'unsupported', 'detail': f'Unsupported reference type {kind}'}
 
     def impact(self, attack):
         paths = self.paths[attack]

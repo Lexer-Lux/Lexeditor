@@ -74,7 +74,7 @@ for key, kind in [('def_slash', 'Slash'), ('def_blow', 'Strike'), ('def_thrust',
         '25 makes it 25% higher. It does not reduce damage by 25%.')
 for key, kind in [('resist_poison', 'Poison'), ('resist_desease', 'Toxic'),
                   ('resist_blood', 'Bleed'), ('resist_curse', 'Curse')]:
-    RESISTANCES[key] = (f'{kind} resistance', 'Status buildup resistance',
+    RESISTANCES[key] = (f'{kind} resistance', 'Defense',
         f'How much {kind.lower()} buildup this enemy takes before it is afflicted: each hit adds its '
         f'weapon\'s {kind.lower()} value, and the enemy is afflicted at this total. Not a percentage. '
         + ('Every vanilla enemy has 0, because nothing the player has inflicts curse.'
@@ -85,7 +85,7 @@ WEAKNESSES = {'isWeakSaint': ('Weak to Divine', 'Divine weapons deal extra damag
               'isWeakA': ('Weak to Occult', 'Occult weapons deal extra damage to this enemy.'),
               'isWeakB': ('Abyssal', 'Marks the enemy as of the Abyss.')}
 for key, (label, description) in WEAKNESSES.items():
-    RESISTANCES[key] = (label, 'Weaknesses', description)
+    RESISTANCES[key] = (label, 'Defense', description)
 for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic'),
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),

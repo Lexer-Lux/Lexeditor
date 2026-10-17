@@ -121,7 +121,7 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/shop', '/api/data-map', '/api/assets',
+        if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
@@ -270,6 +270,17 @@ class Handler(PluginRequestHandler):
                                                   query.get('anim', [''])[0], TAESTORE)
                     elif path == '/api/attacks':
                         result = STORE.get().attack_references().list(int(query.get('monster', [''])[0]), query.get('all', ['0'])[0] == '1')
+                        result['dirtyCount'] = STORE.get().dirty_count
+                    elif path == '/api/behaviors':
+                        npc = int(query.get('monster', [''])[0])
+                        document = STORE.get()
+                        if not (document.is_monster(npc) or document.is_friend(npc)
+                                or document.is_merchant(npc)):
+                            raise ValueError('Select a reviewed monster or NPC')
+                        variation = document.value('NpcParam', npc, 'behaviorVariationId')
+                        references = document.attack_references()
+                        result = {'rows': references.moves(variation), 'variation': variation,
+                                  'behaviorCount': len(references.by_variation[variation])}
                         result['dirtyCount'] = STORE.get().dirty_count
                     elif path == '/api/shop':
                         result = {'rows': shops.stock(STORE.get(), query.get('npc', [''])[0])}
