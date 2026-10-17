@@ -1,9 +1,9 @@
 """DS1 maps directory mounts the compact pagination bar, never game files.
 
-The 360px Directory panel shows search on its own row up top, no X-Y/Z
-position count, the Local toggle label reading bottom-to-top, and pager
-controls plus filters on one shared bottom row. Paging and search keep
-working through the new bar.
+The 360px Directory panel shows a separate search row up top, the list,
+then pager controls plus filters centered on one shared bottom row, with
+no X-Y/Z position count and the Local toggle label reading bottom-to-top.
+Paging and search keep working through the new bar.
 """
 import sys
 import tempfile
@@ -54,23 +54,16 @@ def main():
                     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error',
                                            timeout=60000)
                     page.wait_for_selector("[data-maps-dir] .lex-compact-pager", timeout=30000)
-                    try:
-                        page.wait_for_selector("[data-maps-dir] .lex-compact-pager-search",
-                                               timeout=30000)
-                    except Exception:
-                        print("BAR:", page.evaluate(
-                            "document.querySelector('[data-maps-dir] .lex-compact-pager')?.outerHTML?.slice(0, 2000)"))
-                        print("DIRCHILDREN:", page.evaluate(
-                            "document.querySelector('[data-maps-dir]')?.children.length"))
-                        print("ERRORS:", errors)
-                        raise
+                    searchbox = page.get_by_role("searchbox", name="Search the world")
+                    searchbox.wait_for(timeout=30000)
+                    assert page.locator("[data-maps-dir] .lex-compact-pager-search").count() == 0
                     bar = page.locator("[data-maps-dir] .lex-compact-pager")
                     assert bar.count() == 1
                     assert page.locator("[data-maps-dir] .lex-page-summary").count() == 0
                     assert page.locator("[data-maps-dir] .lex-pager-stacked").count() == 0
-                    search = page.locator("[data-maps-dir] .lex-compact-pager-search").bounding_box()
-                    bottom = page.locator("[data-maps-dir] .lex-compact-pager-bottom").bounding_box()
-                    assert search["y"] + search["height"] <= bottom["y"] + 1, (search, bottom)
+                    search = searchbox.bounding_box()
+                    rows = page.locator("[data-maps-dir] .lex-column-list").bounding_box()
+                    assert search["y"] + search["height"] <= rows["y"] + 1, (search, rows)
                     label = page.locator("[data-maps-dir] .lex-compact-pager .lex-pager-toggle > span")
                     assert label.count() == 1
                     assert label.evaluate("node => getComputedStyle(node).writingMode") == "vertical-rl"
@@ -93,6 +86,10 @@ def main():
                         assert child["y"] <= midline <= child["y"] + child["height"], (child, midline)
                     for left, right in zip(boxes, boxes[1:]):
                         assert right["x"] >= left["x"] + left["width"] - 2, (left, right)
+                    left_gap = boxes[0]["x"] - bottom["x"]
+                    last = boxes[-1]
+                    right_gap = (bottom["x"] + bottom["width"]) - (last["x"] + last["width"])
+                    assert abs(left_gap - right_gap) <= 4, (left_gap, right_gap, bottom, boxes)
                     over = page.evaluate(
                         "document.querySelector('[data-maps-dir]').scrollWidth"
                         " - document.querySelector('[data-maps-dir]').clientWidth")

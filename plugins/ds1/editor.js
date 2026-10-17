@@ -2052,13 +2052,13 @@ function directoryMatches(){
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||(a.id>b.id?1:a.id<b.id?-1:0));
 }
 function directoryPane(){
-  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),directoryList());
+  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),...directoryList());
 }
 function refreshDirectory(){
   if(state.tab!=="maps")return;
   const pane=document.querySelector("[data-maps-dir]");
   if(!pane){render();return;}
-  pane.replaceChildren(directoryStrip(),directoryList());
+  pane.replaceChildren(directoryStrip(),...directoryList());
 }
 function directoryStrip(){
   return subtabBar({tabs:directoryTabs(),active:state.dirTab,label:"World directory",shortcuts:false,className:"lex-dir-tabs",change:id=>{
@@ -2091,13 +2091,15 @@ function directoryList(){
   const columns=[{key:"name",label:"Name",grow:1}];
   if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
-  return LexeditorUI.stack(
-    columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
-    LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
-      search:{key:"maps-directory",value:state.dirQuery,label:"Search the world",
-        change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}},
-      filters:[directoryLocalRow()],
-      change:value=>{state.dirPage=value;refreshDirectory();}}));
+  // Search on its own row up top, like the animations panes; the pager
+  // below the list only pages and filters.
+  return [LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
+      change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
+    LexeditorUI.stack(
+      columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
+      LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+        filters:[directoryLocalRow()],
+        change:value=>{state.dirPage=value;refreshDirectory();}}))];
 }
 async function selectDirectoryParam(row){
   if(key(row)===state.selected&&state.mapTab==="selection")return;

@@ -6669,11 +6669,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-pager-inline.lex-pager-stacked .lex-pager-left { grid-column:1; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-right { grid-column:2; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-controls { grid-column:1 / -1; grid-row:2; }
-/* The compact pagination bar for narrow panels: the search box on its own
-   row up top, then everything left on one bottom row - pager controls,
-   filters and the remaining counts. No position count, nothing stacked.
-   Toggle labels (the maps directory's Local?) read bottom-to-top, trading
-   height the panel has for width it does not. */
+/* The compact pagination bar for narrow panels: an optional search box on
+   its own row up top (panels with room put their search above the list
+   instead), then everything left centered on one bottom row - pager
+   controls, filters and the remaining counts. No position count, nothing
+   stacked. Toggle labels (the maps directory's Local?) read bottom-to-top,
+   trading height the panel has for width it does not. */
 .lex-pager.lex-compact-pager {
   position:static;
   z-index:auto;
@@ -6691,6 +6692,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-compact-pager-bottom {
   display:flex;
   align-items:center;
+  justify-content:center;
   gap:6px;
   flex-wrap:nowrap;
   width:100%;
