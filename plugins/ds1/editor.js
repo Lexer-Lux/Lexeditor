@@ -911,7 +911,7 @@ function monsterDetail(groups){
     :active==="ai"?monsterThinkSection()
     :active==="behaviors"?monsterBehaviorsSection()
     :groups.get(section.label);
-  return tabbedPanel({label:"Monster details",active,tabs,paginate:false,
+  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.monsterTab=id;render();},content});
 }
 function itemDetail(groups){
@@ -922,7 +922,7 @@ function itemDetail(groups){
     help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
   const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
-  return tabbedPanel({label:"Item details",active,tabs,paginate:false,
+  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.itemTab=id;render();},content:groups.get(section.label)});
 }
 function formatAssetSize(size){

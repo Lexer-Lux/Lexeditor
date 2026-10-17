@@ -1774,11 +1774,16 @@
     const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
     const sections = nodes.length > 0 && nodes.every(node =>
       node instanceof Element && node.classList.contains("lex-detail-section"));
+    // Unpaged flows lay out sections and bare fields alike; anything else
+    // passes through untouched, the way paginate:false left it.
+    const unpaged = paginate && typeof paginate === "object" && paginate.unpaged === true;
+    const flowable = sections || (unpaged && nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-field")));
     const flow = paginate === false ? null
       : paginate ? (typeof paginate === "object" ? paginate : {})
       : sections ? {inline: true} : null;
     // A tab's content that does not flow is left exactly as it was given.
-    if (!flow && onlyFlow) return null;
+    if (onlyFlow && (!flow || (unpaged && !flowable))) return null;
     const box = element("div", {class: bodyClass}, nodes);
     return flow ? paginateSettings(box, flow) : box;
   };
