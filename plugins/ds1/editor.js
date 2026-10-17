@@ -782,10 +782,12 @@ function shopNumberControl(line,shopKey,label){
   return input;
 }
 async function toggleShopLine(line,full){
-  // The item name opens the rest of the shop line in place: price and
-  // stock already edit on the line itself, so only the other fields
-  // render here, with the same controls a full record shows.
-  if(full.childNodes.length){full.replaceChildren();return;}
+  // The item name opens the rest of the shop line under the table:
+  // price and stock already edit on the line itself, so only the other
+  // fields render here, with the same controls a full record shows.
+  // Clicking the open line closes it; clicking another line swaps to it.
+  if(full.dataset.line===String(line.id)){full.replaceChildren();delete full.dataset.line;return;}
+  full.dataset.line=String(line.id);
   full.replaceChildren(LexeditorUI.loadingStatus("Reading shop line"));
   try{
     const result=await api(`/api/row?table=ShopLineupParam&id=${line.id}`);
@@ -796,18 +798,29 @@ async function toggleShopLine(line,full){
     full.replaceChildren(...[...fieldSections(row)].map(([title,body])=>detailSection({title,body})));
   }catch(error){full.replaceChildren(LexeditorUI.detailNote("Could not read the shop line."));notify(error);}
 }
+function shopIconCell(line){
+  // The sold item's menu picture; a line that names no known item table
+  // leaves its cell empty rather than guessing.
+  if(!line.item||!ds1IconTables.has(line.item.table))return "";
+  const picture=el("img",{class:"lex-ds1-shop-icon",
+    src:`/api/icon?table=${encodeURIComponent(line.item.table)}&id=${encodeURIComponent(line.item.id)}`,
+    alt:"",draggable:"false","data-lex-no-image":"off"});
+  picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+  return picture;
+}
 function npcShopSection(){
-  const lines=state.npcShop.rows.flatMap(line=>{
-    const full=el("div",{class:"lex-shop-line-full"});
-    return [detailField({label:hoverable({content:line.name,
+  const full=el("div",{class:"lex-shop-line-full"});
+  const rows=state.npcShop.rows.map(line=>({key:String(line.id),
+    icon:shopIconCell(line),
+    name:hoverable({content:line.name,
       targetType:"ds1-shoprow",targetId:line.id,targetLabel:`${line.name} (shop line)`,
       preview:()=>el("div",{},"Price "+line.value+" - Stock "+line.sellQuantity),
       activate:()=>toggleShopLine(line,full)}),
-      control:LexeditorUI.multiNumberRow([
-        {label:"Price",control:shopNumberControl(line,"value","price")},
-        {label:"Stock",control:shopNumberControl(line,"sellQuantity","stock")}],{columns:2,nowrap:true})}),full];
-  });
-  return [detailSection({title:"Stock",body:lines})];
+    price:shopNumberControl(line,"value","price"),
+    stock:shopNumberControl(line,"sellQuantity","stock")}));
+  return [detailSection({title:"Stock",body:[columnList({rows,key:row=>row.key,
+    columns:[{key:"icon",label:"",width:"36px"},{key:"name",label:"Item",grow:1,align:"start"},
+      {key:"price",label:"Price",numeric:true},{key:"stock",label:"Stock",numeric:true}]}),full]})];
 }
 function monsterThinkSection(){
   const aiField=(state.row.fields||[]).find(item=>item.key==="aiThinkId");
