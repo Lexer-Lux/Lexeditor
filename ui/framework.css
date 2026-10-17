@@ -1060,6 +1060,8 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    staying a centred square with equal margins, so a roomy header gets
    a roomy switch. A fixed 18px box sat small in every header.
    Short headers cap it instead of clipping it.
+   The tick scales with the box (the 10:6:2 proportions of the 18px box
+   it was drawn for), so the mark fills a roomy switch too.
 */
 .lex-detail-panel-actions > input[type="checkbox"] {
   align-self:stretch;
@@ -1069,6 +1071,12 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   min-height:16px;
   aspect-ratio:1;
   margin:5px;
+  container-type:size;
+}
+.lex-detail-panel-actions > input[type="checkbox"]::before {
+  width:55%;
+  height:33%;
+  border-width:0 0 11cqw 11cqw;
 }
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */

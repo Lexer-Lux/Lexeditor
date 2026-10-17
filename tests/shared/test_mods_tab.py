@@ -527,6 +527,35 @@ def test_mods_detail_switch_fits_its_header(page):
         page.wait_for_timeout(150)
 
 
+def test_mods_detail_switch_tick_scales_with_its_box(page):
+    # The drawn tick keeps the 10:6:2 proportions of the 18px box it was
+    # drawn for, roomy or short, instead of sitting tiny in a big switch.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("checkbox", name="Mine enabled").wait_for()
+    for _ in range(2):
+        page.wait_for_function("""() => {
+          const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
+          return box && box.getBoundingClientRect().width > 0;
+        }""")
+        geometry = page.evaluate("""() => {
+          const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
+          const tick = getComputedStyle(box, '::before');
+          return {side: box.getBoundingClientRect().width, width: parseFloat(tick.width),
+                  height: parseFloat(tick.height), stroke: parseFloat(tick.borderBottomWidth)};
+        }""")
+        side = geometry["side"]
+        assert abs(geometry["width"] / side - 0.55) <= 0.06, geometry
+        assert abs(geometry["height"] / side - 0.33) <= 0.06, geometry
+        assert abs(geometry["stroke"] / side - 0.11) <= 0.04, geometry
+        page.evaluate("""() => {
+          const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
+          head.style.padding = "0";
+          head.querySelector(".lex-detail-panel-title").style.fontSize = "10px";
+        }""")
+        page.wait_for_timeout(150)
+
+
 def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):
     mount(page, projects=True)
     page.locator(".lex-project-select").click()
