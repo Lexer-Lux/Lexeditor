@@ -90,10 +90,11 @@ work, even if your tool does not load skills on its own.
 ## Git and publishing
 
 - Branches are fine; leftovers are not. When a task is done and verified, merge
-  its branch into master and delete the branch, its worktree and any stash in
-  the same session. Say plainly if you stop with unmerged work. A worker may
-  push the branch it owns. Pushing master, or merging into it, is the root
-  agent's job and needs Lexer's explicit go-ahead.
+  its branch into local master and delete the branch, its worktree and any stash
+  in the same session, no go-ahead needed: local master is the default place
+  finished work lives. Say plainly if you stop with unmerged work. A worker may
+  push the branch it owns. Pushing master to the remote is the root
+  agent's job and needs Lexer's explicit go-ahead (the sync word).
 - This repository is public. Never commit credentials, private binaries
   or unrelated personal data.
 
