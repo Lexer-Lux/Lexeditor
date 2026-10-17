@@ -3004,6 +3004,10 @@
     dex: ['#6ad0c9', '<path d="M4 2l6 6-6 6V2z"/><path d="M9 2l6 6-6 6V2z"/>'],
     int: ['#b48ae0', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/><circle cx="8" cy="8" r="1.6"/>'],
     fth: ['#e08aa0', '<path d="M8 1l5 7-5 7-5-7z"/>'],
+    vit: ['#e05a5a', '<path d="M8 13.5 C5.5 11.5 3.5 9.4 3.5 7 C3.5 5.3 4.8 4.2 6.3 4.2 C7 4.2 7.7 4.5 8 5.1 C8.3 4.5 9 4.2 9.7 4.2 C11.2 4.2 12.5 5.3 12.5 7 C12.5 9.4 10.5 11.5 8 13.5 z"/>'],
+    wil: ['#5aa9e0', '<path d="M3 3.5h10v2H3zM3 7h10v2H3zM3 10.5h10v2H3z"/>'],
+    end: ['#a3c14a', '<path d="M9 1.5 L4.5 9 H7.5 L7 14.5 L11.5 7 H8.5 Z"/>'],
+    luc: ['#c9c9c9', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2.5"/>'],
   };
   const typeGlyph = kind => {
     const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];

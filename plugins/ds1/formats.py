@@ -159,6 +159,19 @@ for _table, _keys, _kinds in (
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('SpEffectParam', ('physicsDiffenceRate', 'magicDiffenceRate', 'fireDiffenceRate', 'thunderDiffenceRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('EquipParamProtector', ('resistPoison', 'resistDisease', 'resistBlood', 'resistCurse'),
+         ('poison', 'toxic', 'bleed', 'curse')),
+        ('EquipParamWeapon', ('poisonGuardResist', 'diseaseGuardResist', 'bloodGuardResist', 'curseGuardResist'),
+         ('poison', 'toxic', 'bleed', 'curse')),
+        ('NpcParam', ('poisonGuardResist', 'diseaseGuardResist', 'bloodGuardResist', 'curseGuardResist'),
+         ('poison', 'toxic', 'bleed', 'curse')),
+        ('SpEffectParam', ('registBlood', 'registCurse', 'registBloodChangeRate', 'registCurseChangeRate',
+         'bloodDamageRate'), ('bleed', 'curse', 'bleed', 'curse', 'bleed')),
+        ('SpEffectParam', ('disablePoison', 'disableDisease', 'disableBlood', 'disableCurse'),
+         ('poison', 'toxic', 'bleed', 'curse')),
+        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
+         'baseLuc', 'baseHp', 'baseMp', 'baseSp'),
+         ('vit', 'wil', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'vit', 'wil', 'end')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind
