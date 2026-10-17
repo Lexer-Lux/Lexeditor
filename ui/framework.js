@@ -2424,7 +2424,124 @@
       options.busy ? element("div", {class: "lex-model-stage-spin", "aria-hidden": "true"}) : (options.message ?? ""));
     const stage = element("div", {class: ["lex-model-stage", options.className || ""].filter(Boolean).join(" ")}, message);
     stage.lexMessage = message;
+    if (options.modes !== false) modelViewModes(stage);
     return stage;
+  };
+
+  // Corner buttons toggling how a 3D view is drawn: Regular (the renderer's
+  // own lighting), Fullbright (every face at full color, no shading) and
+  // Wireframe. modelStage mounts them; modelViewModes puts the same buttons
+  // on any other host (the DS1 map and animation views). bindScene connects
+  // the three.js scene the buttons retint, once the renderer has added every
+  // mesh; clicks before that only move the pressed state. No three.js import
+  // here: wireframe and emissive are plain material flags, so the helper only
+  // walks the scene graph and every plugin's renderer gets the same modes.
+  const modelViewModeIcon = mode => {
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    for (const [key, value] of Object.entries({viewBox: "0 0 24 24", "aria-hidden": "true",
+      fill: "none", stroke: "currentColor", "stroke-width": "2",
+      "stroke-linecap": "round", "stroke-linejoin": "round"})) svg.setAttribute(key, value);
+    const shape = (tag, attrs) => {
+      const node = document.createElementNS(ns, tag);
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+      svg.append(node);
+    };
+    if (mode === "regular") {
+      // A shaded sphere: half lit, half dark.
+      shape("circle", {cx: "12", cy: "12", r: "7"});
+      shape("path", {d: "M12 5a7 7 0 0 1 0 14z", fill: "currentColor", stroke: "none"});
+    } else if (mode === "fullbright") {
+      // A sun: every face lit as if noon.
+      shape("circle", {cx: "12", cy: "12", r: "4", fill: "currentColor", stroke: "none"});
+      shape("path", {d: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"});
+    } else {
+      // A grid square: edges only, no faces.
+      shape("rect", {x: "4", y: "4", width: "16", height: "16"});
+      shape("path", {d: "M4 12h16M12 4v16"});
+    }
+    return svg;
+  };
+  const MODEL_VIEW_MODES = [
+    {id: "regular", label: "Regular", title: "Regular: the renderer's own lighting"},
+    {id: "fullbright", label: "Fullbright", title: "Fullbright: every face at full color, no shading"},
+    {id: "wireframe", label: "Wireframe", title: "Wireframe: edges only, no faces"},
+  ];
+  // What each material looked like before any mode touched it, so Regular
+  // restores exactly that. Keyed weakly: a disposed scene takes its entries.
+  const modelViewModeStash = new WeakMap();
+  const applyModelViewMode = (scene, mode) => {
+    if (!scene || typeof scene.traverse !== "function") return;
+    scene.traverse(obj => {
+      const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+      for (const mat of mats) {
+        if (!mat || typeof mat !== "object") continue;
+        if (!modelViewModeStash.has(mat)) modelViewModeStash.set(mat, {
+          emissive: mat.emissive && typeof mat.emissive.getHex === "function" ? mat.emissive.getHex() : null,
+          emissiveMap: mat.emissiveMap || null,
+          emissiveIntensity: mat.emissiveIntensity ?? 1,
+          wireframe: !!mat.wireframe,
+        });
+        const saved = modelViewModeStash.get(mat);
+        if ("wireframe" in mat) mat.wireframe = mode === "wireframe" ? true : saved.wireframe;
+        if (mat.emissive && typeof mat.emissive.setHex === "function") {
+          // Fullbright without touching the light rig: the material glows in
+          // its own colors, textured or flat. Lines and points have no
+          // emissive and are unlit already, so they are left alone.
+          if (mode === "fullbright") {
+            if (mat.map) { mat.emissive.setHex(0xffffff); mat.emissiveMap = mat.map; }
+            else if (mat.color && typeof mat.color.getHex === "function") {
+              mat.emissive.setHex(mat.color.getHex()); mat.emissiveMap = null;
+            } else mat.emissive.setHex(0xffffff);
+            if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1;
+          } else {
+            mat.emissive.setHex(saved.emissive ?? 0x000000);
+            mat.emissiveMap = saved.emissiveMap;
+            if ("emissiveIntensity" in mat) mat.emissiveIntensity = saved.emissiveIntensity;
+          }
+        }
+        // Swapping the emissive map changes the compiled shader.
+        mat.needsUpdate = true;
+      }
+    });
+  };
+  const modelViewModes = host => {
+    if (host.lexViewModes) return host.lexViewModes;
+    let mode = "regular", scene = null;
+    const buttons = new Map();
+    const paint = () => {
+      for (const [id, button] of buttons) {
+        const on = id === mode;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-pressed", String(on));
+      }
+    };
+    const setMode = next => {
+      if (!MODEL_VIEW_MODES.some(entry => entry.id === next)) return;
+      mode = next;
+      paint();
+      if (scene) applyModelViewMode(scene, mode);
+    };
+    const bar = element("div", {class: "lex-model-view-modes", role: "group", "aria-label": "View mode"},
+      ...MODEL_VIEW_MODES.map(entry => {
+        const button = element("button", {type: "button", class: "lex-model-view-mode",
+          "data-view-mode": entry.id, title: entry.title, "aria-label": entry.label,
+          "aria-pressed": String(entry.id === mode),
+          onclick: () => setMode(entry.id),
+        }, modelViewModeIcon(entry.id));
+        buttons.set(entry.id, button);
+        return button;
+      }));
+    paint();
+    host.append(bar);
+    const controller = {
+      mode: () => mode,
+      setMode,
+      bindScene: next => { scene = next || null; if (scene) applyModelViewMode(scene, mode); },
+    };
+    host.lexViewModes = controller;
+    host.lexSetViewMode = setMode;
+    host.lexBindScene = controller.bindScene;
+    return controller;
   };
 
   // What fills a detail heading's icon box: a picture, a small stage, or a
@@ -11042,11 +11159,34 @@ ${contents.path}`});
       element("span", {class: "lex-page-summary", text: first === last
         ? `${formatNumber(first)}/${formatNumber(total)}`
         : `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
+    if (options.compact === true) {
+      // Narrow panels (the maps directory): the search box takes its own
+      // row up top, the X-Y/Z position count is dropped, and everything
+      // left shares one bottom row - pager controls, filters and the
+      // remaining counts - instead of stacking.
+      const bottom = element("div", {class: "lex-compact-pager-bottom"},
+        ...createControls,
+        pages === 1 ? null : controls,
+        ...filters.filter(control => !createControls.includes(control)),
+        rowControl);
+      return element("div", {
+        class: `lex-pager lex-pager-inline lex-compact-pager${pages === 1 ? " single-page" : ""}`,
+        "aria-label": "Search and pagination",
+      },
+        options.search ? element("div", {class: "lex-compact-pager-search"},
+          bottomSearch(options.search)) : null,
+        bottom);
+    }
     return element("div", {
       class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}${options.stacked === true ? " lex-pager-stacked" : ""}`,
       "aria-label": "Search and pagination",
     }, left, pages === 1 ? null : controls, right);
   };
+
+  // The compact pagination bar: pager's narrow-panel variant, with the
+  // search box on its own row and one shared bottom row. Same options
+  // as pager (page, pages, total, pageSize, search, filters, change).
+  const compactPager = options => pager({...options, compact: true});
 
   // Editing chrome that stays live in a read-only project: none of it changes
   // record data. The in-place rename input and the help-bubble editor only
@@ -13777,7 +13917,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

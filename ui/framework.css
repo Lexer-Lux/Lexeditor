@@ -4655,6 +4655,39 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1e
   animation:lex-plugin-loading-spin .7s linear infinite;
 }
 
+/* Corner buttons switching how a 3D view is drawn: Regular, Fullbright and
+   Wireframe. Bottom-left everywhere: the model drawer's heading floats above
+   the stage's top edge, and the map's own hover actions own the top-right
+   corner. The centered hint below makes room for them where they meet. */
+.lex-model-view-modes {
+  position:absolute;
+  bottom:8px;
+  left:8px;
+  z-index:3;
+  display:flex;
+  gap:4px;
+}
+.lex-model-stage:has(> .lex-model-view-modes) > .lex-model-stage-hint { padding-left:104px; }
+.lex-model-view-mode {
+  width:26px;
+  height:26px;
+  padding:3px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:6px;
+  background:color-mix(in srgb, var(--lex-panel) 78%, transparent);
+  cursor:pointer;
+}
+.lex-model-view-mode:hover {
+  background:color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-highlight));
+}
+.lex-model-view-mode.active {
+  color:var(--lex-accent-text);
+  border-color:transparent;
+  background:var(--lex-accent);
+}
+.lex-model-view-mode svg { display:block; width:100%; height:100%; }
+
 /* ---- Icon slots ---------------------------------------------------------- */
 /* What fills a detail heading's icon box: a picture, a small stage, or a
    line saying why there is neither yet. */
@@ -6631,6 +6664,41 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-pager-inline.lex-pager-stacked .lex-pager-left { grid-column:1; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-right { grid-column:2; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-controls { grid-column:1 / -1; grid-row:2; }
+/* The compact pagination bar for narrow panels: the search box on its own
+   row up top, then everything left on one bottom row - pager controls,
+   filters and the remaining counts. No position count, nothing stacked.
+   Toggle labels (the maps directory's Local?) read bottom-to-top, trading
+   height the panel has for width it does not. */
+.lex-pager.lex-compact-pager {
+  position:static;
+  z-index:auto;
+  display:flex;
+  flex-direction:column;
+  flex:0 0 auto;
+  gap:6px;
+  width:100%;
+  height:auto;
+  min-height:0;
+  padding:6px 8px;
+}
+.lex-compact-pager-search { width:100%; }
+.lex-compact-pager-search .lex-pager-search { width:100%; }
+.lex-compact-pager-bottom {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  width:100%;
+}
+.lex-compact-pager .lex-pager-controls { flex:0 1 auto; gap:4px; }
+.lex-compact-pager .lex-pager-controls button { min-width:0; padding:5px 6px; }
+.lex-compact-pager .lex-pager-toggle { flex:0 0 auto; padding:0 4px; }
+.lex-compact-pager .lex-pager-toggle > span {
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  line-height:1;
+  white-space:nowrap;
+}
 /* An open side panel insists on the width its contents need rather than
    scrolling them sideways, up to a viewport guard for pathological rows. */
 .lex-collapsible-panel:not(.lex-collapsible-collapsed) { min-width:min-content; max-width:90vw; }

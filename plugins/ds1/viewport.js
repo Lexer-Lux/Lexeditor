@@ -49,6 +49,7 @@ window.Ds1Viewport = (() => {
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
     host.append(canvas);
+    const viewModes = LexeditorUI.modelViewModes(host);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 10000);
     camera.position.set(0, 30, 60);
@@ -411,6 +412,7 @@ window.Ds1Viewport = (() => {
       if (++frames === 2) host.dataset.ready = "true";
       requestAnimationFrame(loop);
     };
+    viewModes.bindScene(scene);
     loop();
     return controller;
   }
@@ -438,6 +440,7 @@ window.Ds1Viewport = (() => {
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
     host.append(canvas);
+    const viewModes = LexeditorUI.modelViewModes(host);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
     const controls = new OrbitControls(camera, canvas);
@@ -580,6 +583,7 @@ window.Ds1Viewport = (() => {
       if (++frames === 2) host.dataset.ready = "true";
       requestAnimationFrame(loop);
     };
+    viewModes.bindScene(scene);
     loop();
   }
   return {mount, mountChr, stop};

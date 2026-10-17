@@ -75,6 +75,10 @@ def main():
                     assert '1 slot points at a missing model point' in status, status
                     assert 'Body R 0.5 x H 1.8' in status, status
                     assert page.locator('canvas[data-viewport]').count() == 1
+                    modes = page.locator('[data-chr-host] .lex-model-view-modes button')
+                    assert modes.count() == 3
+                    assert [modes.nth(index).get_attribute('aria-label')
+                            for index in range(3)] == ['Regular', 'Fullbright', 'Wireframe']
                     # The quad, the green model point, the blue body and the
                     # red hitboxes paint more than a blank canvas ever could.
                     shot = page.locator('canvas[data-viewport]').screenshot()

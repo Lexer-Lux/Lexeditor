@@ -151,6 +151,10 @@ def main():
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
                     assert page.locator('canvas[data-preview]').count() == 1
                     assert page.evaluate('!!window.__lexPreview'), 'preview hook missing'
+                    modes = page.locator('.lex-model-stage .lex-model-view-modes button')
+                    assert modes.count() == 3
+                    assert [modes.nth(index).get_attribute('aria-label')
+                            for index in range(3)] == ['Regular', 'Fullbright', 'Wireframe']
                     hint = page.locator('.lex-model-stage-hint').inner_text()
                     assert hint.startswith('Drag to rotate'), hint
                     assert 'mesh' not in hint and 'triangle' not in hint, hint

@@ -50,6 +50,8 @@ window.Ds1Preview = (() => {
     const canvas = renderer.domElement;
     canvas.dataset.preview = "true";
     host.append(canvas);
+    // A snapshot renders one hidden frame for a thumbnail: no buttons.
+    const viewModes = snapshot ? null : LexeditorUI.modelViewModes(host);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
     const controls = new OrbitControls(camera, canvas);
@@ -115,6 +117,7 @@ window.Ds1Preview = (() => {
       root.add(new THREE.Mesh(geo, await materialFor(mesh)));
       if (stale() || !host.isConnected) { stop(host); return null; }
     }
+    if (viewModes) viewModes.bindScene(scene);
     const box = new THREE.Box3();
     root.traverse(obj => { if (obj.isMesh) box.expandByObject(obj); });
     const size = box.isEmpty() ? 2 : box.getSize(new THREE.Vector3()).length();

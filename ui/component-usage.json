@@ -265,6 +265,10 @@
       "stardew_valley",
       "warband"
     ],
+    "compactPager": [
+      "blank",
+      "ds1"
+    ],
     "compareRecords": [
       "bannerlord",
       "blank",
@@ -1160,6 +1164,12 @@
       "warband"
     ],
     "modelStage": [
+      "blank",
+      "ds1",
+      "rdr2",
+      "warband"
+    ],
+    "modelViewModes": [
       "blank",
       "ds1",
       "rdr2",
@@ -2082,6 +2092,7 @@
     "magnifyIcon",
     "magnitudeValue",
     "mapMagnifier",
+    "modelViewModes",
     "newButton",
     "noImage",
     "notice",

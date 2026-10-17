@@ -63,6 +63,10 @@ def main():
                     assert page.evaluate("typeof LexeditorUI.animationViewer") == "function"
                     assert page.evaluate(
                         "!!document.querySelector('[data-anim-host]')._animViewer")
+                    modes = page.locator("[data-anim-host] .lex-model-view-modes button")
+                    assert modes.count() == 3
+                    assert [modes.nth(index).get_attribute("aria-label")
+                            for index in range(3)] == ["Regular", "Fullbright", "Wireframe"]
                     status = page.locator("[data-anim-status]").inner_text()
                     assert "frames at" in status and "bones" in status, status
                     assert "Root motion" in page.locator("[data-anim-timeline]").inner_text()

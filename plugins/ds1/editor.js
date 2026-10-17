@@ -2039,10 +2039,10 @@ function directoryList(){
   if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
   return LexeditorUI.stack(
-    LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
-      change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
     columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+    LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+      search:{key:"maps-directory",value:state.dirQuery,label:"Search the world",
+        change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}},
       filters:[directoryLocalRow()],
       change:value=>{state.dirPage=value;refreshDirectory();}}));
 }

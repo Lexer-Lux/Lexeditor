@@ -68,6 +68,7 @@ window.Ds1Anim = (() => {
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
     host.append(canvas);
+    const viewModes = LexeditorUI.modelViewModes(host);
     overlay.remove();
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
@@ -248,6 +249,7 @@ window.Ds1Anim = (() => {
 
     // The shared viewer owns the scrub bar, transport row, shortcuts and
     // loop from here; this file only poses the skeleton and draws it.
+    viewModes.bindScene(scene);
     host._animViewer = LexeditorUI.animationViewer({
       host, timeline, status, statusText,
       frames: {count, duration: frames.duration, frameDuration: frameDur,

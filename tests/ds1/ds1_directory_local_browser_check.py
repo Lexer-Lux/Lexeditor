@@ -59,7 +59,7 @@ def main():
                     assert page.evaluate("state.mapId") == MAP_A
                     box = page.locator("[data-dir-local] input")
                     assert page.locator(".lex-pager [data-dir-local]").count() == 1
-                    assert page.locator("[data-maps-dir] .lex-pager-stacked").count() == 1
+                    assert page.locator("[data-maps-dir] .lex-compact-pager").count() == 1
                     page.locator("[data-maps-dir] .lex-subtab-button", has_text="Enemies").click()
                     page.wait_for_function('state.dirTab==="enemies"', timeout=30000)
                     page.wait_for_function(
