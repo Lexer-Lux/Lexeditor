@@ -259,6 +259,26 @@
       sample: () => UI.creditsPanel("blank")},
     {id: "dataMap", level: "organism", summary: "Which of a game's files Lexeditor understands."},
     {id: "curveEditor", level: "organism", summary: "A formula drawn as a curve, edited by its terms."},
+    {id: "animationViewer", level: "organism", summary: "An animations view: scrub bar with event cues, transport row and playback loop. The caller draws each frame.",
+      sample: () => {
+        const host = el("div", {style: "height:120px;"});
+        const timeline = el("div", {});
+        const canvas = el("canvas", {width: "320", height: "120"});
+        host.append(canvas);
+        const paint = canvas.getContext("2d");
+        UI.animationViewer({host, timeline, frames: {count: 24, duration: 1,
+            events: [{start: 0.25, label: "Cue"}]},
+          statusText: "Sample motion: 24 frames.",
+          render: shown => {
+            paint.fillStyle = "#222";
+            paint.fillRect(0, 0, 320, 120);
+            paint.fillStyle = "#7cf";
+            paint.beginPath();
+            paint.arc(20 + (shown / 23) * 280, 60, 12, 0, 7);
+            paint.fill();
+          }});
+        return el("div", {}, host, timeline);
+      }},
     {id: "soundCoverageTable", level: "organism", summary: "Which interface sounds a theme provides.",
       sample: () => UI.soundCoverageTable([{event: "save", label: "Save", provided: true},
         {event: "back", label: "Back", provided: false}])},

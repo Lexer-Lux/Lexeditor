@@ -8695,3 +8695,15 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 /* A dialog that asks for a name. */
 .lex-prompt-dialog .lex-dialog-field { margin:.6em 0; }
 .lex-prompt-dialog input[type="text"] { width:100%; box-sizing:border-box; }
+
+/* A shared animation viewer: the scrub bar with its event cues, then one
+   row of square transport buttons directly below it. */
+.lex-anim-timeline { display:flex; flex-direction:column; gap:8px; }
+.lex-anim-scrub { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.lex-anim-scrub input[type="range"] { flex:1 1 auto; min-width:120px; }
+.lex-anim-readout { white-space:nowrap; }
+.lex-anim-follow { white-space:nowrap; }
+.lex-anim-markers { position:relative; flex-basis:100%; height:12px; }
+.lex-anim-marker { position:absolute; top:0; width:4px; height:12px; padding:0; border:none; background:#b26a00; cursor:pointer; }
+.lex-anim-transport { display:flex; gap:8px; }
+.lex-anim-transport-button { width:32px; height:32px; padding:0; font-size:14px; line-height:1; }

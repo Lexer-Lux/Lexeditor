@@ -338,7 +338,43 @@
     }
   }
   attachLocalSamples();
-  function render(){let layout;const levels=["atom","molecule","organism","template","utility"];if(levels.includes(tab))layout=panelLayout([componentsPanel(tab)],"blank-layout",{layoutKey:`blank-${tab}`,defaultSizes:[100]});else if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
+  // Blank's animations view: the shared viewer playing synthetic frames,
+  // so the component is proved without any game behind it. The motion is
+  // deterministic per frame: a dot crossing the stage with its frame number.
+  const BLANK_ANIM={count:48,duration:2,events:[{start:0.5,label:"Cue one"},{start:1.25,label:"Cue two"}]};
+  let blankAnimMount=0;
+  function paintBlankFrame(paint,shown){
+    const last=BLANK_ANIM.count-1,x=40+(shown/last)*560;
+    paint.fillStyle="#101418";paint.fillRect(0,0,640,360);
+    paint.fillStyle="#232b33";paint.fillRect(40,300,560,8);
+    for(const cue of BLANK_ANIM.events){
+      const cx=40+(cue.start/BLANK_ANIM.duration)*560;
+      paint.fillStyle="#b26a00";paint.fillRect(cx-2,292,4,24);
+    }
+    paint.fillStyle="#72ff1e";
+    paint.beginPath();paint.arc(x,220,24,0,7);paint.fill();
+    paint.fillRect(x-2,296,4,16);
+    paint.fillStyle="#e8f0e8";paint.font="28px sans-serif";
+    paint.fillText(`frame ${shown.toFixed(1)} / ${last}`,40,60);
+  }
+  function animationsPanel(){
+    const host=el("div",{class:"lex-viewport-host","data-blank-anim-host":"",style:"position:relative;width:100%;height:440px;min-height:320px;background:#101418;"});
+    const timeline=el("div",{class:"lex-anim-timeline","data-blank-anim-timeline":""});
+    const status=el("div",{class:"lex-viewport-status","data-blank-anim-status":"",style:"flex:0 0 auto"});
+    const token=++blankAnimMount;
+    requestAnimationFrame(()=>{
+      if(token!==blankAnimMount||!host.isConnected)return;
+      const canvas=el("canvas",{width:"640",height:"360",style:"width:100%;height:100%;display:block;object-fit:contain;"});
+      host.append(canvas);
+      const paint=canvas.getContext("2d");
+      LexeditorUI.animationViewer({host,timeline,status,
+        statusText:`Sample motion: ${BLANK_ANIM.count} frames at ${(BLANK_ANIM.count/BLANK_ANIM.duration).toFixed(1)} fps, synthetic.`,
+        frames:BLANK_ANIM,render:shown=>paintBlankFrame(paint,shown)});
+    });
+    return detailPanel({className:"blank-detail",title:"Sample motion",icon:blankIcon(),identity:recordId(0),meta:"Shared animation viewer",
+      body:[host,timeline,status]});
+  }
+  function render(){let layout;const levels=["atom","molecule","organism","template","utility"];if(levels.includes(tab))layout=panelLayout([componentsPanel(tab)],"blank-layout",{layoutKey:`blank-${tab}`,defaultSizes:[100]});else if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else if(tab==="animations")layout=panelLayout([animationsPanel()],"blank-layout",{layoutKey:"blank-animations",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
   function navigate(value){tab=value;render()}
   const editHistory=new EditHistory({capture:()=>({rows,demo}),restore:snapshot=>{rows=clone(snapshot.rows);demo=clone(snapshot.demo)},render:async()=>render(),enabled:()=>activeSource==="mine",changed:()=>refreshShell()});
   // Saved samples belong to the user data store, not the service's changing port.
@@ -377,7 +413,7 @@
     dialog.append(el("button",{type:"button",onclick:()=>close({cancelled:true})},"Cancel"));
     document.body.append(dialog);dialog.showModal();
   });
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"template",label:"Templates",order:0},{id:"organism",label:"Organisms",order:1},{id:"molecule",label:"Molecules",order:2},{id:"atom",label:"Atoms",order:3},{id:"utility",label:"Utilities",order:4}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"template",label:"Templates",order:0},{id:"organism",label:"Organisms",order:1},{id:"molecule",label:"Molecules",order:2},{id:"atom",label:"Atoms",order:3},{id:"utility",label:"Utilities",order:4},{id:"animations",label:"Animations",order:5}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
   async function restoreSample(){
     try{
       const response=await fetch("/api/projects");

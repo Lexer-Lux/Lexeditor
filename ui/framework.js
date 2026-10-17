@@ -5792,6 +5792,136 @@
     return svg;
   };
 
+  // One animation viewer is live at a time: the mounted one. The shell's
+  // key handler and shortcuts panel read this slot, so animation keys only
+  // work - and are only listed - while an animations view is on screen.
+  let activeAnimationViewer = null;
+
+  // The animation bindings, in transport order. Entries here are listed in
+  // the shortcuts panel only while a viewer is mounted; the shell handler
+  // reads the same table, so the two cannot drift apart.
+  const ANIMATION_SHORTCUTS = [
+    {id: "anim-start", keys: ["Shift", "\u2190"], label: "Go to animation start"},
+    {id: "anim-prev", keys: ["\u2190"], label: "Back one frame"},
+    {id: "anim-play", keys: ["Space"], label: "Play or pause the animation"},
+    {id: "anim-next", keys: ["\u2192"], label: "Forward one frame"},
+    {id: "anim-end", keys: ["Shift", "\u2192"], label: "Go to animation end"},
+  ];
+  const matchAnimationShortcut = event => {
+    if (!activeAnimationViewer) return "";
+    if (event.ctrlKey || event.metaKey || event.altKey) return "";
+    if (event.key === "ArrowLeft" || event.code === "ArrowLeft") return event.shiftKey ? "anim-start" : "anim-prev";
+    if (event.key === "ArrowRight" || event.code === "ArrowRight") return event.shiftKey ? "anim-end" : "anim-next";
+    if ((event.key === " " || event.key === "Spacebar" || event.code === "Space") && !event.shiftKey) return "anim-play";
+    return "";
+  };
+
+  // A reusable animation viewer: scrub bar, event markers, transport row and
+  // playback loop. The caller draws the pictures: render() gets the current
+  // frame (fractional, for blending) and the playback state every animation
+  // frame. DS1 poses its skeleton there; a fixture page draws synthetic
+  // frames on a plain canvas. Stepping pauses, as on an editing bench: the
+  // reader asked to look at one frame, not to keep playing past it.
+  const animationViewer = (options = {}) => {
+    const host = options.host, timeline = options.timeline, status = options.status;
+    const frames = options.frames || {};
+    const count = Math.max(1, Math.trunc(Number(frames.count) || 1));
+    const duration = Number(frames.duration) > 0 ? Number(frames.duration) : count / 30;
+    const frameDur = Number(frames.frameDuration) > 0 ? Number(frames.frameDuration)
+      : duration / Math.max(count - 1, 1);
+    const state = {time: 0, playing: options.playing !== false, follow: false, live: true};
+    timeline.replaceChildren();
+    timeline.classList.add("lex-anim-timeline");
+    const slider = element("input", {type: "range", min: "0", max: String(count - 1),
+      step: "0.01", value: "0", "aria-label": "Frame"});
+    const readout = element("span", {class: "lex-anim-readout", "data-anim-readout": "true"});
+    const scrub = element("div", {class: "lex-anim-scrub"}, slider, readout);
+    if (options.follow) {
+      const box = element("input", {type: "checkbox", "aria-label": options.follow.label || "Follow"});
+      box.onchange = () => { state.follow = box.checked; options.follow.change?.(state.follow); };
+      scrub.append(element("label", {class: "lex-anim-follow"}, box, ` ${options.follow.label || "Follow"}`));
+    }
+    const markers = element("div", {class: "lex-anim-markers"});
+    for (const cue of frames.events || []) {
+      const at = Number(cue.start) || 0;
+      const tick = element("button", {type: "button", class: "lex-anim-marker",
+        title: `${cue.label} (${at.toFixed(2)}s)`,
+        style: `left:${Math.min(at / duration, 1) * 100}%`,
+        "aria-label": `${cue.label} (${at.toFixed(2)}s)`,
+        onclick: () => { state.time = at % duration; }});
+      markers.append(tick);
+    }
+    scrub.append(markers);
+    const transport = element("div", {class: "lex-anim-transport",
+      "data-anim-transport": "true", role: "group", "aria-label": "Animation transport"});
+    const glyph = playing => playing ? "\u23F8" : "\u25B6";
+    const setPlaying = playing => {
+      state.playing = playing;
+      playButton.textContent = glyph(playing);
+    };
+    const sync = () => {
+      const shown = (((state.time / frameDur) % count) + count) % count;
+      if (document.activeElement !== slider) slider.value = String(shown);
+      readout.textContent = `${shown.toFixed(1)} / ${count - 1} frames \u00B7 ${state.time.toFixed(2)}s`;
+      return shown;
+    };
+    const goToFrame = frame => {
+      const clamped = Math.max(0, Math.min(count - 1, Math.round(frame)));
+      state.time = clamped * frameDur;
+      setPlaying(false);
+      sync();
+    };
+    const buttons = [
+      {label: "Go to animation start", glyph: "\u23EE", run: () => goToFrame(0)},
+      {label: "Back one frame", glyph: "\u25C0", run: () => goToFrame(Math.round(state.time / frameDur) - 1)},
+      {label: "Play or pause", glyph: glyph(state.playing), run: () => setPlaying(!state.playing)},
+      {label: "Forward one frame", glyph: "\u25B6", run: () => goToFrame(Math.round(state.time / frameDur) + 1)},
+      {label: "Go to animation end", glyph: "\u23ED", run: () => goToFrame(count - 1)},
+    ].map(spec => element("button", {type: "button", class: "lex-anim-transport-button",
+      "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));
+    const playButton = buttons[2];
+    transport.append(...buttons);
+    timeline.append(scrub, transport);
+    slider.oninput = () => { state.time = parseFloat(slider.value) * frameDur; };
+    if (status) status.textContent = options.statusText ?? "";
+    const controller = {
+      play: () => setPlaying(true),
+      pause: () => setPlaying(false),
+      toggle: () => setPlaying(!state.playing),
+      step: delta => goToFrame(Math.round(state.time / frameDur) + delta),
+      toStart: () => goToFrame(0),
+      toEnd: () => goToFrame(count - 1),
+      get playing() { return state.playing; },
+      get frame() { return Math.round(state.time / frameDur); },
+      get count() { return count; },
+      stop: () => {
+        if (!state.live) return;
+        state.live = false;
+        if (activeAnimationViewer === controller) activeAnimationViewer = null;
+        try { options.dispose?.(); } finally {
+          host.replaceChildren();
+          delete host.dataset.ready;
+        }
+      },
+    };
+    if (host.isConnected) activeAnimationViewer = controller;
+    let rendered = 0, last = performance.now();
+    const loop = now => {
+      if (!state.live || !host.isConnected) { controller.stop(); return; }
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      if (state.playing) state.time = (state.time + dt) % duration;
+      options.render?.(sync(), state);
+      if (++rendered === 2) {
+        host.dataset.ready = "true";
+        options.onReady?.();
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+    return controller;
+  };
+
   // Every binding the shell owns, in one place: the panel lists them and the
   // key handler reads the same table, so the two cannot drift apart.
   const SHORTCUTS = [
@@ -5878,7 +6008,11 @@
   ];
   const openShortcutPanel = (developerMode, gestures = false) => {
     if (shortcutPanel) { closeShortcutPanel(); return; }
-    const list = gestures ? DEVELOPER_GESTURES : SHORTCUTS.filter(entry => !entry.developer || developerMode);
+    // The panel lists only what is available now: the animation bindings
+    // join the shell's own while a viewer is mounted, and vanish with it.
+    const available = SHORTCUTS.filter(entry => !entry.developer || developerMode);
+    if (activeAnimationViewer) available.push(...ANIMATION_SHORTCUTS);
+    const list = gestures ? DEVELOPER_GESTURES : available;
     const title = gestures ? "Developer Mode gestures" : "Keyboard shortcuts";
     const rows = list.map(entry =>
       element("div", {class: "lex-shortcut-row", "data-lex-shortcut": entry.id},
@@ -8726,6 +8860,33 @@ ${contents.path}`});
     const shortcutHandler = event => {
       if (event.key === "Escape" && shortcutPanel) { closeShortcutPanel(); return; }
       const developerMode = !!sharedSettingsSnapshot?.developerMode;
+      const animAction = matchAnimationShortcut(event);
+      if (animAction) {
+        // With the panel open the shortcuts are a legend, not live controls.
+        if (shortcutPanel) {
+          event.preventDefault();
+          event.stopPropagation();
+          flashShortcut(animAction);
+          return;
+        }
+        const target = event.target;
+        const typing = target instanceof HTMLElement &&
+          target.matches("input:not([type='checkbox']):not([type='range']),textarea,select,[contenteditable='true']");
+        if (typing) return;
+        // A focused button owns Space: the transport's own play button
+        // toggles through its click, and nothing double-fires.
+        if ((event.key === " " || event.code === "Space") &&
+            target instanceof HTMLElement && target.matches("button")) return;
+        event.preventDefault();
+        flashShortcut(animAction);
+        ({ "anim-start": () => activeAnimationViewer.toStart(),
+           "anim-prev": () => activeAnimationViewer.step(-1),
+           "anim-play": () => activeAnimationViewer.toggle(),
+           "anim-next": () => activeAnimationViewer.step(1),
+           "anim-end": () => activeAnimationViewer.toEnd(),
+        }[animAction]?.());
+        return;
+      }
       const action = matchShortcut(event, developerMode);
       if (!action) return;
       // With the panel open the shortcuts are a legend, not live controls.
@@ -13487,7 +13648,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

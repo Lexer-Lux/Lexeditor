@@ -5,9 +5,11 @@ window.Ds1Anim = (() => {
   const u32 = b64 => new Uint32Array(decode(b64).buffer);
 
   function stop(host) {
-    if (host._animStop) { try { host._animStop(); } catch (_) {} host._animStop = null; }
-    host.replaceChildren();
-    delete host.dataset.ready;
+    if (host._animViewer) { try { host._animViewer.stop(); } catch (_) {} host._animViewer = null; }
+    else {
+      host.replaceChildren();
+      delete host.dataset.ready;
+    }
     delete host._animBones;
   }
 
@@ -205,64 +207,10 @@ window.Ds1Anim = (() => {
     const pos = f32(frames.translations), quat = f32(frames.rotations), scl = f32(frames.scales);
     const trot = frames.motion ? f32(frames.motion) : null;
     const frameDur = frames.frame_duration || frames.duration / Math.max(count - 1, 1);
-    const state = {time: 0, playing: true, follow: false};
-    timeline.style.display = "flex";
-    timeline.style.gap = "8px";
-    timeline.style.alignItems = "center";
-    timeline.style.flexWrap = "wrap";
-    const playButton = document.createElement("button");
-    playButton.type = "button";
-    playButton.textContent = "Pause";
-    playButton.setAttribute("aria-label", "Play or pause");
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "0";
-    slider.max = String(count - 1);
-    slider.step = "0.01";
-    slider.value = "0";
-    slider.setAttribute("aria-label", "Frame");
-    slider.style.flex = "1";
-    slider.style.minWidth = "120px";
-    const readout = document.createElement("span");
-    readout.dataset.animReadout = "true";
-    const followLabel = document.createElement("label");
-    const follow = document.createElement("input");
-    follow.type = "checkbox";
-    followLabel.append(follow, document.createTextNode(" Root motion"));
-    const markers = document.createElement("div");
-    markers.className = "lex-anim-markers";
-    markers.style.position = "relative";
-    markers.style.flexBasis = "100%";
-    markers.style.height = "12px";
-    for (const event of frames.events || []) {
-      const tick = document.createElement("button");
-      tick.type = "button";
-      tick.className = "lex-anim-marker";
-      tick.title = `${event.label} (${event.start.toFixed(2)}s)`;
-      tick.style.position = "absolute";
-      tick.style.top = "0";
-      tick.style.left = `${Math.min(event.start / frames.duration, 1) * 100}%`;
-      tick.style.width = "4px";
-      tick.style.height = "12px";
-      tick.style.padding = "0";
-      tick.style.border = "none";
-      tick.style.background = "#b26a00";
-      tick.style.cursor = "pointer";
-      tick.setAttribute("aria-label", tick.title);
-      tick.onclick = () => { state.time = event.start % frames.duration; };
-      markers.append(tick);
-    }
-    timeline.append(playButton, slider, readout, followLabel, markers);
-    playButton.onclick = () => {
-      state.playing = !state.playing;
-      playButton.textContent = state.playing ? "Pause" : "Play";
-    };
-    slider.oninput = () => { state.time = parseFloat(slider.value) * frameDur; };
-    follow.onchange = () => { state.follow = follow.checked; };
 
     const tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
-    const pose = frameFloat => {
+    const pose = (frameFloat, follow) => {
       const wrapped = ((frameFloat % count) + count) % count;
       const first = Math.floor(wrapped), second = (first + 1) % count, alpha = wrapped - first;
       for (let i = 0; i < bones.length; i++) {
@@ -281,7 +229,7 @@ window.Ds1Anim = (() => {
           scl[a * 3 + 1] + (scl[b * 3 + 1] - scl[a * 3 + 1]) * alpha,
           scl[a * 3 + 2] + (scl[b * 3 + 2] - scl[a * 3 + 2]) * alpha);
       }
-      if (state.follow && trot) {
+      if (follow && trot) {
         const s = Math.floor(wrapped), t = (s + 1) % count, k = wrapped - s;
         mover.position.set(
           trot[s * 4] + (trot[t * 4] - trot[s * 4]) * k,
@@ -295,33 +243,31 @@ window.Ds1Anim = (() => {
       return wrapped;
     };
     const fps = (1 / frameDur).toFixed(1);
-    status.textContent = `${motion.file}: ${count} frames at ${fps} fps, ${bones.length} bones` +
+    const statusText = `${motion.file}: ${count} frames at ${fps} fps, ${bones.length} bones` +
       (frames.events && frames.events.length ? `, ${frames.events.length} event cues.` : ", no event cues.");
 
-    let frames2 = 0, liveFlag = true, last = performance.now();
-    host._animStop = () => {
-      liveFlag = false;
-      delete host._animBones;
-      if (resizer) resizer.disconnect();
-      else window.removeEventListener("resize", resize);
-      controls.dispose();
-      renderer.dispose();
-      for (const item of trash) item.dispose();
-    };
-    const loop = now => {
-      if (!liveFlag || mine !== session || !host.isConnected) { stop(host); return; }
-      const dt = Math.min((now - last) / 1000, 0.1);
-      last = now;
-      if (state.playing) state.time = (state.time + dt) % frames.duration;
-      const shown = pose(state.time / frameDur);
-      if (document.activeElement !== slider) slider.value = String(shown);
-      readout.textContent = `${shown.toFixed(1)} / ${count - 1} frames · ${state.time.toFixed(2)}s`;
-      controls.update();
-      renderer.render(scene, camera);
-      if (++frames2 === 2) host.dataset.ready = "true";
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
+    // The shared viewer owns the scrub bar, transport row, shortcuts and
+    // loop from here; this file only poses the skeleton and draws it.
+    host._animViewer = LexeditorUI.animationViewer({
+      host, timeline, status, statusText,
+      frames: {count, duration: frames.duration, frameDuration: frameDur,
+        events: (frames.events || []).map(event => ({start: event.start, label: event.label}))},
+      follow: {label: "Root motion"},
+      render: (shown, playback) => {
+        pose(shown, playback.follow);
+        controls.update();
+        renderer.render(scene, camera);
+      },
+      dispose: () => {
+        delete host._animBones;
+        host._animViewer = null;
+        if (resizer) resizer.disconnect();
+        else window.removeEventListener("resize", resize);
+        controls.dispose();
+        renderer.dispose();
+        for (const item of trash) item.dispose();
+      },
+    });
   }
   return {mount, stop};
 })();
