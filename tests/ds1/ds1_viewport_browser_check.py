@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bhf_fixture import make_bhf, make_edge
 from ds1_fixture import make_archive, make_text_archive
-from flver_fixture import build_flver
+from flver_fixture import build_flver, make_chrbnd
 from msb_fixture import build_msb
 from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1 import texts
@@ -57,6 +57,27 @@ def make_game(temp):
     (area / 'm10_0000.tpfbdt').write_bytes(bytes(16) + blob)
     (area / 'm10_0000.tpfbhd').write_bytes(
         make_bhf([(r'\m10\tex0.tpf.dcx', 16, len(blob))]))
+    # The collision map: two models wear different bytes under one
+    # texture name. The piece resolves tex0 from the area archive
+    # (blue) while the object keeps its own binder texture (red).
+    (game / MAP_DIR / 'm99_00_00_00.msb').write_bytes(build_msb(
+        parts=(('piece', 0, 0, 0, None, (-4.0, 0.0, 0.0)),
+               ('chest', 1, 0, 1, None, (4.0, 0.0, 0.0))),
+        models=(('p_blue', 0), ('o_red', 1))))
+    part_folder = game / 'map' / 'm99_00_00_00'
+    part_folder.mkdir(parents=True)
+    (part_folder / 'p_blue.flver').write_bytes(build_flver())
+    (game / 'obj').mkdir(parents=True)
+    own = make_dds_rgba(4, 4, [(220, 30, 30, 255)] * 16)
+    (game / 'obj' / 'o_red.objbnd.dcx').write_bytes(
+        make_chrbnd(build_flver(), 'o_red', [('o_red.tpf', make_tpf([('tex0', own)]))]))
+    shared = make_dds_rgba(4, 4, [(30, 30, 220, 255)] * 16)
+    shared_blob = make_edge(make_tpf([('tex0', shared)]))
+    shared_area = game / 'map' / 'm99'
+    shared_area.mkdir(parents=True)
+    (shared_area / 'm99_0000.tpfbdt').write_bytes(bytes(16) + shared_blob)
+    (shared_area / 'm99_0000.tpfbhd').write_bytes(
+        make_bhf([(r'\m99\tex0.tpf.dcx', 16, len(shared_blob))]))
     return game
 
 
@@ -82,6 +103,25 @@ def rendered_pixels(page, label):
     colors = Image.open(io.BytesIO(shot)).convert('RGB').getcolors(maxcolors=1 << 20)
     count = 'many' if colors is None else len(colors)
     assert colors is None or len(colors) > 2, f'{label} canvas blank ({count} colors)'
+
+
+def focused_colors(page, key):
+    # Center the part, then count red and blue pixels around the
+    # middle of the canvas: each focused model fills that region.
+    page.evaluate(f'viewportCtl.focus("{key}")')
+    page.wait_for_timeout(800)
+    shot = page.locator('canvas[data-viewport]').screenshot()
+    image = Image.open(io.BytesIO(shot)).convert('RGB')
+    center = (image.width // 2, image.height // 2)
+    red = blue = 0
+    for dy in range(-40, 41, 2):
+        for dx in range(-40, 41, 2):
+            r, g, b = image.getpixel((center[0] + dx, center[1] + dy))
+            if r > g + 30 and r > b + 30:
+                red += 1
+            elif b > r + 30 and b > g + 30:
+                blue += 1
+    return red, blue
 
 
 def textured_pixels(page, label):
@@ -149,6 +189,17 @@ def phase_readonly(play, game, output, errors):
             page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='test2.msb', timeout=30000)
             page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
             rendered_pixels(page, 'test2.msb')
+            # Same texture name, different bytes per model: the piece
+            # stays blue and the object stays red. A per-name texture
+            # cache paints both with the first model's bytes instead.
+            page.locator('[data-maps-side] .lex-list-row', has_text='m99_00_00_00.msb').click()
+            page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='m99_00_00_00.msb', timeout=30000)
+            page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
+            page.evaluate('viewportCtl.select(null)')
+            red, blue = focused_colors(page, '0:0')
+            assert blue > 100 and red < 10, ('piece', red, blue)
+            red, blue = focused_colors(page, '1:0')
+            assert red > 100 and blue < 10, ('chest', red, blue)
             if output:
                 page.screenshot(path=str(output / 'viewport.png'))
         finally:

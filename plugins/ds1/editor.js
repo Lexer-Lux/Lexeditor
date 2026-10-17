@@ -1409,14 +1409,22 @@ function ds1PreviewContent(target){
   };
   if(!target.variants){show(target.url);return stage;}
   let picked=target.variants[0];
-  const label=picked.variant==="F"?"Female":"Male";
-  const picker=el("button",{type:"button","aria-label":"Model variant","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Model variant",
-      choices:target.variants.map(entry=>({label:entry.variant==="F"?"Female":"Male",value:entry.variant})),
-      select:value=>{picked=target.variants.find(entry=>entry.variant===value)||picked;
-        picker.replaceChildren(`Model: ${picked.variant==="F"?"Female":"Male"}`);
-        show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
-      }}).openFor(event.currentTarget);}},`Model: ${label}`);
+  // Dual-gender armor fits exactly two bodies, so the switch is one
+  // toggle, not a menu: the male sign while the male model shows, the
+  // female sign after one click flips to the female model.
+  const GENDER_SIGN={M:"\u2642",F:"\u2640"};
+  const GENDER_NAME={M:"male",F:"female"};
+  const other=()=>target.variants.find(entry=>entry!==picked)||target.variants[0];
+  const sign=entry=>GENDER_SIGN[entry.variant]||entry.variant||"?";
+  const genderName=entry=>GENDER_NAME[entry.variant]||"other";
+  const action=()=>`Show ${genderName(other())} model`;
+  const picker=el("button",{type:"button",class:"lex-preview-gender-toggle",
+    "aria-label":action(),title:action(),
+    onclick:()=>{picked=other();
+      picker.replaceChildren(sign(picked));
+      picker.setAttribute("aria-label",action());picker.title=action();
+      show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
+    }},sign(picked));
   const wrap=el("div",{class:"lex-preview-variant-wrap"},picker,stage);
   show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
   return wrap;

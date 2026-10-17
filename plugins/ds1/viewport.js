@@ -70,15 +70,28 @@ window.Ds1Viewport = (() => {
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
-    // One texture per diffuse name: the server sends the same bytes for a
-    // name on every model, so loading it once keeps big maps light, and one
-    // material per texture keeps placements sharing materials as before.
+    // One texture per diffuse name AND content: two models in one map
+    // can wear different bytes under one name (an object keeps its own
+    // binder texture while a piece resolves the same name from the area
+    // archive), so the cache keys on both. Identical bytes still load
+    // once and placements keep sharing materials as before.
     const texCache = new Map();
     const matCache = new Map();
+    // Short content digest for cache keys: length plus djb2 over the
+    // base64 PNG. Collisions across a map's handful of textures are
+    // not a practical concern; exact bytes would bloat every key.
+    const texDigest = png => {
+      let hash = 5381;
+      for (let index = 0; index < png.length; index++)
+        hash = ((hash << 5) + hash + png.charCodeAt(index)) | 0;
+      return `${png.length}.${(hash >>> 0).toString(36)}`;
+    };
+    const texKey = (tex, png) => `${tex.length}:${tex}:${texDigest(png)}`;
     const texLoader = new THREE.TextureLoader();
     const disposable = [];
     const textureFor = async (tex, png) => {
-      if (!texCache.has(tex)) {
+      const key = texKey(tex, png);
+      if (!texCache.has(key)) {
         try {
           const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
           image.colorSpace = THREE.SRGBColorSpace;
@@ -89,20 +102,20 @@ window.Ds1Viewport = (() => {
           image.wrapS = image.wrapT = THREE.RepeatWrapping;
           // Test seam: the flags the map textures loaded with.
           host._viewportTex = {flipY: image.flipY, wrapS: image.wrapS, wrapT: image.wrapT};
-          texCache.set(tex, image);
+          texCache.set(key, image);
           disposable.push(image);
         } catch (_error) {
           return null;
         }
       }
-      return texCache.get(tex);
+      return texCache.get(key);
     };
     const materialFor = (mesh, texturesByName, fx) => {
       const plain = fx ? effect : mesh.cull !== false ? front : double;
       const png = mesh.map && texturesByName && texturesByName[mesh.map];
-      const image = mesh.map && mesh.uv && png ? texCache.get(mesh.map) : null;
+      const image = mesh.map && mesh.uv && png ? texCache.get(texKey(mesh.map, png)) : null;
       if (!image) return plain;
-      const key = `${mesh.map}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}`;
+      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}`;
       if (!matCache.has(key)) {
         const textured = fx
           ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
@@ -139,9 +152,11 @@ window.Ds1Viewport = (() => {
     if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const wantedPngs = new Map();
     for (const [name, data] of loaded)
-      for (const [tex, png] of Object.entries(data.textures || {}))
-        if (!wantedPngs.has(tex)) wantedPngs.set(tex, png);
-    await Promise.all([...wantedPngs].map(([tex, png]) => textureFor(tex, png)));
+      for (const [tex, png] of Object.entries(data.textures || {})) {
+        const key = texKey(tex, png);
+        if (!wantedPngs.has(key)) wantedPngs.set(key, [tex, png]);
+      }
+    await Promise.all([...wantedPngs.values()].map(([tex, png]) => textureFor(tex, png)));
     if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const geometries = new Map();
     for (const [name, data] of loaded) {

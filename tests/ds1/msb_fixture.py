@@ -3,17 +3,22 @@ import struct
 
 
 def build_msb(parts=(("enemy", 2, 0, 0, 120000), ("player", 4, 0, 1, None), ("piece", 0, 0, 1, None),
-                     ("chest", 1, 0, 1, None))):
+                     ("chest", 1, 0, 1, None)),
+                models=(("c1200", 0), ("m10piece", 0))):
     """A minimal map: 2 models, no events/points, and the given parts.
-    Each part is (kind, type, id, model, npc)."""
-    model_names = ["c1200", "m10piece"]
+    Each part is (kind, type, id, model, npc) with model indexing
+    `models`; each model is (name, type). A part may carry a sixth
+    item, its (x, y, z) position, defaulting to (1.0, 2.0, 3.0)."""
+    model_names = [name for name, _mtype in models]
     blobs = []
-    for index, name in enumerate(model_names):
-        entry = struct.pack("<8i", 0x20, index if index != 1 else 0, index, 0, 1, 0, 0, 0)
+    for index, (name, mtype) in enumerate(models):
+        entry = struct.pack("<8i", 0x20, mtype, index, 0, 1, 0, 0, 0)
         blobs.append((entry, name, "sib%d" % index))
-    for kind, ptype, pid, model, npc in parts:
+    for part in parts:
+        kind, ptype, pid, model, npc = part[:5]
+        pos = part[5] if len(part) > 5 else (1.0, 2.0, 3.0)
         base = struct.pack("<5i", 0x64, ptype, pid, model, 0)
-        base += struct.pack("<3f", 1.0, 2.0, 3.0) + struct.pack("<3f", 0.0, 90.0, 0.0)
+        base += struct.pack("<3f", *pos) + struct.pack("<3f", 0.0, 90.0, 0.0)
         base += struct.pack("<3f", 1.0, 1.0, 1.0) + bytes(32)
         base += struct.pack("<iii", 0, 0, 0)
         entity = bytes(0x18)
