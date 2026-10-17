@@ -5,7 +5,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],shopTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
-  animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,
+  animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
   assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
@@ -1352,7 +1352,7 @@ function submitTaeForm(form){
       state.taeForm=null;state.selected=key(result.row);state.animQuery="";
       await loadItems();
       const index=animListMatches().findIndex(row=>key(row)===state.selected);
-      state.animPage=Math.max(0,Math.floor(index/state.pageSize));
+      state.animPage=Math.max(0,Math.floor(index/animPaneSize("events")));
     }catch(error){
       state.taeForm=null;await refreshState();await loadItems();notify(error);
     }finally{
@@ -2008,18 +2008,40 @@ function remountAnim(){
     failMount(status,"Could not load the animation.")(error);
   });
 }
+// A panel pages only what fits it: the fitted size caps the global
+// row count, so a paginated list never grows its own scrollbar.
+function animPaneSize(which){
+  const fit=which==="char"?state.animCharFit:which==="events"?state.animEventFit:state.animFit;
+  return Math.max(1,Math.min(state.pageSize,fit||Infinity));
+}
+function fitAnimList(list,which,size){
+  LexeditorUI.fitListPage({list,available:list,pageSize:size,minRowHeight:32,
+    change:value=>{
+      if(which==="char"){if(state.animCharFit===value)return;state.animCharFit=value;}
+      else if(which==="events"){if(state.animEventFit===value)return;state.animEventFit=value;}
+      else{if(state.animFit===value)return;state.animFit=value;}
+      if(state.tab!=="animations")return;
+      if(which==="char")refreshAnimChars();else refreshAnimList();
+    }});
+}
+function stopAnimFit(pane){
+  pane.querySelector(".lex-column-list")?.__lexFitListObserver?.disconnect?.();
+}
 function animCharsPane(){
   const here=animCharMatches();
-  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  const size=animPaneSize("char");
+  const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animCharPage>pages-1)state.animCharPage=pages-1;
-  const shown=here.slice(state.animCharPage*state.pageSize,(state.animCharPage+1)*state.pageSize);
+  const shown=here.slice(state.animCharPage*size,(state.animCharPage+1)*size);
   const select=row=>{if(key(row)!==state.animCharId)void chooseAnimChar(row);};
+  const list=columnList({rows:shown,key,selected:state.animCharId,select,class:"lex-list-fill",
+    columns:[{key:"name",label:"Name",grow:1}]});
+  fitAnimList(list,"char",size);
   return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
-    columnList({rows:shown,key,selected:state.animCharId,select,class:"lex-list-fill",
-      columns:[{key:"name",label:"Name",grow:1}]}),
-    LexeditorUI.pager({pages,page:state.animCharPage,total:here.length,pageSize:state.pageSize,
+    list,
+    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animCharPage,total:here.length,pageSize:size,
       change:value=>{state.animCharPage=value;refreshAnimChars();}}));
 }
 function animEventsCell(){
@@ -2032,34 +2054,40 @@ function animEventsCell(){
 }
 function animAnimsPane(){
   const here=animListMatches();
-  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  const size=animPaneSize("anims");
+  const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animPage>pages-1)state.animPage=pages-1;
-  const shown=here.slice(state.animPage*state.pageSize,(state.animPage+1)*state.pageSize);
+  const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
   const select=row=>{if(key(row)!==state.selected)void pickAnimMotion(row);};
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
+    columns:[{key:"name",label:"Name",grow:1},animEventsCell()]});
+  fitAnimList(list,"anims",size);
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
-      columns:[{key:"name",label:"Name",grow:1},animEventsCell()]}),
-    LexeditorUI.pager({pages,page:state.animPage,total:here.length,pageSize:state.pageSize,
+    list,
+    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
       change:value=>{state.animPage=value;refreshAnimList();}})];
 }
 function animEventsPane(){
   const here=animListMatches();
-  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  const size=animPaneSize("events");
+  const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animPage>pages-1)state.animPage=pages-1;
-  const shown=here.slice(state.animPage*state.pageSize,(state.animPage+1)*state.pageSize);
+  const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
   const select=row=>{if(key(row)!==state.selected)void pickAnimEvent(row);};
   selectVisibleRecord=select;
   const scope=state.animScope;
   const back=el("button",{type:"button","data-anim-back":"",
     onclick:()=>animBackToAnims().catch(notify)},`‹ ${scope.animName||"Animations"}`);
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
+    columns:[{key:"name",label:"Name",grow:1}]});
+  fitAnimList(list,"events",size);
   return [back,
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    columnList({rows:shown,key,selected:state.selected,select,
-      columns:[{key:"name",label:"Name",grow:1}]}),
-    LexeditorUI.pager({pages,page:state.animPage,total:here.length,pageSize:state.pageSize,
+    list,
+    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
       change:value=>{state.animPage=value;refreshAnimList();}}),
     detail()];
 }
@@ -2071,12 +2099,14 @@ function refreshAnimChars(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-chars]");
   if(!pane)return;
+  stopAnimFit(pane);
   pane.replaceWith(animCharsPane());
 }
 function refreshAnimList(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-list]");
   if(!pane){render();return;}
+  stopAnimFit(pane);
   pane.replaceWith(animListPane());
 }
 function renderMaps(){

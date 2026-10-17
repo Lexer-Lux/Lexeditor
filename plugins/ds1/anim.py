@@ -247,13 +247,16 @@ def skeleton(game_root, project, chr_id):
     resolved = resolve_chr(game_root, project, chr_id)
     if resolved[0] == 'member':
         plain, names = _open(resolved[1])
-        for member in sorted(names):
-            if member.endswith('.flver'):
-                doc = FlverDocument(_entry(plain, names, resolved[1], member))
-                flver_bones = [{'name': bone['name'], 'parent': bone['parent'],
-                                'pos': list(bone['pos']), 'rot': list(bone['rot']),
-                                'scale': list(bone['scale'])} for bone in doc.bones]
-                break
+        # The same mesh the geometry endpoint skins: skin indices are
+        # positions in this file's bone list, so a binder holding
+        # several models must not lend another file's bones.
+        flvers = sorted(name for name in names if name.endswith('.flver'))
+        picked = f'{chr_id}.flver' if f'{chr_id}.flver' in flvers else (flvers[:1] or [None])[0]
+        if picked is not None:
+            doc = FlverDocument(_entry(plain, names, resolved[1], picked))
+            flver_bones = [{'name': bone['name'], 'parent': bone['parent'],
+                            'pos': list(bone['pos']), 'rot': list(bone['rot']),
+                            'scale': list(bone['scale'])} for bone in doc.bones]
     order = {bone['name']: index for index, bone in enumerate(hka['bones'])}
     return {'hka': {'bones': [bone['name'] for bone in hka['bones']],
                     'parents': list(hka['parents']),

@@ -8,6 +8,7 @@ window.Ds1Anim = (() => {
     if (host._animStop) { try { host._animStop(); } catch (_) {} host._animStop = null; }
     host.replaceChildren();
     delete host.dataset.ready;
+    delete host._animBones;
   }
 
   async function get(url) {
@@ -55,7 +56,8 @@ window.Ds1Anim = (() => {
       } else {
         const bone = skel.flver[i];
         bindT.push(bone.pos);
-        bindQ.push(new THREE.Quaternion().setFromEuler(new THREE.Euler(bone.rot[0], bone.rot[1], bone.rot[2], "YZX")));
+        // FLVER bone angles are radians in XZY order (soulstruct).
+        bindQ.push(new THREE.Quaternion().setFromEuler(new THREE.Euler(bone.rot[0], bone.rot[1], bone.rot[2], "XZY")));
         bindS.push(bone.scale);
       }
     }
@@ -86,18 +88,75 @@ window.Ds1Anim = (() => {
       bone.scale.set(bindS[i][0], bindS[i][1], bindS[i][2]);
       return bone;
     });
-    bones.forEach((bone, i) => { (parents[i] >= 0 ? bones[parents[i]] : mover).add(bone); });
+    // Mapped bones follow the Havok hierarchy: the model carries
+    // extra anchors the animation never moves, and hanging an
+    // animated bone under one would offset its whole chain. Bones the
+    // model only (SFX and dummy anchors) keep the model's own parent.
+    const flverOfHka = new Map();
+    mapped.forEach((hka, i) => { if (hka >= 0 && !flverOfHka.has(hka)) flverOfHka.set(hka, i); });
+    const parentOf = i => {
+      const hka = mapped[i];
+      if (hka >= 0) {
+        const seen = new Set([hka]);
+        let hp = skel.hka.parents[hka];
+        while (Number.isInteger(hp) && hp >= 0 && hp < skel.hka.parents.length &&
+               !flverOfHka.has(hp) && !seen.has(hp)) {
+          seen.add(hp);
+          hp = skel.hka.parents[hp];
+        }
+        return flverOfHka.has(hp) ? flverOfHka.get(hp) : -1;
+      }
+      return parents[i];
+    };
+    bones.forEach((bone, i) => {
+      const p = parentOf(i);
+      (p >= 0 && p < bones.length && p !== i ? bones[p] : mover).add(bone);
+    });
     mover.updateMatrixWorld(true);
     const skeleton = new THREE.Skeleton(bones, bones.map(bone => bone.matrixWorld.clone().invert()));
+    // Test seam: live bone names and world positions, for alignment checks.
+    host._animBones = () => bones.map(bone => {
+      const at = new THREE.Vector3();
+      bone.getWorldPosition(at);
+      return {name: bone.name, pos: [at.x, at.y, at.z]};
+    });
     const helper = new THREE.SkeletonHelper(mover);
     helper.material.linewidth = 1;
     rig.add(helper);
-    const gray = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0});
-    trash.push(gray);
+    const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
+    const double = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.DoubleSide});
+    trash.push(front, double);
+    // The same diffuse textures the model drawer shows: without them
+    // every animated enemy renders gray.
+    const texCache = new Map();
+    const texLoader = new THREE.TextureLoader();
+    const materialFor = async mesh => {
+      const plain = mesh.cull !== false ? front : double;
+      const png = mesh.map && geo.textures && geo.textures[mesh.map];
+      if (!png || !mesh.uv) return plain;
+      if (!texCache.has(mesh.map)) {
+        try {
+          const tex = await texLoader.loadAsync(`data:image/png;base64,${png}`);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          // DirectX bytes, as on the map: no GL flip, tiled wrap.
+          tex.flipY = false;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          texCache.set(mesh.map, tex);
+          trash.push(tex);
+        } catch (_error) {
+          return plain;
+        }
+      }
+      const textured = new THREE.MeshStandardMaterial({map: texCache.get(mesh.map),
+        roughness: 0.95, metalness: 0, side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+      trash.push(textured);
+      return textured;
+    };
     for (const mesh of geo.meshes) {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
       g.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+      if (mesh.uv) g.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
       g.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
       const ids = u32(mesh.skin_ids);
       let wide = false;
@@ -106,9 +165,18 @@ window.Ds1Anim = (() => {
                                        : new THREE.Uint16BufferAttribute(ids, 4));
       g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(f32(mesh.skin_weights), 4));
       trash.push(g);
-      const skinned = new THREE.SkinnedMesh(g, gray);
+      const skinned = new THREE.SkinnedMesh(g, await materialFor(mesh));
+      if (mine !== session || !host.isConnected) {
+        controls.dispose();
+        renderer.dispose();
+        for (const item of trash) item.dispose();
+        return;
+      }
       skinned.frustumCulled = false;
-      mover.add(skinned);
+      // The mesh hangs off the rig, not the root-motion mover: the
+      // bones already carry the mover's transform, so parenting the
+      // mesh there too would move it twice.
+      rig.add(skinned);
       skinned.bind(skeleton);
     }
     mover.updateMatrixWorld(true);
@@ -233,6 +301,7 @@ window.Ds1Anim = (() => {
     let frames2 = 0, liveFlag = true, last = performance.now();
     host._animStop = () => {
       liveFlag = false;
+      delete host._animBones;
       if (resizer) resizer.disconnect();
       else window.removeEventListener("resize", resize);
       controls.dispose();

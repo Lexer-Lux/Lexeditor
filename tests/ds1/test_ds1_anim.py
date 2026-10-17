@@ -138,3 +138,31 @@ def test_list_anims_marks_broken_member(tmp_path):
     assert broken['reason']
     assert any(entry['file'] == 'a87_3300.hkx' and entry.get('available', True)
                for entry in listed['anims'])
+
+
+def test_skeleton_prefers_own_flver(tmp_path):
+    game = tmp_path / 'game'
+    (game / 'chr').mkdir(parents=True)
+    (game / 'chr' / 'c1200.anibnd.dcx').write_bytes(build_anibnd({
+        'Skeleton.hkx': build_tag0(), 'a87_3300.hkx': build_tag0()}))
+    decoy = build_flver(bones=[('decoy', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0),
+                                (1.0, 1.0, 1.0))])
+    (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(
+        make_chrbnd(build_flver(), 'c1200', [('a_first.flver', decoy)]))
+    skel = anim.skeleton(game, None, 'c1200')
+    assert [bone['name'] for bone in skel['flver']] == ['root']
+    assert skel['map'] == [0]
+
+
+def test_skinned_geometry_explicit_bone_list(tmp_path):
+    game = tmp_path / 'game'
+    (game / 'chr').mkdir(parents=True)
+    bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)),
+             ('child', 0, (0.0, 1.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
+    skin = [((1, 1, 1, 1), (1.0, 0.0, 0.0, 0.0))] * 4
+    (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(
+        make_chrbnd(build_flver(bones=bones, skin=skin), 'c1200'))
+    geo = viewport.chr_geometry(game, None, 'c1200', skin=True)
+    mesh = geo['meshes'][0]
+    assert u32(mesh['skin_ids']) == (1,) * 16
+    assert f32(mesh['skin_weights']) == pytest.approx((1.0, 0.0, 0.0, 0.0) * 4)
