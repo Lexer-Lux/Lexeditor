@@ -158,7 +158,7 @@ def phase_readonly(play, game, output, errors):
             assert page.locator('[data-viewport-action="copy"]').count() == 0
             assert page.locator('[data-viewport-action="paste"]').count() == 0
             assert page.locator('[data-viewport-action="duplicate"] svg').count() == 1
-            assert page.locator('[data-viewport-action="remove"]').inner_text() == 'x'
+            assert page.locator('[data-viewport-action="remove"] svg').count() == 1
             assert not page.locator('[data-viewport-action="rotate"]').is_disabled()
             assert page.locator('[data-viewport-action="collision"]').count() == 0
             canvas = page.locator('canvas[data-viewport]')

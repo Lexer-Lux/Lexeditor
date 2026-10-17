@@ -600,7 +600,7 @@ def test_mods_detail_header_has_duplicate_delete_and_open_buttons(page):
     assert [buttons.nth(index).get_attribute("aria-label") for index in range(buttons.count())] == [
         "Make an editable copy of Mine", "Remove Mine from the library", "Open Mine's folder"]
     assert buttons.nth(0).locator("svg").count() == 1
-    assert buttons.nth(1).inner_text() == "x"
+    assert buttons.nth(1).locator("svg").count() == 1
     assert buttons.nth(2).locator("svg").count() == 1
     assert page.get_by_role("button", name="Open folder", exact=True).count() == 0
 
