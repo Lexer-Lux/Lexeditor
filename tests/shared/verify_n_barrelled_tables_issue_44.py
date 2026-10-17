@@ -88,9 +88,9 @@ def main() -> int:
     require("const barrelPanelMinimum =" in FRAMEWORK
             and "minLeft: barrelPanelMinimum" in FRAMEWORK,
             "the table-panel pixel minimum must grow with the barrel count")
-    require("minimumSplit: Math.min(78, 22 * barrels)" in FRAMEWORK
+    require("minimumSplit: Math.min(78, 22 * barrels)" not in FRAMEWORK
             and "minimumFractions" in FRAMEWORK,
-            "the shared panel composer must consume the barrel-aware split minimum")
+            "no window-share floor may stop the list shrinking; the pixel floor plus measured table widths bind")
     require("fitBarrelTableColumns" in FRAMEWORK,
             "barrel table tracks must fit inside their assigned panel without clipping an edge")
     require("splitKey:`ff8-${view}`" in plugin_ui("ff8"),
