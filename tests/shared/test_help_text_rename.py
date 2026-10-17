@@ -2,7 +2,7 @@
 
 A bubble has no name of its own, so the shipped text is the key: the stored
 override is found by a digest of it. Escape keeps the shipped text, an empty
-text clears it, and a reader who is not the developer cannot edit it.
+text clears it, the marker goes away everywhere, and undo brings it back.
 """
 import pytest
 
@@ -84,7 +84,7 @@ def test_escape_keeps_the_shipped_text_and_an_empty_one_clears_it(page):
     editor.fill("   ")
     editor.press("Control+Enter")
     page.wait_for_timeout(250)
-    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
+    assert page.locator(".lex-field-help .lex-info-help").count() == 0
     assert list(page.evaluate("window.savedCalls")[-1][2].values())[0] == ""
 
 
@@ -144,12 +144,12 @@ def test_clearing_a_panel_tab_bubble_with_empty_enter(page):
     editor.fill("   ")
     editor.press("Enter")
     page.wait_for_timeout(300)
-    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
+    assert page.locator(".lex-subtab-button .lex-info-help").count() == 0
     saved = page.evaluate("window.savedCalls")
     assert saved and list(saved[-1][2].values())[0] == "", saved
 
 
-def test_cleared_help_hides_its_marker_from_readers(page):
+def test_cleared_help_hides_its_marker_everywhere(page):
     framework(page)
     mount_shell(page)
     mount_help(page)
@@ -159,8 +159,16 @@ def test_cleared_help_hides_its_marker_from_readers(page):
     editor.fill("   ")
     editor.press("Enter")
     page.wait_for_timeout(300)
-    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
+    assert page.locator(".lex-field-help .lex-info-help").count() == 0
     # The same reader without developer mode gets no marker at all.
     mount_shell(page, developer=False)
     mount_help(page)
     assert page.locator(".lex-field-help .lex-info-help").count() == 0
+    # Undo brings the wording back on the next mount.
+    mount_shell(page)
+    page.mouse.click(600, 700)
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    mount_help(page)
+    open_help(page)
+    assert popover_text(page) == SHIPPED

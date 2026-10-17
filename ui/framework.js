@@ -781,11 +781,9 @@
     const shipped = typeof text === "string" ? text : null;
     const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
     const isCleared = () => shipped !== null && shown() === "";
-    const clearedHint = () => element("em", {class: "lex-help-cleared"},
-      "Help text cleared. Double-click the marker to write new text.");
-    // Cleared help is gone for readers; developers keep the marker so the
-    // text can be written again, with a hint instead of an empty bubble.
-    if (isCleared() && !sharedSettingsSnapshot?.developerMode) return document.createTextNode("");
+    // Cleared help is gone everywhere: clearing means gone. Ctrl+Z brings
+    // the text back, and the next mount shows the marker again.
+    if (isCleared()) return document.createTextNode("");
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, symbol = "?", ...rest
@@ -797,7 +795,7 @@
       ...rest,
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
-      "aria-label": isCleared() ? "Help text cleared" : ariaLabel, "aria-describedby": popupId,
+      "aria-label": ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, symbol));
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
@@ -816,11 +814,10 @@
       // A developer can reword what the bubble says. The shipped string stays
       // the key, so a bubble reworded here reads the new text on every screen
       // that shows the same explanation.
-      const nowCleared = isCleared();
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
       }, text instanceof Node ? text.cloneNode(true)
-        : nowCleared ? clearedHint() : String(shown() ?? title ?? ""));
+        : String(shown() ?? title ?? ""));
       document.body.append(popup);
       if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
         // The bubble itself never takes the pointer, so the editor is started
@@ -843,7 +840,7 @@
             // text, so a developer can delete help that should not be there.
             const next = typed;
             if (!commit) {
-              popup.replaceChildren(isCleared() ? clearedHint() : String(shown()));
+              popup.replaceChildren(String(shown()));
               // The editor's own blur schedules the bubble's close; keep the
               // wording on screen while the reader is still looking at it.
               cancelClose();
@@ -859,7 +856,8 @@
             // the pointer being back on the marker, so reopen it to face the
             // reader with the wording that was just saved.
             closeHelpPopup();
-            if (reopen) open();
+            if (next === "") marker.remove();
+            else if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
