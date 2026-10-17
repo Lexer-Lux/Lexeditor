@@ -48,12 +48,16 @@ def test_prompt_text():
     assert '.lex-prompt-dialog' in css()
 
 
-def test_detail_tabs_replace_pagination():
+def test_detail_tabs_keep_column_flow():
     source = ui()
-    assert 'detailBody(bodyClass, options.body)' in source
-    assert 'sectionFlow(bodyClass, options.body, options.paginate)' not in source
+    assert 'detailBody(bodyClass, options.body, options.paginate)' in source
     assert '.detailtabs' in source
     assert 'box._detailTabs' in source
     assert 'bodyBox._detailTabs?.addTab()' in source
     assert '.lex-detail-tabpane' in css()
     assert 'text/lex-detail-node' in source
+    # A body of sections still flows into columns (the COLUMNS control sets
+    # how many); tabs take over only where the developer gave the shape its
+    # own, and then the pager's columns go.
+    assert 'hasTabs' in source
+    assert 'paginateSettings(box, flow)' in source

@@ -1080,6 +1080,36 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */
+/* A header icon button fills its header the way the switch does: it
+   stretches to the actions area, staying a centred square with equal
+   margins, and its picture scales with it. One global rule, not one per
+   panel: whatever icons a header carries behave the same. */
+.lex-detail-panel-actions > .lex-header-icon {
+  align-self:stretch;
+  width:auto;
+  height:auto;
+  max-height:100%;
+  min-width:0;
+  min-height:16px;
+  aspect-ratio:1;
+  margin:5px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  font-size:var(--lex-detail-title-size,clamp(21px,2.5vw,32px));
+}
+.lex-detail-panel-actions > .lex-header-icon > svg {
+  width:0.95em;
+  height:0.95em;
+  flex:none;
+}
+.lex-detail-panel-actions > .lex-header-icon:not(:has(> svg)) {
+  font-size:0.85em;
+  line-height:1;
+  font-weight:700;
+}
 .lex-header-icon{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
 .lex-header-icon:hover{opacity:1;}
 .lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}

@@ -848,14 +848,19 @@
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
               after: next, shipped, node: null});
             labelRedo.length = 0;
-            await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
+            const saved = await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
             labelHistoryChanged();
             try {
-              // storeLabel already saved it, with the same transport the rest of
-              // the renames use.
-              showToast(next === shipped ? "The shipped help text is back."
-                                         : next === "" ? "The help text is cleared."
-                                         : "The new help text is now the shipped one.");
+              // "Shipped" only when the shared default kept the text.
+              if (saved) {
+                showToast(next === shipped ? "The shipped help text is back."
+                                           : next === "" ? "The help text is cleared."
+                                           : "The new help text is now the shipped one.");
+              } else {
+                showToast(next === shipped ? "The shipped help text is back on this device."
+                                           : next === "" ? "The help text is cleared on this device."
+                                           : "The new help text is saved on this device.");
+              }
             } catch (_error) {}
           };
           // Enter or clicking away keeps the new wording; Shift+Enter starts a
@@ -1400,12 +1405,36 @@
     seen.set(base, count);
     return count > 1 ? `${base}#${count}` : base;
   };
+  // One record shape's detail tabs, shipped like any other view default.
+  // The key carries the page token the host requires; the local cache keeps
+  // every shape together for fast reads.
+  const detailShapeKey = shape => `${shellPluginId()}-${activePageTab()}.detailtabs.${shape}`;
+  const shipDetailLayout = (shape, layout) => {
+    const key = detailShapeKey(shape);
+    callWindow("save_default_view", shellPluginId(), activePageTab(),
+      {[key]: JSON.stringify({...layout, updatedAt: Date.now()})}).catch(() => {});
+  };
   const loadDetailLayouts = () => {
+    let cached = null;
     try {
       const parsed = JSON.parse(localStorage.getItem(detailTabsKey()) || "");
-      if (parsed && typeof parsed === "object" && parsed.shapes) return parsed;
+      if (parsed && typeof parsed === "object" && parsed.shapes) cached = parsed;
     } catch (_error) {}
-    return {shapes: {}};
+    const shapes = {...(cached?.shapes || {})};
+    // Shipped layouts arrive as one key per shape (the host seeds them into
+    // storage at startup); the newer copy of each shape wins.
+    try {
+      const prefix = `${shellPluginId()}-${activePageTab()}.detailtabs.`;
+      for (let index = 0; index < localStorage.length; index++) {
+        const name = localStorage.key(index);
+        if (!name?.startsWith(prefix)) continue;
+        const entry = JSON.parse(localStorage.getItem(name) || "null");
+        if (!entry || !Array.isArray(entry.tabs)) continue;
+        const shape = name.slice(prefix.length);
+        if ((entry.updatedAt || 0) >= ((shapes[shape] || {}).updatedAt || 0)) shapes[shape] = entry;
+      }
+    } catch (_error) {}
+    return {shapes};
   };
   const saveDetailLayouts = (shape, layout) => {
     const all = loadDetailLayouts();
@@ -1414,13 +1443,25 @@
     all.shapes = Object.fromEntries(entries.slice(0, 12));
     try { localStorage.setItem(detailTabsKey(), JSON.stringify(all)); } catch (_error) {}
   };
-  const detailBody = (bodyClass, body) => {
+  const detailBody = (bodyClass, body, paginate) => {
     const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
     const box = element("div", {class: bodyClass}, nodes);
     const ctx = detailTabsContext(box);
     box._detailTabs = ctx;
     ctx.render();
-    return box;
+    // A shape the developer gave its own tabs keeps those panes; every other
+    // body made only of sections flows into columns, `paginate: false`
+    // keeping one column and an object passing options through.
+    if (ctx.hasTabs()) return box;
+    const sections = nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-section"));
+    const flow = paginate === false ? null
+      : paginate ? (typeof paginate === "object" ? paginate : {})
+      : sections ? {inline: true} : null;
+    if (!flow) return box;
+    const paged = paginateSettings(box, flow);
+    paged._detailTabs = ctx;
+    return paged;
   };
   const detailTabsContext = box => {
     const dev = () => !!sharedSettingsSnapshot?.developerMode;
@@ -1462,6 +1503,11 @@
       active: stored.active ?? null,
     } : {tabs: [], shells: {}, fields: {}, active: null};
     const persist = () => saveDetailLayouts(shape, layout);
+    // Structural changes ship; switching the active tab stays local.
+    const persistShared = () => {
+      persist();
+      shipDetailLayout(shape, layout);
+    };
     const tabIds = () => layout.tabs.map(tab => tab.id);
     const firstTab = () => layout.tabs[0]?.id;
     const validTab = id => tabIds().includes(id) ? id : firstTab();
@@ -1526,7 +1572,7 @@
             value: tab?.label || "", confirmLabel: "Rename"});
           if (!label) return;
           tab.label = label;
-          persist();
+          persistShared();
           strip.setLabel(id, label);
         },
         holdToSave: true});
@@ -1552,7 +1598,7 @@
           } else {
             return;
           }
-          persist();
+          persistShared();
           render();
         });
       }
@@ -1581,6 +1627,16 @@
         }
       }
       for (const [tab, field] of dealt) panes.get(tab)?.append(field);
+      // Tabs take over from column pages: the pager dealt these sections
+      // into columns, so its empty columns, off-page hold and page footer
+      // go, and its resize refits stop (they would deal the panes apart).
+      box.querySelectorAll(":scope > .lex-tweak-column, :scope > .lex-tweak-off-page")
+        .forEach(node => node.remove());
+      const paged = box.closest(".lex-tweaks-paged");
+      paged?.lexPageObserver?.disconnect();
+      paged?.querySelector(":scope > .lex-tweaks-pages")?.remove();
+      const scroller = box.closest(".lex-tweaks-scroll");
+      if (scroller) scroller.style.overflowY = "auto";
     };
     const addTab = async () => {
       const label = await promptText({title: "New detail tab", label: "Tab name", confirmLabel: "Create"});
@@ -1593,11 +1649,11 @@
       }
       layout.tabs.push({id, label});
       layout.active = id;
-      persist();
+      persistShared();
       render();
     };
     enableDrag();
-    return {render, addTab};
+    return {render, addTab, hasTabs: () => layout.tabs.length > 0};
   };
 
   const detailPanel = (options = {}) => {
@@ -1680,7 +1736,7 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
       sound ? sound.scrub : null);
     if (sound && heading) heading.classList.add("lex-audio-heading");
-    const bodyBox = detailBody(bodyClass, options.body);
+    const bodyBox = detailBody(bodyClass, options.body, options.paginate);
     if (heading) heading.addEventListener("contextmenu", event => {
       if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
@@ -7697,6 +7753,7 @@ ${contents.path}`});
     for (const title of document.querySelectorAll(".lex-detail-section-title-text[data-lex-label-key]"))
       if (title.dataset.lexLabelKey === key) title.textContent = text;
   };
+  // True when the host kept the value, so the toast can say so honestly.
   const storeLabel = async (key, tabId, value, shipped) => {
     const cleared = value !== shipped;
     const next = cleared ? value : "";
@@ -7705,8 +7762,10 @@ ${contents.path}`});
       else localStorage.removeItem(key);
     } catch (_error) {}
     try {
-      await callWindow("save_default_view", shellPluginId(), tabId, {[key]: next});
+      const result = await callWindow("save_default_view", shellPluginId(), tabId, {[key]: next});
+      return !!result?.saved;
     } catch (_error) {}
+    return false;
   };
   const undoLabel = async () => {
     const entry = labelUndo.pop();
@@ -8066,6 +8125,45 @@ ${contents.path}`});
     propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after");
     propertyDrop = null;
   };
+  // During a section or property drag, holding the pointer near the top or
+  // bottom edge of the details panel scrolls it, the way other programs do.
+  // The loop runs on animation frames, not drag events, so it keeps scrolling
+  // while the pointer sits still at the edge. It only moves scrollTop: the
+  // panel's own scrollbar stays as usable as it was before the drag.
+  let dragScroll = null;
+  let dragScrollRaf = 0;
+  const dragScrollContainer = target => {
+    for (let node = target instanceof Element ? target : null; node; node = node.parentElement) {
+      if (node.scrollHeight > node.clientHeight + 1) {
+        const vertical = getComputedStyle(node).overflowY;
+        if (vertical === "auto" || vertical === "scroll") return node;
+      }
+    }
+    return null;
+  };
+  const dragScrollTick = () => {
+    dragScrollRaf = 0;
+    if (!dragScroll || (!sectionDrag && !propertyDrag)) { dragScroll = null; return; }
+    const {container, y} = dragScroll;
+    if (container.isConnected) {
+      const box = container.getBoundingClientRect();
+      const zone = 56;
+      const fromTop = y - box.top, fromBottom = box.bottom - y;
+      let delta = 0;
+      if (fromTop >= 0 && fromTop < zone) delta = -Math.ceil((zone - fromTop) / zone * 14);
+      else if (fromBottom >= 0 && fromBottom < zone) delta = Math.ceil((zone - fromBottom) / zone * 14);
+      if (delta) container.scrollTop += delta;
+    }
+    if (sectionDrag || propertyDrag) dragScrollRaf = requestAnimationFrame(dragScrollTick);
+    else dragScroll = null;
+  };
+  const dragScrollNote = event => {
+    if (!sectionDrag && !propertyDrag) return;
+    const container = dragScrollContainer(event.target);
+    if (!container) { dragScroll = null; return; }
+    dragScroll = {container, y: event.clientY};
+    if (!dragScrollRaf) dragScrollRaf = requestAnimationFrame(dragScrollTick);
+  };
   // In Developer Mode a property is dragged by its whole row - anywhere but
   // its value box, which still selects text and edits as usual.
   document.addEventListener("pointerover", event => {
@@ -8094,6 +8192,7 @@ ${contents.path}`});
   });
   document.addEventListener("dragover", event => {
     if (!sectionDrag) return;
+    dragScrollNote(event);
     clearPropertyDrop();
     const {state, section} = sectionDrag;
     const target = [...state.groups.values()].map(layoutSectionOf)
@@ -8140,6 +8239,7 @@ ${contents.path}`});
   });
   document.addEventListener("dragover", event => {
     if (!propertyDrag) return;
+    dragScrollNote(event);
     clearPropertyDrop();
     if (!sharedSettingsSnapshot?.developerMode) return;
     const {state, field} = propertyDrag;
@@ -8289,11 +8389,17 @@ ${contents.path}`});
           // plugin's record history has no idea this happened.
           labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
           labelRedo.length = 0;
-          await storeLabel(key, tabId, label, fallback);
+          const saved = await storeLabel(key, tabId, label, fallback);
           labelHistoryChanged();
           try {
-            showToast(label === fallback ? `${fallback} is back to its shipped name.`
-                                         : `${label} is now the shipped name.`);
+            // "Shipped" only when the shared default kept the name.
+            if (saved) {
+              showToast(label === fallback ? `${fallback} is back to its shipped name.`
+                                           : `${label} is now the shipped name.`);
+            } else {
+              showToast(label === fallback ? `${fallback} is back on this device.`
+                                           : `${label} is saved on this device.`);
+            }
           } catch (_error) {}
     };
     input.addEventListener("keydown", event => {
@@ -13273,7 +13379,7 @@ ${contents.path}`});
       const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
         : `Remove ${row.name} from the library`;
       const openTitle = `Open ${row.name}'s folder`;
-      const actions = [toggle,
+      const actions = [
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
@@ -13281,7 +13387,7 @@ ${contents.path}`});
         element("button", {type: "button", class: "lex-header-icon", title: openTitle,
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
-            .catch(error => failure("Could not open the folder", error))}, folderIcon())];
+            .catch(error => failure("Could not open the folder", error))}, folderIcon()), toggle];
 
       const sections = [];
       const settingsPanels = [];
@@ -13413,7 +13519,9 @@ ${contents.path}`});
           conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
         ...(row.alerts || []).map(line => detailNote(line)),
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
-      return detailPanel({title: row.name, actions, body: [...notes, ...sections], paginate: {inline: true}});
+      // The contents tabbed panel pages its own tables; a pager around the whole
+      // detail would strand it on a later page, hiding the mod's own content.
+      return detailPanel({title: row.name, actions, body: [...notes, ...sections], paginate: false});
     };
     const draw = () => {
       if (!main) return;
