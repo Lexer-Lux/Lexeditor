@@ -4,7 +4,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedList
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
-  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],shopTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
   assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
@@ -77,8 +77,7 @@ const shell=LexeditorUI.mountShell({
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"text",label:"Text",help:"Edit the game's menu text: NPC dialogue, event and system messages, help and menu labels. Item names and descriptions edit on the item."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops and effects. A monster's Attacks tab lists the attack records its parameters reference; its brains live in the AI tab. Vanilla is read-only. Save changes the mod project."},
-    {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Vanilla is read-only. Save changes the mod project."},
-    {id:"shops",label:"Shops",help:"Edit what each merchant sells and at what price. Each row is one item in one shop. Stock of -1 never runs out. Vanilla is read-only. Save changes the mod project."},
+    {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Each merchant's Shop tab holds their stock and prices. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"ai",label:"AI",help:"Enemy brains. AI tables are how enemies sense and answer the player; behaviors are the moves each one can choose from. Vanilla is read-only. Save changes the mod project."},
     {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
@@ -98,14 +97,14 @@ const shell=LexeditorUI.mountShell({
   pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
   save,discard,history:fieldHistory
 });
-const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="shops"?state.shopTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
   tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
   ASSET_TABS.has(tab)?state.assetTabs:
   tab==="misc"?state.miscTabs.map(entry=>entry.id==="encumbrance"?{...entry,help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."}:entry.id==="misc"?{...entry,help:"Base stamina recovery before effects and load penalties. Save and Apply to use your value."}:entry.id==="encumbrance-overrides"?{...entry,help:"Special conditions that replace band recovery. They take priority over load ranges and do not create another range. Save and Apply to use your rules."}:entry):state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.aiTabs=result.aiTabs;state.attackTabs=result.attackTabs;
-  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.npcTabs=result.npcTabs||[];state.shopTabs=result.shopTabs||[];state.miscTabs=result.miscTabs||[];state.nativeRules=result.nativeRules;
+  state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.npcTabs=result.npcTabs||[];state.miscTabs=result.miscTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
 }
 function sortedRows(){
@@ -250,8 +249,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";
   else if(tab==="ai"&&!state.aiTabs.some(entry=>entry.id===sub))sub="ai";
   else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
-  else if(tab==="shops"&&!state.shopTabs.some(entry=>entry.id===sub))sub="shops";
-  else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
+    else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
   else if(tab==="maps"){if(DIRECTORY_TABS.includes(sub))state.dirTab=sub;sub="placements";}
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
@@ -264,7 +262,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","npcs","shops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -746,7 +744,7 @@ function shopNumberControl(line,shopKey,label){
     // edit lands so a rejected value cannot linger here.
     edits.then(async()=>{
       try{
-        const fresh=await api(`/api/row?table=ShopLineupParam&id=${line.id}&sub=shops`);
+        const fresh=await api(`/api/row?table=ShopLineupParam&id=${line.id}`);
         for(const item of fresh.row.fields){
           if(item.key==="value"||item.key==="sellQuantity")line[item.key]=item.value;
         }
@@ -756,14 +754,32 @@ function shopNumberControl(line,shopKey,label){
   });
   return input;
 }
+async function toggleShopLine(line,full){
+  // The item name opens the rest of the shop line in place: price and
+  // stock already edit on the line itself, so only the other fields
+  // render here, with the same controls a full record shows.
+  if(full.childNodes.length){full.replaceChildren();return;}
+  full.replaceChildren(LexeditorUI.loadingStatus("Reading shop line"));
+  try{
+    const result=await api(`/api/row?table=ShopLineupParam&id=${line.id}`);
+    const row={table:"ShopLineupParam",id:line.id,name:line.name,
+      fields:(result.row.fields||[]).filter(field=>field.key!=="value"&&field.key!=="sellQuantity"),
+      recordLinks:result.row.recordLinks||[],dialogLinks:result.row.dialogLinks||[]};
+    if(!row.fields.length){full.replaceChildren(LexeditorUI.detailNote("This shop line holds nothing else."));return;}
+    full.replaceChildren(...[...fieldSections(row)].map(([title,body])=>detailSection({title,body})));
+  }catch(error){full.replaceChildren(LexeditorUI.detailNote("Could not read the shop line."));notify(error);}
+}
 function npcShopSection(){
-  const lines=state.npcShop.rows.map(line=>detailField({label:hoverable({content:line.name,
-    targetType:"ds1-shoprow",targetId:line.id,targetLabel:`${line.name} in Shops`,
-    preview:()=>el("div",{},"Price "+line.value+" - Stock "+line.sellQuantity),
-    activate:()=>navigate("shops","shops",`ShopLineupParam:${line.id}`)}),
-    control:LexeditorUI.multiNumberRow([
-      {label:"Price",control:shopNumberControl(line,"value","price")},
-      {label:"Stock",control:shopNumberControl(line,"sellQuantity","stock")}],{columns:2,nowrap:true})}));
+  const lines=state.npcShop.rows.flatMap(line=>{
+    const full=el("div",{class:"lex-shop-line-full"});
+    return [detailField({label:hoverable({content:line.name,
+      targetType:"ds1-shoprow",targetId:line.id,targetLabel:`${line.name} (shop line)`,
+      preview:()=>el("div",{},"Price "+line.value+" - Stock "+line.sellQuantity),
+      activate:()=>toggleShopLine(line,full)}),
+      control:LexeditorUI.multiNumberRow([
+        {label:"Price",control:shopNumberControl(line,"value","price")},
+        {label:"Stock",control:shopNumberControl(line,"sellQuantity","stock")}],{columns:2,nowrap:true})}),full];
+  });
   return [detailSection({title:"Stock",body:lines})];
 }
 function monsterThinkSection(){
@@ -857,7 +873,7 @@ function monsterDetail(groups){
     help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards. Each value is a percentage off the hit. Nothing here applies to a hit it does not block.":null}));
   tabs.push({id:"attacks",label:"Attacks",help:attackHelp});
   if(effects)tabs.push({id:"effects",label:"Effects",help:"Effects this monster carries. Changing a shared effect changes every use of it."});
-  if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here. -1 stock means unlimited. The item name opens the full shop line for the rest."});
+  if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here; the item name opens the rest of the line below it. -1 stock means unlimited."});
   tabs.push({id:"ai",label:"AI",help:"The think record driving this enemy: senses, distances and goals. Swap it with the finder; think records are edited in the AI tab."});
   tabs.push({id:"behaviors",label:"Behaviors",help:"The behavior set this enemy uses. Every behavior in the set is one move it can choose; each move calls one attack, projectile or effect."});
   const active=tabs.some(tab=>tab.id===state.monsterTab)?state.monsterTab:tabs[0].id;
@@ -1271,7 +1287,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
-  const noun=state.tab==="npcs"?"NPC":state.tab==="shops"?"Shop item":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
+  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
@@ -1638,8 +1654,8 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?"NPCs":state.tab==="shops"?"shop items":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?"monsters":state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
-  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="shops"?"Shops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?"monsters":state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,

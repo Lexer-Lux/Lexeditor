@@ -5,7 +5,7 @@ from . import assets, texts
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'ai':'AI', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.',
               'maps':'Maps', 'animations':'Animations', 'text':'Text',
-              'npcs':'NPCs', 'shops':'Shops',
+              'npcs':'NPCs',
               'models':'Models', 'textures':'Textures', 'sound':'Sound effects',
               'music':'Music'}
 
@@ -99,8 +99,8 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit dropped items and their rates in the directory. One lot may be shared by several enemies.')
         elif table == 'ShopLineupParam':
             row.update(coverage='structured',status='partial',openable=True,
-                target='shops',sub='shops',controls='Shops: merchant stock and prices',
-                notes="Edit what each merchant sells, and at what price. Each merchant's NPC page shows only their lines.")
+                target='npcs',sub='npcs',controls='NPCs: merchant stock and prices',
+                notes="Edit what each merchant sells, and at what price, on their NPC page under the Shop tab. Lines no merchant serves list under the Unowned shops subtab.")
         elif table == 'ObjActParam':
             row.update(coverage='structured',status='partial',openable=True,
                 target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',

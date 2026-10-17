@@ -1,4 +1,4 @@
-"""NPCs + Shops tabs: friend gating and lineup rows on synthetic params."""
+"""NPCs tab: friend gating and shop price edits on synthetic params."""
 import sys
 from pathlib import Path
 
@@ -34,16 +34,22 @@ def test_unreviewed_rows_stay_shut():
         document.edit('NpcParam', 223000, 'hp', 500)
 
 
-def test_shops_tab_lists_lineups_with_merchants():
+def test_unowned_shops_lists_lines_without_merchants():
     document = ItemDocument(make_archive())
-    rows = document.list_rows('shops')
-    assert rows
+    rows = document.list_rows('unowned-shops')
+    assert {row['id'] for row in rows} == {100, 101, 102}
     assert all(row['table'] == 'ShopLineupParam' for row in rows)
-    assert all('merchant' in row['values'] for row in rows)
+
+
+def test_owned_line_leaves_the_unowned_list():
+    # Row 1100 carries a real merchant-prefixed Smithbox name; 100 has none.
+    document = ItemDocument(make_archive(table_ids={'ShopLineupParam': [100, 1100]}))
+    rows = document.list_rows('unowned-shops')
+    assert {row['id'] for row in rows} == {100}
 
 
 def test_shop_price_edit():
     document = ItemDocument(make_archive())
-    row_id = document.list_rows('shops')[0]['id']
+    row_id = document.params['ShopLineupParam'].rows[0].row_id
     document.edit('ShopLineupParam', row_id, 'value', 777)
     assert document.value('ShopLineupParam', row_id, 'value') == 777

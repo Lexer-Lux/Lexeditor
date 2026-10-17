@@ -69,17 +69,33 @@ def test_merchant_shop_panel_tab():
                     price.press('Tab')
                     page.wait_for_function('state.pending === 0 && fieldHistory.undoStack.length === 1')
                     assert page.evaluate(
-                        "fetch('/api/row?table=ShopLineupParam&id=1100&sub=shops')"
+                        "fetch('/api/row?table=ShopLineupParam&id=1100')"
                         ".then(r => r.json()).then(j => j.row.fields.find(f => f.key === 'value').value)"
                     ) == 525
                     page.evaluate('fieldHistory.undo()')
                     page.wait_for_function('fieldHistory.undoStack.length === 0')
                     page.wait_for_function(
                         'state.npcShop && state.npcShop.rows[0].value === 500')
-                    # The item name opens the full shop line.
+                    # The item name opens the rest of the line below it.
+                    lines.nth(1).locator('.lex-hoverable').click()
+                    full = page.locator('.lex-shop-line-full .lex-detail-field')
+                    full.first.wait_for(timeout=60000)
+                    assert full.count() >= 5, full.count()
+                    assert page.locator('.lex-shop-line-full [data-field-key="shopType"]').count() == 1
+                    assert page.locator('.lex-shop-line-full [data-field-key="value"]').count() == 0
+                    flag = page.locator('.lex-shop-line-full [data-field-key="eventFlag"]')
+                    flag.fill('1234')
+                    flag.press('Tab')
+                    page.wait_for_function('state.pending === 0 && fieldHistory.undoStack.length === 1')
+                    assert page.evaluate(
+                        "fetch('/api/row?table=ShopLineupParam&id=1101')"
+                        ".then(r => r.json()).then(j => j.row.fields.find(f => f.key === 'eventFlag').value)"
+                    ) == 1234
+                    # Clicking again closes it; the NPC tab never leaves.
                     lines.nth(1).locator('.lex-hoverable').click()
                     page.wait_for_function(
-                        'state.tab === "shops" && state.row && state.row.id === 1101', timeout=60000)
+                        "document.querySelectorAll('.lex-shop-line-full .lex-detail-field').length === 0")
+                    assert page.evaluate('state.tab') == 'npcs'
                     # No attributed lines, no Shop tab.
                     page.evaluate('navigate("npcs", "npcs", "NpcParam:251000")')
                     page.wait_for_function('state.row && state.row.id === 251000', timeout=60000)

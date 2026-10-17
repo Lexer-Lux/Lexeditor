@@ -1,4 +1,4 @@
-"""World directory: enemy drops and treasure behavior. Merchant shops live in the Shops tab, with each merchant's stock on their NPC page."""
+"""World directory: enemy drops and treasure behavior. Merchant shops live on each merchant's NPC page."""
 from pathlib import Path
 import sys
 
@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
 from plugins.ds1 import data_map, mod_loader
 from plugins.ds1.formats import (
-    TABLES, WORLD_SUBTABS, SHOPS_SUBTABS, FormatError, ItemDocument, schema,
+    TABLES, WORLD_SUBTABS, FormatError, ItemDocument, schema,
 )
 from plugins.ds1.store import MARKER, RELATIVE, ItemStore
 
@@ -46,14 +46,10 @@ def test_world_metadata_matches_vanilla_shape():
 def test_world_subtabs_list_their_rows():
     document = ItemDocument(make_archive())
     assert [entry[0] for entry in WORLD_SUBTABS] == ['drops', 'treasure']
-    assert [entry[0] for entry in SHOPS_SUBTABS] == ['shops']
     drops = document.list_rows('drops')
     assert {row['id'] for row in drops} == {100, 101, 102}
     assert all(row['table'] == 'ItemLotParam' for row in drops)
     assert next(row['name'] for row in drops if row['id'] == 100) == 'Drop 100'
-    shops = document.list_rows('shops')
-    assert {row['id'] for row in shops} == {100, 101, 102}
-    assert next(row['name'] for row in shops if row['id'] == 100) == 'Shop entry 100'
     treasure = document.list_rows('treasure')
     assert {row['id'] for row in treasure} == {100, 101, 102}
     assert next(row['name'] for row in treasure if row['id'] == 100) == 'Treasure 100'
@@ -135,16 +131,15 @@ def test_world_rows_merge_by_field_and_conflict_by_name():
     assert ItemDocument(result.files[RELATIVE]).value('ItemLotParam', 100, 'lotItemId01') == 102
 
 
-def test_state_reports_world_and_shop_tabs(tmp_path):
+def test_state_reports_world_tabs_and_no_shop_tabs(tmp_path):
     game, mod = project(tmp_path)
     state = ItemStore(game, mod, False).state()
     assert [(tab['id'], tab['table'], tab['count']) for tab in state['worldTabs']] == [
         ('drops', 'ItemLotParam', 3), ('treasure', 'ObjActParam', 3)]
-    assert [(tab['id'], tab['table'], tab['count']) for tab in state['shopTabs']] == [
-        ('shops', 'ShopLineupParam', 3)]
+    assert 'shopTabs' not in state
 
 
-def test_data_map_points_world_at_maps_and_shops_at_shops(tmp_path):
+def test_data_map_points_world_at_maps_and_shops_at_npcs(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
     for filename, sub in (('ItemLotParam.param', 'drops'), ('ObjActParam.param', 'treasure')):
@@ -154,5 +149,5 @@ def test_data_map_points_world_at_maps_and_shops_at_shops(tmp_path):
         assert row['targets'] == [{'id': 'maps', 'label': 'Maps'}]
     row = next(entry for entry in rows if entry['filename'] == 'ShopLineupParam.param')
     assert row['coverage'] == 'structured' and row['status'] == 'partial'
-    assert row['openable'] and row['target'] == 'shops' and row['sub'] == 'shops'
-    assert row['targets'] == [{'id': 'shops', 'label': 'Shops'}]
+    assert row['openable'] and row['target'] == 'npcs' and row['sub'] == 'npcs'
+    assert row['targets'] == [{'id': 'npcs', 'label': 'NPCs'}]

@@ -204,8 +204,8 @@ ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),
                   ('projectiles', 'Projectiles', 'Bullet'))
 WORLD_SUBTABS = (('drops', 'Drops', 'ItemLotParam'),
                  ('treasure', 'Treasure', 'ObjActParam'))
-NPCS_SUBTABS = (('npcs', 'NPCs', 'NpcParam'),)
-SHOPS_SUBTABS = (('shops', 'Shops', 'ShopLineupParam'),)
+NPCS_SUBTABS = (('npcs', 'NPCs', 'NpcParam'),
+                ('unowned-shops', 'Unowned shops', 'ShopLineupParam'))
 # Reviewed behavior and projectile fields. Costs, call targets and flight
 # physics are safe numbers; identity and judgement fields stay read-only.
 BEHAVIOR_EDITABLE = frozenset({'stamina', 'mp', 'heroPoint', 'category', 'refType', 'refId'})
@@ -923,7 +923,7 @@ class ItemDocument:
         fmg = next((entry for entry in FMG_SUBTABS if entry[0] == tab), None)
         if fmg is not None:
             return self._fmg_rows(fmg[2])
-        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + AI_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS + SHOPS_SUBTABS if entry[0] == tab), None)
+        match = next((entry for entry in SUBTABS + ENEMY_SUBTABS + AI_SUBTABS + ATTACK_SUBTABS + WORLD_SUBTABS + NPCS_SUBTABS if entry[0] == tab), None)
         if match is None: raise FormatError('Unknown editor subtab')
         table = match[2]
         result = []
@@ -943,11 +943,10 @@ class ItemDocument:
             if table == 'EquipParamWeapon':
                 ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
                 if (tab == 'ammo') != ammo: continue
+            if tab == 'unowned-shops' and _shops.has_owner(self, row.row_id):
+                continue
             values, display = self.row_values(table, row.row_id)
             name = self.display_name(table, row.row_id, row)
-            if table == 'ShopLineupParam':
-                merchant = re.match(r'\[(.*?)\]', name or '')
-                values['merchant'] = merchant.group(1) if merchant else ''
             result.append({'id': row.row_id, 'name': name, 'table': table,
                            'values': values, 'display': display,
                            'created': (table, row.row_id) in self._added_rows})

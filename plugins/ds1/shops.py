@@ -11,8 +11,8 @@ names, with three exceptions pinned here:
   range and sells his Dried Finger, so it joins the male merchant (npc
   251001, who drops the Uchigatana he wields).
 - Laurentius of the Great Swamp has no NpcParam row and no placement in
-  the game's data, so his five rows keep working in the global Shops
-  tab; no NPC tab can claim them.
+  the game's data, so his five rows list under the NPCs tab's Unowned
+  shops subtab; no merchant page can claim them.
 
 Attribution reads the static Smithbox names, never the live display
 names, so a mod renaming a shop line cannot move it to another merchant.
@@ -68,6 +68,20 @@ def _invert() -> dict[int, tuple[str, ...]]:
 NPC_MERCHANTS = _invert()
 
 
+def owners(document, row_id) -> tuple:
+    """The NpcParam rows serving one shop line, or () for an unowned line."""
+    names = document.schemas['ShopLineupParam']['names']
+    match = re.match(r'\[(.*?)\]', names.get(row_id, '') or '')
+    owned = set(MERCHANT_PREFIXES.get(match.group(1), ())) if match else set()
+    owned |= set(SHOP_ROW_MERCHANTS.get(row_id, ()))
+    return tuple(sorted(owned))
+
+
+def has_owner(document, row_id) -> bool:
+    """Whether any merchant page can claim one shop line."""
+    return bool(owners(document, row_id))
+
+
 def is_merchant(npc_id) -> bool:
     """Whether an NpcParam row belongs to a merchant with a shop."""
     return npc_id in NPC_MERCHANTS or any(
@@ -89,12 +103,9 @@ def stock(document, npc_id) -> list[dict]:
     names = document.schemas['ShopLineupParam']['names']
     rows = []
     for row in document.params['ShopLineupParam'].rows:
-        schema_name = names.get(row.row_id, '') or ''
-        match = re.match(r'\[(.*?)\]', schema_name)
-        owners = set(MERCHANT_PREFIXES.get(match.group(1), ())) if match else set()
-        owners |= set(SHOP_ROW_MERCHANTS.get(row.row_id, ()))
-        if npc not in owners:
+        if npc not in owners(document, row.row_id):
             continue
+        schema_name = names.get(row.row_id, '') or ''
         display = document.display_name('ShopLineupParam', row.row_id, row) or schema_name
         bare = re.sub(r'^\[.*?\]\s*', '', display or '')
         rows.append({
