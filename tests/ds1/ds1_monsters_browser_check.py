@@ -369,7 +369,7 @@ def main():
                     page.wait_for_timeout(350)  # Let the shared label fitter finish after resize/search.
                     if output: page.screenshot(path=str(output / 'monsters-small.png'))
                     # Public API must enforce the same narrow boundary as the UI.
-                    for identity, key in [(120000, 'npcType'), (223000, 'def_phys')]:
+                    for identity, key in [(120000, 'npcType'), (502, 'def_phys')]:
                         try:
                             request_json(session.url + 'api/edit', {'table':'NpcParam','id':identity,'field':key,'value':1})
                             raise AssertionError('Out-of-scope field/record accepted')

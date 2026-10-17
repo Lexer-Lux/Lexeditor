@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
-from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES
+from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES, BOSS_FAMILIES, classified_boss
 from .attacks import ATTACK_FIELDS, AttackReferences
 from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
@@ -69,7 +69,7 @@ TEXT_SUBTABS = (
 ) + FMG_SUBTABS
 FMG_TABLES = frozenset(filename for _tab, _label, filename in FMG_SUBTABS)
 FMG_LABELS = {filename: label for _tab, label, filename in FMG_SUBTABS}
-ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
+ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'), ('bosses', 'Bosses', 'NpcParam'))
 AI_SUBTABS = (('ai', 'AI tables', 'NpcThinkParam'),
               ('behaviors', 'Behaviors', 'BehaviorParam'))
 MISC_SUBTABS = (('encumbrance', 'Bands', 'NativeRules'),
@@ -983,7 +983,11 @@ class ItemDocument:
         for row in self.params[table].rows:
             if table == 'NpcParam':
                 if tab == 'npcs':
-                    if not (self.is_friend(row.row_id) or self.is_merchant(row.row_id)):
+                    if not (self.is_friend(row.row_id) or self.is_merchant(row.row_id)) \
+                            or self.is_boss(row.row_id):
+                        continue
+                elif tab == 'bosses':
+                    if not self.is_boss(row.row_id):
                         continue
                 elif not self.is_monster(row.row_id):
                     continue
@@ -1086,8 +1090,8 @@ class ItemDocument:
     def is_friend(self, row_id):
         """A friendly character: merchants, blacksmiths and quest givers,
         everyone whose live team is friendly (2). Like monsters, friends
-        open with the reviewed NpcParam fields; bosses and test rows,
-        whose behavior nobody reviewed, stay shut."""
+        open with the reviewed NpcParam fields; bosses list under Bosses
+        instead, and test rows stay shut."""
         return self.value('NpcParam', row_id, 'npcType') == 2
 
     def is_merchant(self, row_id):
@@ -1107,6 +1111,20 @@ class ItemDocument:
         stem = duplicate_stem(row.name, row_id) if row is not None else None
         return (row_id >= 120000 and stem in MONSTER_FAMILIES
                 and self.value('NpcParam', row_id, 'npcType') == 0) if row is not None else False
+
+    def is_boss(self, row_id):
+        if classified_boss(row_id, self.schemas['NpcParam']['names'].get(row_id),
+                            self.value('NpcParam', row_id, 'npcType')):
+            return True
+        # A duplicate of a reviewed boss keeps its bytes and semantics;
+        # only the reference name is missing. Its param name, which readers
+        # cannot edit, carries the family stem instead.
+        row = self._rows_by_id['NpcParam'].get(row_id)
+        stem = duplicate_stem(row.name, row_id) if row is not None else None
+        if row is None or stem not in BOSS_FAMILIES:
+            return False
+        npc_type = self.value('NpcParam', row_id, 'npcType')
+        return row_id >= 120000 and (npc_type in (0, 1) or stem == 'Gwyndolin')
 
     def attack_references(self):
         if not hasattr(self, '_attack_references'):
@@ -1169,7 +1187,7 @@ class ItemDocument:
             return self._read_menu_label(row_id, only)
         if table in FMG_TABLES:
             return self._read_fmg(table, row_id, only)
-        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id) or self.is_boss(row_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         row, _, data = self._row(table, row_id)
         vanilla = self._vanilla_row(table, row_id)
@@ -1415,11 +1433,11 @@ class ItemDocument:
             self.menu_texts.set_text(table, row_id, value)
             return self.read_row(table, row_id, only=only)
         if table in ('EquipParamProtector', 'NpcParam') and isinstance(key, str) and key.startswith('absorption:'):
-            if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
+            if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id) or self.is_boss(row_id)):
                 raise FormatError('This record is not a reviewed monster or NPC')
             self._row(table, row_id)
             return self._edit_absorption(row_id, key.split(':', 1)[1], value, table)
-        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id)):
+        if table == 'NpcParam' and not (self.is_monster(row_id) or self.is_friend(row_id) or self.is_merchant(row_id) or self.is_boss(row_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         if table == 'NpcParam' and key == 'behaviorVariationId':
             return self._write_variation(row_id, value, only=only)
@@ -1557,7 +1575,7 @@ class ItemDocument:
             source = view.row(source_id)
         except DS3FormatError:
             raise FormatError(f'Expected one row ID {source_id}; found 0') from None
-        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id) or self.is_merchant(source_id)):
+        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id) or self.is_merchant(source_id) or self.is_boss(source_id)):
             raise FormatError('This record is not a reviewed monster or NPC')
         if new_id is None:
             new_id = max(row.row_id for row in view.rows) + 1
@@ -1568,10 +1586,10 @@ class ItemDocument:
         taken = {row.name for row in view.rows if row.name}
         reference = self.schemas[table].get('names', {}).get(source_id)
         if table == 'NpcParam':
-            # The duplicate stays openable as a monster only under a family
-            # stem; the source gate guarantees one of these is a family.
+            # The duplicate stays openable as a monster or boss only under a
+            # family stem; the source gate guarantees one of these is a family.
             stem = next((candidate for candidate in (base_stem(source.name), reference)
-                         if candidate in MONSTER_FAMILIES),
+                         if candidate in MONSTER_FAMILIES or candidate in BOSS_FAMILIES),
                         reference or base_stem(source.name) or f'Row {source_id}')
         else:
             stem = base_stem(source.name) or reference or f'Row {source_id}'

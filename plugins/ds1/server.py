@@ -283,7 +283,7 @@ class Handler(PluginRequestHandler):
                         npc = int(query.get('monster', [''])[0])
                         document = STORE.get()
                         if not (document.is_monster(npc) or document.is_friend(npc)
-                                or document.is_merchant(npc)):
+                                or document.is_merchant(npc) or document.is_boss(npc)):
                             raise ValueError('Select a reviewed monster or NPC')
                         variation = document.value('NpcParam', npc, 'behaviorVariationId')
                         references = document.attack_references()

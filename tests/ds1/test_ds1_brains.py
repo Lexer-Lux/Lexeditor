@@ -48,7 +48,7 @@ def test_brains_metadata_matches_vanilla_shape():
 
 
 def test_brains_subtabs_list_their_rows():
-    assert [entry[0] for entry in ENEMY_SUBTABS] == ['monsters']
+    assert [entry[0] for entry in ENEMY_SUBTABS] == ['monsters', 'bosses']
     assert [(entry[0], entry[1], entry[2]) for entry in AI_SUBTABS] == [
         ('ai', 'AI tables', 'NpcThinkParam'), ('behaviors', 'Behaviors', 'BehaviorParam')]
     assert [entry[0] for entry in ATTACK_SUBTABS] == ['attacks', 'player-attacks', 'projectiles']
@@ -151,7 +151,7 @@ def test_brains_rows_merge_by_field_and_conflict_by_name():
 def test_state_reports_brains_tabs(tmp_path):
     game, mod = project(tmp_path)
     state = ItemStore(game, mod, False).state()
-    assert [tab['id'] for tab in state['enemyTabs']] == ['monsters']
+    assert [tab['id'] for tab in state['enemyTabs']] == ['monsters', 'bosses']
     ai = {tab['id']: tab for tab in state['aiTabs']}
     assert [(ai[key]['table'], ai[key]['count']) for key in ('ai', 'behaviors')] == [
         ('NpcThinkParam', 3), ('BehaviorParam', 3)]

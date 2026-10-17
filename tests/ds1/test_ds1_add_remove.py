@@ -121,9 +121,9 @@ def test_add_row_npc_monster_gate():
     assert 251000 in ids and document.is_friend(251000)
     friend = document.add_row("NpcParam", 251000)
     assert document.is_friend(friend["id"])
-    assert 223000 in ids and not document.is_monster(223000) and not document.is_friend(223000)
+    assert 502 in ids and not document.is_monster(502) and not document.is_friend(502) and not document.is_boss(502)
     with pytest.raises(FormatError, match="reviewed monster or NPC"):
-        document.add_row("NpcParam", 223000)
+        document.add_row("NpcParam", 502)
     # A refused duplicate changes nothing.
     assert [row.row_id for row in document.params["NpcParam"].rows] == ids + [row["id"], friend["id"]]
 
