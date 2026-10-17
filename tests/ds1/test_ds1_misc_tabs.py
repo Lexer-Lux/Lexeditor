@@ -68,3 +68,21 @@ def test_editor_mounts_misc_subtabs_and_no_encumbrance_tab():
     assert b'tab==="misc"?state.miscTabs' in source
     assert b'state.tab==="misc"?detail():renderItems()' not in source
     assert b"?renderTweaks():renderItems()" in source
+
+
+def test_asset_folders_split_into_tabs_and_unbrowsed():
+    from plugins.ds1 import assets
+    roots = set(assets.ASSET_ROOTS)
+    assert set(data_map.ASSET_TARGETS) | set(data_map.UNTARGETED_ASSETS) == roots
+    assert not set(data_map.ASSET_TARGETS) & set(data_map.UNTARGETED_ASSETS)
+    assert "other" not in data_map.TAB_LABELS
+    assert data_map.ASSET_TARGETS["remo"] == ("models", "files")
+    assert data_map.ASSET_TARGETS["font"] == ("textures", "files")
+    assert all(target[0] in data_map.TAB_LABELS for target in data_map.ASSET_TARGETS.values())
+
+
+def test_editor_mounts_no_other_files_tab():
+    source = (ROOT / "plugins" / "ds1" / "editor.js").read_bytes()
+    assert b'{id:"other",label:"Other files"' not in source
+    assert b'"models","textures","sound","music","other"' not in source
+    assert b'new Set(["models","textures","sound","music"])' in source

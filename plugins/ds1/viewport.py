@@ -13,7 +13,8 @@ import struct
 from collections import OrderedDict
 from pathlib import Path
 
-from .assets import AssetError, dds_info, parse_tpf
+from .assets import (AssetError, COLLISION_EXTENSIONS, MODEL_KINDS, check_relative, dds_info,
+                       parse_tpf)
 from .bhf import BhfError, inflate_member, parse_bhf
 from .flver import FlverDocument, FlverError
 from .formats import FormatError, inflate, members
@@ -634,6 +635,89 @@ def part_geometry(game_root, project, stem):
     return _payload(_cached_textured('member', str(location), member,
                                         (stat.st_mtime_ns, stat.st_size), False,
                                         game_root, project))
+
+
+def resolve_asset_model(game_root, project, relative, side, member=None):
+    """Where a Models-tab file's preview mesh lives: ('member', path,
+    member name), ('piece', path), or ('skip', reason). The side names
+    whose bytes preview: the mod's override unless the game side is
+    asked for, else the installed file, like the asset detail."""
+    relative = check_relative(relative)
+    lowered = relative.as_posix().lower()
+    inner = lowered[:-4] if lowered.endswith('.dcx') else lowered
+    leaf = inner.rsplit('/', 1)[-1]
+    extension = '.' + leaf.rsplit('.', 1)[-1] if '.' in leaf else ''
+    if extension in COLLISION_EXTENSIONS:
+        return ('skip', 'collision and navigation have no visible mesh')
+    live = None
+    if (side or 'mod') != 'game' and project is not None:
+        own = Path(project) / relative
+        if own.is_file():
+            live = own
+    if live is None:
+        if game_root is None:
+            return ('skip', 'Select the installed game before browsing its files')
+        candidate = Path(game_root) / relative
+        if candidate.is_file():
+            live = candidate
+    if live is None:
+        return ('skip', 'The installed game has no such file')
+    if extension == '.flver':
+        return ('piece', live)
+    if extension not in MODEL_KINDS:
+        return ('skip', 'That file holds no model mesh')
+    try:
+        plain = live.read_bytes()
+    except OSError:
+        return ('skip', f'Cannot read {live.name}')
+    if plain[:4] == b'DCX\0':
+        try:
+            plain = inflate(plain)
+        except FormatError:
+            return ('skip', f'Cannot open {live.name}')
+    try:
+        found = members(plain)
+    except FormatError:
+        return ('skip', f'Cannot open {live.name}')
+    names = found if isinstance(found, dict) else {entry.name: entry for entry in found}
+    flvers = sorted(name for name in names if name.lower().endswith('.flver'))
+    if not flvers:
+        return ('skip', f'{live.name} holds no model mesh')
+    if member:
+        # A key into the binder's own member table, never a path, so an
+        # unknown member can only miss, never escape.
+        if member not in flvers:
+            return ('skip', f'{live.name} has no {member}')
+        return ('member', live, member)
+    stem = leaf.rsplit('.', 1)[0]
+    wanted = stem + '.flver'
+    return ('member', live, wanted if wanted in flvers else flvers[0])
+
+
+def asset_geometry(game_root, project, relative, side, member=None):
+    """Base64 float32 geometry for one Models-tab file, cached by file
+    stamp, with UVs and diffuse textures for the drawer. Map pieces
+    resolve their area's split texture archives like the viewport."""
+    relative = check_relative(relative)
+    resolved = resolve_asset_model(game_root, project, relative, side, member)
+    if resolved[0] == 'skip':
+        raise FlverError(resolved[1])
+    kind = resolved[0]
+    member = resolved[2] if kind == 'member' else ''
+    location = resolved[1]
+    try:
+        stat = Path(location).stat()
+    except OSError as error:
+        raise FlverError(f'Cannot read {Path(location).name}') from error
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    area = None
+    if len(relative.parts) > 1 and relative.parts[0] == 'map':
+        area = relative.parts[1].split('_')[0] or None
+    if area is not None:
+        return _payload(_cached_map(kind, str(location), member, stamp,
+                                    game_root, project, area))
+    return _payload(_cached_textured(kind, str(location), member, stamp, False,
+                                     game_root, project))
 
 
 def part_view(game_root, project, stem):

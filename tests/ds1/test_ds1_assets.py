@@ -15,7 +15,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive
+from flver_fixture import build_flver, make_chrbnd
 from plugins.ds1 import assets, deployment
 from plugins.ds1.assets import AssetError
 from plugins.ds1.msb import MAP_DIR
@@ -333,6 +335,8 @@ def test_kind_of_sorts_assets_into_models_textures_sound_music_other():
     assert assets.kind_of("map/m10_00_00_00.m10_00_00_00.flver.dcx") == "models"
     assert assets.kind_of("map/m10_00_00_00.m10_00_00_00.hkxbdt.dcx") == "models"
     assert assets.kind_of("facegen/female.fgbnd.dcx") == "models"
+    assert assets.kind_of("remo/c0000.remobnd.dcx") == "models"
+    assert assets.kind_of("remo/c0000.remobnd") == "models"
     assert assets.kind_of("chr/c0000/c0000.tpf") == "textures"
     assert assets.kind_of("chr/c0000/c0000.tpf.dcx") == "textures"
     assert assets.kind_of("map/m10/m10.tpfbdt.dcx") == "textures"
@@ -421,3 +425,100 @@ def test_scan_merged_without_the_game_lists_mod_files_unmarked(tmp_path):
     assert [row["relative"] for row in rows] == [TPF.as_posix()]
     assert all(row["status"] is None for row in rows)
     assert assets.scan_merged(None, None) == []
+
+
+def test_model_info_character_counts_meshes_and_bones():
+    blob = make_chrbnd(build_flver(), stem="c0000")
+    assert assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx") == {
+        "kind": "character", "previewable": True, "members": ["c0000.flver"],
+        "member": "c0000.flver", "objects": None, "meshes": 1, "bones": 1,
+        "reason": None}
+
+
+def test_model_info_object_binder_counts_its_objects():
+    blob = make_chrbnd(build_flver(), stem="o1000",
+                       extra=[("o1001.flver", build_flver()),
+                              ("o1000.tpf", b"not a tpf")])
+    info = assets.model_info(blob, "obj/o1000.objbnd.dcx")
+    assert info["kind"] == "object" and info["previewable"]
+    assert info["objects"] == 2 and info["meshes"] == 2 and info["bones"] == 2
+    assert info["members"] == ["o1000.flver", "o1001.flver"]
+    assert info["member"] == "o1000.flver"
+    # Characters count meshes and bones, never objects.
+    assert assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")["objects"] is None
+
+
+def test_model_info_piece_lists_no_members():
+    info = assets.model_info(build_flver(), "map/m10_00_00_00/m10piece.flver.dcx")
+    assert (info["kind"], info["previewable"], info["members"], info["member"]) == (
+        "piece", True, [], "")
+    assert (info["meshes"], info["bones"], info["objects"]) == (1, 1, None)
+
+
+def test_model_info_static_geometry_carries_no_bones():
+    info = assets.model_info(build_flver(bones=[]), "map/m10_00_00_00/m10piece.flver")
+    assert info["previewable"] and info["bones"] == 0 and info["meshes"] == 1
+
+
+def test_model_info_names_why_a_file_has_no_preview():
+    assert assets.model_info(b"junk", "map/m10/m10.hkx")["reason"] == "collision"
+    assert assets.model_info(b"junk", "map/m10/m10.hkxbdt.dcx")["reason"] == "collision"
+    broken = assets.model_info(b"not a binder", "chr/c0000/c0000.chrbnd.dcx")
+    assert broken["previewable"] is False and broken["reason"] == "unreadable"
+    assert broken["members"] == [] and broken["member"] == ""
+    params = assets.model_info(make_archive(), "obj/o1000.objbnd.dcx")
+    assert params["previewable"] is False and params["reason"] == "no-mesh"
+
+
+def test_model_info_cache_returns_copies():
+    blob = make_chrbnd(build_flver(), stem="c0000")
+    first = assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")
+    first["members"].append("evil.flver")
+    assert assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")["members"] == ["c0000.flver"]
+
+
+def test_service_assets_geometry_serves_model_mesh(tmp_path):
+    game, mod = project(tmp_path)
+    target = Path("chr/c0000/c0000.chrbnd.dcx")
+    (game / target).parent.mkdir(parents=True)
+    (game / target).write_bytes(make_chrbnd(build_flver(), stem="c0000"))
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
+                          "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
+    try:
+        session.start()
+        detail = request_json(session, f"/api/assets?scope=textures&file={target.as_posix()}")
+        assert detail["model"] == {"kind": "character", "previewable": True,
+                                   "members": ["c0000.flver"], "member": "c0000.flver",
+                                   "objects": None, "meshes": 1, "bones": 1,
+                                   "reason": None}
+        geometry = request_json(session, f"/api/assets/geometry?file={target.as_posix()}")
+        assert len(geometry["meshes"]) == 1
+        assert geometry["meshes"][0]["tris"] == 2
+        member = request_json(
+            session, f"/api/assets/geometry?file={target.as_posix()}&member=c0000.flver")
+        assert len(member["meshes"]) == 1
+        with pytest.raises(HTTPError):
+            request_json(session, f"/api/assets/geometry?file={target.as_posix()}&member=nope.flver")
+        # A mod override previews from the mod side unless game is asked for.
+        override = make_chrbnd(build_flver(pos_offset=(5.0, 0.0, 0.0)), stem="c0000")
+        assets.store_bytes(mod, target.as_posix(), override)
+        detail = request_json(session, f"/api/assets?scope=textures&file={target.as_posix()}")
+        assert detail["source"] == "mod"
+        from_mod = request_json(session, f"/api/assets/geometry?file={target.as_posix()}")
+        from_game = request_json(
+            session, f"/api/assets/geometry?side=game&file={target.as_posix()}")
+        assert from_mod["meshes"][0]["positions"] != from_game["meshes"][0]["positions"]
+        # Texture files and collision have no geometry to preview.
+        (game / TPF).parent.mkdir(parents=True, exist_ok=True)
+        (game / TPF).write_bytes(make_tpf([("a.dds", make_dds())]))
+        with pytest.raises(HTTPError):
+            request_json(session, f"/api/assets/geometry?file={TPF.as_posix()}")
+        hkx = Path("map/m10_00_00_00/m10_00_00_00.hkx.dcx")
+        (game / hkx).parent.mkdir(parents=True)
+        (game / hkx).write_bytes(b"junk collision")
+        hkx_detail = request_json(session, f"/api/assets?scope=textures&file={hkx.as_posix()}")
+        assert hkx_detail["model"]["reason"] == "collision"
+        with pytest.raises(HTTPError):
+            request_json(session, f"/api/assets/geometry?file={hkx.as_posix()}")
+    finally:
+        session.stop()

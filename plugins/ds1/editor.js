@@ -15,8 +15,8 @@ let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=nu
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 // File tabs share one browser: each tab id is the file kind it lists.
-const ASSET_TABS=new Set(["models","textures","sound","music","other"]);
-const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound effects",music:"Music",other:"Other files"};
+const ASSET_TABS=new Set(["models","textures","sound","music"]);
+const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound effects",music:"Music"};
 const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.tab)
   .map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size},
     created:file.status==="new",modified:file.status==="modified"}));
@@ -85,11 +85,10 @@ const shell=LexeditorUI.mountShell({
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
-    {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"textures",label:"Textures",help:"The images on the models. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"music",label:"Music",help:"Area themes and boss music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
-    {id:"other",label:"Other files",help:"Movies, menu interface, scripts and shaders: game files no structured editor owns. Tinted names replace an installed file; a pen nib marks files only the mod carries. Replace and Remove save at once. Vanilla is read-only."},
+    {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
+    {id:"textures",label:"Textures",help:"The images on the models. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
+    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Add and Remove save at once. Vanilla is read-only."},
+    {id:"music",label:"Music",help:"Area themes and boss music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Add and Remove save at once. Vanilla is read-only."},
     {id:"misc",label:"Misc.",help:"Load ranges, base stamina recovery and effect overrides. Save and Apply to use your rules."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -265,7 +264,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","npcs","shops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","other","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","shops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -872,36 +871,27 @@ function renderAssetDetail(){
   const fromMod=info.source==="mod";
   const busy=state.assetBusy;
   const locked=state.readOnly||busy;
-  const picker=el("input",{type:"file",style:"display:none","aria-hidden":"true",tabindex:"-1",
-    onchange:event=>{const file=event.target.files[0];event.target.value="";if(file)void uploadAsset(row.id,file);}});
   const progress=state.assetUpload?`Uploading ${formatAssetSize(state.assetUpload.received)} of ${formatAssetSize(state.assetUpload.total)}`:"";
-  const textures=(info.textures||[]).map(texture=>{
-    const url=`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(texture.member||"")}&index=${texture.index}`;
-    return detailField({label:texture.name,
-      control:el("img",{src:url,alt:texture.name,style:"max-width:100%;height:auto",loading:"lazy"}),
-      help:infoHelp(`${texture.width} by ${texture.height}, ${texture.format}. Preview of the ${fromMod?"mod":"installed game"} file, shrunk to fit.`)});
-  });
-  const firstTexture=(info.textures||[])[0];
-  const thumbUrl=firstTexture?`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(firstTexture.member||"")}&index=${firstTexture.index}`:null;
-  const thumbArt=state.tab==="textures"?(thumbUrl?LexeditorUI.iconSlot({content:el("img",{src:thumbUrl,alt:row.name,loading:"lazy"})}):LexeditorUI.noThumbnail("ds1")):null;
-  return detailPanel({title:row.name,meta:formatAssetSize(info.size),
-    icon:thumbArt,
-    help:"Replace carries your file in the mod under this same path; the installed game is untouched until Apply. Remove drops the mod's copy, so the game file shows again. Both save at once.",
-    body:[
-      detailSection({title:"FILE",body:[
-        detailField({label:"SOURCE",control:readonlyField(fromMod?"Mod file":"Installed game file"),
-          help:infoHelp(fromMod?"The mod carries this file. The game loads it once the mod is applied.":"No mod file replaces this yet. The game loads its own copy.")}),
-        detailField({label:"ACTIONS",control:LexeditorUI.stack(
-          el("span",{style:"display:flex;gap:8px;flex-wrap:wrap"},
-            el("button",{type:"button","data-asset-action":"replace",disabled:locked,onclick:()=>picker.click(),
-              title:state.readOnly?"Open a mod project to replace files":"Replace this file with one from your disk"},"Replace…"),
-            fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null),
-          picker,
-          progress?el("span",{role:"status"},progress):null),
-          help:infoHelp("Replace keeps your file's bytes as they are. It must open as the same kind of file it replaces.")})]}),
-      detailSection({title:"PREVIEW",body:textures.length?textures:[
-        detailField({label:"TEXTURES",control:readonlyField("No preview"),
-          help:infoHelp("Only textures preview. Sounds, movies and models still replace as whole files.")})]})]});
+  const previewUrl=texture=>`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(texture.member||"")}&index=${texture.index}`;
+  const textureHelp=texture=>infoHelp(`${texture.width} by ${texture.height}, ${texture.format}. Preview of the ${fromMod?"mod":"installed game"} file, shrunk to fit.`);
+  // Vanilla-vs-mod already shows in the list (tinted names, pen nibs), so
+  // the panel carries no SOURCE row; files join the mod through the
+  // list's add button, never a Replace action.
+  const body=[];
+  let icon=null,preview=null,help="";
+  if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
+  else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
+  else{
+    help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
+    body.push(detailSection({title:"PREVIEW",body:[
+      detailField({label:"TEXTURES",control:readonlyField("No preview"),
+        help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]}));
+  }
+  const actions=[
+    fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
+    progress?el("span",{role:"status"},progress):null].filter(Boolean);
+  if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
+  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,body});
 }
 async function uploadAsset(target,file){
   if(state.assetBusy)return;
@@ -938,6 +928,120 @@ async function removeAssetOverride(target){
   }
   catch(error){notify(error);}
   finally{state.assetBusy=false;render();}
+}
+// A model file's counts, FF8's GEOMETRY row in DS1 terms: object
+// binders count their member objects, rigged models count bones, and
+// static meshes count neither. Whatever does not apply stays off.
+function assetModelCounts(model){
+  if(!model||!model.previewable)return null;
+  const parts=[];
+  if(model.objects!=null)parts.push({label:"OBJECTS",control:readonlyField(LexeditorUI.formatNumber(model.objects))});
+  parts.push({label:"MESHES",control:readonlyField(LexeditorUI.formatNumber(model.meshes))});
+  if(model.bones>0)parts.push({label:"BONES",control:readonlyField(LexeditorUI.formatNumber(model.bones))});
+  return LexeditorUI.controlGroup(parts,{columns:parts.length,stacked:true});
+}
+const ASSET_MODEL_INFO={
+  collision:["Collision data","Collision files shape where the player can walk. They hold no visible mesh."],
+  "no-mesh":["No model mesh","This file holds no model mesh to preview. It still replaces as a whole file."],
+  unreadable:["Unreadable model","This file does not open as a model. It still replaces as a whole file."]};
+function assetModelPanel(row,info,body,previewUrl,textureHelp){
+  const model=info.model;
+  const counts=assetModelCounts(model);
+  if(counts)body.push(detailSection({title:"GEOMETRY",body:[counts]}));
+  else if(model&&model.reason&&ASSET_MODEL_INFO[model.reason]){
+    const [value,tip]=ASSET_MODEL_INFO[model.reason];
+    body.push(detailSection({title:"GEOMETRY",body:[
+      detailField({label:"INFO",control:readonlyField(value),help:infoHelp(tip)})]}));
+  }
+  const textures=(info.textures||[]).map(texture=>detailField({label:texture.name,
+    control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto",loading:"lazy"}),
+    help:textureHelp(texture)}));
+  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures}));
+  const previewable=!!(model&&model.previewable);
+  const icon=LexeditorUI.iconSlot({content:previewable
+    ?window.Ds1Preview.thumbnail({url:assetGeometryUrl(row.id,info.source,model.member),label:row.name})
+    :LexeditorUI.noThumbnail("ds1")});
+  return {icon,
+    preview:previewable?{label:`${row.name} model`,
+      openLabel:`View ${row.name} model`,closeLabel:`Close ${row.name} model`,
+      content:()=>assetModelContent(row,info),
+      onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}}:null,
+    help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. The magnifier opens the 3D model. Remove drops the mod's copy."};
+}
+function assetTexturePanel(row,info,body,previewUrl,textureHelp){
+  const textures=info.textures||[];
+  if(textures.length){
+    body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
+      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",
+        style:"max-width:160px;max-height:160px;width:auto;height:auto"}),
+      help:textureHelp(texture)}))}));
+    const first=textures[0];
+    return {icon:LexeditorUI.iconSlot({content:el("img",{src:previewUrl(first),alt:row.name,loading:"lazy"})}),
+      preview:{label:`${row.name} textures`,
+        openLabel:`View ${row.name} textures`,closeLabel:`Close ${row.name} textures`,
+        content:()=>LexeditorUI.stack(...textures.map(texture=>detailField({label:texture.name,
+          control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto"}),
+          help:textureHelp(texture)}))),
+        onClose:drawer=>drawer.replaceChildren()},
+      help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. The magnifier shows every texture full-size. Remove drops the mod's copy."};
+  }
+  body.push(detailSection({title:"PREVIEW",body:[
+    detailField({label:"TEXTURES",control:readonlyField("No preview"),
+      help:infoHelp("Only TPF containers and DDS files preview.")})]}));
+  return {icon:LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}),preview:null,
+    help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy."};
+}
+function assetGeometryUrl(file,side,member){
+  return `/api/assets/geometry?side=${side}&file=${encodeURIComponent(file)}&member=${encodeURIComponent(member||"")}`;
+}
+// The drawer's 3D stage for one Models-tab file; an object binder's
+// members share it through a picker, like armor fits do.
+function assetModelContent(row,info){
+  const stage=LexeditorUI.modelStage({message:`Loading ${row.name}…`});
+  const message=stage.lexMessage;
+  const show=member=>{
+    message.replaceChildren(`Loading ${row.name}…`);
+    message.className="lex-model-stage-message";
+    window.Ds1Preview.mount(stage,assetGeometryUrl(row.id,info.source,member)).then(task=>{
+      if(!stage.isConnected)return;
+      message.replaceChildren(el("span",{},"Drag to rotate · Wheel to zoom"));
+      message.className="lex-model-stage-hint";
+      if(task)window.__lexPreview={target:row.name,canvas:task.canvas};
+    }).catch(error=>{
+      if(stage.isConnected)message.replaceChildren(error.message||String(error));
+    });
+  };
+  const members=(info.model&&info.model.members)||[];
+  if(members.length<2){show(info.model.member||"");return stage;}
+  let picked=info.model.member||members[0];
+  const picker=el("button",{type:"button","aria-label":"Model member","aria-haspopup":"listbox",
+    onclick:event=>{LexeditorUI.choicePopover({label:"Model member",
+      choices:members.map(name=>({label:name,value:name})),
+      select:value=>{picked=value;
+        picker.replaceChildren(`Member: ${picked}`);
+        show(picked);
+      }}).openFor(event.currentTarget);}},`Member: ${picked}`);
+  const wrap=el("div",{class:"lex-preview-variant-wrap"},picker,stage);
+  show(picked);
+  return wrap;
+}
+let assetPicker=null;
+function assetFilePicker(){
+  if(!assetPicker){
+    assetPicker=el("input",{type:"file",id:"ds1-asset-picker",style:"display:none","aria-hidden":"true",tabindex:"-1"});
+    assetPicker.onchange=event=>{const file=event.target.files[0];assetPicker.value="";
+      if(!file)return;
+      const target=state.rows.find(row=>key(row)===state.selected);
+      if(target)void uploadAsset(target.id,file);};
+    document.body.append(assetPicker);
+  }
+  return assetPicker;
+}
+function assetAddUpload(){
+  if(state.assetBusy||state.readOnly)return;
+  const target=state.rows.find(row=>key(row)===state.selected);
+  if(!target){LexeditorUI.showToast("Select a file in the list to add it to the mod.");return;}
+  assetFilePicker().click();
 }
 function targetIcon(){
   const namespace="http://www.w3.org/2000/svg";
@@ -1484,6 +1588,7 @@ function submitBandForm(form){
 }
 
 function renderItems(){
+  if(ASSET_TABS.has(state.tab))assetFilePicker();
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations")return renderAnimPanels();
@@ -1494,6 +1599,13 @@ function renderItems(){
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-items-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
+    // Asset files join the mod through the list's add button: adding at a
+    // path the game has replaces it through the loader, so asset tabs
+    // need no Replace action of their own.
+    add:ASSET_TABS.has(state.tab)?(()=>assetAddUpload()):undefined,
+    addTitle:"Add file to mod",
+    addDisabled:ASSET_TABS.has(state.tab)&&(state.readOnly||state.assetBusy),
+    addDisabledReason:!ASSET_TABS.has(state.tab)?undefined:state.readOnly?"This is the game's own data, shown read-only. Create a mod to add files to it.":state.assetBusy?"An upload is already running.":undefined,
     sync:next=>{
       state.page=next.page;state.pageSize=next.pageSize;state.selection=next.selection||[];
       if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}

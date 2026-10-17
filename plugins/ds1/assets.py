@@ -39,8 +39,14 @@ UPLOAD_PART_PREFIX = ".lexeditor-upload-"
 UPLOAD_ID = re.compile(r"[A-Za-z0-9-]{1,64}\Z")
 
 # Inner extensions (past .dcx) that hold geometry, and ones that hold images.
+# Cutscene binders carry character meshes, so they list with the models.
 MODEL_EXTENSIONS = frozenset({'.flver', '.chrbnd', '.objbnd', '.partsbnd', '.fgbnd',
-                              '.hkx', '.hkxbhd', '.hkxbdt'})
+                              '.remobnd', '.hkx', '.hkxbhd', '.hkxbdt'})
+# Geometry extensions mapped to the model kind they carry for the Models
+# tab; Havok files hold collision and navigation, never a visible mesh.
+MODEL_KINDS = {'.flver': 'piece', '.chrbnd': 'character', '.objbnd': 'object',
+               '.partsbnd': 'part', '.fgbnd': 'face', '.remobnd': 'cutscene'}
+COLLISION_EXTENSIONS = frozenset({'.hkx', '.hkxbhd', '.hkxbdt'})
 TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
 SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
 # FMOD bank name tags that mark music: area themes (m), streamed themes
@@ -430,6 +436,100 @@ def texture_png(file_bytes, filename, member="", index=0):
     if match is None:
         raise AssetError("That file has no such texture")
     return render_png(payload[match["offset"]:match["offset"] + match["size"]])
+
+
+# Model inventories by content hash: selecting two copies of one file, or
+# coming back to it, must not re-decode its meshes. Digests key it, so the
+# bytes themselves are never retained.
+_MODEL_INFO_CACHE = {}
+_MODEL_INFO_CACHE_SIZE = 32
+
+
+def _inner_extension(filename):
+    lowered = str(filename).replace(chr(92), '/').lower()
+    inner = lowered[:-4] if lowered.endswith('.dcx') else lowered
+    leaf = inner.rsplit('/', 1)[-1]
+    return '.' + leaf.rsplit('.', 1)[-1] if '.' in leaf else ''
+
+
+def _default_flver(stem, names):
+    wanted = stem + '.flver'
+    if wanted in names:
+        return wanted
+    ordered = sorted(names)
+    return ordered[0] if ordered else ''
+
+
+def model_info(data, filename):
+    """A model file's inventory for the Models tab: kind, mesh members,
+    mesh and bone counts. Object binders count their member objects;
+    character models count bones; collision files carry neither and say
+    so. Best-effort throughout: an unreadable member is skipped, and a
+    file with no readable mesh reports why instead of raising."""
+    from .flver import FlverDocument
+    digest = (sha_short(data), str(filename).lower())
+    hit = _MODEL_INFO_CACHE.get(digest)
+    if hit is not None:
+        return dict(hit, members=list(hit['members']))
+    extension = _inner_extension(filename)
+    if extension in COLLISION_EXTENSIONS:
+        info = {'kind': 'collision', 'previewable': False, 'members': [], 'member': '',
+                'objects': None, 'meshes': 0, 'bones': 0, 'reason': 'collision'}
+    else:
+        plain, owned = open_container(bytes(data))
+        if owned:
+            blobs = sorted(name for name in owned if name.lower().endswith('.flver'))
+            leaf = str(filename).replace(chr(92), '/').rsplit('/', 1)[-1]
+            inner = leaf[:-4] if leaf.lower().endswith('.dcx') else leaf
+            default = _default_flver(inner.rsplit('.', 1)[0], blobs)
+            meshes = bones = 0
+            broken = set()
+            for name in blobs:
+                entry = owned[name]
+                try:
+                    doc = FlverDocument(plain[entry.offset:entry.offset + entry.size])
+                except Exception:
+                    # Counts must never break a selection: a corrupt member
+                    # is skipped, and only the preview member's failure
+                    # marks the file unreadable.
+                    broken.add(name)
+                    continue
+                meshes += len(doc.meshes)
+                bones += len(doc.bones)
+            if not blobs:
+                reason = 'no-mesh'
+            elif default in broken:
+                reason = 'unreadable'
+            else:
+                reason = None
+            info = {'kind': MODEL_KINDS.get(extension, 'model'),
+                    'previewable': reason is None,
+                    'members': blobs, 'member': default if reason is None else '',
+                    'objects': len(blobs) if extension == '.objbnd' else None,
+                    'meshes': meshes, 'bones': bones, 'reason': reason}
+        else:
+            payload = plain if plain is not None else bytes(data)
+            if extension == '.flver':
+                try:
+                    doc = FlverDocument(payload)
+                except Exception:
+                    info = {'kind': 'piece', 'previewable': False, 'members': [],
+                            'member': '', 'objects': None, 'meshes': 0, 'bones': 0,
+                            'reason': 'unreadable'}
+                else:
+                    info = {'kind': 'piece', 'previewable': True, 'members': [],
+                            'member': '', 'objects': None,
+                            'meshes': len(doc.meshes), 'bones': len(doc.bones),
+                            'reason': None}
+            else:
+                info = {'kind': MODEL_KINDS.get(extension, 'model'),
+                        'previewable': False, 'members': [], 'member': '',
+                        'objects': None, 'meshes': 0, 'bones': 0,
+                        'reason': 'unreadable'}
+    _MODEL_INFO_CACHE[digest] = dict(info, members=list(info['members']))
+    while len(_MODEL_INFO_CACHE) > _MODEL_INFO_CACHE_SIZE:
+        _MODEL_INFO_CACHE.pop(next(iter(_MODEL_INFO_CACHE)))
+    return info
 
 
 def sha_short(data):
