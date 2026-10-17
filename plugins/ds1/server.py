@@ -141,8 +141,11 @@ class Handler(PluginRequestHandler):
                         elif scope == 'textures':
                             data, source, name = _asset_bytes(query.get('file', [''])[0],
                                                               query.get('side', ['mod'])[0])
+                            model = assets.model_info(data, name) \
+                                if assets.kind_of(name) == 'models' else None
                             result = {'file': name, 'source': source, 'size': len(data),
-                                      'textures': assets.list_textures(data, name)}
+                                      'textures': assets.list_textures(data, name),
+                                      'model': model}
                         else:
                             result = {'files': assets.scan_project(STORE.project, strict=False,
                                                                     game_root=STORE.game_root)
@@ -392,6 +395,19 @@ class Handler(PluginRequestHandler):
                         raise ValueError('A texture preview needs a numeric texture') from None
                     self.send_bytes(assets.texture_png(data, name, query.get('member', [''])[0], index),
                                     'image/png')
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/assets/geometry':
+            try:
+                with LOCK:
+                    relative = assets.check_relative(query.get('file', [''])[0])
+                    if assets.kind_of(relative.as_posix()) != 'models':
+                        raise ValueError('Only model files have geometry to preview')
+                    self.send_json(viewport.asset_geometry(
+                        STORE.game_root, STORE.project, relative,
+                        query.get('side', ['mod'])[0],
+                        query.get('member', [''])[0] or None))
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return

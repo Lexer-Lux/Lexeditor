@@ -24,6 +24,8 @@ def main():
         archives={RELATIVE:make_stats_archive(),texts.RELATIVE:make_text_archive()}
         for relative,data in archives.items():
             path=game/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+        for top in ('movww','remo','font'):
+            (game/top).mkdir(parents=True,exist_ok=True)
         store=ItemStore(game,mod,False)
         document=store.get()
         document.members['Unreviewed.param']=object()
@@ -56,8 +58,17 @@ def main():
             for row in rows:
                 if not row['id'].startswith('assets:'):continue
                 top=row['id'].split(':',1)[1]
-                assert (row['target'],row['sub'])==ASSET_TARGETS[top]
-                assert row['openable'] and row['targets']==[{'id':row['target'],'label':row['targets'][0]['label']}]
+                if top in ASSET_TARGETS:
+                    assert (row['target'],row['sub'])==ASSET_TARGETS[top]
+                    assert row['openable'] and row['targets']==[{'id':row['target'],'label':row['targets'][0]['label']}]
+                else:
+                    assert row['coverage']=='unavailable' and row['status']=='not-integrated'
+                    assert not row['openable'] and 'target' not in row and 'targets' not in row
+            by_asset={row['id']:row for row in rows if row['id'].startswith('assets:')}
+            assert by_asset['assets:remo']['target']=='models'
+            assert by_asset['assets:font']['target']=='textures'
+            assert by_asset['assets:movww']['coverage']=='unavailable'
+            assert 'movies' in by_asset['assets:movww']['notes']
             assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance','native-levelup'}
             assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}

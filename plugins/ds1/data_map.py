@@ -7,20 +7,27 @@ TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'ai':'AI', 'attacks':'Attack
               'maps':'Maps', 'animations':'Animations', 'text':'Text',
               'npcs':'NPCs', 'shops':'Shops',
               'models':'Models', 'textures':'Textures', 'sound':'Sound effects',
-              'music':'Music', 'other':'Other files'}
+              'music':'Music'}
 
 
 # Asset folders open on the file tab that holds their kind. msg/ holds the
-# message archives the Text tab edits; everything else is a whole-file tab.
-ASSET_TARGETS = {'chr': ('models', 'files'), 'event': ('other', 'files'),
-                 'facegen': ('models', 'files'), 'font': ('other', 'files'),
+# message archives the Text tab edits; font/ textures list with the
+# textures and cutscene binders list with the models. Folders with no
+# tab keep an unavailable row below instead of a target.
+ASSET_TARGETS = {'chr': ('models', 'files'),
+                 'facegen': ('models', 'files'), 'font': ('textures', 'files'),
                  'map': ('models', 'files'), 'menu': ('textures', 'files'),
-                 'movww': ('other', 'files'), 'msg': ('text', 'menu-labels'),
-                 'mtd': ('other', 'files'), 'obj': ('models', 'files'),
-                 'other': ('other', 'files'), 'parts': ('models', 'files'),
-                 'remo': ('other', 'files'), 'script': ('other', 'files'),
-                 'sfx': ('other', 'files'), 'shader': ('other', 'files'),
+                 'msg': ('text', 'menu-labels'),
+                 'obj': ('models', 'files'),
+                 'parts': ('models', 'files'),
+                 'remo': ('models', 'files'),
                  'sound': ('sound', 'files')}
+# Folders whose files no tab lists: movies, scripts and the like have no
+# browser, but Apply still installs files a mod carries there.
+UNTARGETED_ASSETS = {'event': 'event scripts', 'movww': 'movies',
+                     'mtd': 'material data', 'other': 'these files',
+                     'script': 'scripts', 'sfx': 'visual effects',
+                     'shader': 'shaders'}
 
 
 def payload(store, native_rules=None, theme=None):
@@ -197,16 +204,24 @@ def payload(store, native_rules=None, theme=None):
             'notes': 'Retime animation events, change their settings, and add or remove documented events. The 3D models themselves stay untouched.'})
     # Whole-file asset overrides: every data folder outside the structured editors.
     # Weapon and armor models also preview in their Items drawers, so parts/ says so.
+    # Folders with no tab keep an unavailable row: their files have no
+    # browser, but Apply still installs files a mod carries there.
     for top in assets.ASSET_ROOTS:
         folder = store.game_root / top
         if not folder.is_dir():
             continue
-        controls = 'Assets: whole-file replacement with texture previews'
-        notes = 'Replace game files with your own. Textures preview; sounds, movies and models replace without one. Files owned by another editor change there instead.'
+        if top not in ASSET_TARGETS:
+            rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
+                'coverage': 'unavailable', 'status': 'not-integrated', 'openable': False,
+                'controls': 'No editor',
+                'notes': f'No browser shows {UNTARGETED_ASSETS[top]}. Apply still installs files the mod carries here.'})
+            continue
+        controls = 'Assets: whole-file replacement with previews'
+        notes = 'Add game files to the mod to replace them. Models and textures preview; sounds replace without one. Files owned by another editor change there instead.'
         if top == 'parts':
             controls = 'Assets: whole-file replacement; models preview in Items'
-            notes = ('Replace game files with your own. Textures preview; weapon and armor models preview '
-                     'in their Items detail drawers. Files owned by another editor change there instead.')
+            notes = ('Add game files to the mod to replace them. Models and textures preview; weapon and armor models also preview '
+                     'in their Items detail. Files owned by another editor change there instead.')
         rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
             'coverage': 'structured', 'status': 'partial', 'openable': True,
             'target': ASSET_TARGETS[top][0], 'sub': ASSET_TARGETS[top][1],
