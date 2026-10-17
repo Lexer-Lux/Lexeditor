@@ -70,8 +70,21 @@ def main():
             assert by_asset['assets:movww']['coverage']=='unavailable'
             assert 'movies' in by_asset['assets:movww']['notes']
             assert {row['id'] for row in rows if row['id'].startswith('native-')}=={'native-misc','native-encumbrance','native-levelup'}
-            assert all(row['status']=='partial' for row in rows if row['openable'])
             by_file={row['filename']:row for row in rows}
+            # Fully covered files read Integrated: every row opens and every
+            # meaningful property edits. Reviewed subsets stay Partial.
+            for filename in ('ReinforceParamWeapon.param','ReinforceParamProtector.param',
+                    'EquipMtrlSetParam.param','ItemLotParam.param','ShopLineupParam.param',
+                    'ObjActParam.param','CalcCorrectGraph.param'):
+                if filename in members:
+                    assert by_file[filename]['status']=='integrated',filename
+            assert by_file['NpcParam.param']['status']=='partial'
+            assert by_file['EquipParamWeapon.param']['status']=='partial'
+            assert all(row['status']=='integrated' for row in rows
+                if row['id'].startswith('desc:') and row['openable'])
+            assert all(row['status']=='partial' for row in rows
+                if row['id'].startswith('name:') and row['openable'])
+            assert all(row['status'] in ('partial','integrated') for row in rows if row['openable'])
             assert by_file['BehaviorParam.param']['coverage']=='structured'
             assert by_file['Bullet.param']['coverage']=='structured'
             assert by_file['NpcParam.param']['target']=='enemies'

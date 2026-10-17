@@ -118,7 +118,7 @@ class AttackReferences:
 
     def list(self, monster_id, all_records=False):
         if not (self.doc.is_monster(monster_id) or self.doc.is_friend(monster_id)
-                or self.doc.is_merchant(monster_id)):
+                or self.doc.is_merchant(monster_id) or self.doc.is_boss(monster_id)):
             raise ValueError('Select a reviewed monster or NPC')
         variation = self.doc.value('NpcParam', monster_id, 'behaviorVariationId')
         rows = []

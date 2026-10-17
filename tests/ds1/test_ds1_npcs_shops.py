@@ -27,11 +27,11 @@ def test_friend_read_and_edit():
 
 def test_unreviewed_rows_stay_shut():
     document = ItemDocument(make_archive())
-    assert not document.is_monster(223000) and not document.is_friend(223000)
+    assert not document.is_monster(502) and not document.is_friend(502) and not document.is_boss(502)
     with pytest.raises(FormatError, match='reviewed monster or NPC'):
-        document.read_row('NpcParam', 223000)
+        document.read_row('NpcParam', 502)
     with pytest.raises(FormatError, match='reviewed monster or NPC'):
-        document.edit('NpcParam', 223000, 'hp', 500)
+        document.edit('NpcParam', 502, 'hp', 500)
 
 
 def test_unowned_shops_lists_lines_without_merchants():

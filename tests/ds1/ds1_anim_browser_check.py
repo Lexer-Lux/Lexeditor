@@ -66,10 +66,9 @@ def main():
                     page.wait_for_selector('[data-anim-host] .lex-panel-loading', timeout=30000)
                     page.wait_for_selector('[data-anim-host][data-ready="true"]', timeout=30000)
                     page.wait_for_selector('[data-anim-host] .lex-panel-loading', state='detached')
+                    # Loaded: the status line under the viewer stays empty.
                     status = page.locator('[data-anim-status]').inner_text()
-                    assert 'a87_3300.hkx' in status, status
-                    assert '4 frames at 30.0 fps' in status, status
-                    assert '4 event cues' in status, status
+                    assert status.strip() == '', status
                     assert page.locator('canvas[data-viewport]').count() == 1
                     shot = page.locator('canvas[data-viewport]').screenshot()
                     colors = Image.open(io.BytesIO(shot)).convert('RGB').getcolors(maxcolors=1 << 20)

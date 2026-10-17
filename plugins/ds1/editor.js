@@ -322,7 +322,11 @@ function openRecord(link){
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return openAttack(link.id);
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
+  if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
+}
+function openAsset(link){
+  navigate(link.tab==="textures"?"textures":"models","files",`Asset:${link.id}`);
 }
 // The thing finder opens the same list the face opens: the target tab's
 // rows become hold-to-choose candidates (see the master list's
@@ -354,6 +358,22 @@ async function recordPreview(link){
     parts.push(detailField({label:field.label,control:readonlyField(shown,{format:false})}));
   }
   return LexeditorUI.stack({fill:false,compact:true},...parts);
+}
+// An asset link previews what the ID resolves to: the menu icon picture,
+// or the worn model's first available mesh. Failures show why, never throw.
+async function assetPreview(row,entry){
+  if(entry.tab!=="models"){
+    const picture=el("img",{src:`/api/icon?table=${encodeURIComponent(row.table)}&id=${encodeURIComponent(row.id)}`,
+      alt:"",draggable:"false",style:"width:40px;height:40px;","data-lex-no-image":"off"});
+    picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+    return picture;
+  }
+  const view=await api(`/api/parts/view?table=${encodeURIComponent(row.table)}&id=${row.id}`).catch(()=>null);
+  const models=((view&&view.models)||[]).filter(item=>item.available);
+  if(!models.length)return el("div",{},(view&&view.reason)||"The model file is not installed.");
+  if(!window.Ds1Preview)return el("div",{},`${row.name} model`);
+  const first=models[0];
+  return window.Ds1Preview.thumbnail({url:`/api/parts/geometry?table=${encodeURIComponent(row.table)}&id=${row.id}&variant=${encodeURIComponent(first.variant||"")}`,label:`${row.name} model`});
 }
 async function deploymentAction(action){
   if(state.deployBusy)return;
@@ -652,7 +672,10 @@ function fieldSections(row){
   const groups=new Map();
   // A field that is itself a record link opens that record from its own row;
   // only links with no editable field on the page are listed separately.
-  const links=new Map((row.recordLinks||[]).map(entry=>[entry.field,entry]));
+  // Asset links serve through the field label below: a face would replace the
+  // number input and a picked file could never write back into it, so neither
+  // joins them here or in the Linked records group.
+  const links=new Map((row.recordLinks||[]).filter(entry=>entry.kind!=="asset").map(entry=>[entry.field,entry]));
   const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
   const shownLinks=new Set();
   // Placement coordinates ride one row per vector: Position, then
@@ -693,15 +716,19 @@ function fieldSections(row){
           title:dialog.text||"",format:false}));
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
+    const assetLink=!textLink?(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved):null;
     const label=textLink?hoverable({content:shown,targetType:"ds1-text",targetId:textLink,
-      targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)}):shown;
+      targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)})
+      :assetLink?hoverable({content:shown,targetType:"ds1-asset",targetId:assetLink.id,
+      targetLabel:`${assetLink.name} in ${assetLink.tab==="textures"?"Textures":"Models"}`,
+      preview:()=>assetPreview(row,assetLink),activate:()=>openRecord(assetLink)}):shown;
     groups.get(group).push(detailField({label,property:field.key,control,icon:field.icon||null,
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
       help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
       sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
-  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field));
+  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field)&&entry.kind!=="asset");
   if(unlisted.length){
     groups.set("Linked records",unlisted.map(entry=>detailField({
       label:row.fields.find(field=>field.key===entry.field)?.label||entry.field,
@@ -755,10 +782,12 @@ function shopNumberControl(line,shopKey,label){
   return input;
 }
 async function toggleShopLine(line,full){
-  // The item name opens the rest of the shop line in place: price and
-  // stock already edit on the line itself, so only the other fields
-  // render here, with the same controls a full record shows.
-  if(full.childNodes.length){full.replaceChildren();return;}
+  // The item name opens the rest of the shop line under the table:
+  // price and stock already edit on the line itself, so only the other
+  // fields render here, with the same controls a full record shows.
+  // Clicking the open line closes it; clicking another line swaps to it.
+  if(full.dataset.line===String(line.id)){full.replaceChildren();delete full.dataset.line;return;}
+  full.dataset.line=String(line.id);
   full.replaceChildren(LexeditorUI.loadingStatus("Reading shop line"));
   try{
     const result=await api(`/api/row?table=ShopLineupParam&id=${line.id}`);
@@ -769,18 +798,29 @@ async function toggleShopLine(line,full){
     full.replaceChildren(...[...fieldSections(row)].map(([title,body])=>detailSection({title,body})));
   }catch(error){full.replaceChildren(LexeditorUI.detailNote("Could not read the shop line."));notify(error);}
 }
+function shopIconCell(line){
+  // The sold item's menu picture; a line that names no known item table
+  // leaves its cell empty rather than guessing.
+  if(!line.item||!ds1IconTables.has(line.item.table))return "";
+  const picture=el("img",{class:"lex-ds1-shop-icon",
+    src:`/api/icon?table=${encodeURIComponent(line.item.table)}&id=${encodeURIComponent(line.item.id)}`,
+    alt:"",draggable:"false","data-lex-no-image":"off"});
+  picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+  return picture;
+}
 function npcShopSection(){
-  const lines=state.npcShop.rows.flatMap(line=>{
-    const full=el("div",{class:"lex-shop-line-full"});
-    return [detailField({label:hoverable({content:line.name,
+  const full=el("div",{class:"lex-shop-line-full"});
+  const rows=state.npcShop.rows.map(line=>({key:String(line.id),
+    icon:shopIconCell(line),
+    name:hoverable({content:line.name,
       targetType:"ds1-shoprow",targetId:line.id,targetLabel:`${line.name} (shop line)`,
       preview:()=>el("div",{},"Price "+line.value+" - Stock "+line.sellQuantity),
       activate:()=>toggleShopLine(line,full)}),
-      control:LexeditorUI.multiNumberRow([
-        {label:"Price",control:shopNumberControl(line,"value","price")},
-        {label:"Stock",control:shopNumberControl(line,"sellQuantity","stock")}],{columns:2,nowrap:true})}),full];
-  });
-  return [detailSection({title:"Stock",body:lines})];
+    price:shopNumberControl(line,"value","price"),
+    stock:shopNumberControl(line,"sellQuantity","stock")}));
+  return [detailSection({title:"Stock",body:[columnList({rows,key:row=>row.key,
+    columns:[{key:"icon",label:"",width:"36px"},{key:"name",label:"Item",grow:1,align:"start"},
+      {key:"price",label:"Price",numeric:true},{key:"stock",label:"Stock",numeric:true}]}),full]})];
 }
 function monsterThinkSection(){
   const aiField=(state.row.fields||[]).find(item=>item.key==="aiThinkId");
@@ -884,7 +924,7 @@ function monsterDetail(groups){
     :active==="ai"?monsterThinkSection()
     :active==="behaviors"?monsterBehaviorsSection()
     :groups.get(section.label);
-  return tabbedPanel({label:"Monster details",active,tabs,paginate:false,
+  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.monsterTab=id;render();},content});
 }
 function itemDetail(groups){
@@ -895,7 +935,7 @@ function itemDetail(groups){
     help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
   const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
-  return tabbedPanel({label:"Item details",active,tabs,paginate:false,
+  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.itemTab=id;render();},content:groups.get(section.label)});
 }
 function formatAssetSize(size){
@@ -1004,10 +1044,13 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
     body.push(detailSection({title:"GEOMETRY",body:[
       detailField({label:"INFO",control:readonlyField(value),help:infoHelp(tip)})]}));
   }
-  const textures=(info.textures||[]).map(texture=>detailField({label:texture.name,
-    control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto",loading:"lazy"}),
-    help:textureHelp(texture)}));
-  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures}));
+  const textures=info.textures||[];
+  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
+    control:el("img",{src:previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
+    help:textureHelp(texture)}))}));
+  else body.push(detailSection({title:"PREVIEW",body:[
+    detailField({label:"TEXTURES",control:readonlyField("None in this file"),
+      help:infoHelp("Only files with their own textures preview here. Character and map textures live in companion archives.")})]}));
   const previewable=!!(model&&model.previewable);
   const icon=LexeditorUI.iconSlot({content:previewable
     ?window.Ds1Preview.thumbnail({url:assetGeometryUrl(row.id,info.source,model.member),label:row.name})
@@ -1023,8 +1066,7 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
   if(textures.length){
     body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
-      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",
-        style:"max-width:160px;max-height:160px;width:auto;height:auto"}),
+      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",class:"lex-asset-thumbnail"}),
       help:textureHelp(texture)}))}));
     const first=textures[0];
     return {icon:LexeditorUI.iconSlot({content:el("img",{src:previewUrl(first),alt:row.name,loading:"lazy"})}),
@@ -1654,11 +1696,11 @@ function renderItems(){
   if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?"monsters":state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
-    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-items",rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
+    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     // Asset files join the mod through the list's add button: adding at a
     // path the game has replaces it through the loader, so asset tabs
@@ -2023,13 +2065,13 @@ function directoryMatches(){
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||(a.id>b.id?1:a.id<b.id?-1:0));
 }
 function directoryPane(){
-  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),directoryList());
+  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),...directoryList());
 }
 function refreshDirectory(){
   if(state.tab!=="maps")return;
   const pane=document.querySelector("[data-maps-dir]");
   if(!pane){render();return;}
-  pane.replaceChildren(directoryStrip(),directoryList());
+  pane.replaceChildren(directoryStrip(),...directoryList());
 }
 function directoryStrip(){
   return subtabBar({tabs:directoryTabs(),active:state.dirTab,label:"World directory",shortcuts:false,className:"lex-dir-tabs",change:id=>{
@@ -2062,13 +2104,15 @@ function directoryList(){
   const columns=[{key:"name",label:"Name",grow:1}];
   if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
-  return LexeditorUI.stack(
-    columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
-    LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
-      search:{key:"maps-directory",value:state.dirQuery,label:"Search the world",
-        change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}},
-      filters:[directoryLocalRow()],
-      change:value=>{state.dirPage=value;refreshDirectory();}}));
+  // Search on its own row up top, like the animations panes; the pager
+  // below the list only pages and filters.
+  return [LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
+      change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
+    LexeditorUI.stack(
+      columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
+      LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
+        filters:[directoryLocalRow()],
+        change:value=>{state.dirPage=value;refreshDirectory();}}))];
 }
 async function selectDirectoryParam(row){
   if(key(row)===state.selected&&state.mapTab==="selection")return;
@@ -2206,8 +2250,10 @@ function animPaneSize(which){
   const fit=which==="char"?state.animCharFit:which==="events"?state.animEventFit:state.animFit;
   return Math.max(1,Math.min(state.pageSize,fit||Infinity));
 }
-function fitAnimList(list,which,size){
-  LexeditorUI.fitListPage({list,available:list,pageSize:size,minRowHeight:32,
+// The fit measures the paged pane (list plus pager), and the wheel turns
+// pages through that same pane: fitted lists never scroll.
+function fitAnimList(list,which,size,available){
+  LexeditorUI.fitListPage({list,available:available||list,pageSize:size,minRowHeight:32,
     change:value=>{
       if(which==="char"){if(state.animCharFit===value)return;state.animCharFit=value;}
       else if(which==="events"){if(state.animEventFit===value)return;state.animEventFit=value;}
@@ -2228,13 +2274,15 @@ function animCharsPane(){
   const select=row=>{if(key(row)!==state.animCharId)void chooseAnimChar(row);};
   const list=columnList({rows:shown,key,selected:state.animCharId,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1}]});
-  fitAnimList(list,"char",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animCharPage,total:here.length,pageSize:size,
+    change:value=>{state.animCharPage=value;refreshAnimChars();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"char",size,both);
   return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animCharPage,total:here.length,pageSize:size,
-      change:value=>{state.animCharPage=value;refreshAnimChars();}}));
+    both);
 }
 function animEventsCell(){
   return {key:"events",label:"Events",sortable:false,render:row=>{
@@ -2253,13 +2301,15 @@ function animAnimsPane(){
   const select=row=>{if(key(row)!==state.selected)void pickAnimMotion(row);};
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1},animEventsCell()]});
-  fitAnimList(list,"anims",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
+    change:value=>{state.animPage=value;refreshAnimList();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"anims",size,both);
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
-      change:value=>{state.animPage=value;refreshAnimList();}})];
+    both];
 }
 function animEventsPane(){
   const here=animListMatches();
@@ -2274,13 +2324,15 @@ function animEventsPane(){
     onclick:()=>animBackToAnims().catch(notify)},`‹ ${scope.animName||"Animations"}`);
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1}]});
-  fitAnimList(list,"events",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
+    change:value=>{state.animPage=value;refreshAnimList();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"events",size,both);
   return [back,
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
-      change:value=>{state.animPage=value;refreshAnimList();}}),
+    both,
     detail()];
 }
 function animListPane(){

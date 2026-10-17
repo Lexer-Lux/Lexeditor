@@ -56,6 +56,17 @@ SHOP_ROW_MERCHANTS = {
     1134: (251001,),
 }
 
+#: equipType values to the item table each line's equipId points at.
+#: Mirrors the equipId Refs in metadata/meta/ShopLineupParam.xml; the
+#: shop-items test guards the mirror against drift.
+SHOP_ITEM_TABLES = {
+    0: 'EquipParamWeapon',
+    1: 'EquipParamProtector',
+    2: 'EquipParamAccessory',
+    3: 'EquipParamGoods',
+    4: 'Magic',
+}
+
 def _invert() -> dict[int, tuple[str, ...]]:
     inverted: dict[int, list[str]] = {}
     for prefix, ids in MERCHANT_PREFIXES.items():
@@ -91,8 +102,10 @@ def is_merchant(npc_id) -> bool:
 def stock(document, npc_id) -> list[dict]:
     """The shop lines one NPC serves, in shop order.
 
-    Each line carries its ShopLineupParam id, the bare item name, and the
-    editable price (value) and stock (sellQuantity).
+    Each line carries its ShopLineupParam id, the bare item name, the
+    editable price (value) and stock (sellQuantity), and the sold item
+    as an (item table, item id) pair, or None when the line's equipType
+    names no known table.
     """
     try:
         npc = int(npc_id)
@@ -108,11 +121,18 @@ def stock(document, npc_id) -> list[dict]:
         schema_name = names.get(row.row_id, '') or ''
         display = document.display_name('ShopLineupParam', row.row_id, row) or schema_name
         bare = re.sub(r'^\[.*?\]\s*', '', display or '')
+        equip_type = document.value('ShopLineupParam', row.row_id, 'equipType')
+        item_table = SHOP_ITEM_TABLES.get(equip_type)
+        item = None
+        if item_table is not None:
+            item = {'table': item_table,
+                    'id': document.value('ShopLineupParam', row.row_id, 'equipId')}
         rows.append({
             'id': row.row_id,
             'name': bare or display or f'Row {row.row_id}',
             'value': document.value('ShopLineupParam', row.row_id, 'value'),
             'sellQuantity': document.value('ShopLineupParam', row.row_id, 'sellQuantity'),
+            'item': item,
         })
     rows.sort(key=lambda entry: entry['id'])
     return rows

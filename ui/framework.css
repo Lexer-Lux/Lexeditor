@@ -1073,10 +1073,13 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   margin:5px;
   container-type:size;
 }
+/* A fractional cqw border truncates instead of rounding, so a switch
+   whose tick lands just under a pixel boundary (a 29px switch wants
+   2.97px) would draw one pixel thin. round() keeps the proportions. */
 .lex-detail-panel-actions > input[type="checkbox"]::before {
   width:55%;
   height:33%;
-  border-width:0 0 11cqw 11cqw;
+  border-width:0 0 round(11cqw, 1px) round(11cqw, 1px);
 }
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */
@@ -1124,8 +1127,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-mod-file-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .lex-mod-file-size{flex:0 0 auto;opacity:.75;}
 .lex-mod-file-loaded>.lex-mod-file-name{color:var(--lex-accent);font-weight:600;}
-.lex-mod-contents-tabs .lex-column-list-row.lex-mod-file-loaded .lex-column-cell-content{color:var(--lex-accent);font-weight:600;}
-.lex-mod-contents-tabs{display:flex;flex-direction:column;}
+.lex-mod-contents .lex-column-list-row.lex-mod-file-loaded .lex-column-cell-content{color:var(--lex-accent);font-weight:600;}
 
 /* Multi-select prepends a banner beside the tabbed panel, so the pair below
    gets the same fill treatment an only-child tabbed panel gets. The tabs
@@ -5749,6 +5751,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-model-preview-drawer > .lex-stack { flex:1 1 auto; min-width:0; }
 
 /* The thumbnail owns one magnifier for hover and the open viewer state. */
+/* One file tab's texture thumbnails, Models and Textures alike: small
+   capped squares in the detail panel; the magnifier shows them full-size. */
+.lex-asset-thumbnail { max-width:160px; max-height:160px; width:auto; height:auto; }
 .lex-model-preview-trigger {
    cursor:pointer;
  position:relative;
@@ -6664,11 +6669,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-pager-inline.lex-pager-stacked .lex-pager-left { grid-column:1; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-right { grid-column:2; grid-row:1; }
 .lex-pager-inline.lex-pager-stacked .lex-pager-controls { grid-column:1 / -1; grid-row:2; }
-/* The compact pagination bar for narrow panels: the search box on its own
-   row up top, then everything left on one bottom row - pager controls,
-   filters and the remaining counts. No position count, nothing stacked.
-   Toggle labels (the maps directory's Local?) read bottom-to-top, trading
-   height the panel has for width it does not. */
+/* The compact pagination bar for narrow panels: an optional search box on
+   its own row up top (panels with room put their search above the list
+   instead), then everything left centered on one bottom row - pager
+   controls, filters and the remaining counts. No position count, nothing
+   stacked. Toggle labels (the maps directory's Local?) read bottom-to-top,
+   trading height the panel has for width it does not. */
 .lex-pager.lex-compact-pager {
   position:static;
   z-index:auto;
@@ -6686,6 +6692,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-compact-pager-bottom {
   display:flex;
   align-items:center;
+  justify-content:center;
   gap:6px;
   flex-wrap:nowrap;
   width:100%;
@@ -8804,14 +8811,17 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-prompt-dialog .lex-dialog-field { margin:.6em 0; }
 .lex-prompt-dialog input[type="text"] { width:100%; box-sizing:border-box; }
 
-/* A shared animation viewer: the scrub bar with its event cues, then one
-   row of square transport buttons directly below it. */
+/* A shared animation viewer: the scrub bar with its event cues overlaid on
+   it, then one centered row of square transport buttons directly below it.
+   The markers float over the slider and keep their own clicks; the slider
+   keeps everything between them. */
 .lex-anim-timeline { display:flex; flex-direction:column; gap:8px; }
 .lex-anim-scrub { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.lex-anim-scrub input[type="range"] { flex:1 1 auto; min-width:120px; }
+.lex-anim-slider { position:relative; flex:1 1 auto; min-width:120px; display:flex; }
+.lex-anim-slider input[type="range"] { flex:1 1 auto; min-width:0; width:100%; }
 .lex-anim-readout { white-space:nowrap; }
 .lex-anim-follow { white-space:nowrap; }
-.lex-anim-markers { position:relative; flex-basis:100%; height:12px; }
-.lex-anim-marker { position:absolute; top:0; width:4px; height:12px; padding:0; border:none; background:#b26a00; cursor:pointer; }
-.lex-anim-transport { display:flex; gap:8px; }
+.lex-anim-markers { position:absolute; left:0; right:0; top:50%; height:12px; margin-top:-6px; pointer-events:none; }
+.lex-anim-marker { position:absolute; top:0; width:4px; height:12px; padding:0; border:none; background:#b26a00; cursor:pointer; pointer-events:auto; }
+.lex-anim-transport { display:flex; gap:8px; justify-content:center; }
 .lex-anim-transport-button { width:32px; height:32px; padding:0; font-size:14px; line-height:1; }

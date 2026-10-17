@@ -20,10 +20,11 @@ def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     assert all(field['editable'] for field in fields if field['key'] != 'effectiveHp')
     effective = next(field for field in fields if field['key'] == 'effectiveHp')
     assert not effective['editable'] and effective['value'] == 0
-    # Stray Demon deliberately has type 0, and Egg Carrier shares a monster
-    # family name but has type 2. Neither name-only nor type-only filtering works.
+    # Stray Demon has type 0 like a monster but lists under Bosses now; Egg
+    # Carrier shares a monster family name but has type 2. Neither name-only
+    # nor type-only filtering works.
     # 251000 and 321001 are friendly (type 2): the NPCs tab reviews them.
-    for excluded in (223000, 502, 999999):
+    for excluded in (502, 999999):
         with pytest.raises(FormatError, match='not a reviewed'):
             doc.read_row('NpcParam', excluded)
         with pytest.raises(FormatError, match='not a reviewed'):

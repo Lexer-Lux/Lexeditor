@@ -2,9 +2,9 @@
 
 The male Undead Merchant is npcType 0, so his admission to the NPCs tab
 also proves merchants no longer need npcType 2 to be editable. His two
-fixture shop lines (real Smithbox names) render with inline price and
-stock; the female merchant, with no attributed fixture lines, shows no
-Shop tab.
+fixture shop lines (real Smithbox names) render in the standard table
+with an icon column and inline price and stock; the female merchant,
+with no attributed fixture lines, shows no Shop tab.
 """
 import sys
 import tempfile
@@ -18,6 +18,10 @@ from plugins.ds1.store import RELATIVE, MARKER  # noqa: E402
 from plugins.ds1.plugin import DS1Session  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
+PIXEL = bytes.fromhex(
+    '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489'
+    '0000000d49444154789c6360000000020001e221bc330000000049454e44ae426082')
+
 
 def test_merchant_shop_panel_tab():
     errors = []
@@ -28,8 +32,8 @@ def test_merchant_shop_panel_tab():
         },
         field_values={
             'ShopLineupParam': {
-                1100: {'value': 500, 'sellQuantity': 3},
-                1101: {'value': 750, 'sellQuantity': -1},
+                1100: {'equipId': 11210000, 'equipType': 3, 'value': 500, 'sellQuantity': 3},
+                1101: {'equipId': 10000010, 'equipType': 3, 'value': 750, 'sellQuantity': -1},
             },
         })
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-shop-') as temp:
@@ -49,6 +53,8 @@ def test_merchant_shop_panel_tab():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.route('**/api/icon**', lambda route: route.fulfill(
+                        status=200, content_type='image/png', body=PIXEL))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
                     page.evaluate('navigate("npcs", "npcs", "NpcParam:251001")')
@@ -58,11 +64,22 @@ def test_merchant_shop_panel_tab():
                     assert 251001 in names, names
                     page.locator('.lex-tabbed-panel [data-subtab="shop"]').click()
                     page.wait_for_function('state.monsterTab === "shop"')
-                    lines = page.locator('.lex-detail-panel .lex-detail-field')
-                    assert lines.count() == 2, lines.count()
-                    assert 'Orange Guidance Soapstone' in lines.nth(0).inner_text()
-                    assert 'Repair Powder' in lines.nth(1).inner_text()
-                    price = lines.nth(0).locator('input').nth(0)
+                    # The stock is the standard table: icon, item, price, stock.
+                    table = page.locator('.lex-tabbed-panel .lex-column-list')
+                    table.wait_for(timeout=60000)
+                    heads = table.locator(':scope > .lex-column-list-header > .lex-column-list-head-cell')
+                    assert [heads.nth(n).inner_text() for n in range(heads.count())] == [
+                        '', 'Item', 'Price', 'Stock']
+                    rows = table.locator(':scope > .lex-column-list-row')
+                    assert rows.count() == 2, rows.count()
+                    assert 'Orange Guidance Soapstone' in rows.nth(0).inner_text()
+                    assert 'Repair Powder' in rows.nth(1).inner_text()
+                    icons = rows.locator('.lex-ds1-shop-icon')
+                    assert icons.count() == 2, icons.count()
+                    assert icons.nth(0).get_attribute('src') == \
+                        '/api/icon?table=EquipParamGoods&id=11210000'
+                    assert icons.nth(0).is_visible()
+                    price = rows.nth(0).locator('input').nth(0)
                     assert price.input_value() == '500'
                     # Price edits commit to the shop line and undo cleanly.
                     price.fill('525')
@@ -76,8 +93,8 @@ def test_merchant_shop_panel_tab():
                     page.wait_for_function('fieldHistory.undoStack.length === 0')
                     page.wait_for_function(
                         'state.npcShop && state.npcShop.rows[0].value === 500')
-                    # The item name opens the rest of the line below it.
-                    lines.nth(1).locator('.lex-hoverable').click()
+                    # The item name opens the rest of the line below the table.
+                    rows.nth(1).locator('.lex-hoverable').click()
                     full = page.locator('.lex-shop-line-full .lex-detail-field')
                     full.first.wait_for(timeout=60000)
                     assert full.count() >= 5, full.count()
@@ -92,7 +109,7 @@ def test_merchant_shop_panel_tab():
                         ".then(r => r.json()).then(j => j.row.fields.find(f => f.key === 'eventFlag').value)"
                     ) == 1234
                     # Clicking again closes it; the NPC tab never leaves.
-                    lines.nth(1).locator('.lex-hoverable').click()
+                    rows.nth(1).locator('.lex-hoverable').click()
                     page.wait_for_function(
                         "document.querySelectorAll('.lex-shop-line-full .lex-detail-field').length === 0")
                     assert page.evaluate('state.tab') == 'npcs'

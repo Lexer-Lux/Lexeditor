@@ -121,7 +121,7 @@ def main():
         (game / MODEL_CHR).parent.mkdir(parents=True, exist_ok=True)
         (game / MODEL_CHR).write_bytes(make_chrbnd(
             build_flver(), stem="c0000",
-            extra=[("c0000.tpf", make_tpf("c0000_diffuse.dds"))]))
+            extra=[("c0000.tpf", make_tpf("c0000_diffuse.dds", 200, 200))]))
         (game / MODEL_OBJ).parent.mkdir(parents=True, exist_ok=True)
         (game / MODEL_OBJ).write_bytes(make_chrbnd(
             build_flver(), stem="o1000",
@@ -186,6 +186,11 @@ def main():
                     assert page.evaluate("state.assetDetail.model.bones") == 1
                     assert page.evaluate("state.assetDetail.model.objects") is None
                     assert "PREVIEW" in section_titles(page)
+                    loaded_images(page, "#main .lex-detail-section-content img[alt='c0000_diffuse.dds']")
+                    model_max = page.locator(
+                        "#main .lex-detail-section-content img[alt='c0000_diffuse.dds']").evaluate(
+                        "img=>getComputedStyle(img).maxWidth")
+                    assert model_max == "160px", model_max
                     assert page.locator(".lex-detail-field-label-text", has_text="SOURCE").count() == 0
                     assert page.locator('[data-asset-action="replace"]').count() == 0
                     assert page.locator(".lex-detail-panel-meta").inner_text().strip() != ""
@@ -212,6 +217,10 @@ def main():
                     assert "OBJECTS" in geo and "MESHES" in geo and "BONES" in geo, geo
                     assert page.evaluate("state.assetDetail.model.objects") == 2
                     assert page.evaluate("state.assetDetail.model.meshes") == 2
+                    assert "PREVIEW" in section_titles(page)
+                    no_tex = page.locator(".lex-detail-section", has_text="PREVIEW").first.locator(
+                        "input").input_value()
+                    assert no_tex == "None in this file", no_tex
                     open_drawer(page)
                     painted(page, "canvas[data-preview]")
                     picker = page.locator('button[aria-label="Model member"]')

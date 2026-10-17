@@ -781,11 +781,9 @@
     const shipped = typeof text === "string" ? text : null;
     const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
     const isCleared = () => shipped !== null && shown() === "";
-    const clearedHint = () => element("em", {class: "lex-help-cleared"},
-      "Help text cleared. Double-click the marker to write new text.");
-    // Cleared help is gone for readers; developers keep the marker so the
-    // text can be written again, with a hint instead of an empty bubble.
-    if (isCleared() && !sharedSettingsSnapshot?.developerMode) return document.createTextNode("");
+    // Cleared help is gone everywhere: clearing means gone. Ctrl+Z brings
+    // the text back, and the next mount shows the marker again.
+    if (isCleared()) return document.createTextNode("");
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, symbol = "?", ...rest
@@ -797,7 +795,7 @@
       ...rest,
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
-      "aria-label": isCleared() ? "Help text cleared" : ariaLabel, "aria-describedby": popupId,
+      "aria-label": ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, symbol));
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
@@ -816,11 +814,10 @@
       // A developer can reword what the bubble says. The shipped string stays
       // the key, so a bubble reworded here reads the new text on every screen
       // that shows the same explanation.
-      const nowCleared = isCleared();
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
       }, text instanceof Node ? text.cloneNode(true)
-        : nowCleared ? clearedHint() : String(shown() ?? title ?? ""));
+        : String(shown() ?? title ?? ""));
       document.body.append(popup);
       if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
         // The bubble itself never takes the pointer, so the editor is started
@@ -843,7 +840,7 @@
             // text, so a developer can delete help that should not be there.
             const next = typed;
             if (!commit) {
-              popup.replaceChildren(isCleared() ? clearedHint() : String(shown()));
+              popup.replaceChildren(String(shown()));
               // The editor's own blur schedules the bubble's close; keep the
               // wording on screen while the reader is still looking at it.
               cancelClose();
@@ -859,7 +856,8 @@
             // the pointer being back on the marker, so reopen it to face the
             // reader with the wording that was just saved.
             closeHelpPopup();
-            if (reopen) open();
+            if (next === "") marker.remove();
+            else if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
@@ -1721,8 +1719,8 @@
     // A heading reads: its name, the help bubble, the copy button, then a
     // thing finder when the panel can pick a different record from here.
     if (options.help) title.append(infoHelp(options.help));
-    if (options.title !== undefined || options.titleControl || options.renameRecord)
-      title.append(copyValueButton(titleText, "Copy this name"));
+    // No title copy button: its glyph read as a second duplicate button
+    // next to the real one, so the heading keeps name, help and finder only.
     if (typeof options.find === "function") {
       const label = options.findTitle || "Find a different record";
       title.append(element("button", {type: "button", class: "lex-title-finder", title: label,
@@ -1774,11 +1772,16 @@
     const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
     const sections = nodes.length > 0 && nodes.every(node =>
       node instanceof Element && node.classList.contains("lex-detail-section"));
+    // Unpaged flows lay out sections and bare fields alike; anything else
+    // passes through untouched, the way paginate:false left it.
+    const unpaged = paginate && typeof paginate === "object" && paginate.unpaged === true;
+    const flowable = sections || (unpaged && nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-field")));
     const flow = paginate === false ? null
       : paginate ? (typeof paginate === "object" ? paginate : {})
       : sections ? {inline: true} : null;
     // A tab's content that does not flow is left exactly as it was given.
-    if (!flow && onlyFlow) return null;
+    if (onlyFlow && (!flow || (unpaged && !flowable))) return null;
     const box = element("div", {class: bodyClass}, nodes);
     return flow ? paginateSettings(box, flow) : box;
   };
@@ -2522,7 +2525,14 @@
     });
   };
   const modelViewModes = host => {
-    if (host.lexViewModes) return host.lexViewModes;
+    // Remounting clears the host (animationViewer.stop replaces its
+    // children), which detaches the bar while the cached controller
+    // survives. Re-attach it so the buttons - and the mode - persist.
+    if (host.lexViewModes) {
+      const cached = host.lexViewModes;
+      if (cached.bar && !cached.bar.isConnected) host.append(cached.bar);
+      return cached;
+    }
     let mode = "regular", scene = null;
     const buttons = new Map();
     const paint = () => {
@@ -2551,6 +2561,7 @@
     paint();
     host.append(bar);
     const controller = {
+      bar,
       mode: () => mode,
       setMode,
       bindScene: next => { scene = next || null; if (scene) applyModelViewMode(scene, mode); },
@@ -2999,6 +3010,10 @@
     dex: ['#6ad0c9', '<path d="M4 2l6 6-6 6V2z"/><path d="M9 2l6 6-6 6V2z"/>'],
     int: ['#b48ae0', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/><circle cx="8" cy="8" r="1.6"/>'],
     fth: ['#e08aa0', '<path d="M8 1l5 7-5 7-5-7z"/>'],
+    vit: ['#e05a5a', '<path d="M8 13.5 C5.5 11.5 3.5 9.4 3.5 7 C3.5 5.3 4.8 4.2 6.3 4.2 C7 4.2 7.7 4.5 8 5.1 C8.3 4.5 9 4.2 9.7 4.2 C11.2 4.2 12.5 5.3 12.5 7 C12.5 9.4 10.5 11.5 8 13.5 z"/>'],
+    wil: ['#5aa9e0', '<path d="M3 3.5h10v2H3zM3 7h10v2H3zM3 10.5h10v2H3z"/>'],
+    end: ['#a3c14a', '<path d="M9 1.5 L4.5 9 H7.5 L7 14.5 L11.5 7 H8.5 Z"/>'],
+    luc: ['#c9c9c9', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2.5"/>'],
   };
   const typeGlyph = kind => {
     const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];
@@ -6011,8 +6026,9 @@
     return "";
   };
 
-  // A reusable animation viewer: scrub bar, event markers, transport row and
-  // playback loop. The caller draws the pictures: render() gets the current
+  // A reusable animation viewer: scrub bar with its event markers overlaid
+  // on it, a transport row and a playback loop. The caller draws the
+  // pictures: render() gets the current
   // frame (fractional, for blending) and the playback state every animation
   // frame. DS1 poses its skeleton there; a fixture page draws synthetic
   // frames on a plain canvas. Stepping pauses, as on an editing bench: the
@@ -6030,13 +6046,14 @@
     const slider = element("input", {type: "range", min: "0", max: String(count - 1),
       step: "0.01", value: "0", "aria-label": "Frame"});
     const readout = element("span", {class: "lex-anim-readout", "data-anim-readout": "true"});
-    const scrub = element("div", {class: "lex-anim-scrub"}, slider, readout);
+    const markers = element("div", {class: "lex-anim-markers"});
+    const sliderWrap = element("div", {class: "lex-anim-slider"}, slider, markers);
+    const scrub = element("div", {class: "lex-anim-scrub"}, sliderWrap, readout);
     if (options.follow) {
       const box = element("input", {type: "checkbox", "aria-label": options.follow.label || "Follow"});
       box.onchange = () => { state.follow = box.checked; options.follow.change?.(state.follow); };
       scrub.append(element("label", {class: "lex-anim-follow"}, box, ` ${options.follow.label || "Follow"}`));
     }
-    const markers = element("div", {class: "lex-anim-markers"});
     for (const cue of frames.events || []) {
       const at = Number(cue.start) || 0;
       const tick = element("button", {type: "button", class: "lex-anim-marker",
@@ -6046,7 +6063,6 @@
         onclick: () => { state.time = at % duration; }});
       markers.append(tick);
     }
-    scrub.append(markers);
     const transport = element("div", {class: "lex-anim-transport",
       "data-anim-transport": "true", role: "group", "aria-label": "Animation transport"});
     const glyph = playing => playing ? "\u23F8" : "\u25B6";
@@ -9510,8 +9526,14 @@ ${contents.path}`});
       },
       move: (value, before) => {
         if (!order.includes(value) || value === before) return;
+        const from = order.indexOf(value);
+        const to = order.indexOf(before);
         order = order.filter(item => item !== value);
-        const index = order.indexOf(before);
+        let index = order.indexOf(before);
+        // Dropped on a column it takes that slot: dragged rightward it
+        // lands after the target, dragged leftward before it. Always
+        // inserting before made a rightward drop a no-op.
+        if (from >= 0 && to >= 0 && from < to) index = index < 0 ? order.length : index + 1;
         order.splice(index < 0 ? order.length : index, 0, value);
         save();
       },
@@ -13424,7 +13446,8 @@ ${contents.path}`});
 
   const modsPage = (pluginId, pluginName) => {
     let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
-    let contentsTab = "records", contentsMod = null;
+    let modDetailTab = "details", contentsMod = null, contentsResult = null, contentsFailed = false;
+    const contentsWraps = {files: null, records: null};
     const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
@@ -13587,7 +13610,6 @@ ${contents.path}`});
         detailSection({title: "SOURCE", body: [
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
           ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
-          detailField({label: "FOLDER", control: readonlyField(row.path)}),
         ]}));
       if (selected !== contentsMod) {
         contentsMod = selected;
@@ -13595,9 +13617,21 @@ ${contents.path}`});
         contentsQuery.files = "";
         contentsPage.records = 0;
         contentsPage.files = 0;
+        contentsResult = null;
+        contentsFailed = false;
+        // One fetch per selected mod: tab switches redraw from the cache,
+        // so they never flash the loading line or refetch.
+        const fetched = selected;
+        callWindow("mod_contents", pluginId, row.path).then(result => {
+          if (selected !== fetched) return;
+          contentsResult = result || {};
+          paintWraps();
+        }).catch(() => {
+          if (selected !== fetched) return;
+          contentsFailed = true;
+          paintWraps();
+        });
       }
-      let contentsResult = null, contentsFailed = false;
-      const contentsWrap = element("div", {class: "lex-mod-contents-tabs"}, loadingStatus("Reading mod contents"));
       const modChangeText = entry => (entry.fields || []).length ? entry.fields.join(", ")
         : entry.before != null || entry.after != null
           ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
@@ -13609,9 +13643,9 @@ ${contents.path}`});
         contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab] || 0, pages - 1));
         const slice = filtered.slice(contentsPage[tab] * size, (contentsPage[tab] + 1) * size);
         const pagerNode = pager({inline: true, page: contentsPage[tab], pages, total: filtered.length, pageSize: size,
-          change: next => { contentsPage[tab] = next; paintContents(); },
+          change: next => { contentsPage[tab] = next; draw(); },
           search: {key: `${pluginId}-mod-${tab}`, value: contentsQuery[tab] || "", label: searchLabel,
-            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; paintContents(); }}});
+            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; draw(); }}});
         const foot = notes.map(line => detailNote(line));
         if (!rows.length) return element("div", {class: "lex-mod-contents"}, detailNote(emptyNote), ...foot);
         if (!filtered.length) return element("div", {class: "lex-mod-contents"},
@@ -13650,44 +13684,41 @@ ${contents.path}`});
           row => row.loaded ? "lex-mod-file-loaded" : "",
           row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
       };
-      const paintContents = () => {
-        if (contentsFailed) { contentsWrap.replaceChildren(detailNote("Could not read the mod's contents.")); return; }
-        if (!contentsResult) { contentsWrap.replaceChildren(loadingStatus("Reading mod contents")); return; }
-        // Panel tabs, not a bare strip: the same component every detail
-        // panel uses, so Records and Files look and behave like the rest.
-        // Each table carries its own inline pager, so no panel paging.
-        contentsWrap.replaceChildren(tabbedPanel({
-          tabs: [
-            {id: "records", label: "Records",
-              help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
-            {id: "files", label: "Files",
-              help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
-          ],
-          active: contentsTab,
-          label: "Mod contents",
-          paginate: false,
-          change: id => { contentsTab = id; paintContents(); },
-          content: contentsTab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult),
-        }));
+      const contentsNode = tab => {
+        if (contentsFailed) return detailNote("Could not read the mod's contents.");
+        if (!contentsResult) return loadingStatus("Reading mod contents");
+        return tab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
       };
-      sections.push(contentsWrap);
-      callWindow("mod_contents", pluginId, row.path).then(result => {
-        if (keyOf(row) !== selected) return;
-        contentsResult = result || {};
-        paintContents();
-      }).catch(() => {
-        if (keyOf(row) !== selected) return;
-        contentsFailed = true;
-        paintContents();
-      });
+      const paintWraps = () => {
+        if (contentsWraps.files) contentsWraps.files.replaceChildren(contentsNode("files"));
+        if (contentsWraps.records) contentsWraps.records.replaceChildren(contentsNode("records"));
+      };
+      const filesWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("files"));
+      const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
+      contentsWraps.files = filesWrap;
+      contentsWraps.records = recordsWrap;
       const notes = [row.error ? detailNote(row.error) : null,
         row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
           conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
         ...(row.alerts || []).map(line => detailNote(line)),
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
-      // The contents tabbed panel pages its own tables; a pager around the whole
-      // detail would strand it on a later page, hiding the mod's own content.
-      return detailPanel({title: row.name, actions, body: [...notes, ...sections], paginate: false});
+      // Panel tabs, not sections with a tab strip inside: Details, Files and
+      // Records work the way every other detail panel's tabs do. Each table
+      // carries its own inline pager, so no panel paging.
+      return detailPanel({title: row.name, actions, body: [...notes, tabbedPanel({
+        label: "Mod details",
+        active: modDetailTab,
+        paginate: false,
+        tabs: [
+          {id: "details", label: "Details"},
+          {id: "files", label: "Files",
+            help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
+          {id: "records", label: "Records",
+            help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
+        ],
+        change: id => { modDetailTab = id; draw(); },
+        content: modDetailTab === "details" ? sections : modDetailTab === "files" ? filesWrap : recordsWrap,
+      })], paginate: false});
     };
     const draw = () => {
       if (!main) return;

@@ -646,23 +646,36 @@ def test_mods_detail_open_button_opens_the_folder(page):
     assert calls(page, "open_mod_folder")[-1][1:] == ["C:/lib/game/Mine"]
 
 
-def _contents_tabs(page):
+STRIP = ".lex-tabbed-panel-tabs .lex-subtab-button"
+
+
+def _detail_tabs(page):
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("checkbox", name="Mine enabled").wait_for()
     page.wait_for_function("window.calls.some(c => c[0] === 'mod_contents')")
-    page.locator(".lex-mod-contents-tabs .lex-subtab-button").first.wait_for()
+    page.locator(".lex-mods-page .lex-detail-panel " + STRIP).first.wait_for()
     return page.locator(".lex-mods-page .lex-detail-panel")
+
+
+def test_mods_detail_opens_on_details_without_a_folder_property(page):
+    mount(page)
+    detail = _detail_tabs(page)
+    tabs = detail.locator(STRIP)
+    # Panel tabs sort themselves: Details, Files, Records; Details first.
+    assert [tabs.nth(i).get_attribute("data-subtab") for i in range(3)] == ["details", "files", "records"]
+    assert "DETAILS" in tabs.nth(0).inner_text().upper()
+    assert "active" in (tabs.nth(0).get_attribute("class") or "")
+    for label in ("Name", "Author", "Description", "Credits"):
+        assert detail.get_by_role("textbox", name=label).count() == 1
+    source = detail.locator(".lex-detail-section", has_text="SOURCE").inner_text()
+    assert "FROM" in source
+    assert "FOLDER" not in source
 
 
 def test_mods_detail_lists_changed_records(page):
     mount(page)
-    detail = _contents_tabs(page)
-    tabs = detail.locator(".lex-mod-contents-tabs .lex-subtab-button")
-    # Panel tabs sort themselves: Files before Records, Records active first.
-    assert [tabs.nth(i).get_attribute("data-subtab") for i in range(2)] == ["files", "records"]
-    assert "FILES" in tabs.nth(0).inner_text().upper()
-    assert "RECORDS" in tabs.nth(1).inner_text().upper()
-    assert "active" in (tabs.nth(1).get_attribute("class") or "")
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Records").click()
     table = detail.locator(".lex-mod-contents .lex-column-list")
     table.wait_for()
     rows = table.locator(".lex-column-list-row")
@@ -679,8 +692,8 @@ def test_mods_detail_lists_changed_records(page):
 
 def test_mods_detail_lists_files_with_loader_marks(page):
     mount(page)
-    detail = _contents_tabs(page)
-    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Files").click()
     table = detail.locator(".lex-mod-contents .lex-column-list")
     table.wait_for()
     rows = table.locator(".lex-column-list-row")
@@ -697,9 +710,10 @@ def test_mods_detail_contents_empty_states(page):
     mount(page)
     page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
                   " changesTruncated: false, canDescribe: false, note: 'Locate the game.'}")
-    detail = _contents_tabs(page)
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Records").click()
     assert "Locate the game." in detail.locator(".lex-mod-contents").inner_text()
-    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    detail.locator(STRIP, has_text="Files").click()
     files = detail.locator(".lex-mod-contents").inner_text()
     assert "This mod has no files." in files
     assert "not known for this game" in files
@@ -708,7 +722,7 @@ def test_mods_detail_contents_empty_states(page):
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine").click()
     page.wait_for_function("window.calls.filter(c => c[0] === 'mod_contents').length >= 3")
-    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Records").click()
+    detail.locator(STRIP, has_text="Records").click()
     assert "No record changes compared to vanilla." in detail.locator(".lex-mod-contents").inner_text()
 
 
@@ -718,23 +732,25 @@ def test_mods_detail_contents_truncation(page):
                   " added: false, removed: true, before: null, after: null}],"
                   " files: [{relative: 'a.bin', size: 1, sizeLabel: '1 B', loaded: false}],"
                   " truncated: true, changesTruncated: true, canDescribe: true, note: ''}")
-    detail = _contents_tabs(page)
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Records").click()
     assert "Removed" in detail.locator(".lex-mod-contents .lex-column-list-row").first.inner_text()
     assert "Showing the first 1 changes." in detail.inner_text()
-    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    detail.locator(STRIP, has_text="Files").click()
     assert "Showing the first 1 files." in detail.inner_text()
 
 
 def test_mods_detail_contents_search_filters_each_table(page):
     mount(page)
-    detail = _contents_tabs(page)
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Records").click()
     detail.get_by_role("searchbox", name="Search changed records").fill("Basic price")
     page.wait_for_timeout(300)
     assert detail.locator(".lex-mod-contents .lex-column-list-row").count() == 1
     detail.get_by_role("searchbox", name="Search changed records").fill("zzz-no-such-change")
     page.wait_for_timeout(300)
     assert "match this search" in detail.locator(".lex-mod-contents").inner_text()
-    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    detail.locator(STRIP, has_text="Files").click()
     detail.get_by_role("searchbox", name="Search files").fill("GameParam")
     page.wait_for_timeout(300)
     assert detail.locator(".lex-mod-contents .lex-column-list-row").count() == 1

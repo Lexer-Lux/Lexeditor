@@ -1,10 +1,13 @@
-"""Reviewed DS1R monster families and the resistance-only editing boundary.
+"""Reviewed DS1R monster and boss families and the editing boundary.
 
 Evidence: pinned Smithbox DS1R NpcParam row names, NPC_TYPE and PARAMDEF in
-metadata/SOURCE.json. Names alone are insufficient: the live npcType must also
-be Standard Enemy (0). Stray Demon is 0 too, so a type-only filter is unsafe.
-Mixed boss families (Capra/Taurus, Pinwheel, Butterfly, Sanctuary Guardian),
-boss body parts, named NPCs, test rows, and unknown/custom IDs are not admitted.
+metadata/SOURCE.json. Names alone are insufficient: the live npcType must
+also match. Stray Demon is 0 too, so a type-only filter is unsafe for
+monsters; bosses fight at types 0 and 1 instead, with Gwyndolin alone at
+the friendly type (2). Mixed families (Capra/Taurus, Pinwheel, Butterfly,
+Sanctuary Guardian) list every variant under Bosses: the rows are one
+enemy, and the tab says which. Boss body parts (tails, heads, arms, legs,
+wings), named NPCs, test rows, and unknown/custom IDs are admitted nowhere.
 Egg Carrier's named NPC variant (321001) is type 2 and therefore excluded.
 These are parameter variants, not proof of individual map placements.
 """
@@ -35,6 +38,29 @@ MONSTER_FAMILIES = frozenset({
 
 def classified_monster(row_id, reference_name, npc_type):
     return row_id >= 120000 and reference_name in MONSTER_FAMILIES and npc_type == 0
+
+
+BOSS_FAMILIES = frozenset({
+    'Stray Demon', 'Firesage Demon', 'Asylum Demon', 'Capra Demon',
+    'Taurus Demon', 'Iron Golem', 'Smough', 'Priscilla',
+    'Moonlight Butterfly', 'Pinwheel', 'Undead Dragon', 'Hellkite Drake',
+    'Sanctuary Guardian (Old)', 'Sanctuary Guardian', 'Hydra',
+    'Knight Artorias', 'Manus, Father of the Abyss', 'Kalameet',
+    'Great Grey Wolf Sif (DLC)', 'Centipede Demon', 'Great Grey Wolf Sif',
+    'Gravelord Nito', 'Bed Of Chaos', 'Bed Of Chaos (Moving)',
+    'Ceaseless Discharge', 'Gaping Dragon', 'Dragonslayer Ornstein',
+    'Dragonslayer Ornstein (Giant)', 'Chaos Witch Quelaag',
+    'Seath the Scaleless', 'Gwyndolin', 'Gargoyle',
+    'Gargoyle [Anor Londo]', 'Gwyn, Lord of Cinder', 'Four Kings',
+})
+
+
+def classified_boss(row_id, reference_name, npc_type):
+    if row_id < 120000 or reference_name not in BOSS_FAMILIES:
+        return False
+    # Bosses fight as Standard Enemy (0) or boss type (1); Gwyndolin
+    # alone keeps the friendly type (2) into his boss fight.
+    return npc_type in (0, 1) or reference_name == 'Gwyndolin'
 
 
 def duplicate_stem(name, row_id):
