@@ -9526,8 +9526,14 @@ ${contents.path}`});
       },
       move: (value, before) => {
         if (!order.includes(value) || value === before) return;
+        const from = order.indexOf(value);
+        const to = order.indexOf(before);
         order = order.filter(item => item !== value);
-        const index = order.indexOf(before);
+        let index = order.indexOf(before);
+        // Dropped on a column it takes that slot: dragged rightward it
+        // lands after the target, dragged leftward before it. Always
+        // inserting before made a rightward drop a no-op.
+        if (from >= 0 && to >= 0 && from < to) index = index < 0 ? order.length : index + 1;
         order.splice(index < 0 ? order.length : index, 0, value);
         save();
       },
