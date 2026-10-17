@@ -761,6 +761,14 @@
 
   const infoHelp = (text, attrs = {}) => {
     if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
+    const shipped = typeof text === "string" ? text : null;
+    const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
+    const isCleared = () => shipped !== null && shown() === "";
+    const clearedHint = () => element("em", {class: "lex-help-cleared"},
+      "Help text cleared. Double-click the marker to write new text.");
+    // Cleared help is gone for readers; developers keep the marker so the
+    // text can be written again, with a hint instead of an empty bubble.
+    if (isCleared() && !sharedSettingsSnapshot?.developerMode) return document.createTextNode("");
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, symbol = "?", ...rest
@@ -772,7 +780,7 @@
       ...rest,
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
-      "aria-label": ariaLabel, "aria-describedby": popupId,
+      "aria-label": isCleared() ? "Help text cleared" : ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, symbol));
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
@@ -791,11 +799,11 @@
       // A developer can reword what the bubble says. The shipped string stays
       // the key, so a bubble reworded here reads the new text on every screen
       // that shows the same explanation.
-      const shipped = typeof text === "string" ? text : null;
-      const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
+      const nowCleared = isCleared();
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
-      }, text instanceof Node ? text.cloneNode(true) : String(shown() ?? title ?? ""));
+      }, text instanceof Node ? text.cloneNode(true)
+        : nowCleared ? clearedHint() : String(shown() ?? title ?? ""));
       document.body.append(popup);
       if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
         // The bubble itself never takes the pointer, so the editor is started
@@ -818,7 +826,7 @@
             // text, so a developer can delete help that should not be there.
             const next = typed;
             if (!commit) {
-              popup.replaceChildren(String(shown()));
+              popup.replaceChildren(isCleared() ? clearedHint() : String(shown()));
               // The editor's own blur schedules the bubble's close; keep the
               // wording on screen while the reader is still looking at it.
               cancelClose();
@@ -10252,12 +10260,14 @@ ${contents.path}`});
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
       const capacity = minimumRowHeight > 0 ? Math.max(1, Math.floor((available - 0.5) / minimumRowHeight)) : Infinity;
       const pageSize = fixedRows || Math.min(Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
-      const rowHeight = fixedRows ? Math.max(minimumRowHeight, available / pageSize) : naturalRowHeight;
+      // An explicit row count squeezes rows to fit: paginated content never
+      // scrolls, so a high count shrinks rows instead of adding a scrollbar.
+      const rowHeight = fixedRows ? available / pageSize : naturalRowHeight;
       if (!(rowHeight > 0)) return;
       if (fixedRows) fittedLists.forEach(node => {
         node.style.setProperty("--lex-fitted-row-height", `${rowHeight}px`);
         node.dataset.lexFixedRows = String(pageSize);
-        node.style.overflowY = rowHeight > available / pageSize + 0.5 ? "auto" : "";
+        node.style.overflowY = "";
       });
       listNode.dataset.lexFittedPageSize = String(pageSize);
       const requestedVisibleRows = typeof options.visibleRows === "function"
@@ -13191,15 +13201,22 @@ ${contents.path}`});
       const paintContents = () => {
         if (contentsFailed) { contentsWrap.replaceChildren(detailNote("Could not read the mod's contents.")); return; }
         if (!contentsResult) { contentsWrap.replaceChildren(loadingStatus("Reading mod contents")); return; }
-        const bar = subtabBar({tabs: [
-          {id: "records", label: "Records",
-            help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
-          {id: "files", label: "Files",
-            help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
-        ], active: contentsTab, order: "given", label: "Mod contents", className: "lex-mod-contents-bar",
-          change: id => { contentsTab = id; paintContents(); }});
-        const body = contentsTab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
-        contentsWrap.replaceChildren(bar, body);
+        // Panel tabs, not a bare strip: the same component every detail
+        // panel uses, so Records and Files look and behave like the rest.
+        // Each table carries its own inline pager, so no panel paging.
+        contentsWrap.replaceChildren(tabbedPanel({
+          tabs: [
+            {id: "records", label: "Records",
+              help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
+            {id: "files", label: "Files",
+              help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
+          ],
+          active: contentsTab,
+          label: "Mod contents",
+          paginate: false,
+          change: id => { contentsTab = id; paintContents(); },
+          content: contentsTab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult),
+        }));
       };
       sections.push(contentsWrap);
       callWindow("mod_contents", pluginId, row.path).then(result => {

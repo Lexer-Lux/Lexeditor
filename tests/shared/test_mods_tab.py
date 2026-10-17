@@ -658,10 +658,11 @@ def test_mods_detail_lists_changed_records(page):
     mount(page)
     detail = _contents_tabs(page)
     tabs = detail.locator(".lex-mod-contents-tabs .lex-subtab-button")
-    assert [tabs.nth(i).get_attribute("data-subtab") for i in range(2)] == ["records", "files"]
-    assert "RECORDS" in tabs.nth(0).inner_text().upper()
-    assert "FILES" in tabs.nth(1).inner_text().upper()
-    assert "active" in (tabs.nth(0).get_attribute("class") or "")
+    # Panel tabs sort themselves: Files before Records, Records active first.
+    assert [tabs.nth(i).get_attribute("data-subtab") for i in range(2)] == ["files", "records"]
+    assert "FILES" in tabs.nth(0).inner_text().upper()
+    assert "RECORDS" in tabs.nth(1).inner_text().upper()
+    assert "active" in (tabs.nth(1).get_attribute("class") or "")
     table = detail.locator(".lex-mod-contents .lex-column-list")
     table.wait_for()
     rows = table.locator(".lex-column-list-row")

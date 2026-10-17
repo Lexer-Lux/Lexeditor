@@ -1096,8 +1096,6 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-mod-file-loaded>.lex-mod-file-name{color:var(--lex-accent);font-weight:600;}
 .lex-mod-contents-tabs .lex-column-list-row.lex-mod-file-loaded .lex-column-cell-content{color:var(--lex-accent);font-weight:600;}
 .lex-mod-contents-tabs{display:flex;flex-direction:column;}
-.lex-detail-panel .lex-mod-contents-tabs>.lex-subtab-bar{order:0;margin:0 0 8px;}
-.lex-detail-panel .lex-mod-contents-tabs>.lex-mod-contents{order:1;}
 
 /* Multi-select prepends a banner beside the tabbed panel, so the pair below
    gets the same fill treatment an only-child tabbed panel gets. The tabs
@@ -5393,6 +5391,7 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-plugin-credits details { margin:.5rem 0; }
 .lex-plugin-credits summary { cursor:pointer; padding:.4rem 0; }
 .lex-plugin-credits pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:22rem; overflow:auto; line-height:1.4; font-family:inherit; padding:.75rem; border:1px solid currentColor; }
+.lex-help-cleared{opacity:.65;font-style:italic;}
 .lex-help-popover {
 
   position:fixed;

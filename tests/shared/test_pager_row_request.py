@@ -3,7 +3,7 @@
 Lexer: "if i enter a different number in the rows number on the pagination
 bar then hit enter...nothing happens". A count over what fits was saved
 and quietly capped, so Enter looked dead. The box now takes 5 to 80 rows;
-more rows than fit keep a readable height and scroll, and one Enter commits once.
+more rows than fit shrink to fit without scrolling, and one Enter commits once.
 """
 from test_shared_ui_feedback import page, framework
 
@@ -52,7 +52,16 @@ def test_row_count_applies_once_and_allows_above_the_fit(page):
     _type_rows(page, 60)
     assert rows() == 60, 'a high count applies instead of capping to the fit'
     height = page.locator('.lex-column-list-row').first.bounding_box()['height']
-    assert height >= 33, f'rows stay readable, got {height}'
+    assert height < 33, f'rows shrink to fit, got {height}'
+    # Paginated content never scrolls: squeezed rows must not gain an
+    # overflow that can render a scrollbar (sub-pixel residue aside).
+    overflows = page.evaluate('''() => {
+      const lists = [...document.querySelectorAll('.lex-column-list')];
+      return lists.filter(n => n.querySelectorAll('.lex-column-list-row').length == 60)
+        .map(n => { const s = getComputedStyle(n); return s.overflowY + '/' + s.overflowX; });
+    }''')
+    assert overflows and all(value in ('visible/visible', 'hidden/hidden')
+                               for value in overflows), overflows
 
     box = page.locator('.lex-page-row-override input')
     assert box.get_attribute('max') == '80', 'the box runs to 80, not the fit'

@@ -84,7 +84,7 @@ def test_escape_keeps_the_shipped_text_and_an_empty_one_clears_it(page):
     editor.fill("   ")
     editor.press("Control+Enter")
     page.wait_for_timeout(250)
-    assert popover_text(page) == ""
+    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
     assert list(page.evaluate("window.savedCalls")[-1][2].values())[0] == ""
 
 
@@ -144,6 +144,23 @@ def test_clearing_a_panel_tab_bubble_with_empty_enter(page):
     editor.fill("   ")
     editor.press("Enter")
     page.wait_for_timeout(300)
-    assert popover_text(page) == ""
+    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
     saved = page.evaluate("window.savedCalls")
     assert saved and list(saved[-1][2].values())[0] == "", saved
+
+
+def test_cleared_help_hides_its_marker_from_readers(page):
+    framework(page)
+    mount_shell(page)
+    mount_help(page)
+    page.locator(".lex-field-help .lex-info-help").first.dblclick()
+    editor = page.locator(".lex-help-edit").first
+    editor.wait_for(timeout=3000)
+    editor.fill("   ")
+    editor.press("Enter")
+    page.wait_for_timeout(300)
+    assert popover_text(page) == "Help text cleared. Double-click the marker to write new text."
+    # The same reader without developer mode gets no marker at all.
+    mount_shell(page, developer=False)
+    mount_help(page)
+    assert page.locator(".lex-field-help .lex-info-help").count() == 0
