@@ -1721,8 +1721,8 @@
     // A heading reads: its name, the help bubble, the copy button, then a
     // thing finder when the panel can pick a different record from here.
     if (options.help) title.append(infoHelp(options.help));
-    if (options.title !== undefined || options.titleControl || options.renameRecord)
-      title.append(copyValueButton(titleText, "Copy this name"));
+    // No title copy button: its glyph read as a second duplicate button
+    // next to the real one, so the heading keeps name, help and finder only.
     if (typeof options.find === "function") {
       const label = options.findTitle || "Find a different record";
       title.append(element("button", {type: "button", class: "lex-title-finder", title: label,
