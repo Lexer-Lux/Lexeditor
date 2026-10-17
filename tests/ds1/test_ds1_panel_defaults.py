@@ -1,7 +1,7 @@
 """DS1 panel contracts: per-tab list keys and unpaged record details.
 
 1. Barrels, rows and detail columns are stored per tab and subtab, so two
-   tabs keep different counts. The divider split stays one global key.
+   tabs keep different counts, and so does the divider split.
 2. Every record-data detail flows into columns on a single scrolling page
    instead of paginating; the row remove button uses the shared SVG icon.
 """
@@ -18,8 +18,8 @@ def test_barrel_rows_and_columns_keys_carry_tab_and_sub():
     assert re.search(r"rowsKey\s*:\s*\"ds1-\"\s*\+\s*state\.tab\s*\+\s*\"-\"\s*\+\s*state\.sub", DS1) is not None
 
 
-def test_divider_split_stays_global():
-    assert 'splitKey:"ds1-items"' in DS1
+def test_divider_split_is_per_tab():
+    assert re.search(r"splitKey\s*:\s*\"ds1-\"\s*\+\s*state\.tab", DS1) is not None
 
 
 def test_record_details_flow_unpaged():
