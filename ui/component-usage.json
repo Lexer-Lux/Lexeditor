@@ -95,6 +95,8 @@
       "warband"
     ],
     "beginSearcher": [
+      "blank",
+      "ds1",
       "ff8"
     ],
     "bindSettingDependencies": [
@@ -522,6 +524,7 @@
     ],
     "decorateSearchCandidate": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "detailField": [
@@ -696,6 +699,7 @@
     ],
     "finishSearcher": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "fitListPage": [
@@ -1096,7 +1100,6 @@
     ],
     "magnifyIcon": [
       "blank",
-      "ds1",
       "ff8"
     ],
     "magnitudeValue": [
@@ -1873,6 +1876,15 @@
       "terraria",
       "warband"
     ],
+    "thingFinderButton": [
+      "blank",
+      "ds1",
+      "ff8"
+    ],
+    "thingFinderField": [
+      "blank",
+      "ff8"
+    ],
     "tileGrid": [
       "blank",
       "ff8",
@@ -2022,10 +2034,12 @@
     "applyTheme",
     "autoFitControlText",
     "badge",
+    "beginSearcher",
     "bindSettingDependencies",
     "booleanMark",
     "bottomSearch",
     "callWindow",
+    "choiceField",
     "clone",
     "closeButton",
     "columnList",
@@ -2100,6 +2114,7 @@
     "subtabBar",
     "tabStrip",
     "tabbedPanel",
+    "thingFinderButton",
     "tileGrid",
     "tweakModPanels",
     "tweakPanel",

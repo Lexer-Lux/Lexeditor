@@ -60,13 +60,12 @@
     const name=slot.enabled
       ? recordHoverLabel("enemies",enemy,enemyDisplayName(enemy.name))
       : "Empty";
-    const finder=el('button',{type:'button',disabled:state.activeSource!=='mine',
-      'aria-label':`Choose enemy for formation ${formation.id} slot ${slot.slot+1}`,
-      onclick:()=>beginSearcher({type:'enemies',prompt:`Choose the enemy for formation ${formation.id}, slot ${slot.slot+1}.`,
-        target:()=>navigate('enemies'),origin,
-        accept:value=>{if(state.activeSource!=='mine')return;const next=enemyById(value);
-          slot.enemyId=Number(value);slot.enemyName=next.name;slot.enabled=true;
-          formation.name=encounterName(formation);shell.refresh();}})},LexeditorUI.selectionIcon());
+    const finder=LexeditorUI.thingFinderButton({type:'enemies',prompt:`Choose the enemy for formation ${formation.id}, slot ${slot.slot+1}.`,
+      target:()=>navigate('enemies'),origin,
+      accept:value=>{if(state.activeSource!=='mine')return;const next=enemyById(value);
+        slot.enemyId=Number(value);slot.enemyName=next.name;slot.enabled=true;
+        formation.name=encounterName(formation);shell.refresh();},
+      disabled:state.activeSource!=='mine',label:`Choose enemy for formation ${formation.id} slot ${slot.slot+1}`});
     const card=LexeditorUI.recordCard({title:name,identity:slot.slot+1,
       image:slot.enabled?encounterEnemyPreview(slot.enemyId):LexeditorUI.noImage('Empty slot'),
       body:slot.enabled?encounterSlotLevelText(slot):null,action:finder});
@@ -209,17 +208,15 @@
     const link=hoverable({content:el("span",{},"Formation ",recordId(value)),targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
       activate:()=>showEncounterSubtab("formations","encounters",Number(value))});
     const accept=next=>{if(state.activeSource!=='mine'||!encounterRowById(next))return;row.encounters[index]=Number(next);refresh()};
-    const finder=el("button",{type:"button",title:"Choose a battle formation",disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',
-      "aria-label":`Choose the battle formation for group ${row.id} battle ${index+1}`,
-      onclick:event=>{event.preventDefault();event.stopPropagation();
-        beginSearcher({type:"encounters",prompt:`Select the battle formation for group ${row.id}, battle ${index+1}.`,
-          target:()=>showEncounterSubtab("formations"),
-          origin:origin||(()=>showEncounterSubtab("groups","encounterGroups",row.id)),accept})}},
-      LexeditorUI.selectionIcon());
+    const finder={type:"encounters",prompt:`Select the battle formation for group ${row.id}, battle ${index+1}.`,
+      target:()=>showEncounterSubtab("formations"),
+      origin:origin||(()=>showEncounterSubtab("groups","encounterGroups",row.id)),accept,
+      title:"Choose a battle formation",label:`Choose the battle formation for group ${row.id} battle ${index+1}`,
+      disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',fillValue:true,hoverAction:true};
     const vanilla=worldRow(state.vanilla,"group",row.id)?.encounters?.[index];
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
-    return sourceControl(LexeditorUI.choiceField(link,finder,{fillValue:true,hoverAction:true}),()=>row.encounters[index],vanilla,references,accept,
+    return sourceControl(LexeditorUI.thingFinderField(link,finder),()=>row.encounters[index],vanilla,references,accept,
       next=>`Formation #${next}`);
   }
   function encounterGroupUsage(row){

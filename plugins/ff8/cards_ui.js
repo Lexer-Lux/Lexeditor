@@ -265,13 +265,12 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               // id thing couldn't that just be a thing finder?").
               const link=LexeditorUI.hoverable({content:`Deck ${param.value}`,targetType:'card-decks',targetId:param.value,
                 targetLabel:`deck ${param.value}`,activate:()=>openDeck(param.value)});
-              const finder=el('button',{type:'button',title:'Choose a deck','aria-label':`Choose the deck for ${entry.name}`,disabled:locked(param),
-                onclick:event=>{event.preventDefault();event.stopPropagation();
-                  LexeditorUI.beginSearcher({type:'card-decks',prompt:`Choose the deck for ${entry.name}.`,
-                    target:()=>{mode='decks';render()},origin:()=>openPlayer(entry.key),
-                    accept:value=>{update(value);openPlayer(entry.key)}})}},LexeditorUI.selectionIcon());
+              const finder={type:'card-decks',prompt:`Choose the deck for ${entry.name}.`,
+                target:()=>{mode='decks';render()},origin:()=>openPlayer(entry.key),
+                accept:value=>{update(value);openPlayer(entry.key)},
+                title:'Choose a deck',label:`Choose the deck for ${entry.name}`,disabled:locked(param)};
               return detailField({label:'Deck',help:infoHelp(help[0]),
-                control:sourceControl(LexeditorUI.choiceField(link,finder),()=>param.value,before?.value,[],value=>{update(value);render()},value=>`Deck ${value}`)});
+                control:sourceControl(LexeditorUI.thingFinderField(link,finder),()=>param.value,before?.value,[],value=>{update(value);render()},value=>`Deck ${value}`)});
             }
             // Rules and card levels are bits of one argument: the shared
             // switch row, with boxes, and a pin on each rule so it can be a

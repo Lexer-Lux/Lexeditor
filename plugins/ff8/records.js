@@ -44,12 +44,10 @@
     const name=character?.name||`Character ${field.value}`;
     const origin=()=>{state.selected.weapons=row.id;navigate('weapons')};
     const apply=value=>{field.value=Number(value);renderWeapons();shell.refresh()};
-    const finder=el('button',{type:'button','aria-label':`Choose character for ${row.name}`,
-      disabled:field.readonly||state.activeSource!=='mine',onclick:()=>beginSearcher({
-        type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
-        target:()=>navigate('characters'),accept:value=>{
-          if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
-        }})},LexeditorUI.selectionIcon());
+    const finder=LexeditorUI.thingFinderButton({type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
+      target:()=>navigate('characters'),accept:value=>{
+        if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
+      },disabled:field.readonly||state.activeSource!=='mine',label:`Choose character for ${row.name}`});
     const card=LexeditorUI.recordCard({image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
     const figure=LexeditorUI.figureGrid([{media:card,caption:recordHoverLabel('characters',{id:Number(field.value),name},name)}]);
     return sourceControl(figure,()=>field.value,rowOf(state.vanilla,'weapons',row.id)?.fields?.find(entry=>entry.field===field.field)?.value,

@@ -1,11 +1,13 @@
-"""Record links render hoverable faces with finder buttons.
+"""Record links render hoverable faces with thing-finder buttons.
 
 A goods row with an item, a spell and a dialog reference shows a
-hoverable face plus a picker button for each record link (clicking the
-face opens the linked record; the button changes it), and the dialog
-line beside its number. An accessory's effect link opens the Effects
-tab from its face.
+hoverable face plus a finder button for each record link (clicking the
+face opens the linked record; the button opens the shared thing finder
+to hold-to-choose another target), and the dialog line beside its
+number. An accessory's effect link is picked from the Effects tab and
+opens it from its face.
 """
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -44,8 +46,9 @@ def face(page, key):
 
 def main():
     errors = []
-    document = ItemDocument(make_archive({'SpEffectParam': [100, 101, 102]}))
-    poke(document, 'EquipParamGoods', 100, 'replaceItemId', 101)
+    document = ItemDocument(make_archive({'SpEffectParam': [100, 101, 102],
+                                               'EquipParamGoods': [100, 101, 102, 103]}))
+    poke(document, 'EquipParamGoods', 100, 'replaceItemId', 100)
     poke(document, 'EquipParamGoods', 100, 'magicId', 102)
     poke(document, 'EquipParamGoods', 100, 'yesNoDialogMessageId', 10010710)
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 2)
@@ -87,56 +90,122 @@ def main():
                     page.wait_for_function(
                         'state.tab === "items" && state.sub === "spells"'
                         ' && state.row?.table === "Magic" && state.row?.id === 102')
-                    # The picker button changes the target like any other edit.
+                    # The finder button is the shared thing finder: a prompt
+                    # up top, the menu bar blocked out, a way back, and
+                    # hold-to-choose.
                     page.locator('[data-subtab="consumables"]').click()
                     page.wait_for_function('state.sub === "consumables" && !state.pending')
                     select(page, 'EquipParamGoods', 100)
                     field = face(page, 'replaceItemId')
                     field.scroll_into_view_if_needed()
+                    finder = page.locator(
+                        '.ds1-reference-field:has(.ds1-reference-face[data-field-key="replaceItemId"])'
+                        ' .ds1-find-reference')
+                    assert 'lex-thing-finder' in (finder.get_attribute('class') or '')
                     before = page.evaluate(
                         'state.row.fields.find(item => item.key === "replaceItemId").value')
-                    page.locator(
-                        '.ds1-reference-field:has(.ds1-reference-face[data-field-key="replaceItemId"])'
-                        ' .ds1-find-reference').click()
-                    search = page.locator('.lex-choice-popover-search')
-                    search.wait_for()
-                    target = page.evaluate('''() => {
-                      const current = document.querySelector(
-                        '.ds1-reference-face[data-field-key="replaceItemId"]').textContent;
-                      const labels = [...document.querySelectorAll('.lex-choice-popover > button')]
-                        .map(node => node.getAttribute('aria-label'));
-                      return labels.find(label => label !== current);
-                    }''')
-                    assert target, 'picker shows no alternative choice'
-                    search.fill(target)
-                    choice = page.locator('.lex-choice-popover > button:not([hidden])').first
-                    picked = choice.get_attribute('aria-label')
-                    wanted = page.evaluate(
-                        '''label => Object.entries(state.row.fields
-                          .find(item => item.key === "replaceItemId").enum)
-                          .find(([, name]) => name === label)[0]''', arg=picked)
-                    assert str(before) != str(wanted)
-                    choice.click()
+                    finder.click()
+                    bar = page.locator('.lex-searcher-bar')
+                    bar.wait_for()
+                    assert page.locator('.lex-searcher-prompt').inner_text().startswith(
+                        'Choose the item for ')
+                    assert not page.locator('.lex-nav-frame').is_visible()
                     page.wait_for_function(
-                        '(want) => state.pending === 0 && String(state.row.fields'
-                        '.find(item => item.key === "replaceItemId").value) === want',
-                        arg=str(wanted))
-                    assert picked in face(page, 'replaceItemId').inner_text()
-                    assert page.locator('.lex-choice-popover').count() == 0
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    shots = os.environ.get('LEXEDITOR_TEST_SHOTS')
+                    if shots:
+                        page.screenshot(path=str(Path(shots) / 'ds1-thing-finder.png'))
+                    # The back button shows the source record, locked; a
+                    # second press returns to the candidates.
+                    page.locator('.lex-searcher-context').click()
+                    assert page.locator('#main').evaluate('node => node.inert')
+                    assert 'blue return button' in bar.inner_text()
+                    page.locator('.lex-searcher-context').click()
+                    page.wait_for_function(
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    assert not page.locator('#main').evaluate('node => node.inert')
+                    # Cancelling changes nothing and returns to the source.
+                    page.get_by_role('button', name='Cancel selection', exact=True).click()
+                    page.wait_for_function(
+                        'state.sub === "consumables" && !state.pending'
+                        ' && document.querySelector(".lex-searcher-bar") === null')
+                    assert page.evaluate(
+                        'state.row.fields.find(item => item.key === "replaceItemId").value') == before
+                    assert page.locator('.lex-nav-frame').is_visible()
+                    # Holding another candidate chooses it like any other edit.
+                    finder.click()
+                    bar.wait_for()
+                    page.wait_for_function(
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    picked = page.evaluate("""before => {
+                      const rows = [...document.querySelectorAll('.lex-search-candidate')];
+                      const other = rows.find(row => row.getAttribute('data-key')
+                        !== `EquipParamGoods:${before}`);
+                      return [other.getAttribute('data-key'),
+                        other.querySelector('[data-column-key="name"]').innerText.trim()];
+                    }""", before)
+                    assert picked[0], 'finder shows no alternative choice'
+                    box = page.locator(f'.lex-search-candidate[data-key="{picked[0]}"]'
+                                       ).bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function(
+                        'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
+                    wanted = int(picked[0].split(':')[1])
+                    assert wanted != before
+                    page.wait_for_function(
+                        '(want) => state.sub === "consumables" && state.pending === 0'
+                        ' && state.row?.fields?.find(item => item.key === "replaceItemId")?.value === want',
+                        arg=wanted)
+                    assert picked[1] in face(page, 'replaceItemId').inner_text()
                     # The dialog line reads beside its number.
                     dialog = page.locator(
                         '.ds1-dialog-row [data-field-key="yesNoDialogMessageId"][data-lex-dialog]')
                     assert dialog.count() == 1
                     assert dialog.input_value() == 'Use it? Yes or no?'
-                    # An effect face opens the Effects tab.
+                    # An effect link is picked from the Effects tab itself.
                     page.locator('[data-subtab="rings"]').click()
                     page.wait_for_function('state.sub === "rings" && state.row && !state.pending')
                     select(page, 'EquipParamAccessory', 100)
                     assert face(page, 'refId').count() == 1
+                    effect_before = page.evaluate(
+                        'state.row.fields.find(item => item.key === "refId").value')
+                    page.locator(
+                        '.ds1-reference-field:has(.ds1-reference-face[data-field-key="refId"])'
+                        ' .ds1-find-reference').click()
+                    page.wait_for_function('state.tab === "effects" && state.sub === "effects-all"')
+                    page.wait_for_function(
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    picked = page.evaluate("""before => {
+                      const rows = [...document.querySelectorAll('.lex-search-candidate')];
+                      const other = rows.find(row => row.getAttribute('data-key')
+                        !== `SpEffectParam:${before}`);
+                      return [other.getAttribute('data-key'),
+                        other.querySelector('[data-column-key="name"]').innerText.trim()];
+                    }""", effect_before)
+                    assert picked[0], 'finder shows no alternative effect'
+                    box = page.locator(f'.lex-search-candidate[data-key="{picked[0]}"]'
+                                       ).bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function(
+                        'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
+                    effect_wanted = int(picked[0].split(':')[1])
+                    assert effect_wanted != effect_before
+                    page.wait_for_function(
+                        '(want) => state.tab === "items" && state.sub === "rings"'
+                        ' && state.pending === 0'
+                        ' && state.row?.fields?.find(item => item.key === "refId")?.value === want',
+                        arg=effect_wanted)
+                    assert picked[1] in face(page, 'refId').inner_text()
+                    # An effect face opens the Effects tab.
                     face(page, 'refId').locator('.lex-hoverable').click()
                     page.wait_for_function(
-                        'state.tab === "effects" && state.row?.table === "SpEffectParam"'
-                        ' && state.row?.id === 101')
+                        '(want) => state.tab === "effects" && state.row?.table === "SpEffectParam"'
+                        ' && state.row?.id === want',
+                        arg=effect_wanted)
                     assert not errors, errors
                 finally:
                     browser.close()

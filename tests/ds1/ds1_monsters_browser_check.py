@@ -316,10 +316,21 @@ def main():
                     thinks = request_json(session.url + 'api/table?tab=ai')['rows']
                     target = next(r for r in thinks if r['id'] != think_id)
                     page.locator('.lex-tabbed-panel button.ds1-find-reference:visible').click()
-                    search = page.locator('.lex-choice-popover-search'); search.wait_for()
-                    search.fill(target['name'])
-                    page.locator('.lex-choice-popover > button:not([hidden])').first.click()
-                    page.wait_for_function('(want)=>state.pending===0 && state.row.fields.find(f=>f.key==="aiThinkId").value===want && state.thinkRow?.id===want',
+                    page.wait_for_function('state.tab === "ai" && state.sub === "ai"')
+                    page.wait_for_function(
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    row = page.locator(
+                        f'.lex-search-candidate[data-key="NpcThinkParam:{target["id"]}"]')
+                    box = row.bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function(
+                        'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
+                    page.wait_for_function('(want)=>state.tab==="enemies" && state.sub==="monsters"'
+                                           ' && state.pending===0'
+                                           ' && state.row?.fields?.find(f=>f.key==="aiThinkId")?.value===want'
+                                           ' && state.thinkRow?.id===want',
                                            arg=target['id'])
                     assert page.evaluate('state.dirty') == 1
                     page.evaluate('fieldHistory.undo()')
