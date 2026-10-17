@@ -72,6 +72,9 @@ FMG_LABELS = {filename: label for _tab, label, filename in FMG_SUBTABS}
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'),)
 AI_SUBTABS = (('ai', 'AI tables', 'NpcThinkParam'),
               ('behaviors', 'Behaviors', 'BehaviorParam'))
+MISC_SUBTABS = (('encumbrance', 'Bands', 'NativeRules'),
+                ('misc', 'Stamina', 'NativeRules'),
+                ('encumbrance-overrides', 'Overrides', 'NativeRules'))
 
 # Armor defense, said the way the game uses it (0x2DC350): physical, magic,
 # fire and lightning are unsigned whole numbers the game reads as 0 or more;
@@ -104,16 +107,19 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
 # and thrust have no glyph of their own anywhere in the menu, HUD, font or
 # icon sheets (they are text wherever the game shows them), so they reuse
 # the physical shield: every one of these fields scales physical defense,
-# which is what the shield means. Statuses (poison, toxic, bleed, curse),
-# divine, occult and stamina guard have no icon anywhere either, and stay
-# unmapped: no invented glyphs, and no cure-item icons that would read as
-# the item instead of the status.
+# which is what the shield means. Statuses (poison, toxic, bleed, curse)
+# have no game art either, so they use the shared fallback glyphs: the
+# detail field shows the shared icon before the label. Divine, occult and
+# stamina guard stay unmapped: no invented glyphs, and no cure-item icons
+# that would read as the item instead of the status.
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('def_slash', 'def_blow', 'def_thrust'),
          ('physicalDef', 'physicalDef', 'physicalDef')),
+        ('NpcParam', ('resist_poison', 'resist_desease', 'resist_blood', 'resist_curse'),
+         ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),

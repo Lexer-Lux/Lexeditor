@@ -104,11 +104,30 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('EquipParamProtector', 'defenseMagic')] == 'magicDef'
     assert found[('EquipParamProtector', 'durabilityMax')] == 'durability'
     assert found[('Magic', 'requirementIntellect')] == 'int'
-    assert ('NpcParam', 'resist_poison') not in found
+    assert found[('NpcParam', 'resist_poison')] == 'poison'
+    assert found[('NpcParam', 'resist_desease')] == 'toxic'
+    assert found[('NpcParam', 'resist_blood')] == 'bleed'
+    assert found[('NpcParam', 'resist_curse')] == 'curse'
     assert ('NpcParam', 'isWeakSaint') not in found
     assert ('NpcParam', 'staminaGuardDef') not in found
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
     assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
+
+
+def test_status_icons_reuse_shared_fallback_glyphs():
+    """Every icon kind renders: game art from icons.py, else a shared glyph.
+
+    The detail field draws `field.icon` through the shared typeGlyph helper,
+    which shows nothing for an unknown kind. Kinds with equipment-screen art
+    are replaced by DS1 label art; the rest must name a shared glyph.
+    """
+    import re
+    framework = (Path(__file__).resolve().parents[2] / "ui" / "framework.js").read_text(encoding="utf-8")
+    block = framework.split("const TYPE_GLYPHS = {", 1)[1].split("\n  };", 1)[0]
+    shared = set(re.findall(r"^\s*(\w+):", block, re.M))
+    assert {"poison", "toxic", "bleed", "curse"} <= shared
+    for kind in set(formats._FIELD_ICONS.values()) | set(formats.ABSORPTION_ICONS.values()):
+        assert kind in icons.LABELS or kind in shared, kind
 
 
 def test_sheet_bytes_finds_texture_across_archives(tmp_path):

@@ -57,6 +57,28 @@ def main():
                     page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
                     page.wait_for_function('state.monsterTab==="defense"')
                     assert page.evaluate('state.row.id') == 120000
+                    icons = page.evaluate("""() => {
+                        const out = {};
+                        for (const [key, kind] of [['resist_poison', 'poison'],
+                                ['resist_desease', 'toxic'], ['resist_blood', 'bleed'],
+                                ['resist_curse', 'curse']]) {
+                            const input = document.querySelector(`input[data-field-key="${key}"]`);
+                            const field = input && input.closest('.lex-detail-field');
+                            const label = field && field.querySelector(':scope > .lex-detail-field-label');
+                            const glyph = label && label.querySelector(':scope > .lex-type-glyph svg');
+                            const text = label && label.querySelector('.lex-detail-field-label-text');
+                            const order = label && glyph && text
+                                ? ((glyph.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING) ? 'before' : 'after')
+                                : 'missing';
+                            out[key] = [field && field.getAttribute('data-lex-icon'), !!glyph, order];
+                        }
+                        return out;
+                    }""")
+                    assert icons == {'resist_poison': ['poison', True, 'before'],
+                                     'resist_desease': ['toxic', True, 'before'],
+                                     'resist_blood': ['bleed', True, 'before'],
+                                     'resist_curse': ['curse', True, 'before']}, icons
+                    if output: page.screenshot(path=str(output / 'monsters-defense-icons.png'))
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))

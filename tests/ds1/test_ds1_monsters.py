@@ -151,9 +151,10 @@ def test_effective_hp_multiplies_resident_rates_and_skips_the_rest():
 def test_defense_fields_carry_game_art_where_it_exists():
     # Damage and defense labels show the equipment screen's own icons. Slash,
     # strike and thrust have no glyph of their own, so they reuse the physical
-    # shield: every one of these fields scales physical defense. Kinds with no
-    # icon and no parent stat (resistances, weaknesses, stamina guard) ship
-    # with none: game art only, no invented glyphs.
+    # shield: every one of these fields scales physical defense. Resistances
+    # show the shared status glyphs before their labels. Kinds with no icon
+    # and no parent stat (weaknesses, stamina guard) ship with none: game art
+    # or shared glyphs only, no invented glyphs.
     fields = {field['key']: field.get('icon')
               for field in ItemDocument(make_archive()).read_row('NpcParam', 120000)['fields']}
     assert fields['def_fire'] == 'fireDef'
@@ -162,7 +163,10 @@ def test_defense_fields_carry_game_art_where_it_exists():
     assert fields['slashGuardCutRate'] == 'physicalDef'
     assert fields['blowGuardCutRate'] == 'physicalDef'
     assert fields['thrustGuardCutRate'] == 'physicalDef'
-    assert fields['resist_desease'] is None
+    assert fields['resist_poison'] == 'poison'
+    assert fields['resist_desease'] == 'toxic'
+    assert fields['resist_blood'] == 'bleed'
+    assert fields['resist_curse'] == 'curse'
     assert fields['isWeakSaint'] is None
     assert fields['staminaGuardDef'] is None
     assert fields['hp'] is None
