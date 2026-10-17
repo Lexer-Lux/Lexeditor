@@ -348,7 +348,7 @@ class Handler(PluginRequestHandler):
                             row_id = int(query.get('id', [''])[0])
                             only = stats_fields(query.get('sub', [''])[0], table)
                             result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
-                                      else STORE.get().read_row(table, row_id, only=only)}
+                                      else STORE.get().read_row(table, row_id, only=only, game_root=STORE.game_root)}
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
                     result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
                     result['nativeRules'] = RULES.snapshot()

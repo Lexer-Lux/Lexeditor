@@ -83,6 +83,46 @@ def sheet_bytes(menu_dir, sheet):
     raise IconError(f'The menu texture {sheet} is not installed')
 
 
+@lru_cache(maxsize=8)
+def _sheet_archives(game_root):
+    """menu/<archive> holding each icon sheet: {'Icon00': 'menu/menu_1.tpf.dcx'}."""
+    found = {}
+    menu = Path(game_root) / 'menu'
+    for name in MENU_FILES:
+        try:
+            plain = _menu(menu, name)
+        except IconError:
+            continue
+        for texture in parse_tpf(plain):
+            found.setdefault(texture['name'], f'menu/{name}')
+    return found
+
+
+@lru_cache(maxsize=512)
+def icon_archive(game_root, icon_id):
+    """The menu archive holding one icon ID's sheet, else None.
+
+    Range-covered IDs resolve from the static sheet map; anything
+    else needs the installed layout. Either way each archive is
+    read once per game and cached, so row loads stay cheap.
+    """
+    if game_root is None:
+        return None
+    sheet = next((name for name, first, last in SHEET_RANGES if first <= icon_id < last), None)
+    if sheet is None:
+        try:
+            found = load_icon_table(game_root).get(icon_id)
+        except IconError:
+            return None
+        if found is None:
+            return None
+        sheet = found[0]
+    try:
+        return _sheet_archives(game_root).get(sheet)
+    except (OSError, IconError, ValueError, struct.error):
+        return None
+
+
 def _texi_names(drb):
     data, count = drb.sections['TEXI']
     names = []

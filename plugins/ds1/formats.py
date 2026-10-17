@@ -871,6 +871,46 @@ class ItemDocument:
                 'category': category,
                 'gender': self.value(table, row_id, 'equipModelGender')}
 
+    def _asset_links(self, table, row_id, fields, game_root):
+        """Parts-binder and icon-atlas links for one row's file-backed IDs.
+
+        A Model ID names a member of a parts binder and an Icon ID names
+        a cell of a menu icon sheet: hover targets, never pickers, since
+        a picked file could never write back into a numeric ID. Model
+        paths need no game files; icon sheets do, so icons stay unlinked
+        offline. Consumables name no model file, so their Model ID stays
+        a dead number. Never raises: a row must load even when game
+        files are missing or unreadable.
+        """
+        from . import icons as _icons
+        from . import viewport as _viewport
+        present = {field['key'] for field in fields}
+        found = []
+        for key in ('iconId', 'iconIdM', 'iconIdF'):
+            if key not in present:
+                continue
+            try:
+                archive = _icons.icon_archive(game_root, int(self.value(table, row_id, key)))
+            except (OSError, ValueError, TypeError, struct.error):
+                continue
+            if archive is None:
+                continue
+            found.append({'kind': 'asset', 'table': 'Asset', 'id': archive, 'tab': 'textures',
+                          'field': key, 'resolved': True, 'name': archive.rsplit('/', 1)[-1]})
+        if 'equipModelId' in present and table in ('EquipParamWeapon', 'EquipParamProtector'):
+            try:
+                info = self.part_model(table, row_id)
+                stems, _reason = _viewport.part_candidates(
+                    table, info['category'], info['gender'], info['model_id']) if info['available'] else (None, None)
+            except (ValueError, TypeError, KeyError):
+                stems = None
+            if stems:
+                relative = f"parts/{stems[0][0]}.partsbnd.dcx"
+                found.append({'kind': 'asset', 'table': 'Asset', 'id': relative, 'tab': 'models',
+                              'field': 'equipModelId', 'resolved': True,
+                              'name': f'{stems[0][0]}.partsbnd.dcx'})
+        return found
+
     def row_name(self, table, row_id):
         row = self._rows_by_id.get(table, {}).get(row_id)
         fallback = f'Effect {row_id}' if table == EFFECT_TABLE else f'Item {row_id}'
@@ -1111,7 +1151,7 @@ class ItemDocument:
         cache[table] = spans
         return spans
 
-    def read_row(self, table, row_id, only=None):
+    def read_row(self, table, row_id, only=None, game_root=None):
         if table == 'MenuText':
             return self._read_menu_label(row_id, only)
         if table in FMG_TABLES:
@@ -1219,6 +1259,7 @@ class ItemDocument:
                                  'field': field['key'], 'resolved': str(current) in choices,
                                  'name': choices.get(str(current), f'Missing {noun} {current}')})
         result['recordLinks'] = record_links
+        result['recordLinks'] += self._asset_links(table, row_id, fields, game_root)
         dialogs = []
         if table == 'EquipParamGoods' and self.menu_texts is not None:
             for field in fields:

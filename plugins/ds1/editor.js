@@ -322,7 +322,11 @@ function openRecord(link){
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return openAttack(link.id);
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
+  if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
+}
+function openAsset(link){
+  navigate(link.tab==="textures"?"textures":"models","files",`Asset:${link.id}`);
 }
 // The thing finder opens the same list the face opens: the target tab's
 // rows become hold-to-choose candidates (see the master list's
@@ -354,6 +358,22 @@ async function recordPreview(link){
     parts.push(detailField({label:field.label,control:readonlyField(shown,{format:false})}));
   }
   return LexeditorUI.stack({fill:false,compact:true},...parts);
+}
+// An asset link previews what the ID resolves to: the menu icon picture,
+// or the worn model's first available mesh. Failures show why, never throw.
+async function assetPreview(row,entry){
+  if(entry.tab!=="models"){
+    const picture=el("img",{src:`/api/icon?table=${encodeURIComponent(row.table)}&id=${encodeURIComponent(row.id)}`,
+      alt:"",draggable:"false",style:"width:40px;height:40px;","data-lex-no-image":"off"});
+    picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+    return picture;
+  }
+  const view=await api(`/api/parts/view?table=${encodeURIComponent(row.table)}&id=${row.id}`).catch(()=>null);
+  const models=((view&&view.models)||[]).filter(item=>item.available);
+  if(!models.length)return el("div",{},(view&&view.reason)||"The model file is not installed.");
+  if(!window.Ds1Preview)return el("div",{},`${row.name} model`);
+  const first=models[0];
+  return window.Ds1Preview.thumbnail({url:`/api/parts/geometry?table=${encodeURIComponent(row.table)}&id=${row.id}&variant=${encodeURIComponent(first.variant||"")}`,label:`${row.name} model`});
 }
 async function deploymentAction(action){
   if(state.deployBusy)return;
@@ -652,7 +672,10 @@ function fieldSections(row){
   const groups=new Map();
   // A field that is itself a record link opens that record from its own row;
   // only links with no editable field on the page are listed separately.
-  const links=new Map((row.recordLinks||[]).map(entry=>[entry.field,entry]));
+  // Asset links serve through the field label below: a face would replace the
+  // number input and a picked file could never write back into it, so neither
+  // joins them here or in the Linked records group.
+  const links=new Map((row.recordLinks||[]).filter(entry=>entry.kind!=="asset").map(entry=>[entry.field,entry]));
   const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
   const shownLinks=new Set();
   // Placement coordinates ride one row per vector: Position, then
@@ -693,15 +716,19 @@ function fieldSections(row){
           title:dialog.text||"",format:false}));
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
+    const assetLink=!textLink?(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved):null;
     const label=textLink?hoverable({content:shown,targetType:"ds1-text",targetId:textLink,
-      targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)}):shown;
+      targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)})
+      :assetLink?hoverable({content:shown,targetType:"ds1-asset",targetId:assetLink.id,
+      targetLabel:`${assetLink.name} in ${assetLink.tab==="textures"?"Textures":"Models"}`,
+      preview:()=>assetPreview(row,assetLink),activate:()=>openRecord(assetLink)}):shown;
     groups.get(group).push(detailField({label,property:field.key,control,icon:field.icon||null,
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
       help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
       sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
   }
-  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field));
+  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field)&&entry.kind!=="asset");
   if(unlisted.length){
     groups.set("Linked records",unlisted.map(entry=>detailField({
       label:row.fields.find(field=>field.key===entry.field)?.label||entry.field,
