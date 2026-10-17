@@ -68,7 +68,7 @@ def main():
                     assert [modes.nth(index).get_attribute("aria-label")
                             for index in range(3)] == ["Regular", "Fullbright", "Wireframe"]
                     status = page.locator("[data-anim-status]").inner_text()
-                    assert "frames at" in status and "bones" in status, status
+                    assert status.strip() == "", status
                     assert "Root motion" in page.locator("[data-anim-timeline]").inner_text()
                     assert page.locator("[data-anim-timeline] .lex-anim-marker").count() >= 1
                     buttons = page.locator("[data-anim-timeline] [data-anim-transport] button")

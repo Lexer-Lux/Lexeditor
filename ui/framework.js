@@ -2525,7 +2525,14 @@
     });
   };
   const modelViewModes = host => {
-    if (host.lexViewModes) return host.lexViewModes;
+    // Remounting clears the host (animationViewer.stop replaces its
+    // children), which detaches the bar while the cached controller
+    // survives. Re-attach it so the buttons - and the mode - persist.
+    if (host.lexViewModes) {
+      const cached = host.lexViewModes;
+      if (cached.bar && !cached.bar.isConnected) host.append(cached.bar);
+      return cached;
+    }
     let mode = "regular", scene = null;
     const buttons = new Map();
     const paint = () => {
@@ -2554,6 +2561,7 @@
     paint();
     host.append(bar);
     const controller = {
+      bar,
       mode: () => mode,
       setMode,
       bindScene: next => { scene = next || null; if (scene) applyModelViewMode(scene, mode); },
@@ -6018,8 +6026,9 @@
     return "";
   };
 
-  // A reusable animation viewer: scrub bar, event markers, transport row and
-  // playback loop. The caller draws the pictures: render() gets the current
+  // A reusable animation viewer: scrub bar with its event markers overlaid
+  // on it, a transport row and a playback loop. The caller draws the
+  // pictures: render() gets the current
   // frame (fractional, for blending) and the playback state every animation
   // frame. DS1 poses its skeleton there; a fixture page draws synthetic
   // frames on a plain canvas. Stepping pauses, as on an editing bench: the
@@ -6037,13 +6046,14 @@
     const slider = element("input", {type: "range", min: "0", max: String(count - 1),
       step: "0.01", value: "0", "aria-label": "Frame"});
     const readout = element("span", {class: "lex-anim-readout", "data-anim-readout": "true"});
-    const scrub = element("div", {class: "lex-anim-scrub"}, slider, readout);
+    const markers = element("div", {class: "lex-anim-markers"});
+    const sliderWrap = element("div", {class: "lex-anim-slider"}, slider, markers);
+    const scrub = element("div", {class: "lex-anim-scrub"}, sliderWrap, readout);
     if (options.follow) {
       const box = element("input", {type: "checkbox", "aria-label": options.follow.label || "Follow"});
       box.onchange = () => { state.follow = box.checked; options.follow.change?.(state.follow); };
       scrub.append(element("label", {class: "lex-anim-follow"}, box, ` ${options.follow.label || "Follow"}`));
     }
-    const markers = element("div", {class: "lex-anim-markers"});
     for (const cue of frames.events || []) {
       const at = Number(cue.start) || 0;
       const tick = element("button", {type: "button", class: "lex-anim-marker",
@@ -6053,7 +6063,6 @@
         onclick: () => { state.time = at % duration; }});
       markers.append(tick);
     }
-    scrub.append(markers);
     const transport = element("div", {class: "lex-anim-transport",
       "data-anim-transport": "true", role: "group", "aria-label": "Animation transport"});
     const glyph = playing => playing ? "\u23F8" : "\u25B6";

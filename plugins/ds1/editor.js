@@ -2233,8 +2233,10 @@ function animPaneSize(which){
   const fit=which==="char"?state.animCharFit:which==="events"?state.animEventFit:state.animFit;
   return Math.max(1,Math.min(state.pageSize,fit||Infinity));
 }
-function fitAnimList(list,which,size){
-  LexeditorUI.fitListPage({list,available:list,pageSize:size,minRowHeight:32,
+// The fit measures the paged pane (list plus pager), and the wheel turns
+// pages through that same pane: fitted lists never scroll.
+function fitAnimList(list,which,size,available){
+  LexeditorUI.fitListPage({list,available:available||list,pageSize:size,minRowHeight:32,
     change:value=>{
       if(which==="char"){if(state.animCharFit===value)return;state.animCharFit=value;}
       else if(which==="events"){if(state.animEventFit===value)return;state.animEventFit=value;}
@@ -2255,13 +2257,15 @@ function animCharsPane(){
   const select=row=>{if(key(row)!==state.animCharId)void chooseAnimChar(row);};
   const list=columnList({rows:shown,key,selected:state.animCharId,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1}]});
-  fitAnimList(list,"char",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animCharPage,total:here.length,pageSize:size,
+    change:value=>{state.animCharPage=value;refreshAnimChars();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"char",size,both);
   return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animCharPage,total:here.length,pageSize:size,
-      change:value=>{state.animCharPage=value;refreshAnimChars();}}));
+    both);
 }
 function animEventsCell(){
   return {key:"events",label:"Events",sortable:false,render:row=>{
@@ -2280,13 +2284,15 @@ function animAnimsPane(){
   const select=row=>{if(key(row)!==state.selected)void pickAnimMotion(row);};
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1},animEventsCell()]});
-  fitAnimList(list,"anims",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
+    change:value=>{state.animPage=value;refreshAnimList();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"anims",size,both);
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
-      change:value=>{state.animPage=value;refreshAnimList();}})];
+    both];
 }
 function animEventsPane(){
   const here=animListMatches();
@@ -2301,13 +2307,15 @@ function animEventsPane(){
     onclick:()=>animBackToAnims().catch(notify)},`‹ ${scope.animName||"Animations"}`);
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1}]});
-  fitAnimList(list,"events",size);
+  const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
+    change:value=>{state.animPage=value;refreshAnimList();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  fitAnimList(list,"events",size,both);
   return [back,
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    list,
-    LexeditorUI.pager({inline:true,stacked:true,pages,page:state.animPage,total:here.length,pageSize:size,
-      change:value=>{state.animPage=value;refreshAnimList();}}),
+    both,
     detail()];
 }
 function animListPane(){

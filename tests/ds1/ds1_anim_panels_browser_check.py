@@ -1,8 +1,10 @@
 """Animations panes: per-panel pagination without scrollbars, textures, bones.
 
-Each side panel pages its own list with an inline pager that lives
+Each side panel pages its own list with a compact pager that lives
 inside the panel (never the window's fixed bottom bar), shows only
-rows that fit (paginated lists never scroll), and both pagers work.
+rows that fit (paginated lists never scroll), turns pages with the
+mouse wheel, and both pagers work. The compact pager shows no
+X-Y/Z position count.
 The viewer binds the model's diffuse textures, and bones parented
 under a model-only SFX anchor still follow the Havok hierarchy.
 Synthetic fixtures only; read-only with no mod.
@@ -102,13 +104,22 @@ def main():
                         assert box['inside'], (pane, 'pager escapes its panel')
                         assert not box['scrollable'], (pane, 'paginated list scrolls')
                     assert page.locator('.ds1-anim .lex-pager:not(.lex-pager-inline)').count() == 0
-                    assert '/25' in page.locator('[data-anim-chars] .lex-page-summary').inner_text()
-                    assert '/25' in page.locator('[data-anim-list] .lex-page-summary').inner_text()
+                    assert page.locator('[data-anim-chars] .lex-compact-pager').count() == 1
+                    assert page.locator('[data-anim-list] .lex-compact-pager').count() == 1
+                    assert page.locator('[data-anim-chars] .lex-page-summary').count() == 0
+                    assert page.locator('[data-anim-list] .lex-page-summary').count() == 0
                     first_chars = page.locator('[data-anim-chars] .lex-list-row').first.inner_text()
                     page.locator("[data-anim-chars] .lex-pager button[aria-label='Next page']").click()
                     page.wait_for_function('state.animCharPage === 1')
                     assert page.locator('[data-anim-chars] .lex-list-row').first.inner_text() != first_chars
                     page.locator("[data-anim-chars] .lex-pager button[aria-label='First page']").click()
+                    page.wait_for_function('state.animCharPage === 0')
+                    box = page.locator('[data-anim-chars] .lex-column-list').bounding_box()
+                    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                    page.mouse.wheel(0, 120)
+                    page.wait_for_function('state.animCharPage === 1')
+                    page.wait_for_timeout(250)
+                    page.mouse.wheel(0, -120)
                     page.wait_for_function('state.animCharPage === 0')
                     first_motions = page.locator('[data-anim-list] .lex-list-row').first.inner_text()
                     page.locator("[data-anim-list] .lex-pager button[aria-label='Next page']").click()
@@ -116,8 +127,18 @@ def main():
                     assert page.locator('[data-anim-list] .lex-list-row').first.inner_text() != first_motions
                     page.locator("[data-anim-list] .lex-pager button[aria-label='First page']").click()
                     page.wait_for_function('state.animPage === 0')
+                    box = page.locator('[data-anim-list] .lex-column-list').bounding_box()
+                    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                    page.mouse.wheel(0, 120)
+                    page.wait_for_function('state.animPage === 1')
+                    page.wait_for_timeout(250)
+                    page.mouse.wheel(0, -120)
+                    page.wait_for_function('state.animPage === 0')
                     # Textures: the plain quad renders in its diffuse red.
                     page.locator('[data-anim-chars] .lex-list-row', has_text='c1201').click()
+                    page.wait_for_function(
+                        '!document.querySelector("[data-anim-host]").hasAttribute("data-ready")',
+                        timeout=30000)
                     page.wait_for_selector("[data-anim-host][data-ready='true']", timeout=30000)
                     shot = page.locator('canvas[data-viewport]').screenshot()
                     pixels = Image.open(io.BytesIO(shot)).convert('RGB')
@@ -132,6 +153,9 @@ def main():
                     # model-only SFX anchor (frame 0, paused). The fixture's
                     # root reference scale is 2, doubling child offsets.
                     page.locator('[data-anim-chars] .lex-list-row', has_text='c1200').click()
+                    page.wait_for_function(
+                        '!document.querySelector("[data-anim-host]").hasAttribute("data-ready")',
+                        timeout=30000)
                     page.wait_for_selector("[data-anim-host][data-ready='true']", timeout=30000)
                     page.locator('[data-anim-timeline] button[aria-label="Play or pause"]').click()
                     page.locator('[data-anim-timeline] input[type="range"]').fill('0')

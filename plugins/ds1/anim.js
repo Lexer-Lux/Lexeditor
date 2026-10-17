@@ -243,15 +243,13 @@ window.Ds1Anim = (() => {
       }
       return wrapped;
     };
-    const fps = (1 / frameDur).toFixed(1);
-    const statusText = `${motion.file}: ${count} frames at ${fps} fps, ${bones.length} bones` +
-      (frames.events && frames.events.length ? `, ${frames.events.length} event cues.` : ", no event cues.");
-
     // The shared viewer owns the scrub bar, transport row, shortcuts and
-    // loop from here; this file only poses the skeleton and draws it.
+    // loop from here; this file only poses the skeleton and draws it. The
+    // status line stays for loading and errors; a loaded motion writes
+    // nothing there.
     viewModes.bindScene(scene);
     host._animViewer = LexeditorUI.animationViewer({
-      host, timeline, status, statusText,
+      host, timeline, status,
       frames: {count, duration: frames.duration, frameDuration: frameDur,
         events: (frames.events || []).map(event => ({start: event.start, label: event.label}))},
       follow: {label: "Root motion"},

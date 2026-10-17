@@ -1,9 +1,9 @@
 """The shared animation viewer: transport, shortcuts and the shortcuts menu.
 
 Every animations view mounts LexeditorUI.animationViewer: the scrub bar with
-its event cues, one row of square transport buttons below it, and the
-arrow/space bindings. The shortcuts panel lists those bindings only while a
-viewer is mounted.
+its event cues overlaid on it, one centered row of square transport
+buttons below it, and the arrow/space bindings. The shortcuts panel lists
+those bindings only while a viewer is mounted.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401
 from test_vanilla_metadata_edit import mount_vanilla_shell
@@ -191,3 +191,36 @@ def test_animation_keys_rest_while_typing_and_outside_a_view(page):
         page.keyboard.press(key)
     page.wait_for_timeout(200)
     assert errors == []
+
+
+def test_event_markers_overlay_the_scrub_slider(page):
+    mount(page)
+    slider = page.locator("#anim-timeline input[type='range']").bounding_box()
+    marker = page.locator(".lex-anim-marker").bounding_box()
+    assert marker["y"] < slider["y"] + slider["height"], (slider, marker)
+    assert marker["y"] + marker["height"] > slider["y"], (slider, marker)
+
+
+def test_transport_row_is_centered(page):
+    mount(page)
+    assert page.evaluate(
+        "getComputedStyle(document.querySelector('[data-anim-transport]')).justifyContent") == "center"
+
+
+def test_view_mode_bar_returns_with_its_mode_after_the_host_is_cleared(page):
+    framework(page)
+    page.evaluate("""() => {
+      const host = LexeditorUI.el("div", {id: "mode-host"});
+      document.querySelector("main").replaceChildren(host);
+      window.modes = LexeditorUI.modelViewModes(host);
+      window.modes.setMode("wireframe");
+      host.replaceChildren();
+      window.modesAgain = LexeditorUI.modelViewModes(host);
+    }""")
+    buttons = page.locator("#mode-host .lex-model-view-mode")
+    assert buttons.count() == 3
+    assert page.evaluate("window.modesAgain === window.modes") is True
+    assert page.evaluate("window.modesAgain.mode()") == "wireframe"
+    pressed = page.locator("#mode-host .lex-model-view-mode[aria-pressed='true']")
+    assert pressed.count() == 1
+    assert pressed.get_attribute("data-view-mode") == "wireframe"
