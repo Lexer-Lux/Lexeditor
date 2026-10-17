@@ -23,10 +23,15 @@ def ready(page):
 
 def tab(page, name, target):
     page.get_by_text(name, exact=True).first.click()
-    page.wait_for_function("""(tab)=>state.tab===tab && state.sub===tab && state.row &&
-        key(state.row)===state.selected && !state.error &&
-        (tab==='encumbrance' ? state.rows.length>=1 && state.row.id>=1001 :
-         state.row.id===(tab==='misc'?0:100))""", arg=target)
+    page.wait_for_function("""(tab)=>state.tab===tab && state.row &&
+        key(state.row)===state.selected && !state.error""", arg=target)
+
+
+def subtab(page, sub, row_id):
+    page.locator(f'[data-subtab="{sub}"]').click()
+    page.wait_for_function("""([sub,row])=>state.tab==="misc" && state.sub===sub && state.row &&
+        key(state.row)===state.selected && !state.error && state.row.id===row""",
+        arg=[sub, row_id])
 
 
 def fill(page, key, value):
@@ -76,10 +81,18 @@ def main():
                     ready(page)
                     assert page.locator('[data-tab="attacks"]').count() == 1
                     assert page.locator('[data-tab="tweaks"]').count() == 1
+                    assert page.locator('[data-tab="encumbrance"]').count() == 0
                     tab(page, "Misc.", "misc")
+                    assert page.locator("[data-subtab]").evaluate_all(
+                        "nodes=>nodes.map(n=>n.dataset.subtab)") == [
+                            "encumbrance", "encumbrance-overrides", "misc"]
+                    subtab(page, "misc", 0)
                     fill(page, "baseRecovery", 70)
                     page.screenshot(path=str(output / "misc.png"))
-                    tab(page, "Encumbrance", "encumbrance")
+                    subtab(page, "encumbrance-overrides", 200)
+                    fill(page, "specialRecovery", 110)
+                    page.screenshot(path=str(output / "overrides.png"))
+                    subtab(page, "encumbrance", 1001)
                     assert page.evaluate("state.rows.length") == 4
                     fill(page, "upper", 30)
                     fill(page, "recovery", 115)
@@ -112,6 +125,7 @@ def main():
                     fill(page, "upper", 120)
                     page.screenshot(path=str(output / "encumbrance.png"))
                     page.set_viewport_size({"width": 1000, "height": 700})
+                    page.wait_for_timeout(350)  # Let the shared label fitter finish after resize.
                     control = page.locator('[data-field-key="recovery"]:visible')
                     control.scroll_into_view_if_needed()
                     box = control.bounding_box()
@@ -122,12 +136,15 @@ def main():
                     page.wait_for_function("state.dirty===0 && state.pending===0")
                     config = json.loads((mod / SETTINGS_FILE).read_text())["rules"]
                     assert config["baseRecovery"] == 70 and config["bands"][0]["upper"] == 30
+                    assert config["specialLight"]["recovery"] == 110
                     assert config["bands"][2]["upper"] == 120 and config["bands"][0]["recovery"] == 115
                     assert config["nextBandId"] == 6
                     assert (game / RELATIVE).read_bytes() == source
                     page.reload(wait_until="domcontentloaded")
                     ready(page)
                     tab(page, "Misc.", "misc")
+                    assert page.evaluate("state.sub") == "encumbrance"
+                    subtab(page, "misc", 0)
                     assert float(page.locator('[data-field-key="baseRecovery"]').input_value()) == 70
                     fill(page, "baseRecovery", 80)
                     page.evaluate("discard()")
@@ -146,12 +163,14 @@ def main():
                     page.goto(session.url, wait_until="domcontentloaded")
                     ready(page)
                     tab(page, "Misc.", "misc")
-                    control = page.locator('[data-field-key="baseRecovery"]')
-                    assert control.is_disabled() and float(control.input_value()) == 45
-                    tab(page, "Encumbrance", "encumbrance")
                     assert page.locator('[data-field-key="recovery"]').is_disabled()
                     assert page.get_by_role("button", name="Add band", exact=True).is_disabled()
                     assert page.get_by_role("button", name="Delete band", exact=True).is_disabled()
+                    subtab(page, "misc", 0)
+                    control = page.locator('[data-field-key="baseRecovery"]')
+                    assert control.is_disabled() and float(control.input_value()) == 45
+                    subtab(page, "encumbrance-overrides", 200)
+                    assert page.locator('[data-field-key="specialRecovery"]').is_disabled()
                     assert not errors, errors
                 except Exception:
                     traceback.print_exc()

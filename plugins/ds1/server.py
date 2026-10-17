@@ -162,6 +162,11 @@ class Handler(PluginRequestHandler):
                                                             'It shows where that swing lands. '
                                                             'This screen only shows the game data. '
                                                             'It changes nothing.'})
+                        for entry in result.get('miscTabs', []):
+                            try:
+                                entry['count'] = len(RULES.list_rows(entry['id']))
+                            except ValueError:
+                                pass
                         result['theme'] = theme_status()
                     elif path == '/api/data-map':
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True), theme_status())
