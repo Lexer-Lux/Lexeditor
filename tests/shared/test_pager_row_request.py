@@ -1,9 +1,9 @@
 """Typing a row count in the pager and pressing Enter visibly does something.
 
 Lexer: "if i enter a different number in the rows number on the pagination
-bar then hit enter...nothing happens". A count under what fits applied; a
-count over it was saved and quietly capped, so Enter looked dead. The box is
-now bounded by what fits and says so when it clamps, and one Enter commits once.
+bar then hit enter...nothing happens". A count over what fits was saved
+and quietly capped, so Enter looked dead. The box now takes 5 to 80 rows;
+more rows than fit keep a readable height and scroll, and one Enter commits once.
 """
 from test_shared_ui_feedback import page, framework
 
@@ -16,7 +16,7 @@ def _table(page):
         activeTab: () => '', navigate: () => {}});
       dispatchEvent(new CustomEvent('lexeditor-settings-changed',
         {detail: {developerMode: true, tableRowsPerPage: 15, viewPreferences: {}}}));
-      const U = LexeditorUI, rows = Array.from({length: 80}, (_, id) => ({id, name: 'Row ' + id}));
+      const U = LexeditorUI, rows = Array.from({length: 200}, (_, id) => ({id, name: 'Row ' + id}));
       window.changes = [];
       let state = {page: 0, selected: 0};
       const render = () => {
@@ -42,7 +42,7 @@ def _type_rows(page, value):
     page.wait_for_timeout(600)
 
 
-def test_row_count_applies_once_and_explains_a_cap(page):
+def test_row_count_applies_once_and_allows_above_the_fit(page):
     _table(page)
     rows = lambda: page.locator('.lex-column-list-row').count()
     _type_rows(page, 8)
@@ -50,11 +50,19 @@ def test_row_count_applies_once_and_explains_a_cap(page):
     assert page.evaluate('changes') == ['table-rows:8'], 'one Enter, one commit'
 
     _type_rows(page, 60)
-    fits = rows()
-    assert 8 < fits < 60
-    toasts = page.locator('.lex-toast').all_text_contents()
-    assert toasts and f'Only {fits} rows fit' in toasts[-1], toasts
+    assert rows() == 60, 'a high count applies instead of capping to the fit'
+    height = page.locator('.lex-column-list-row').first.bounding_box()['height']
+    assert height >= 33, f'rows stay readable, got {height}'
 
     box = page.locator('.lex-page-row-override input')
-    assert box.get_attribute('max') == str(fits), 'the box is bounded by what fits'
-    assert box.input_value() == str(fits)
+    assert box.get_attribute('max') == '80', 'the box runs to 80, not the fit'
+    assert box.input_value() == '60'
+
+
+def test_row_count_over_80_clamps_with_an_explanation(page):
+    _table(page)
+    _type_rows(page, 120)
+    assert page.locator('.lex-column-list-row').count() == 80
+    toasts = page.locator('.lex-toast').all_text_contents()
+    assert toasts and 'At most 80 rows' in toasts[-1], toasts
+    assert page.locator('.lex-page-row-override input').input_value() == '80'

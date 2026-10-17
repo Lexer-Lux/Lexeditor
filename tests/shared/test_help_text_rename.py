@@ -2,7 +2,7 @@
 
 A bubble has no name of its own, so the shipped text is the key: the stored
 override is found by a digest of it. Escape keeps the shipped text, an empty
-text restores it, and a reader who is not the developer cannot edit it.
+text clears it, and a reader who is not the developer cannot edit it.
 """
 import pytest
 
@@ -60,7 +60,7 @@ def test_reworded_help_is_saved_and_shown_again(page):
     assert popover_text(page) == REWORDED
 
 
-def test_escape_keeps_the_shipped_text_and_an_empty_one_restores_it(page):
+def test_escape_keeps_the_shipped_text_and_an_empty_one_clears_it(page):
     framework(page)
     mount_shell(page)
     mount_help(page)
@@ -84,7 +84,8 @@ def test_escape_keeps_the_shipped_text_and_an_empty_one_restores_it(page):
     editor.fill("   ")
     editor.press("Control+Enter")
     page.wait_for_timeout(250)
-    assert popover_text(page) == SHIPPED
+    assert popover_text(page) == ""
+    assert list(page.evaluate("window.savedCalls")[-1][2].values())[0] == ""
 
 
 def test_a_reader_who_is_not_the_developer_cannot_reword_help(page):
@@ -119,3 +120,30 @@ def test_plain_enter_or_clicking_away_keeps_the_new_wording(page, finish):
     page.wait_for_timeout(300)
     saved = page.evaluate("window.savedCalls")
     assert saved and list(saved[-1][2].values())[0] == REWORDED, saved
+def mount_panel_tab(page, shipped):
+    page.evaluate("""shipped => {
+      document.querySelector('main').replaceChildren(
+        LexeditorUI.tabbedPanel({tabs: [{id: 'records', label: 'Records', help: shipped},
+          {id: 'files', label: 'Files'}], active: 'records', label: 'Panel views',
+          change(){}, content: LexeditorUI.el('p', {}, 'body')}));
+    }""", shipped)
+    page.wait_for_timeout(200)
+
+
+def test_clearing_a_panel_tab_bubble_with_empty_enter(page):
+    framework(page)
+    mount_shell(page)
+    mount_panel_tab(page, SHIPPED)
+    marker = page.locator(".lex-subtab-button .lex-info-help").first
+    marker.hover()
+    page.wait_for_selector(".lex-help-popover", timeout=3000)
+    assert popover_text(page) == SHIPPED
+    marker.dblclick()
+    editor = page.locator(".lex-help-edit").first
+    editor.wait_for(timeout=3000)
+    editor.fill("   ")
+    editor.press("Enter")
+    page.wait_for_timeout(300)
+    assert popover_text(page) == ""
+    saved = page.evaluate("window.savedCalls")
+    assert saved and list(saved[-1][2].values())[0] == "", saved

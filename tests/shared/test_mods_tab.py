@@ -139,7 +139,7 @@ def test_the_table_lists_mods_then_downloadable_modules_and_edits_details(page):
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("textbox", name="Name").wait_for()
     assert page.locator('[data-tab="mods"]').get_attribute("class").count("active") == 1
-    names = page.locator(".lex-mods-page .lex-column-list").inner_text()
+    names = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").inner_text()
     assert names.index("Mine") < names.index("Combat") < names.index("Extra"), names
     assert page.locator(".lex-mods-remote", has_text="Extra").count() == 1
     page.get_by_role("textbox", name="Author").fill("Someone")
@@ -161,7 +161,7 @@ def test_mods_reorder_with_alt_arrow_keys(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("textbox", name="Name").wait_for()
-    rows = page.locator(".lex-mods-page .lex-column-list-row")
+    rows = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row")
     assert rows.nth(0).get_attribute("draggable") == "true"
     assert rows.nth(0).get_attribute("tabindex") == "0"
     assert "Alt+Up or Alt+Down" in (rows.nth(0).get_attribute("aria-description") or "")
@@ -172,11 +172,11 @@ def test_mods_reorder_with_alt_arrow_keys(page):
     page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
     assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Combat", -1]
     page.wait_for_function(
-        "document.querySelector('.lex-mods-page .lex-column-list').innerText.indexOf('Combat')"
-        " < document.querySelector('.lex-mods-page .lex-column-list').innerText.indexOf('Mine')")
+        "document.querySelector('.lex-mods-page .lex-barrelled-master .lex-column-list').innerText.indexOf('Combat')"
+        " < document.querySelector('.lex-mods-page .lex-barrelled-master .lex-column-list').innerText.indexOf('Mine')")
     # At the top, Alt+Up is a no-op; Alt+Down moves back.
     before = len(calls(page, "move_mod"))
-    page.locator(".lex-mods-page .lex-column-list-row").filter(has_text="Combat").focus()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row").filter(has_text="Combat").focus()
     page.keyboard.press("Alt+ArrowUp")
     page.wait_for_timeout(200)
     assert len(calls(page, "move_mod")) == before
@@ -191,14 +191,14 @@ def test_mods_reorder_by_dragging_one_row_onto_another(page):
     page.get_by_role("textbox", name="Name").wait_for()
     # A drop onto the downloadable module is ignored: it has no library place.
     ignored = page.evaluate("""() => {
-      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-barrelled-master .lex-column-list-row')];
       const data = new DataTransfer(); data.setData('application/x-lex-mod', '1');
       rows[2].dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data}));
       return window.calls.some(c => c[0] === 'move_mod');
     }""")
     assert ignored is False
     moved = page.evaluate("""() => {
-      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-barrelled-master .lex-column-list-row')];
       const data = new DataTransfer();
       rows[1].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
       rows[0].dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: data}));
@@ -209,7 +209,7 @@ def test_mods_reorder_by_dragging_one_row_onto_another(page):
     assert moved == {"carried": "1", "dropped": True}, moved
     page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
     assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Combat", -1]
-    names = page.locator(".lex-mods-page .lex-column-list").inner_text()
+    names = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").inner_text()
     assert names.index("Combat") < names.index("Mine"), names
 
 
@@ -217,10 +217,10 @@ def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("textbox", name="Name").wait_for()
-    rows = page.locator(".lex-mods-page .lex-column-list-row")
+    rows = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row")
     # The detail can paint before the list settles, and a second draw can
     # land between a wait and its read; a box read mid-draw is None.
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Extra").wait_for()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Extra").wait_for()
     box = None
     for _ in range(50):
         box = rows.nth(1).bounding_box()
@@ -231,7 +231,7 @@ def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
     top = box["y"] + box["height"] * 0.25
     bottom = box["y"] + box["height"] * 0.75
     line = page.evaluate("""([top, bottom]) => {
-      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-barrelled-master .lex-column-list-row')];
       const data = new DataTransfer();
       rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
       const over = y => rows[1].dispatchEvent(new DragEvent('dragover',
@@ -254,11 +254,11 @@ def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
     page.wait_for_function("window.calls.some(c => c[0] === 'move_mod')")
     assert calls(page, "move_mod")[-1] == ["game", "C:/lib/game/Mine", 1]
     # Dropping a row beside itself lands where it started: no call.
-    box = page.locator(".lex-mods-page .lex-column-list-row").nth(0).bounding_box()
+    box = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row").nth(0).bounding_box()
     bottom = box["y"] + box["height"] * 0.75
     before = len(calls(page, "move_mod"))
     page.evaluate("""bottom => {
-      const rows = [...document.querySelectorAll('.lex-mods-page .lex-column-list-row')];
+      const rows = [...document.querySelectorAll('.lex-mods-page .lex-barrelled-master .lex-column-list-row')];
       const data = new DataTransfer();
       rows[0].dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: data}));
       rows[0].dispatchEvent(new DragEvent('drop',
@@ -271,9 +271,9 @@ def test_dragging_shows_a_drop_line_and_drops_between_rows(page):
 def test_a_mods_settings_and_a_downloadable_module(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.get_by_role("spinbutton", name="Amount").wait_for()
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Extra").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Extra").click()
     page.get_by_role("button", name="Download", exact=True).click()
     page.wait_for_function("window.calls.some(c => c[0] === 'lexmod_download')")
     assert calls(page, "lexmod_download")[-1] == ["game", ["Extra"]]
@@ -339,7 +339,7 @@ def test_vanilla_still_switches_mods_and_reads_text_boxes(page):
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("checkbox", name="Switch Combat").click()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.get_by_role("spinbutton", name="Amount").fill("4")
     page.get_by_role("spinbutton", name="Amount").press("Tab")
     page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_settings')")
@@ -439,7 +439,7 @@ def test_a_changed_mod_shows_one_mark_listing_every_flag(page):
     page.get_by_role("textbox", name="Name").wait_for()
     page.get_by_role("checkbox", name="Switch Combat").check()
     page.wait_for_function("document.querySelectorAll('.lex-column-list .lex-conflict-mark').length === 2")
-    combat = page.locator(".lex-mods-page .lex-column-list-row", has_text="Combat").locator(".lex-conflict-mark")
+    combat = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row", has_text="Combat").locator(".lex-conflict-mark")
     assert combat.count() == 1
     assert (combat.get_attribute("aria-label") or "").startswith("Mod warnings"), combat.get_attribute("aria-label")
     # A squeezed name column truncates the name text; the mark stays
@@ -454,17 +454,17 @@ def test_a_changed_mod_shows_one_mark_listing_every_flag(page):
     page.locator(".lex-help-popover .lex-conflict-list li").first.wait_for()
     popover = page.locator(".lex-help-popover").inner_text()
     assert "overrides Mine" in popover and "changed since the last build" in popover
-    mine = page.locator(".lex-mods-page .lex-column-list-row", has_text="Mine").locator(".lex-conflict-mark")
+    mine = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row", has_text="Mine").locator(".lex-conflict-mark")
     assert (mine.get_attribute("aria-label") or "").startswith("Conflicts with other mods")
     # The detail pane repeats the alert as its own note.
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.locator(".lex-detail-note", has_text="This mod changed since the last build.").wait_for()
 
 
 def test_a_bundles_components_are_ordinary_settings_that_save(page):
     mount(page, bundle=True)
     page.locator('[data-tab="mods"]').click()
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Collection").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Collection").click()
     combat = page.get_by_role("checkbox", name="Combat", exact=True)
     combat.wait_for()
     assert combat.is_checked()
@@ -632,7 +632,7 @@ def test_mods_detail_delete_removes_the_library_entry(page):
 def test_mods_detail_delete_is_disabled_for_managed_mods(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
-    page.locator(".lex-mods-page .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.get_by_role("checkbox", name="Combat enabled").wait_for()
     delete = page.get_by_role("button", name="This mod updates automatically, so it cannot be removed from here")
     assert delete.is_disabled()
@@ -646,45 +646,69 @@ def test_mods_detail_open_button_opens_the_folder(page):
     assert calls(page, "open_mod_folder")[-1][1:] == ["C:/lib/game/Mine"]
 
 
-def _contents_sections(page):
+def _contents_tabs(page):
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("checkbox", name="Mine enabled").wait_for()
     page.wait_for_function("window.calls.some(c => c[0] === 'mod_contents')")
+    page.locator(".lex-mod-contents-tabs .lex-subtab-button").first.wait_for()
     return page.locator(".lex-mods-page .lex-detail-panel")
 
 
 def test_mods_detail_lists_changed_records(page):
     mount(page)
-    detail = _contents_sections(page)
-    changes = detail.locator(".lex-mod-change")
-    assert changes.count() == 2
-    first = changes.nth(0).inner_text()
+    detail = _contents_tabs(page)
+    tabs = detail.locator(".lex-mod-contents-tabs .lex-subtab-button")
+    assert [tabs.nth(i).get_attribute("data-subtab") for i in range(2)] == ["records", "files"]
+    assert "RECORDS" in tabs.nth(0).inner_text().upper()
+    assert "FILES" in tabs.nth(1).inner_text().upper()
+    assert "active" in (tabs.nth(0).get_attribute("class") or "")
+    table = detail.locator(".lex-mod-contents .lex-column-list")
+    table.wait_for()
+    rows = table.locator(".lex-column-list-row")
+    assert rows.count() == 2
+    first = rows.nth(0).inner_text()
     assert "Fixture Stone" in first
     assert "EquipParamGoods 100" in first
     assert "Basic price" in first
-    second = changes.nth(1).inner_text()
+    second = rows.nth(1).inner_text()
     assert "Old Stone" in second and "Fixture Stone" in second
+    assert detail.get_by_role("searchbox", name="Search changed records").count() == 1
+    assert detail.locator(".lex-mod-contents .lex-pager").count() == 1
 
 
 def test_mods_detail_lists_files_with_loader_marks(page):
     mount(page)
-    detail = _contents_sections(page)
-    files = detail.locator(".lex-mod-file")
-    assert files.count() == 2
-    assert files.nth(0).get_attribute("class") is not None
-    assert "lex-mod-file-loaded" in (files.nth(0).get_attribute("class") or "")
-    assert "lex-mod-file-loaded" not in (files.nth(1).get_attribute("class") or "")
-    assert "12 B" in files.nth(0).inner_text()
+    detail = _contents_tabs(page)
+    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    table = detail.locator(".lex-mod-contents .lex-column-list")
+    table.wait_for()
+    rows = table.locator(".lex-column-list-row")
+    assert rows.count() == 2
+    assert "lex-mod-file-loaded" in (rows.nth(0).get_attribute("class") or "")
+    assert "lex-mod-file-loaded" not in (rows.nth(1).get_attribute("class") or "")
+    assert "12 B" in rows.nth(0).inner_text()
+    assert "Yes" in rows.nth(0).inner_text()
+    assert rows.nth(0).get_attribute("data-lex-title") == "The mod loader reads this file when the mod is on"
+    assert detail.get_by_role("searchbox", name="Search files").count() == 1
 
 
 def test_mods_detail_contents_empty_states(page):
     mount(page)
     page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
                   " changesTruncated: false, canDescribe: false, note: 'Locate the game.'}")
-    detail = _contents_sections(page)
-    assert "Locate the game." in detail.inner_text()
-    assert "This mod has no files." in detail.inner_text()
-    assert "not known for this game" in detail.inner_text()
+    detail = _contents_tabs(page)
+    assert "Locate the game." in detail.locator(".lex-mod-contents").inner_text()
+    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    files = detail.locator(".lex-mod-contents").inner_text()
+    assert "This mod has no files." in files
+    assert "not known for this game" in files
+    page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
+                  " changesTruncated: false, canDescribe: true, note: ''}")
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine").click()
+    page.wait_for_function("window.calls.filter(c => c[0] === 'mod_contents').length >= 3")
+    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Records").click()
+    assert "No record changes compared to vanilla." in detail.locator(".lex-mod-contents").inner_text()
 
 
 def test_mods_detail_contents_truncation(page):
@@ -693,8 +717,24 @@ def test_mods_detail_contents_truncation(page):
                   " added: false, removed: true, before: null, after: null}],"
                   " files: [{relative: 'a.bin', size: 1, sizeLabel: '1 B', loaded: false}],"
                   " truncated: true, changesTruncated: true, canDescribe: true, note: ''}")
-    detail = _contents_sections(page)
-    assert "Removed" in detail.locator(".lex-mod-change").first.inner_text()
+    detail = _contents_tabs(page)
+    assert "Removed" in detail.locator(".lex-mod-contents .lex-column-list-row").first.inner_text()
     assert "Showing the first 1 changes." in detail.inner_text()
+    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
     assert "Showing the first 1 files." in detail.inner_text()
+
+
+def test_mods_detail_contents_search_filters_each_table(page):
+    mount(page)
+    detail = _contents_tabs(page)
+    detail.get_by_role("searchbox", name="Search changed records").fill("Basic price")
+    page.wait_for_timeout(300)
+    assert detail.locator(".lex-mod-contents .lex-column-list-row").count() == 1
+    detail.get_by_role("searchbox", name="Search changed records").fill("zzz-no-such-change")
+    page.wait_for_timeout(300)
+    assert "match this search" in detail.locator(".lex-mod-contents").inner_text()
+    detail.locator(".lex-mod-contents-tabs .lex-subtab-button", has_text="Files").click()
+    detail.get_by_role("searchbox", name="Search files").fill("GameParam")
+    page.wait_for_timeout(300)
+    assert detail.locator(".lex-mod-contents .lex-column-list-row").count() == 1
 

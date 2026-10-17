@@ -814,7 +814,9 @@
             finished = true;
             popup.classList.remove("lex-help-editing");
             const typed = editor.value.trim();
-            const next = typed && typed !== shipped ? typed : shipped;
+            // An empty edit clears the bubble instead of restoring the shipped
+            // text, so a developer can delete help that should not be there.
+            const next = typed;
             if (!commit) {
               popup.replaceChildren(String(shown()));
               // The editor's own blur schedules the bubble's close; keep the
@@ -844,6 +846,7 @@
               // storeLabel already saved it, with the same transport the rest of
               // the renames use.
               showToast(next === shipped ? "The shipped help text is back."
+                                         : next === "" ? "The help text is cleared."
                                          : "The new help text is now the shipped one.");
             } catch (_error) {}
           };
@@ -7511,7 +7514,12 @@ ${contents.path}`});
   const activePageTab = () =>
     document.querySelector(".lex-shell-header nav button.active")?.dataset.tab || "";
   const savedLabel = (key, fallback) => {
-    try { return localStorage.getItem(key) || fallback; } catch (_error) { return fallback; }
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === null) return fallback;
+      if (stored === "" && !String(key).includes(".help.")) return fallback;
+      return stored;
+    } catch (_error) { return fallback; }
   };
   // The help text a developer rewords. A bubble has no name of its own and its
   // text is far too long for a key, so the key is a short digest of the shipped
@@ -7548,9 +7556,10 @@ ${contents.path}`});
       if (title.dataset.lexLabelKey === key) title.textContent = text;
   };
   const storeLabel = async (key, tabId, value, shipped) => {
-    const next = value && value !== shipped ? value : "";
+    const cleared = value !== shipped;
+    const next = cleared ? value : "";
     try {
-      if (next) localStorage.setItem(key, next);
+      if (cleared) localStorage.setItem(key, next);
       else localStorage.removeItem(key);
     } catch (_error) {}
     try {
@@ -10242,12 +10251,13 @@ ${contents.path}`});
       const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
       const capacity = minimumRowHeight > 0 ? Math.max(1, Math.floor((available - 0.5) / minimumRowHeight)) : Infinity;
-      const pageSize = Math.min(fixedRows || Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
-      const rowHeight = fixedRows ? available / pageSize : naturalRowHeight;
+      const pageSize = fixedRows || Math.min(Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
+      const rowHeight = fixedRows ? Math.max(minimumRowHeight, available / pageSize) : naturalRowHeight;
       if (!(rowHeight > 0)) return;
       if (fixedRows) fittedLists.forEach(node => {
         node.style.setProperty("--lex-fitted-row-height", `${rowHeight}px`);
         node.dataset.lexFixedRows = String(pageSize);
+        node.style.overflowY = rowHeight > available / pageSize + 0.5 ? "auto" : "";
       });
       listNode.dataset.lexFittedPageSize = String(pageSize);
       const requestedVisibleRows = typeof options.visibleRows === "function"
@@ -10686,9 +10696,9 @@ ${contents.path}`});
       options.search ? bottomSearch(options.search) : null);
     let rowControl = null;
     if (options.rowControl) {
-      // The most rows that fit this panel at a readable height. Asking for
-      // more used to be saved and then silently capped, so Enter looked dead.
-      const rowMax = Math.max(5, Math.min(80, Number(options.rowControl.max) || 80));
+      // Rows per page runs 5 to 80. The fit used to cap it to what the
+      // panel holds at a readable height, so a reader who set 40 got 27.
+      const rowMax = 80;
       const commitRows = input => {
         // A box replaced by the render its own Enter caused still blurs; that
         // second commit re-rendered the table again for nothing.
@@ -10697,7 +10707,7 @@ ${contents.path}`});
         const requested = Number.parseInt(input.value, 10);
         if (Number.isFinite(requested) && requested > rowMax) {
           input.value = rowMax;
-          showToast(`Only ${rowMax} rows fit this panel at a readable height.`);
+          showToast(`At most ${rowMax} rows on a page.`);
         }
         options.rowControl.change?.(input.value);
       };
@@ -11040,7 +11050,7 @@ ${contents.path}`});
     const globalPageSize = boundedTableRows(sharedSettingsSnapshot?.tableRowsPerPage || fitCapacity?.requested || options.pageSize || 15);
     const hasRowOverride = hasTableRowsOverride(rowPreferenceKey);
     const requestedPageSize = readTableRows(rowPreferenceKey, globalPageSize);
-    const pageSize = Math.min(requestedPageSize, fitCapacity?.capacity || requestedPageSize);
+    const pageSize = requestedPageSize;
     // The page always declares a full page of tracks: sizing the tracks to a
     // short table's own row count stretched its rows to fill the panel.
     const rowCapacity = Math.max(1, pageSize);
@@ -11518,7 +11528,7 @@ ${contents.path}`});
       };
       const rowControl = sharedSettingsSnapshot?.developerMode ? {
         value: pageSize,
-        max: fitCapacity?.capacity || null,
+        max: 80,
         defaultValue: globalPageSize,
         overridden: hasRowOverride,
         change: setPageSize,
@@ -11649,8 +11659,6 @@ ${contents.path}`});
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
-          if (typedRowsKey === rowPreferenceKey && nextSize < requestedPageSize)
-            showToast(`Only ${nextSize} rows fit this panel at a readable height.`);
           typedRowsKey = null;
           const selectedIndex = records.findIndex(record => keyOf(record) === selected);
           const anchor = selectedIndex >= 0 ? selectedIndex : groupStart;
@@ -12954,6 +12962,8 @@ ${contents.path}`});
 
   const modsPage = (pluginId, pluginName) => {
     let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
+    let contentsTab = "records", contentsMod = null;
+    const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
@@ -13030,36 +13040,6 @@ ${contents.path}`});
         if (result.state === "failed") throw new Error(result.error);
         await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
       } catch (error) { button.disabled = false; failure("Could not download the module", error); }
-    };
-    const paintModChanges = (fill, result) => {
-      const changes = result.changes || [];
-      if (result.note && !changes.length) { fill.replaceChildren(detailNote(result.note)); return; }
-      if (!changes.length) { fill.replaceChildren(detailNote("No record changes compared to vanilla.")); return; }
-      const rows = changes.map(entry => {
-        const state = entry.added ? "New" : entry.removed ? "Removed" : null;
-        const meta = [state, `${entry.table} ${entry.id}`].filter(Boolean).join(" · ");
-        const extra = (entry.fields || []).length ? entry.fields.join(", ")
-          : entry.before != null || entry.after != null
-            ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
-        return element("div", {class: "lex-mod-change"},
-          element("div", {class: "lex-mod-change-label"}, entry.label),
-          element("div", {class: "lex-mod-change-meta"}, extra ? `${meta} \u00b7 ${extra}` : meta));
-      });
-      if (result.changesTruncated) rows.push(detailNote(`Showing the first ${changes.length} changes.`));
-      if (result.note) rows.push(detailNote(result.note));
-      fill.replaceChildren(element("div", {class: "lex-mod-change-list"}, rows));
-    };
-    const paintModFiles = (fill, result) => {
-      const files = result.files || [];
-      const rows = files.map(entry => element("div",
-        {class: ["lex-mod-file", entry.loaded ? "lex-mod-file-loaded" : ""].filter(Boolean).join(" "),
-          title: entry.loaded ? "The mod loader reads this file when the mod is on" : null},
-        element("span", {class: "lex-mod-file-name"}, entry.relative),
-        element("span", {class: "lex-mod-file-size"}, entry.sizeLabel || "")));
-      if (!files.length) rows.push(detailNote("This mod has no files."));
-      if (result.truncated) rows.push(detailNote(`Showing the first ${files.length} files.`));
-      if (!result.canDescribe) rows.push(detailNote("Which files the loader reads is not known for this game."));
-      fill.replaceChildren(element("div", {class: "lex-mod-file-list"}, rows));
     };
     const detail = () => {
       const row = rows().find(item => keyOf(item) === selected);
@@ -13147,23 +13127,89 @@ ${contents.path}`});
           ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
           detailField({label: "FOLDER", control: readonlyField(row.path)}),
         ]}));
-      const changesFill = element("div", {class: "lex-mod-contents"}, loadingStatus("Comparing records"));
-      const filesFill = element("div", {class: "lex-mod-contents"}, loadingStatus("Listing files"));
-      sections.push(
-        detailSection({title: "CHANGED RECORDS",
-          help: infoHelp("Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."),
-          body: [changesFill]}),
-        detailSection({title: "FILES",
-          help: infoHelp("Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."),
-          body: [filesFill]}));
+      if (selected !== contentsMod) {
+        contentsMod = selected;
+        contentsQuery.records = "";
+        contentsQuery.files = "";
+        contentsPage.records = 0;
+        contentsPage.files = 0;
+      }
+      let contentsResult = null, contentsFailed = false;
+      const contentsWrap = element("div", {class: "lex-mod-contents-tabs"}, loadingStatus("Reading mod contents"));
+      const modChangeText = entry => (entry.fields || []).length ? entry.fields.join(", ")
+        : entry.before != null || entry.after != null
+          ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
+      const modContentsTable = (tab, rows, columns, searchLabel, emptyNote, notes, rowClass, rowTitle) => {
+        const needle = String(contentsQuery[tab] || "").toLowerCase();
+        const filtered = needle ? rows.filter(row => JSON.stringify(row).toLowerCase().includes(needle)) : rows;
+        const size = 10;
+        const pages = Math.max(1, Math.ceil(filtered.length / size));
+        contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab] || 0, pages - 1));
+        const slice = filtered.slice(contentsPage[tab] * size, (contentsPage[tab] + 1) * size);
+        const pagerNode = pager({inline: true, page: contentsPage[tab], pages, total: filtered.length, pageSize: size,
+          change: next => { contentsPage[tab] = next; paintContents(); },
+          search: {key: `${pluginId}-mod-${tab}`, value: contentsQuery[tab] || "", label: searchLabel,
+            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; paintContents(); }}});
+        const foot = notes.map(line => detailNote(line));
+        if (!rows.length) return element("div", {class: "lex-mod-contents"}, detailNote(emptyNote), ...foot);
+        if (!filtered.length) return element("div", {class: "lex-mod-contents"},
+          detailNote(`No ${tab === "records" ? "changes" : "files"} match this search.`), pagerNode, ...foot);
+        return element("div", {class: "lex-mod-contents"},
+          columnList({rows: slice, key: (row, index) => index, columns, rowClass, rowTitle}),
+          pagerNode, ...foot);
+      };
+      const modRecordsTable = result => {
+        const changes = result.changes || [];
+        if (result.note && !changes.length) return element("div", {class: "lex-mod-contents"}, detailNote(result.note));
+        const notes = [];
+        if (result.changesTruncated) notes.push(`Showing the first ${changes.length} changes.`);
+        if (result.note) notes.push(result.note);
+        return modContentsTable("records", changes, [
+          {key: "label", label: "Record", grow: 1},
+          {key: "location", label: "Table", sortValue: row => `${row.table} ${row.id}`,
+            render: row => `${row.table} ${row.id}`},
+          {key: "change", label: "Change", grow: 1, sortValue: modChangeText, render: modChangeText},
+          {key: "state", label: "State", width: "max-content",
+            sortValue: row => row.added ? "New" : row.removed ? "Removed" : "",
+            render: row => row.added ? "New" : row.removed ? "Removed" : ""},
+        ], "Search changed records", "No record changes compared to vanilla.", notes, null, null);
+      };
+      const modFilesTable = result => {
+        const files = result.files || [];
+        const notes = [];
+        if (result.truncated) notes.push(`Showing the first ${files.length} files.`);
+        if (!result.canDescribe) notes.push("Which files the loader reads is not known for this game.");
+        return modContentsTable("files", files, [
+          {key: "relative", label: "File", grow: 1},
+          {key: "sizeLabel", label: "Size", width: "max-content", align: "end", sortValue: row => row.size},
+          {key: "loaded", label: "Read", width: "max-content", align: "center",
+            sortValue: row => row.loaded ? 1 : 0, render: row => row.loaded ? "Yes" : ""},
+        ], "Search files", "This mod has no files.", notes,
+          row => row.loaded ? "lex-mod-file-loaded" : "",
+          row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
+      };
+      const paintContents = () => {
+        if (contentsFailed) { contentsWrap.replaceChildren(detailNote("Could not read the mod's contents.")); return; }
+        if (!contentsResult) { contentsWrap.replaceChildren(loadingStatus("Reading mod contents")); return; }
+        const bar = subtabBar({tabs: [
+          {id: "records", label: "Records",
+            help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
+          {id: "files", label: "Files",
+            help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
+        ], active: contentsTab, order: "given", label: "Mod contents", className: "lex-mod-contents-bar",
+          change: id => { contentsTab = id; paintContents(); }});
+        const body = contentsTab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
+        contentsWrap.replaceChildren(bar, body);
+      };
+      sections.push(contentsWrap);
       callWindow("mod_contents", pluginId, row.path).then(result => {
         if (keyOf(row) !== selected) return;
-        paintModChanges(changesFill, result || {});
-        paintModFiles(filesFill, result || {});
+        contentsResult = result || {};
+        paintContents();
       }).catch(() => {
         if (keyOf(row) !== selected) return;
-        changesFill.replaceChildren(detailNote("Could not read the mod's contents."));
-        filesFill.replaceChildren(detailNote("Could not read the mod's contents."));
+        contentsFailed = true;
+        paintContents();
       });
       const notes = [row.error ? detailNote(row.error) : null,
         row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
