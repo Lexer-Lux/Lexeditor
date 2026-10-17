@@ -91,6 +91,8 @@
       "warband"
     ],
     "beginSearcher": [
+      "blank",
+      "ds1",
       "ff8"
     ],
     "bindSettingDependencies": [
@@ -188,6 +190,7 @@
     ],
     "choicePopover": [
       "blank",
+      "ds1",
       "ff8",
       "ff9"
     ],
@@ -213,31 +216,17 @@
       "warband"
     ],
     "closeButton": [
-      "bannerlord",
       "blank",
-      "chrono_trigger",
-      "ds1",
-      "ds3",
-      "factorio",
-      "ff7",
-      "ff7r",
-      "ff7r2",
-      "ff8",
-      "ff9",
-      "ffx_x2",
-      "palworld",
-      "project_zomboid",
-      "rdr",
-      "rdr2",
-      "stardew_valley",
-      "terraria",
-      "warband"
+      "rdr2"
     ],
     "codeField": [
       "blank",
       "ff8",
       "terraria",
       "warband"
+    ],
+    "collapsiblePanel": [
+      "ds1"
     ],
     "columnList": [
       "bannerlord",
@@ -275,9 +264,23 @@
     "compareRecords": [
       "bannerlord",
       "blank",
+      "chrono_trigger",
       "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
       "ff7r",
-      "ffx_x2"
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "componentSample": [
       "blank"
@@ -373,13 +376,33 @@
     ],
     "controlGroup": [
       "blank",
-      "ds1",
       "ff7r",
       "ff8",
       "rdr2"
     ],
     "controlHelp": [
       "blank"
+    ],
+    "copyIcon": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "copyText": [
       "bannerlord",
@@ -467,6 +490,7 @@
     ],
     "curveEditor": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "curveGrid": [
@@ -496,6 +520,7 @@
     ],
     "decorateSearchCandidate": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "detailField": [
@@ -670,6 +695,7 @@
     ],
     "finishSearcher": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "fitListPage": [
@@ -760,6 +786,27 @@
       "terraria",
       "warband"
     ],
+    "hoverActions": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "hoverable": [
       "blank",
       "ds1",
@@ -770,6 +817,7 @@
     "iconSlot": [
       "blank",
       "chrono_trigger",
+      "ds1",
       "ff8",
       "rdr2",
       "warband"
@@ -1019,6 +1067,27 @@
       "terraria",
       "warband"
     ],
+    "loadingStatus": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "logView": [
       "bannerlord",
       "blank",
@@ -1087,6 +1156,7 @@
     ],
     "modelStage": [
       "blank",
+      "ds1",
       "rdr2",
       "warband"
     ],
@@ -1113,6 +1183,7 @@
     ],
     "multiNumberRow": [
       "blank",
+      "ds1",
       "ff8",
       "ff9",
       "ffx_x2",
@@ -1141,9 +1212,13 @@
     ],
     "noImage": [
       "blank",
+      "ds1",
       "ff8",
       "ff9",
       "rdr2"
+    ],
+    "noThumbnail": [
+      "ds1"
     ],
     "notice": [
       "bannerlord",
@@ -1356,6 +1431,27 @@
       "terraria",
       "warband"
     ],
+    "promptText": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "provenanceControl": [
       "blank",
       "ds1",
@@ -1465,6 +1561,9 @@
       "stardew_valley",
       "terraria",
       "warband"
+    ],
+    "registerNoThumbnail": [
+      "ds1"
     ],
     "renameValue": [
       "bannerlord",
@@ -1662,9 +1761,23 @@
     "sortValueOf": [
       "bannerlord",
       "blank",
+      "chrono_trigger",
       "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
       "ff7r",
-      "ffx_x2"
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "soundCoverageTable": [
       "blank",
@@ -1708,28 +1821,7 @@
       "terraria",
       "warband"
     ],
-    "tabbedPanel": [
-      "bannerlord",
-      "blank",
-      "ds1",
-      "ff8",
-      "terraria"
-    ],
-    "textArea": [
-      "blank",
-      "ff7r",
-      "ff8",
-      "palworld",
-      "rdr2",
-      "terraria",
-      "warband"
-    ],
-    "tileGrid": [
-      "blank",
-      "ff8",
-      "rdr2"
-    ],
-    "toggleRow": [
+    "tabStrip": [
       "bannerlord",
       "blank",
       "chrono_trigger",
@@ -1749,6 +1841,58 @@
       "stardew_valley",
       "terraria",
       "warband"
+    ],
+    "tabbedPanel": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
+    "textArea": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "palworld",
+      "rdr2",
+      "terraria",
+      "warband"
+    ],
+    "thingFinderButton": [
+      "blank",
+      "ds1",
+      "ff8"
+    ],
+    "thingFinderField": [
+      "blank",
+      "ff8"
+    ],
+    "tileGrid": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ],
+    "toggleRow": [
+      "blank",
+      "ff7",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "rdr2"
     ],
     "toolbar": [
       "blank",
@@ -1815,6 +1959,27 @@
       "rdr",
       "rdr2"
     ],
+    "typeGlyph": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "uiScaleControl": [
       "bannerlord",
       "blank",
@@ -1865,17 +2030,21 @@
     "applyTheme",
     "autoFitControlText",
     "badge",
+    "beginSearcher",
     "bindSettingDependencies",
     "booleanMark",
     "bottomSearch",
     "callWindow",
+    "choiceField",
     "clone",
     "closeButton",
     "columnList",
+    "compareRecords",
     "confirmAction",
     "confirmDiscardChanges",
     "confirmUnsavedExit",
     "conflictMark",
+    "copyIcon",
     "copyText",
     "createModProject",
     "createWindowActions",
@@ -1891,6 +2060,7 @@
     "folderIcon",
     "formatNumber",
     "hasEnabledProperty",
+    "hoverActions",
     "imageMap",
     "infoHelp",
     "infoIcon",
@@ -1903,6 +2073,7 @@
     "list",
     "listDetail",
     "loadingPanel",
+    "loadingStatus",
     "magnifyIcon",
     "magnitudeValue",
     "mapMagnifier",
@@ -1918,6 +2089,7 @@
     "panelLayout",
     "pendingChangeList",
     "playThemeSound",
+    "promptText",
     "readonlyField",
     "recordId",
     "recordSource",
@@ -1936,10 +2108,13 @@
     "showToast",
     "sortValueOf",
     "subtabBar",
+    "tabStrip",
+    "tabbedPanel",
+    "thingFinderButton",
     "tileGrid",
-    "toggleRow",
     "tweakModPanels",
     "tweakPanel",
+    "typeGlyph",
     "uiScaleControl",
     "unitField"
   ]

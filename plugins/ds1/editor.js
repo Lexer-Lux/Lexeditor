@@ -327,6 +327,21 @@ function openRecord(link){
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
   return openCatalog(link.table,link.id);
 }
+// The thing finder opens the same list the face opens: the target tab's
+// rows become hold-to-choose candidates (see the master list's
+// decorateRow), and the source tab, sub and selection are captured when
+// the finder opens so the way back survives browsing.
+const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table"};
+const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
+const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",EquipParamAccessory:"rings",Magic:"spells",EquipParamGoods:"consumables"};
+function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):LINK_NOUNS[link.kind]||"record";}
+async function finderTarget(link,value){
+  if(link.kind==="effect")return ["effects","effects-all"];
+  if(link.kind==="attack")return ["attacks","attacks"];
+  if(link.kind==="ai")return ["ai","ai"];
+  try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
+  catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
+}
 async function recordPreview(link){
   const row=await recordRow(link.table,link.id);
   const parts=[el("strong",{},row.name)];
@@ -561,16 +576,18 @@ function referenceFace(row,field){
   if(live!==undefined&&String(live)!==current)face.value=String(live);
   return face;
 }
-function referencePicker(row,field,face){
-  const choices=Object.entries(field.enum);
-  if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
-  const pick=el("button",{type:"button",class:"ds1-find-reference",title:`Change ${field.label}`,
-    "aria-label":`Change ${field.label}`,disabled:state.readOnly||field.disabled,
-    onclick:()=>{LexeditorUI.choicePopover({label:field.label,search:`Search ${field.label}`,
-      choices:choices.map(([value,label])=>({label,value})),
-      select:picked=>{commit(row,field,Number(picked),face);face.value=String(picked);}}).openFor(pick);}},
-    LexeditorUI.magnifyIcon());
-  return pick;
+function referencePicker(row,field,face,knownLink){
+  const link=knownLink||(row.recordLinks||[]).find(entry=>entry.field===field.key);
+  const source={};
+  const value=()=>{const live=state.row&&key(state.row)===key(row)?state.row:row;
+    return live.fields?.find(item=>item.key===field.key)?.value??field.value;};
+  return LexeditorUI.thingFinderButton({class:"ds1-find-reference",label:`Change ${field.label}`,
+    disabled:state.readOnly||field.disabled||!link,type:`ds1-${link?.table||"record"}`,
+    prompt:link?`Choose the ${linkNoun(link)} for ${row.name}.`:"Choose a record.",
+    target:async()=>{Object.assign(source,{tab:state.tab,sub:state.sub,selected:state.selected,selection:state.selection});
+      const [tab,sub]=await finderTarget(link,value());await navigate(tab,sub);},
+    origin:()=>navigate(source.tab,source.sub,source.selected),
+    accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),face);face.value=String(picked);}});
 }
 function plainControlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
@@ -755,7 +772,10 @@ function monsterThinkSection(){
     const frozen={...state.thinkRow,fields:state.thinkRow.fields.map(item=>({...item,editable:false}))};
     for(const [title,fields] of fieldSections(frozen))body.push(detailSection({title,body:fields}));
   }
-  return [detailPanel({label:"Think record",titleControl:face,actions:[referencePicker(state.row,aiField,face)],body})];
+  return [detailPanel({label:"Think record",titleControl:face,actions:[referencePicker(state.row,aiField,face,
+    // The panel always swaps the enemy's think record, even when none
+    // is assigned yet and the value has no link entry of its own.
+    {kind:"ai",table:"NpcThinkParam",field:aiField.key})],body})];
 }
 function behaviorVariationControl(variation){
   const input=el("input",{type:"number",value:String(variation),"aria-label":"Behaviors ID"});
@@ -1482,6 +1502,7 @@ function renderItems(){
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,rowClass:row=>row.modified?"lex-record-modified":"",
+      decorateRow:(node,row)=>LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name}),
       sortState:state.sort,
       sort:column=>{if(misc||(state.tab==="stats"&&state.sub==="levelup"))return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
       // The record is fetched first, then the shared list swaps in its detail

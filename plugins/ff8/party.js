@@ -187,27 +187,24 @@
     const link=found?hoverable({content:abilityLabel(found.row),targetType:found.view,targetId:found.row.id,targetLabel:found.row.name,
       activate:()=>{state.selected[found.view]=found.row.id;navigate(found.view)}}):el("span",{},name(field.value));
     const origin=()=>{state.selected.gfs=gf.id;navigate("gfs")};
-    const finder=el("button",{type:"button",title:"Choose an ability","aria-label":`Choose an ability for ${gf.name}`,onclick:event=>{event.preventDefault();event.stopPropagation();
-      beginSearcher({type:"ability",prompt:`Choose an ability for ${gf.name}.`,target:()=>navigate(found?.view||abilityCategories[0][0]),origin,
-        accept:value=>{field.value=Number(value);renderGFs();shell.refresh()}})}},LexeditorUI.selectionIcon());
-    return fieldSourceControl(field,"gfs",gf.id,{control:LexeditorUI.choiceField(link,finder),format:name});
+    return fieldSourceControl(field,"gfs",gf.id,{control:LexeditorUI.thingFinderField(link,
+      {type:"ability",prompt:`Choose an ability for ${gf.name}.`,target:()=>navigate(found?.view||abilityCategories[0][0]),origin,
+        accept:value=>{field.value=Number(value);renderGFs();shell.refresh()},
+        title:"Choose an ability",label:`Choose an ability for ${gf.name}`}),format:name});
   }
   function magicSearchControl(value,prompt,accept,origin){
     const magic=state.data.magic.rows.find(row=>Number(row.id)===Number(value))||{id:value,name:`Magic ${value}`};
     // The name is an ordinary hoverable and the magnifier is its own control,
     // so following the link and picking a different record stay separate.
     const link=hoverable({content:magicLabel(magic),targetType:"magic",targetId:magic.id,targetLabel:magic.name,activate:()=>{state.selected.magic=Number(magic.id);navigate("magic")}});
-    const finder=el("button",{type:"button",title:"Choose magic","aria-label":"Choose magic",onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"magic",prompt,target:()=>navigate("magic"),origin,accept})}},LexeditorUI.selectionIcon());
-    return LexeditorUI.choiceField(link,finder);
+    return LexeditorUI.thingFinderField(link,{type:"magic",prompt,target:()=>navigate("magic"),origin,accept,label:"Choose magic"});
   }
   function enemyTableRow(dataset,id){return rowOf(dataset,"enemyTables",id)}
   function enemyAttackSearchControl(value,prompt,accept,origin){
     const row=state.data.enemyAbilities.rows.find(row=>Number(row.id)===Number(value));
     const link=row?recordHoverLabel("enemyAbilities",row,row.name):el("span",{},`Enemy ability ${value}`);
-    const finder=el("button",{type:"button",title:"Choose enemy ability","aria-label":"Choose enemy ability",onclick:event=>{
-      event.preventDefault();event.stopPropagation();beginSearcher({type:"enemyAbilities",prompt,
-        target:()=>navigate("enemyAbilities"),origin,accept})}},LexeditorUI.selectionIcon());
-    return LexeditorUI.choiceField(link,finder);
+    return LexeditorUI.thingFinderField(link,{type:"enemyAbilities",prompt,
+      target:()=>navigate("enemyAbilities"),origin,accept,label:"Choose enemy ability"});
   }
   function enemyAiRow(dataset,id){return rowOf(dataset,"enemyAi",id)}
   function enemyBattleTextRow(dataset,id){return rowOf(dataset,"enemyBattleText",id)}
@@ -270,11 +267,10 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
           onload:()=>{placeholder.hidden=true},onerror:()=>{image.remove();placeholder.replaceWith(LexeditorUI.noImage('Art unavailable'))}});
         art.append(image);
       }
-      const choose=el('button',{type:'button',disabled:state.activeSource!=='mine',
-        'aria-label':`Choose card for slot ${entry.slot+1}: ${name}`,
-        title:`Choose card for slot ${entry.slot+1}: ${name}`,onclick:()=>beginSearcher({type:'cards',
-          prompt:`Select card ${entry.slot+1} for ${row.name}.`,target:()=>navigate('cards'),origin,accept:set})},
-        LexeditorUI.figureGrid([{media:art,caption:name}]));
+      const choose=LexeditorUI.thingFinderButton({type:'cards',prompt:`Select card ${entry.slot+1} for ${row.name}.`,
+        target:()=>navigate('cards'),origin,accept:set,disabled:state.activeSource!=='mine',
+        label:`Choose card for slot ${entry.slot+1}: ${name}`,title:`Choose card for slot ${entry.slot+1}: ${name}`,
+        content:LexeditorUI.figureGrid([{media:art,caption:name}])});
       // 255 is a real sentinel in the existing schema, not card zero. Keep it
       // selectable even though the Cards tab only contains the 110 real cards.
       const clear=el('button',{type:'button',disabled:state.activeSource!=='mine'||id===255,
