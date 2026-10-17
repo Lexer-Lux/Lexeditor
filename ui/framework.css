@@ -5749,6 +5749,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-model-preview-drawer > .lex-stack { flex:1 1 auto; min-width:0; }
 
 /* The thumbnail owns one magnifier for hover and the open viewer state. */
+/* One file tab's texture thumbnails, Models and Textures alike: small
+   capped squares in the detail panel; the magnifier shows them full-size. */
+.lex-asset-thumbnail { max-width:160px; max-height:160px; width:auto; height:auto; }
 .lex-model-preview-trigger {
    cursor:pointer;
  position:relative;

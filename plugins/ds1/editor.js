@@ -1031,10 +1031,13 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
     body.push(detailSection({title:"GEOMETRY",body:[
       detailField({label:"INFO",control:readonlyField(value),help:infoHelp(tip)})]}));
   }
-  const textures=(info.textures||[]).map(texture=>detailField({label:texture.name,
-    control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto",loading:"lazy"}),
-    help:textureHelp(texture)}));
-  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures}));
+  const textures=info.textures||[];
+  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
+    control:el("img",{src:previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
+    help:textureHelp(texture)}))}));
+  else body.push(detailSection({title:"PREVIEW",body:[
+    detailField({label:"TEXTURES",control:readonlyField("None in this file"),
+      help:infoHelp("Only files with their own textures preview here. Character and map textures live in companion archives.")})]}));
   const previewable=!!(model&&model.previewable);
   const icon=LexeditorUI.iconSlot({content:previewable
     ?window.Ds1Preview.thumbnail({url:assetGeometryUrl(row.id,info.source,model.member),label:row.name})
@@ -1050,8 +1053,7 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
   if(textures.length){
     body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
-      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",
-        style:"max-width:160px;max-height:160px;width:auto;height:auto"}),
+      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",class:"lex-asset-thumbnail"}),
       help:textureHelp(texture)}))}));
     const first=textures[0];
     return {icon:LexeditorUI.iconSlot({content:el("img",{src:previewUrl(first),alt:row.name,loading:"lazy"})}),
