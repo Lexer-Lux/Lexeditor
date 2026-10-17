@@ -17,7 +17,8 @@ A tweak mod asks for a node as `look like` one text node (its rectangle,
 moved by `dy` and `dx`, its font, colour and alignment) and `hold` dynamic
 text of a
 given length, empty until the game or a hook sets it; `left` widens the
-rectangle leftwards. It can also copy an existing sprite (an icon) from any
+rectangle leftwards, and `from` borrows the text node from another dialog
+when the target has none to look like. It can also copy an existing sprite (an icon) from any
 dialog, placed like a node moved by `dy` and `dx`, tinted, and optionally
 resized with `size` [width, height]: a sprite's last four
 bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
@@ -275,15 +276,21 @@ class Drb:
         self._insert(dialog, name, sprite_type, bytes(shape), *self._static_control(dialog, place))
 
     def add_text(self, dialog: str, name: str, look_like: str, dy: int, length: int,
-                 left: int | None = None, dx: int = 0) -> None:
+                 left: int | None = None, dx: int = 0, source_dialog: str | None = None) -> None:
+        """Dynamic text styled and placed like `look_like`, moved by (dx, dy).
+
+        `source_dialog` names another dialog holding `look_like`, for a
+        dialog with no text node of its own (the start menu's R00-00); the
+        offsets then move the source's rectangle into this dialog's space."""
         self._check_new(dialog, name, dy, dx)
         if type(length) is not int or not 1 <= length <= MAX_TEXT:
             raise LayoutError(f"Text length must be between 1 and {MAX_TEXT}")
-        source = self.node(dialog, look_like)
+        source_dialog = dialog if source_dialog is None else source_dialog
+        source = self.node(source_dialog, look_like)
         kind, blob = self._blob("SHAP", "SHPR", source.shape)
         if kind != "Text" or len(blob) <= TEXT_PREFIX:
-            raise LayoutError(f"{dialog}/{look_like} is a {kind}, not text")
-        static_type, control = self._static_control(dialog, source)
+            raise LayoutError(f"{source_dialog}/{look_like} is a {kind}, not text")
+        static_type, control = self._static_control(source_dialog, source)
         shape = self._moved(blob[:TEXT_PREFIX], dy, dx, left)
         shape += bytes([DYNAMIC]) + struct.pack("<ii", TEXT_TAIL, length) + b"\0" * 6
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
@@ -431,7 +438,9 @@ def validate(spec: object, owner: str) -> dict:
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
     clone = {"dialog", "name", "clone", "rect"}
     clone_keys = (clone, clone | {"textId"})
-    text_keys = (text, text | {"left"}, text | {"dx"}, text | {"left", "dx"})
+    text_keys = tuple(text | set(extra) for extra in
+                      ((), ("left",), ("dx",), ("left", "dx"), ("from",), ("left", "from"),
+                       ("dx", "from"), ("left", "dx", "from")))
     sprite_keys = tuple(sprite | set(extra) for extra in
                         ((), ("dx",), ("size",), ("uv",), ("dx", "size"), ("dx", "uv"),
                          ("size", "uv"), ("dx", "size", "uv")))
@@ -440,12 +449,12 @@ def validate(spec: object, owner: str) -> dict:
         keys = set(node) if isinstance(node, dict) else set()
         if keys not in text_keys + sprite_keys + clone_keys:
             raise LayoutError(f"{owner}: a layout node is text "
-                              f"({', '.join(sorted(text))}, optional left and dx), "
+                              f"({', '.join(sorted(text))}, optional left, dx and from), "
                               f"a sprite ({', '.join(sorted(sprite))}, optional dx, size and uv) "
                               f"or a clone ({', '.join(sorted(clone))}, optional textId)")
         if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout node names must be text")
-        for key in ("lookLike", "clone"):
+        for key in ("lookLike", "clone", "from"):
             if key in node and not (isinstance(node[key], str) and node[key]):
                 raise LayoutError(f"{owner}: layout node names must be text")
         if "rect" in node:
@@ -511,7 +520,7 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
                                   node.get("uv"))
             else:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
-                                node.get("left"), node.get("dx", 0))
+                                node.get("left"), node.get("dx", 0), node.get("from"))
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     moved = {}
