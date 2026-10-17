@@ -71,6 +71,23 @@ def loaded_images(page, selector):
     return shots.count()
 
 
+def trigger_open(page):
+    """The header thumbnail that opened the viewer stays visible and
+    clickable while viewing, so clicking it again exits."""
+    state = page.evaluate("""() => {
+        const trigger = document.querySelector(
+            '.lex-detail-panel-heading .lex-model-preview-trigger');
+        const box = trigger.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+            box.left + box.width / 2, box.top + box.height / 2);
+        const style = getComputedStyle(trigger);
+        return {shown: style.visibility === 'visible' && style.display !== 'none'
+                && box.width > 0 && box.height > 0,
+                clickable: !!(hit && (hit === trigger || trigger.contains(hit)))};
+    }""")
+    assert state == {'shown': True, 'clickable': True}, state
+
+
 def attached_thumb(page):
     icon = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
     img = icon.locator('img.ds1-model-thumbnail')
@@ -113,7 +130,7 @@ def main():
         (game / 'parts' / 'BD_M_0200.partsbnd.dcx').write_bytes(
             make_chrbnd(build_flver(), stem='BD_M_0200'))
         (game / 'parts' / 'BD_F_0200.partsbnd.dcx').write_bytes(
-            make_chrbnd(build_flver(), stem='BD_F_0200'))
+            make_chrbnd(build_flver(pos_offset=(5.0, 0.0, 0.0)), stem='BD_F_0200'))
         (game / 'menu').mkdir(parents=True)
         quadrants = []
         for y in range(360):
@@ -149,6 +166,7 @@ def main():
                     attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
+                    trigger_open(page)
                     assert page.locator('canvas[data-preview]').count() == 1
                     assert page.evaluate('!!window.__lexPreview'), 'preview hook missing'
                     modes = page.locator('.lex-model-stage .lex-model-view-modes button')
@@ -186,17 +204,40 @@ def main():
                     attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
-                    picker = page.locator('button[aria-label="Model variant"]')
-                    assert picker.inner_text() == 'Model: Male'
-                    picker.click()
-                    page.locator('.lex-choice-popover button', has_text='Female').click()
+                    trigger_open(page)
+                    toggle = page.locator('.lex-preview-gender-toggle')
+                    assert toggle.inner_text() == '\u2642', toggle.inner_text()
+                    assert toggle.get_attribute('aria-label') == 'Show female model'
                     page.wait_for_function(
-                        'document.querySelector(\'button[aria-label="Model variant"]\')'
-                        '.textContent === "Model: Female"')
+                        'document.querySelector(".lex-preview-gender-toggle")'
+                        '.dataset.lexTitle === "Show female model"')
+                    asked = []
+                    page.on('request', lambda request: asked.append(request.url)
+                            if 'parts/geometry' in request.url else None)
+                    toggle.click()
+                    page.wait_for_function(
+                        'document.querySelector(".lex-preview-gender-toggle")'
+                        '.textContent === "\u2640"')
+                    assert toggle.get_attribute('aria-label') == 'Show male model'
+                    page.wait_for_function(
+                        'document.querySelector(".lex-preview-gender-toggle")'
+                        '.dataset.lexTitle === "Show male model"')
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
+                    assert any('variant=F' in url for url in asked), asked
+                    male = page.evaluate(
+                        "fetch('/api/parts/geometry?table=EquipParamProtector&id=100&variant=M')"
+                        '.then(r => r.json())')
+                    female = page.evaluate(
+                        "fetch('/api/parts/geometry?table=EquipParamProtector&id=100&variant=F')"
+                        '.then(r => r.json())')
+                    assert (male['meshes'][0]['positions']
+                            != female['meshes'][0]['positions'])
                     painted(page, 'canvas[data-preview]')
                     if output:
                         page.screenshot(path=str(output / 'parts-armor.png'))
+                    trigger.click()
+                    page.wait_for_function('window.__lexPreview === undefined')
+                    assert page.locator('canvas[data-preview]').count() == 0
                     # Consumables have no model: the heading shows the item's
                     # inventory picture with no magnifier and no drawer.
                     navigate(page, '[data-subtab="consumables"]', "EquipParamGoods", 100)
@@ -261,6 +302,7 @@ def main():
                     attached_thumb(page)
                     trigger.click()
                     page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
+                    trigger_open(page)
                     assert page.locator('canvas[data-preview]').count() == 1
                     painted(page, 'canvas[data-preview]')
                     if output:

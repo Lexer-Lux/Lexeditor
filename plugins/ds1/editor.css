@@ -60,6 +60,10 @@
    at its minimum height in a tall empty drawer. */
 .lex-preview-variant-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
 .lex-preview-variant-wrap>button{align-self:flex-start;}
+/* The gender toggle is one sign, not a word: a square button with a
+   readable glyph in the symbol face, like the drawer's close mark. */
+.lex-preview-gender-toggle{font:400 1.3em/1 var(--lex-symbol-font);
+  min-width:2em;text-align:center;}
 .ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
 .lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
 /* A record link is a hoverable face (the linked record's name) plus a
