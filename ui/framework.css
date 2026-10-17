@@ -5727,6 +5727,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   visibility:visible;
   pointer-events:auto;
 }
+/* The drawer must never cover the heading that closes it. On a grid
+   panel it sits in the body's row, but a tabbed panel is flex, where
+   its grid row means nothing and inset:0 covers the whole panel. The
+   heading floats above it either way; the tab strip stays covered
+   until the drawer closes. */
+.lex-model-preview-open > .lex-detail-panel-heading { position:relative; z-index:7; }
 .lex-model-preview-open > .lex-model-preview-drawer { opacity:1; }
 .lex-model-preview-trigger:is(:hover,:focus-visible) > .lex-model-preview-close,
 .lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-close { opacity:1; background:color-mix(in srgb,var(--lex-panel) 45%,transparent); }
