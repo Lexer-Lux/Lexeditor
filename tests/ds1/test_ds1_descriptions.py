@@ -134,7 +134,7 @@ def test_data_map_points_descriptions_at_items(tmp_path):
     descs = [row for row in rows if row['id'].startswith('desc:')]
     assert len(descs) == 10
     for row in descs:
-        assert row['coverage'] == 'structured' and row['status'] == 'partial'
+        assert row['coverage'] == 'structured' and row['status'] == 'integrated'
         assert row['openable'] and row['target'] == 'items'
     goods = next(row for row in rows if row['id'] == 'name:EquipParamGoods')
     assert {row['sub'] for row in descs if 'EquipParamGoods' in row['id']} == {goods['sub']}

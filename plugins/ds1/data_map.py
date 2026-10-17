@@ -78,15 +78,15 @@ def payload(store, native_rules=None, theme=None):
                 target='attacks',sub='player-attacks',controls='Attacks: player attack damage and hitboxes',
                 notes='Edit reviewed damage and hitbox properties. An attack may be shared by several player moves.')
         elif table == 'ReinforceParamWeapon':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='stats',sub='weapon-upgrades',controls='Stats: weapon upgrade multipliers',
                 notes='Edit every weapon upgrade level, from Normal +0 to the special paths.')
         elif table == 'ReinforceParamProtector':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='stats',sub='armor-upgrades',controls='Stats: armor upgrade multipliers',
                 notes='Edit every armor upgrade level.')
         elif table == 'EquipMtrlSetParam':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='stats',sub='upgrade-materials',controls='Stats: upgrade material sets',
                 notes='Edit the items each upgrade level spends, and how many of each.')
         elif table == 'CharaInitParam':
@@ -94,15 +94,15 @@ def payload(store, native_rules=None, theme=None):
                 target='stats',sub='starting-classes',controls='Stats: starting classes and gifts',
                 notes='Edit starting classes and what each starting gift grants. Other rows in this table stay read-only.')
         elif table == 'ItemLotParam':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='maps',sub='drops',controls='Maps: enemy and corpse drops',
                 notes='Edit dropped items and their rates in the directory. One lot may be shared by several enemies.')
         elif table == 'ShopLineupParam':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='npcs',sub='npcs',controls='NPCs: merchant stock and prices',
                 notes="Edit what each merchant sells, and at what price, on their NPC page under the Shop tab. Lines no merchant serves list under the Unowned shops subtab.")
         elif table == 'ObjActParam':
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',
                 notes='Edit how treasure chests and pickups behave in the directory.')
         elif table == EFFECT_TABLE:
@@ -112,7 +112,7 @@ def payload(store, native_rules=None, theme=None):
                 notes=f'{len(editable)} documented properties are editable. Other properties and unknown bytes are preserved.')
         elif table == GRAPH_TABLE:
             editable = [f for f in document.schemas[table]['fields'] if f['editable']]
-            row.update(coverage='structured',status='partial',openable=True,
+            row.update(coverage='structured',status='integrated',openable=True,
                 target='stats',sub='curves',controls='Stats: weapon, level-up and resistance scaling curves',
                 notes=f'{len(editable)} curve properties are editable. The multiplayer level-sync rows keep the game\'s own reference names.')
         rows.append(row)
@@ -144,7 +144,7 @@ def payload(store, native_rules=None, theme=None):
             rows.append({'id':f'desc:{table}:{role}', 'filename':filename,
                 'path':str(store.text_source or store.game_root/texts.RELATIVE),
                 'coverage':'structured' if available else 'unavailable',
-                'status':'partial' if available else 'not-integrated', 'openable':available,
+                'status':'integrated' if available else 'not-integrated', 'openable':available,
                 'target':'items' if available else '', 'sub':tabs[0][0],
                 'controls':'Items: '+', '.join(label for _,label in tabs),
                 'notes':f'Edit the {role} in the Description section of each item.' if available
@@ -153,7 +153,7 @@ def payload(store, native_rules=None, theme=None):
     rows.append({'id': 'menu:labels', 'filename': texts.MENU_LABEL_FILE,
         'path': str(store.menu_source or store.game_root/texts.MENU_RELATIVE),
         'coverage': 'structured' if menu_available else 'unavailable',
-        'status': 'partial' if menu_available else 'not-integrated', 'openable': menu_available,
+        'status': 'integrated' if menu_available else 'not-integrated', 'openable': menu_available,
         'target': 'text' if menu_available else '', 'sub': 'menu-labels',
         'controls': 'Text: Menu labels',
         'notes': 'Edit the equipment defense labels.' if menu_available
@@ -166,7 +166,7 @@ def payload(store, native_rules=None, theme=None):
             rows.append({'id': f'menu:{tab_id}', 'filename': filename,
                 'path': str(store.menu_source or store.game_root/texts.MENU_RELATIVE),
                 'coverage': 'structured' if have else 'unavailable',
-                'status': 'partial' if have else 'not-integrated', 'openable': have,
+                'status': 'integrated' if have else 'not-integrated', 'openable': have,
                 'target': 'text' if have else '', 'sub': tab_id,
                 'controls': f'Text: {label}',
                 'notes': f'Edit every {label.lower()} line.' if have

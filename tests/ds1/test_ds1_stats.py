@@ -199,7 +199,7 @@ def test_data_map_points_curves_at_stats(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
     curves = next(row for row in rows if row['filename'] == 'CalcCorrectGraph.param')
-    assert curves['coverage'] == 'structured' and curves['status'] == 'partial'
+    assert curves['coverage'] == 'structured' and curves['status'] == 'integrated'
     assert curves['openable'] and curves['target'] == 'stats' and curves['sub'] == 'curves'
     assert curves['targets'] == [{'id': 'stats', 'label': 'Stats'}]
     game, mod = project(tmp_path / 'plain', make_archive())
@@ -294,7 +294,7 @@ def test_data_map_points_upgrades_at_stats(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
     weapon = next(row for row in rows if row['filename'] == 'ReinforceParamWeapon.param')
-    assert weapon['coverage'] == 'structured' and weapon['status'] == 'partial'
+    assert weapon['coverage'] == 'structured' and weapon['status'] == 'integrated'
     assert weapon['openable'] and weapon['target'] == 'stats' and weapon['sub'] == 'weapon-upgrades'
     armor = next(row for row in rows if row['filename'] == 'ReinforceParamProtector.param')
     assert armor['openable'] and armor['target'] == 'stats' and armor['sub'] == 'armor-upgrades'
