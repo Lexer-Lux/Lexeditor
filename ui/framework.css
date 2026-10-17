@@ -1073,10 +1073,13 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   margin:5px;
   container-type:size;
 }
+/* A fractional cqw border truncates instead of rounding, so a switch
+   whose tick lands just under a pixel boundary (a 29px switch wants
+   2.97px) would draw one pixel thin. round() keeps the proportions. */
 .lex-detail-panel-actions > input[type="checkbox"]::before {
   width:55%;
   height:33%;
-  border-width:0 0 11cqw 11cqw;
+  border-width:0 0 round(11cqw, 1px) round(11cqw, 1px);
 }
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */
@@ -1124,8 +1127,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-mod-file-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .lex-mod-file-size{flex:0 0 auto;opacity:.75;}
 .lex-mod-file-loaded>.lex-mod-file-name{color:var(--lex-accent);font-weight:600;}
-.lex-mod-contents-tabs .lex-column-list-row.lex-mod-file-loaded .lex-column-cell-content{color:var(--lex-accent);font-weight:600;}
-.lex-mod-contents-tabs{display:flex;flex-direction:column;}
+.lex-mod-contents .lex-column-list-row.lex-mod-file-loaded .lex-column-cell-content{color:var(--lex-accent);font-weight:600;}
 
 /* Multi-select prepends a banner beside the tabbed panel, so the pair below
    gets the same fill treatment an only-child tabbed panel gets. The tabs

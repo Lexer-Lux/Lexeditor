@@ -13440,7 +13440,8 @@ ${contents.path}`});
 
   const modsPage = (pluginId, pluginName) => {
     let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
-    let contentsTab = "records", contentsMod = null;
+    let modDetailTab = "details", contentsMod = null, contentsResult = null, contentsFailed = false;
+    const contentsWraps = {files: null, records: null};
     const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
@@ -13603,7 +13604,6 @@ ${contents.path}`});
         detailSection({title: "SOURCE", body: [
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
           ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
-          detailField({label: "FOLDER", control: readonlyField(row.path)}),
         ]}));
       if (selected !== contentsMod) {
         contentsMod = selected;
@@ -13611,9 +13611,21 @@ ${contents.path}`});
         contentsQuery.files = "";
         contentsPage.records = 0;
         contentsPage.files = 0;
+        contentsResult = null;
+        contentsFailed = false;
+        // One fetch per selected mod: tab switches redraw from the cache,
+        // so they never flash the loading line or refetch.
+        const fetched = selected;
+        callWindow("mod_contents", pluginId, row.path).then(result => {
+          if (selected !== fetched) return;
+          contentsResult = result || {};
+          paintWraps();
+        }).catch(() => {
+          if (selected !== fetched) return;
+          contentsFailed = true;
+          paintWraps();
+        });
       }
-      let contentsResult = null, contentsFailed = false;
-      const contentsWrap = element("div", {class: "lex-mod-contents-tabs"}, loadingStatus("Reading mod contents"));
       const modChangeText = entry => (entry.fields || []).length ? entry.fields.join(", ")
         : entry.before != null || entry.after != null
           ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
@@ -13625,9 +13637,9 @@ ${contents.path}`});
         contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab] || 0, pages - 1));
         const slice = filtered.slice(contentsPage[tab] * size, (contentsPage[tab] + 1) * size);
         const pagerNode = pager({inline: true, page: contentsPage[tab], pages, total: filtered.length, pageSize: size,
-          change: next => { contentsPage[tab] = next; paintContents(); },
+          change: next => { contentsPage[tab] = next; draw(); },
           search: {key: `${pluginId}-mod-${tab}`, value: contentsQuery[tab] || "", label: searchLabel,
-            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; paintContents(); }}});
+            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; draw(); }}});
         const foot = notes.map(line => detailNote(line));
         if (!rows.length) return element("div", {class: "lex-mod-contents"}, detailNote(emptyNote), ...foot);
         if (!filtered.length) return element("div", {class: "lex-mod-contents"},
@@ -13666,44 +13678,41 @@ ${contents.path}`});
           row => row.loaded ? "lex-mod-file-loaded" : "",
           row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
       };
-      const paintContents = () => {
-        if (contentsFailed) { contentsWrap.replaceChildren(detailNote("Could not read the mod's contents.")); return; }
-        if (!contentsResult) { contentsWrap.replaceChildren(loadingStatus("Reading mod contents")); return; }
-        // Panel tabs, not a bare strip: the same component every detail
-        // panel uses, so Records and Files look and behave like the rest.
-        // Each table carries its own inline pager, so no panel paging.
-        contentsWrap.replaceChildren(tabbedPanel({
-          tabs: [
-            {id: "records", label: "Records",
-              help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
-            {id: "files", label: "Files",
-              help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
-          ],
-          active: contentsTab,
-          label: "Mod contents",
-          paginate: false,
-          change: id => { contentsTab = id; paintContents(); },
-          content: contentsTab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult),
-        }));
+      const contentsNode = tab => {
+        if (contentsFailed) return detailNote("Could not read the mod's contents.");
+        if (!contentsResult) return loadingStatus("Reading mod contents");
+        return tab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
       };
-      sections.push(contentsWrap);
-      callWindow("mod_contents", pluginId, row.path).then(result => {
-        if (keyOf(row) !== selected) return;
-        contentsResult = result || {};
-        paintContents();
-      }).catch(() => {
-        if (keyOf(row) !== selected) return;
-        contentsFailed = true;
-        paintContents();
-      });
+      const paintWraps = () => {
+        if (contentsWraps.files) contentsWraps.files.replaceChildren(contentsNode("files"));
+        if (contentsWraps.records) contentsWraps.records.replaceChildren(contentsNode("records"));
+      };
+      const filesWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("files"));
+      const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
+      contentsWraps.files = filesWrap;
+      contentsWraps.records = recordsWrap;
       const notes = [row.error ? detailNote(row.error) : null,
         row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
           conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
         ...(row.alerts || []).map(line => detailNote(line)),
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
-      // The contents tabbed panel pages its own tables; a pager around the whole
-      // detail would strand it on a later page, hiding the mod's own content.
-      return detailPanel({title: row.name, actions, body: [...notes, ...sections], paginate: false});
+      // Panel tabs, not sections with a tab strip inside: Details, Files and
+      // Records work the way every other detail panel's tabs do. Each table
+      // carries its own inline pager, so no panel paging.
+      return detailPanel({title: row.name, actions, body: [...notes, tabbedPanel({
+        label: "Mod details",
+        active: modDetailTab,
+        paginate: false,
+        tabs: [
+          {id: "details", label: "Details"},
+          {id: "files", label: "Files",
+            help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
+          {id: "records", label: "Records",
+            help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
+        ],
+        change: id => { modDetailTab = id; draw(); },
+        content: modDetailTab === "details" ? sections : modDetailTab === "files" ? filesWrap : recordsWrap,
+      })], paginate: false});
     };
     const draw = () => {
       if (!main) return;
