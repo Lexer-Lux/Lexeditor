@@ -51,7 +51,7 @@
    icon slot keeps its placeholder, so the heading never jumps or flashes. */
 .ds1-model-thumbnail{max-width:100%;max-height:100%;object-fit:contain;}
 .ds1-item-icon{max-width:100%;max-height:100%;object-fit:contain;}
-.lex-ds1-label-art{flex:0 0 auto;width:14px;height:14px;display:block;}
+.lex-ds1-label-art{flex:0 0 auto;width:22px;height:22px;display:block;}
 /* Detail lanes fit three across a 950px panel: measured spill-free
    with zero new clips against the 400px default. Tweaks and settings
    keep the shared width. */
