@@ -16,7 +16,13 @@ from plugins.ds1.formats import TABLES, schema  # noqa: E402
 def sentences(text):
     shielded = re.sub(r"(\d)\.(\d)", r"\1<DOT>\2", text)
     shielded = shielded.replace("e.g.", "e<DOT>g<DOT>")
-    return [part for part in re.split(r"[.!?]+", shielded) if part.strip()]
+    parts = [part for part in re.split(r"[.!?]+", shielded) if part.strip()]
+    # The shared presentation appends one neutral-value note ("1 is
+    # unchanged") after the authored bubble; the audit counts what the
+    # author wrote, not the uniform suffix.
+    if parts and re.fullmatch(r"\s*\d+(\.\d+)? is unchanged\s*", parts[-1].replace("<DOT>", ".")):
+        parts.pop()
+    return parts
 
 
 def norm(text):
@@ -85,6 +91,7 @@ def test_guard_stability_keeps_its_facts_short():
               for entry in schema("SpEffectParam")["fields"]}
     description = fields["guardStaminaCutRate"].description
     assert "magic shield" in description
+    assert "stateInfo" in description
     assert "100" in description
     assert len(sentences(description)) <= 3
 
