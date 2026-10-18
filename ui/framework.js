@@ -207,11 +207,14 @@
 
   const uiScaleControl = () => {
     const value = element("output", {}, "100%");
-    const slider = element("input", {type:"range", min:50, max:150, step:1, value:100,
+    const slider = element("input", {type:"range", min:50, max:150, step:5, value:100,
       "aria-label":"UI scale", "aria-valuetext":"100%"});
     let pending = null, running = false;
+    // Five-percent increments only: the slider quantizes drags and keys,
+    // and stored or scripted values snap on the way in.
+    const snap = raw => Math.min(150, Math.max(50, Math.round(Number(raw) / 5) * 5));
     const applyBarScale = percent => document.documentElement.style.setProperty("--lex-ui-scale", String(percent / 100));
-    const show = percent => { slider.value=percent; value.textContent=`${percent}%`; slider.setAttribute("aria-valuetext",`${percent}%`); };
+    const show = raw => { const percent=snap(raw); slider.value=percent; value.textContent=`${percent}%`; slider.setAttribute("aria-valuetext",`${percent}%`); };
     const apply = async () => {
       if(running)return;
       running=true;
@@ -221,7 +224,7 @@
       finally{running=false;}
     };
     slider.addEventListener("input",()=>show(Number(slider.value)));
-    slider.addEventListener("change",()=>{pending=Number(slider.value);apply();});
+    slider.addEventListener("change",()=>{pending=snap(slider.value);apply();});
     const initialize=async()=>{try{const result=await callWindow("ui_scale");if(result?.percent&&!running){show(result.percent);applyBarScale(result.percent);}}catch(_error){}};
     if(window.pywebview?.api)initialize();else window.addEventListener("pywebviewready",initialize,{once:true});
     return element("label",{class:"lex-ui-scale",title:"UI scale. Right-click to reset to 100%.",
