@@ -4451,8 +4451,9 @@ body:has(.lex-data-map-table) #main {
     transform:rotate(90deg);
   }
 }
+/* A finder inside a quantity keeps its standard size: the choice text
+   truncates instead of the button squeezing to a sliver. */
 .lex-quantity-choice .lex-choice-field { gap:2px; }
-.lex-quantity-choice .lex-choice-field > button:last-child { width:1.2em; min-width:1.2em; }
 .lex-quantity-choice > .lex-source-control:last-child input { text-align:left; padding-inline:3px; }
 .lex-quantity-mark { font-family:var(--lex-symbol-font); line-height:1; }
 .lex-source-control.lex-source-control-stacked { grid-template-columns:minmax(0,1fr); gap:2px; }
