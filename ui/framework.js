@@ -12474,6 +12474,14 @@ ${contents.path}`});
         return tight ? `${number}${unit}` : `${number} ${unit}`;
       }};
     }
+    // A checkbox paints its references as ticks, whatever type the game
+    // stores: "V 0" on a boolean reads as a value, not as off.
+    const checkHost = options.control instanceof Element
+      ? (options.control.matches("input[type=checkbox]") ? options.control : options.control.querySelector("input[type=checkbox]")) : null;
+    if (checkHost && !options.format) {
+      options = {...options, format: value => booleanMark(
+        !(value === false || value === 0 || value === "0" || value === "" || value === null || value === undefined))};
+    }
     const sources = [
       {name: options.vanillaName || "Vanilla", shortName: options.vanillaShortName || "V", value: options.vanilla},
       ...(options.references || []),

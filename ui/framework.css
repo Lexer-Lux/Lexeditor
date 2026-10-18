@@ -7395,6 +7395,13 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    values show. Reserving it for the placeholder too made every boolean
    row taller than its siblings for nothing on screen. */
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) { padding-bottom:12px; }
+/* In wide-box mode the rail rides ON the box, centered at its right end,
+   and the field keeps its height: no padding below, no shift above. */
+html[data-lex-boolean-style="box"] .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) { padding-bottom:0; }
+html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  top:50%;
+  translate:0 -50%;
+}
 .lex-boolean-field > .lex-detail-field-label {
   min-width:0;
   overflow:visible;
@@ -7452,6 +7459,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-field-boolean-arrow,
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-detail-field-control {
   top:6px;
+}
+/* ...but in wide-box mode nothing grew, so nothing needs the nudge. */
+html[data-lex-boolean-style="box"] .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-detail-field-label,
+html[data-lex-boolean-style="box"] .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-field-boolean-arrow,
+html[data-lex-boolean-style="box"] .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-detail-field-control {
+  top:0;
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { grid-area:1/1; }
 .lex-boolean-field .lex-source-control > input[type="checkbox"] {
