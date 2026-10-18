@@ -83,7 +83,8 @@ def test_label_cells_cover_the_equipment_screen():
                                  'physicalDef', 'magicDef', 'fireDef', 'lightningDef',
                                  'str', 'dex', 'int', 'faith', 'weight', 'durability',
                                  'poison', 'toxic', 'bleed', 'curse', 'poise',
-                                 'vit', 'att', 'end', 'res', 'souls', 'slot'}
+                                 'vit', 'att', 'end', 'res', 'souls', 'slot',
+                                 'hp', 'stamina', 'divine', 'occult'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
@@ -99,7 +100,10 @@ def test_label_cells_cover_the_equipment_screen():
     assert icons.LABELS['end'] == (83, 301, 125, 343)
     assert icons.LABELS['res'] == (82, 344, 124, 386)
     assert icons.LABELS['slot'] == (125, 215, 167, 257)
-
+    assert icons.LABELS['hp'] == (126, 172, 168, 214)
+    assert icons.LABELS['stamina'] == (126, 258, 168, 300)
+    assert icons.LABELS['divine'] == (126, 473, 168, 512)
+    assert icons.LABELS['occult'] == (83, 473, 125, 512)
 
 def test_item_art_labels_name_catalog_icons():
     assert icons.ICON_LABELS == {'humanity': 2066}
@@ -147,7 +151,10 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('NpcParam', 'resist_desease')] == 'toxic'
     assert found[('NpcParam', 'resist_blood')] == 'bleed'
     assert found[('NpcParam', 'resist_curse')] == 'curse'
-    assert ('NpcParam', 'isWeakSaint') not in found
+    assert found[('NpcParam', 'isWeakSaint')] == 'divine'
+    assert found[('NpcParam', 'isWeakA')] == 'occult'
+    assert found[('EquipParamWeapon', 'antSaintDamageRate')] == 'divine'
+    assert found[('EquipParamWeapon', 'antWeakA_DamageRate')] == 'occult'
     assert ('NpcParam', 'staminaGuardDef') not in found
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
     assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
@@ -178,3 +185,14 @@ def test_sheet_bytes_finds_texture_across_archives(tmp_path):
     assert icons.sheet_bytes(tmp_path, 'Icon00') == dds
     with pytest.raises(icons.IconError):
         icons.sheet_bytes(tmp_path, 'Missing')
+
+
+def test_label_png_serves_divine_and_occult(tmp_path):
+    menu = tmp_path / 'menu'
+    menu.mkdir()
+    dds = make_dds_rgba(512, 1024, [(10, 20, 30, 255)] * (512 * 1024))
+    (menu / 'menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([('Menu04_2', dds)])))
+    for kind in ('divine', 'occult'):
+        with Image.open(io.BytesIO(icons.label_png(str(tmp_path), kind))) as image:
+            image.load()
+            assert image.size == (84, 78)

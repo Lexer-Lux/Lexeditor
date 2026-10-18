@@ -13,8 +13,9 @@ tolerance icons (poison, toxic, bleed, curse, poise), the level-up
 screen's stat and souls icons, and the attune screen's slot icon. Every
 rectangle is the layout's own sprite rect, read from menu.drb.
 Humanity rides the item-icon catalog (the Humanity goods picture).
-Kinds the game shows no icon for (divine, occult, luck, HP and stamina
-bars) get none here either: no invented glyphs.
+The sheet's bottom row holds white, black and gold rings: divine takes
+the white ring and occult the black one. Luck stays unmapped: no
+invented glyphs, and no cure-item icons that would read as the item.
 """
 from __future__ import annotations
 
@@ -66,6 +67,7 @@ LABELS = {
     'end': (83, 301, 125, 343), 'res': (82, 344, 124, 386),
     'hp': (126, 172, 168, 214), 'stamina': (126, 258, 168, 300),
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
+    'divine': (126, 473, 168, 512), 'occult': (83, 473, 125, 512),
 }
 # Label kinds served from the item-icon catalog instead of the label
 # sheet: the Humanity goods picture (EquipParamGoods row 350).

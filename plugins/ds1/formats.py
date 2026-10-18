@@ -107,10 +107,11 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
 # strike and thrust have no glyph of their own anywhere in the menu, HUD,
 # font or icon sheets (they are text wherever the game shows them), so
 # they reuse the physical shield: every one of these fields scales
-# physical defense, which is what the shield means. Divine, occult, luck
-# stay unmapped: no invented glyphs, and no cure-item
-# icons that would read as the item instead of the status. HP and
-# stamina take their bar frames (red and green boxes, gold outline).
+# physical defense, which is what the shield means. Divine takes the
+# white ring and occult the black one (the sheet's bottom row); luck
+# stays unmapped, with no cure-item icon that would read as the item
+# instead of the status. HP and stamina take their bar frames (red and
+# green boxes, gold outline).
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
@@ -181,7 +182,9 @@ for _table, _keys, _kinds in (
          ('souls', 'souls', 'souls', 'souls', 'souls')),
         ('SpEffectParam', ('changeSuperArmorPoint',), ('poise',)),
         ('Magic', ('slotLength',), ('slot',)),
-        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
+        ('EquipParamWeapon', ('antSaintDamageRate', 'antWeakA_DamageRate'),
+         ('divine', 'occult')),
+        ('NpcParam', ('isWeakSaint', 'isWeakA'), ('divine', 'occult')),        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
          'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul'),
          ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'att', 'stamina', 'souls')),
 ):

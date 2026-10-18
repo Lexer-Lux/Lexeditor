@@ -1507,8 +1507,8 @@ const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
   "physicalDef","magicDef","fireDef","lightningDef",
   "str","dex","int","faith","weight","durability",
   "poison","toxic","bleed","curse","poise",
-  "vit","att","end","res","souls","slot","humanity","hp","stamina"]);
-const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
+  "vit","att","end","res","souls","slot","humanity","hp","stamina",
+  "divine","occult"]);const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
   "EquipParamGoods","Magic","SpEffectParam"]);
 function ds1LabelArt(panel){
   if(!(panel instanceof Element))return;

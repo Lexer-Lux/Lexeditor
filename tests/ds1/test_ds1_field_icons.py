@@ -61,9 +61,9 @@ def test_starting_class_stats_have_icons():
     assert found['baseMag'] == 'int'
     assert found['baseFai'] == 'faith'
     assert found['baseLuc'] == 'luc'
-    assert found['baseHp'] == 'vit'
+    assert found['baseHp'] == 'hp'
     assert found['baseMp'] == 'att'
-    assert found['baseSp'] == 'end'
+    assert found['baseSp'] == 'stamina'
     assert found['soulLv'] is None
     assert found['soul'] == 'souls'
 
@@ -99,10 +99,10 @@ def test_enemy_vitals_have_stat_icons():
     npc = ItemDocument(make_archive())
     rows = npc._rows_by_id['NpcParam']
     found = icons(npc, 'NpcParam', next(iter(rows)))
-    assert found['hp'] == 'vit'
+    assert found['hp'] == 'hp'
     assert found['mp'] == 'att'
-    assert found['stamina'] == 'end'
-    assert found['staminaRecoverBaseVel'] == 'end'
+    assert found['stamina'] == 'stamina'
+    assert found['staminaRecoverBaseVel'] == 'stamina'
 
 
 def test_magic_slot_length_has_icon():
@@ -117,3 +117,14 @@ def test_item_humanity_fields_have_icons():
     assert found['heroPoint'] == 'humanity'
     found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
     assert found['isLuckCorrect'] == 'humanity'
+
+
+def test_divine_and_occult_fields_have_icons():
+    found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
+    assert found['antSaintDamageRate'] == 'divine'
+    assert found['antWeakA_DamageRate'] == 'occult'
+    npc = ItemDocument(make_archive())
+    rows = npc._rows_by_id['NpcParam']
+    found = icons(npc, 'NpcParam', next(iter(rows)))
+    assert found['isWeakSaint'] == 'divine'
+    assert found['isWeakA'] == 'occult'
