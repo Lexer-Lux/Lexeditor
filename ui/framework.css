@@ -4307,6 +4307,17 @@ body:has(.lex-data-map-table) #main {
 .lex-detail-section-content:has(> .lex-curve-grid) { display:flex; flex-direction:column; flex:1; min-height:0; }
 .lex-curve-grid > .lex-curve-editor > .lex-curve-plot { height:100%; box-sizing:border-box; }
 .lex-tabbed-panel-content:has(> .lex-curve-grid) { display:flex; flex-direction:column; }
+/* A lone graph fills its tab the way a grid of graphs does: the plot takes
+   the tab's height instead of ending halfway down it. */
+.lex-tabbed-panel-content:has(> .lex-curve-editor) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:0;
+}
+.lex-tabbed-panel-content > .lex-curve-editor { flex:1; min-height:0; display:flex; flex-direction:column; }
+.lex-tabbed-panel-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
+.lex-tabbed-panel-content > .lex-curve-editor .lex-curve-svg { height:100%; aspect-ratio:auto; }
 .lex-curve-grid .lex-curve-svg { height:100%; min-height:140px; aspect-ratio:auto; }
 .lex-gender-toggle { border:0; background:transparent; color:inherit; padding:0 6px; font:700 30px/1 var(--lex-symbol-font); cursor:pointer; }
 .lex-curve-editor { position:relative; min-width:0; padding:0; border:0; background:transparent; }
