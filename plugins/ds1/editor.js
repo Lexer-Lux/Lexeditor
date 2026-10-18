@@ -689,7 +689,7 @@ function plainControlFor(row,field){
     }});
 }
 const GROUP_ORDER=["Description","Basics","Starting gear","Starting spells","Starting items","Body & gestures","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
-  "Use behavior","Value & rewards","Appearance","Properties"];
+  "Use behavior","Value & rewards","Appearance","Logic & goals","Battle distances","Return home","Senses","Call for help","Team tactics","Movement","Properties"];
 // Every property that decides what an item becomes as it is reinforced:
 // its upgrade path, materials, reinforcement cost and ascension options.
 // Buffable flags and presentation materials are not upgrades.

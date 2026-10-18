@@ -264,6 +264,32 @@ THINK_EDITABLE = frozenset({
     'disablePathMove', 'skipArrivalVisibleCheck', 'thinkAttr_doAdmirer',
     'enableNaviFlg_Edge', 'enableNaviFlg_LargeSpace', 'enableNaviFlg_Ladder',
     'enableNaviFlg_Hole', 'enableNaviFlg_Door', 'enableNaviFlg_InSideWall'})
+THINK_GROUPS = {
+    'logicId': 'Logic & goals', 'battleGoalID': 'Logic & goals',
+    'BackHomeLife_OnHitEneWal': 'Logic & goals', 'idAttackCannotMove': 'Logic & goals',
+    'goalID_ToCaution': 'Logic & goals', 'goalAction_ToCaution': 'Logic & goals',
+    'goalID_ToFind': 'Logic & goals', 'goalAction_ToFind': 'Logic & goals',
+    'nearDist': 'Battle distances', 'midDist': 'Battle distances',
+    'farDist': 'Battle distances', 'outDist': 'Battle distances',
+    'BattleStartDist': 'Battle distances',
+    'maxBackhomeDist': 'Return home', 'backhomeDist': 'Return home',
+    'backhomeBattleDist': 'Return home', 'nonBattleActLife': 'Return home',
+    'BackHome_LookTargetTime': 'Return home', 'BackHome_LookTargetDist': 'Return home',
+    'eye_dist': 'Senses', 'ear_dist': 'Senses', 'ear_soundcut_dist': 'Senses',
+    'nose_dist': 'Senses', 'eye_angX': 'Senses', 'eye_angY': 'Senses',
+    'ear_angX': 'Senses', 'ear_angY': 'Senses',
+    'SightTargetForgetTime': 'Senses', 'SoundTargetForgetTime': 'Senses',
+    'callHelp_ActionAnimId': 'Call for help', 'callHelp_CallActionId': 'Call for help',
+    'callHelp_MyPeerId': 'Call for help', 'callHelp_CallPeerId': 'Call for help',
+    'callHelp_CallValidMinDistTarget': 'Call for help', 'callHelp_CallValidRange': 'Call for help',
+    'callHelp_ForgetTimeByArrival': 'Call for help', 'callHelp_MinWaitTime': 'Call for help',
+    'callHelp_MaxWaitTime': 'Call for help', 'callHelp_ReplyBehaviorType': 'Call for help',
+    'targetSys_DmgEffectRate': 'Team tactics', 'TeamAttackEffectivity': 'Team tactics',
+    'thinkAttr_doAdmirer': 'Team tactics',
+    'disablePathMove': 'Movement', 'skipArrivalVisibleCheck': 'Movement',
+    'enableNaviFlg_Edge': 'Movement', 'enableNaviFlg_LargeSpace': 'Movement',
+    'enableNaviFlg_Ladder': 'Movement', 'enableNaviFlg_Hole': 'Movement',
+    'enableNaviFlg_Door': 'Movement', 'enableNaviFlg_InSideWall': 'Movement'}
 STATS_SUBTABS = (
     ('curves', 'Scaling curves', GRAPH_TABLE),
     ('weapon-upgrades', 'Weapon upgrades', 'ReinforceParamWeapon'),
@@ -504,6 +530,8 @@ def schema(table):
             label, group, description = ATTACK_FIELDS[key]
         if table == 'Bullet' and key in BULLET_GROUPS:
             group = BULLET_GROUPS[key]
+        if table == 'NpcThinkParam' and key in THINK_GROUPS:
+            group = THINK_GROUPS[key]
         if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
             label, group, description = ARMOR_FIELDS[key]
         if table == 'EquipParamProtector' and key.startswith('invisibleFlag') and not description:
@@ -1278,7 +1306,7 @@ class ItemDocument:
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
-                           MATERIAL_TABLE, CHARA_TABLE, 'Bullet') else '',
+                           MATERIAL_TABLE, CHARA_TABLE, 'Bullet', 'NpcThinkParam') else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
