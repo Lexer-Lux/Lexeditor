@@ -2502,9 +2502,14 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   background: color-mix(in srgb, var(--lex-accent) 24%, var(--lex-panel));
 }
 
+/* A crowded table scrolls inside its own panel: its columns stay reachable
+   instead of escaping sideways off the page (the page clips, so an escaped
+   column would be cut off with no way to reach it). */
 .lex-column-list {
   display: grid;
   width:100%;
+  max-width:100%;
+  overflow-x:auto;
   grid-template-columns: var(--lex-column-list-template);
   grid-auto-rows: max-content;
   align-content: start;

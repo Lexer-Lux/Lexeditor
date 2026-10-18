@@ -9635,6 +9635,13 @@ ${contents.path}`});
           button.setAttribute("aria-pressed", String(inserting));
           button.title = inserting ? `Hide ${label} in the table` : `Show ${label} in the table`;
           button.setAttribute("aria-label", inserting ? `Unpin ${label} column` : `Pin ${label} column`);
+          if (inserting) refusePinWhenCrowded(button, () => {
+            owner.toggle(key, label, icon);
+            button.classList.toggle("pinned", false);
+            button.setAttribute("aria-pressed", "false");
+            button.title = `Show ${label} in the table`;
+            button.setAttribute("aria-label", `Pin ${label} column`);
+          });
         },
       }, pinIcon()));
     }
@@ -9722,6 +9729,13 @@ ${contents.path}`});
               button.setAttribute('aria-label',inserting?`Unpin ${label} column`:`Pin ${label} column`);
               button.title=inserting?`Hide ${label} in the table`:`Show ${label} in the table`;
               api.toggle(value);
+              if(inserting)refusePinWhenCrowded(button,()=>{
+                api.toggle(value);
+                button.classList.toggle('pinned',false);
+                button.setAttribute('aria-pressed','false');
+                button.setAttribute('aria-label',`Pin ${label} column`);
+                button.title=`Show ${label} in the table`;
+              });
               markArrivingColumn(document, value);
             } finally { delete button.dataset.pinMoving; }
           },
@@ -9738,6 +9752,22 @@ ${contents.path}`});
   // A column that has just been pinned or unpinned announces itself once, so
   // the table does not simply have a different shape the next time you look
   // at it.
+  // Pinning refuses when the table has no horizontal room: the insert is
+  // rolled back after layout proves the table overflows, and the reader is
+  // told why, instead of growing the page sideways.
+  const refusePinWhenCrowded = (button, rollback) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const root = button.closest(".lex-paged-list-detail");
+      const list = root?.querySelector(".lex-barrelled-master .lex-column-list")
+        ?? root?.querySelector(".lex-column-list")
+        ?? document.querySelector(".lex-barrelled-master .lex-column-list");
+      if (!list || !list.isConnected) return;
+      if (list.scrollWidth <= list.clientWidth + 1) return;
+      rollback();
+      showToast("No room for another column. Widen the table or unpin a column first.", true);
+    }));
+  };
+
   const markArrivingColumn = (root, key) => {
     if (!root || !key) return;
     requestAnimationFrame(() => {
