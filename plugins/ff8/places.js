@@ -26,6 +26,12 @@
     try{
       const dataset=state.activeSource==="mine"?"current":state.activeSource;
       const current=await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=${encodeURIComponent(dataset)}`),vanilla=state.activeSource==="mine"?await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=vanilla`):current;
+      // The guard above inserted _loading before the fetch, while the vanilla
+      // row appends it after its detail: same values, different key order, and
+      // the row compare is order-sensitive, so the map read as changed the
+      // moment it was clicked. Drop _loading first so the assign appends it
+      // last like the vanilla row's.
+      delete row._loading;
       Object.assign(row,current,{_loaded:true,_loading:false});
       const vanillaRow=fieldMapRow(state.vanilla,row.key);if(vanillaRow)Object.assign(vanillaRow,clone(vanilla),{_loaded:true,_loading:false});
       const baseIndex=state.base.fields?.findIndex(value=>value.key===row.key)??-1;if(baseIndex>=0)state.base.fields[baseIndex]=clone(row);touchHistoryBaseRow("fields",row.key);
