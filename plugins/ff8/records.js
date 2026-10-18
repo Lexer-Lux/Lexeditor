@@ -241,12 +241,12 @@
     const button=(entry,content,extra={})=>el("button",{type:"button",title:entry.caption||entry.label,"aria-label":`Insert ${entry.label}`,onmousedown:event=>event.preventDefault(),onclick:()=>insert(entry.text),...extra},content);
     // One bubble per group of inserting controls, instead of one long bubble on
     // the box: the reader is pointing at the thing they want explained.
-    const group=(label,children,help)=>el("div",{class:"lex-toolbar ff8-text-token-group",role:"group","aria-label":label},...children,help?infoHelp(help):null);
+    const group=(label,children,help,cls="")=>el("div",{class:`lex-toolbar ff8-text-token-group${cls?" "+cls:""}`,role:"group","aria-label":label},...children,help?infoHelp(help):null);
     const choose=(label,entries)=>el("select",{"aria-label":`Insert ${label}`,onchange:event=>{if(event.target.value)insert(event.target.value);event.target.value=""}},el("option",{value:""},label),...entries.map(entry=>el("option",{value:entry.text},entry.label)));
     return el("div",{class:"lex-toolbar lex-toolbar-icons ff8-text-token-toolbar",role:"group","aria-label":"Special text"},
       group("Character names",tokens.characters.map(entry=>button(entry,
         entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""})
-          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile"})),
+          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile lex-toolbar-tile-portrait"})),
         "Insert a character's name. The game draws that name where the token stands. "
         +"The three tiles without a portrait are the game's animal characters, shown "
         +"by their initials."),
@@ -262,7 +262,7 @@
       group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)],
         "Insert a stored name, a variable, a key icon or a special character at the "
         +"cursor. Locations, variables and keys are tokens the game resolves when the "
-        +"message is shown."));
+        +"message is shown.","ff8-text-token-choices"));
   }
   function textDetail(row,prefs){
     const input=LexeditorUI.textArea({rows:8,"aria-label":`Text for ${row.name}`,oninput:event=>{row.value=event.target.value;shell.refresh()}});input.value=row.value;

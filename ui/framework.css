@@ -4244,6 +4244,11 @@ body:has(.lex-data-map-table) #main {
   place-items:center;
   overflow:hidden;
 }
+/* A tile shaped for a portrait asset: the game's 32x48 faces keep their
+   2:3 ratio instead of cropping to a square. */
+.lex-toolbar button.lex-toolbar-tile-portrait {
+  height:calc(var(--lex-toolbar-tile-size, 26px) * 1.5);
+}
 .lex-toolbar-tile > img { width:100%; height:100%; object-fit:cover; }
 .lex-toolbar-tile-text {
   writing-mode:vertical-rl;

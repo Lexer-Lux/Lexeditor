@@ -161,6 +161,10 @@
 /* Token picker rows reuse the shared toolbars; only gaps differ here. */
 .ff8-text-token-toolbar { --lex-toolbar-gap:6px; --lex-toolbar-margin:0; }
 .ff8-text-token-group { --lex-toolbar-gap:3px; }
+/* The four insert dropdowns stay one row however narrow the panel gets;
+   the group scrolls sideways instead of wrapping. */
+.ff8-text-token-choices { flex-wrap:nowrap; overflow-x:auto; max-width:100%; }
+.ff8-text-token-choices > select { flex:none; }
 
 /* The Encounters tab. Rules is a region-by-ground grid of stored rules; the
    preview boxes are one battle position each, name over the box, level under. */
