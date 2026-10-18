@@ -535,7 +535,11 @@ window.Ds1Viewport = (() => {
       camera.updateProjectionMatrix();
     };
     resize();
-    window.addEventListener("resize", resize);
+    // The stage flexes with its panel, so divider drags resize it
+    // without a window resize: watch the host itself (anim.js).
+    const resizer = typeof ResizeObserver === "function" ? new ResizeObserver(() => resize()) : null;
+    if (resizer) resizer.observe(host);
+    else window.addEventListener("resize", resize);
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     const short = n => +Number(n).toFixed(3);
     let text = `${chr.id}: ${plural(data.meshes.length, "mesh", "meshes")}, ${plural(Math.round(tris), "triangle", "triangles")}, ${plural(byId.size, "model point", "model points")}. `;
@@ -547,6 +551,7 @@ window.Ds1Viewport = (() => {
     let frames = 0, liveFlag = true;
     host._viewportStop = () => {
       liveFlag = false;
+      if (resizer) resizer.disconnect();
       window.removeEventListener("resize", resize);
       controls.dispose();
       renderer.dispose();

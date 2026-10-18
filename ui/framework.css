@@ -7687,6 +7687,14 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
   overflow:hidden;
   padding:0;
 }
+/* The monster Model tab's stage fills its panel the way a table does: a
+   fixed-height stage left the panel's bottom quarter blank on tall panes. */
+.lex-tabbed-panel-content:has(> [data-chr-host]) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.lex-tabbed-panel-content:has(> [data-chr-host]) > .lex-viewport-bar { flex:0 0 auto; }
 .lex-tabbed-panel-content > .lex-column-list:not([hidden]) {
   flex:1 1 0;
   min-height:0;

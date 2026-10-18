@@ -2580,7 +2580,7 @@ function monsterModelSection(){
       choices:attacks.map(entry=>({label:entry.name,value:entry.id})),select:pickAttack}).openFor(event.currentTarget);}},
     `Attack: ${attack?attack.name:"none"}`);
   const status=el("div",{class:"lex-viewport-status","data-chr-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading model"));
-  const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE});
+  const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE+"height:auto;flex:1 1 auto;"});
   requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(failMount(status,"Could not load the model."));});
   return [el("div",{class:"lex-viewport-bar"},attackPicker),host,status];
 }
