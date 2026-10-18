@@ -7653,12 +7653,14 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 /* A record with a picture: the first section beside the rest, stacking when the
    panel is too narrow for both. Sections in this layout carry no frame and no
    title, because the picture and its properties read as one thing. */
+/* A beside box is a column layout, not a padded container: vertical
+   padding would start its content below any sibling section's. */
 .lex-detail-panel-beside {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 18px;
-  padding: 14px 16px;
+  padding: 0 16px;
   min-height: 0;
   overflow: hidden;
 }
