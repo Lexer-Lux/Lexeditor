@@ -596,7 +596,8 @@ function controlFor(row,field){
   const plain=plainControlFor(row,field);
   const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
     :TIMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00d7")
-    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,field.label.match(RATE)[1])
+    // The quantity names the row already; the unit only says per second.
+    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"/sec")
     :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
     :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
     :POINTS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"pts")
