@@ -71,11 +71,16 @@ def test_weapons_and_armor_open_an_upgrades_panel_tab():
     assert "function itemDetail(groups){" in EDITOR
     assert 'title==="Upgrades"' in EDITOR
     assert EDITOR.count("state.itemTab") >= 3
+    assert ('const goodsSub=state.row.table==="EquipParamGoods"'
+            '?catalogSub(state.row.table,state.row):null;') in EDITOR
     assert ('if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"'
             '||state.row.table==="EquipParamProtector"'
             '||state.row.table==="EquipParamAccessory"'
             '||state.row.table==="Magic"'
-            '||state.row.table==="EquipParamGoods"))') in EDITOR
+            '||goodsSub==="upgrades"||goodsSub==="spells"))') in EDITOR
+    # Consumables and keys keep the stacked detail: routing every goods
+    # row through the panel tabs hid the weight slider from undo tests.
+    assert '||state.row.table==="EquipParamGoods"))' not in EDITOR
 
 
 def test_data_map_names_the_upgrades_tab(tmp_path):
