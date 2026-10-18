@@ -11,6 +11,8 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 ARTIFACTS = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "bannerlord-browser"
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
@@ -235,7 +237,9 @@ def main() -> None:
             assert source_request["body"]["originalText"] == "before"
 
             page.evaluate('navigate("info")')
-            page.get_by_text("MOD LOADER", exact=True).wait_for()
+            loader_label = page.get_by_text("MOD LOADER", exact=True)
+            loader_label.wait_for(state="attached")
+            reveal(page, loader_label)
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
             loader_values = page.locator("#main .lex-detail-field input").evaluate_all(
@@ -254,6 +258,7 @@ def main() -> None:
             assert validation_summary.input_value().startswith("1 schema issue")
 
             missing_panel = page.locator(".lex-detail-section").filter(has_text="MISSING REQUIRED ATTRIBUTES")
+            reveal(page, missing_panel)
             missing_panel.locator('input[type="checkbox"]').first.check()
             missing_panel.locator('input[type="text"]').first.fill("browser_fixture")
             assert page.evaluate("moduleDataDirty()") is True
@@ -283,11 +288,15 @@ def main() -> None:
             page.wait_for_function("state.deployResult && state.deployResult.copied.length===1")
 
             page.evaluate('navigate("info")')
-            page.get_by_text("ASSETS", exact=True).wait_for()
+            assets_label = page.get_by_text("ASSETS", exact=True)
+            assets_label.wait_for(state="attached")
+            reveal(page, assets_label)
             deployment_text = page.locator("#main").inner_text()
             assert "GUI" in deployment_text
             assert "ModuleData" in deployment_text
-            assert "Project/deployed sync" in deployment_text
+            sync_label = page.get_by_text("Project/deployed sync", exact=True)
+            reveal(page, sync_label)
+            assert sync_label.is_visible()
 
             page.evaluate('navigate("datamap")')
             page.wait_for_selector(".lex-data-map-table")

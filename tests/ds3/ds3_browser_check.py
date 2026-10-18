@@ -15,6 +15,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 from plugins.ds3.formats import encrypt_regulation
 from core.service_session import LocalPluginSession, request_json
 from test_ds3_plugin import _bnd4, _row_ids
+from ds3_browser_support import reveal_detail_control
 
 
 TABLES = (
@@ -82,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
                 page.wait_for_selector('body[data-ds3-ready="true"]', timeout=20000)
                 page.wait_for_selector(".lex-column-list .lex-list-row", timeout=10000)
 
-                page.wait_for_selector('[data-ds3-field="atkBasePhysics"]', timeout=10000)
+                reveal_detail_control(page, page.locator('[data-ds3-field="atkBasePhysics"]'))
                 if page.locator('input[type="checkbox"][data-ds3-field]').count() < 1:
                     raise RuntimeError("Weapons detail did not render boolean checkboxes")
                 if page.locator("select[data-ds3-field]").count() < 1:
@@ -111,6 +112,20 @@ def main(argv: list[str] | None = None) -> int:
                     diagnostics["browserErrors"] = list(errors)
                     raise RuntimeError(f"DS3 edit did not enable Save: {diagnostics}") from error
                 page.screenshot(path=str(output / "weapons-edited.png"), full_page=True)
+                real = '.ds3-layout .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+                toggle = page.locator('.lex-pager-toggle input[aria-label="Mod contents only"]')
+                assert toggle.count() == 1
+                assert toggle.is_enabled()
+                full = page.locator(real).count()
+                assert full > 1
+                toggle.check()
+                page.wait_for_function(
+                    "() => document.querySelectorAll('" + real + "').length===1", timeout=10000)
+                assert str(weapon_id) in (page.locator(real).first.get_attribute('data-key') or '')
+                toggle.uncheck()
+                page.wait_for_function(
+                    "(full) => document.querySelectorAll('" + real + "').length===full",
+                    arg=full, timeout=10000)
                 page.locator("#global-save").click()
                 page.wait_for_function(
                     """() => {
@@ -136,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
                 page.screenshot(path=str(output/'create-record.png'),full_page=True)
                 page.get_by_role('button',name='Create record',exact=True).click()
                 page.get_by_role('img',name='Created in this mod',exact=True).wait_for()
-                page.wait_for_selector('[data-ds3-field="atkBasePhysics"]')
+                reveal_detail_control(page, page.locator('[data-ds3-field="atkBasePhysics"]'))
                 assert page.locator('[data-ds3-field="atkBasePhysics"]').input_value()=='321'
                 page.locator('[data-ds3-field="atkBasePhysics"]').fill('432')
                 page.locator('[data-ds3-field="atkBasePhysics"]').press('Tab')

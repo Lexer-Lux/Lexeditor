@@ -23,6 +23,7 @@ import struct
 import zlib
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from core.numeric_values import integer_value
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
@@ -403,6 +404,7 @@ class ParamView:
         return self.data[offset:(len(self.data) if end < 0 else end)].decode("shift_jis", errors="replace")
 
     def row(self, row_id: int) -> ParamRow:
+        row_id = integer_value(row_id, "PARAM row ID", DS3FormatError)
         matches = [row for row in self.rows if row.row_id == row_id]
         if len(matches) != 1:
             raise DS3FormatError(f"Expected one row ID {row_id}; found {len(matches)}")
@@ -460,10 +462,81 @@ class ParamView:
         struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
         return bytes(result)
 
+    def delete_row(self, row_id: int, row_size: int) -> bytes:
+        """Drop one row's directory entry and payload, preserving the rest.
+
+        The row's name bytes stay orphaned after the strings, as they harm
+        nothing and their extent is not tracked. Row order is otherwise kept.
+        """
+        target = [index for index, row in enumerate(self.rows) if row.row_id == row_id]
+        if len(target) != 1:
+            raise DS3FormatError(f"Expected one row ID {row_id}; found {len(target)}")
+        if self.row_count <= 1:
+            raise DS3FormatError("A PARAM keeps at least one row")
+        target = target[0]
+        extended = bool(self.format2d & 4 or self.format2d & 3 == 3)
+        header_end = 64 if extended else 48
+        stride = 24 if self.long_offsets else 12
+        directory_end = header_end + self.row_count * stride
+        strings = self.strings_offset
+        if row_size <= 0 or not directory_end <= strings <= len(self.data):
+            raise DS3FormatError("PARAM data/string boundaries are inconsistent")
+        if any(not directory_end <= row.data_offset or row.data_offset + row_size > strings for row in self.rows):
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        entry_at = header_end + target * stride
+        data_pos = entry_at + (8 if self.long_offsets else 4)
+        code = 'q' if self.long_offsets else 'I'
+        data_at = self._unpack(code, data_pos)
+        if not directory_end <= data_at or data_at + row_size > strings:
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        # Nothing kept may point into either removed span.
+        for index, row in enumerate(self.rows):
+            if index == target:
+                continue
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if not offset:
+                    continue
+                if entry_at <= offset < entry_at + stride or data_at <= offset < data_at + row_size:
+                    raise DS3FormatError("PARAM row data overlaps another row's target")
+        result = bytearray(self.data[:entry_at] + self.data[entry_at + stride:data_at]
+                           + self.data[data_at + row_size:])
+
+        def relocated(offset):
+            return offset - (stride if offset >= entry_at + stride else 0) - (row_size if offset >= data_at + row_size else 0)
+
+        struct.pack_into(self.endian + 'H', result, 10, self.row_count - 1)
+        struct.pack_into(self.endian + 'I', result, 0, strings - stride - row_size)
+        data_code, data_position = ('q', 48) if self.long_offsets else ('I', 48) if extended else ('H', 4)
+        data_start = self._unpack(data_code, data_position)
+        struct.pack_into(self.endian + data_code, result, data_position, relocated(data_start))
+        if self.format2d & 0x80:
+            struct.pack_into(self.endian + 'q', result, 16, relocated(self._unpack('q', 16)))
+        for index in range(target):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if offset:
+                    struct.pack_into(self.endian + code, result, offset_position, relocated(offset))
+        for index in range(target + 1, self.row_count):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            moved = pos - stride
+            for shift in (0, 8 if self.long_offsets else 4):
+                offset = self._unpack(code, pos + shift)
+                if offset:
+                    struct.pack_into(self.endian + code, result, moved + shift, relocated(offset))
+        return bytes(result)
+
 _TYPE_SIZE = {"s8":1,"u8":1,"dummy8":1,"s16":2,"u16":2,"s32":4,"u32":4,"b32":4,"f32":4,"angle32":4,"f64":8}
 _INT_LIMITS = {
     "s8":(-128,127), "u8":(0,255), "s16":(-32768,32767), "u16":(0,65535),
     "s32":(-2147483648,2147483647), "u32":(0,4294967295), "b32":(-2147483648,2147483647),
+}
+_FLOAT_LIMITS = {
+    "f32": (-3.4028234663852886e38, 3.4028234663852886e38),
+    "angle32": (-3.4028234663852886e38, 3.4028234663852886e38),
+    "f64": (-1.7976931348623157e308, 1.7976931348623157e308),
 }
 
 
@@ -484,12 +557,17 @@ class FieldSpec:
     padding: bool = False
 
     @property
+    def editable(self):
+        return (not self.padding and self.array_length == 1
+                and not re.match(r"^(?:unk(?:nown)?)(?:\d|[ _]|$)", self.key, re.IGNORECASE))
+
+    @property
     def minimum(self):
         if self.bit_size is not None:
             if self.dtype.startswith("s"):
                 return -(1 << (self.bit_size - 1))
             return 0
-        return _INT_LIMITS.get(self.dtype, (None, None))[0]
+        return _INT_LIMITS.get(self.dtype, _FLOAT_LIMITS.get(self.dtype, (None, None)))[0]
 
     @property
     def maximum(self):
@@ -497,7 +575,7 @@ class FieldSpec:
             if self.dtype.startswith("s"):
                 return (1 << (self.bit_size - 1)) - 1
             return (1 << self.bit_size) - 1
-        return _INT_LIMITS.get(self.dtype, (None, None))[1]
+        return _INT_LIMITS.get(self.dtype, _FLOAT_LIMITS.get(self.dtype, (None, None)))[1]
 
 
 @dataclass(frozen=True)
@@ -658,13 +736,24 @@ def read_field(row_bytes: bytes, field: FieldSpec, endian: str):
     raise DS3FormatError(f"Field {field.key} is not safely editable")
 
 
+def _field_integer(field: FieldSpec, value) -> int:
+    if isinstance(value, bool):
+        if not field.is_bool:
+            raise DS3FormatError(f"{field.key} requires an integer")
+    elif isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise DS3FormatError(f"{field.key} requires an integer")
+    elif not isinstance(value, int) and not (isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip())):
+        raise DS3FormatError(f"{field.key} requires an integer")
+    return int(value)
+
+
 def write_field(row_bytes: bytes, field: FieldSpec, value, endian: str) -> bytes:
-    if field.padding or field.array_length != 1:
+    if not field.editable:
         raise DS3FormatError(f"Field {field.key} is preserved but not editable")
     result=bytearray(row_bytes); size=_TYPE_SIZE[field.dtype]; byteorder="big" if endian==">" else "little"
     if field.bit_size is not None:
-        try: value=int(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires an integer")
+        value = _field_integer(field, value)
         if field.is_bool:
             if value not in (0,1): raise DS3FormatError(f"{field.key} is boolean")
         if not field.minimum <= value <= field.maximum:
@@ -675,16 +764,18 @@ def write_field(row_bytes: bytes, field: FieldSpec, value, endian: str) -> bytes
         result[field.offset:field.offset+size]=raw.to_bytes(size,byteorder,signed=False)
         return bytes(result)
     if field.dtype in _INT_LIMITS:
-        try: value=int(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires an integer")
+        value = _field_integer(field, value)
         if field.is_bool and value not in (0,1): raise DS3FormatError(f"{field.key} is boolean")
         if not field.minimum <= value <= field.maximum:
             raise DS3FormatError(f"{field.key} must be between {field.minimum} and {field.maximum}")
         result[field.offset:field.offset+size]=value.to_bytes(size,byteorder,signed=field.dtype.startswith("s") or field.dtype=="b32")
     elif field.dtype in ("f32","angle32","f64"):
+        if isinstance(value, bool): raise DS3FormatError(f"{field.key} requires a number")
         try: value=float(value)
-        except (TypeError,ValueError): raise DS3FormatError(f"{field.key} requires a number")
+        except (TypeError,ValueError,OverflowError): raise DS3FormatError(f"{field.key} requires a number")
         if not math.isfinite(value): raise DS3FormatError(f"{field.key} must be finite")
+        if not field.minimum <= value <= field.maximum:
+            raise DS3FormatError(f"{field.key} must be between {field.minimum} and {field.maximum}")
         struct.pack_into(endian+("d" if field.dtype=="f64" else "f"),result,field.offset,value)
     else:
         raise DS3FormatError(f"Field {field.key} is not safely editable")
@@ -736,9 +827,16 @@ class RegulationDocument:
         schema = self.schemas[table]
         return row.name or schema.row_names.get(row.row_id) or f"Row {row.row_id}"
 
+    def row_modified(self, table: str, row_id: int):
+        """Whether this session changed the row: an edited field or a created row."""
+        if (table, row_id) in self._created_ids:
+            return True
+        return any(entry[0] == table and entry[1] == row_id for entry in self._dirty)
+
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids,
+                 "modified":self.row_modified(table,r.row_id)} for r in param.rows]
 
     def create_row(self, table: str, source_id: int, new_id: int, name: str):
         schema = self.schemas[table]
@@ -769,6 +867,7 @@ class RegulationDocument:
                 "value":value,"type":"bool" if field.is_bool else "enum" if field.enum and schema.enums.get(field.enum) else "number",
                 "minimum":field.minimum,"maximum":field.maximum,"enum":schema.enums.get(field.enum,{}),"enumName":field.enum,
                 "reference":field.reference,"dtype":field.dtype,
+                "editable":field.editable,
             })
         return {
             "id": row.row_id,
@@ -778,6 +877,7 @@ class RegulationDocument:
         }
 
     def edit(self, table: str, row_id: int, field_key: str, value):
+        row_id = integer_value(row_id, "PARAM row ID", DS3FormatError)
         schema=self.schemas[table]; field=schema.field(field_key); param=self.params[table]; row=param.row(row_id)
         if field.enum and schema.enums.get(field.enum):
             if str(value) not in schema.enums[field.enum]:

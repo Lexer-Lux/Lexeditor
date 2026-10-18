@@ -83,7 +83,10 @@ def _read_entries(data: bytes, offsets: list[int], expected_count: int) -> list[
 
 
 def read_msd(path: Path, source: Source) -> list[str]:
-    data = path.read_bytes()
+    return _values_from_bytes(path.read_bytes(), source)
+
+
+def _values_from_bytes(data: bytes, source: Source) -> list[str]:
     table_size = source.count * 4
     if len(data) <= table_size:
         raise ValueError(f"{source.filename} is too short")
@@ -96,6 +99,41 @@ def read_msd(path: Path, source: Source) -> list[str]:
     if _bounded_end(data, offsets, table_size) != len(data):
         raise ValueError(f"{source.filename} has unowned trailing data")
     return _read_entries(data, offsets, source.count)
+
+
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str,
+          source: Source) -> tuple[bytes | None, list[dict], str]:
+    """Merge override lines per entry, or return a visible whole-file fallback."""
+    try:
+        baseline = _values_from_bytes(vanilla, source)
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    claims: dict[int, list[tuple[str, str]]] = {}
+    for mod_id, data in mods:
+        try:
+            values = _values_from_bytes(data, source)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        replacements = {index: value for index, (value, base)
+                        in enumerate(zip(values, baseline)) if value != base}
+        for index, value in replacements.items():
+            claims.setdefault(index, []).append((mod_id, value))
+        try:
+            reconstructed, _ = apply_edits(vanilla, source, replacements)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if reconstructed != data:
+            return None, [], f"{mod_id} contains changes outside proved text entries"
+    winners = {index: values[-1][1] for index, values in claims.items()}
+    output, _ = apply_edits(vanilla, source, winners)
+    conflicts = [
+        {"unit": f"{path}:entry:{index}", "winner": values[-1][0],
+         "claimants": [mod_id for mod_id, _ in values]}
+        for index, values in claims.items()
+        if len(values) > 1 and len({value for _, value in values}) > 1
+    ]
+    _values_from_bytes(output, source)
+    return output, conflicts, ""
 
 
 def build_msd(values: list[str], source: Source) -> bytes:

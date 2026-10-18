@@ -2,9 +2,11 @@
   "source": "https://github.com/vawser/Smithbox",
   "revision": "057b417887cc7d0ddc8001602be3f5339f42c74f",
   "license": "MIT",
-  "scope": "DS1 item and enemy parameter metadata only; no GPL dependencies or executable code.",
+  "scope": "DS1 item, NPC, attack, behavior, projectile, effect and scaling-curve parameter metadata only; no GPL dependencies or executable code.",
   "unavailableEnums": [
-    "WEP_CORRECT_TYPE"
+    "WEP_CORRECT_TYPE",
+    "OBACT_CHR_SORB_TYPE",
+    "OBACT_SP_QUALIFIED_TYPE"
   ],
   "transformations": [
     "UTF-8/UTF-16 BOMs removed; XML declarations normalized to UTF-8."
@@ -270,6 +272,110 @@
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/AtkParam_Npc.json",
       "sha256": "dc3ff562e90a49002ededec9b26f3649407e706abbc69eca6fd55a627cd89b3b"
     },
+    "defs/AtkParam_Pc.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/AtkParam.xml",
+      "sha256": "a72a9bed8bad372aca03d0502b155fd73be9f001a9338231416b2be459f45f48"
+    },
+    "meta/AtkParam_Pc.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/AtkParam.xml",
+      "sha256": "d63d52aa29817068bcf6db085f46f94a5e84bd546630389b7c82b1f7b084c12a"
+    },
+    "row_names/AtkParam_Pc.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/AtkParam_Pc.json",
+      "sha256": "20fcdc0d44a73b815bbd5ed0c174c8dd68d4daae0c4a5c6b84e05b5d23fccc970"
+    },
+    "defs/ReinforceParamWeapon.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/ReinforceParamWeapon.xml",
+      "sha256": "7d2612039ad8ea6867ed775c15c82b2957cfcde66777ea1ad82be0104f02bb42"
+    },
+    "meta/ReinforceParamWeapon.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/ReinforceParamWeapon.xml",
+      "sha256": "aeb582330e1e1398878cbf57c04fe8d2a7cf9703378e5e332f924c1646c38909"
+    },
+    "annotations/REINFORCE_PARAM_WEAPON_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/REINFORCE_PARAM_WEAPON_ST.json",
+      "sha256": "44086e1e18b8a7b86e22287eb0e9a2eeb2ea56d7ff60fa64b4c8071b6451ae38"
+    },
+    "row_names/ReinforceParamWeapon.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/ReinforceParamWeapon.json",
+      "sha256": "2451f2fafeed1b86badd91f37a02e8dafb7782c27b821d840d9da8368aa6f2a0"
+    },
+    "defs/ReinforceParamProtector.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/ReinforceParamProtector.xml",
+      "sha256": "2012f924b79d3b6ddb4e81108c06ccbd74d2af719f8c47c836ac1504154fb41a"
+    },
+    "meta/ReinforceParamProtector.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/ReinforceParamProtector.xml",
+      "sha256": "ccbfbd2ef0b4d3b207d0bcd6b6cceac689c9955ac8e401e34f9fb341e7f71997"
+    },
+    "annotations/REINFORCE_PARAM_PROTECTOR_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/REINFORCE_PARAM_PROTECTOR_ST.json",
+      "sha256": "1b716d925cd8b206e8bb1eba031ed269c16f97ac29ebe7e86fc56b0e0e1cd4cf"
+    },
+    "row_names/ReinforceParamProtector.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/ReinforceParamProtector.json",
+      "sha256": "d16f6da677609ff7dbf5a114386166d46196ed84a6782ee846bd4c3af59e5572"
+    },
+    "defs/ItemLotParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/ItemLotParam.xml",
+      "sha256": "39732314f8c2d01c9fb5e78d60c9a194ac642725b84eedd8ef23efce8cee3370"
+    },
+    "meta/ItemLotParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/ItemLotParam.xml",
+      "sha256": "5f489e896c29aeee65375e98b5ca06de0edfc4b7dbae19febfc7ec4a02ae4ded"
+    },
+    "annotations/ITEMLOT_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/ITEMLOT_PARAM_ST.json",
+      "sha256": "da35c67601da1d4e8b3bde601f388d1f81d5bfd2bf253eb5c56da759a09a0efb"
+    },
+    "row_names/ItemLotParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/ItemLotParam.json",
+      "sha256": "f994c8b91c641165be03762b061979084cb2f5943d95d2bea9c7bc9cf83403a9"
+    },
+    "defs/ShopLineupParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/ShopLineupParam.xml",
+      "sha256": "ed50e474743bae99e03659a5f33e36da40bc53e4392d3969c269dd609155fd1e"
+    },
+    "meta/ShopLineupParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/ShopLineupParam.xml",
+      "sha256": "88c32e5fa2705b70439bf973cf4816fc876c41f97013b48a310083f576fcff20"
+    },
+    "annotations/SHOP_LINEUP_PARAM.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/SHOP_LINEUP_PARAM.json",
+      "sha256": "a782d60a6b2855057b340b6cbcd3af7744b74705e72030e2f7c5fbedb012f1f4"
+    },
+    "row_names/ShopLineupParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/ShopLineupParam.json",
+      "sha256": "7c303bc13031066b745ff3d22004ca765184c7febef7a0a7f7db0dfb3e579ec3"
+    },
+    "defs/ObjActParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/ObjActParam.xml",
+      "sha256": "c819c79b85483e8ce86236ed920fc6bf15e3a41e40a69b06b2a8178b57dedc12"
+    },
+    "meta/ObjActParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/ObjActParam.xml",
+      "sha256": "27a8316d1efa821b673a089b0cb450a0a31572868b6f3a1fa10f8f6a875026e0"
+    },
+    "annotations/OBJ_ACT_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/OBJ_ACT_PARAM_ST.json",
+      "sha256": "2725579c8bd830b799259e05ccd74ad4a05b32978dad95a734e363e8b618a4b9"
+    },
+    "row_names/ObjActParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/ObjActParam.json",
+      "sha256": "97707145d76ae9e16dc3f9caffc39859876f80c44477c81c51c476869f7a408a"
+    },
+    "enums/ITEMLOT_ITEMCATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ITEMLOT_ITEMCATEGORY.json",
+      "sha256": "82e13b44ecb6d49b6b9a7f99b4c4c6c50e95b0edeb8a652f963ab68f068064bd"
+    },
+    "enums/SHOP_LINEUP_EQUIPTYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SHOP_LINEUP_EQUIPTYPE.json",
+      "sha256": "520828ca53e7a2f4d304f58944aac9bbfeda28b602afce6316eed86889bb61bc"
+    },
+    "enums/SHOP_LINEUP_SHOPTYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SHOP_LINEUP_SHOPTYPE.json",
+      "sha256": "b5a8cb61f0b09c5f482ea5e515bb2928ccdeb002b53ac8ab6f2767b171d85b1a"
+    },
     "defs/BehaviorParam.xml": {
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/BehaviorParam.xml",
       "sha256": "d04fe6fbadfbf4924860a5b41556d9c6db20d824a88b92724a0c7afca4afdcd9"
@@ -305,6 +411,86 @@
     "enums/ATKPARAM_ATKATTR_TYPE.json": {
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATKPARAM_ATKATTR_TYPE.json",
       "sha256": "5558365cfdf67e4d540558de570b2e3dfc02a11a51fa8cf2278df55aa51a71f6"
+    },
+    "enums/ATK_PARAM_HIT_SOURCE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATK_PARAM_HIT_SOURCE.json",
+      "sha256": "7ee1b8a26a6632cb3984704026f3fc0df00c45b6c360f2a8e454123a372447d4"
+    },
+    "defs/CalcCorrectGraph.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/CalcCorrectGraph.xml",
+      "sha256": "a617f744136f91642cfd90f3d69b6a2869176b9880195976ea13289a1cb05089"
+    },
+    "meta/CalcCorrectGraph.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/CalcCorrectGraph.xml",
+      "sha256": "a065aba0a35ce67268e0523f5bb0c0bbef78be1849ae4619770cbabd910cbc9b"
+    },
+    "annotations/CACL_CORRECT_GRAPH_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/CACL_CORRECT_GRAPH_ST.json",
+      "sha256": "46607a4b88d81db128baa09f7daa7113ee07ed21e8a860641031a9a233e89698"
+    },
+    "row_names/CalcCorrectGraph.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/CalcCorrectGraph.json",
+      "sha256": "98f492df901dbb8692b1864069670ca9b0794c6a1d9f552f0d4a27a3affea19a"
+    },
+    "defs/NpcThinkParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Defs/NpcThinkParam.xml",
+      "sha256": "b3ba1bd897430ba9de0d57e2e3b8d05180a108dfae5ba1cb0e973c52b2b54d7b"
+    },
+    "meta/NpcThinkParam.xml": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Meta/NpcThinkParam.xml",
+      "sha256": "4cd12feac991d05023c0dfec1e42db02c48f9d9c7995a99c11190ecc15de4a74"
+    },
+    "annotations/NPC_THINK_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/NPC_THINK_PARAM_ST.json",
+      "sha256": "ee546486c14530d22d3562e0235ed98447cf1f5d4259cc254ea5d00eab55e3f4"
+    },
+    "row_names/NpcThinkParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/NpcThinkParam.json",
+      "sha256": "449ad41a737f53653c1061f5a58d521e35ba29132877b920c9c94ff433d1cc1b"
+    },
+    "enums/BULLET_FOLLOW_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/BULLET_FOLLOW_TYPE.json",
+      "sha256": "7f18d3a9a812041fe0554e6836e200e65e51e2ff488bf0a6a304d68e70948051"
+    },
+    "enums/BULLET_LAUNCH_CONDITION_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/BULLET_LAUNCH_CONDITION_TYPE.json",
+      "sha256": "409c54a632164294227f4d5e928731d87b2e27c0eea5a50f1186fd19020abcb4"
+    },
+    "enums/NPC_THINK_GOAL_ACTION.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_THINK_GOAL_ACTION.json",
+      "sha256": "9471247a1ee562b4414b692dc4de52c17a8144313e4b0d7c766189253320d993"
+    },
+    "enums/NPC_THINK_REPLY_BEHAVIOR_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/NPC_THINK_REPLY_BEHAVIOR_TYPE.json",
+      "sha256": "9c1bba704db0ea67c4cc1df3f3a59d12a8e50ebce225a3699599cb072b3cd81e"
+    },
+    "annotations/SP_EFFECT_PARAM_ST.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/SP_EFFECT_PARAM_ST.json",
+      "sha256": "70d1571e02a0cf08ae7b809e3ffd75d0bc9535d5cb95601a596e06fcf291d570"
+    },
+    "row_names/SpEffectParam.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/SpEffectParam.json",
+      "sha256": "48392ed8af354af7c3a584b6a4d6dd596b00dbaddb7c70e78a756f12225a8dfa"
+    },
+    "enums/ATKPARAM_REP_DMGTYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/ATKPARAM_REP_DMGTYPE.json",
+      "sha256": "3a2dbf39cc51d378f802f6fbea7b086a039849da204ae26b2f6dea3672378a02"
+    },
+    "enums/SP_EFE_WEP_CHANGE_PARAM.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFE_WEP_CHANGE_PARAM.json",
+      "sha256": "686a41bbea155f4543638f5134d1953707b439fc7e43d65830a862b260345f0e"
+    },
+    "enums/SP_EFFECT_MOVE_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFFECT_MOVE_TYPE.json",
+      "sha256": "11a9bf2a2863484b516d26701d768b3cedfc304540cfc99cddbf2020c6fb53c4"
+    },
+    "enums/SP_EFFECT_SPCATEGORY.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFFECT_SPCATEGORY.json",
+      "sha256": "08f792a916d713d6f790a420dcb4b7ebced754566776ca6744df72383bdd081e"
+    },
+    "enums/SP_EFFECT_THROW_CONDITION_TYPE.json": {
+      "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Enums/SP_EFFECT_THROW_CONDITION_TYPE.json",
+      "sha256": "e22aafce23f2646d164a3da094ffdc060d75ec025de51748a9f21611bb225198"
     }
   }
 }

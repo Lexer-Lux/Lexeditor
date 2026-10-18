@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.bounded import whole_number
+from core.numeric_values import integer_value
 
 from .ffx_table import FFXTableError, parse_table
 from .treasures import sha256_bytes
@@ -76,10 +77,7 @@ def apply_edits(data: bytes, edits: list[dict]) -> bytes:
     for edit in edits:
         if not isinstance(edit, dict):
             raise CtbBaseError("Each CTB edit must be an object")
-        try:
-            record_id = int(edit.get("id"))
-        except (TypeError, ValueError) as error:
-            raise CtbBaseError("CTB record ID must be an integer") from error
+        record_id = integer_value(edit.get("id"), "CTB record ID", CtbBaseError)
         if not table.min_index <= record_id <= table.max_index:
             raise CtbBaseError(
                 f"CTB record ID must be between {table.min_index} and {table.max_index}"

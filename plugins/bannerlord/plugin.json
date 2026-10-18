@@ -2,6 +2,7 @@
   "id": "bannerlord",
   "name": "Mount & Blade II: Bannerlord",
   "accent": "#8d2f25",
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-Bannerlord",
   "processNames": [
     "Bannerlord.exe"
   ],

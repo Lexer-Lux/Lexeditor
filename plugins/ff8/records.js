@@ -44,13 +44,11 @@
     const name=character?.name||`Character ${field.value}`;
     const origin=()=>{state.selected.weapons=row.id;navigate('weapons')};
     const apply=value=>{field.value=Number(value);renderWeapons();shell.refresh()};
-    const finder=el('button',{type:'button','aria-label':`Choose character for ${row.name}`,
-      disabled:field.readonly||state.activeSource!=='mine',onclick:()=>beginSearcher({
-        type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
-        target:()=>navigate('characters'),accept:value=>{
-          if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
-        }})},LexeditorUI.selectionIcon());
-    const card=LexeditorUI.recordCard({image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
+    const finder=LexeditorUI.thingFinderButton({type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
+      target:()=>navigate('characters'),accept:value=>{
+        if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
+      },disabled:field.readonly||state.activeSource!=='mine',label:`Choose character for ${row.name}`});
+    const card=LexeditorUI.recordCard({className:'weapon-character-card',image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
     const figure=LexeditorUI.figureGrid([{media:card,caption:recordHoverLabel('characters',{id:Number(field.value),name},name)}]);
     return sourceControl(figure,()=>field.value,rowOf(state.vanilla,'weapons',row.id)?.fields?.find(entry=>entry.field===field.field)?.value,
       referenceValues('weapons',row.id,value=>value?.fields?.find(entry=>entry.field===field.field)?.value),apply,
@@ -390,34 +388,31 @@
     }
     return 10*at("gf_level_modifier_1")*level+Math.floor(at("gf_level_modifier_2")*level*level/256);
   };
-  function gfStatGrowth(fields,rowId){
+  // One graph per tab: the Leveling tab split into HP and XP, and the
+  // pager went away with it.
+  function gfCurveCards(fields,rowId){
     const pick=names=>names.map(name=>fields.find(field=>field.field===name)).filter(Boolean);
     const hpFields=pick(["gf_hp_modifier_1","gf_hp_modifier_2","gf_hp_modifier_3"]);
     const expFields=pick(["gf_level_modifier_1","gf_level_modifier_2"]);
-    const cards=[];
+    const cards={};
     const axis=kind=>{
       const peak=Math.max(...Array.from({length:100},(_,index)=>Number(gfCurveValue(kind,fields,index+1))||0));
       return{min:0,max:Math.max(1,Math.ceil(peak*1.08/5)*5)};
     };
-    if(hpFields.length===3)cards.push(curveEditor({title:"HP",overlayExtrema:true,
+    if(hpFields.length===3)cards.hp=curveEditor({title:"HP",overlayExtrema:true,
       variables:hpFields.map((field,index)=>({label:"ABC"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
       domain:{min:1,max:100},range:()=>axis("HP"),
       graphLabel:"GF HP from level 1 to level 100",
       evaluate:level=>gfCurveValue("HP",fields,level),
       formula:coloredCurveFormula("HP(L) = C + L * A + floor(10 * L^2 / B)"),
-      invalidText:"A DIVISOR IS 0"}));
-    if(expFields.length===2)cards.push(curveEditor({title:"XP",overlayExtrema:true,
+      invalidText:"A DIVISOR IS 0"});
+    if(expFields.length===2)cards.xp=curveEditor({title:"XP",overlayExtrema:true,
       variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
       domain:{min:1,max:100},range:()=>axis("XP"),
       graphLabel:"Cumulative experience required from level 1 to level 100",
       evaluate:level=>gfCurveValue("XP",fields,level),
-      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")}));
-    if(!cards.length)return null;
-    // One graph a page, like an enemy's stat graphs (Lexer: GF Leveling
-    // should be paged like the Enemies one, not stacked).
-    const index=Math.max(0,Math.min(cards.length-1,state.gfLevelPage||0));
-    return LexeditorUI.pagedPane(cards[index],pager({inline:true,page:index,pages:cards.length,pageSize:1,
-      total:cards.length,noun:"graphs",change:value=>{state.gfLevelPage=value;renderGFs()}}));
+      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")});
+    return cards;
   }
   function characterDetail(row){
     const visible=row.fields.filter(field=>field.field!=="gender"&&field.name!=="gender"&&field.label!=="Gender"),growth=visible.filter(field=>field.group==="Stat coefficients"),exp=visible.filter(field=>["exp_linear","exp_quadratic"].includes(field.field)),other=visible.filter(field=>field.group!=="Stat coefficients"&&!exp.includes(field));

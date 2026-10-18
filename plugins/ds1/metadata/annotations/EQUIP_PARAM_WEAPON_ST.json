@@ -27,7 +27,7 @@
     {
       "Field": "weaponWeightRate",
       "Name": "Equipment Weight Ratio",
-      "Description": "Affects animation recovery timing (such as dodging or follow-up attacks) via TAE event 300.\nHigher values mean slower recovery, lower values mean faster recovery.\nValues determine how much of the early recovery event (if present) is not active, from 0% to 100%.\nEffects of values will be dependent on the length of the early recovery event.\n1 = 100% (slowest), .5 = 50% (half), 0 = 0% (fastest)"
+      "Description": "Recovery speed after attacks and dodges. Higher values recover slower. 1 is slowest, 0 is fastest."
     },
     {
       "Field": "fixPrice",
@@ -377,7 +377,7 @@
     {
       "Field": "correctType",
       "Name": "Damage Correction Graph",
-      "Description": "Determine the calculcation correction graph to use when correcting damage."
+      "Description": "Which scaling graph this weapon uses. It stays read-only because the graph choices are not documented."
     },
     {
       "Field": "spAttribute",
@@ -452,7 +452,7 @@
     {
       "Field": "guardLevel",
       "Name": "Guard Damage Level",
-      "Description": "When guarding, the guard animation offset to use when being attacked."
+      "Description": "Which guard animation plays when a hit lands."
     },
     {
       "Field": "slashGuardCutRate",
@@ -492,7 +492,7 @@
     {
       "Field": "isDurabilityDivergence",
       "Name": "Is Animation Changed by Durability",
-      "Description": "The offset to apply to the animation set based on durability."
+      "Description": "Changes the weapon's animations based on its remaining durability."
     },
     {
       "Field": "rightHandEquipable",
@@ -617,7 +617,7 @@
     {
       "Field": "baseChangeCategory",
       "Name": "Job Category",
-      "Description": "The weapon job category (e.g. ascension or infusion). Used to display the attribute icon."
+      "Description": "Which ascension or infusion family this weapon belongs to. The game shows the matching attribute icon."
     },
     {
       "Field": "isDragonSlayer",

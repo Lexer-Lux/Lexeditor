@@ -9,8 +9,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   const fields = [...sides, "element", "power"];
   const labels = {top:"Top", bottom:"Bottom", left:"Left", right:"Right", element:"Element", power:"Selection power"};
   const clone = value => JSON.parse(JSON.stringify(value));
+  const ownerHelp = 'This rare card starts in this opponent deck when you begin a new game. Zero excludes it from opponent rare pools. Existing saves keep their ownership, and the last enabled mod with a starting-card map wins.';
+  const setOwner = (card, value) => {
+    if(state.activeSource!=='mine'||!Number.isInteger(Number(value))||Number(value)<0||Number(value)>239)return;
+    card.startingOwner=Number(value);noteFieldEdit('cards',{field:'startingOwner'});render();
+  };
   let mode = "cards";
-  const playerView = {query:"",page:0,selected:null};
+  const playerView = {query:"",page:0,selected:null,modOnly:false};
   const rank = value => Number(value) === 10 ? "A" : String(value);
   const elementOptions = () => state.data.cards.elements || [];
   const elementName = value => elementOptions()
@@ -91,6 +96,14 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         control: sourceControl(control, () => row[field], vanilla[field],
           referenceValues("cards", row.id, value => value?.[field]), update, format)});
     });
+    if(row.id>=77){
+      const control=numberControl(row.startingOwner,0,239,1,value=>setOwner(row,value),
+        {'aria-label':`${row.name} Starting deck`});
+      control.disabled=state.activeSource!=='mine';
+      properties.push(detailField({label:'STARTING DECK',pin:prefs?.pinButton('startingOwner','Starting deck'),
+        help:infoHelp(ownerHelp),control:sourceControl(control,()=>row.startingOwner,vanilla.startingOwner,
+          referenceValues('cards',row.id,value=>value?.startingOwner),value=>setOwner(row,value))}));
+    }
     // No NAME property. The name is the heading, and the heading is typed into
     // directly, so a card no longer carries its own name twice.
     return detailPanel({
@@ -115,7 +128,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // the one edit you want without leaving the list you are scanning.
     {key: "name", label: "Card",
       edit: (row, value) => {renameCard(row, value);shell.refresh();}},
-    ...fields.map(field => ({key: field, label: labels[field], pinned: false, numeric: true}))
+    ...fields.map(field => ({key: field, label: labels[field], pinned: false, numeric: true})),
+    {key:'startingOwner',label:'Starting deck',pinned:false,numeric:true,render:row=>row.startingOwner??'—'}
   ], detail, "74px minmax(240px,1fr)", {}, false);
   let render = () => null;
   // Only areas that really have a card player are listed. Finding them reads
@@ -128,13 +142,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       while (true) {
         const response = await fetch("/api/card-players");
         playerAreas = await response.json();
-        if (state.tab === "cards" && mode === "players") render();
+        if (state.tab === "cards" && (mode === "players" || mode === "decks")) render();
         if (playerAreas.ready || playerAreas.error) break;
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (error) {
       playerAreas = {ready:false, error:error.message || String(error), keys:[]};
-      if (state.tab === "cards" && mode === "players") render();
+      if (state.tab === "cards" && (mode === "players" || mode === "decks")) render();
     } finally { playerAreasPolling = false; }
   };
   const PLAYER_RULES=['Open','Same','Plus','Random','Sudden Death','Retry (unused)','Same Wall','Elemental'];
@@ -210,6 +224,26 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       deck:deckOfCall.has(entry.key)?[...deckOfCall.get(entry.key)].sort((a,b)=>a-b).join(', '):undefined}));
     return {players,deckOfCall};
   };
+  // Card players and decks are derived views: a player is its field map's
+  // script entries for one entity, a deck its rare cards plus its members.
+  // Field detail loads the vanilla copy alongside, so an unloaded map has
+  // no players on either side and compares unchanged.
+  const clean = row => {
+    const kept = {};
+    for (const key of Object.keys(row || {}).sort()) if (!key.startsWith("_")) kept[key] = row[key];
+    return JSON.stringify(kept);
+  };
+  const cardChanged = row => clean(row) !== clean(rowOf(state.vanilla, "cards", row.id));
+  const playerChanged = row => {
+    const map = state.data.fields.rows.find(value => value.key === row.map);
+    const before = state.vanilla?.fields?.rows?.find(value => value.key === row.map);
+    const now = (map?.players || []).filter(player => player.entity === row.entity);
+    const was = (before?.players || []).filter(player => player.entity === row.entity);
+    return clean(now) !== clean(was);
+  };
+  const deckChanged = row => row.members.some(playerChanged)
+    || state.data.cards.rows.some(card => card.id >= 77 && row.id !== 0
+      && card.startingOwner === row.id && cardChanged(card));
   const renderPlayers = () => {
     const pending=playerScanPending("Card players");
     if(pending)return pending;
@@ -251,13 +285,12 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               // id thing couldn't that just be a thing finder?").
               const link=LexeditorUI.hoverable({content:`Deck ${param.value}`,targetType:'card-decks',targetId:param.value,
                 targetLabel:`deck ${param.value}`,activate:()=>openDeck(param.value)});
-              const finder=el('button',{type:'button',title:'Choose a deck','aria-label':`Choose the deck for ${entry.name}`,disabled:locked(param),
-                onclick:event=>{event.preventDefault();event.stopPropagation();
-                  LexeditorUI.beginSearcher({type:'card-decks',prompt:`Choose the deck for ${entry.name}.`,
-                    target:()=>{mode='decks';render()},origin:()=>openPlayer(entry.key),
-                    accept:value=>{update(value);openPlayer(entry.key)}})}},LexeditorUI.selectionIcon());
+              const finder={type:'card-decks',prompt:`Choose the deck for ${entry.name}.`,
+                target:()=>{mode='decks';render()},origin:()=>openPlayer(entry.key),
+                accept:value=>{update(value);openPlayer(entry.key)},
+                title:'Choose a deck',label:`Choose the deck for ${entry.name}`,disabled:locked(param)};
               return detailField({label:'Deck',help:infoHelp(help[0]),
-                control:sourceControl(LexeditorUI.choiceField(link,finder),()=>param.value,before?.value,[],value=>{update(value);render()},value=>`Deck ${value}`)});
+                control:sourceControl(LexeditorUI.thingFinderField(link,finder),()=>param.value,before?.value,[],value=>{update(value);render()},value=>`Deck ${value}`)});
             }
             // Rules and card levels are bits of one argument: the shared
             // switch row, with boxes, and a pin on each rule so it can be a
@@ -304,6 +337,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           if(calls.length===1)body.push(...fields);
           else body.push(detailSection({title:`Setup ${index+1}`,
             help:infoHelp('The game script chooses which of this opponent\'s card-game setups is used.'),body:fields}));
+          const deck=player.params?.find(param=>param.id===0);
+          if(deck?.mode==='literal')body.push(rareCardsSection(deck.value,false,
+            calls.length===1?'STARTING RARE CARDS':`SETUP ${index+1} STARTING RARE CARDS`));
           const levels=player.params?.find(param=>param.id===6);
           if(levels?.mode==='literal'){
             const mask=(levels.value&255)===0?1:levels.value&127;
@@ -321,6 +357,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
       page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,addDisabledReason:'Card players are the people the game places in its world; each is fixed by the game and a new one has nowhere to stand.',fit:{minRowHeight:28},
+      modOnly:{available:state.activeSource==='mine',value:playerView.modOnly===true,changed:playerChanged,
+        change:value=>{playerView.modOnly=value;playerView.page=0;render();}},
       className:'ff8-card-players',splitKey:'ff8-card-players',rowsKey:'ff8-card-players',
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
@@ -333,44 +371,79 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         return columnList({rows,key:row=>row.key,selected,select,columns:playerColumnDefinitions(),columnPreferences:playerColumns()})},detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
-  const deckView = {query:"",page:0,selected:null};
+  const deckView = {query:"",page:0,selected:null,modOnly:false};
   const cardDecks = () => {
     const decks=new Map();
+    for(const card of state.data.cards.rows.filter(card=>card.id>=77))
+      if(!decks.has(card.startingOwner))decks.set(card.startingOwner,{id:card.startingOwner,members:[]});
     for(const player of cardPlayerModel().players)
       for(const deck of String(player.deck??'').split(', ').filter(Boolean).map(Number)){
         if(!decks.has(deck))decks.set(deck,{id:deck,members:[]});
         decks.get(deck).members.push(player);
       }
-    return [...decks.values()].sort((a,b)=>a.id-b.id);
+    return [...decks.values()].map(deck=>({...deck,values:{
+      count:deck.members.length,names:deck.members.map(member=>member.name).join(', '),
+      rareCards:state.data.cards.rows.filter(card=>card.id>=77&&deck.id!==0&&card.startingOwner===deck.id).map(card=>card.name).join(', ')
+    }})).sort((a,b)=>a.id-b.id);
   };
+  const deckColumnDefinitions=()=>[
+    {key:'id',label:'Deck',numberedId:true,numeric:true,render:row=>row.id},
+    {key:'count',label:'Opponents',numeric:true,sortValue:row=>row.values.count,render:row=>row.values.count},
+    {key:'names',label:'Used by',sortValue:row=>row.values.names,render:row=>row.values.names},
+    {key:'rareCards',label:'Starting rare cards',pinned:false,sortValue:row=>row.values.rareCards,render:row=>row.values.rareCards}];
+  let deckColumnPrefs=null;
+  const deckColumns=()=>deckColumnPrefs||=LexeditorUI.columnPreferences('ff8-card-decks',deckColumnDefinitions(),()=>render());
   const openPlayer = key => {mode='players';playerView.selected=key;playerView.query='';playerView.page=null;render()};
   const openDeck = id => {mode='decks';deckView.selected=Number(id);deckView.query='';deckView.page=null;render()};
+  const rareCardsSection = (deckId,editable,title='STARTING RARE CARDS') => {
+    const cards=state.data.cards.rows.filter(card=>card.id>=77&&deckId!==0&&card.startingOwner===deckId);
+    const body=[];
+    if(editable&&deckId>0&&deckId<=239){
+      const choices=state.data.cards.rows.filter(card=>card.id>=77&&card.startingOwner!==deckId);
+      const picker=LexeditorUI.choicePopover({label:`Add a rare card to deck ${deckId}`,
+        choices:choices.map(card=>({value:card.id,label:card.name})),
+        select:id=>setOwner(state.data.cards.rows.find(card=>card.id===Number(id)),deckId)});
+      const add=el('button',{type:'button',disabled:state.activeSource!=='mine'||!choices.length,
+        'aria-label':`Add rare card to deck ${deckId}`,onclick:()=>picker.openFor(add)},'ADD RARE CARD');
+      body.push(LexeditorUI.actionRow(add));
+    }
+    if(cards.length)body.push(LexeditorUI.tileGrid(cards.map(card=>LexeditorUI.recordCard({
+      title:LexeditorUI.hoverable({content:card.name,targetType:'cards',targetId:card.id,targetLabel:card.name,
+        activate:()=>{state.selected.cards=card.id;state.filters.cards='';mode='cards';render()}}),
+      image:el('img',{src:`/assets/cards/${card.id}.png`,alt:card.name,loading:'lazy'}),
+      body:editable?el('button',{type:'button',disabled:state.activeSource!=='mine',
+        'aria-label':`Remove ${card.name} from deck ${deckId}`,onclick:()=>setOwner(card,0)},'REMOVE'):null
+    })),{balanced:true,minWidth:110}));
+    else body.push(LexeditorUI.detailNote('No starting rare cards in this deck.'));
+    return detailSection({title,help:el('span',{},editable?deckColumns().pinButton('rareCards','Starting rare cards'):null,infoHelp(ownerHelp)),body});
+  };
   const renderDecks = () => {
     const pending=playerScanPending("Decks");
     if(pending)return pending;
     const decks=cardDecks(),query=deckView.query.trim().toLowerCase();
     const rows=decks.filter(deck=>!query||`${deck.id} ${deck.members.map(member=>member.name).join(' ')}`.toLowerCase().includes(query));
     const detail=deck=>detailPanel({title:`Deck ${deck.id}`,identity:recordId(deck.id),
-      help:"A deck is the number a CARDGAME call names: it identifies the opponent's rare-card ownership, and several opponents can share one. Which rare cards a deck holds is set in the game's program and is not read yet.",
-      body:[detailSection({title:'OPPONENTS',help:infoHelp('Every opponent whose script names this deck. Open one to change its settings or its deck.'),
-        body:[columnList({rows:deck.members,key:member=>member.key,fill:true,localSort:false,class:'ff8-record-list',
+      help:"Several opponents can share a deck number. These rare cards are the starting assignments, which can change owners during play. Each opponent's detail shows its common card pool. Deck zero uses no rare cards. This page does not read ownership from your save.",
+      body:[rareCardsSection(deck.id,true),detailSection({title:'OPPONENTS',help:el('span',{},deckColumns().pinButton('count','Opponents'),deckColumns().pinButton('names','Used by'),infoHelp('Every opponent whose script names this deck. Open one to change its settings or its deck.')),
+        body:[deck.members.length?columnList({rows:deck.members,key:member=>member.key,fill:true,localSort:false,class:'ff8-record-list',
           'aria-label':`Opponents using deck ${deck.id}`,template:'minmax(140px,1fr) minmax(140px,1fr)',
           columns:[{key:'name',label:'Player',sortable:false,render:member=>LexeditorUI.hoverable({content:member.name,
               targetType:'card-players',targetId:member.key,targetLabel:member.name,activate:()=>openPlayer(member.key)})},
             {key:'map',label:'Location',sortable:false,render:member=>{const map=state.data.fields.rows.find(row=>row.key===member.map);
               return map?LexeditorUI.hoverable({content:map.name,targetType:'fields',targetId:map.id,targetLabel:map.name,
-                activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}}):member.map}}]})]})]});
-    return LexeditorUI.pagedListDetail({rows,key:row=>row.id,selected:deckView.selected,
+                activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}}):member.map}}]}):LexeditorUI.detailNote('No opponent script names this deck directly.')]})]});
+    // names: decks are numeric script references and have no stored names.
+    return LexeditorUI.pagedListDetail({order:"given",rows,key:row=>row.id,selected:deckView.selected,
       page:deckView.page,pageSize:40,noun:'decks',maxBarrels:1,slots:true,
+      modOnly:{available:state.activeSource==='mine',value:deckView.modOnly===true,changed:deckChanged,
+        change:value=>{deckView.modOnly=value;deckView.page=0;render();}},
       addDisabledReason:'A deck exists only as a number an opponent\'s script names; choose a deck on the opponent instead.',fit:{minRowHeight:28},
       className:'ff8-card-decks',splitKey:'ff8-card-decks',rowsKey:'ff8-card-decks',
       search:{key:'ff8-card-decks',value:deckView.query,label:'Search decks',change:value=>{deckView.query=value;deckView.page=0;render()}},
       sync:next=>Object.assign(deckView,next),change:next=>{Object.assign(deckView,next);render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.id,selected,select,
         decorateRow:(node,row)=>LexeditorUI.decorateSearchCandidate(node,{type:'card-decks',value:row.id,label:`Deck ${row.id}`}),
-        columns:[{key:'id',label:'Deck',numberedId:true,render:row=>row.id},
-          {key:'count',label:'Opponents',render:row=>row.members.length},
-          {key:'names',label:'Used by',render:row=>row.members.map(member=>member.name).join(', ')}]}),detail,
+        columns:deckColumnDefinitions(),columnPreferences:deckColumns()}),detail,
       emptyDetail:()=>detailPanel({title:'Decks',body:[LexeditorUI.detailNote('No decks match this search.')]})});
   };
   render = () => {
@@ -393,7 +466,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     render,
     edits: () => state.data.cards.rows.flatMap(row => {
       const base = state.base.cards.find(value => value.id === row.id);
-      return fields.filter(field => row[field] !== base[field])
+      return [...fields,'startingOwner'].filter(field => row[field] !== base[field])
         .map(field => ({id: row.id, field, value: row[field]}));
     })
   };

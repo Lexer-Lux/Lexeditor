@@ -189,13 +189,28 @@ class NoModProjectTests(unittest.TestCase):
             self.assertTrue(fresh["noMod"], fresh)
             self.assertFalse(fresh["valid"])
             self.assertIn("Create one to save changes", fresh["problems"][0])
-            # A folder the reader picked that has since gone is damage, not
-            # a game that was never modded.
+            # A selected mod deleted outside Lexeditor leaves the game on
+            # Vanilla, which opens, instead of a plugin that never restarts.
+            gone_path = root / "gone"
             manager.path.write_text(json.dumps({PLUGIN.plugin_id: {
-                "current": str(root / "gone")}}), encoding="utf-8")
-            gone = manager.snapshot(PLUGIN.plugin_id)["projects"][0]
-            self.assertFalse(gone["noMod"], gone)
-            self.assertIn("Reselect or recreate it", gone["problems"][0])
+                "current": str(gone_path), "known": [str(gone_path)]}}), encoding="utf-8")
+            snapshot = manager.snapshot(PLUGIN.plugin_id)
+            self.assertEqual(snapshot["missingProject"], str(gone_path.resolve()))
+            current = [row for row in snapshot["projects"] if row["current"]]
+            self.assertEqual([row["name"] for row in current], ["Vanilla"])
+            self.assertTrue(current[0]["valid"] and current[0]["noMod"])
+            self.assertNotIn(str(gone_path.resolve()), [row["path"] for row in snapshot["projects"]])
+            # It is not marked removed: a folder that comes back is choosable again.
+            stored = json.loads(manager.path.read_text(encoding="utf-8"))[PLUGIN.plugin_id]
+            self.assertFalse(stored.get("forgotten"))
+            # The page is told until another mod is chosen.
+            self.assertIn("missingProject", manager.snapshot(PLUGIN.plugin_id))
+            gone_path.mkdir()
+            for name in PLUGIN.projects.required_paths:
+                (gone_path / name).parent.mkdir(parents=True, exist_ok=True)
+                (gone_path / name).write_text("", encoding="utf-8")
+            chosen = manager.select(PLUGIN.plugin_id, str(gone_path))
+            self.assertNotIn("missingProject", chosen)
 
 
 if __name__ == "__main__":

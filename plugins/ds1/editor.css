@@ -1,5 +1,99 @@
-.ds1-items { display:flex; flex-direction:column; height:100%; min-height:0; }
-.ds1-records { flex:1; min-height:0; }
-.ds1-attack-preview dl { display:grid; grid-template-columns:auto auto; gap:.15em 1em; margin:.4em 0; }
-.ds1-attack-preview dd { margin:0; text-align:end; }
-.ds1-attack-preview p { margin:0; }
+/* Dark Souls Remastered, as values: abyss blacks under parchment lettering,
+   bonfire-gold borders and headings, ember-gold marked rows, and the game's
+   own blood red for destructive actions. Headings use an engraved serif
+   stack in place of the installed bitmap menu font, which has no proved
+   webfont conversion yet (see Theme in credits.md). This layers over the
+   shared framework; layout stays shared. */
+:root {--lex-bg:#0d0c0a;--lex-panel:#151310;--lex-panel-2:#1d1a14;--lex-border:#3a332a;
+  --lex-text:#e9e1cf;--lex-muted:#a79b80;--lex-accent:#a4824c;--lex-accent-text:#141210;
+  --lex-highlight:#f6eeda;--lex-danger:#a02622;--lex-skin:on;
+  --lex-shell-header-bg:#080706;--lex-nav-bg:#080706;
+  --lex-command-row-bg:#100e0a;--lex-command-row-border:1px solid;--lex-command-row-border-color:#3a332a;
+  --lex-tab-fg:#d8cdb2;--lex-tab-bg:#1d1a14;
+  --lex-tab-border:1px solid;--lex-tab-border-color:#3a332a;
+  --lex-tab-hover-bg:#2a2419;
+  --lex-tab-active-fg:#ffe9b8;--lex-tab-active-bg:#33291a;--lex-tab-active-border-color:#a4824c;
+  /* Panels, lists and the marked row. */
+  --lex-surface-bg:#151310;--lex-surface-border:1px solid;
+  --lex-surface-border-color:#3a332a;
+  --lex-list-header-fg:#f6eeda;--lex-list-header-bg:#241f15;--lex-list-cell-border:#ffffff1f;
+  --lex-sort-header-fg:#e8c67a;--lex-sort-header-bg:#100e0a;
+  --lex-row-hover-bg:#2a2419;--lex-row-selected-bg:#4a3a20;--lex-row-selected-fg:#ffe9b8;
+  --lex-pager-fg:#e9e1cf;--lex-pager-bg:#100e0a;--lex-pager-border:1px solid;
+  --lex-pager-border-color:#3a332a;--lex-pager-button-fg:#e9e1cf;
+  --lex-pager-button-bg:#241f15;--lex-pager-button-border:1px solid;
+  --lex-pager-button-border-color:#4a4234;--lex-pager-button-radius:3px;
+  /* Every value sits in the window's darker inset. */
+  --lex-input-fg:#e9e1cf;--lex-input-border:1px solid;
+  --lex-input-border-color:#4a4234;--lex-input-radius:3px;
+  --lex-input-bg:#0a0908;--lex-input-shadow:none;
+  --lex-section-title-fg:#e8c67a;--lex-section-title-font:17px/1.2 var(--lex-heading-font);
+  --lex-section-title-border:1px solid #3a332a;
+  --lex-detail-title-fg:#f6eeda;--lex-detail-id-fg:#a79b80;
+  --lex-heading-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-radius:3px;
+  --lex-detail-icon-bg:#241f15;--lex-detail-icon-fg:#e8c67a;
+  --lex-loading-color:#a4824c;
+  /* The record's own picture stays with its name on the header's left,
+     whether or not a model preview is attached. */
+  --lex-preview-icon-side:left;}
+
+.lex-goto-button{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+.lex-goto-button:hover{opacity:1;}
+.lex-goto-icon{width:16px;height:16px;vertical-align:middle;}
+.lex-goto-button:disabled{opacity:.3;cursor:default;}
+.lex-viewport-picker>svg{width:16px;height:16px;vertical-align:middle;}
+
+.lex-dir-tabs > .lex-subtab-button{flex:0 1 auto;}
+
+.ds1-directory{flex:0 0 auto;}
+.ds1-anim{display:flex;gap:8px;align-items:stretch;}
+/* A model thumbnail stays unseen until its snapshot is drawn: before that the
+   icon slot keeps its placeholder, so the heading never jumps or flashes. */
+.ds1-model-thumbnail{max-width:100%;max-height:100%;object-fit:contain;}
+.ds1-item-icon{max-width:100%;max-height:100%;object-fit:contain;}
+.lex-ds1-label-art{flex:0 0 auto;width:14px;height:14px;display:block;}
+/* Detail lanes fit three across a 950px panel: measured spill-free
+   with zero new clips against the 400px default. Tweaks and settings
+   keep the shared width. */
+.lex-detail-panel .lex-tweak-card-grid{--lex-tweak-card-width:300px;}
+/* A shop row's sold-item picture fits a single table row. */
+.lex-ds1-shop-icon{width:28px;height:28px;object-fit:contain;display:block;}
+.lex-ds1-no-thumbnail{display:inline-grid;place-items:center;}
+.lex-ds1-no-thumbnail>svg{width:100%;height:100%;display:block;}
+.ds1-model-thumbnail.lex-image-pending{visibility:hidden;}
+/* The variant picker plus its stage fill the drawer like a bare stage:
+   without this the plain div breaks the drawer's flex and the stage sits
+   at its minimum height in a tall empty drawer. */
+.lex-preview-variant-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.lex-preview-variant-wrap>button{align-self:flex-start;}
+/* The gender toggle is one sign in the view-mode bar: the mode class
+   gives the 26px box, this centers a readable glyph inside it. */
+.lex-preview-gender-toggle{display:flex;align-items:center;justify-content:center;
+  padding:0;font:400 16px/1 var(--lex-symbol-font);}
+.ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
+.lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
+/* A record link is a hoverable face (the linked record's name) plus a
+   finder button (pick another target). The face takes the row; the
+   dialog line beside its number does the same. */
+.ds1-reference-field{display:flex;align-items:center;gap:6px;}
+.ds1-reference-field>*:first-child{flex:1 1 auto;min-width:0;}
+.ds1-reference-face{width:100%;}
+.ds1-reference-face{flex:1 1 auto;min-width:0;display:flex;}
+.ds1-reference-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+.ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+.ds1-find-reference{flex:0 0 auto;}
+.ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.lex-compact-pager [data-dir-local].lex-pager-toggle>span{writing-mode:horizontal-tb;transform:none;}
+.ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* The Selection pane is narrow, and its longest name-plus-help ("Enemy" plus
+   its mark) would otherwise shrink to the font floor. The floor is the
+   framework's own lane minimum: wide enough that the names settle with the
+   pane's other labels, narrow enough that the coordinate inputs still fit. */
+[data-maps-side]{--lex-detail-label-floor:68px;}
+/* The file tabs' texture thumbnails share one wrapping row of squares,
+   Models and Textures alike; each square is named under its picture. */
+.ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;}
+.ds1-texture-tile{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;max-width:160px;}
+.ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
+.ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
+.ds1-texture-help{flex:0 0 auto;display:flex;}

@@ -23,23 +23,26 @@ def test_attack_fields_move_without_losing_edits(page):
       function gfPanel(title,fields,row,kind){return el('div',{'data-gf-panel':kind},...fields.map(field=>
         LexeditorUI.detailField({label:field.label,control:el('input',{type:'number',value:field.value,
           'aria-label':field.label,onchange:e=>field.value=Number(e.target.value)})})));}
-      function gfStatGrowth(fields,rowId){
+      function gfCurveCards(fields,rowId){
         const card=(title,names)=>el('div',{class:'lex-curve-editor','data-curve':title},
           ...names.map((name,index)=>{const field=row.fields.find(f=>f.field===name);
             return el('label',{},`${title} variable ${'ABC'[index]}`,
               el('input',{type:'number',value:field.value,'aria-label':`${title} variable ${'ABC'[index]}`,
                 onchange:e=>field.value=Number(e.target.value)}))}));
-        return LexeditorUI.curveGrid({columns:1},card('HP',GF_CURVE_FIELDS.slice(0,3)),card('XP',GF_CURVE_FIELDS.slice(3)));
+        return {hp:card('HP',GF_CURVE_FIELDS.slice(0,3)),xp:card('XP',GF_CURVE_FIELDS.slice(3))};
       }
       const startingFields=()=>el('div',{},'Initial GF state');
       function renderGFs(){document.querySelector('main').replaceChildren(gfCenterPanel(row,gfFieldsByPanel(row),{fields:[],id:0}));}
     '''.replace('ROWS',json.dumps(rows))+routing+panel+'renderGFs();')
-    assert page.get_by_role('tab',name=re.compile('^Leveling',re.I)).count()==1
+    assert page.get_by_role('tab',name=re.compile('^HP',re.I)).count()==1
+    assert page.get_by_role('tab',name=re.compile('^XP',re.I)).count()==1
+    assert page.get_by_role('tab',name=re.compile('^Leveling',re.I)).count()==0
     assert page.get_by_role('tab',name=re.compile('^Properties',re.I)).count()==0
-    assert page.locator('.lex-curve-editor').count()==2
+    assert page.locator('.lex-curve-editor').count()==1
+    assert page.locator('.lex-curve-editor[data-curve="HP"]').count()==1
     assert page.get_by_text('LEVEL CURVES').count()==0
     assert page.locator('main .lex-detail-section').count()==0
-    assert 'repeat(1,minmax(0,1fr))' in (page.locator('[data-gf-panel="general"]').get_attribute('style') or '')
+    assert page.locator('.lex-curve-editor[data-gf-panel="general"]').count()==1
     assert page.get_by_role('spinbutton',name='GF power',exact=True).count()==0
     assert page.get_by_role('spinbutton',name='Boost phase 1 length (x15)',exact=True).count()==0
     assert page.get_by_role('spinbutton',name='Boost total window (x15)',exact=True).count()==0
@@ -54,8 +57,11 @@ def test_attack_fields_move_without_losing_edits(page):
     power.fill('45');power.blur()
     boost=page.get_by_role('spinbutton',name='Boost phase 1 length (x15)',exact=True)
     boost.fill('9');boost.blur()
-    page.get_by_role('tab',name=re.compile('^Leveling',re.I)).click()
+    page.get_by_role('tab',name=re.compile('^HP',re.I)).click()
     assert page.get_by_role('spinbutton',name='HP variable A',exact=True).input_value()=='7'
+    page.get_by_role('tab',name=re.compile('^XP',re.I)).click()
+    assert page.get_by_role('spinbutton',name='XP variable A',exact=True).count()==1
+    assert page.get_by_role('spinbutton',name='HP variable A',exact=True).count()==0
     page.get_by_role('tab',name=re.compile('^Defaults',re.I)).click()
     page.get_by_text('Initial GF state',exact=True).wait_for()
     page.get_by_role('tab',name=re.compile('^Attack',re.I)).click()

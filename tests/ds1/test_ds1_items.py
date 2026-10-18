@@ -7,10 +7,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from ds1_fixture import make_archive
-from plugins.ds1.formats import ItemDocument, FormatError, SUBTABS, TABLES, inflate
+from ds1_fixture import make_archive, make_menu_archive
+from ds1_effects_fixture import make_effects_archive
+from plugins.ds1.formats import ABSORPTION_BASE, EFFECT_TABLE, ItemDocument, FormatError, SUBTABS, TABLES, inflate
+from plugins.ds3.formats import write_field
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
+from plugins.ds1 import texts
 
 
 def project(tmp_path):
@@ -95,7 +98,7 @@ def test_service_edit_save_and_reload(tmp_path):
         with urlopen(req) as reply: return json.load(reply)
     try:
         session.start()
-        assert len(request('/api/state')['tabs']) == 8
+        assert [tab['id'] for tab in request('/api/state')['tabs']] == [tab for tab, _, _ in SUBTABS]
         assert request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'sellValue', 'value': 42})['dirtyCount'] == 1
         assert request('/api/save', {})['saved']
         request('/api/discard', {})
@@ -104,3 +107,252 @@ def test_service_edit_save_and_reload(tmp_path):
         with pytest.raises(HTTPError): request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'goodsType', 'value': 999})
     finally:
         session.stop()
+
+
+def test_service_edit_returns_fresh_row_values(tmp_path):
+    game, mod = tmp_path / 'game', tmp_path / 'mod'
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(make_effects_archive())
+    (game / texts.MENU_RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive())
+    mod.mkdir()
+    (mod / MARKER).touch()
+    session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
+                          'LEXEDITOR_MOD_READ_ONLY': '0', 'LEXEDITOR_NO_MOD': '0'})
+    def request(path, payload=None):
+        req = Request(session.url.rstrip('/') + path, data=None if payload is None else json.dumps(payload).encode(),
+                      headers={'Content-Type': 'application/json'})
+        with urlopen(req) as reply: return json.load(reply)
+    try:
+        session.start()
+        edited = request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'sellValue', 'value': 42})
+        assert edited['values']['sellValue'] == 42
+        assert edited['refreshRows'] is False
+        fresh = {field['key']: field['value']
+                 for field in request('/api/row?table=EquipParamGoods&id=100')['row']['fields']}
+        for key, value in fresh.items():
+            assert edited['values'][key] == value, key
+        effect = request('/api/edit', {'table': 'SpEffectParam', 'id': 40, 'field': 'maxHpRate', 'value': 1.5})
+        assert effect['refreshRows'] is True
+        assert effect['values']['maxHpRate'] == 1.5
+        label = request('/api/edit', {'table': 'MenuText', 'id': 102204, 'field': 'label', 'value': 'Mag DEF!'})
+        assert label['values'] == {'label': 'Mag DEF!'}
+    finally:
+        session.stop()
+
+
+def test_pending_changes_read_newest_first():
+    # Lexer: "new things get placed on the top of the list".
+    document = ItemDocument(make_archive())
+    edited, originals = [], []
+    for tab, _, _ in SUBTABS[:3]:
+        row = document.list_rows(tab)[0]
+        field = next(f for f in document.read_row(row['table'], row['id'])['fields']
+                     if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'] and f['value'] != 1)
+        document.edit(row['table'], row['id'], field['key'], 1)
+        edited.append(field['label'])
+        originals.append(field['value'])
+    labels = [change['label'] for change in document.pending_changes()]
+    assert [next(label for label in edited if entry.endswith(label)) for entry in labels] == edited[::-1]
+    # Editing the oldest again brings it back to the top.
+    first = labels[-1]
+    row = document.list_rows(SUBTABS[0][0])[0]
+    key = next(f['key'] for f in document.read_row(row['table'], row['id'])['fields'] if f['label'] == edited[0])
+    document.edit(row['table'], row['id'], key, 2 if originals[0] != 2 else 3)
+    assert document.pending_changes()[0]['label'] == first
+
+
+def test_putting_a_float_back_as_shown_leaves_nothing_to_save():
+    # Lexer: undo all the way back "and there are still 7 changes". Undo sends
+    # back the value as shown (seven digits); a float needs up to nine.
+    document = ItemDocument(make_archive())
+    for tab, _, _ in SUBTABS:
+        row = document.list_rows(tab)[0]
+        fields = [f for f in document.read_row(row['table'], row['id'])['fields']
+                  if f['editable'] and f['dtype'] == 'f32' and isinstance(f['value'], float)]
+        if fields:
+            break
+    field = fields[0]
+    # A saved value that seven digits cannot spell exactly, as most are.
+    from plugins.ds1.formats import write_field, read_field
+    spec = next(f['spec'] for f in document.schemas[row['table']]['fields'] if f['spec'].key == field['key'])
+    _r, start, data = document._row(row['table'], row['id'])
+    third = write_field(data, spec, 1 / 3, '<')
+    document.plain[start:start + len(data)] = third
+    original = document.original_plain
+    document.original_plain = original[:start] + bytes(third) + original[start + len(data):]
+    shown = document.read_row(row['table'], row['id'])['fields'][[f['key'] for f in document.read_row(row['table'], row['id'])['fields']].index(field['key'])]['value']
+    assert shown != read_field(third, spec, '<')
+    document.edit(row['table'], row['id'], field['key'], shown + 1 if shown + 1 <= field['maximum'] else shown - 1)
+    assert document.dirty_count == 1
+    document.edit(row['table'], row['id'], field['key'], shown)
+    assert document.dirty_count == 0
+    assert bytes(document.plain) == bytes(document.original_plain)
+
+
+def armor_with_upgrades(rates):
+    """Armor 100 with Armor Rework effects for +0..+3; upgrade rows exist for +0..+2 only."""
+    from ds1_effects_fixture import make_effects_archive
+    from plugins.ds1.formats import write_field
+    base = 30_000_100
+    document = ItemDocument(make_effects_archive(extra_ids=range(base, base + 4)))
+    def put(table, row_id, key, value):
+        _r, start, data = document._row(table, row_id)
+        spec = next(f['spec'] for f in document.schemas[table]['fields'] if f['spec'].key == key)
+        document.plain[start:start + len(data)] = write_field(data, spec, value, '<')
+    put('EquipParamProtector', 100, 'residentSpEffectId3', base)
+    put('EquipParamProtector', 100, 'reinforceTypeId', 100)
+    for row_id, (physics, magic, fire, thunder) in zip((100, 101, 102), rates):
+        for key, value in zip(('physicsDefRate', 'slashDefRate', 'blowDefRate', 'thrustDefRate',
+                               'magicDefRate', 'fireDefRate', 'thunderDefRate'),
+                              (physics, physics, physics, physics, magic, fire, thunder)):
+            put('ReinforceParamProtector', row_id, key, value)
+    return document, base
+
+
+def absorbed(document, effect, cut):
+    return (1 - document.value('SpEffectParam', effect, cut)) * 100
+
+
+def test_armor_absorption_scales_by_the_upgrade_table():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1.1, 1.5, 2), (1.5, 1.2, 1.5, 2)])
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 15)
+    # Slash follows slashDefRate (set equal to physical here); +3 has no upgrade row, so it is not scaled.
+    got = [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)]
+    assert got == pytest.approx([15, 15.3, 22.5, 15], abs=1e-4)
+    document.edit('EquipParamProtector', 100, 'absorption:magicDamageCutRate', 10)
+    document.edit('EquipParamProtector', 100, 'absorption:fireDamageCutRate', 10)
+    document.edit('EquipParamProtector', 100, 'absorption:thunderDamageCutRate', 10)
+    for cut, expected in (('magicDamageCutRate', [10, 11, 12, 10]), ('fireDamageCutRate', [10, 15, 15, 10]),
+                          ('thunderDamageCutRate', [10, 20, 20, 10])):
+        assert [absorbed(document, base + level, cut) for level in range(4)] == pytest.approx(expected, abs=1e-4)
+    # Every level is recomputed from +0, whatever the rows held before.
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 20)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([20, 20.4, 30, 20], abs=1e-4)
+
+
+def test_slash_strike_thrust_upgrade_independently_of_physical():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.5, 1, 1, 1), (1.5, 1, 1, 1)])
+    from plugins.ds1.formats import write_field
+    def put(key, row_id, value):
+        _r, start, data = document._row('ReinforceParamProtector', row_id)
+        spec = next(f['spec'] for f in document.schemas['ReinforceParamProtector']['fields'] if f['spec'].key == key)
+        document.plain[start:start + len(data)] = write_field(data, spec, value, '<')
+    for row_id in (101, 102):
+        put('slashDefRate', row_id, 1.0)
+        put('blowDefRate', row_id, 2.0)
+    for cut in ('neutralDamageCutRate', 'slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'):
+        document.edit('EquipParamProtector', 100, 'absorption:' + cut, 10)
+    level = lambda cut: [absorbed(document, base + n, cut) for n in range(3)]
+    assert level('neutralDamageCutRate') == pytest.approx([10, 15, 15], abs=1e-4)
+    assert level('slashDamageCutRate') == pytest.approx([10, 10, 10], abs=1e-4)
+    assert level('blowDamageCutRate') == pytest.approx([10, 20, 20], abs=1e-4)
+    assert level('thrustDamageCutRate') == pytest.approx([10, 15, 15], abs=1e-4)
+
+
+def test_editing_an_upgrade_multiplier_rebuilds_the_armor_using_it():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
+    for cut in ('neutralDamageCutRate', 'slashDamageCutRate'):
+        document.edit('EquipParamProtector', 100, 'absorption:' + cut, 10)
+    # The Armor Upgrades tab: +1's slash multiplier goes to 2.
+    document.edit('ReinforceParamProtector', 101, 'slashDefRate', 2.0)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(3)] == \
+        pytest.approx([10, 20, 15], abs=1e-4)
+    # Physical scales by its own column, untouched.
+    assert [absorbed(document, base + level, 'neutralDamageCutRate') for level in range(3)] == \
+        pytest.approx([10, 10.2, 15], abs=1e-4)
+
+
+def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 0)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([0, 0, 0, 0], abs=1e-4)
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', -5)
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([-5, -4.9, -2.5, -5], abs=1e-4)
+    for bad in (-101, 100):
+        with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
+
+
+def test_armor_and_shield_guard_fields_carry_no_icons():
+    # The hand-drawn glyphs were never game art, so fields ship without
+    # icons until the menu icon atlas is extracted: game art only.
+    document = ItemDocument(make_archive())
+    armor = {field['key']: field.get('icon', '')
+             for field in document.read_row('EquipParamProtector', 100)['fields']}
+    assert armor['defenseThunder'] == ''
+    assert armor['resistBlood'] == ''
+    guard = {field['key']: field.get('icon', '')
+             for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert guard['thunGuardCutRate'] == ''
+    assert guard['curseGuardResist'] == ''
+
+
+def test_weapon_guard_labels_carry_percent_unit():
+    document = ItemDocument(make_archive())
+    fields = {field['key']: field
+              for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert fields['poisonGuardResist']['label'] == 'Poison guard (%)'
+    assert fields['diseaseGuardResist']['label'] == 'Toxic guard (%)'
+    assert fields['bloodGuardResist']['label'] == 'Bleed guard (%)'
+    assert fields['curseGuardResist']['label'] == 'Curse guard (%)'
+    from plugins.ds1.monsters import NPC_FIELDS
+    assert NPC_FIELDS['poisonGuardResist'][0] == 'Poison guard (%)'
+
+
+def test_scaling_and_requirement_fields_carry_no_icons():
+    # The hand-drawn glyphs were never game art, so fields ship without
+    # icons until the menu icon atlas is extracted: game art only.
+    document = ItemDocument(make_archive())
+    weapon = {field['key']: field.get('icon', '')
+              for field in document.read_row('EquipParamWeapon', 100)['fields']}
+    assert weapon['correctStrength'] == ''
+    assert weapon['correctAgility'] == ''
+    assert weapon['correctMagic'] == ''
+    assert weapon['correctFaith'] == ''
+    assert weapon['properStrength'] == ''
+    assert weapon['properAgility'] == ''
+    assert weapon['properMagic'] == ''
+    assert weapon['properFaith'] == ''
+    magic = {field['key']: field.get('icon', '')
+             for field in document.read_row('Magic', 100)['fields']}
+    assert magic['requirementIntellect'] == ''
+    assert magic['requirementFaith'] == ''
+
+
+def test_armor_list_rows_carry_absorption_shares_for_pinned_columns(monkeypatch):
+    """A pinned Lightning absorption column reads row values, like the detail pane."""
+    document = ItemDocument(make_effects_archive())
+    document.edit(EFFECT_TABLE, 6890, "thunderDamageCutRate", 0.9)
+    reopened = ItemDocument(document.export())
+    monkeypatch.setattr(reopened, "_absorption_levels",
+                        lambda row_id, table="EquipParamProtector": [6890])
+    listed = next(r for r in reopened.list_rows("armor") if r["id"] == 100)
+    detail = next(f for f in reopened.read_row("EquipParamProtector", 100)["fields"]
+                  if f["key"] == "absorption:thunderDamageCutRate")
+    assert listed["values"]["absorption:thunderDamageCutRate"] == pytest.approx(10.0)
+    assert listed["values"]["absorption:thunderDamageCutRate"] == detail["value"]
+
+
+def test_armor_list_rows_omit_absorption_without_linked_effects():
+    """Vanilla armor carries no absorption keys, effects table or not."""
+    assert "absorption:thunderDamageCutRate" not in \
+        ItemDocument(make_archive()).list_rows("armor")[0]["values"]
+    assert "absorption:thunderDamageCutRate" not in \
+        ItemDocument(make_effects_archive()).list_rows("armor")[0]["values"]
+
+
+def test_list_rows_marks_modified_after_edit():
+    document = ItemDocument(make_archive())
+    for tab, _, _ in SUBTABS:
+        assert all(not row.get('modified') for row in document.list_rows(tab))
+    tab, _, _ = SUBTABS[0]
+    row = document.list_rows(tab)[0]
+    fields = document.read_row(row['table'], row['id'])['fields']
+    field = next(f for f in fields if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'])
+    document.edit(row['table'], row['id'], field['key'], 1)
+    flags = {r['id']: r.get('modified') for r in document.list_rows(tab)}
+    assert flags[row['id']] is True
+    assert all(value is not True for key, value in flags.items() if key != row['id'])

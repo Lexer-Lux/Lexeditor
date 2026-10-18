@@ -5,8 +5,9 @@ Game/common/bankc6.bin. The eighth header is unused. Lexeditor edits only
 documented active-header bytes and preserves the rest of bankc6.bin verbatim.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
-from .project import OverlayStore, digest
+from .project import OverlayStore, digest, validate_edits
 
 
 BANK_PATH = "Game/common/bankc6.bin"
@@ -71,20 +72,25 @@ def load_worlds(store: OverlayStore, source: str = "mine") -> dict:
 
 
 def _u8(name: str, value) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not 0 <= number <= 0xFF:
         raise ValueError(f"{name} must be between 0 and 255")
     return number
 
 
 def save_worlds(store: OverlayStore, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     payload, _ = _payload(store, "mine")
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{BANK_PATH} changed since it was opened; reload before saving")
     output = bytearray(payload)
     seen: set[str] = set()
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World header edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World header token must be text")
         if token in seen:
             raise ValueError("Duplicate world header edit")
         seen.add(token)

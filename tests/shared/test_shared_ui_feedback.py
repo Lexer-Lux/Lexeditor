@@ -427,6 +427,129 @@ def test_mod_actions_use_one_dropdown(page):
     assert page.get_by_text('Featured',exact=True).count()==0
 
 
+
+def test_mod_dropdown_reorders_by_drag(page):
+    framework(page)
+    page.evaluate('''() => {
+      const U=LexeditorUI;window.changes=[];
+      document.body.insertAdjacentHTML('afterbegin','<div id="shell"></div>');
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],activeTab:()=>'',navigate:()=>{},
+        projectSnapshot:async()=>({canCreate:false,projects:[]}),sourcesReplaceProjects:true,
+        projectSources:()=>[{key:'mine',label:'First mod',managed:true,enabled:true},
+          {key:'second',label:'Second mod',managed:true,enabled:true,removable:true}],
+        changeProjectSource:async(key,change)=>changes.push({key,...change})});
+    }''')
+    page.get_by_role('button',name='Active mod project',exact=True).click()
+    rows=page.locator('.lex-project-reference')
+    assert rows.nth(0).get_attribute('draggable')=='true'
+    moved=page.evaluate('''() => {
+      const rows=[...document.querySelectorAll('.lex-project-reference')];
+      const data=new DataTransfer();
+      rows[1].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:data}));
+      rows[0].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:data}));
+      const drop=new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data});
+      rows[0].dispatchEvent(drop);
+      return {carried:data.getData('application/x-lex-mod'),dropped:drop.defaultPrevented};
+    }''')
+    assert moved=={'carried':'1','dropped':True},moved
+    page.wait_for_function('window.changes.length===1')
+    assert page.evaluate('changes')==[{'key':'second','move':-1}]
+
+
+def test_mod_dropdown_lines_up_unavailable_rows_with_the_rest(page):
+    """Greyed-out rows keep the menu's columns: the mark sits under the rest.
+
+    A tweak mod (or any mod the editor cannot open) has no rename, folder
+    or info buttons, but its on/off mark must still land in the status
+    column, with or without warning flags - not drift toward the center.
+    """
+    framework(page)
+    page.evaluate('''() => {
+      const U = LexeditorUI;
+      document.body.insertAdjacentHTML('afterbegin', '<div id="shell"></div>');
+      U.mountShell({host: '#shell', plugin: {id: 'fixture', name: 'Fixture'},
+        tabs: [], activeTab: () => '', navigate: () => {},
+        projectSnapshot: async () => ({canCreate: false, projects: [
+          {path: 'C:/lib/Mine', folder: 'Mine', name: 'Mine', version: '1.0',
+           valid: true, current: true, readOnly: false, enabled: true},
+          {path: 'C:/lib/Tweak', folder: 'Tweak', name: 'Tweak Mod', version: '',
+           valid: false, enabled: false,
+           notEditable: 'A tweak mod: it has no game data to edit here.'},
+          {path: 'C:/lib/Flagged', folder: 'Flagged', name: 'Flagged Tweak', version: '0.2',
+           valid: false, enabled: true, alerts: ['This mod changed since the last build.'],
+           notEditable: 'A tweak mod: it has no game data to edit here.'},
+        ]})});
+    }''')
+    page.get_by_role('button', name='Active mod project', exact=True).click()
+    page.wait_for_timeout(250)
+    columns = page.evaluate('''() => [...document.querySelectorAll('.lex-project-menu-item')].map(row => {
+      const at = s => { const e = row.querySelector(s);
+        return e ? Math.round(e.getBoundingClientRect().left) : null; };
+      const status = row.querySelector('.lex-project-source-status');
+      return [at('.lex-project-source-mode'), at('.lex-project-menu-name'),
+              at('.lex-project-menu-path'), at('.lex-project-source-status'),
+              status ? Math.round(status.getBoundingClientRect().right) : null]; })''')
+    assert len(columns) == 3, columns
+    assert all(row == columns[0] for row in columns), columns
+
+
+def test_mod_package_drop_anywhere_opens_the_mods_import(page):
+    """A package dropped on the program lands in the Mods tab import flow.
+
+    The Mods tab stays the single place that uploads and inspects, but
+    the drop can start anywhere outside a field or a dialog. Text drags
+    never open it, and a second drop while the import is open is ignored
+    instead of stacking another.
+    """
+    framework(page)
+    page.evaluate('''() => {
+      const U = LexeditorUI;
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div id="shell"></div><input id="field" type="text">');
+      window.calls = [];
+      const record = name => (...args) => calls.push([name, args]);
+      window.pywebview = {api: {
+        mod_library_status: async () => ({canManage: true}),
+        mod_projects: async () => ({canCreate: false, projects: []}),
+        mods_overview: async () => ({rows: [], remote: [], canManage: true, message: ""}),
+        lexmod_update: async () => ({updated: false}),
+        begin_mod_upload: async (...args) => {
+          record('begin_mod_upload')(...args); return {token: 't', root: 'C:/up'}; },
+        upload_mod_chunk: async (...args) => record('upload_mod_chunk')(...args),
+        end_mod_upload: async (...args) => record('end_mod_upload')(...args),
+        inspect_mod_package: async () => (
+          {valid: true, files: [], rootFiles: [], packages: [], metadata: {}}),
+      }};
+      U.mountShell({host: '#shell', plugin: {id: 'fixture', name: 'Fixture'},
+        tabs: [], activeTab: () => '', navigate: () => {}});
+      window.dropOn = (selector, files) => {
+        const data = new DataTransfer();
+        for (const name of files) data.items.add(new File(['x'], name));
+        document.querySelector(selector).dispatchEvent(
+          new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: data}));
+      };
+    }''')
+    page.wait_for_timeout(250)
+    dialog = page.get_by_role("dialog", name="Add a mod")
+    uploads = "() => window.calls.filter(c => c[0] === 'begin_mod_upload').length"
+    page.evaluate("document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true}))")
+    page.wait_for_timeout(250)
+    assert dialog.count() == 0
+    assert page.evaluate(uploads) == 0
+    page.evaluate("dropOn('#field', ['mod.zip'])")
+    page.wait_for_timeout(250)
+    assert dialog.count() == 0
+    assert page.evaluate(uploads) == 0
+    page.evaluate("dropOn('main', ['mod.zip'])")
+    page.wait_for_function("window.calls.some(c => c[0] === 'begin_mod_upload')")
+    assert dialog.count() == 1
+    page.get_by_text("PAK package(s) checked").wait_for()
+    page.evaluate("dropOn('[aria-label=\"Add a mod\"]', ['other.zip'])")
+    page.wait_for_timeout(250)
+    assert page.evaluate(uploads) == 1
+    assert dialog.count() == 1
+
+
 def test_ff8_dropdown_preserves_options_when_reordering(page):
     source=(ROOT/'plugins/ff8/boot.js').read_text(encoding='utf-8')
     change=source[source.index('  async function changeProjectSource('):source.index('  function addProjectSource(')]

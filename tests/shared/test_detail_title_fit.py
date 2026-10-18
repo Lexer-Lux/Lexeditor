@@ -20,8 +20,8 @@ def test_record_title_fits_beside_picture_and_id_after_panel_resize(page):
         result = page.locator('.lex-detail-panel-name').evaluate('''e=>{
           const range=document.createRange();range.selectNodeContents(e);
           const text=range.getBoundingClientRect(),box=e.getBoundingClientRect();
-          const copy=e.parentElement.querySelector('.lex-copy-value').getBoundingClientRect();
-          return {width:box.width,text:text.width,right:text.right,copy:copy.left,
+          const edge=e.parentElement.getBoundingClientRect();
+          return {width:box.width,text:text.width,right:text.right,copy:edge.right,
             lines:range.getClientRects().length,size:parseFloat(getComputedStyle(e).fontSize)};
         }''')
         assert result['text'] <= result['width'] + 1, result

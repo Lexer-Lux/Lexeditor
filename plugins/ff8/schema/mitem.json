@@ -44,7 +44,7 @@
         {"bit": 4, "name": "Silence",  "description": "Cure Silence (Echo Screen like)."},
         {"bit": 5, "name": "Berserk",  "description": "Cure Berserk (Elixir like)."},
         {"bit": 6, "name": "Zombie",   "description": "Cure Zombie (Holy Water like)."},
-        {"bit": 7, "name": "Reserved", "description": "Never curable, always kept unchecked in vanilla."}
+        {"bit": 7, "name": "Reserved", "readonly": true, "description": "Never curable, always kept unchecked in vanilla."}
     ]},
     {"name": "stat_mask",           "widget": "flags", "description": "Permanent stat(s) increased by the item.", "values": [
         {"bit": 0, "name": "HP",   "description": "Increase max HP."},
@@ -54,7 +54,7 @@
         {"bit": 4, "name": "Spr",  "description": "Increase Spirit."},
         {"bit": 5, "name": "Spd",  "description": "Increase Speed."},
         {"bit": 6, "name": "Luck", "description": "Increase Luck."},
-        {"bit": 7, "name": "Unused", "description": "Unused bit, always kept unchecked in vanilla."}
+        {"bit": 7, "name": "Unused", "readonly": true, "description": "Unused bit, always kept unchecked in vanilla."}
     ]},
     {"name": "gf_target",           "widget": "list",  "description": "Guardian Force whose compatibility is modified.", "source": "gforce", "extra_values": [
         {"id": 255, "name": "All GFs"}

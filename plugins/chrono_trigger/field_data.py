@@ -1,9 +1,10 @@
 """Fixed-size Steam field exits and treasure records from CTViewer's PC layouts."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import struct
 
-from .project import OverlayStore, digest
+from .project import OverlayStore, digest, validate_edits
 
 
 EXIT_OFFSET_PATH = "Game/common/MapJumpOffsetTbl.dat"
@@ -73,13 +74,14 @@ def load_exits(store: OverlayStore, source: str = "mine") -> dict:
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number
 
 
 def save_exits(store: OverlayStore, expected_data_sha: str, expected_offset_sha: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     offset_payload, _ = store.read(EXIT_OFFSET_PATH, "mine")
     data_payload, _ = store.read(EXIT_DATA_PATH, "mine")
     if digest(offset_payload) != expected_offset_sha or digest(data_payload) != expected_data_sha:
@@ -88,16 +90,30 @@ def save_exits(store: OverlayStore, expected_data_sha: str, expected_offset_sha:
     output = bytearray(data_payload)
     seen = set()
     for edit in edits:
-        token = str(edit["token"])
+        if not isinstance(edit, dict):
+            raise ValueError("Exit edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Exit token must be text")
         if token in seen or token not in current:
             raise ValueError("Invalid or duplicate exit edit")
         seen.add(token)
         row = current[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Exit values must be an object")
+        unknown = set(values) - {"xTile", "yTile", "lengthTiles", "orientation", "destinationId", "facing", "targetX", "targetY", "halfTileLeft", "halfTileUp"}
+        if unknown:
+            raise ValueError(f"Unsupported exit fields: {', '.join(sorted(unknown))}")
+        for field in ("halfTileLeft", "halfTileUp"):
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"Exit {field} must be a boolean")
         x = _bounded("Exit X", values.get("xTile", row["xTile"]), 0, 255)
         y = _bounded("Exit Y", values.get("yTile", row["yTile"]), 0, 255)
         length = _bounded("Exit length", values.get("lengthTiles", row["lengthTiles"]), 1, 128)
-        orientation = str(values.get("orientation", row["orientation"]))
+        orientation = values.get("orientation", row["orientation"])
+        if not isinstance(orientation, str):
+            raise ValueError("Exit orientation must be horizontal or vertical")
         if orientation not in {"horizontal", "vertical"}:
             raise ValueError("Exit orientation must be horizontal or vertical")
         destination = _bounded("Destination", values.get("destinationId", row["destinationId"]), 0, 0x1FF)
@@ -105,9 +121,9 @@ def save_exits(store: OverlayStore, expected_data_sha: str, expected_offset_sha:
         target_x = _bounded("Destination X", values.get("targetX", row["targetX"]), 0, 255)
         target_y = _bounded("Destination Y", values.get("targetY", row["targetY"]), 0, 255)
         flags = row["unknownFacingBits"] | facing
-        if bool(values.get("halfTileLeft", row["halfTileLeft"])):
+        if values.get("halfTileLeft", row["halfTileLeft"]):
             flags |= 0x04
-        if bool(values.get("halfTileUp", row["halfTileUp"])):
+        if values.get("halfTileUp", row["halfTileUp"]):
             flags |= 0x08
         size = (length - 1) | (0x80 if orientation == "vertical" else 0)
         struct.pack_into("<BBBBHBB", output, row["byteOffset"], x, y, size, flags, destination, target_x, target_y)
@@ -160,6 +176,7 @@ def load_treasure(store: OverlayStore, source: str = "mine", language: str = "en
                 "token": f"{scene}:{index}", "sceneId": scene, "treasureId": index,
                 "xTile": x, "yTile": y, "alias": alias, "aliasScene": contents if alias else None,
                 **decoded,
+                "unknownContentsBits": contents & 0x0E00 if decoded["kind"] not in {"gold", "unknown"} else 0,
                 "itemName": names[global_id] if isinstance(global_id, int) and 0 <= global_id < len(names) else "",
                 "trailingWord": trailing, "editable": not alias and decoded["kind"] != "unknown", "byteOffset": pos,
             })
@@ -171,6 +188,7 @@ def load_treasure(store: OverlayStore, source: str = "mine", language: str = "en
 
 
 def save_treasure(store: OverlayStore, expected_data_sha: str, expected_offset_sha: str, edits: list[dict], language: str = "en") -> dict:
+    validate_edits(edits)
     offset_payload, _ = store.read(TREASURE_OFFSET_PATH, "mine")
     data_payload, _ = store.read(TREASURE_DATA_PATH, "mine")
     if digest(offset_payload) != expected_offset_sha or digest(data_payload) != expected_data_sha:
@@ -179,27 +197,48 @@ def save_treasure(store: OverlayStore, expected_data_sha: str, expected_offset_s
     output = bytearray(data_payload)
     seen = set()
     for edit in edits:
-        token = str(edit["token"])
+        if not isinstance(edit, dict):
+            raise ValueError("Treasure edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Treasure token must be text")
         if token in seen or token not in current:
             raise ValueError("Invalid or duplicate treasure edit")
         seen.add(token)
         row = current[token]
         if not row["editable"]:
             raise ValueError("Aliased or unknown treasure records are read-only")
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Treasure values must be an object")
+        unknown = set(values) - {"xTile", "yTile", "kind", "gold", "localIndex"}
+        if unknown:
+            raise ValueError(f"Unsupported treasure fields: {', '.join(sorted(unknown))}")
+        if "localIndex" in values:
+            _bounded("Treasure item index", values["localIndex"], 0, 0x1FF)
+        if "gold" in values:
+            gold_value = _bounded("Gold", values["gold"], 0, 65534)
+            if gold_value % 2:
+                raise ValueError("Steam treasure gold is stored in increments of 2")
         x = _bounded("Treasure X", values.get("xTile", row["xTile"]), 0, 255)
         y = _bounded("Treasure Y", values.get("yTile", row["yTile"]), 0, 255)
         if x == 0 and y == 0:
             raise ValueError("0,0 is a treasure-alias sentinel and cannot be created by the fixed record editor")
-        kind = str(values.get("kind", row["kind"]))
+        kind = values.get("kind", row["kind"])
+        if not isinstance(kind, str):
+            raise ValueError("Unknown treasure type")
+        original_contents = struct.unpack_from("<H", data_payload, row["byteOffset"] + 2)[0]
+        unknown_contents_bits = original_contents & 0x0E00 if row["kind"] != "gold" else 0
         if kind == "gold":
+            if unknown_contents_bits:
+                raise ValueError("Unknown item contents bits cannot be converted to gold")
             gold = _bounded("Gold", values.get("gold", row.get("gold") or 0), 0, 65534)
             if gold % 2:
                 raise ValueError("Steam treasure gold is stored in increments of 2")
             contents = 0x8000 | (gold // 2)
         elif kind in TREASURE_PREFIX:
             local = _bounded("Treasure item index", values.get("localIndex", row.get("localIndex") or 0), 0, 0x1FF)
-            contents = TREASURE_PREFIX[kind] | local
+            contents = TREASURE_PREFIX[kind] | unknown_contents_bits | local
         else:
             raise ValueError("Unknown treasure type")
         struct.pack_into("<BBH", output, row["byteOffset"], x, y, contents)

@@ -438,6 +438,23 @@
     return svg;
   };
 
+  // The remove mark beside the copy icon in record headings: the same X
+  // the text button drew, as SVG so it scales with its neighbours.
+  const removeIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "5 5 14 14");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("d", "M8 8l8 8M16 8l-8 8");
+    svg.append(path);
+    return svg;
+  };
+
   // One "no image" mark for every place a picture is missing: a record with
   // no art of its own, or an image that failed to load. It replaces the
   // browser's broken-image glyph and alt text ("[mapid] composed background").
@@ -450,6 +467,22 @@
     frame.setAttribute("d", "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M3 3l18 18");
     svg.append(frame);
     return element("span", {class: "lex-no-image", role: "img", "aria-label": label, title: label}, svg);
+  };
+
+  // A model that exists but has no still picture: the placeholder behind
+  // the magnifier. Plugins register their own art; everyone else gets the
+  // shared mark. The art is UI chrome, never game art: game art ships
+  // only as real record pictures, decoded at runtime.
+  const noThumbnailMakers = new Map();
+  const registerNoThumbnail = (plugin, make) => {
+    if (make == null) noThumbnailMakers.delete(plugin);
+    else noThumbnailMakers.set(plugin, make);
+  };
+  const noThumbnail = (plugin = "", label = "No thumbnail") => {
+    const make = plugin ? noThumbnailMakers.get(plugin) : null;
+    const art = make ? make(label) : noImage(label);
+    if (art instanceof Element) art.classList.add("lex-no-thumbnail");
+    return art;
   };
   document.addEventListener("error", event => {
     const image = event.target;
@@ -469,6 +502,164 @@
       class: ["lex-new-button lex-ui-symbol", className].filter(Boolean).join(" "),
       title, "aria-label": ariaLabel,
     }, element("span", {class: "lex-new-button-plus", "aria-hidden": "true"}, "+"));
+  };
+
+  // Actions that wait quietly over their host: invisible until the host is
+  // hovered, half-visible then, and full under the pointer or keyboard
+  // focus. hoverActions(host, {actions, align, label, overlay}) marks the
+  // host, adds the bar and returns it. Each action either builds a square
+  // button ({key, label, title, icon, className, disabled, onClick}) or
+  // adopts a ready-made one ({key, node}). An inline bar sits in the flow
+  // instead of overlaying the host's corner.
+  const HOVER_ALIGN = {"top-left": "lex-hover-actions-tl", "top-right": "lex-hover-actions-tr",
+    "bottom-left": "lex-hover-actions-bl", "bottom-right": "lex-hover-actions-br"};
+  const hoverActions = (host, options = {}) => {
+    const bar = element("div", {
+      class: ["lex-hover-actions", HOVER_ALIGN[options.align] || "lex-hover-actions-tr",
+        options.overlay === false ? "lex-hover-actions-inline" : ""].filter(Boolean).join(" "),
+      role: "toolbar", "aria-label": options.label || "Actions",
+    }, ...(options.actions || []).map(action => {
+      if (action.node instanceof Element) {
+        if (action.key) action.node.dataset.hoverAction = action.key;
+        return action.node;
+      }
+      return element("button", {
+        type: "button", disabled: !!action.disabled,
+        class: ["lex-new-button", "lex-hover-action", action.className || ""].filter(Boolean).join(" "),
+        ...(action.key ? {"data-hover-action": action.key} : {}),
+        title: action.title || action.label || "",
+        "aria-label": action.label || action.title || "Action",
+        onclick: event => action.onClick?.(event),
+      }, action.icon || action.label || "");
+    }));
+    if (host instanceof Element) {
+      host.classList.add("lex-hover-actions-host");
+      host.append(bar);
+    }
+    return bar;
+  };
+
+  // A tab strip for caller-owned tabs (collapsible panels, detail panels):
+  // given order, no shortcuts, optional dev rename. Not subtabBar: that one
+  // sorts, and its rename keys belong to page subtabs.
+  const tabStrip = (options = {}) => {
+    const bar = element("div", {
+      class: ["lex-tabstrip", options.className || ""].filter(Boolean).join(" "),
+      role: "tablist", "aria-label": options.label || "Views",
+    });
+    const buttons = new Map();
+    for (const tab of options.tabs || []) {
+      const on = tab.id === options.active;
+      const button = element("button", {type: "button",
+        class: ["lex-subtab-button", "lex-tabstrip-button", on ? "active" : ""].filter(Boolean).join(" "),
+        role: "tab", "aria-selected": String(on), tabindex: on ? "0" : "-1",
+        "data-tabstrip-id": tab.id,
+        onclick: () => options.change?.(tab.id),
+      }, element("span", {class: "lex-tab-label lex-tabstrip-label"}, tab.label ?? tab.id));
+      if (typeof options.onRename === "function") {
+        button.addEventListener("dblclick", event => {
+          if (!sharedSettingsSnapshot?.developerMode) return;
+          event.preventDefault();
+          event.stopPropagation();
+          options.onRename(tab.id, button);
+        });
+      }
+      if (options.holdToSave) holdToSaveDefaultView(button);
+      bar.append(button);
+      buttons.set(tab.id, button);
+    }
+    bar.setActive = id => {
+      for (const [key, button] of buttons) {
+        const on = key === id;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-selected", String(on));
+        button.tabIndex = on ? 0 : -1;
+      }
+    };
+    bar.setLabel = (id, label) => {
+      buttons.get(id)?.querySelector(".lex-tabstrip-label")?.replaceChildren(label);
+    };
+    return bar;
+  };
+
+  // A side panel that shrinks to a clickable handle and expands pushing its
+  // siblings over. {tabs:[{id,label,content}], active, onChange, side, label,
+  // width, collapsed, viewKey, className, attrs}. Collapse state stays
+  // personal (plain localStorage, never shipped); pass no viewKey for
+  // session-only memory.
+  const collapsiblePanel = (options = {}) => {
+    const side = options.side === "right" ? "right" : "left";
+    const storeKey = options.viewKey ? `lex-collapsible-${options.viewKey}` : null;
+    const stored = name => {
+      try { return storeKey ? localStorage.getItem(`${storeKey}.${name}`) : null; }
+      catch (_error) { return null; }
+    };
+    const remember = (name, value) => {
+      if (!storeKey) return;
+      try { localStorage.setItem(`${storeKey}.${name}`, value); } catch (_error) {}
+    };
+    const tabs = (options.tabs || []).map(tab => ({
+      ...tab,
+      label: stored(`label.${tab.id}`) || tab.label,
+    }));    const root = element("section", {
+      ...(options.attrs || {}),
+      class: ["lex-collapsible-panel", `lex-collapsible-${side}`, options.className || ""].filter(Boolean).join(" "),
+      "aria-label": options.label || "Side panel",
+    });
+    const panes = new Map();
+    const paneBox = element("div", {class: "lex-collapsible-panes"},
+      ...tabs.map(tab => {
+        const pane = element("div", {class: "lex-collapsible-pane", role: "tabpanel",
+          "data-tabstrip-pane": tab.id}, tab.content || []);
+        panes.set(tab.id, pane);
+        return pane;
+      }));
+    const show = id => {
+      const next = tabs.some(tab => tab.id === id) ? id : tabs[0]?.id;
+      if (next === undefined) return;
+      strip.setActive(next);
+      for (const [key, pane] of panes) pane.hidden = key !== next;
+      remember("tab", next);
+      options.onChange?.(next);
+    };
+    const strip = tabs.length ? tabStrip({tabs, active: stored("tab") || options.active,
+      label: options.label || "Side panel views", className: "lex-collapsible-tabs",
+      change: show, holdToSave: true,
+      onRename: async id => {
+        const tab = tabs.find(entry => entry.id === id);
+        const label = await promptText({title: "Rename panel tab", label: "Tab name",
+          value: tab?.label || "", confirmLabel: "Rename"});
+        if (!label) return;
+        tab.label = label;
+        remember(`label.${id}`, label);
+        strip.setLabel(id, label);
+      }}) : null;
+    const body = element("div", {class: "lex-collapsible-body"},
+      strip || null, tabs.length ? paneBox : (options.content || []));
+    const chevron = element("span", {class: "lex-collapsible-chevron", "aria-hidden": "true"});
+    const handle = element("button", {type: "button", class: "lex-collapsible-handle",
+      onclick: () => setCollapsed(!root.classList.contains("lex-collapsible-collapsed")),
+    }, element("span", {class: "lex-collapsible-grip", "aria-hidden": "true"}),
+      chevron,
+      element("span", {class: "lex-collapsible-tag", "aria-hidden": "true"}, options.label || ""));
+    const setCollapsed = collapsed => {
+      root.classList.toggle("lex-collapsible-collapsed", collapsed);
+      root.style.width = collapsed ? "" : (options.width || "320px");
+      handle.setAttribute("aria-expanded", String(!collapsed));
+      const name = options.label || "side panel";
+      handle.setAttribute("aria-label", collapsed ? `Expand ${name}` : `Collapse ${name}`);
+      handle.title = collapsed ? `Expand ${name}` : `Collapse ${name}`;
+      const inward = side === "left" ? "\u2039" : "\u203A";
+      const outward = side === "left" ? "\u203A" : "\u2039";
+      chevron.textContent = collapsed ? outward : inward;
+      remember("collapsed", collapsed ? "1" : "0");
+    };
+    root.append(body, handle);
+    if (strip) show(stored("tab") || options.active);
+    setCollapsed(stored("collapsed") !== null ? stored("collapsed") === "1" : !!options.collapsed);
+    root.setCollapsed = setCollapsed;
+    root.showTab = show;
+    return root;
   };
 
   let infoHelpSequence = 0;
@@ -587,9 +778,15 @@
 
   const infoHelp = (text, attrs = {}) => {
     if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
+    const shipped = typeof text === "string" ? text : null;
+    const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
+    const isCleared = () => shipped !== null && shown() === "";
+    // Cleared help is gone everywhere: clearing means gone. Ctrl+Z brings
+    // the text back, and the next mount shows the marker again.
+    if (isCleared()) return document.createTextNode("");
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
-      onclick = null, ...rest
+      onclick = null, symbol = "?", ...rest
     } = attrs;
     const interactive = typeof onclick === "function";
     const popupId = `lex-help-${++infoHelpSequence}`;
@@ -599,7 +796,7 @@
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
       "aria-label": ariaLabel, "aria-describedby": popupId,
-    }, element("span", {"aria-hidden": "true"}, "?"));
+    }, element("span", {"aria-hidden": "true"}, symbol));
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
     const scheduleClose = () => {
@@ -617,11 +814,10 @@
       // A developer can reword what the bubble says. The shipped string stays
       // the key, so a bubble reworded here reads the new text on every screen
       // that shows the same explanation.
-      const shipped = typeof text === "string" ? text : null;
-      const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
-      }, text instanceof Node ? text.cloneNode(true) : String(shown() ?? title ?? ""));
+      }, text instanceof Node ? text.cloneNode(true)
+        : String(shown() ?? title ?? ""));
       document.body.append(popup);
       if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
         // The bubble itself never takes the pointer, so the editor is started
@@ -640,7 +836,9 @@
             finished = true;
             popup.classList.remove("lex-help-editing");
             const typed = editor.value.trim();
-            const next = typed && typed !== shipped ? typed : shipped;
+            // An empty edit clears the bubble instead of restoring the shipped
+            // text, so a developer can delete help that should not be there.
+            const next = typed;
             if (!commit) {
               popup.replaceChildren(String(shown()));
               // The editor's own blur schedules the bubble's close; keep the
@@ -658,19 +856,26 @@
             // the pointer being back on the marker, so reopen it to face the
             // reader with the wording that was just saved.
             closeHelpPopup();
-            if (reopen) open();
+            if (next === "") marker.remove();
+            else if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
               after: next, shipped, node: null});
             labelRedo.length = 0;
-            await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
+            const saved = await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
             labelHistoryChanged();
             try {
-              // storeLabel already saved it, with the same transport the rest of
-              // the renames use.
-              showToast(next === shipped ? "The shipped help text is back."
-                                         : "The new help text is now the shipped one.");
+              // "Shipped" only when the shared default kept the text.
+              if (saved) {
+                showToast(next === shipped ? "The shipped help text is back."
+                                           : next === "" ? "The help text is cleared."
+                                           : "The new help text is now the shipped one.");
+              } else {
+                showToast(next === shipped ? "The shipped help text is back on this device."
+                                           : next === "" ? "The help text is cleared on this device."
+                                           : "The new help text is saved on this device.");
+              }
             } catch (_error) {}
           };
           // Enter or clicking away keeps the new wording; Shift+Enter starts a
@@ -716,7 +921,9 @@
         if (popup.contains(event.target)) return;
         // Keyboard focus can scroll the marker - or the bubble itself, which is
         // focusable so its own text can be read - into view after opening help.
-        if (marker.matches(":focus-within") || popup.matches(":focus-within")) position();
+        // A hover can land its own scroll the same way; while the marker is
+        // still under the pointer the bubble follows it instead of dying.
+        if (marker.matches(":hover") || marker.matches(":focus-within") || popup.matches(":focus-within")) position();
         else close();
       };
       popup.addEventListener("pointerenter", cancelClose);
@@ -738,6 +945,12 @@
     marker.addEventListener("pointerenter", open);
     marker.addEventListener("pointerleave", scheduleClose);
     marker.addEventListener("focus", open);
+    // A help marker can sit inside a checkbox label or clickable record.
+    // Reading help must not activate the control that contains it.
+    marker.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
     marker.addEventListener("dblclick", event => {
       if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
@@ -771,7 +984,8 @@
       });
       section.replaceChildren(element("h2", {}, "Mod Loading"), list);
     }).catch(error => section.replaceChildren(element("h2", {}, "Mod Loading"),
-      element("p", {role: "alert"}, error.message)));
+      element("p", {role: "alert"}, error.message)))
+      .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
     return section;
   };
 
@@ -810,9 +1024,12 @@
       // A frozen distribution supplies notices for the exact Python packages it bundles.
       fetch(new URL("distribution-notices.json", sharedAssetBase)).then(response => response.ok ? response.json() : [])
         .then(entries => entries.forEach(row => section.append(element("details", {},
-          element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))))).catch(() => {});
+          element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))))).catch(() => {})
+        .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
     }).catch(error => section.replaceChildren(element("h2", {}, "Credits"),
-      element("p", {role: "alert"}, error.message)));
+      element("p", {role: "alert"}, error.message)))
+      .finally(() => section.closest(".lex-tweaks-paged")?.lexFitPage?.());
+    section.addEventListener("toggle", () => section.closest(".lex-tweaks-paged")?.lexFitPage?.(), true);
     return section;
   };
 
@@ -824,13 +1041,19 @@
     // Existing Info pages vary, but all use the shared shell. Keep credits inside
     // their scrollable detail body when present, and never create a second header.
     const parent = main.querySelector(".lex-information-panel .lex-detail-panel-body") || main;
-    if (!main.querySelector(".lex-plugin-mod-loading")) parent.append(modLoadingPanel(pluginId));
-    if (!main.querySelector(".lex-plugin-credits")) parent.append(creditsPanel(pluginId));
+    const added = [];
+    if (!main.querySelector(".lex-plugin-mod-loading")) added.push(modLoadingPanel(pluginId));
+    if (!main.querySelector(".lex-plugin-credits")) added.push(creditsPanel(pluginId));
+    const paged = parent.closest(".lex-tweaks-paged");
+    if (paged?.lexAppendCards) paged.lexAppendCards(...added);
+    else parent.append(...added);
   };
 
   const unitField = (control, unit, attrs = {}) => {
-    const boxed = attrs.boxed ?? (control instanceof Element &&
-      control.matches("input,select,textarea,output,.lex-readonly-field"));
+    const scalar = control instanceof Element
+      ? (control.matches("input,select,textarea,output,.lex-readonly-field") ? control
+        : control.querySelector("input,select,textarea,output,.lex-readonly-field")) : null;
+    const boxed = attrs.boxed ?? !!scalar;
     const prefix = attrs.position === "prefix";
     const reserve = Math.max(1.8, String(unit || "").length * .45 + .9);
     const field = element("span", {
@@ -842,11 +1065,13 @@
       ].filter(Boolean).join(" "),
       title: attrs.title,
       style: boxed ? `--lex-unit-reserve:${reserve}em` : null,
+      // A reference beside the value reads its unit from here.
+      "data-lex-unit": unit || null, "data-lex-unit-position": unit ? (prefix ? "prefix" : "suffix") : null,
     }, control, unit ? element("span", {
     class: ["lex-unit", unit === "×" ? "lex-unit-multiplier" : "", attrs.unitClass || ""].filter(Boolean).join(" "),
     "aria-hidden": "true",
     }, unit) : null);
-    if (boxed && unit && !prefix) followUnit(field, control);
+    if (boxed && unit && !prefix) followUnit(field, scalar || control);
     return field;
   };
 
@@ -905,13 +1130,77 @@
 
   const formatNumber = (value, options = {}) => {
     if (value === null || value === undefined || value === "") return String(value ?? "");
-    const numeric = typeof value === "number" ? value : Number(value);
-    if (!Number.isFinite(numeric)) return String(value);
+    const numeric = typeof value === "bigint" ? value
+      : typeof value === "string" && /^[+-]?\d{16,}$/.test(value.trim()) ? BigInt(value.trim())
+      : typeof value === "number" ? value : Number(value);
+    if (typeof numeric !== "bigint" && !Number.isFinite(numeric)) return String(value);
     return new Intl.NumberFormat("en-US", {
       useGrouping: true,
       maximumFractionDigits: 20,
       ...options,
     }).format(numeric);
+  };
+
+  // Exact wide integers keep the browser's bounded numeric control, while
+  // validation and stepping use decimal strings and BigInt rather than double.
+  const exactIntegerInput = (options = {}) => {
+    const low = BigInt(options.min), high = BigInt(options.max);
+    if (low > high) throw new RangeError("Invalid integer bounds");
+    const input = element("input", {type:"number", min:String(low), max:String(high), step:1,
+      value:String(options.value), "aria-label":options.label,
+      "data-lex-exact-integer":"true", "data-lex-value-type":"INT"});
+    const validate = () => {
+      input.setCustomValidity("");
+      const text = input.value;
+      if (!/^[+-]?\d+$/.test(text)) {
+        input.setCustomValidity("Enter a whole number.");
+        return null;
+      }
+      const value = BigInt(text);
+      if (value < low || value > high) {
+        input.setCustomValidity(`Enter a number from ${low} through ${high}.`);
+        return null;
+      }
+      const issue = options.validate?.(value, text);
+      if (issue) { input.setCustomValidity(issue); return null; }
+      return value;
+    };
+    const commit = () => {
+      if (input.disabled || input.readOnly || refusesEdit(input)) return false;
+      const value = validate();
+      if (value === null) { input.reportValidity(); return false; }
+      input.value = String(value);
+      options.change?.(input.value);
+      return true;
+    };
+    input.addEventListener("change", commit);
+    const step = direction => {
+      if (input.disabled || input.readOnly || refusesEdit(input)) return;
+      const value = validate();
+      if (value === null) { input.reportValidity(); return; }
+      const next = value + BigInt(direction);
+      if (next < low || next > high) return;
+      input.value = String(next);
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      input.dispatchEvent(new Event("change", {bubbles:true}));
+    };
+    input.addEventListener("keydown", event => {
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault(); step(event.key === "ArrowUp" ? 1 : -1);
+      }
+    });
+    const arrow = (direction, label) => element("button", {type:"button", tabindex:"-1",
+      class:direction > 0 ? "lex-stepper-up" : "lex-stepper-down", "aria-label":label,
+      onpointerdown:event=>event.preventDefault(), onclick:()=>step(direction)});
+    const root = element("div", {class:"lex-source-control lex-has-stepper lex-exact-integer"}, input,
+      element("span", {class:"lex-stepper"}, arrow(1, "Increase"), arrow(-1, "Decrease")));
+    root.focus = () => input.focus();
+    root.select = () => input.select();
+    root.lexCommitInteger = commit;
+    root.lexValidateInteger = () => validate() !== null;
+    input.lexValidateInteger = root.lexValidateInteger;
+    validate();
+    return root;
   };
 
   // What a value box holds, as a number. A plugin is free to paint its number
@@ -968,6 +1257,18 @@
     });
   };
 
+  // One sound's preview, the SFX layout every game shares: a playable
+  // sound renders an audio element the detail panel adopts into its
+  // heading player with a scrubber, and a sound with no playable file
+  // says so in its preview row instead.
+  const soundPreview = (options = {}) => detailField({
+    label: "",
+    control: options.src
+      ? element("audio", {src: options.src, controls: true, "aria-label": options.label || "Play sound"})
+      : readonlyField(options.note || "No preview"),
+    help: options.help || null,
+  });
+
   // Numbered record identity is a prefix unit. The shared helper owns the
   // hash, spacing, and muted tone in lists and detail headings.
   // Record ids are padded to the widest id in the active record set, so a
@@ -1008,7 +1309,7 @@
   // record identity, metadata, and actions. Games supply themed content.
   // Where a panel's body arranges its sections: stacked by default, or the
   // first section beside the others, for a record with a picture.
-  const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside"};
+  const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside", row: "lex-detail-panel-row"};
 
   // A NAME property whose value is the heading's text is the heading. Lexer:
   // "names should not be shown in the details panel as a property if the
@@ -1115,6 +1416,273 @@
   const breakableName = value => typeof value !== "string" ? [value]
     : value.split(/(?<=[_./\\])(?=.)/).flatMap((part, index) => index ? [element("wbr"), part] : [part]);
 
+  // Detail tabs a developer arranges: right-click a panel heading to add a
+  // tab, drag properties or whole sections onto tabs. Layouts live under one
+  // localStorage key per page, so the shipped-default flow carries them for
+  // everyone; shapes are hashed, so each distinct panel shape keeps its own.
+  // Panels render one column; nothing paginates anymore.
+  const detailTabsKey = () => `${shellPluginId()}-${activePageTab()}.detailtabs`;
+  const detailNodeKey = (node, seen) => {
+    const base = node.classList.contains("lex-detail-section")
+      ? `s:${node.dataset.lexLayoutSection ?? node.getAttribute("aria-label") ?? node.tagName}`
+      : node.classList.contains("lex-detail-field")
+        ? `f:${node.dataset.lexLayoutField ?? node.tagName}`
+        : `n:${node.tagName}`;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return count > 1 ? `${base}#${count}` : base;
+  };
+  // One record shape's detail tabs, shipped like any other view default.
+  // The key carries the page token the host requires; the local cache keeps
+  // every shape together for fast reads.
+  const detailShapeKey = shape => `${shellPluginId()}-${activePageTab()}.detailtabs.${shape}`;
+  const shipDetailLayout = (shape, layout) => {
+    const key = detailShapeKey(shape);
+    callWindow("save_default_view", shellPluginId(), activePageTab(),
+      {[key]: JSON.stringify({...layout, updatedAt: Date.now()})}).catch(() => {});
+  };
+  const loadDetailLayouts = () => {
+    let cached = null;
+    try {
+      const parsed = JSON.parse(localStorage.getItem(detailTabsKey()) || "");
+      if (parsed && typeof parsed === "object" && parsed.shapes) cached = parsed;
+    } catch (_error) {}
+    const shapes = {...(cached?.shapes || {})};
+    // Shipped layouts arrive as one key per shape (the host seeds them into
+    // storage at startup); the newer copy of each shape wins.
+    try {
+      const prefix = `${shellPluginId()}-${activePageTab()}.detailtabs.`;
+      for (let index = 0; index < localStorage.length; index++) {
+        const name = localStorage.key(index);
+        if (!name?.startsWith(prefix)) continue;
+        const entry = JSON.parse(localStorage.getItem(name) || "null");
+        if (!entry || !Array.isArray(entry.tabs)) continue;
+        const shape = name.slice(prefix.length);
+        if ((entry.updatedAt || 0) >= ((shapes[shape] || {}).updatedAt || 0)) shapes[shape] = entry;
+      }
+    } catch (_error) {}
+    return {shapes};
+  };
+  const saveDetailLayouts = (shape, layout) => {
+    const all = loadDetailLayouts();
+    all.shapes[shape] = {...layout, updatedAt: Date.now()};
+    const entries = Object.entries(all.shapes).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+    all.shapes = Object.fromEntries(entries.slice(0, 12));
+    try { localStorage.setItem(detailTabsKey(), JSON.stringify(all)); } catch (_error) {}
+  };
+  const detailBody = (bodyClass, body, paginate) => {
+    const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
+    const box = element("div", {class: bodyClass}, nodes);
+    const ctx = detailTabsContext(box);
+    box._detailTabs = ctx;
+    ctx.render();
+    // A shape the developer gave its own tabs keeps those panes; every other
+    // body made only of sections flows into columns, `paginate: false`
+    // keeping one column and an object passing options through.
+    if (ctx.hasTabs()) return box;
+    const sections = nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-section"));
+    const flow = paginate === false ? null
+      : paginate ? (typeof paginate === "object" ? paginate : {})
+      : sections ? {inline: true} : null;
+    if (!flow) return box;
+    const paged = paginateSettings(box, flow);
+    paged._detailTabs = ctx;
+    return paged;
+  };
+  const detailTabsContext = box => {
+    const dev = () => !!sharedSettingsSnapshot?.developerMode;
+    const seen = new Map();
+    const home = [...box.childNodes];
+    const nodeByKey = new Map();
+    const shells = new Map();
+    const fields = new Map();
+    const order = [];
+    const keyNodes = node => {
+      const key = detailNodeKey(node, seen);
+      nodeByKey.set(key, node);
+      return key;
+    };
+    for (const node of home) {
+      if (!(node instanceof Element)) continue;
+      const key = keyNodes(node);
+      order.push(key);
+      if (node.classList.contains("lex-detail-section")) {
+        const content = node.querySelector(":scope > .lex-detail-section-content") || node;
+        const kids = [...content.childNodes];
+        const keys = [];
+        for (const field of content.querySelectorAll(":scope > .lex-detail-field")) {
+          const fkey = keyNodes(field);
+          fields.set(fkey, field);
+          keys.push(fkey);
+        }
+        shells.set(key, {node, content, kids, fields: keys});
+      } else if (node.classList.contains("lex-detail-field")) {
+        fields.set(key, node);
+      }
+    }
+    const shape = textDigest([...nodeByKey.keys()].sort().join("\n"));
+    const stored = loadDetailLayouts().shapes[shape];
+    const layout = stored && Array.isArray(stored.tabs) ? {
+      tabs: stored.tabs.filter(tab => tab && tab.id).map(tab => ({id: String(tab.id), label: tab.label ?? String(tab.id)})),
+      shells: stored.shells || {},
+      fields: stored.fields || {},
+      active: stored.active ?? null,
+    } : {tabs: [], shells: {}, fields: {}, active: null};
+    const persist = () => saveDetailLayouts(shape, layout);
+    // Structural changes ship; switching the active tab stays local.
+    const persistShared = () => {
+      persist();
+      shipDetailLayout(shape, layout);
+    };
+    const tabIds = () => layout.tabs.map(tab => tab.id);
+    const firstTab = () => layout.tabs[0]?.id;
+    const validTab = id => tabIds().includes(id) ? id : firstTab();
+    const shellTab = key => validTab(layout.shells[key]);
+    const fieldTab = key => {
+      if (layout.fields[key] !== undefined) return validTab(layout.fields[key]);
+      for (const [skey, shell] of shells) if (shell.fields.includes(key)) return shellTab(skey);
+      return firstTab();
+    };
+    let strip = null;
+    const panes = new Map();
+    const show = id => {
+      const next = validTab(id);
+      layout.active = next;
+      persist();
+      strip?.setActive(next);
+      for (const [key, pane] of panes) pane.hidden = key !== next;
+    };
+    const enableDrag = () => {
+      for (const [key, field] of fields) {
+        field.draggable = true;
+        if (field._detailDragKey) continue;
+        field._detailDragKey = key;
+        field.addEventListener("dragstart", event => {
+          if (!dev()) { event.preventDefault(); return; }
+          event.dataTransfer.setData("text/lex-detail-node", JSON.stringify({key: field._detailDragKey, shell: false}));
+          event.dataTransfer.effectAllowed = "move";
+          field.classList.add("lex-dragging");
+        });
+        field.addEventListener("dragend", () => field.classList.remove("lex-dragging"));
+      }
+      for (const [key, shell] of shells) {
+        const title = shell.node.querySelector(":scope > .lex-detail-section-title");
+        if (!title || title._detailDragKey) continue;
+        title.draggable = true;
+        title._detailDragKey = key;
+        title.addEventListener("dragstart", event => {
+          if (!dev()) { event.preventDefault(); return; }
+          event.dataTransfer.setData("text/lex-detail-node", JSON.stringify({key: title._detailDragKey, shell: true}));
+          event.dataTransfer.effectAllowed = "move";
+          shell.node.classList.add("lex-dragging");
+        });
+        title.addEventListener("dragend", () => shell.node.classList.remove("lex-dragging"));
+      }
+    };
+    const render = () => {
+      box.querySelector(":scope > .lex-detail-tabstrip-wrap")?.remove();
+      for (const pane of panes.values()) {
+        while (pane.firstChild) box.append(pane.firstChild);
+        pane.remove();
+      }
+      panes.clear();
+      for (const shell of shells.values()) for (const kid of shell.kids) shell.content.append(kid);
+      for (const node of home) box.append(node);
+      if (!layout.tabs.length) return;
+      const wrap = element("div", {class: "lex-detail-tabstrip-wrap"});
+      strip = tabStrip({tabs: layout.tabs, active: validTab(layout.active), label: "Detail views",
+        className: "lex-detail-tabs", change: show,
+        onRename: async id => {
+          const tab = layout.tabs.find(entry => entry.id === id);
+          const label = await promptText({title: "Rename detail tab", label: "Tab name",
+            value: tab?.label || "", confirmLabel: "Rename"});
+          if (!label) return;
+          tab.label = label;
+          persistShared();
+          strip.setLabel(id, label);
+        },
+        holdToSave: true});
+      for (const button of strip.querySelectorAll(".lex-tabstrip-button")) {
+        button.addEventListener("dragover", event => {
+          if (!dev() || ![...event.dataTransfer.types].includes("text/lex-detail-node")) return;
+          event.preventDefault();
+          button.classList.add("lex-drop-target");
+        });
+        button.addEventListener("dragleave", () => button.classList.remove("lex-drop-target"));
+        button.addEventListener("drop", event => {
+          button.classList.remove("lex-drop-target");
+          if (!dev()) return;
+          event.preventDefault();
+          let dropped = null;
+          try { dropped = JSON.parse(event.dataTransfer.getData("text/lex-detail-node")); } catch (_error) {}
+          if (!dropped || !tabIds().includes(button.dataset.tabstripId)) return;
+          if (dropped.shell && shells.has(dropped.key)) {
+            layout.shells[dropped.key] = button.dataset.tabstripId;
+            for (const fkey of shells.get(dropped.key).fields) delete layout.fields[fkey];
+          } else if (fields.has(dropped.key)) {
+            layout.fields[dropped.key] = button.dataset.tabstripId;
+          } else {
+            return;
+          }
+          persistShared();
+          render();
+        });
+      }
+      wrap.append(strip);
+      box.prepend(wrap);
+      for (const tab of layout.tabs) {
+        const pane = element("div", {class: "lex-detail-tabpane", role: "tabpanel",
+          "data-tabstrip-pane": tab.id, hidden: tab.id !== validTab(layout.active)});
+        panes.set(tab.id, pane);
+        box.append(pane);
+      }
+      const dealt = [];
+      for (const key of order) {
+        const node = nodeByKey.get(key);
+        if (!node) continue;
+        if (shells.has(key)) {
+          const here = shellTab(key);
+          const stays = shells.get(key).fields.filter(fkey => fieldTab(fkey) === here);
+          if (!stays.length && shells.get(key).fields.length) continue;
+          panes.get(here)?.append(node);
+          for (const fkey of shells.get(key).fields) {
+            if (fieldTab(fkey) !== here && fields.get(fkey)) dealt.push([fieldTab(fkey), fields.get(fkey)]);
+          }
+        } else {
+          panes.get(fields.has(key) ? fieldTab(key) : firstTab())?.append(node);
+        }
+      }
+      for (const [tab, field] of dealt) panes.get(tab)?.append(field);
+      // Tabs take over from column pages: the pager dealt these sections
+      // into columns, so its empty columns, off-page hold and page footer
+      // go, and its resize refits stop (they would deal the panes apart).
+      box.querySelectorAll(":scope > .lex-tweak-column, :scope > .lex-tweak-off-page")
+        .forEach(node => node.remove());
+      const paged = box.closest(".lex-tweaks-paged");
+      paged?.lexPageObserver?.disconnect();
+      paged?.querySelector(":scope > .lex-tweaks-pages")?.remove();
+      const scroller = box.closest(".lex-tweaks-scroll");
+      if (scroller) scroller.style.overflowY = "auto";
+    };
+    const addTab = async () => {
+      const label = await promptText({title: "New detail tab", label: "Tab name", confirmLabel: "Create"});
+      if (!label) return;
+      let id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "tab";
+      if (tabIds().includes(id)) {
+        let serial = 2;
+        while (tabIds().includes(`${id}-${serial}`)) serial++;
+        id = `${id}-${serial}`;
+      }
+      layout.tabs.push({id, label});
+      layout.active = id;
+      persistShared();
+      render();
+    };
+    enableDrag();
+    return {render, addTab, hasTabs: () => layout.tabs.length > 0};
+  };
+
   const detailPanel = (options = {}) => {
     options = adoptBodyAudio(options);
     const sound = options.audio?.src ? recordAudio(options.audio) : null;
@@ -1163,8 +1731,8 @@
     // A heading reads: its name, the help bubble, the copy button, then a
     // thing finder when the panel can pick a different record from here.
     if (options.help) title.append(infoHelp(options.help));
-    if (options.title !== undefined || options.titleControl || options.renameRecord)
-      title.append(copyValueButton(titleText, "Copy this name"));
+    // No title copy button: its glyph read as a second duplicate button
+    // next to the real one, so the heading keeps name, help and finder only.
     if (typeof options.find === "function") {
       const label = options.findTitle || "Find a different record";
       title.append(element("button", {type: "button", class: "lex-title-finder", title: label,
@@ -1195,11 +1763,39 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
       sound ? sound.scrub : null);
     if (sound && heading) heading.classList.add("lex-audio-heading");
+    const bodyBox = detailBody(bodyClass, options.body, options.paginate);
+    if (heading) heading.addEventListener("contextmenu", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      bodyBox._detailTabs?.addTab();
+    });
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || []),
-      typeof options.paginate === "object" ? options.paginate : {}) : element("div", {class: bodyClass}, options.body || []));
+    }, heading, bodyBox);
+  };
+  // Every record pane lays its sections out the same way: in as many columns
+  // as the pane is wide, a section too tall for its column going on in the
+  // next. That used to be a per-call `paginate` flag, so three panes had it
+  // and the rest stayed one long column however wide the window was. Now any
+  // body made only of sections flows; `paginate: false` keeps one column,
+  // and an object still passes options through.
+  const sectionFlow = (bodyClass, body, paginate, onlyFlow = false) => {
+    const nodes = [body || []].flat(Infinity).filter(node => node !== null && node !== undefined && node !== false);
+    const sections = nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-section"));
+    // Unpaged flows lay out sections and bare fields alike; anything else
+    // passes through untouched, the way paginate:false left it.
+    const unpaged = paginate && typeof paginate === "object" && paginate.unpaged === true;
+    const flowable = sections || (unpaged && nodes.length > 0 && nodes.every(node =>
+      node instanceof Element && node.classList.contains("lex-detail-field")));
+    const flow = paginate === false ? null
+      : paginate ? (typeof paginate === "object" ? paginate : {})
+      : sections ? {inline: true} : null;
+    // A tab's content that does not flow is left exactly as it was given.
+    if (onlyFlow && (!flow || (unpaged && !flowable))) return null;
+    const box = element("div", {class: bodyClass}, nodes);
+    return flow ? paginateSettings(box, flow) : box;
   };
 
   // A panel can own local navigation without turning those choices into
@@ -1242,6 +1838,9 @@
     const content = typeof options.content === "function"
       ? options.content(active, selected)
       : options.content;
+    const contentNodes = [content || []].flat(Infinity).filter(Boolean);
+    const empty = contentNodes.length === 1 && contentNodes[0] instanceof Element
+      && contentNodes[0].classList.contains("lex-notice");
     return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
       class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
@@ -1253,10 +1852,10 @@
       shortcuts: false,
       change: options.change,
     }), element("div", {
-      class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
+      class: ["lex-tabbed-panel-content", empty ? "lex-tabbed-panel-empty" : "", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
-    }, content || [])));
+    }, sectionFlow("lex-detail-panel-body", content, options.paginate, true) || content || [])));
   };
 
   // A select that shows one of hundreds of choices holds only that choice
@@ -1308,10 +1907,11 @@
     })
     : null;
   const autoFitControlText = (control, options = {}) => {
-    if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
+    const readOnlyBox = control instanceof HTMLElement && control.classList.contains("lex-readonly-field");
+    if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement || readOnlyBox)) return control;
     if (control.dataset.lexAutofit === "false") return control;
     if (control.__lexAutoFitUpdate) {
-      control.__lexAutoFitUpdate();
+      queueAutoFit(control);
       return control;
     }
     const minimum = Math.max(8, Number(options.minimum) || (control instanceof HTMLSelectElement ? 8 : 11));
@@ -1337,6 +1937,7 @@
       const available = Math.max(1, control.clientWidth - horizontal);
       const value = control instanceof HTMLSelectElement
         ? control.selectedOptions[0]?.textContent || ""
+        : readOnlyBox ? (control.value ?? control.textContent ?? "").trim()
         : control.value || control.placeholder || "";
       const canvas = autoFitControlText.canvas ||= document.createElement("canvas");
       const context = canvas.getContext("2d");
@@ -1369,115 +1970,180 @@
       reset();
       apply(measure());
     };
-    control.addEventListener("input", update);
-    control.addEventListener("change", update);
+    // An edit commonly emits both events. Fit once in the next frame so
+    // handlers do not repeatedly force layout across a large detail panel.
+    const queueUpdate = () => queueAutoFit(control);
+    control.addEventListener("input", queueUpdate);
+    control.addEventListener("change", queueUpdate);
     control.__lexAutoFitUpdate = update;
     control.__lexAutoFitMeasure = measure;
     control.__lexAutoFitReset = reset;
     control.__lexAutoFitApply = apply;
     autoFitObserver?.observe(control);
-    document.fonts?.ready?.then(() => queueAutoFit(control));
     queueAutoFit(control);
     return control;
   };
+  document.fonts?.addEventListener?.("loadingdone", event => {
+    if (!event.fontfaces.length) return;
+    document.querySelectorAll("input,select,textarea").forEach(control => {
+      if (control.__lexAutoFitUpdate) queueAutoFit(control);
+    });
+  });
 
   // Every value box on a panel should end at the same edge, so the reference
   // rail takes the widest requirement in that panel rather than each control
   // keeping its own.
-  const alignReferenceRails = (container = document) => {
-    const panels = new Set();
-    container.querySelectorAll?.(".lex-source-control[data-lex-rail-tag]")
-      .forEach(control => panels.add(
-        control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
-    for (const panel of panels) {
+  const alignReferenceRailsNow = (containers = [document]) => {
+    const controlsFor=(container,selector)=>[
+      ...(container instanceof Element&&container.matches(selector)?[container]:[]),
+      ...(container.querySelectorAll?.(selector)||[])
+    ];
+    // Every read first, then every write, then one read of the probes and
+    // their writes: two layouts for the whole pass. Reading a row after the
+    // previous row's write forced a layout per property, and with each caller
+    // running its own pass, switching records laid the page out dozens of
+    // times (Lexer: "OBSCENE amounts of lag every time i do LITERALLY
+    // ANYTHING").
+    const panels = new Map();
+    for (const container of containers)
+      controlsFor(container, ".lex-source-control[data-lex-rail-tag]").forEach(control => {
+        const panel = control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container;
+        if (!panels.has(panel)) panels.set(panel, null);
+      });
+    const outside = [...panels.keys()].map(panel => {
       const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")];
-      if (!controls.length) continue;
       // Each entry gets an equal share of the space beside the property it
       // annotates, so a deeper stack is a smaller stack rather than a taller
-      // row.
-      for (const control of controls) {
-        const stack = control.querySelector(":scope > .lex-reference-values");
-        const count = stack?.children.length || 0;
-        if (!count) {
+      // row. The share is taken from the PROPERTY ROW, not from the value box
+      // inside it: dividing the shorter box by three left a three-deep stack
+      // at seven pixels.
+      const caps = controls.map(control => {
+        const count = control.querySelector(":scope > .lex-reference-values")?.children.length || 0;
+        const row = control.closest(".lex-detail-field") || control;
+        return count ? {count, height: row.getBoundingClientRect().height} : null;
+      });
+      return {panel, controls, caps};
+    }).filter(entry => entry.controls.length);
+    // An inside rail lives in the value box, so its share comes from that box
+    // rather than from the property row: it is capped at the box's own height.
+    // These controls have no outside rail, so their share is measured on its
+    // own - a graph card's variable drawer is a panel with nothing else in it.
+    const insideRails = [];
+    const seenInside = new Set();
+    for (const container of containers)
+      controlsFor(container, ".lex-source-control[data-lex-inside-rail]").forEach(control => {
+        if (seenInside.has(control)) return;
+        seenInside.add(control);
+        const count = control.querySelector(":scope > .lex-reference-values")?.children.length || 0;
+        if (!count) return;
+        // The box the rail shares is the control's own input, not the grid
+        // cell around it, which is taller than the box inside it.
+        const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
+          || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
+        const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
+        const fontSize = Math.max(8, parseFloat(getComputedStyle(control).fontSize) || 16);
+        insideRails.push({control, cap, count, fontSize, boxWidth: control.getBoundingClientRect().width});
+      });
+
+    // Writes, and every probe mounted at once.
+    for (const {controls, caps} of outside) {
+      controls.forEach((control, index) => {
+        const measured = caps[index];
+        if (!measured) {
           control.style.removeProperty("--lex-reference-slot");
           control.style.removeProperty("--lex-reference-cap");
-          continue;
+          return;
         }
-        // The share is taken from the PROPERTY ROW, not from the value box
-        // inside it. The box is the shorter of the two, and dividing that by
-        // three left a three-deep stack at seven pixels - it fitted, and it
-        // could not be read. The row is the space actually available beside
-        // the box, and staying inside it is what keeps the stack from making
-        // the row taller.
-        const row = control.closest(".lex-detail-field") || control;
-        const cap = Math.max(12, Math.round(row.getBoundingClientRect().height) - 4);
+        const cap = Math.max(12, Math.round(measured.height) - 4);
         control.style.setProperty("--lex-reference-cap", `${cap}px`);
-        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
-      }
-      // The rail is reserved in advance from the longest tag and the longest
-      // value any control on this panel can ever put in it, measured in a
-      // hidden copy of a real entry rather than from the entries on screen.
-      // Two earlier attempts both moved the value boxes as values changed: a
-      // character count times a guessed em over-reserved by half a rail, and
-      // measuring what was displayed re-sized the rail on every edit that
-      // matched or stopped matching a reference. The probe is pinned to the
-      // largest type a stack ever uses, because a deeper stack only ever
-      // draws smaller.
-      const longest = (attribute, floor) => controls
+        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / measured.count))}px`);
+      });
+    }
+    // The outside rail is reserved in advance from the longest tag and the
+    // longest value any control on the panel can ever put in it, measured in
+    // a hidden copy of a real entry rather than from the entries on screen,
+    // so the value boxes never move as values change. The probe is pinned to
+    // the largest type a stack ever uses, because a deeper stack only ever
+    // draws smaller.
+    for (const entry of outside) {
+      const longest = (attribute, floor) => entry.controls
         .map(control => control.dataset[attribute] || "")
         .reduce((widest, text) => text.length > widest.length ? text : widest, floor);
-      const probe = element("div", {
+      entry.probe = element("div", {
         class: "lex-source-strip lex-reference-values lex-reference-probe",
         "aria-hidden": "true",
       }, element("span", {class: "lex-reference-value"},
         element("span", {class: "lex-reference-tag"}, longest("lexRailTag", "V")),
         element("span", {class: "lex-reference-text"}, longest("lexRailValue", "000"))));
-      (controls[0].parentElement || panel).append(probe);
-      const tag = Math.ceil(probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
-      const text = Math.ceil(probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
-      probe.remove();
-      // tag + the column gap the stack opens between the two + the value, and
-      // two pixels so the last glyph is not flush against the panel edge.
-      const widest = tag + text + 6;
-      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
-      panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
-      for (const control of controls) {
-        control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
-        control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
-      }
+      (entry.controls[0].parentElement || entry.panel).append(entry.probe);
     }
-    // An inside rail lives in the value box, so its share comes from that box
-    // rather than from the property row: it is capped at the box's own height.
-    // Uncapped, a drawer's strip was taller than the value it labelled and
-    // stood above it, which read as a rail that had left its box. These
-    // controls have no outside rail, so their share is measured on its own -
-    // a graph card's variable drawer is a panel with nothing else in it.
-    container.querySelectorAll?.(".lex-source-control[data-lex-inside-rail]").forEach(control => {
-      const stack = control.querySelector(":scope > .lex-reference-values");
-      const count = stack?.children.length || 0;
-      if (!count) return;
-      // The box the rail shares is the control's own input, not the grid cell
-      // around it: a drawer's cell is taller than the box inside it, and
-      // measuring the cell left the strip taller than the value again.
-      const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
-        || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
-      const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
+    for (const rail of insideRails) {
+      const {control, cap, count, fontSize} = rail;
       control.style.setProperty("--lex-reference-cap", `${cap}px`);
       control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
-      // The lane is measured from the longest entry this rail can paint, at the
-      // size it paints it. The old character-count estimate was tuned for the
-      // shared symbol font at an outside rail's small size; an inside rail
-      // draws at the value's own size, so "V 255" in a game font came out wider
-      // than the lane reserved for it and left the box.
+      // The lane is measured from the longest entry this rail can paint, at
+      // the size it paints it (an inside rail draws at the value's own size),
+      // and at the rail's preferred size, before its own reservation
+      // constrains it - measuring the constrained font fed the previous width
+      // back into the next reservation.
       const probe = element("span", {class: "lex-reference-value lex-reference-probe-value",
         "aria-hidden": "true"},
         element("span", {class: "lex-reference-tag"}, control.dataset.lexInsideTag || "V"),
         element("span", {class: "lex-reference-text"}, control.dataset.lexInsideValue || ""));
+      probe.style.fontSize = `${fontSize}px`;
       control.append(probe);
-      const width = Math.ceil(probe.getBoundingClientRect().width) + 2;
+      rail.probe = probe;
+    }
+
+    // One read of every probe, then their writes.
+    for (const entry of outside) {
+      entry.tag = Math.ceil(entry.probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
+      entry.text = Math.ceil(entry.probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
+    }
+    const widths = insideRails.map(({probe}) => Math.ceil(probe.getBoundingClientRect().width) + 2);
+    for (const entry of outside) {
+      entry.probe.remove();
+      // tag + the column gap the stack opens between the two + the value, and
+      // two pixels so the last glyph is not flush against the panel edge.
+      const widest = entry.tag + entry.text + 6;
+      entry.panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
+      entry.panel.style?.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
+      for (const control of entry.controls) {
+        control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
+        control.style.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
+      }
+    }
+    insideRails.forEach(({control, probe, fontSize, boxWidth}, index) => {
       probe.remove();
-      if (width > 2) control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+      const width = widths[index];
+      if (width <= 2) return;
+      control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+      // The lane is capped at 35% of the box. Only when that cap is narrower
+      // than the reference needs does the reference shrink, and only by that
+      // much.
+      const lane = boxWidth ? Math.min(width, boxWidth * 0.35) : width;
+      control.style.setProperty("--lex-reference-fit", `${Math.max(8, fontSize * Math.min(1, lane / width))}px`);
     });
+  };
+  // Every value box on a panel should end at the same edge, so the reference
+  // rail takes the widest requirement in that panel rather than each control
+  // keeping its own. Callers ask for it as often as they like; the work is
+  // done once, before the next paint, over everything asked for.
+  const pendingRailContainers = new Set();
+  let railFrame = 0;
+  const flushReferenceRails = () => {
+    cancelAnimationFrame(railFrame);
+    railFrame = 0;
+    const containers = [...pendingRailContainers].filter(node => node === document || node.isConnected);
+    pendingRailContainers.clear();
+    if (!containers.length) return;
+    const outer = containers.includes(document) ? [document]
+      : containers.filter(node => !containers.some(other => other !== node && other.contains(node)));
+    alignReferenceRailsNow(outer);
+  };
+  const alignReferenceRails = (container = document) => {
+    pendingRailContainers.add(container);
+    if (!railFrame) railFrame = requestAnimationFrame(flushReferenceRails);
   };
 
   // Refresh every mounted reference display from its live control value. This
@@ -1487,14 +2153,20 @@
     container.querySelectorAll?.("[data-lex-record-provenance]").forEach(node => node.refreshRecordProvenance?.());
     alignReferenceRails(container);
   };
-  // The first pass measures the rail against whatever face is loaded at the
-  // time. A face only starts loading when something asks to paint with it, so
-  // a panel that mounts after the document is otherwise ready measures its
-  // rail against the fallback and re-reserves it a pixel or two later, on the
-  // reader's first edit. Every batch of faces that finishes re-reserves it
-  // instead, which is what the rail exists to prevent.
-  document.fonts?.addEventListener?.("loadingdone", () => alignReferenceRails(document));
-  document.fonts?.ready?.then(() => alignReferenceRails(document));
+  // Reserve newly mounted rails immediately, including panels added after
+  // fonts are ready. A successfully loaded face can change their text width;
+  // failed font requests do not require another pass over every control.
+  document.fonts?.addEventListener?.("loadingdone", event => {
+    if(event.fontfaces.length)alignReferenceRails(document);
+  });
+  new MutationObserver(records=>{
+    const roots=new Set();
+    for(const record of records)for(const node of record.addedNodes){
+      if(node instanceof Element&&node.isConnected&&
+        (node.matches('.lex-source-control')||node.querySelector('.lex-source-control')))roots.add(node);
+    }
+    for(const root of roots)alignReferenceRails(root.closest('.lex-detail-panel-body, .lex-detail-panel, .lex-detail')||root);
+  }).observe(document.documentElement,{childList:true,subtree:true});
 
   // A section heading is renamed the same way a property name is: a
   // developer double-clicks it, types, and the wording ships for everyone
@@ -1576,7 +2248,10 @@
   options.action || null);
 
   // Buttons that act on the thing above them, in one wrapping row.
-  const actionRow = (...children) => element("div", {class: "lex-action-row"}, ...children);
+  const actionRow = (...children) => {
+    const options=children[0] && typeof children[0]==='object' && !Array.isArray(children[0]) && !(children[0] instanceof Node) ? children.shift() : {};
+    return element("div", {class:["lex-action-row",options.fillFirst?"lex-action-row-fill-first":"",options.className||""].filter(Boolean).join(" ")}, ...children);
+  };
 
   // A table that is its own pane, with its pager under it.
   const pagedPane = (content, pagerNode) => {
@@ -1733,7 +2408,8 @@
     return element("span", {class:"lex-record-source", role:"img",
       title:options.label, "aria-label":options.label}, options.icon);
   };
-  const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
+  const choiceField = (value, action, options={}) => element("span", {
+    class:["lex-choice-field",options.fillValue?"lex-choice-field-fill":"",options.hoverAction?"lex-choice-field-hover":""].filter(Boolean).join(" ")}, value, action);
   const quantityChoice = (choice, quantity) => element("div", {class:"lex-quantity-choice"},
     choice, element("span", {class:"lex-quantity-mark","aria-hidden":"true"}, "×"), quantity);
   const iconValue = ({icon,label,toggle,control}) => element("div",{class:"lex-icon-value"},
@@ -1780,7 +2456,132 @@
       options.busy ? element("div", {class: "lex-model-stage-spin", "aria-hidden": "true"}) : (options.message ?? ""));
     const stage = element("div", {class: ["lex-model-stage", options.className || ""].filter(Boolean).join(" ")}, message);
     stage.lexMessage = message;
+    if (options.modes !== false) modelViewModes(stage);
     return stage;
+  };
+
+  // Corner buttons toggling how a 3D view is drawn: Regular (the renderer's
+  // own lighting), Fullbright (every face at full color, no shading) and
+  // Wireframe. modelStage mounts them; modelViewModes puts the same buttons
+  // on any other host (the DS1 map and animation views). bindScene connects
+  // the three.js scene the buttons retint, once the renderer has added every
+  // mesh; clicks before that only move the pressed state. No three.js import
+  // here: wireframe and emissive are plain material flags, so the helper only
+  // walks the scene graph and every plugin's renderer gets the same modes.
+  const modelViewModeIcon = mode => {
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    for (const [key, value] of Object.entries({viewBox: "0 0 24 24", "aria-hidden": "true",
+      fill: "none", stroke: "currentColor", "stroke-width": "2",
+      "stroke-linecap": "round", "stroke-linejoin": "round"})) svg.setAttribute(key, value);
+    const shape = (tag, attrs) => {
+      const node = document.createElementNS(ns, tag);
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+      svg.append(node);
+    };
+    if (mode === "regular") {
+      // A shaded sphere: half lit, half dark.
+      shape("circle", {cx: "12", cy: "12", r: "7"});
+      shape("path", {d: "M12 5a7 7 0 0 1 0 14z", fill: "currentColor", stroke: "none"});
+    } else if (mode === "fullbright") {
+      // A sun: every face lit as if noon.
+      shape("circle", {cx: "12", cy: "12", r: "4", fill: "currentColor", stroke: "none"});
+      shape("path", {d: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"});
+    } else {
+      // A grid square: edges only, no faces.
+      shape("rect", {x: "4", y: "4", width: "16", height: "16"});
+      shape("path", {d: "M4 12h16M12 4v16"});
+    }
+    return svg;
+  };
+  const MODEL_VIEW_MODES = [
+    {id: "regular", label: "Regular", title: "Regular: the renderer's own lighting"},
+    {id: "fullbright", label: "Fullbright", title: "Fullbright: every face at full color, no shading"},
+    {id: "wireframe", label: "Wireframe", title: "Wireframe: edges only, no faces"},
+  ];
+  // What each material looked like before any mode touched it, so Regular
+  // restores exactly that. Keyed weakly: a disposed scene takes its entries.
+  const modelViewModeStash = new WeakMap();
+  const applyModelViewMode = (scene, mode) => {
+    if (!scene || typeof scene.traverse !== "function") return;
+    scene.traverse(obj => {
+      const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+      for (const mat of mats) {
+        if (!mat || typeof mat !== "object") continue;
+        if (!modelViewModeStash.has(mat)) modelViewModeStash.set(mat, {
+          emissive: mat.emissive && typeof mat.emissive.getHex === "function" ? mat.emissive.getHex() : null,
+          emissiveMap: mat.emissiveMap || null,
+          emissiveIntensity: mat.emissiveIntensity ?? 1,
+          wireframe: !!mat.wireframe,
+        });
+        const saved = modelViewModeStash.get(mat);
+        if ("wireframe" in mat) mat.wireframe = mode === "wireframe" ? true : saved.wireframe;
+        if (mat.emissive && typeof mat.emissive.setHex === "function") {
+          // Fullbright without touching the light rig: the material glows in
+          // its own colors, textured or flat. Lines and points have no
+          // emissive and are unlit already, so they are left alone.
+          if (mode === "fullbright") {
+            if (mat.map) { mat.emissive.setHex(0xffffff); mat.emissiveMap = mat.map; }
+            else if (mat.color && typeof mat.color.getHex === "function") {
+              mat.emissive.setHex(mat.color.getHex()); mat.emissiveMap = null;
+            } else mat.emissive.setHex(0xffffff);
+            if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1;
+          } else {
+            mat.emissive.setHex(saved.emissive ?? 0x000000);
+            mat.emissiveMap = saved.emissiveMap;
+            if ("emissiveIntensity" in mat) mat.emissiveIntensity = saved.emissiveIntensity;
+          }
+        }
+        // Swapping the emissive map changes the compiled shader.
+        mat.needsUpdate = true;
+      }
+    });
+  };
+  const modelViewModes = host => {
+    // Remounting clears the host (animationViewer.stop replaces its
+    // children), which detaches the bar while the cached controller
+    // survives. Re-attach it so the buttons - and the mode - persist.
+    if (host.lexViewModes) {
+      const cached = host.lexViewModes;
+      if (cached.bar && !cached.bar.isConnected) host.append(cached.bar);
+      return cached;
+    }
+    let mode = "regular", scene = null;
+    const buttons = new Map();
+    const paint = () => {
+      for (const [id, button] of buttons) {
+        const on = id === mode;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-pressed", String(on));
+      }
+    };
+    const setMode = next => {
+      if (!MODEL_VIEW_MODES.some(entry => entry.id === next)) return;
+      mode = next;
+      paint();
+      if (scene) applyModelViewMode(scene, mode);
+    };
+    const bar = element("div", {class: "lex-model-view-modes", role: "group", "aria-label": "View mode"},
+      ...MODEL_VIEW_MODES.map(entry => {
+        const button = element("button", {type: "button", class: "lex-model-view-mode",
+          "data-view-mode": entry.id, title: entry.title, "aria-label": entry.label,
+          "aria-pressed": String(entry.id === mode),
+          onclick: () => setMode(entry.id),
+        }, modelViewModeIcon(entry.id));
+        buttons.set(entry.id, button);
+        return button;
+      }));
+    paint();
+    host.append(bar);
+    const controller = {
+      bar,
+      mode: () => mode,
+      setMode,
+      bindScene: next => { scene = next || null; if (scene) applyModelViewMode(scene, mode); },
+    };
+    host.lexViewModes = controller;
+    host.lexSetViewMode = setMode;
+    host.lexBindScene = controller.bindScene;
+    return controller;
   };
 
   // What fills a detail heading's icon box: a picture, a small stage, or a
@@ -1913,6 +2714,15 @@
     const image=stage.querySelector('img');
     if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;
+    const sideControls=[];
+    root.lexSideControls = ({left,right}={}) => {
+      sideControls.splice(0).forEach(node=>node.remove());
+      for(const [side,content] of [['left',left],['right',right]]){
+        if(!content)continue;
+        const controls=element('div',{class:`lex-image-map-side-controls ${side}`},content);
+        sideControls.push(controls);root.append(controls);
+      }
+    };
     // A map in a panel is small, and a stored coordinate is not. The magnifier
     // opens the same map at the size of the window, with the same markers and the
     // same click, so a point is placed against the art. `magnify` returns that
@@ -1946,15 +2756,31 @@
     options.footer ? element("div", {class:"lex-stat-card-footer"}, options.footer) : null);
 
   const choicePopover = (options = {}) => {
-    const popup = element("div", {class:"lex-choice-popover",popover:"auto",role:"group",
-      "aria-label":options.label || "Choose a value"}, ...(options.choices || []).map(choice =>
+    const buttons=(options.choices || []).map(choice =>
       element("button", {type:"button","aria-label":choice.label,onclick:()=>{popup.hidePopover();options.select?.(choice.value);}},
-        choice.icon || null, element("span",{},choice.label))));
+        choice.icon || null, element("span",{},choice.label)));
+    const popup = element("div", {class:"lex-choice-popover",popover:"auto",role:"group",
+      "aria-label":options.label || "Choose a value"});
+    // A long choice list filters as the reader types, so a 4,000-effect
+    // picker stays usable where a dropdown would freeze the pane.
+    if (options.search) {
+      const box = element("input", {type:"search", class:"lex-choice-popover-search",
+        placeholder:typeof options.search === "string" ? options.search : "Search",
+        "aria-label":typeof options.search === "string" ? options.search : "Search choices"});
+      box.addEventListener("input", () => {
+        const needle = box.value.trim().toLocaleLowerCase();
+        buttons.forEach((button, index) => {
+          const label = String((options.choices || [])[index]?.label || "");
+          button.hidden = !!needle && !label.toLocaleLowerCase().includes(needle);
+        });
+      });
+      popup.append(box, ...buttons);
+    } else popup.append(...buttons);
     popup.addEventListener("keydown", event => {
       if (!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) return;
       event.preventDefault();
-      const buttons=[...popup.querySelectorAll("button")], step=["ArrowUp","ArrowLeft"].includes(event.key)?-1:1;
-      buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length]?.focus();
+      const live=buttons.filter(button=>!button.hidden), step=["ArrowUp","ArrowLeft"].includes(event.key)?-1:1;
+      live[(live.indexOf(document.activeElement)+step+live.length)%live.length]?.focus();
     });
     popup.openFor = anchor => {
       if (!popup.isConnected) document.body.append(popup);
@@ -1973,7 +2799,7 @@
         }};
         popup.addEventListener("toggle",cleanup);
       }
-      popup.querySelector("button")?.focus();
+      (popup.querySelector(".lex-choice-popover-search") || popup.querySelector("button"))?.focus();
     };
     popup.addEventListener("toggle",event=>{if(event.newState==="closed")popup.remove();});
     return popup;
@@ -2033,6 +2859,14 @@
     class: ["lex-panel-loading", options.className || ""].filter(Boolean).join(" "),
     role: "status", "aria-label": options.label || "Loading", "aria-busy": "true",
   }, element("span", {class:"lex-plugin-loading-pulse", "aria-hidden":"true"}));
+  // A status bar's loading state: the standard pulse beside its label,
+  // for bars whose text later changes to results or errors. Callers show
+  // it with status.replaceChildren(loadingStatus("Loading map")) and go
+  // back to plain text once loading finishes.
+  const loadingStatus = (label = "Loading") => element("span", {
+    class: "lex-loading-status", role: "status", "aria-busy": "true",
+  }, element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}),
+  element("span", {class: "lex-loading-status-label"}, label));
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
   // A word or two that classifies a record - Project or Vanilla - in a
@@ -2069,6 +2903,17 @@
         return;
       }
       const inset = Math.min(3, target.height * .1);
+      if (wideBoolean) {
+        // Wide boolean boxes keep the pin the way every other value box
+        // does: the whole icon inside the box's top-right corner. Aiming
+        // the drawn tip at the corner hung the mark half past the box
+        // edge, where the panel body sliced it off.
+        const boolScale = owner.width / control.offsetWidth || 1;
+        pin.style.setProperty("left", `${(target.right - owner.left - inset - icon.width) / boolScale}px`, "important");
+        pin.style.setProperty("top", `${(target.top - owner.top + inset) / boolScale}px`, "important");
+        pin.style.setProperty("right", "auto", "important");
+        return;
+      }
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
@@ -2143,7 +2988,7 @@
     const switches = list.length > 0 && list.every(part => part instanceof Element && part.matches(".lex-toggle"));
     const columns = Math.max(1, Number(options.columns) || Math.min(3, list.length) || 1);
     return element("div", {
-      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.className || ""]
+      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.nowrap ? "lex-detail-parts-nowrap" : "", options.fixedFirst ? "lex-detail-parts-fixed-first" : "", options.className || ""]
         .filter(Boolean).join(" "),
       style: `--lex-part-columns:${columns};--lex-multi-number-columns:${columns}`,
       "data-lex-copy-parts": options.copy ? "" : null,
@@ -2153,6 +2998,47 @@
 
   const controlGroup = (parts, options = {}) => detailParts(parts, options);
 
+  // Small geometric glyphs for damage, status and weakness kinds: a
+  // label about fire carries a flame, one about bleeding a drop. Game art
+  // stays with its own pipeline (FF8 renders its menu icons); these are the
+  // shared fallback wherever a label names a kind. Unknown kinds draw
+  // nothing rather than guessing.
+  const TYPE_GLYPHS = {
+    physical: ['#cfcfcf', '<rect x="7" y="1" width="2" height="9"/><path d="M7 10h2l-1 3z"/><rect x="4.5" y="10.5" width="7" height="1.6"/><rect x="7.4" y="12" width="1.2" height="3"/>'],
+    magic: ['#5aa9ff', '<path d="M8 1l1.6 5.4L15 8l-5.4 1.6L8 15l-1.6-5.4L1 8l5.4-1.6z"/>'],
+    fire: ['#ff7a3c', '<path d="M8 1c2 3 4 5 4 8.5a4 4.5 0 1 1-8 0C4 7 5.5 5.5 6.5 4c.3 1.5 1 2 1.5 2.2C7.6 4.5 7.8 2.5 8 1z"/>'],
+    lightning: ['#ffd94d', '<path d="M9 1l-5 8h3l-1 6 6-8.5H8.8z"/>'],
+    slash: ['#d8d8d8', '<path d="M2 14L11 2h2L4 14z"/>'],
+    strike: ['#b09a7a', '<rect x="4.5" y="1.5" width="7" height="5" rx="1"/><rect x="7.2" y="6" width="1.6" height="9"/>'],
+    thrust: ['#d8d8d8', '<path d="M8 1l2.5 12h-5z"/>'],
+    poison: ['#b06ac9', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    toxic: ['#8a6a2a', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    bleed: ['#d43a3a', '<path d="M8 2s-3.5 5-3.5 8a3.5 3.5 0 0 0 7 0C11.5 7 8 2 8 2z"/>'],
+    curse: ['#9aa3ad', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/>'],
+    divine: ['#e8c67a', '<ellipse cx="8" cy="8" rx="5" ry="2.4" fill="none" stroke-width="1.8"/>'],
+    occult: ['#7a5ac9', '<path d="M11 2a6.5 6.5 0 1 0 0 12 8 8 0 1 1 0-12z"/>'],
+    abyssal: ['#a02622', '<circle cx="8" cy="8" r="5" fill="#000" stroke-width="1.5"/>'],
+    str: ['#7fd08a', '<rect x="3" y="3" width="10" height="10" rx="1"/>'],
+    dex: ['#6ad0c9', '<path d="M4 2l6 6-6 6V2z"/><path d="M9 2l6 6-6 6V2z"/>'],
+    int: ['#b48ae0', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2"/><circle cx="8" cy="8" r="1.6"/>'],
+    fth: ['#e08aa0', '<path d="M8 1l5 7-5 7-5-7z"/>'],
+    vit: ['#e05a5a', '<path d="M8 13.5 C5.5 11.5 3.5 9.4 3.5 7 C3.5 5.3 4.8 4.2 6.3 4.2 C7 4.2 7.7 4.5 8 5.1 C8.3 4.5 9 4.2 9.7 4.2 C11.2 4.2 12.5 5.3 12.5 7 C12.5 9.4 10.5 11.5 8 13.5 z"/>'],
+    wil: ['#5aa9e0', '<path d="M3 3.5h10v2H3zM3 7h10v2H3zM3 10.5h10v2H3z"/>'],
+    end: ['#a3c14a', '<path d="M9 1.5 L4.5 9 H7.5 L7 14.5 L11.5 7 H8.5 Z"/>'],
+    luc: ['#c9c9c9', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2.5"/>'],
+  };
+  const typeGlyph = kind => {
+    const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];
+    if (!found) return null;
+    const [color, shapes] = found;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('fill', color);
+    svg.setAttribute('stroke', color);
+    svg.innerHTML = shapes;
+    return element('span', {class: 'lex-type-glyph', 'aria-hidden': 'true'}, svg);
+  };
   const detailField = (options = {}) => {
     if (Array.isArray(options.controls)) {
       options = {...options, control: detailParts(options.controls)};
@@ -2196,7 +3082,7 @@
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
       ? `(${min === null || min === undefined || min === "" ? "…" : formatNumber(min)}-${max === null || max === undefined || max === "" ? "…" : formatNumber(max)})` : "");
-    if (input && !readOnly && dataType === "INT") {
+    if (input && !readOnly && dataType === "INT" && !input.dataset.lexExactInteger && !input.dataset.lexValidateNumber) {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";
       let lastValid = /^-?\d+$/.test(String(input.value)) ? String(input.value) : "0";
@@ -2282,12 +3168,14 @@
       "data-lex-layout-field": options.property || pin?.getAttribute?.("data-lex-pin-column") || labelText,
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
+      "data-lex-icon": options.icon || null,
       "data-lex-readonly": String(readOnly),
       // The property name is wrapped so it is a real flex item. Left as a bare
       // text node it was an anonymous item the leader arrow could shrink to
       // nothing, which wrapped "CAN SELL" one letter per line and drove the
       // label fitter down to its six-pixel floor.
       }, element("div", {class: "lex-detail-field-label"},
+      options.icon ? typeGlyph(options.icon) : null,
       labelNode(options),
       helpMarker ? element("span", {class:"lex-field-help"}, helpMarker) : null,
       // The arrow used to live inside the label, which forced a boolean's
@@ -2362,10 +3250,40 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    // The slider's span can be narrower than what the field accepts: a value
+    // bounded only by its type (a whole 32-bit range) put every record's fill
+    // at the same spot (Lexer: "all the sliders ... exact same initial
+    // position"). `sliderMin`/`sliderMax` give the span the data really uses;
+    // typing still accepts the whole range, and the fill pins at its ends.
+    const shownLow = Number.isFinite(Number(options.sliderMin ?? NaN)) && Number.isFinite(lowBound)
+      ? Math.max(lowBound, Number(options.sliderMin)) : lowBound;
+    const shownHigh = Number.isFinite(Number(options.sliderMax ?? NaN)) && Number.isFinite(highBound)
+      ? Math.min(highBound, Number(options.sliderMax)) : highBound;
+    const [sliderLow, sliderHigh] = shownHigh > shownLow ? [shownLow, shownHigh] : [lowBound, highBound];
+    // Native arrows move by 1 when step is "any": without this, float
+    // fields changed through whole numbers from the keyboard too.
+    if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
+        && (input.step === "any" || !Number.isFinite(Number(input.step)))) {
+      input.addEventListener("keydown", event => {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        const at = readNumeric(input);
+        const base = Number.isFinite(at) ? at : 0;
+        const floor = input.min === "" ? -Infinity : Number(input.min);
+        const ceiling = input.max === "" ? Infinity : Number(input.max);
+        const next = Math.max(Number.isFinite(floor) ? floor : -Infinity,
+          Math.min(Number.isFinite(ceiling) ? ceiling : Infinity,
+            Number((base + (event.key === "ArrowUp" ? 0.1 : -0.1)).toPrecision(12))));
+        if (next === base) return;
+        writeNumeric(input, next);
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+        input.dispatchEvent(new Event("change", {bubbles: true}));
+      });
+    }
     // Wide ranges still have a coarse slider; direct entry retains precise
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
-    if (input && !readOnly && numericLike &&
+    if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
         Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
@@ -2373,7 +3291,7 @@
       const ratio = () => {
         const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
-        return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
+        return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
       };
       const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
       input.__lexValueSliderPaint = paint;
@@ -2385,10 +3303,14 @@
         if (input.disabled || input.readOnly || refusesEdit(input)) return;
         const bounds = box().getBoundingClientRect();
         const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-        const step = Number(input.step) || 1;
-        const raw = lowBound + share * (highBound - lowBound);
-        const snapped = Math.round(raw / step) * step;
-        const nextValue = Math.max(lowBound, Math.min(highBound, snapped));
+        // A float field's step is "any": snapping to step 1 would drag
+        // it through whole numbers only. Without a usable step the
+        // pointer position stands, rounded past float dust.
+        const declared = Number(input.step);
+        const snap = Number.isFinite(declared) && declared > 0 ? declared : 0;
+        const raw = sliderLow + share * (sliderHigh - sliderLow);
+        const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
+        const nextValue = Math.max(sliderLow, Math.min(sliderHigh, snapped));
         if (readNumeric(input) === nextValue) return;
         writeNumeric(input, nextValue);
         paint();
@@ -2466,7 +3388,9 @@
     if (input && !readOnly && inputType !== "checkbox") {
       // Selecting the whole value on focus keeps a drag inside the field from
       // competing with the slider handle that shares the same box.
-      input.addEventListener("focus", () => requestAnimationFrame(() => input.select?.()));
+      input.addEventListener("focus", () => {
+        if (!input.lexRestoringFocus) requestAnimationFrame(() => input.select?.());
+      });
       if (numericLike) {
         input.addEventListener("beforeinput", event => {
           if (event.data && /[^0-9.eE+-]/.test(event.data)) { event.preventDefault(); rejectValue(); }
@@ -2636,7 +3560,7 @@
     // is why one form of the same property had one and another did not.
     entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control,
       title: entry.title, help: entry.help, pin: entry.pin})),
-    {columns: options.columns, stacked: options.stacked, copy: !options.stacked,
+    {columns: options.columns, stacked: options.stacked, nowrap: options.nowrap, copy: !options.stacked,
      className: ["lex-multi-number", options.className || ""].filter(Boolean).join(" ")});
 
   // Nested navigation is a shared control. Plugins provide only labels,
@@ -2650,6 +3574,75 @@
   // default, as it does on the page tab: a subtab's layout is stored under its
   // page, so the page is what gets saved (Lexer: the hold did nothing on a
   // subtab). Developer mode only, like the page tab.
+  // A mod's place in the load order, moved the same way in every list of
+  // mods (the mod selector and the Mods tab): drag a row onto another, or
+  // Alt+Up / Alt+Down with the row focused. `index` is the row's place in the
+  // list, `movable(i)` whether the row at i takes part, and `move(from, by)`
+  // moves the row at `from` by `by` places. A press on one of the row's own
+  // controls (`controls`, a selector) never starts a drag.
+  const MOD_ORDER_TYPE = "application/x-lex-mod";
+  const modOrderGestures = ({index, movable, move, controls = "input,button"}) => {
+    let controlGesture = false;
+    // The row under the pointer shows where the drop lands: a line above
+    // it or below it, the way a dragged header marks its target cell.
+    const showLine = (row, after) => {
+      row.parentElement?.querySelectorAll(".lex-drop-before,.lex-drop-after").forEach(node => {
+        if (node !== row) node.classList.remove("lex-drop-before", "lex-drop-after");
+      });
+      row.classList.toggle("lex-drop-before", !after);
+      row.classList.toggle("lex-drop-after", after);
+    };
+    const clearLines = row => {
+      row.parentElement?.querySelectorAll(".lex-drop-before,.lex-drop-after").forEach(node =>
+        node.classList.remove("lex-drop-before", "lex-drop-after"));
+    };
+    const pastMiddle = event => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      return event.clientY > rect.top + rect.height / 2;
+    };
+    return {
+      draggable: "true", tabindex: 0,
+      "aria-description": "Drag to a new position. Alt+Up or Alt+Down moves one place.",
+      onpointerdown: event => { controlGesture = !!event.target.closest(controls); },
+      ondragstart: event => {
+        if (controlGesture) { event.preventDefault(); return; }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(MOD_ORDER_TYPE, String(index));
+        event.currentTarget.classList.add("dragging");
+      },
+      onkeydown: event => {
+        if (event.target !== event.currentTarget || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const by = event.key === "ArrowUp" ? -1 : 1;
+        if (movable(index + by)) move(index, by);
+      },
+      ondragover: event => {
+        if (event.dataTransfer.types.includes(MOD_ORDER_TYPE)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          showLine(event.currentTarget, pastMiddle(event));
+        }
+      },
+      ondragleave: event => {
+        event.currentTarget.classList.remove("lex-drop-before", "lex-drop-after");
+      },
+      ondragend: event => {
+        event.currentTarget.classList.remove("dragging");
+        clearLines(event.currentTarget);
+      },
+      ondrop: event => {
+        clearLines(event.currentTarget);
+        const from = Number(event.dataTransfer.getData(MOD_ORDER_TYPE));
+        if (!Number.isInteger(from) || !movable(from)) return;
+        event.preventDefault();
+        // The line says the slot: above the row takes its place, below it
+        // takes the next one. Beside itself both are a no-op.
+        const slot = pastMiddle(event) ? index + 1 : index;
+        const to = slot <= from ? slot : slot - 1;
+        if (to !== from) move(from, to - from);
+      },
+    };
+  };
   const holdToSaveDefaultView = button => {
     let timer = 0, saved = false;
     button.addEventListener("pointerdown", event => {
@@ -2728,7 +3721,13 @@
       role: "tab",
       "aria-selected": String(tab.id === options.active),
       tabindex: tab.id === options.active ? "0" : "-1",
-      onclick: () => options.change?.(tab.id),
+      // Clicking the active subtab changes nothing: re-running change
+      // would rebuild the strip (wiping the rename box a double-click
+      // just opened) for no visible effect.
+      onclick: event => {
+        if (event.currentTarget.classList.contains("active")) return;
+        options.change?.(tab.id);
+      },
     }, element("span", {class: "lex-tab-label"}, labelText),
   tab.help ? (() => {
     const help = infoHelp(tab.help);
@@ -3971,6 +4970,41 @@
     confirm.focus();
   });
 
+  // A dialog that asks for a name. Resolves the trimmed answer, or null
+  // when dismissed.
+  const promptText = (options = {}) => new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
+    const input = element("input", {type: "text", class: "lex-dialog-input",
+      value: String(options.value ?? ""), "aria-label": String(options.label || options.title || "Name")});
+    const cancel = element("button", {class: "lex-dialog-action", text: String(options.cancelLabel || "Cancel")});
+    const confirm = element("button", {class: "lex-dialog-action primary",
+      text: String(options.confirmLabel || "Create")});
+    const dialog = element("section", {class: "lex-dialog lex-prompt-dialog", role: "dialog", "aria-modal": "true"},
+      element("h2", {text: String(options.title || "Name")}),
+      options.message ? element("p", {class: "lex-important-message"}, String(options.message)) : null,
+      element("div", {class: "lex-dialog-field"}, input),
+      element("div", {class: "lex-dialog-actions"}, cancel, confirm));
+    const finish = answer => {
+      backdrop.remove();
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus?.();
+      resolve(answer);
+    };
+    const onKey = event => {
+      if (event.key === "Escape") finish(null);
+      else if (event.key === "Enter") finish(input.value.trim() || null);
+    };
+    cancel.onclick = () => finish(null);
+    confirm.onclick = () => finish(input.value.trim() || null);
+    backdrop.onclick = event => { if (event.target === backdrop) finish(null); };
+    document.addEventListener("keydown", onKey);
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    input.focus();
+    input.select();
+  });
+
   // One ReShade, managed by Lexeditor; one preset per mod, carried by the mod.
   // The section is deliberately honest about the three ways this does nothing:
   // ReShade is not installed, the mod ships no preset, or the manifest names a
@@ -4033,19 +5067,72 @@
     }, {passive:false});
   };
 
+  const labelMeasure = document.createElement('canvas').getContext('2d');
+  const labelWidths = new Map();
+  const readablePropertyWidth = (cards, fontSize=12) => {
+    let minimum=0;
+    for(const card of cards){
+      for(const label of card.querySelectorAll('.lex-detail-field:not(.lex-detail-field-stacked) > .lex-detail-field-label')){
+        const text=label.querySelector(':scope > .lex-detail-field-label-text');
+        if(!text?.textContent.trim())continue;
+        const css=getComputedStyle(label),lane=css.getPropertyValue('--lex-detail-label-width').trim();
+        if(!lane.endsWith('%'))continue;
+        const share=parseFloat(lane)/100;
+        if(!(share>0&&share<=1))continue;
+        // Give the percentage lane room for a readable word before fitting.
+        // Longer names can wrap between words without changing that percentage.
+        const font=`${css.fontStyle} ${css.fontWeight} ${fontSize}px ${css.fontFamily}`;
+        labelMeasure.font=font;
+        let wordWidth=0;
+        for(const original of text.textContent.trim().split(/\s+/)){
+          const word=css.textTransform==='uppercase'?original.toUpperCase():css.textTransform==='lowercase'?original.toLowerCase():original;
+          const spacing=parseFloat(css.letterSpacing)||0;
+          const key=font+'|'+spacing+'|'+word;
+          if(!labelWidths.has(key)){
+            if(labelWidths.size>=8192)labelWidths.delete(labelWidths.keys().next().value);
+            labelWidths.set(key,labelMeasure.measureText(word).width+Math.max(0,word.length-1)*spacing);
+          }
+          wordWidth=Math.max(wordWidth,labelWidths.get(key));
+        }
+        const help=label.querySelector(':scope > .lex-field-help');
+        const helpWidth=help?parseFloat(getComputedStyle(help).width)+(parseFloat(css.columnGap)||0):0;
+        const inset=(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0);
+        minimum=Math.max(minimum,(wordWidth+helpWidth+inset+2)/share+32);
+      }
+    }
+    return minimum;
+  };
+
+  const pagedSectionMemory = new Map();
   const paginateSettings = (content, options = {}) => {
     content.classList.add("lex-tweak-card-grid");
     const cards = [...content.children];
     if(options.columnMajor)cards.sort((a,b)=>(a.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||a.textContent).localeCompare(b.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||b.textContent,undefined,{sensitivity:"base"}));
     const size = options.pageSize || 0;
+    // A record pane's sections remember their page: editing a property on
+    // page 2 re-renders the pane, and it came back on page 1. The page is
+    // kept per screen and set of sections, so the next record of the same
+    // kind opens on it too.
+    const titleOf = card => (card.querySelector(".lex-detail-section-title,.lex-detail-panel-title")?.textContent || "").trim();
+    const memoryKey = options.inline ? `${shellPluginId()}-${activePageTab()}:${cards.map(titleOf).join("|")}` : null;
+    let restore = memoryKey ? pagedSectionMemory.get(memoryKey) || null : null;
     let page = 0;
     // Where each page starts, as an index into the visible cards. Cards differ
     // in height, so one count per page was only ever right for the page it was
     // measured on: a page of tall cards ran under the pager.
     let starts = [0];
     let pagedCount = -1;
+    // The box size the pages were last fitted to; a refit at the same size,
+    // with the same cards, would only repeat the same work.
+    let fittedSize = "";
     const footer = element("div", {class:"lex-tweaks-pages"});
     const scroll = element("div", {class:"lex-tweaks-scroll", tabindex:"-1"}, content);
+    const sizeKey = () => scroll.isConnected ? `${scroll.clientWidth}x${scroll.clientHeight}` : "";
+    const refitIfChanged = () => {
+      const visible = cards.filter(card => !card.hidden).length;
+      if (fittedSize && fittedSize === sizeKey() && visible === pagedCount) return;
+      refit();
+    };
     const root = element("div", {class:"lex-tweaks-paged"}, scroll, footer);
 
     // Fill each page until one more card would overflow the box. A caller
@@ -4053,14 +5140,26 @@
     const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
     let cardHeights = new WeakMap();
     const columnCount = length => {
+      // The reader's own count, from the COLUMNS control on the divider.
+      const chosen=Number(content.closest('[data-lex-detail-columns]')?.dataset.lexDetailColumns)||0;
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
       // Allow room for the shared name, copy button, value and help lanes.
       // Narrower cards clipped flag names and could abort strict pagination.
       // A caller can supply a measured minimum for a simpler card.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
+      // Columns are at least 400px. Names no longer decide it: in a paged
+      // flow their lane is a share of the whole panel (framework.css), so a
+      // narrower column does not shrink it.
       const target=asked||400;
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      root.lexFittedColumns=fit;
+      // A chosen count is honored past the fit: the fit guards the
+      // default, never the maximum. Columns squeeze (flex, min-width 0),
+      // so the panel still grows no horizontal scrollbar. Unpaged detail
+      // flows honor it as well; only pages without the divider control
+      // (tweaks, settings) never set one.
+      if(chosen>0)return Math.max(1,Math.min(length,chosen));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
       // beside three empty columns. A page never has more columns than cards.
@@ -4080,14 +5179,19 @@
       const cutFrom = new Map(pieces.map(entry => [entry.piece, entry.source]));
       const original = card => { let at = card; while (cutFrom.has(at)) at = cutFrom.get(at); return at; };
       const inOrder = [...pieces].sort((left, right) => cards.indexOf(left.piece) - cards.indexOf(right.piece));
+      const originalSubs = new Map();
       for (const {piece, subSplit} of inOrder) {
         const body = original(piece).querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         if (subSplit && body && rest) {
           const continued = rest.querySelector(':scope > [data-lex-continued="true"]');
-          const fields = subSplit.querySelector(":scope > .settings-fields");
+          // A long sub can span several pieces. Earlier continuations have
+          // already been removed, so later fields must return to the live sub.
+          const targetSub = originalSubs.get(subSplit) || subSplit;
+          const fields = targetSub.querySelector(":scope > .settings-fields");
           const moved = continued?.querySelector(":scope > .settings-fields");
           if (fields && moved) fields.append(...moved.children);
+          if (continued) originalSubs.set(continued, targetSub);
           continued?.remove();
         }
         if (body && rest) body.append(...rest.children);
@@ -4227,6 +5331,7 @@
         visible = cards.filter(card => !card.hidden);
       }
       pagedCount = visible.length;
+      fittedSize = "";
       if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
         const per = size || visible.length || 1;
         starts = Array.from({length: Math.max(1, Math.ceil(visible.length / per))}, (_, index) => index * per);
@@ -4270,19 +5375,23 @@
           if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
         }
       }
-      const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
+    // An unpaged flow deals every card into columns on one scrolling
+    // page: the page-break pass below is skipped and no footer renders.
+    if (options.unpaged) { starts = [0]; fittedSize = sizeKey(); return; }
+    const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const available=scroll.clientHeight,loads=Array(count).fill(0),next=[0];
       let orderedLane=0;
       for(let index=0;index<visible.length;index++){
         const height=cardHeights.get(visible[index])||0;
-        let lane=options.columnMajor?orderedLane:loads.indexOf(Math.min(...loads));
+        let lane=orderedLane;
         if(loads[lane]>0&&loads[lane]+gap+height>available+1){
-          if(options.columnMajor&&lane<count-1)lane=++orderedLane;
+          if(lane<count-1)lane=++orderedLane;
           else {next.push(index);loads.fill(0);lane=0;orderedLane=0;}
         }
         loads[lane]+=(loads[lane]?gap:0)+height;
       }
       starts=next;
+      fittedSize=sizeKey();
     };
 
     // Measure at the final width, then fill ordered columns from top to bottom.
@@ -4297,7 +5406,7 @@
       // unless that share would run past the foot.
       const heights=onPage.map(card=>cardHeights.get(card));
       let lanesFor=null;
-      if(options.columnMajor&&heights.every(height=>height!==undefined)&&count>1){
+      if(heights.every(height=>height!==undefined)&&count>1){
         const total=heights.reduce((sum,height)=>sum+height,0)+gap*Math.max(0,onPage.length-count);
         const share=Math.max(Math.max(...heights),total/count);
         const lanes=[],sums=Array(count).fill(0);
@@ -4307,13 +5416,13 @@
           if(sums[at]>0&&at<count-1&&(sums[at]+gap+height>share+1||left<=count-1-at))at++;
           lanes.push(at);sums[at]+=(sums[at]?gap:0)+height;
         });
-        if(sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
+        if(options.unpaged||sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
       }
       onPage.forEach((card,index)=>{
         const measured=cardHeights.get(card);
-        let lane=measured===undefined?index%count:loads.indexOf(Math.min(...loads));
+        let lane=index%count;
         if(lanesFor)lane=lanesFor[index];
-        else if(options.columnMajor&&measured!==undefined){
+        else if(measured!==undefined){
           if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
           lane=orderedLane;
         }
@@ -4324,12 +5433,25 @@
       content.replaceChildren(...columns,off);
     };
 
-    const render = () => {
+    const retainContentFocus = action => {
+      const focused = content.contains(document.activeElement) ? document.activeElement : null;
+      const selection = focused && [focused.selectionStart, focused.selectionEnd];
+      action();
+      if (focused?.isConnected && !focused.closest("[hidden]") && focused.getClientRects().length) {
+        focused.lexRestoringFocus = true;
+        try { focused.focus({preventScroll: true}); }
+        finally { delete focused.lexRestoringFocus; }
+        if (selection?.[0] != null && typeof focused.setSelectionRange === "function")
+          focused.setSelectionRange(...selection);
+      }
+    };
+    const render = () => retainContentFocus(() => {
       let visible = cards.filter(card => !card.hidden);
       // Paginating can split a tall section into pieces, so read the cards
       // again afterwards.
       if (visible.length !== pagedCount) { paginate(visible); visible = cards.filter(card => !card.hidden); }
       const pages = starts.length;
+      if (restore !== null && pages > 1) { page = restore; restore = null; }
       page = Math.max(0, Math.min(page, pages - 1));
       const from = starts[page], to = starts[page + 1] ?? visible.length;
       deal(visible.slice(from, to));
@@ -4337,7 +5459,11 @@
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
       // Embedded property panes need their own footer, not the window's list pager.
-      footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
+      // Unpaged flows render no footer: every card is on the one page. A single
+      // page without a search needs none either: its footer would carry only
+      // a summary, the stray block from FF8's item details.
+      if (options.unpaged || (pages <= 1 && !options.search)) footer.replaceChildren();
+      else footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
         search:options.search, change:turn}));
       if (label && focused?.matches("input")) {
         const replacement = [...footer.querySelectorAll("input")].find(input=>input.getAttribute("aria-label")===label);
@@ -4345,29 +5471,64 @@
         if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
       }
       scroll.style.overflowY = overflows() ? "auto" : "hidden";
-    };
+    });
 
-    const turn = value => {page = value; render(); scroll.scrollTop = 0;};
+    const turn = value => {
+      page = value; restore = null;
+      if (memoryKey) pagedSectionMemory.set(memoryKey, value);
+      render(); scroll.scrollTop = 0;
+    };
     // Re-break the pages for the box as it is now, keeping the first card on
     // screen on screen.
-    const refit = () => {
+    const refit = () => retainContentFocus(() => {
       let visible = cards.filter(card => !card.hidden);
       const anchor = visible[starts[page]] || null;
       paginate(visible);
       visible = cards.filter(card => !card.hidden);
       const at = anchor ? Math.max(0, visible.indexOf(anchor)) : 0;
       page = Math.max(0, starts.findLastIndex(start => start <= at));
+      // The first fit, once there are pages, opens the remembered one.
+      if (restore !== null && starts.length > 1) { page = restore; restore = null; }
       render();
-    };
+    });
     wheelPages(scroll, direction => {
       const target = page + direction;
       if (target >= 0 && target < starts.length) turn(target);
     }, overflows);
     root.refreshPages = () => {page=0;pagedCount=-1;refit();};
+    root.lexAppendCards = (...added) => {
+      const fresh = added.filter(card => !cards.includes(card));
+      if (!fresh.length) return;
+      cards.push(...fresh);
+      content.append(...fresh);
+      pagedCount = -1;
+      refit();
+    };
     // What the pager decided, for checks and for debugging a page break.
     root.lexPaging = () => ({starts:[...starts],page,
       cards:cards.filter(card=>!card.hidden).map(card=>({title:(card.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||"").trim(),height:cardHeights.get(card)??null}))});
     root.lexFitPage = refit;
+    // The pager deals its cards into columns from this list on every render,
+    // so a developer's section order is set here, not by moving nodes. The
+    // listed cards fill the places they hold now, in the order given; one the
+    // list has not seen (a section the developer added) goes after the card
+    // before it in the order.
+    root.lexCards = () => [...cards];
+    root.lexOrderCards = wanted => {
+      joinSections();
+      const was = [...cards];
+      const known = wanted.filter(card => cards.includes(card));
+      const slots = known.map(card => cards.indexOf(card)).sort((a, b) => a - b);
+      known.forEach((card, index) => { cards[slots[index]] = card; });
+      wanted.forEach((card, index) => {
+        if (cards.includes(card) || !card.isConnected) return;
+        const previous = wanted.slice(0, index).reverse().find(other => cards.includes(other));
+        cards.splice(previous ? cards.indexOf(previous) + 1 : cards.length, 0, card);
+      });
+      if (cards.length === was.length && cards.every((card, index) => card === was[index])) return;
+      pagedCount = -1;
+      refit();
+    };
     render();
     if (options.notice) root.prepend(options.notice);
     if ((options.tabs || []).length > 1) root.prepend(subtabBar({
@@ -4377,13 +5538,15 @@
       let frame = 0;
       const observer = new ResizeObserver(() => {
         if (frame) return;
-        frame = requestAnimationFrame(() => {frame = 0; refit();});
+        frame = requestAnimationFrame(() => {frame = 0; refitIfChanged();});
       });
       observer.observe(scroll);
-      document.fonts?.ready.then(() => { if (root.isConnected) refit(); });
+      // Fonts still loading change every measurement once they arrive.
+      if (document.fonts && document.fonts.status !== "loaded")
+        document.fonts.ready.then(() => { labelWidths.clear(); if (root.isConnected) refit(); });
       root.lexPageObserver = observer;
     }
-    requestAnimationFrame(refit);
+    requestAnimationFrame(refitIfChanged);
     return root;
   };
   const settingsColumns = (sections, options = {}) => {
@@ -4394,6 +5557,63 @@
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
     return root;
+  };
+
+  // Every game's Tweaks page. A plugin hands over its own pages (its tweak
+  // mods first) and how to redraw; the page adds ReShade on a subtab of its
+  // own when the game has it, and owns ReShade's loading and actions. Each
+  // plugin used to build this by hand, with its own copy of the ReShade
+  // calls, and one put ReShade in among the tweak mods (Lexer: "WHY AM I
+  // SEEING RESHADE IN THE MAIN TWEAKS TAB").
+  //   pages: [{id, label, help?, body: () => [sections], bind?: view => void,
+  //            whole?: node}] - `whole` owns the screen when it is the only
+  //            page, as a lone status panel would look lost in a column.
+  //   notice: a step the reader must take, above every page
+  //   columnWidth: the cards' width, for pages of wide cards
+  //   active, change: a plugin that keeps the open page in its own state
+  // A page that draws its own view (a config list with its own search) gives
+  // `view: tabProps => node` instead of `body`, and puts the shared subtab
+  // props on its own component.
+  //   render: () => void, called when the page must be drawn again
+  const tweaksPageMemory = new Map();
+  const tweaksPage = (options = {}) => {
+    const plugin = options.plugin || shellPluginId();
+    const memory = tweaksPageMemory.get(plugin) || {tab: "", reshade: null, loading: null};
+    tweaksPageMemory.set(plugin, memory);
+    const redraw = () => options.render?.();
+    if (options.reshade !== false && !memory.reshade && !memory.loading) {
+      memory.loading = Promise.resolve(callWindow("mod_reshade", plugin))
+        .then(value => { memory.reshade = value || {}; })
+        .catch(() => { memory.reshade = {}; })
+        .finally(() => { memory.loading = null; if (memory.reshade?.available) redraw(); });
+    }
+    const act = async (method, ...args) => {
+      try { memory.reshade = await callWindow(method, plugin, ...args) || memory.reshade; }
+      catch (error) { showAlert({title: "ReShade could not do that", message: error.message || String(error)}); }
+      redraw();
+    };
+    const pages = (options.pages || []).filter(Boolean);
+    const reshade = options.reshade === false ? null : reshadeSection({snapshot: memory.reshade, act});
+    if (reshade) pages.push({id: "reshade", label: "ReShade", help: "Effects over the finished frame.", body: () => [reshade]});
+    const active = pages.find(page => page.id === (options.active ?? memory.tab)) || pages[0];
+    if (!active) return notice({message: "This game has no tweaks yet."});
+    if (pages.length === 1 && active.whole) return active.whole;
+    const tabProps = {tabs: pages.map(({id, label, help}) => ({id, label, help})), activeTab: active.id,
+      tabsLabel: options.tabsLabel || "Tweak pages",
+      changeTab: id => { memory.tab = id; if (options.change) options.change(id); else redraw(); }};
+    if (typeof active.view === "function") {
+      const own = active.view(tabProps);
+      if (typeof active.bind === "function" && own) requestAnimationFrame(() => active.bind(own));
+      return own;
+    }
+    const body = typeof active.body === "function" ? active.body() : active.body;
+    const view = settingsColumns([body].flat(), {columnWidth: options.columnWidth, notice: options.notice,
+      className: ["lex-tweaks-page", options.className || ""].filter(Boolean).join(" "),
+      tabs: pages.map(({id, label, help}) => ({id, label, help})), activeTab: active.id,
+      tabsLabel: options.tabsLabel || "Tweak pages",
+      changeTab: id => { memory.tab = id; if (options.change) options.change(id); else redraw(); }});
+    if (typeof active.bind === "function") requestAnimationFrame(() => active.bind(view));
+    return view;
   };
 
   // One game's ReShade: a switch for the whole thing, then each of Lexeditor's
@@ -4541,19 +5761,43 @@
     cancel.onclick = dismiss;
     discard.onclick = async () => {
       setBusy(true);
-      status.textContent = copy.pendingLabel || "Please wait…";
+      // "Without saving" still discards first: guarded exits refuse to
+      // run while changes are unsent, so abandoning them is part of the
+      // button, not a skip. A page with no discard hook keeps the old
+      // direct exit.
+      const canDiscard = typeof options.discard === "function";
+      status.replaceChildren(loadingStatus(canDiscard ? "Discarding changes…" : (copy.pendingLabel || "Please wait…")));
+      let discarded = false;
       try {
+        if (canDiscard) {
+          await options.discard();
+          const remaining = options.dirtyCount?.() || 0;
+          if (remaining) {
+            status.textContent = `${remaining} change${remaining === 1 ? "" : "s"} could not be discarded. Lexeditor stayed open.`;
+            setBusy(false);
+            return;
+          }
+          discarded = true;
+          status.replaceChildren(loadingStatus(copy.pendingLabel || "Please wait…"));
+          // The host guards restart and close on its own dirty count, synced
+          // fire-and-forget while editing. A discard that just reached zero
+          // has not been reported yet, so report it now and wait for the
+          // round trip: exiting first refuses to leave.
+          await callWindow("set_dirty_count", 0).catch(() => {});
+        }
         if (await exit()) backdrop.remove();
+        else if (discarded) status.textContent = "Discarded, but the action did not complete. Try again or cancel.";
         else status.textContent = "The action did not complete. Try again or cancel.";
       } catch (error) {
-        status.textContent = `${copy.exitError || "Could not exit"}: ${error.message || error}`;
+        const failed = canDiscard && !discarded ? "Could not discard changes" : (copy.exitError || "Could not exit");
+        status.textContent = `${failed}: ${error.message || error}`;
       } finally {
         setBusy(false);
       }
     };
     save.onclick = async () => {
       setBusy(true);
-      status.textContent = "Saving changes…";
+      status.replaceChildren(loadingStatus("Saving changes…"));
       let saved = false;
       try {
         await options.save?.();
@@ -4564,7 +5808,8 @@
           return;
         }
         saved = true;
-        status.textContent = copy.pendingLabel || "Please wait…";
+        status.replaceChildren(loadingStatus(copy.pendingLabel || "Please wait…"));
+        await callWindow("set_dirty_count", 0).catch(() => {});
         if (await exit()) backdrop.remove();
         else status.textContent = "Saved, but the action did not complete. Try again or cancel.";
       } catch (error) {
@@ -4606,7 +5851,7 @@
     discard.onclick = async () => {
       cancel.disabled = true;
       discard.disabled = true;
-      status.textContent = "Restoring the saved state…";
+      status.replaceChildren(loadingStatus("Restoring the saved state…"));
       try {
         await options.discard();
         dismiss();
@@ -4652,6 +5897,7 @@
     // Lexer liked a boolean drawn as one wide box and asked for it as the
     // default, with the arrow-and-checkbox layout as the alternative.
     document.documentElement.dataset.lexBooleanStyle = settings.booleanBoxStyle === false ? "arrow" : "box";
+    document.documentElement.dataset.lexShowHidden = settings.showHiddenProperties === true ? "true" : "false";
     document.documentElement.style.setProperty("--lex-panel-gap", `${Number(settings.panelGapPercent || 1)}vw`);
     // The pagination bar is one height on every page, and that height is a
     // setting rather than a number buried in the stylesheet.
@@ -4665,6 +5911,29 @@
 
   const hoverableAltClickEnabled = () => sharedSettingsSnapshot?.hoverableAltClick === true;
   const sharedSettings = () => sharedSettingsSnapshot ? clone(sharedSettingsSnapshot) : null;
+  // Enabling a mod runs its scripts, so the first time each mod is enabled
+  // the reader confirms they trust it (Lexer: "the first time you enable a
+  // mod"). The Trust Warning setting switches the warning off entirely. `mod`
+  // is the mod's folder, or its key where a list has no folder.
+  const confirmFirstModEnable = async mod => {
+    let settings = sharedSettingsSnapshot;
+    if (!settings) {
+      try { settings = rememberSharedSettings(await callWindow("lexeditor_settings")); }
+      catch (_error) { settings = null; }
+    }
+    const seen = new Set((Array.isArray(settings?.trustWarningSeen) ? settings.trustWarningSeen : []).map(String));
+    const id = String(mod || "").trim().toLocaleLowerCase();
+    if (!settings || settings.trustWarning === false || (id && seen.has(id))) return true;
+    const agreed = await confirmAction({title: "Enable this mod?",
+      message: "Are you sure you want to enable this mod? Only enable mods you trust.\n\nThis warning shows up the first time you enable a mod because it's important. You can disable this in the settings under \"Trust Warning\".",
+      confirmLabel: "Enable", cancelLabel: "Cancel"});
+    if (!agreed) return false;
+    if (id) {
+      const updated = await callWindow("acknowledge_trust_warning", id);
+      if (updated) rememberSharedSettings(updated);
+    }
+    return true;
+  };
   const soundCoverageTable = rows => element("table", {class:"lex-theme-sound-table"},
     element("thead", {}, element("tr", {},
       element("th", {}, "Action"), element("th", {}, "Plugin sound"), element("th", {}, "Source"))),
@@ -4750,6 +6019,147 @@
     return svg;
   };
 
+  // One animation viewer is live at a time: the mounted one. The shell's
+  // key handler and shortcuts panel read this slot, so animation keys only
+  // work - and are only listed - while an animations view is on screen.
+  let activeAnimationViewer = null;
+
+  // The animation bindings, in transport order. Entries here are listed in
+  // the shortcuts panel only while a viewer is mounted; the shell handler
+  // reads the same table, so the two cannot drift apart.
+  const ANIMATION_SHORTCUTS = [
+    {id: "anim-start", keys: ["Shift", "\u2190"], label: "Go to animation start"},
+    {id: "anim-prev", keys: ["\u2190"], label: "Back one frame"},
+    {id: "anim-play", keys: ["Space"], label: "Play or pause the animation"},
+    {id: "anim-next", keys: ["\u2192"], label: "Forward one frame"},
+    {id: "anim-end", keys: ["Shift", "\u2192"], label: "Go to animation end"},
+  ];
+  const matchAnimationShortcut = event => {
+    if (!activeAnimationViewer) return "";
+    if (event.ctrlKey || event.metaKey || event.altKey) return "";
+    if (event.key === "ArrowLeft" || event.code === "ArrowLeft") return event.shiftKey ? "anim-start" : "anim-prev";
+    if (event.key === "ArrowRight" || event.code === "ArrowRight") return event.shiftKey ? "anim-end" : "anim-next";
+    if ((event.key === " " || event.key === "Spacebar" || event.code === "Space") && !event.shiftKey) return "anim-play";
+    return "";
+  };
+
+  // A reusable animation viewer: scrub bar with its event markers overlaid
+  // on it, a transport row and a playback loop. The caller draws the
+  // pictures: render() gets the current
+  // frame (fractional, for blending) and the playback state every animation
+  // frame. DS1 poses its skeleton there; a fixture page draws synthetic
+  // frames on a plain canvas. Stepping pauses, as on an editing bench: the
+  // reader asked to look at one frame, not to keep playing past it.
+  const animationViewer = (options = {}) => {
+    const host = options.host, timeline = options.timeline, status = options.status;
+    const frames = options.frames || {};
+    const count = Math.max(1, Math.trunc(Number(frames.count) || 1));
+    const duration = Number(frames.duration) > 0 ? Number(frames.duration) : count / 30;
+    const frameDur = Number(frames.frameDuration) > 0 ? Number(frames.frameDuration)
+      : duration / Math.max(count - 1, 1);
+    const state = {time: 0, playing: options.playing !== false, follow: false, live: true};
+    timeline.replaceChildren();
+    timeline.classList.add("lex-anim-timeline");
+    const slider = element("input", {type: "range", min: "0", max: String(count - 1),
+      step: "0.01", value: "0", "aria-label": "Frame"});
+    const readout = element("span", {class: "lex-anim-readout", "data-anim-readout": "true"});
+    const markers = element("div", {class: "lex-anim-markers"});
+    const sliderWrap = element("div", {class: "lex-anim-slider"}, slider, markers);
+    const scrub = element("div", {class: "lex-anim-scrub"}, sliderWrap, readout);
+    for (const cue of frames.events || []) {
+      const at = Number(cue.start) || 0;
+      const tick = element("button", {type: "button", class: "lex-anim-marker",
+        title: `${cue.label} (${at.toFixed(2)}s)`,
+        style: `left:${Math.min(at / duration, 1) * 100}%`,
+        "aria-label": `${cue.label} (${at.toFixed(2)}s)`,
+        onclick: () => { state.time = at % duration; }});
+      markers.append(tick);
+    }
+    const transport = element("div", {class: "lex-anim-transport",
+      "data-anim-transport": "true", role: "group", "aria-label": "Animation transport"});
+    const glyph = playing => playing ? "\u23F8" : "\u25B6";
+    const setPlaying = playing => {
+      state.playing = playing;
+      playButton.textContent = glyph(playing);
+    };
+    const sync = () => {
+      const shown = (((state.time / frameDur) % count) + count) % count;
+      if (document.activeElement !== slider) slider.value = String(shown);
+      readout.textContent = `${shown.toFixed(1)} / ${count - 1} frames \u00B7 ${state.time.toFixed(2)}s`;
+      return shown;
+    };
+    const goToFrame = frame => {
+      const clamped = Math.max(0, Math.min(count - 1, Math.round(frame)));
+      state.time = clamped * frameDur;
+      setPlaying(false);
+      sync();
+    };
+    const buttons = [
+      {label: "Go to animation start", glyph: "\u23EE", run: () => goToFrame(0)},
+      {label: "Back one frame", glyph: "\u25C0", run: () => goToFrame(Math.round(state.time / frameDur) - 1)},
+      {label: "Play or pause", glyph: glyph(state.playing), run: () => setPlaying(!state.playing)},
+      {label: "Forward one frame", glyph: "\u25B6", run: () => goToFrame(Math.round(state.time / frameDur) + 1)},
+      {label: "Go to animation end", glyph: "\u23ED", run: () => goToFrame(count - 1)},
+    ].map(spec => element("button", {type: "button", class: "lex-anim-transport-button",
+      "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));
+    const playButton = buttons[2];
+    transport.append(...buttons);
+    // The follow switch is a transport toggle button, like every other
+    // viewer switch: a checkbox in the scrub row hid beside the slider.
+    if (options.follow) {
+      const followLabel = options.follow.label || "Follow";
+      const followButton = element("button", {type: "button",
+        class: "lex-anim-transport-button lex-anim-follow-button",
+        "aria-label": followLabel, title: followLabel, "aria-pressed": "false",
+        onclick: () => {
+          state.follow = !state.follow;
+          followButton.setAttribute("aria-pressed", String(state.follow));
+          options.follow.change?.(state.follow);
+        }}, followLabel);
+      transport.append(followButton);
+    }
+    timeline.append(scrub, transport);
+    slider.oninput = () => { state.time = parseFloat(slider.value) * frameDur; };
+    if (status) status.textContent = options.statusText ?? "";
+    const controller = {
+      play: () => setPlaying(true),
+      pause: () => setPlaying(false),
+      toggle: () => setPlaying(!state.playing),
+      step: delta => goToFrame(Math.round(state.time / frameDur) + delta),
+      toStart: () => goToFrame(0),
+      toEnd: () => goToFrame(count - 1),
+      get playing() { return state.playing; },
+      get follow() { return state.follow; },
+      get frame() { return Math.round(state.time / frameDur); },
+      get count() { return count; },
+      stop: () => {
+        if (!state.live) return;
+        state.live = false;
+        if (activeAnimationViewer === controller) activeAnimationViewer = null;
+        try { options.dispose?.(); } finally {
+          host.replaceChildren();
+          delete host.dataset.ready;
+        }
+      },
+    };
+    if (host.isConnected) activeAnimationViewer = controller;
+    let rendered = 0, last = performance.now();
+    const loop = now => {
+      if (!state.live || !host.isConnected) { controller.stop(); return; }
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      if (state.playing) state.time = (state.time + dt) % duration;
+      options.render?.(sync(), state);
+      if (++rendered === 2) {
+        host.dataset.ready = "true";
+        options.onReady?.();
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+    return controller;
+  };
+
   // Every binding the shell owns, in one place: the panel lists them and the
   // key handler reads the same table, so the two cannot drift apart.
   const SHORTCUTS = [
@@ -4763,7 +6173,7 @@
     {id: "info", keys: ["F1"], label: "Open or close the information page"},
     {id: "datamap", keys: ["Ctrl", "M"], label: "Open or close the Data Map"},
     {id: "launch", keys: ["Ctrl", "Enter"], label: "Launch the game"},
-    {id: "restart", keys: ["Ctrl", "Shift", "R"], label: "Restart the plugin", developer: true},
+    {id: "restart", keys: ["Ctrl", "Shift", "R"], label: "Restart Lexeditor", developer: true},
   ];
 
   // Matched on event.code, the physical key, so a Dvorak or AZERTY layout gets
@@ -4821,17 +6231,36 @@
     shortcutPanel?.remove();
     shortcutPanel = null;
   };
-  const openShortcutPanel = developerMode => {
+  // What Developer Mode adds with the mouse. Every change here is shipped
+  // to everyone, and Ctrl+Z takes it back. Right-click the shortcuts button
+  // for this list.
+  const DEVELOPER_GESTURES = [
+    {id: "rename-property", keys: ["Double-click", "property name"], label: "Rename the property"},
+    {id: "rename-section", keys: ["Double-click", "section heading"], label: "Rename the section"},
+    {id: "edit-help", keys: ["Double-click", "?"], label: "Edit the help bubble's text"},
+    {id: "move-property", keys: ["Drag", "property row"], label: "Move the property, within or between sections"},
+    {id: "hide-property", keys: ["Hold right", "property"], label: "Hide it for readers without Show hidden properties; again to show it"},
+    {id: "add-section", keys: ["Hold right", "section heading"], label: "Add a new section below it; on an empty section, remove it"},
+    {id: "save-view", keys: ["Hold right", "page tab or subtab"], label: "Save the page's view as the shipped default"},
+    {id: "undo-layout", keys: ["Ctrl", "Z"], label: "Undo any of these"},
+  ];
+  const openShortcutPanel = (developerMode, gestures = false) => {
     if (shortcutPanel) { closeShortcutPanel(); return; }
-    const rows = SHORTCUTS.filter(entry => !entry.developer || developerMode).map(entry =>
+    // The panel lists only what is available now: the animation bindings
+    // join the shell's own while a viewer is mounted, and vanish with it.
+    const available = SHORTCUTS.filter(entry => !entry.developer || developerMode);
+    if (activeAnimationViewer) available.push(...ANIMATION_SHORTCUTS);
+    const list = gestures ? DEVELOPER_GESTURES : available;
+    const title = gestures ? "Developer Mode gestures" : "Keyboard shortcuts";
+    const rows = list.map(entry =>
       element("div", {class: "lex-shortcut-row", "data-lex-shortcut": entry.id},
         element("span", {class: "lex-shortcut-keys"},
           ...entry.keys.map(key => element("kbd", {}, key))),
         element("span", {class: "lex-shortcut-label"}, entry.label)));
     const dialog = element("section", {
       class: "lex-dialog lex-shortcut-panel", role: "dialog", "aria-modal": "false",
-      "aria-label": "Keyboard shortcuts",
-    }, element("h2", {}, "Keyboard shortcuts"), ...rows);
+      "aria-label": title,
+    }, element("h2", {}, title), ...rows);
     shortcutPanel = element("div", {
       class: "lex-dialog-backdrop lex-shortcut-backdrop",
       onclick: closeShortcutPanel,
@@ -5000,10 +6429,28 @@
     new MutationObserver(()=>{if(anchor.disabled)close()}).observe(anchor,{attributes:true,attributeFilter:['disabled']});
     return close;
   };
+  // The save button's list reads newest first (Lexer: "new things get placed
+  // on the top of the list"). A plugin's list is in its data's order, so each
+  // change is stamped when it first appears or its value changes; the shell
+  // looks after every edit, and the hover sorts by the stamps. A list given
+  // newest first already keeps its order.
   const saveChangePreview = (button, changes, count) => {
     const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
+    const stamps=new Map();let clock=0;
+    const order=rows=>{
+      const present=new Set();
+      for(const row of [...rows].reverse()){
+        const label=String(row.label),seen=stamps.get(label),signature=JSON.stringify([row.before,row.after]);
+        present.add(label);
+        if(!seen||seen.signature!==signature)stamps.set(label,{stamp:++clock,signature});
+      }
+      for(const label of [...stamps.keys()])if(!present.has(label))stamps.delete(label);
+      return rows.map((row,index)=>({row,index,stamp:stamps.get(String(row.label)).stamp}))
+        .sort((a,b)=>b.stamp-a.stamp||a.index-b.index).map(entry=>entry.row);
+    };
+    button.lexNoteChanges=()=>{try{order(count?.()?changes?.()||[]:[]);}catch(_error){}};
     hoverPreview(button,()=>{
-      const rows=count?.()?changes?.() || []:[];
+      const rows=order(count?.()?changes?.() || []:[]);
       return rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.');
     },'lex-save-preview');
   };
@@ -5141,12 +6588,19 @@
     let parent = "";
     const cancel = element("button", {class: "lex-dialog-action"}, "Cancel");
     const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Create"));
+    // Every mod carries a name, and optionally an author and a description,
+    // in its mod.json (core/mod_metadata.py). Creating one asks for them here.
+    const author = options.details ? element("input", {type: "text", maxlength: "200", value: options.author || "",
+      placeholder: "Author (optional)", "aria-label": "Author"}) : null;
+    const about = options.details ? element("textarea", {maxlength: "4000", rows: "5",
+      placeholder: "Description (optional)", "aria-label": "Description"}, options.about || "") : null;
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close(null);
     create.onclick = () => {
       const value = input.value.trim();
       if (!value) { message.textContent = "Enter a mod name."; input.focus(); return; }
-      close(options.rename ? value : {name: value, parent});
+      close(options.rename ? value : {name: value, parent,
+        details: options.details ? {author: author.value.trim(), description: about.value.trim()} : undefined});
     };
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") create.click();
@@ -5167,7 +6621,8 @@
     backdrop.append(element("section", {class: "lex-dialog lex-project-dialog", role: "dialog", "aria-modal": "true"},
       element("h2", {}, options.rename ? "Rename Mod" : "Create New Mod"),
       element("p", {}, options.rename ? "Change the mod project folder name." : (options.description || "Lexeditor will create a new editable project from this game's working template.")),
-      input, message, element("div", {class: "lex-dialog-actions"}, location, cancel, create)));
+      input, ...(options.details ? [author, about] : []), message,
+      element("div", {class: "lex-dialog-actions"}, location, cancel, create)));
     document.body.append(backdrop); input.focus(); input.select();
     });
   };
@@ -5221,9 +6676,13 @@ ${contents.path}`});
   // read-only data needs it most.
   const createModProject = async (pluginId, options = {}) => {
     const named = await askProjectName(options.pluginName || pluginId,
-      {...options, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
+      {...options, details: true, chooseLocation: () => callWindow("choose_mod_project_location", pluginId)});
     if (!named) return null;
-    return callWindow("create_mod_project", pluginId, named.name, named.parent || "");
+    const result = await callWindow("create_mod_project", pluginId, named.name, named.parent || "", named.details || {});
+    // The host restarted the editor on the new mod; the old page's service
+    // is gone, so every caller follows it there.
+    if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
+    return result;
   };
 
   const mountProjectControl = (options, host) => {
@@ -5254,12 +6713,45 @@ ${contents.path}`});
       const widest = Math.ceil(Math.max(...names.map(node => node.getBoundingClientRect().width)));
       if (widest > 0) menu.style.setProperty("--lex-project-name-width", `${widest}px`);
     };
+    // The menu opens on its cached snapshot, then refreshes it: switches
+    // flipped in the Mods tab and new loader flags must show up without a
+    // page reload. A failed refresh keeps the cache; it never hides the menu.
+    const refreshSnapshot = async () => {
+      try {
+        const value = options.projectSnapshot
+          ? await options.projectSnapshot()
+          : await callWindow("mod_projects", options.plugin.id);
+        if (value) render(value);
+      } catch (_error) { /* keep the cached menu for this open */ }
+    };
+    // A mod package dropped anywhere on the program lands in the Mods
+    // tab's import flow: the Mods tab stays the single place that
+    // uploads and inspects packages, but nobody should have to hunt for
+    // it first. Text and in-page drags are untouched, as are drops onto
+    // fields or onto a dialog (an open import never stacks another).
+    const globalDropFiles = event => {
+      if (![...(event.dataTransfer?.types || [])].includes("Files")) return false;
+      if (event.target.closest?.(".lex-dialog, input, textarea, select, [contenteditable=true]")) return false;
+      return true;
+    };
+    document.addEventListener("dragover", event => {
+      if (globalDropFiles(event)) event.preventDefault();
+    });
+    document.addEventListener("drop", async event => {
+      if (!globalDropFiles(event)) return;
+      event.preventDefault();
+      if (modSupport && !modSupport.canManage) return;
+      // The Mods tab only accepts the drop once its first load sets its
+      // switches, so it must finish opening first.
+      if (options.activeTab?.() !== "mods") options.navigate?.("mods");
+      await options.importModDrop?.(event.dataTransfer).catch(() => {});
+    });
     const toggleMenu = () => {
       const open = menu.hidden;
       if (open && snapshot) render(snapshot);
       menu.hidden = !open;
       trigger.setAttribute("aria-expanded", String(open));
-      if (open) measureNameColumn();
+      if (open) { measureNameColumn(); refreshSnapshot(); }
     };
     const openResult = result => {
       if (!result || result.cancelled) { render(snapshot); return false; }
@@ -5322,24 +6814,13 @@ ${contents.path}`});
           + "an editable mod; Find a Mod opens one you already have."
           + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
-      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid && !row.noMod)).map(row => {
-        const select = element("button", {
-        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
-        type: "button", role: "menuitem", title: row.path,
-        onclick: () => {
-          closeMenu();
-          if (row.current && activeSource !== "mine") guarded(async () => {
-            await options.selectProjectSource?.("mine");
-            render(snapshot);
-          });
-          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
-        },
-      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
-      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
-      element("span", {class: "lex-project-menu-path"}, row.path),
-      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
-        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
-        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
+      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => (row.valid || row.notEditable) && !row.noMod)).map(row => {
+        // The Mods tab's list: a mod the editor cannot open is shown, greyed,
+        // with the reason, rather than missing from one list and not the other.
+        // Same five columns as an editable row: the select's mode, name and
+        // path, then the actions lane (warning flags, if any), then the
+        // on/off mark. Without the actions lane the mark lands a column
+        // early, and a flag pushes the path out of its column.
         const folder = element("button", {
           class: "lex-project-folder", type: "button",
           title: `Open the ${row.name} folder`, "aria-label": `Open the ${row.name} folder`,
@@ -5372,10 +6853,36 @@ ${contents.path}`});
             }
           },
         }, infoIcon());
+        if (row.notEditable) return element("div", {class: "lex-project-menu-item lex-project-menu-item-unavailable", title: row.notEditable},
+          element("span", {class: "lex-project-menu-item-select", "aria-disabled": "true", role: "menuitem", "aria-label": `${row.name}: ${row.notEditable}`},
+            element("span", {class: "lex-project-source-mode", "aria-hidden": "true"}, "🔒"),
+            element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+            element("span", {class: "lex-project-menu-path"}, row.path)),
+          element("span", {class: "lex-project-menu-item-actions"},
+            folder, about, modFlagsMark(row.conflicts, row.alerts)),
+          element("span", {class: `lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+              "aria-label": row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const select = element("button", {
+        class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
+        type: "button", role: "menuitem", title: row.path,
+        onclick: () => {
+          closeMenu();
+          if (row.current && activeSource !== "mine") guarded(async () => {
+            await options.selectProjectSource?.("mine");
+            render(snapshot);
+          });
+          else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
+        },
+      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
+      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
+      element("span", {class: "lex-project-menu-path"}, row.path),
+      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
           select,
           element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about,
-            row.linkedTweaks?.length ? infoHelp(`This mod contains components attached to these tweaks: ${row.linkedTweaks.join(", ")}. Use Mod library to enable or disable them together.`) : null),
+            modFlagsMark(row.conflicts, row.alerts)),
           select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map((row,index) => {
@@ -5394,18 +6901,14 @@ ${contents.path}`});
         const sourceStatus=row.managed && options.changeProjectSource
           ? element("input",{type:"checkbox",checked:row.enabled!==false,
             class:"lex-project-source-status",
-            "aria-label":`Enable ${row.label}`,onchange:event=>run(()=>options.changeProjectSource(row.key,{enabled:event.target.checked}))})
+            "aria-label":`Enable ${row.label}`,onchange:event=>run(async()=>{
+              if(event.target.checked && !(await confirmFirstModEnable(row.path||row.key)))return;
+              await options.changeProjectSource(row.key,{enabled:event.target.checked})})})
           : null;
         if(row.managed && options.changeProjectSource){
-          let controlGesture=false;
-          Object.assign(dragAttrs,{draggable:"true",tabindex:0,
-            "aria-description":"Drag onto another mod. Alt+Up or Alt+Down moves one place.",
-            onpointerdown:event=>{controlGesture=!!event.target.closest('input,.lex-project-menu-item-actions');},
-            ondragstart:event=>{if(controlGesture){event.preventDefault();return;}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("application/x-lex-mod",String(index));},
-            onkeydown:event=>{if(event.target===event.currentTarget&&event.altKey&&["ArrowUp","ArrowDown"].includes(event.key)){
-              event.preventDefault();const delta=event.key==="ArrowUp"?-1:1;
-              if(sources[index+delta]?.managed)run(()=>options.changeProjectSource(row.key,{move:delta}));
-            }}});
+          Object.assign(dragAttrs,modOrderGestures({index,controls:"input,.lex-project-menu-item-actions",
+            movable:at=>!!sources[at]?.managed,
+            move:(from,by)=>run(()=>options.changeProjectSource(sources[from].key,{move:by}))}));
           if(row.removable)actions.append(element("button",{type:"button","aria-label":`Remove ${row.label}`,
             onclick:async()=>{if(await confirmAction({title:`Remove ${row.label}?`,message:"Remove this managed mod from the library?",confirmLabel:"Remove"}))run(()=>options.changeProjectSource(row.key,{remove:true}))}},"×"));
           if(row.settings?.length || row.notes?.length)actions.append(element("button",{
@@ -5426,12 +6929,8 @@ ${contents.path}`});
               document.body.append(backdrop);backdrop.querySelector("select,button")?.focus();
             }},"⚙"));
         }
-        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,...dragAttrs,
-          ondragover:event=>{if(row.managed&&event.dataTransfer.types.includes("application/x-lex-mod")){event.preventDefault();event.dataTransfer.dropEffect="move";}},
-          ondrop:event=>{const from=Number(event.dataTransfer.getData("application/x-lex-mod"));
-            if(!row.managed||!sources[from]?.managed)return;event.preventDefault();
-            if(from!==index)run(()=>options.changeProjectSource(sources[from].key,{move:index-from}));
-          }},select,actions,sourceStatus);
+        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,...dragAttrs},
+          select,actions,sourceStatus);
       });
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
@@ -5445,6 +6944,7 @@ ${contents.path}`});
           // mods are files on disk; a plugin with its own createProject
           // (Blank's in-browser samples) has no folder to offer one for.
           const named = await askProjectName(options.plugin.name || options.plugin.id, {
+            details: !options.createProject,
             ...(options.projectCreatePrompt || {}),
             chooseLocation: options.createProject ? undefined
               : () => callWindow("choose_mod_project_location", options.plugin.id),
@@ -5452,7 +6952,7 @@ ${contents.path}`});
           if (named) guarded(async () => {
             const result = options.createProject
               ? await options.createProject(named.name)
-              : await callWindow("create_mod_project", options.plugin.id, named.name, named.parent || "");
+              : await callWindow("create_mod_project", options.plugin.id, named.name, named.parent || "", named.details || {});
             if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${named.name}`);
             return result;
           });
@@ -5472,11 +6972,10 @@ ${contents.path}`});
         class:"lex-project-menu-action",type:"button",role:"menuitem",
         onclick:async()=>{closeMenu();try{await options.addProjectSource();render(snapshot)}catch(error){showAlert({title:"Could not add mod",message:error.message})}}
       },"➕ Add a Mod"):null;
-        // A game without mod management says so where the Mod library button
-        // would be. The button opened a dialog that only repeated that it is
-        // not supported. Adding and finding a mod stay: they are project work,
-        // they work without a mod adapter, and they are how a reader gets out
-        // of the unmodded state.
+        // A game without mod management says so in the actions row. Adding
+        // and finding a mod stay: they are project work, they work without
+        // a mod adapter, and they are how a reader gets out of the
+        // unmodded state.
         const modLibraryNote = modSupport && !modSupport.canManage
           ? element("p", {class:"lex-dialog-status"},
               modSupport.message || "Mod management is not supported for this game yet.")
@@ -5496,8 +6995,7 @@ ${contents.path}`});
         // passed as null and printed the word in the middle of the menu.
         menu.replaceChildren(...(vanillaMenuItem?[vanillaMenuItem]:[]), ...sourceRows, ...projects,
           element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
-            modLibraryNote || (options.sourcesReplaceProjects ? null
-              : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…"))));
+            modLibraryNote));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
@@ -5505,7 +7003,7 @@ ${contents.path}`});
     // Clicking a property, or typing into a control, is an edit attempt. A
     // button inside one is not: pins, copy buttons and question marks stay
     // usable while the page is read-only.
-    const isEditAttempt = target => {
+    const isEditAttempt = (target, event) => {
       if (!target?.closest?.("main") || target.closest?.("button") ||
           target.closest?.(READONLY_EXEMPT)) return false;
       // A developer's double-click on a property name, a section heading or
@@ -5519,13 +7017,18 @@ ${contents.path}`});
       if (sharedSettingsSnapshot?.developerMode &&
           target.closest?.(".lex-detail-field-label-text,.lex-detail-section-title,.lex-info-help"))
         return false;
-      return Boolean(target.closest?.(".lex-detail-field,.lex-toggle"))
-        || Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
+      // Clicking into a text box, selecting in it or dragging its resize
+      // grip reads the value; only typing into it would change it. A switch,
+      // a list or a number's spin arrows change it on the click itself.
+      if (event.type === "keydown") return Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
+      return Boolean(target.closest?.(".lex-toggle")) || changesOnPointer(target, event);
     };
+    requestModForEdit = () => protectManagedEdit({type: "request", target: document.querySelector("main") || document.body,
+      preventDefault() {}, stopImmediatePropagation() {}});
     const protectManagedEdit = async event => {
       const current = snapshot?.projects?.find(row => row.current);
-      if (event.type === "keydown" && ["Tab","Escape","Shift","Control","Alt"].includes(event.key)) return;
-      if (copyPromptOpen || !isEditAttempt(event.target)) return;
+      if (event.type === "keydown" && !typesIntoValue(event)) return;
+      if (copyPromptOpen || (event.type !== "request" && !isEditAttempt(event.target, event))) return;
       // A game with no mod has nothing to write into, so the attempt to edit
       // the game's own data is the moment to offer the way out of it.
       if (current?.noMod || current?.vanilla || sessionHasNoMod() ||
@@ -5567,7 +7070,19 @@ ${contents.path}`});
         const value = options.projectSnapshot
           ? await options.projectSnapshot()
           : await callWindow("mod_projects", options.plugin.id);
-        if (value) { render(value); return; }
+        if (value) {
+          render(value);
+          // A selected mod deleted outside Lexeditor: the game opened on
+          // Vanilla instead. Said once per session, not on every reload.
+          const missing = value.missingProject;
+          if (missing) {
+            const key = `lex-missing-mod:${options.plugin.id}:${missing}`;
+            let told = false;
+            try { told = sessionStorage.getItem(key) === "1"; sessionStorage.setItem(key, "1"); } catch (_error) {}
+            if (!told) showToast(`${missing} was not found, so ${options.plugin.name} opened on Vanilla. Choose or create a mod to edit again.`, {tone: "warning"});
+          }
+          return;
+        }
         // WebView2 can expose window.pywebview before its API methods are
         // callable. Retry instead of permanently hiding the shared selector.
         if (!options.projectSnapshot && loadAttempts++ < 40) {
@@ -5586,208 +7101,6 @@ ${contents.path}`});
     else window.addEventListener("pywebviewready", load, {once: true});
     box.refresh = () => { if (options.projectSnapshot) load(); else if (snapshot) render(snapshot); };
     return box;
-  };
-
-  const openModLibrary = async pluginId => {
-    const backdrop = element("div", {class:"lex-dialog-backdrop"});
-    const dialog = element("section", {class:"lex-dialog", role:"dialog", "aria-modal":"true", "aria-label":"Mod library"});
-    const message = element("p", {role:"status"}, "Loading mod library…");
-    const content = element("div", {style:"max-height:65vh;overflow:auto;min-width:0"});
-    let uploadToken = null, uploading = false, canManage = false;
-    const close = () => {
-      backdrop.remove();
-      if (uploadToken) callWindow("end_mod_upload", uploadToken).catch(() => {});
-    };
-    dialog.append(element("h2", {}, "Mod library"), closeButton({onclick:close}), message, content);
-    backdrop.append(dialog); document.body.append(backdrop);
-    const failure = error => { message.textContent = String(error?.message || error); };
-    dialog.addEventListener("dragover", event => { event.preventDefault(); });
-    dialog.addEventListener("drop", async event => {
-      event.preventDefault();
-      if (!canManage || uploading) return;
-      uploading = true;
-      try {
-        if (uploadToken) await callWindow("end_mod_upload", uploadToken);
-        const upload = await callWindow("begin_mod_upload", pluginId);
-        uploadToken = upload.token;
-        const items = [...event.dataTransfer.items];
-        const dropped = [];
-        const visit = async (entry, parent = "") => {
-          if (entry.isFile) {
-            const file = await new Promise((resolve,reject) => entry.file(resolve,reject));
-            dropped.push({file, path:parent + file.name});
-          } else if (entry.isDirectory) {
-            const reader = entry.createReader();
-            for (;;) {
-              const children = await new Promise((resolve,reject) => reader.readEntries(resolve,reject));
-              if (!children.length) break;
-              for (const child of children) await visit(child, parent + entry.name + "/");
-            }
-          }
-        };
-        for (const item of items) {
-          const entry = item.webkitGetAsEntry?.();
-          if (entry) await visit(entry);
-          else { const file = item.getAsFile(); if (file) dropped.push({file,path:file.name}); }
-        }
-        if (!dropped.length) throw Error("Drop a folder or ZIP archive.");
-        for (const {file,path} of dropped) {
-          for (let offset = 0; offset < file.size || offset === 0; offset += 3 * 1024 * 1024) {
-            message.textContent = `Reading ${path}: ${Math.min(offset,file.size).toLocaleString()} / ${file.size.toLocaleString()} bytes`;
-            const data = await new Promise((resolve,reject) => {
-              const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]);
-              reader.onerror = () => reject(reader.error); reader.readAsDataURL(file.slice(offset,offset + 3 * 1024 * 1024));
-            });
-            await callWindow("upload_mod_chunk", uploadToken, path, offset, data);
-            if (!backdrop.isConnected) return;
-          }
-        }
-        const source = dropped.length === 1 && dropped[0].path.toLowerCase().endsWith(".zip")
-          ? `${upload.root}/${dropped[0].path}` : upload.root;
-        await inspect(source);
-      } catch (error) { failure(error); }
-      finally { uploading = false; }
-    });
-    const inspect = async source => {
-      let selected = null, rootValue = "", revision = 0;
-      const root = element("select", {"aria-label":"Package data folder"});
-      const name = element("input", {type:"text", "aria-label":"Mod name"});
-      const files = element("div", {style:"max-height:30vh;overflow:auto"});
-      const result = element("p", {role:"status"});
-      const add = element("button", {type:"button", disabled:true}, "Import mod");
-      const refresh = async (rebuild = false) => {
-        const request = ++revision;
-        add.disabled = true; result.textContent = "Checking package…";
-        try {
-          const report = await callWindow("inspect_mod_package", pluginId, source, rootValue, selected);
-          if (request !== revision) return;
-          if (!root.options.length) {
-            const folders = new Set([""]);
-            for (const path of report.files) {
-              const parts = path.split("/"); parts.pop();
-              while (parts.length) { folders.add(parts.join("/")); parts.pop(); }
-            }
-            root.replaceChildren(...[...folders].sort().map(value => element("option", {value}, value || "Package root")));
-          }
-          if (!name.value) name.value = report.metadata.name;
-          if (rebuild) {
-            files.replaceChildren(...report.rootFiles.map(path => {
-              const box = element("input", {type:"checkbox", checked:true, value:path});
-              box.onchange = () => {
-                selected = [...files.querySelectorAll("input:checked")].map(node => node.value);
-                refresh();
-              };
-              return element("label", {style:"display:block"}, box, path);
-            }));
-          }
-          result.textContent = report.valid
-            ? `${report.packages.length} PAK package(s) checked. Import does not activate the mod.`
-            : report.problems.join("\n");
-          result.style.whiteSpace = "pre-line";
-          add.disabled = !report.valid;
-        } catch (error) { if (request === revision) result.textContent = String(error?.message || error); }
-      };
-      root.onchange = () => { rootValue = root.value; selected = null; refresh(true); };
-      add.onclick = async () => {
-        add.disabled = true;
-        try {
-          await callWindow("import_mod_package", pluginId, source, name.value, rootValue, selected);
-          await render();
-        } catch (error) { failure(error); add.disabled = false; }
-      };
-      content.replaceChildren(element("p", {}, source), element("label", {}, "Data folder", root),
-        element("label", {}, "Name", name), files, result,
-        element("div", {class:"lex-dialog-actions"}, element("button", {type:"button", onclick:render}, "Back"), add));
-      await refresh(true);
-    };
-    const render = async () => {
-      try {
-        const state = await callWindow("mod_library_entries", pluginId);
-        canManage = state.canManage;
-        message.textContent = state.authorTest ? "Author test build: game loading has not been verified." : state.message;
-        if (state.managedUpdate?.message) message.textContent += ` ${state.managedUpdate.message}`;
-        if (state.managedUpdate?.error) message.textContent += ` ${state.managedUpdate.error}`;
-        const blocked = !state.canManage || !!state.bundleError || !!state.bundles?.recoveryRequired;
-        if (state.bundleError) message.textContent = state.bundleError;
-        if (state.bundles?.inconsistent) message.textContent = "Linked mods and tweaks differ from the saved selection. Apply the component selection to restore them.";
-        if (state.bundles?.recoveryRequired) message.textContent = "A linked mod change was interrupted. Recover the previous selection before continuing.";
-        const syncLinked = () => {
-          const selected = new Set([...content.querySelectorAll('input[data-bundle-component]:checked')].map(node=>node.dataset.bundleComponent));
-          for(const tweak of state.bundles?.tweaks || []){
-            const control=[...content.querySelectorAll('input[data-bundle-tweak]')].find(node=>node.dataset.bundleTweak===tweak.id);
-            if(control)control.checked=tweak.components.some(token=>selected.has(token));
-          }
-        };
-        const rows = state.entries.map(row => {
-          if(row.components?.length){
-            return detailSection({title:row.name,body:row.components.map(component=>toggleRow({toggles:[{
-              label:component.name, key:component.token, checked:component.enabled,
-              disabled:blocked || !!component.error,
-              control:element("input",{type:"checkbox",checked:component.enabled,
-                disabled:blocked || !!component.error,"aria-label":component.name,
-                "data-bundle-component":component.token,onchange:syncLinked}),
-              help:component.error || (component.linkedTweaks.length
-                ? `Attached tweaks: ${component.linkedTweaks.map(t=>t.name).join(", ")}. Apply enables these together. Disabling this component disables a tweak when no other enabled component needs it.`
-                : "Apply enables or disables this component independently.")
-            }]}))});
-          }
-          const box = element("input", {type:"checkbox", checked:row.enabled, disabled:!state.canManage || !!row.error, value:row.path});
-          const copy = element("button", {type:"button", disabled:!state.canManage || !!row.error, onclick:async event => {
-            event.preventDefault();
-            const agreed = await confirmAction({title:"Create an editable copy?",
-              message:"Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel:"Make a copy"});
-            if (!agreed) return;
-            const named = await askProjectName("mod", {value:`${row.name} Copy`,
-              createLabel:"Create copy", description:"Choose a name for your independent editable copy. It will be stored in the mod library."});
-            if (!named) return;
-            copy.disabled = true;
-            try {
-              const result = await callWindow("copy_library_mod", pluginId, row.path, named.name);
-              if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
-            } catch (error) { failure(error); copy.disabled = false; }
-          }}, "Make editable copy…");
-          return element("div", {style:"display:flex;gap:8px;align-items:center"},
-            element("label", {}, box, `${row.readOnly ? "🔒 " : ""}${row.name}${row.version ? ` · ${row.version}` : ""}${row.error ? ` — ${row.error}` : ""}`), copy);
-        });
-        const choose = kind => async () => {
-          try { const value = await callWindow("choose_mod_package", pluginId, kind); if (value && !value.cancelled) await inspect(value.source); }
-          catch (error) { failure(error); }
-        };
-        const apply = element("button", {type:"button", disabled:blocked, onclick:async () => {
-          content.querySelectorAll("input,button").forEach(node=>node.disabled=true);
-          try {
-            await callWindow("activate_library_mods", pluginId,
-              rows.flatMap(row => [...row.querySelectorAll("input:checked:not([data-bundle-component])")].map(box => box.value)),
-              rows.flatMap(row => [...row.querySelectorAll("input[data-bundle-component]:checked")].map(box => box.dataset.bundleComponent)));
-            await render(); message.textContent = "Active mod files updated. Launch the game to test them.";
-          } catch (error) { await render(); failure(error); }
-        }}, "Apply enabled mods");
-        const linked = state.bundles?.tweaks?.length ? detailSection({title:"Linked tweaks",body:
-          state.bundles.tweaks.map(tweak=>toggleRow({toggles:[{label:tweak.name,key:tweak.id,
-            checked:tweak.enabled,disabled:blocked,
-            control:element("input",{type:"checkbox",checked:tweak.enabled,disabled:blocked,
-              "aria-label":tweak.name,"data-bundle-tweak":tweak.id,onchange:event=>{
-                for(const box of content.querySelectorAll('input[data-bundle-component]')){
-                  if(tweak.components.includes(box.dataset.bundleComponent)&&!box.disabled)box.checked=event.target.checked;
-                }
-                syncLinked();
-              }}),
-            help:`Attached to: ${tweak.components.map(token=>state.bundles.components.find(c=>c.token===token)?.name||token).join(", ")}. This switch also selects or deselects all attached components. Apply saves both together.` +
-              (tweak.inconsistent ? " The saved states differ. Apply the component selection to restore the link." : ""),
-            }]}))}) : null;
-        const recover = state.bundles?.recoveryRequired ? element("button",{type:"button",onclick:async()=>{
-          recover.disabled=true;
-          try{await callWindow("recover_bundled_mods",pluginId);await render();}
-          catch(error){failure(error);recover.disabled=false;}
-        }},"Recover linked mods") : null;
-        content.replaceChildren(element("p", {}, state.root), element("p", {}, "Drop a folder or ZIP here, or use Import below."), ...rows,
-          ...(linked?[linked]:[]),...(recover?[recover]:[]),
-          element("div", {class:"lex-dialog-actions"},
-            element("button", {type:"button", disabled:!state.canManage, onclick:choose("folder")}, "Import folder…"),
-            element("button", {type:"button", disabled:!state.canManage, onclick:choose("zip")}, "Import ZIP…"), apply));
-      } catch (error) { failure(error); }
-    };
-    await render();
   };
 
   const openSettings = async () => {
@@ -5840,9 +7153,11 @@ ${contents.path}`});
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"showHoverTooltips", scope:"user", title:"Show hover tooltips", type:"checkbox"},
+        {key:"showHiddenProperties", scope:"user", title:"Show hidden properties", description:"Shows the properties Lexeditor hides as not worth editing, dimmed.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
         {key:"booleanBoxStyle", scope:"user", title:"Wide boolean boxes", description:"An on/off property is one wide box that fills its row, ticked when on. Off draws a small checkbox at the end of an arrow from the property name.", type:"checkbox"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
+        {key:"trustWarning", scope:"user", title:"Trust Warning", description:"Warn the first time a mod is enabled. Only enable mods you trust.", type:"checkbox"},
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
@@ -6579,7 +7894,12 @@ ${contents.path}`});
   const activePageTab = () =>
     document.querySelector(".lex-shell-header nav button.active")?.dataset.tab || "";
   const savedLabel = (key, fallback) => {
-    try { return localStorage.getItem(key) || fallback; } catch (_error) { return fallback; }
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === null) return fallback;
+      if (stored === "" && !String(key).includes(".help.")) return fallback;
+      return stored;
+    } catch (_error) { return fallback; }
   };
   // The help text a developer rewords. A bubble has no name of its own and its
   // text is far too long for a key, so the key is a short digest of the shipped
@@ -6615,15 +7935,19 @@ ${contents.path}`});
     for (const title of document.querySelectorAll(".lex-detail-section-title-text[data-lex-label-key]"))
       if (title.dataset.lexLabelKey === key) title.textContent = text;
   };
+  // True when the host kept the value, so the toast can say so honestly.
   const storeLabel = async (key, tabId, value, shipped) => {
-    const next = value && value !== shipped ? value : "";
+    const cleared = value !== shipped;
+    const next = cleared ? value : "";
     try {
-      if (next) localStorage.setItem(key, next);
+      if (cleared) localStorage.setItem(key, next);
       else localStorage.removeItem(key);
     } catch (_error) {}
     try {
-      await callWindow("save_default_view", shellPluginId(), tabId, {[key]: next});
+      const result = await callWindow("save_default_view", shellPluginId(), tabId, {[key]: next});
+      return !!result?.saved;
     } catch (_error) {}
+    return false;
   };
   const undoLabel = async () => {
     const entry = labelUndo.pop();
@@ -6667,6 +7991,46 @@ ${contents.path}`});
   const propertyRoot = field => field.closest(".lex-detail-panel") || field.closest(".lex-detail-section");
   const layoutFields = root => [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")]
     .filter(field => propertyRoot(field) === root && !field.parentElement.closest(".lex-detail-field"));
+  const hiddenKey = (plugin, tab) => `${plugin}-${tab}.hidden-properties`;
+  // The section order is kept per page by section name too: a layout is keyed
+  // by its record's exact fields, so an order set on one armor piece did not
+  // reach a piece with one field more.
+  const orderKey = (plugin, tab) => `${plugin}-${tab}.section-order`;
+  const sectionNameOf = id => String(id).replace(/:\d+$/, "");
+  const readSectionOrder = (plugin, tab) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(orderKey(plugin, tab)) || "null");
+      return Array.isArray(stored) ? stored.map(String) : null;
+    } catch (_error) { return null; }
+  };
+  const propertyOf = id => String(id).split("/").pop().replace(/:\d+$/, "");
+  const readHiddenProperties = (plugin, tab) => {
+    const key = hiddenKey(plugin, tab);
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) || "null");
+      if (Array.isArray(stored)) return new Set(stored.map(String));
+    } catch (_error) {}
+    // First time: gather what every earlier layout of this page hid.
+    const gathered = new Set();
+    const prefix = `${plugin}-${tab}.property-layout.`;
+    try {
+      for (let index = 0; index < localStorage.length; index++) {
+        const name = localStorage.key(index);
+        if (!name?.startsWith(prefix)) continue;
+        const layout = JSON.parse(localStorage.getItem(name) || "null");
+        for (const id of Array.isArray(layout?.hidden) ? layout.hidden : []) gathered.add(propertyOf(id));
+      }
+      localStorage.setItem(key, JSON.stringify([...gathered]));
+    } catch (_error) {}
+    return gathered;
+  };
+  // The hidden list rides along with the layout's own save: one host call
+  // per change.
+  const writeHiddenProperties = (plugin, tab, hidden) => {
+    const key = hiddenKey(plugin, tab), value = JSON.stringify([...hidden].sort());
+    try { localStorage.setItem(key, value); } catch (_error) {}
+    return {[key]: value};
+  };
   const preparePropertyLayout = root => {
     const fields = layoutFields(root);
     const previous = propertyLayouts.get(root);
@@ -6677,7 +8041,7 @@ ${contents.path}`});
       const section = node.closest(".lex-detail-section");
       const name = section?.dataset.lexLayoutSection || "properties";
       const index = [...groups.values()].filter(group => group.name === name).length;
-      const group = {id: `${name}:${index}`, name, node};
+      const group = {id: `${name}:${index}`, name, node, custom: section?.dataset.lexCustomSection === "true"};
       groups.set(node, group);
       return group;
     };
@@ -6707,11 +8071,135 @@ ${contents.path}`});
     try { applyPropertyLayout(state, JSON.parse(localStorage.getItem(state.key) || "null")); } catch (_error) {}
     return state;
   };
-  const capturePropertyLayout = state => Object.fromEntries([...state.groups.values()].map(group =>
-    [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))]));
+  // A layout is each group's property order, plus the properties the
+  // developer hid. Group ids always hold a colon, so "hidden" never clashes.
+  const layoutSectionOf = group => group.node.closest(".lex-detail-section");
+  // Sections in a flowing pane are dealt into columns, so their reading
+  // order is the pager's list, not where they sit in the document.
+  const byReadingOrder = (a, b) => {
+    if (a === b) return 0;
+    const pager = a.closest(".lex-tweaks-paged");
+    const list = pager && pager === b.closest(".lex-tweaks-paged") ? pager.lexCards?.() : null;
+    if (list?.includes(a) && list.includes(b)) return list.indexOf(a) - list.indexOf(b);
+    return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+  };
+  const sectionOrder = state => [...state.groups.values()].filter(group => layoutSectionOf(group))
+    .sort((a, b) => byReadingOrder(layoutSectionOf(a), layoutSectionOf(b))).map(group => group.id);
+  // The listed sections keep the places they hold now and fill them in the
+  // saved order, so a page that flows sections into columns keeps its flow.
+  const orderSections = (state, order) => {
+    if (!Array.isArray(order)) return;
+    const byId = new Map([...state.groups.values()].map(group => [group.id, layoutSectionOf(group)]));
+    const listed = [...new Set(order.map(id => byId.get(id)).filter(section => section?.parentNode))];
+    // A custom section belongs to the layout even when the wanted order does
+    // not name it: the page-level order is shared across record shapes, so it
+    // can name another shape's customs. One left out never joins the pager's
+    // cards, and the next deal drops it from the page. Each rejoins after the
+    // section it was added below.
+    for (const group of state.groups.values()) {
+      if (!group.custom) continue;
+      const section = layoutSectionOf(group);
+      if (!section?.parentNode || listed.includes(section)) continue;
+      const spec = (state.custom || []).find(item => item.id === group.name) || {};
+      const anchor = byId.get(spec.after);
+      const at = anchor ? listed.indexOf(anchor) : -1;
+      listed.splice(at < 0 ? listed.length : at + 1, 0, section);
+    }
+    const movable = listed.filter(section => !listed.some(other => other !== section && other.contains(section)));
+    const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
+    if (pager) {
+      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager));
+      return;
+    }
+    if (movable.length < 2) return;
+    const slots = [...movable].sort(byReadingOrder).map(section => {
+      const mark = document.createComment("");
+      section.before(mark);
+      return mark;
+    });
+    movable.forEach((section, index) => slots[index].replaceWith(section));
+  };
+  const capturePropertyLayout = state => ({
+    ...Object.fromEntries([...state.groups.values()].map(group =>
+      [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))])),
+    hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id),
+    sections: (state.custom || []).map(spec => ({...spec})),
+    removed: [...(state.removed || [])],
+    order: sectionOrder(state)});
+  // A page's own section the developer removed. It is hidden only while it
+  // holds no properties, so a property moved back into it (or one the page
+  // gains later) is never lost behind a removed heading.
+  const hideRemovedSections = state => {
+    const removed = new Set(state.removed || []);
+    for (const group of state.groups.values()) {
+      if (group.custom) continue;
+      const section = group.node.closest(".lex-detail-section");
+      if (!section) continue;
+      const empty = ![...group.node.children].some(node => state.fields.has(node));
+      section.hidden = removed.has(group.id) && empty;
+    }
+  };
+  // A section the developer added: a heading and an empty body that
+  // properties are dragged into. It belongs to the layout, after the section
+  // it was added below, and its title is the layout's, not a shipped label.
+  const customSectionNode = (state, spec) => {
+    const text = element("span", {class: "lex-detail-section-title-text"}, spec.title);
+    text.addEventListener("dblclick", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      renameValue(text, {value: spec.title, label: "this section", commit: typed => {
+        const before = capturePropertyLayout(state);
+        spec.title = typed;
+        const after = capturePropertyLayout(state);
+        const apply = layout => storePropertyLayout(state, layout);
+        labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+        void apply(after);
+      }});
+    });
+    const section = detailSection({title: text, body: []});
+    section.dataset.lexLayoutSection = spec.id;
+    section.dataset.lexCustomSection = "true";
+    return section;
+  };
+  const placeCustomSections = (state, specs) => {
+    state.custom = (Array.isArray(specs) ? specs : []).filter(spec => spec && typeof spec.id === "string")
+      .map(spec => ({id: spec.id, title: String(spec.title || "New section"), after: String(spec.after || "")}));
+    const wanted = new Set(state.custom.map(spec => `${spec.id}:0`));
+    for (const [node, group] of [...state.groups]) {
+      if (!group.custom || wanted.has(group.id)) continue;
+      // A removed section gives its properties back to where they came from.
+      const home = [...state.groups.values()].find(other => !other.custom);
+      for (const field of [...node.children]) if (state.fields.has(field)) home?.node.append(field);
+      node.closest(".lex-detail-section")?.remove();
+      state.groups.delete(node);
+    }
+    for (const spec of state.custom) {
+      const id = `${spec.id}:0`;
+      const existing = [...state.groups.values()].find(group => group.id === id);
+      if (existing) {
+        const text = existing.node.closest(".lex-detail-section")?.querySelector(".lex-detail-section-title-text");
+        if (text && text.textContent !== spec.title) text.textContent = spec.title;
+        continue;
+      }
+      const section = customSectionNode(state, spec);
+      const anchor = [...state.groups.values()].find(group => group.id === spec.after)?.node.closest(".lex-detail-section");
+      if (anchor) anchor.after(section);
+      else (state.root.querySelector(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body") || state.root).append(section);
+      const node = section.querySelector(".lex-detail-section-content") || section;
+      state.groups.set(node, {id, name: spec.id, node, anchors: [], custom: true});
+    }
+  };
   const applyPropertyLayout = (state, layout) => {
-    if (!layout || typeof layout !== "object") return;
+    // No saved layout for this exact page still gets the page's hidden properties.
+    if (!layout || typeof layout !== "object") layout = {};
     const byId = new Map([...state.fields].map(([field, id]) => [id, field]));
+    placeCustomSections(state, layout.sections);
+    state.removed = Array.isArray(layout.removed) ? layout.removed.filter(id => typeof id === "string") : [];
+    const hidden = new Set(Array.isArray(layout.hidden) ? layout.hidden : []);
+    const byName = readHiddenProperties(state.plugin, state.tab);
+    for (const [field, id] of state.fields)
+      field.classList.toggle("lex-property-hidden", hidden.has(id) || byName.has(propertyOf(id)));
     const used = new Set();
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
@@ -6724,32 +8212,222 @@ ${contents.path}`});
         group.node.insertBefore(field, anchor?.parentNode === group.node ? anchor : null);
       }
     }
+    const pageOrder = readSectionOrder(state.plugin, state.tab);
+    // The page's order is the latest one set on any record of the page (every
+    // save, undo included, writes it), so it wins over an older layout's.
+    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
+    hideRemovedSections(state);
   };
   const storePropertyLayout = async (state, layout) => {
     const value = JSON.stringify(layout);
     localStorage.setItem(state.key, value);
+    // This page's properties take their hidden state from this layout; ones
+    // only other record shapes have keep theirs.
+    const byName = readHiddenProperties(state.plugin, state.tab);
+    const hiddenNow = new Set((layout.hidden || []).map(propertyOf));
+    for (const id of state.fields.values()) byName.delete(propertyOf(id));
+    for (const name of hiddenNow) byName.add(name);
+    const hiddenEntry = writeHiddenProperties(state.plugin, state.tab, byName);
+    if (Array.isArray(layout.order)) {
+      const names = JSON.stringify([...new Set(layout.order.map(sectionNameOf))]);
+      try { localStorage.setItem(orderKey(state.plugin, state.tab), names); } catch (_error) {}
+      hiddenEntry[orderKey(state.plugin, state.tab)] = names;
+    }
     for (const root of document.querySelectorAll(".lex-detail-panel, .lex-detail-section")) {
       const current = propertyLayouts.get(root);
       if (current?.key === state.key) applyPropertyLayout(current, layout);
     }
-    try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value}); }
+    try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value, ...hiddenEntry}); }
     catch (_error) { showToast("Layout saved on this device; the shared default could not be saved."); }
   };
+  // Developer Mode: holding the right button on a property hides it for
+  // everyone, or shows it again. It is a layout change like a drag, so it is
+  // saved and undone the same way. A plain right-click still restores the
+  // vanilla value; the hold swallows the right-click it ends with.
+  let hideTimer = 0, hideHeld = false;
+  document.addEventListener("pointerdown", event => {
+    clearTimeout(hideTimer);
+    hideHeld = false;
+    if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    const root = field && propertyRoot(field);
+    if (!root) return;
+    field.classList.add("lex-property-holding");
+    hideTimer = setTimeout(() => {
+      field.classList.remove("lex-property-holding");
+      const state = preparePropertyLayout(root);
+      if (!state.fields.has(field)) return;
+      hideHeld = true;
+      const before = capturePropertyLayout(state);
+      field.classList.toggle("lex-property-hidden");
+      const after = capturePropertyLayout(state);
+      const apply = layout => storePropertyLayout(state, layout);
+      labelUndo.push({before, after, apply});
+      labelRedo.length = 0;
+      labelHistoryChanged();
+      void apply(after);
+      const name = field.querySelector(".lex-detail-field-label-text")?.textContent || "This property";
+      showToast(field.classList.contains("lex-property-hidden")
+        ? `${name} is hidden for everyone without Show hidden properties.` : `${name} is shown again.`);
+    }, 700);
+  }, true);
+  document.addEventListener("pointerdown", event => {
+    if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    const section = heading?.closest(".lex-detail-section");
+    const root = section && (section.closest(".lex-detail-panel") || section);
+    if (!root || event.target.closest(".lex-detail-field")) return;
+    clearTimeout(hideTimer);
+    heading.classList.add("lex-property-holding");
+    hideTimer = setTimeout(() => {
+      heading.classList.remove("lex-property-holding");
+      const fieldInside = root.querySelector(".lex-detail-field[data-lex-layout-field]");
+      // A section with no property rows (a table, a graph, a note) still
+      // answers the header gesture: its panel, or itself, is the layout
+      // root, so holding removes it and dragging moves it.
+      const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : root);
+      hideHeld = true;
+      const before = capturePropertyLayout(state);
+      const group = [...state.groups.values()].find(entry => entry.node.closest(".lex-detail-section") === section);
+      const holdsFields = group && [...group.node.children].some(node => state.fields.has(node));
+      // An empty section, the page's own or an added one, is removed; one
+      // that still holds properties gets a new section added below it.
+      let specs = [...(state.custom || [])];
+      const removing = group && !holdsFields;
+      if (removing && group.custom) specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+      else if (removing) state.removed = [...new Set([...(state.removed || []), group.id])];
+      else specs.push({id: `custom-${Date.now().toString(36)}`, title: "New section", after: group?.id || ""});
+      placeCustomSections(state, specs);
+      hideRemovedSections(state);
+      const after = capturePropertyLayout(state);
+      const apply = layout => storePropertyLayout(state, layout);
+      labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+      void apply(after);
+      showToast(removing ? "Removed the empty section. Undo brings it back."
+        : "Added a section. Double-click its heading to name it, and drag properties into it. "
+          + "To remove a section, drag its properties out, then hold right on its heading.");
+    }, 700);
+  }, true);
+  for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
+    clearTimeout(hideTimer);
+    document.querySelectorAll(".lex-property-holding").forEach(node => node.classList.remove("lex-property-holding"));
+  }, true);
+  document.addEventListener("contextmenu", event => {
+    if (!hideHeld) return;
+    hideHeld = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
   let propertyDrag = null, propertyDrop = null;
   const clearPropertyDrop = () => {
     propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after");
     propertyDrop = null;
   };
+  // During a section or property drag, holding the pointer near the top or
+  // bottom edge of the details panel scrolls it, the way other programs do.
+  // The loop runs on animation frames, not drag events, so it keeps scrolling
+  // while the pointer sits still at the edge. It only moves scrollTop: the
+  // panel's own scrollbar stays as usable as it was before the drag.
+  let dragScroll = null;
+  let dragScrollRaf = 0;
+  const dragScrollContainer = target => {
+    for (let node = target instanceof Element ? target : null; node; node = node.parentElement) {
+      if (node.scrollHeight > node.clientHeight + 1) {
+        const vertical = getComputedStyle(node).overflowY;
+        if (vertical === "auto" || vertical === "scroll") return node;
+      }
+    }
+    return null;
+  };
+  const dragScrollTick = () => {
+    dragScrollRaf = 0;
+    if (!dragScroll || (!sectionDrag && !propertyDrag)) { dragScroll = null; return; }
+    const {container, y} = dragScroll;
+    if (container.isConnected) {
+      const box = container.getBoundingClientRect();
+      const zone = 56;
+      const fromTop = y - box.top, fromBottom = box.bottom - y;
+      let delta = 0;
+      if (fromTop >= 0 && fromTop < zone) delta = -Math.ceil((zone - fromTop) / zone * 14);
+      else if (fromBottom >= 0 && fromBottom < zone) delta = Math.ceil((zone - fromBottom) / zone * 14);
+      if (delta) container.scrollTop += delta;
+    }
+    if (sectionDrag || propertyDrag) dragScrollRaf = requestAnimationFrame(dragScrollTick);
+    else dragScroll = null;
+  };
+  const dragScrollNote = event => {
+    if (!sectionDrag && !propertyDrag) return;
+    const container = dragScrollContainer(event.target);
+    if (!container) { dragScroll = null; return; }
+    dragScroll = {container, y: event.clientY};
+    if (!dragScrollRaf) dragScrollRaf = requestAnimationFrame(dragScrollTick);
+  };
+  // In Developer Mode a property is dragged by its whole row - anywhere but
+  // its value box, which still selects text and edits as usual.
   document.addEventListener("pointerover", event => {
-    const label = event.target.closest?.(".lex-detail-field-label-text");
-    if (label?.closest(".lex-detail-field")) label.draggable = !!sharedSettingsSnapshot?.developerMode;
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    if (heading && !event.target.closest(".lex-detail-field,.lex-label-rename,input"))
+      heading.draggable = !!sharedSettingsSnapshot?.developerMode;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    if (!field) return;
+    field.draggable = !!sharedSettingsSnapshot?.developerMode &&
+      !event.target.closest(".lex-detail-field-control,.lex-label-rename,.lex-help-edit");
+  });
+  // A heading drags its whole section before or after another section's.
+  let sectionDrag = null;
+  document.addEventListener("dragstart", event => {
+    const heading = event.target.closest?.(".lex-detail-section-title");
+    const section = heading && !event.target.closest(".lex-detail-field") && heading.closest(".lex-detail-section");
+    if (!section || !sharedSettingsSnapshot?.developerMode) return;
+    const panel = section.closest(".lex-detail-panel") || section;
+    const fieldInside = panel.querySelector(".lex-detail-field[data-lex-layout-field]");
+    const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : panel);
+    if (![...state.groups.values()].some(group => layoutSectionOf(group) === section)) { event.preventDefault(); return; }
+    sectionDrag = {state, section, before: capturePropertyLayout(state)};
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", heading.textContent || "");
+    section.classList.add("lex-property-dragging");
+  });
+  document.addEventListener("dragover", event => {
+    if (!sectionDrag) return;
+    dragScrollNote(event);
+    clearPropertyDrop();
+    const {state, section} = sectionDrag;
+    const target = [...state.groups.values()].map(layoutSectionOf)
+      .find(node => node && node !== section && node.contains(event.target) && !node.contains(section) && !section.contains(node)
+        && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section));
+    if (!target) return;
+    const after = event.clientY >= target.getBoundingClientRect().top + target.offsetHeight / 2;
+    propertyDrop = {target, marker: target, after};
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    target.classList.add(after ? "lex-property-drop-after" : "lex-property-drop-before");
+  });
+  document.addEventListener("drop", event => {
+    if (!sectionDrag || !propertyDrop?.target || !sharedSettingsSnapshot?.developerMode) return;
+    event.preventDefault();
+    const {state, section, before} = sectionDrag;
+    const idOf = node => [...state.groups.values()].find(group => layoutSectionOf(group) === node)?.id;
+    const moving = idOf(section), target = idOf(propertyDrop.target);
+    const order = sectionOrder(state).filter(id => id !== moving);
+    order.splice(order.indexOf(target) + (propertyDrop.after ? 1 : 0), 0, moving);
+    clearPropertyDrop();
+    orderSections(state, order);
+    const after = capturePropertyLayout(state);
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    const apply = layout => storePropertyLayout(state, layout);
+    labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+    void apply(after);
+  });
+  document.addEventListener("dragend", () => {
+    sectionDrag?.section.classList.remove("lex-property-dragging");
+    sectionDrag = null;
   });
   document.addEventListener("dragstart", event => {
-    const label = event.target.closest?.(".lex-detail-field-label-text");
-    const field = label?.closest(".lex-detail-field");
-    if (!field) return;
+    const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
+    if (!field || event.target.closest(".lex-detail-field-control")) return;
     const root = propertyRoot(field);
-    if (!sharedSettingsSnapshot?.developerMode || !root || label.querySelector("input")) { event.preventDefault(); return; }
+    if (!sharedSettingsSnapshot?.developerMode || !root || field.querySelector(".lex-detail-field-label input")) { event.preventDefault(); return; }
     const state = preparePropertyLayout(root);
     if (!state.fields.has(field)) { event.preventDefault(); return; }
     propertyDrag = {state, field, before: capturePropertyLayout(state)};
@@ -6759,6 +8437,7 @@ ${contents.path}`});
   });
   document.addEventListener("dragover", event => {
     if (!propertyDrag) return;
+    dragScrollNote(event);
     clearPropertyDrop();
     if (!sharedSettingsSnapshot?.developerMode) return;
     const {state, field} = propertyDrag;
@@ -6797,13 +8476,35 @@ ${contents.path}`});
     clearPropertyDrop();
   });
   let layoutPending = false;
-  new MutationObserver(() => {
+  const changedLayoutRoots = new Set();
+  new MutationObserver(records => {
+    for (const record of records) {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      if (!target || target.closest('.lex-detail-field')) continue;
+      const changed = [...record.addedNodes, ...record.removedNodes].filter(node => node instanceof Element &&
+        (node.matches('.lex-detail-field[data-lex-layout-field],.lex-detail-section,.lex-detail-section-content') ||
+         node.querySelector('.lex-detail-field[data-lex-layout-field],.lex-detail-section')));
+      if (!changed.length) continue;
+      const existing = target.closest('.lex-detail-panel') || target.closest('.lex-detail-section');
+      if (existing) changedLayoutRoots.add(existing);
+      for (const node of changed) {
+        if (!node.isConnected) continue;
+        const fields = node.matches('.lex-detail-field[data-lex-layout-field]') ? [node] :
+          [...node.querySelectorAll('.lex-detail-field[data-lex-layout-field]')];
+        for (const field of fields) {
+          const root = propertyRoot(field);
+          if (root) changedLayoutRoots.add(root);
+        }
+      }
+    }
+    if (!changedLayoutRoots.size) return;
     if (layoutPending) return;
     layoutPending = true;
     requestAnimationFrame(() => {
       layoutPending = false;
-      const roots = new Set([...document.querySelectorAll(".lex-detail-field[data-lex-layout-field]")].map(propertyRoot).filter(Boolean));
-      roots.forEach(preparePropertyLayout);
+      const roots = [...changedLayoutRoots];
+      changedLayoutRoots.clear();
+      roots.filter(root=>root.isConnected).forEach(preparePropertyLayout);
     });
   }).observe(document.documentElement, {childList: true, subtree: true});
 
@@ -6831,6 +8532,7 @@ ${contents.path}`});
     const before = String(options.value ?? node.textContent ?? "");
     const input = element("input", {type: "text", class: "lex-label-rename",
       value: before, "aria-label": `Rename ${options.label || "this value"}`});
+    copyRenameFace(node, input);
     node.replaceWith(input);
     input.focus();
     input.select();
@@ -6851,10 +8553,22 @@ ${contents.path}`});
     input.addEventListener("blur", () => finish(false));
     return input;
   };
+  // An in-place rename swaps text for an input; the typed text keeps the
+  // fitted size and face of the text it replaces instead of jumping to
+  // the container's inherited font.
+  const copyRenameFace = (node, input) => {
+    const face = getComputedStyle(node);
+    input.style.fontSize = face.fontSize;
+    input.style.fontFamily = face.fontFamily;
+    input.style.fontWeight = face.fontWeight;
+    input.style.lineHeight = face.lineHeight;
+    input.style.letterSpacing = face.letterSpacing;
+  };
   const renameInPlace = (key, tabId, fallback, text) => {
     const before = text.textContent;
     const input = element("input", {type: "text", class: "lex-label-rename",
       value: before, "aria-label": `Rename ${fallback}`});
+    copyRenameFace(text, input);
     text.replaceWith(input);
     input.focus();
     input.select();
@@ -6873,11 +8587,17 @@ ${contents.path}`});
           // plugin's record history has no idea this happened.
           labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
           labelRedo.length = 0;
-          await storeLabel(key, tabId, label, fallback);
+          const saved = await storeLabel(key, tabId, label, fallback);
           labelHistoryChanged();
           try {
-            showToast(label === fallback ? `${fallback} is back to its shipped name.`
-                                         : `${label} is now the shipped name.`);
+            // "Shipped" only when the shared default kept the name.
+            if (saved) {
+              showToast(label === fallback ? `${fallback} is back to its shipped name.`
+                                           : `${label} is now the shipped name.`);
+            } else {
+              showToast(label === fallback ? `${fallback} is back on this device.`
+                                           : `${label} is saved on this device.`);
+            }
           } catch (_error) {}
     };
     input.addEventListener("keydown", event => {
@@ -6888,6 +8608,30 @@ ${contents.path}`});
   };
 
   const mountShell = options => {
+    // Every game has the shared Mods tab, always leftmost. The shell draws it
+    // itself; every other tab still belongs to the plugin.
+    const pluginNavigate = options.navigate, pluginActiveTab = options.activeTab;
+    const mods = modsPage(options.plugin.id, options.plugin.name);
+    let shellPage = null;
+    options = {...options,
+      importModDrop: transfer => mods.importDrop(transfer),
+      tabs: [{id: "mods", label: "Mods", help: "Every mod in this game's library: switch them on or off, edit their details and settings, or add new ones."},
+        ...(options.tabs || []).filter(tab => tab.id !== "mods")],
+      activeTab: () => shellPage || pluginActiveTab(),
+      navigate: tab => {
+        if (tab === "mods") {
+          shellPage = "mods";
+          const toolbar = document.querySelector("#toolbar");
+          if (toolbar) toolbar.hidden = true;
+          mods.show(document.querySelector("#main"));
+          refreshShellTabs();
+          return;
+        }
+        shellPage = null;
+        mods.hide();
+        return pluginNavigate(tab);
+      }};
+    let refreshShellTabs = () => {};
     activeShellReadonly = sessionHasNoMod() ? () => true
       : typeof options.readonly === "function" ? options.readonly : null;
     const host = typeof options.host === "string" ? document.querySelector(options.host) : options.host;
@@ -6943,7 +8687,7 @@ ${contents.path}`});
           changed = true;
         }
       }
-      if (changed) options.navigate(options.activeTab());
+      if (changed) { relabelTabBar(); options.navigate(options.activeTab()); }
     };
     if (window.pywebview?.api) installPackagedDefaults().catch(() => {});
     else window.addEventListener("pywebviewready", () => installPackagedDefaults().catch(() => {}), {once:true});
@@ -6960,6 +8704,7 @@ ${contents.path}`});
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
+      if ((left.id === "mods") !== (right.id === "mods")) return left.id === "mods" ? -1 : 1;
       if (leftSettings !== rightSettings) return leftSettings ? 1 : -1;
       const rank = tab => tab.id === "tweaks" ? 2 : (tab.id === "misc" || /^misc\.?$/i.test(String(tab.label))) ? 1 : 0;
       // A page whose order carries meaning - Blank's component levels run from
@@ -6969,6 +8714,44 @@ ${contents.path}`});
       return rank(left) - rank(right)
         || tabName(left).localeCompare(tabName(right), undefined, {numeric: true, sensitivity: "base"});
     });
+    const tabButtons = new Map();
+    // Tabs the reader never opened carry a dot until first viewed. The set
+    // persists per plugin; a first mount seeds it with the tabs at hand, so
+    // a fresh install shows no dots and only a tab that appears later (a new
+    // page) is dotted. Stale ids prune on the way in.
+    const viewedTabsKey = `lexeditor:viewed-tabs:${options.plugin.id}`;
+    let viewedTabs = null;
+    try {
+      const stored = localStorage.getItem(viewedTabsKey);
+      viewedTabs = stored === null ? null : new Set(JSON.parse(stored));
+    } catch (_error) { viewedTabs = new Set(); }
+    if (viewedTabs === null) {
+      viewedTabs = new Set(orderedTabs.map(tab => tab.id));
+    } else {
+      for (const id of [...viewedTabs]) {
+        if (!orderedTabs.some(tab => tab.id === id)) viewedTabs.delete(id);
+      }
+    }
+    const saveViewedTabs = () => {
+      try { localStorage.setItem(viewedTabsKey, JSON.stringify([...viewedTabs])); }
+      catch (_error) {}
+    };
+    saveViewedTabs();
+    // A shipped rename reaches an already-built bar: the packaged
+    // defaults arrive after the buttons are drawn, so seeding (and a
+    // view reset, which wipes the tab's own keys) re-applies the
+    // stored names. Only an override rewrites a label, so a drawn
+    // game font never becomes plain text.
+    const relabelTabBar = () => {
+      for (const [id, button] of tabButtons) {
+        let stored = null;
+        try { stored = localStorage.getItem(`${options.plugin.id}-${id}.label`); }
+        catch (_error) {}
+        if (stored === null || stored === "") continue;
+        const labelText = button.querySelector(".lex-tab-label-text");
+        if (labelText && labelText.textContent !== stored) labelText.textContent = stored;
+      }
+    };
     for (const [tabIndex, tab] of orderedTabs.entries()) {
       let defaultHoldTimer = 0;
       let savedDefault = false;
@@ -6987,7 +8770,9 @@ ${contents.path}`});
         "data-tab": tab.id,
         class: [tab.id === options.activeTab() ? "active" : "",
         isSpecialTab(tab) ? "lex-settings-tab" : "",
-        isSpecialTab(tab) || tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
+        isSpecialTab(tab) || tab.id === "tweaks" || tab.id === "mods" ? "lex-tweaks-tab" : "",
+        // Mods wears the same special fill as Tweaks; the sort puts it first.
+        tab.id === "mods" ? "lex-settings-tab lex-mods-tab" : ""].filter(Boolean).join(" "),
         onclick: () => {
           playThemeSound("confirm");
           githubWorkspace?.hide();
@@ -7012,7 +8797,7 @@ ${contents.path}`});
         },
         onpointerup: () => clearTimeout(defaultHoldTimer),
         onpointercancel: () => clearTimeout(defaultHoldTimer),
-        oncontextmenu: event => {
+        oncontextmenu: async event => {
           event.preventDefault();
           clearTimeout(defaultHoldTimer);
           if (savedDefault) { savedDefault = false; return; }
@@ -7023,17 +8808,29 @@ ${contents.path}`});
               if (key && key.includes(token)) localStorage.removeItem(key);
             }
           } catch (_error) {}
+          // Reset returns to the shipped default view, not to an empty
+          // one: the tab's packaged defaults come back at once, a renamed
+          // tab among them.
+          try {
+            const views = (await callWindow("default_views", options.plugin.id))?.views?.[tab.id] || {};
+            for (const [key, value] of Object.entries(views))
+              if (key.includes(token)) localStorage.setItem(key, String(value));
+          } catch (_error) {}
+          relabelTabBar();
           options.resetView?.(tab.id);
           window.dispatchEvent(new CustomEvent("lexeditor-view-reset", {detail: {plugin: options.plugin.id, tab: tab.id}}));
           options.navigate(tab.id);
         },
       }, element("span", {class: "lex-tab-label"},
           element("span", {class: "lex-tab-label-text"},
-            savedLabel(`${options.plugin.id}-${tab.id}.label`, tab.label))),
+            savedLabel(`${options.plugin.id}-${tab.id}.label`, tab.label)),
+          viewedTabs.has(tab.id) ? "" : element("span",
+            {class: "lex-tab-unviewed", "aria-hidden": "true", title: "Not opened yet"})),
         (key => key ? element("span", {
           class: "lex-tab-shortcut", "aria-hidden": "true",
         }, key) : "")(shortcutKeyFor(tabIndex + 1)));
       nav.append(button);
+      tabButtons.set(tab.id, button);
       // The handler is always attached and the mode is read when it fires:
       // settings arrive after the bar is built, so a developer-mode test at
       // build time would leave every tab unrenamable.
@@ -7066,6 +8863,11 @@ ${contents.path}`});
       id: "lexeditor-shortcuts", class: "lex-settings-button", title: "Keyboard shortcuts",
       "aria-label": "Show keyboard shortcuts", "data-lex-history-control": true,
       onclick: () => openShortcutPanel(!!sharedSettingsSnapshot?.developerMode),
+      oncontextmenu: event => {
+        if (!sharedSettingsSnapshot?.developerMode) return;
+        event.preventDefault();
+        openShortcutPanel(true, true);
+      },
     }, keyboardIcon());
     const settings = element("button", {
       id: "lexeditor-settings", class: "lex-settings-button", title: "Lexeditor settings",
@@ -7096,7 +8898,7 @@ ${contents.path}`});
     }, githubLogo());
     const restart = element("button", {
       id: "plugin-restart", class: "lex-window-button",
-      title: "Restart this plugin", "aria-label": "Restart this plugin",
+      title: "Restart Lexeditor", "aria-label": "Restart Lexeditor",
       "data-lex-history-control": true,
     }, restartIcon());
     const projectControl = mountProjectControl(options, context);
@@ -7206,23 +9008,16 @@ ${contents.path}`});
       }
     };
     brand.onclick = () => { playThemeSound("exit"); return returnToMainMenu(options, leaveForMainMenu); };
-    const restartPlugin = async () => {
-      const opened = await callWindow("restart_plugin", options.plugin.id);
-      if (!opened?.url) throw new Error("The desktop host did not return a restart address. Close and reopen Lexeditor if this continues.");
+    const restartLexeditor = async () => {
+      const started = await callWindow("restart_lexeditor");
+      if (!started?.restarting) throw new Error("The desktop host did not restart. Close and reopen Lexeditor if this continues.");
+      // The window is closing and a fresh process is starting; stay marked
+      // navigating so the button never re-arms under the old page.
       window.__lexeditorNavigating = true;
-      // A restart is still a load, so it gets a real loading message rather
-      // than dropping through to the fallback text.
-      const destination = new URL(opened.url, location.href);
-      // The old service has stopped. Navigate immediately; optional quote
-      // retrieval must never keep the discard dialog waiting on another bridge call.
-      destination.searchParams.set("lexTransition", "load");
-      destination.searchParams.set("lexLoadStarted", String(Date.now()));
-      location.href = destination.href;
       return true;
     };
-    // One restart at a time. A second click while the first was still starting
-    // the new service started a third, which shut down the service the page
-    // had just been sent to: "Failed to fetch", and a page left pointing at it.
+    // One restart at a time. A second click while the window is closing is
+    // ignored; the host also refuses a second restart once one is underway.
     let restarting = false;
     restart.onclick = async () => {
       if (restarting) return;
@@ -7230,13 +9025,13 @@ ${contents.path}`});
       restart.disabled = true;
       restart.classList.add("busy");
       try {
-        await confirmUnsavedExit(options, restartPlugin, {
+        await confirmUnsavedExit(options, restartLexeditor, {
           title: "Unsaved changes",
-          question: "Save before restarting this plugin?",
+          question: "Save before restarting Lexeditor?",
           discardLabel: "Restart Without Saving",
           saveLabel: "Save and Restart",
-          exitError: "Could not restart the plugin",
-          pendingLabel: "Restarting plugin…",
+          exitError: "Could not restart Lexeditor",
+          pendingLabel: "Restarting Lexeditor…",
         });
       } finally {
         if (!window.__lexeditorNavigating) {
@@ -7260,8 +9055,13 @@ ${contents.path}`});
       context.append(...(Array.isArray(content) ? content : [content]));
     }
 
-    const history = options.history ? new EditHistory({...options.history, changed: refresh}) : null;
-    if (history) history.observe(document);
+    // A plugin whose data lives in the browser hands over capture and restore
+    // and gets snapshot history. One whose edits live on its server (DS1)
+    // hands over its own history, with undo and redo, and keeps it as given.
+    const ownHistory = typeof options.history?.undo === "function";
+    const history = !options.history ? null
+      : ownHistory ? options.history : new EditHistory({...options.history, changed: refresh});
+    if (history && !ownHistory) history.observe(document);
   // A name the developer changed is undone first, then the record history:
   // the two are different kinds of change and the newest one wins.
   undo.onclick = async () => { if (!(await undoLabel())) history?.undo(); };
@@ -7285,7 +9085,11 @@ ${contents.path}`});
     save.onclick = async () => {
       if (saveBusy || save.disabled) return;
       setSaveBusy(true);
-      try { await options.save?.(); playThemeSound("save"); }
+      // Saving rebuilds the installed tweaks, which is what the Mods tab
+      // alert marks describe: re-read them so a rebuilt mod clears its
+      // mark at once instead of waiting for Play.
+      try { await options.save?.(); playThemeSound("save"); await mods.refresh(); }
+      catch (error) { showToast(error?.message || "Save failed.", true); }
       finally { setSaveBusy(false); }
     };
     save.oncontextmenu = event => {
@@ -7359,7 +9163,7 @@ ${contents.path}`});
 
     let savedPreviewState;
     saveChangePreview(save,()=>options.pendingChanges?.() || pendingChangeList(savedPreviewState,options.history?.capture?.()),options.dirtyCount);
-    let lastReportedDirty = null;
+    let lastReportedDirty = null, noticedDirty = 0;
   function refresh() {
     // A rename outside a render - the shell's own undo - still has to move the
     // history buttons.
@@ -7367,6 +9171,7 @@ ${contents.path}`});
       refreshReferences();
       projectControl.refresh?.();
       const dirty = options.dirtyCount?.() || 0;
+      if (dirty !== noticedDirty) { noticedDirty = dirty; save.lexNoteChanges?.(); }
       // Only the built-in change list reads this copy; a plugin with its own
       // pendingChanges would pay for a full copy of its data on every refresh.
       if (!dirty && options.history?.capture && !options.pendingChanges) savedPreviewState=clone(options.history.capture());
@@ -7391,6 +9196,14 @@ ${contents.path}`});
       }
       nav.querySelectorAll("button").forEach(button => button.classList.toggle("active",
         !githubWorkspace?.state.open && button.dataset.tab === options.activeTab()));
+      // Opening a tab marks it viewed wherever the navigation came from: a
+      // click, a record link, or the tab the plugin opened itself with.
+      const activeButton = tabButtons.get(options.activeTab());
+      if (activeButton?.querySelector(".lex-tab-unviewed")) {
+        viewedTabs.add(options.activeTab());
+        saveViewedTabs();
+        activeButton.querySelector(".lex-tab-unviewed").remove();
+      }
       if (nav.querySelector("button.active") !== shownNavTab) revealActiveTab();
       github.classList.toggle("active", !!githubWorkspace?.state.open);
       help?.classList.toggle("active", !!options.helpActive?.());
@@ -7409,6 +9222,33 @@ ${contents.path}`});
     const shortcutHandler = event => {
       if (event.key === "Escape" && shortcutPanel) { closeShortcutPanel(); return; }
       const developerMode = !!sharedSettingsSnapshot?.developerMode;
+      const animAction = matchAnimationShortcut(event);
+      if (animAction) {
+        // With the panel open the shortcuts are a legend, not live controls.
+        if (shortcutPanel) {
+          event.preventDefault();
+          event.stopPropagation();
+          flashShortcut(animAction);
+          return;
+        }
+        const target = event.target;
+        const typing = target instanceof HTMLElement &&
+          target.matches("input:not([type='checkbox']):not([type='range']),textarea,select,[contenteditable='true']");
+        if (typing) return;
+        // A focused button owns Space: the transport's own play button
+        // toggles through its click, and nothing double-fires.
+        if ((event.key === " " || event.code === "Space") &&
+            target instanceof HTMLElement && target.matches("button")) return;
+        event.preventDefault();
+        flashShortcut(animAction);
+        ({ "anim-start": () => activeAnimationViewer.toStart(),
+           "anim-prev": () => activeAnimationViewer.step(-1),
+           "anim-play": () => activeAnimationViewer.toggle(),
+           "anim-next": () => activeAnimationViewer.step(1),
+           "anim-end": () => activeAnimationViewer.toEnd(),
+        }[animAction]?.());
+        return;
+      }
       const action = matchShortcut(event, developerMode);
       if (!action) return;
       // With the panel open the shortcuts are a legend, not live controls.
@@ -7484,6 +9324,16 @@ ${contents.path}`});
     const removeControlHelp = installControlHelp(document.body);
     window.addEventListener("pagehide", removeControlHelp, {once:true});
 
+    refreshShellTabs = refresh;
+    // The first time a game opens, offer Lexer's Mod and show where things are.
+    // Downloaded Lexer's Mod modules stay up to date: checked as the game
+    // opens (at most hourly, in the background) as well as on the Mods tab.
+    const startFirstRun = () => {
+      callWindow("lexmod_update", options.plugin.id).catch(() => {});
+      return firstRun(options.plugin.id, options.plugin.name).catch(() => {});
+    };
+    if (window.pywebview?.api) startFirstRun();
+    else window.addEventListener("pywebviewready", startFirstRun, {once: true});
     return {
       header, nav, context, settings, help, info, github, restart, githubWorkspace: () => githubWorkspace,
       save, game, undo, redo, minimize, maximize, close, history, navigationHistory, refresh,
@@ -7511,11 +9361,20 @@ ${contents.path}`});
         style: rowStyle,
         title: typeof options.rowTitle === "function" ? options.rowTitle(row) : options.rowTitle,
         "aria-selected": options.select ? String(selected) : null,
+        // A shift-click ranges the selection: swallow the press so the
+        // browser does not also stretch a text selection across the rows.
+        onmousedown: options.select ? event => { if (event.shiftKey) event.preventDefault(); } : null,
         // The clicked row is marked at once, so a caller that keeps the table
         // and only updates what it drives does not have to reach into the
         // list's rows to move the selection itself.
         onclick: options.select ? event => {
           const marked = options.selectedClass || "selected";
+          // Clicking the row that is already the only selection changes
+          // nothing, so it re-selects nothing: re-rendering for it threw away
+          // a name being double-clicked for editing in that row.
+          const only = root.querySelectorAll(':scope > .lex-list-row[aria-selected="true"]');
+          if (event.currentTarget.getAttribute("aria-selected") === "true" && only.length === 1 &&
+              !event.shiftKey && !event.ctrlKey && !event.metaKey) return;
           for (const sibling of root.querySelectorAll(":scope > .lex-list-row")) {
             sibling.classList.toggle(marked, sibling === event.currentTarget);
             sibling.setAttribute("aria-selected", String(sibling === event.currentTarget));
@@ -7538,8 +9397,10 @@ ${contents.path}`});
     // switch: unpinning the name column would otherwise leave every real
     // column at max-content and the table wider than its panel.
     const firstDescription = columns.findIndex(column => !column.generated && !column.width && !column.numberedId && !column.numeric);
-    const firstReal = firstDescription >= 0 ? firstDescription : columns.findIndex(column => !column.generated && !column.width);
-    const automaticGrow = nameIndex >= 0 ? nameIndex : firstReal;
+    // If every field is numeric, keep every track at its content width.
+    // Giving the first coordinate the unused width makes X look like a
+    // description column while Y and Z stay compact.
+    const automaticGrow = nameIndex >= 0 ? nameIndex : firstDescription;
     return columns.map((column, index) => {
       if (column.width) return column.width;
       const grow = Number(column.grow)
@@ -7628,6 +9489,116 @@ ${contents.path}`});
     return autoAdd ? [enabledColumn(change), ...columns] : columns;
   };
 
+  // One pin, two positions: an unpinned pin hovers up and to the right and
+  // drops into the page when it is stuck in. No crossed-out variant.
+  const pinIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(namespace, "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("aria-hidden", "true");
+    const pin = document.createElementNS(namespace, "path");
+    pin.classList.add("lex-column-pin-on");
+    pin.setAttribute("d", "M3.71 21.71L9 16.42l2.29 2.29c.2.2.45.29.71.29s.51-.1.71-.29l2-2a.996.996 0 0 0 0-1.41l-.79-.79l3.59-3.59l.79.79c.39.39 1.02.39 1.41 0l2-2a.996.996 0 0 0 0-1.41l-6-6a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41l.79.79l-3.59 3.59l-.79-.79a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41L7.59 15L2.3 20.29l1.41 1.41Z");
+    icon.append(pin);
+    return icon;
+  };
+
+  // Every property in a list-and-detail page can be pinned as a table column,
+  // in every game. Pins used to exist only where a plugin wired its own
+  // column preferences, so most games had none. The paged list now gives
+  // each property without a pin of its own one, and its table shows the
+  // pinned properties as columns. A row supplies a pinned value as
+  // row.values[key] (or row[key]), and may give row.display[key] to show.
+  let pagedPinOwner = null;
+  // A list whose records' names the game stores renames them in its table's
+  // Name column and in the detail heading, by double-click, through one
+  // option: pagedListDetail({rename(row, name), renamable(row)}).
+  let pagedRenameOwner = null;
+  // Set by the shell's mod control: what an edit attempt on a locked project
+  // does (offer to create a mod).
+  let requestModForEdit = null;
+  const renameColumn = (column, owner) => owner && column.key === "name" && !column.edit && !column.editor ? {
+    ...column,
+    edit: (row, value) => {
+      const name = String(value ?? "").trim();
+      if (name && name !== String(row.name ?? "") && owner.renamable(row)) owner.rename(row, name);
+    },
+    editValue: row => row.name ?? "",
+    cellClass: row => [typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "",
+      owner.renamable(row) ? "" : "lex-cell-fixed"].filter(Boolean).join(" "),
+  } : column;
+  const autoPinStores = new Map();
+  const autoPins = viewKey => {
+    if (!autoPinStores.has(viewKey)) {
+      const key = `lexeditor:pins:${viewKey}`;
+      let pinned = [];
+      try { pinned = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_error) {}
+      autoPinStores.set(viewKey, {key, pinned: (Array.isArray(pinned) ? pinned : [])
+        .filter(entry => entry && typeof entry.key === "string")});
+    }
+    return autoPinStores.get(viewKey);
+  };
+  const pinnedValue = (row, key) => row?.values?.[key] ?? row?.[key];
+  // The value a list sorts a record by: a pinned property (key "pin:<name>")
+  // from the row's values, anything else from the row itself.
+  const sortValueOf = (row, key) => {
+    const name = String(key ?? "");
+    return name.startsWith("pin:") ? pinnedValue(row, name.slice(4)) : (row?.[name] ?? row?.values?.[name]);
+  };
+  // Compare two records for a {key, dir} sort. Blanks go last whichever way.
+  const compareRecords = (left, right, sort = {}) => {
+    const a = sortValueOf(left, sort.key), b = sortValueOf(right, sort.key);
+    const blank = value => value === undefined || value === null || value === "" || value === "\u2014";
+    if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
+    const result = typeof a === "number" && typeof b === "number" ? a - b
+      : typeof a === "boolean" && typeof b === "boolean" ? Number(a) - Number(b)
+      : String(a).localeCompare(String(b), undefined, {numeric: true, sensitivity: "base"});
+    return result * (sort.dir || 1);
+  };
+  const pinnedColumns = owner => owner.store.pinned.map(entry => {
+    const described = typeof owner.describe === "function" ? owner.describe(entry.key) : null;
+    const editable = !!described?.editable && typeof owner.commitCell === "function";
+    return {
+      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label"}, typeGlyph(entry.icon), entry.label) : entry.label, sortable: true, pinnedProperty: entry.key,
+      sortValue: row => pinnedValue(row, entry.key) ?? "",
+      numeric: described?.numeric === true,
+      min: described?.minimum, max: described?.maximum, step: described?.step,
+      choices: described?.choices || null,
+      editValue: row => row?.values?.[entry.key] ?? "",
+      edit: editable ? ((row, value) => owner.commitCell(row, entry.key, value)) : null,
+      render: row => {
+        const shown = row?.display?.[entry.key] ?? pinnedValue(row, entry.key);
+        return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
+      }};
+  });
+  const autoPinDetail = (node, owner) => {
+    for (const field of node.querySelectorAll(".lex-detail-field[data-lex-layout-field]")) {
+      if (field.querySelector(".lex-column-pin")) continue;
+      const box = field.querySelector(":scope > .lex-detail-field-control");
+      if (!box) continue;
+      const key = field.dataset.lexLayoutField;
+      const label = field.querySelector(".lex-detail-field-label-text")?.textContent?.trim() || key;
+      const icon = field.dataset.lexIcon || "";
+      const pinned = owner.store.pinned.some(entry => entry.key === key);
+      box.append(element("button", {
+        type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`, "data-lex-control": "pin", "data-lex-auto-pin": "",
+        "data-lex-pin-column": key, "aria-pressed": String(pinned),
+        title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
+        "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
+        onclick: event => {
+          event.preventDefault(); event.stopPropagation();
+          const inserting = !owner.store.pinned.some(entry => entry.key === key);
+          owner.toggle(key, label, icon);
+          const button = event.currentTarget;
+          button.classList.toggle("pinned", inserting);
+          button.setAttribute("aria-pressed", String(inserting));
+          button.title = inserting ? `Hide ${label} in the table` : `Show ${label} in the table`;
+          button.setAttribute("aria-label", inserting ? `Unpin ${label} column` : `Pin ${label} column`);
+        },
+      }, pinIcon()));
+    }
+  };
+
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
     const declared = numberedIdColumns(definitions || [], []);
@@ -7663,24 +9634,21 @@ ${contents.path}`});
       },
       move: (value, before) => {
         if (!order.includes(value) || value === before) return;
+        const from = order.indexOf(value);
+        const to = order.indexOf(before);
         order = order.filter(item => item !== value);
-        const index = order.indexOf(before);
+        let index = order.indexOf(before);
+        // Dropped on a column it takes that slot: dragged rightward it
+        // lands after the target, dragged leftward before it. Always
+        // inserting before made a rightward drop a no-op.
+        if (from >= 0 && to >= 0 && from < to) index = index < 0 ? order.length : index + 1;
         order.splice(index < 0 ? order.length : index, 0, value);
         save();
       },
       reset: () => { order = [...defaults]; save(); },
       pinButton: (value, label = byKey.get(value)?.label || value) => {
         const pinned = order.includes(value);
-        const namespace = "http://www.w3.org/2000/svg";
-        const icon = document.createElementNS(namespace, "svg");
-        icon.setAttribute("viewBox", "0 0 24 24");
-        icon.setAttribute("aria-hidden", "true");
-        const pin = document.createElementNS(namespace, "path");
-        pin.classList.add("lex-column-pin-on");
-        pin.setAttribute("d", "M3.71 21.71L9 16.42l2.29 2.29c.2.2.45.29.71.29s.51-.1.71-.29l2-2a.996.996 0 0 0 0-1.41l-.79-.79l3.59-3.59l.79.79c.39.39 1.02.39 1.41 0l2-2a.996.996 0 0 0 0-1.41l-6-6a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41l.79.79l-3.59 3.59l-.79-.79a.996.996 0 0 0-1.41 0l-2 2a.996.996 0 0 0 0 1.41L7.59 15L2.3 20.29l1.41 1.41Z");
-        // One pin, two positions: an unpinned pin hovers up and to the right
-        // and drops into the page when it is stuck in. No crossed-out variant.
-        icon.append(pin);
+        const icon = pinIcon();
         return element("button", {
           type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`,
           "data-lex-control": "pin",
@@ -7842,9 +9810,37 @@ ${contents.path}`});
   // Editing is a per-cell action, not a table mode: double-click a value and
   // the column's own editor takes over that cell until it is committed or
   // dismissed. Tables that never declare an editor stay read-only.
+  // A double-click on an editable cell, counted by hand: when the first
+  // click selects the row and the list re-renders, the second click lands on
+  // a new cell and the browser sends no dblclick at all. Two clicks on the
+  // same row's same column within the double-click time are one.
+  let lastCellClick = null;
+  document.addEventListener("click", event => {
+    const cell = event.target.closest?.(".lex-column-list-cell");
+    if (!cell) { lastCellClick = null; return; }
+    const row = cell.closest("[data-key]");
+    const identity = row ? `${row.dataset.key}|${cell.dataset.columnKey}` : null;
+    const now = performance.now();
+    const again = lastCellClick && now - lastCellClick.at < 500;
+    // The same cell still on the page gets the browser's own double-click.
+    if (again && lastCellClick.cell !== cell && identity && lastCellClick.identity === identity) {
+      lastCellClick = null;
+      // This click may re-render the list too, so the editor opens after it,
+      // in whichever cell is there by then.
+      const rowKey = row.dataset.key, columnKey = cell.dataset.columnKey;
+      setTimeout(() => {
+        if (document.querySelector(".lex-cell-editing")) return;
+        const current = [...document.querySelectorAll(`[data-key="${CSS.escape(rowKey)}"] .lex-column-list-cell[data-column-key="${CSS.escape(columnKey)}"]`)]
+          .find(node => node.isConnected && node.lexBeginEdit);
+        current?.lexBeginEdit();
+      }, 0);
+      return;
+    }
+    lastCellClick = {identity, cell, at: now};
+  }, true);
   const beginCellEdit = (cell, column, row, refresh) => {
-    if (!column?.edit || cell.classList.contains("lex-cell-editing")) return;
-    if (shellIsReadonly()) return;
+    if (!column?.edit || cell.classList.contains("lex-cell-editing") || cell.classList.contains("lex-cell-fixed")) return;
+    if (shellIsReadonly()) { requestModForEdit?.(); return; }
     const content = cell.querySelector(".lex-column-cell-content");
     if (!content) return;
     const original = [...content.childNodes];
@@ -7860,7 +9856,10 @@ ${contents.path}`});
       ? column.editor(row, commit)
       : (() => {
         const current=column.editValue ? column.editValue(row) : (row?.[column.key] ?? "");
-        const input = column.choices ? element("select", {}, ...column.choices.map(value=>element("option",{value},value)))
+        const input = column.choices ? element("select", {}, ...column.choices.map(entry => {
+          const [value, label] = Array.isArray(entry) ? entry : [entry, entry];
+          return element("option", {value: String(value)}, String(label));
+        }))
           : element("input", {type:column.numeric?"number":"text",min:column.min,max:column.max,step:column.step,value:current});
         input.value=String(current);
         if(column.choices)input.addEventListener("change",()=>commit(input.value));
@@ -7970,10 +9969,18 @@ ${contents.path}`});
     const preferredColumns = options.columnPreferences?.active?.();
     // The generic enabled column is not a user-choosable column, so it is
     // added after saved preferences rather than being subject to them.
+    // A table with its own column preferences wires its own pins; the paged
+    // list then adds none, so no pin is ever dead.
+    if (options.columnPreferences && pagedPinOwner) pagedPinOwner.declined = true;
+    const pinOwner = options.columnPreferences ? null : pagedPinOwner;
+    const renameOwner = pagedRenameOwner;
+    const ownColumns = (pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
+      .filter(column => !(options.columns || []).some(own => own.key === column.pinnedProperty))] : options.columns || [])
+      .map(column => renameColumn(column, renameOwner));
     const columns = preferredColumns
       ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
-          withEnabledColumn(options.columns, options.rows, options.enabledChange),
+          withEnabledColumn(ownColumns, options.rows, options.enabledChange),
           options.rows || []);
     if (columns.some(column => isNumberedIdColumn(column, options.rows || []))) {
       setRecordIdWidth(options.rows, {floor: options.idFloor});
@@ -8007,8 +10014,11 @@ ${contents.path}`});
       for (const row of options.rows || []) {
         const value = Number(valueForSort(row, column));
         if (!Number.isFinite(value)) continue;
-        const [integer, fraction = ""] = String(Math.abs(value)).split(".");
-        integerDigits = Math.max(integerDigits, integer.length + (value < 0 ? 1 : 0));
+        // Count what the cell shows, sign and thousands separators included:
+        // counting bare digits left "-29,406" a character short, and its last
+        // digit was cut off (FF8 > World > Field Returns, Z).
+        const [integer, fraction = ""] = formatNumber(value).split(".");
+        integerDigits = Math.max(integerDigits, integer.length);
         fractionDigits = Math.max(fractionDigits, fraction.length);
       }
       return [column.key, {integerDigits, fractionDigits}];
@@ -8065,6 +10075,11 @@ ${contents.path}`});
       columns.find(column => ["name", "title", "item", "ability", "gf", "enemy", "shop", "weapon", "magic"]
         .includes(String(column.key).toLowerCase()))?.key ||
       columns.find(column => String(column.key).toLowerCase() !== "id")?.key || columns[0]?.key;
+    // Origin belongs to the record, so every table paints its pen without a
+    // game-specific name renderer. Keep existing source icons supplied by
+    // callers, and require the explicit boolean rather than a field's value.
+    const sourceColumn = columns.find(column => ["name", "title"].includes(String(column.key).toLowerCase()))?.key
+      || columns.find(column => !["enabled", "status"].includes(String(column.key).toLowerCase()))?.key;
     const header = element("div", {
       class: ["lex-column-list-header", options.headerClass || ""].filter(Boolean).join(" "),
       role: "row",
@@ -8106,6 +10121,7 @@ ${contents.path}`});
         onclick: event => {
           if (!sortable || event.target.closest(".lex-info-help,.lex-column-pin")) return;
           if (performance.now() < suppressSortUntil) return;
+          listResortedAt = performance.now();
           if (typeof options.sort === "function") options.sort(column.key);
           else localSort(column);
         },
@@ -8121,7 +10137,7 @@ ${contents.path}`});
         },
       }, content), column.key);
     }));
-    if (options.columnPreferences) {
+    if (options.columnPreferences || pinOwner?.move) {
       let drag = null;
       const clearTargets = () => header.querySelectorAll(".drag-target,.dragging")
         .forEach(node => node.classList.remove("drag-target", "dragging"));
@@ -8152,7 +10168,30 @@ ${contents.path}`});
           event.preventDefault();
           event.stopPropagation();
           suppressSortUntil = performance.now() + 250;
-          options.columnPreferences.move(drag.key, drag.target?.dataset.columnKey);
+          if (options.columnPreferences) options.columnPreferences.move(drag.key, drag.target?.dataset.columnKey);
+          else if (pinOwner?.move) {
+            const strip = key => String(key || "").startsWith("pin:") ? String(key).slice(4) : null;
+            const value = strip(drag.key);
+            if (value) {
+              let before = strip(drag.target?.dataset.columnKey);
+              if (before === null) {
+                // Dropped on a fixed column: the dragged pin goes to the
+                // near end of the pinned run, ahead of it when dropped left.
+                const headCells = [...header.querySelectorAll(".lex-column-list-head-cell")];
+                const firstPin = headCells.find(cell => String(cell.dataset.columnKey).startsWith("pin:"));
+                if (firstPin && headCells.indexOf(drag.target) < headCells.indexOf(drag.cell)) before = strip(firstPin.dataset.columnKey);
+              } else {
+                // Dropped on a pin it takes that slot: dragged rightward
+                // it lands after the target, dragged leftward before it.
+                // Always inserting before made a rightward drop a no-op.
+                const order = pinOwner.store?.pinned || [];
+                const from = order.findIndex(entry => entry.key === value);
+                const to = order.findIndex(entry => entry.key === before);
+                if (from >= 0 && to >= 0 && from < to) before = (order[to + 1] || {}).key ?? null;
+              }
+              pinOwner.move(value, before);
+            }
+          }
         }
         clearTargets();
         drag = null;
@@ -8188,14 +10227,16 @@ ${contents.path}`});
           : (!column.render && typeof rendered === "number"
             ? (column.numeric === true ? magnitudeValue(rendered, magnitudeMetrics.get(column.key) || {}) : numberValue(rendered))
             : rendered);
+        const ownClass = typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "";
         const cell = element("div", {
           class: ["lex-column-list-cell",
-            column.edit ? "lex-cell-editable" : "",
+            // A record that cannot be renamed keeps a plain name cell.
+            column.edit && !String(ownClass).split(" ").includes("lex-cell-fixed") ? "lex-cell-editable" : "",
             column.key === pointerColumn ? "lex-column-pointer-cell" : "",
             isNumbered ? "lex-numbered-id-cell" : "",
             column.numeric === true ? "lex-numeric-cell" : "",
             alignmentClass(column),
-            typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
+            ownClass].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
         // A bare string handed straight to the flex content span cannot be
@@ -8207,10 +10248,21 @@ ${contents.path}`});
           (typeof content === "string" || typeof content === "number")
             ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
             : content));
+        if (row?.created === true && column.key === sourceColumn &&
+            !cell.querySelector(".lex-record-source")) {
+          const value = cell.querySelector(".lex-column-cell-content");
+          value.replaceChildren(inlineLabel(recordSource({created:true}), ...value.childNodes));
+        }
+        // The double-click is caught once, at the document: a list whose
+        // click selects the row re-renders between the two clicks, so the
+        // cell the double-click lands on is a new one, not the first.
         if (column.edit) {
+          cell.lexBeginEdit = () => beginCellEdit(cell, column, row, options.refresh);
+          // A table that stays put between clicks gets the browser's own
+          // double-click; the counted one covers a table that re-rendered.
           cell.addEventListener("dblclick", event => {
             event.preventDefault();
-            beginCellEdit(cell, column, row, options.refresh);
+            if (!document.querySelector(".lex-cell-editing")) cell.lexBeginEdit();
           });
         }
         return cell;
@@ -8220,6 +10272,29 @@ ${contents.path}`});
     root.lexHeadingKey = JSON.stringify([template, options.class, header.textContent]);
     const cachedHeadingTemplate = columnHeadingWidths.get(root.lexHeadingKey);
     if (cachedHeadingTemplate) root.style.setProperty("--lex-column-list-template", cachedHeadingTemplate);
+    // An edit repaints its pinned cells in place. The rows array is shared
+    // with the plugin, so patched values show without rebuilding the table,
+    // which would steal focus from whatever is edited next.
+    const pinnedRefresh = new Map(columns
+      .filter(column => typeof column?.pinnedProperty === "string" && typeof column?.render === "function")
+      .map(column => [column.key, column]));
+    root.refreshValues = () => {
+      if (!pinnedRefresh.size) return;
+      const listKeyOf = options.key || ((row, index) => row.id ?? row.key ?? index);
+      const records = new Map((options.rows || []).map((row, index) => [String(listKeyOf(row, index)), row]));
+      for (const row of root.querySelectorAll(".lex-column-list-row[data-key]")) {
+        const record = records.get(row.dataset.key);
+        if (!record) continue;
+        for (const cell of row.querySelectorAll(':scope > .lex-column-list-cell[data-column-key^="pin:"]')) {
+          const column = pinnedRefresh.get(cell.dataset.columnKey);
+          const text = cell.querySelector(":scope > .lex-column-cell-content > .lex-column-cell-text");
+          if (!column || !text || cell.classList.contains("lex-cell-editing")) continue;
+          const shown = column.render(record);
+          text.textContent = shown;
+          text.title = String(shown);
+        }
+      }
+    };
     fitColumnHeadings(root);
     document.fonts?.ready.then(() => fitColumnHeadings(root));
     return root;
@@ -8338,15 +10413,42 @@ ${contents.path}`});
         : [`minmax(${minSizes[index]}px, ${value}fr)`]).join(" ");
     const minSizes = Array.from({length: nodes.length}, (_, index) =>
       Math.max(80, Number(options.minSizes?.[index]) || 240));
+    const configuredMinSizes=[...minSizes];
     if (!vertical) root.style.setProperty('--lex-panel-stack-min', `${Math.max(0, ...minSizes)}px`);
     let belowMinimum = false, measuredGap = 14;
     // Every side-by-side layout keeps its panes at their minimum widths, from
     // the first draw on, not only the ones that stack when room runs out: a
     // three-pane page at 1100px squeezed its detail to 350px of a 430px
     // minimum while its other panes kept more than theirs (Enemies > Loot).
+    // A pane holding a table is at least as wide as the table's own columns
+    // at their minimum, so a header is never cut off by its pane. The width
+    // is the table's real minimum, not its current width, so the pane can
+    // always shrink back to it; side-by-side barrels add up.
+    const tableMinimum = node => {
+      let widest = 0;
+      const grids = new Map();
+      for (const list of node.querySelectorAll(".lex-column-list")) {
+        if (list.closest(".lex-detail-panel") || !list.offsetParent) continue;
+        const grid = list.closest(".lex-barrel-grid") || list;
+        if (!grids.has(grid)) grids.set(grid, []);
+        grids.get(grid).push(list);
+      }
+      for (const [grid, lists] of grids) {
+        const chrome = node.getBoundingClientRect().width - grid.getBoundingClientRect().width;
+        let need = 0;
+        for (const list of lists) {
+          const before = list.style.width;
+          list.style.width = "min-content";
+          need += list.getBoundingClientRect().width;
+          list.style.width = before;
+        }
+        need += 7 * (lists.length - 1);
+        widest = Math.max(widest, Math.ceil(need + Math.max(0, chrome)));
+      }
+      return widest;
+    };
     const updateResponsive = () => {
       const extent = vertical ? root.clientHeight : root.clientWidth;
-      if (!extent) return 0;
       const css = getComputedStyle(root);
       const divider = root.querySelector(':scope > .lex-panel-layout-divider');
       const dividerSize = vertical ? divider?.offsetHeight : divider?.offsetWidth;
@@ -8354,6 +10456,22 @@ ${contents.path}`});
       else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(vertical ? css.rowGap : css.columnGap) || 0;
       const available = extent - (parseFloat(vertical ? css.paddingTop : css.paddingLeft) || 0)
         - (parseFloat(vertical ? css.paddingBottom : css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      if(!vertical&&root.isConnected){
+        // A table's columns and the configured minimum are hard floors. Room
+        // for a whole word in the label lane is only asked for from the space
+        // that is left: at 1280px a detail pane wanting 1020px for "Dependent"
+        // pushed the page into a sideways scroll (Bannerlord > Dependencies),
+        // where the label fit already shrinks a long name instead.
+        const hard=nodes.map((node,index)=>Math.max(configuredMinSizes[index],tableMinimum(node)));
+        const wanted=nodes.map((node,index)=>Math.max(0,readablePropertyWidth([node],9)-hard[index]));
+        const asked=wanted.reduce((sum,value)=>sum+value,0);
+        const spare=Math.max(0,(extent?available:Infinity)-hard.reduce((sum,value)=>sum+value,0));
+        // A layout that stacks below its minimum stacks instead of squeezing.
+        const granted=options.stackBelowMinimum||asked<=spare?1:spare/asked;
+        nodes.forEach((_node,index)=>minSizes[index]=Math.floor(hard[index]+wanted[index]*granted));
+        root.style.setProperty('--lex-panel-stack-min',`${Math.max(...minSizes)}px`);
+      }
+      if (!extent) return 0;
       const least = minSizes.reduce((sum, value) => sum + value, 0);
       root.classList.toggle('lex-panel-layout-overflow', available <
         (!vertical && options.stackBelowMinimum ? Math.max(...minSizes) : least));
@@ -8386,13 +10504,16 @@ ${contents.path}`});
           const fitted = fitResponsiveSizes(updateResponsive());
           if (fitted) {
             sizes = sizesWithMinimums(fitted);
-            root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
           }
+          root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
         };
         const observer = new ResizeObserver(refresh);
         observer.observe(root);
         root.__lexPanelLayoutObserver = observer;
-        requestAnimationFrame(refresh);
+        requestAnimationFrame(() => {
+          refresh();
+          document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refresh();});
+        });
       }
       return root;
     }
@@ -8411,7 +10532,7 @@ ${contents.path}`});
       if (options.dividerClass) divider.classList.add(options.dividerClass);
       divider.dataset.dividerIndex = String(index);
       const accessory = options.dividerAccessories?.[index];
-      if (accessory) divider.append(accessory);
+      [accessory].flat().filter(Boolean).forEach(node => divider.append(node));
       return divider;
     });
     const updateDividerState = () => dividers.forEach((divider, index) => {
@@ -8425,8 +10546,14 @@ ${contents.path}`});
     });
     const setSizes = (requested, persist = false) => {
       sizes = sizesWithMinimums(requested);
-      const fitted = fitResponsiveSizes(updateResponsive());
-      if (fitted) sizes = sizesWithMinimums(fitted);
+      // A drag moves the divider every frame; the table and label minima are
+      // remeasured once when it lands instead. Measuring them per frame forced
+      // a synchronous layout of every pane and made the divider lag behind.
+      // The drag-start minima still clamp the move itself, through resizePair.
+      if (!document.body.classList.contains("lex-panel-layout-dragging")) {
+        const fitted = fitResponsiveSizes(updateResponsive());
+        if (fitted) sizes = sizesWithMinimums(fitted);
+      }
       root.style.setProperty("--lex-panel-layout-template", template(sizes));
       updateDividerState();
       const detail = {sizes: [...sizes], split: sizes[0]};
@@ -8541,6 +10668,7 @@ ${contents.path}`});
     const refreshResponsive = () => {
       const fitted = fitResponsiveSizes(updateResponsive());
       if (fitted) setSizes(fitted);
+      else root.style.setProperty('--lex-panel-layout-template',template(sizes));
     };
     if (typeof ResizeObserver !== "undefined") {
       let pending = 0;
@@ -8561,6 +10689,7 @@ ${contents.path}`});
     requestAnimationFrame(() => {
       refreshResponsive();
       if (root.isConnected && nodes.length === 2) resizePair(0, 0);
+      document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refreshResponsive();});
     });
     return root;
   };
@@ -8668,12 +10797,15 @@ ${contents.path}`});
       const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
       const capacity = minimumRowHeight > 0 ? Math.max(1, Math.floor((available - 0.5) / minimumRowHeight)) : Infinity;
-      const pageSize = Math.min(fixedRows || Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
+      const pageSize = fixedRows || Math.min(Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
+      // An explicit row count squeezes rows to fit: paginated content never
+      // scrolls, so a high count shrinks rows instead of adding a scrollbar.
       const rowHeight = fixedRows ? available / pageSize : naturalRowHeight;
       if (!(rowHeight > 0)) return;
       if (fixedRows) fittedLists.forEach(node => {
         node.style.setProperty("--lex-fitted-row-height", `${rowHeight}px`);
         node.dataset.lexFixedRows = String(pageSize);
+        node.style.overflowY = "";
       });
       listNode.dataset.lexFittedPageSize = String(pageSize);
       const requestedVisibleRows = typeof options.visibleRows === "function"
@@ -8950,7 +11082,27 @@ ${contents.path}`});
     return node;
   };
 
+  // THE thing finder: FF8's hold-to-choose record picker, shared by every
+  // game. The button opens the shared Searcher: the prompt reads up top in
+  // the menu bar's place (which goes inert behind it), the magnifier goes
+  // back to the source record, and holding a candidate chooses it while a
+  // plain click only looks inside it. thingFinderField pairs the button
+  // with the linked value it changes: a hoverable plus this button is the
+  // standard linked-record control.
+  const thingFinderButton = (options = {}) => element("button", {
+    type: "button",
+    class: ["lex-thing-finder", options.content ? "lex-thing-finder-custom" : "", options.class || ""].filter(Boolean).join(" "),
+    title: options.title || options.label || "Choose a record",
+    "aria-label": options.label || options.title || "Choose a record",
+    disabled: options.disabled === true,
+    onclick: event => { event.preventDefault(); event.stopPropagation();
+      beginSearcher({type: options.type, prompt: options.prompt, target: options.target,
+        origin: options.origin, accept: options.accept, holdMs: options.holdMs}); },
+  }, options.content || selectionIcon());
+  const thingFinderField = (content, options = {}) => choiceField(content, thingFinderButton(options), options);
+
   const bottomSearchChangeTimers = new Map();
+  let typingSearch = null;
   const bottomSearch = options => {
     const key = String(options.key || options.label || "records");
     let composing = false;
@@ -8985,12 +11137,40 @@ ${contents.path}`});
         next.focus({preventScroll: true});
         if (Number.isInteger(start)) next.setSelectionRange(
           start, Number.isInteger(end) ? end : start, direction || "none");
+        typingSearch = {key, control: next, start, end, direction};
       };
       const delay = Math.max(0, Number(options.delay) || 0);
       if (delay) bottomSearchChangeTimers.set(key, setTimeout(apply, delay));
       else apply();
     };
+    // A page may rebuild its search box again later than the keystroke - DS1
+    // loads the newly selected record and renders once more - and the restore
+    // above only covers a rebuild inside the keystroke. So the box being typed
+    // in is remembered, and a box built under the same key while that one
+    // has left the page (taking focus with it, to <body>) takes over.
+    const remember = () => { typingSearch = {key, control, start: control.selectionStart,
+      end: control.selectionEnd, direction: control.selectionDirection}; };
+    // The caret is read before the keystroke's own rebuild: read after it, the
+    // box had left the page and reported 0, and the next rebuild put the
+    // caret at the front ("travelling" came out "ingtravell").
+    for (const type of ["input", "keyup", "focus", "select"]) control.addEventListener(type, () => {
+      if (control.isConnected) remember();
+    });
     control.addEventListener("input", change);
+    control.addEventListener("blur", () => {
+      // A blur while still on the page is the reader leaving the box.
+      setTimeout(() => { if (typingSearch?.control === control && control.isConnected) typingSearch = null; }, 0);
+    });
+    queueMicrotask(() => {
+      const last = typingSearch;
+      if (!last || last.key !== key || last.control === control || last.control.isConnected || !control.isConnected) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) return;
+      control.focus({preventScroll: true});
+      if (Number.isInteger(last.start)) control.setSelectionRange(last.start,
+        Number.isInteger(last.end) ? last.end : last.start, last.direction || "none");
+      remember();
+    });
     control.addEventListener("compositionstart", () => {
       composing = true;
       clearTimeout(bottomSearchChangeTimers.get(key));
@@ -9083,9 +11263,9 @@ ${contents.path}`});
       options.search ? bottomSearch(options.search) : null);
     let rowControl = null;
     if (options.rowControl) {
-      // The most rows that fit this panel at a readable height. Asking for
-      // more used to be saved and then silently capped, so Enter looked dead.
-      const rowMax = Math.max(5, Math.min(80, Number(options.rowControl.max) || 80));
+      // Rows per page runs 5 to 80. The fit used to cap it to what the
+      // panel holds at a readable height, so a reader who set 40 got 27.
+      const rowMax = 80;
       const commitRows = input => {
         // A box replaced by the render its own Enter caused still blurs; that
         // second commit re-rendered the table again for nothing.
@@ -9094,7 +11274,7 @@ ${contents.path}`});
         const requested = Number.parseInt(input.value, 10);
         if (Number.isFinite(requested) && requested > rowMax) {
           input.value = rowMax;
-          showToast(`Only ${rowMax} rows fit this panel at a readable height.`);
+          showToast(`At most ${rowMax} rows on a page.`);
         }
         options.rowControl.change?.(input.value);
       };
@@ -9131,11 +11311,34 @@ ${contents.path}`});
       element("span", {class: "lex-page-summary", text: first === last
         ? `${formatNumber(first)}/${formatNumber(total)}`
         : `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
+    if (options.compact === true) {
+      // Narrow panels (the maps directory): the search box takes its own
+      // row up top, the X-Y/Z position count is dropped, and everything
+      // left shares one bottom row - pager controls, filters and the
+      // remaining counts - instead of stacking.
+      const bottom = element("div", {class: "lex-compact-pager-bottom"},
+        ...createControls,
+        pages === 1 ? null : controls,
+        ...filters.filter(control => !createControls.includes(control)),
+        rowControl);
+      return element("div", {
+        class: `lex-pager lex-pager-inline lex-compact-pager${pages === 1 ? " single-page" : ""}`,
+        "aria-label": "Search and pagination",
+      },
+        options.search ? element("div", {class: "lex-compact-pager-search"},
+          bottomSearch(options.search)) : null,
+        bottom);
+    }
     return element("div", {
-      class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,
+      class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}${options.stacked === true ? " lex-pager-stacked" : ""}`,
       "aria-label": "Search and pagination",
     }, left, pages === 1 ? null : controls, right);
   };
+
+  // The compact pagination bar: pager's narrow-panel variant, with the
+  // search box on its own row and one shared bottom row. Same options
+  // as pager (page, pages, total, pageSize, search, filters, change).
+  const compactPager = options => pager({...options, compact: true});
 
   // Editing chrome that stays live in a read-only project: none of it changes
   // record data. The in-place rename input and the help-bubble editor only
@@ -9146,22 +11349,63 @@ ${contents.path}`});
     ".lex-dialog-backdrop", ".lex-modal", ".lex-global-settings", ".lex-project-control",
     ".lex-shortcut-panel", ".lex-github-workspace", ".lex-toast-stack", ".lex-data-map",
     ".lex-label-rename", ".lex-help-edit",
+    // View filters narrow a list; they edit no record.
+    "[data-lex-view-filter]",
+    // Switching, configuring and downloading mods manages the mod library,
+    // which exists whether or not a mod is open for editing.
+    ".lex-mods-page", ".lex-first-run", ".lex-tweak-panel",
     "header", "nav"].join(",");
+  // A control whose value a click changes, as opposed to one a click only
+  // focuses. A number box changes on a click only on its spin arrows.
+  const changesOnPointer = (target, event) => {
+    // Only the value box is reaching for the value. The property's name and
+    // the rest of its row are for reading it, and in Developer Mode for
+    // dragging it; a click there edits nothing, so it asks nothing. A
+    // disabled control takes no pointer events, so a click on it lands on its
+    // box. A switch row is one control from end to end.
+    const own = target?.closest?.("input,select,textarea");
+    const field = own || target?.closest?.(".lex-detail-field-control,.lex-toggle")
+      ?.querySelector("input,select,textarea");
+    if (!field || field.matches(".lex-readonly-field,[type='search']")) return false;
+    // A locked value cannot be typed into, so the click is the only way to
+    // reach for it - except a text area's resize grip, which only reads.
+    if (field.disabled || field.readOnly) {
+      if (!field.matches("textarea") || !event || own !== field) return true;
+      const box = field.getBoundingClientRect();
+      return !(event.clientX > box.right - 18 && event.clientY > box.bottom - 18);
+    }
+    // A switch, a list or a number's spin arrows change on the click itself;
+    // clicking into a live text or number box only focuses it.
+    if (field.matches("select,[type='checkbox'],[type='radio'],[type='range'],[type='color'],[type='file']")) return true;
+    if (!field.matches("[type='number']") || !event || own !== field) return false;
+    const box = field.getBoundingClientRect();
+    return event.clientX > box.right - 20;
+  };
+  // A key that would change a text value: a character, deleting, or a
+  // cut or paste shortcut. Moving the caret, selecting and copying read.
+  const typesIntoValue = event => {
+    if (event.ctrlKey || event.metaKey) return ["v", "x", "z", "y"].includes(String(event.key).toLowerCase());
+    return event.key.length === 1 || ["Backspace", "Delete", "Enter"].includes(event.key);
+  };
   const readonlyProject = () =>
     document.documentElement.getAttribute("data-lex-project-readonly") === "true";
-  const refusesEdit = target => {
+  const refusesEdit = (target, event) => {
     if (!readonlyProject()) return false;
     if (!(target instanceof HTMLElement)) return false;
     const control = target.closest("input,select,textarea,[contenteditable='true']");
     if (!control) return false;
     if (control.matches("[type='search'],[type='button'],[type='submit'],[type='reset']")) return false;
-    return !control.closest(READONLY_EXEMPT);
+    if (control.closest(READONLY_EXEMPT)) return false;
+    // Clicking only focuses a text box: the caret, selection and resize grip
+    // stay usable, and beforeinput refuses the typing itself.
+    if (event?.type === "mousedown" || event?.type === "click") return changesOnPointer(target, event);
+    return true;
   };
   // A locked project refuses every record edit, not only the ones a plugin
   // remembered to disable. Capture phase, so it survives every re-render.
   for (const kind of ["beforeinput", "paste", "drop", "keydown", "mousedown", "click", "change"]) {
     document.addEventListener(kind, event => {
-      if (!refusesEdit(event.target)) return;
+      if (!refusesEdit(event.target, event)) return;
       // Reading a locked project still means moving through it, so navigation
       // keys and copying are left alone.
       if (kind === "keydown" && (event.ctrlKey || event.metaKey || event.key.length > 1)) return;
@@ -9182,6 +11426,27 @@ ${contents.path}`});
       if (local !== null) return boundedBarrelCount(local, maximum);
     } catch (_error) {}
     return boundedBarrelCount(fallback, maximum);
+  };
+  // How many columns a page's details use: 1-6, or none saved for "fit".
+  const detailColumnsKey = options => `columns:${String(
+    options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
+  const readDetailColumns = key => {
+    const managed = sharedSettingsSnapshot?.viewPreferences?.[key];
+    let value = managed;
+    if (value === undefined) {
+      try { value = localStorage.getItem(`lexeditor:${key}`); } catch (_error) {}
+    }
+    const count = Number.parseInt(value, 10);
+    return count >= 1 && count <= 6 ? count : 0;
+  };
+  const saveDetailColumns = (key, value) => {
+    if (!value) {
+      try { localStorage.removeItem(`lexeditor:${key}`); } catch (_error) {}
+      if (sharedSettingsSnapshot?.viewPreferences) delete sharedSettingsSnapshot.viewPreferences[key];
+      if (window.pywebview?.api) callWindow("clear_lexeditor_view_preference", key).then(rememberSharedSettings).catch(() => {});
+      return;
+    }
+    saveBarrelCount(key, value, 6);
   };
   const saveBarrelCount = (key, value, maximum = 6) => {
     const count = boundedBarrelCount(value, maximum);
@@ -9233,7 +11498,6 @@ ${contents.path}`});
         .then(rememberSharedSettings).catch(() => {});
     }
   };
-  const tableCapacityCache = new Map();
   const tableFitCapacityCache = new Map();
   // The table whose row count the reader just typed, so a fit that caps it
   // says why instead of quietly showing fewer rows than asked for.
@@ -9314,6 +11578,7 @@ ${contents.path}`});
       else target[key]=clone(b);
     }
   };
+  let listResortedAt = -Infinity;
   const pagedListDetail = options => {
     const slotBased = options.slots !== false;
     if (options.slots === undefined && sharedSettingsSnapshot?.developerMode) {
@@ -9340,7 +11605,25 @@ ${contents.path}`});
     // A column sort belongs to the list, not to the page: a table that holds
     // one page asked for this order, so apply it before the page is cut.
     const rowPreferenceKey = tableRowPreferenceKey(options);
-    const keptSort = pagedSortStates.get(rowPreferenceKey);
+    let keptSort = pagedSortStates.get(rowPreferenceKey);
+    // Every record list sorts by name, A to Z, until the reader picks
+    // a column: the shipped default. A click still wins for that table,
+    // and a page whose order is data (load order, time order, fixed
+    // slots) passes order "given" to keep it. Stored like a click, so
+    // the first click on Name flips to Z to A instead of re-sorting
+    // to the order already shown.
+    // Nameless rows have nothing to sort by: stamping the default
+    // anyway would be a no-op today that silently starts sorting the
+    // day a name field appears. Those tables keep their given order.
+    const hasNames = records.some(record => {
+      const name = sortValueOf(record, "name");
+      return name !== undefined && name !== null && name !== "" && name !== "\u2014";
+    });
+    if (!keptSort && options.order !== "given" && hasNames) {
+      keptSort = {key: "name", dir: 1,
+        compare: (left, right) => compareRecords(left, right, {key: "name"})};
+      pagedSortStates.set(rowPreferenceKey, keptSort);
+    }
     if (keptSort && typeof keptSort.compare === "function") {
       records = [...records].sort((left, right) => keptSort.compare(left, right) * keptSort.dir);
     }
@@ -9357,13 +11640,10 @@ ${contents.path}`});
     const globalPageSize = boundedTableRows(sharedSettingsSnapshot?.tableRowsPerPage || fitCapacity?.requested || options.pageSize || 15);
     const hasRowOverride = hasTableRowsOverride(rowPreferenceKey);
     const requestedPageSize = readTableRows(rowPreferenceKey, globalPageSize);
-    const pageSize = Math.min(requestedPageSize, fitCapacity?.capacity || requestedPageSize);
-    const queryActive = Boolean(String(options.search?.value || "").trim());
-    if (!queryActive) tableCapacityCache.set(rowPreferenceKey, records.length);
-    const stableRecordCount = queryActive
-      ? (tableCapacityCache.get(rowPreferenceKey) ?? pageSize)
-      : records.length;
-    const rowCapacity = Math.max(1, Math.min(pageSize, stableRecordCount || pageSize));
+    const pageSize = requestedPageSize;
+    // The page always declares a full page of tracks: sizing the tracks to a
+    // short table's own row count stretched its rows to fill the panel.
+    const rowCapacity = Math.max(1, pageSize);
     const maximumBarrels = boundedBarrelCount(options.maxBarrels || 6, 6);
     const preferenceKey = barrelPreferenceKey(options);
     const oldPages = Math.max(1, Math.ceil(records.length / pageSize));
@@ -9383,7 +11663,14 @@ ${contents.path}`});
     // A null page is a link asking for its record, not a page choice: several
     // lists can share one key (FF8's World subtabs), and a link from one to
     // another must still reveal its record.
-    const pagedDeliberately = options.page !== null && options.page !== undefined &&
+    // A new sort starts at the top (Lexer: sorting "didn't sort", because the
+    // list stayed on the page that held the selected record, mid-order). The
+    // header click is read by the list it re-renders, even one that fetches
+    // first, and by no other.
+    const resorted = performance.now() - listResortedAt < 2000;
+    listResortedAt = -Infinity;
+    if (resorted) page = 0;
+    const pagedDeliberately = resorted || options.page !== null && options.page !== undefined &&
       lastRenderedPage.get(rowPreferenceKey) !== undefined &&
       lastRenderedPage.get(rowPreferenceKey) !== page;
     lastRenderedPage.set(rowPreferenceKey, page);
@@ -9427,18 +11714,54 @@ ${contents.path}`});
 
     // Synchronize clamped pages and selection fallback without causing a
     // second render. Interactive changes go through the one change callback.
-    options.sync?.({page, pageSize, selected});
     const selectionKey=options.splitKey || rowPreferenceKey;
     const selection=tableSelections.get(selectionKey)||{keys:new Set([selected]),anchor:selected};
     selection.keys=new Set([...selection.keys].filter(key=>records.some(row=>keyOf(row)===key)));
     if(!selection.keys.size)selection.keys.add(selected);
     tableSelections.set(selectionKey,selection);
+    options.sync?.({page, pageSize, selected, selection: [...selection.keys]});
+    const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),
+      describe:options.describePinnedCell||null,commitCell:options.commitPinnedCell||null,
+      move:(value,before)=>{
+      const pinned=pinOwner.store.pinned,moving=pinned.find(entry=>entry.key===value);
+      if(!moving||value===before)return;
+      const rest=pinned.filter(entry=>entry.key!==value);
+      const index=rest.findIndex(entry=>entry.key===before);
+      if(index<0)rest.push(moving);else rest.splice(index,0,moving);
+      pinOwner.store.pinned=rest;
+      try{localStorage.setItem(pinOwner.store.key,JSON.stringify(rest));}catch(_error){}
+      change("pins",{});
+    },toggle:(key,label,icon)=>{
+      const store=pinOwner.store;
+      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label,icon:icon||""}];
+      try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
+      change("pins",{});
+    }};
+    const renameOwner=typeof options.rename==="function"
+      ?{rename:options.rename,renamable:row=>typeof options.renamable==="function"?options.renamable(row)!==false:true}:null;
     const makeDetail=record=>{
       const node=options.detail(record);
+      // The heading's name renames the record too, by double-click.
+      const heading=renameOwner&&renameOwner.renamable(record)?node.querySelector?.(".lex-detail-panel-name"):null;
+      if(heading){
+        heading.title="Double-click to rename";
+        heading.addEventListener("dblclick",event=>{
+          event.preventDefault();event.stopPropagation();
+          if(shellIsReadonly()){requestModForEdit?.();return;}
+          renameValue(heading,{value:String(record.name??heading.textContent),label:"this record",
+            commit:name=>renameOwner.rename(record,name)});
+        });
+      }
+      if(typeof options.change==="function"&&!pinOwner.declined)autoPinDetail(node,pinOwner);
       const chosen=records.filter(row=>selection.keys.has(keyOf(row)));
       if(chosen.length>1){
         const banner=element('div',{class:'lex-multi-edit-notice'},`${chosen.length} records selected. Edits apply to all selected records. Values shown are from ${record.name||keyOf(record)}; other records may differ.`);
-        node.prepend(banner);
+        // The notice heads the panel's body. Prepended to the panel itself it
+        // took the heading's grid row, the heading took the body's, and the
+        // body was left with no height: a giant name over an empty pane
+        // (Lexer: multi-select "literally doesn't work").
+        const body=node.querySelector?.(":scope > .lex-tweaks-paged, :scope > .lex-detail-panel-body");
+        if(body)body.prepend(banner);else node.prepend(banner);
         let editBefore;
         const beginEdit=event=>{
           if(!event.target.matches('input,select,textarea'))return;
@@ -9482,7 +11805,7 @@ ${contents.path}`});
       }else {selection.keys=new Set([nextSelected]);selection.anchor=nextSelected;}
       selected = selection.keys.has(nextSelected)?nextSelected:[...selection.keys].at(-1);
       record=records.find(row=>keyOf(row)===selected)||record;
-      options.sync?.({page, pageSize, selected, reason:"select"});
+      options.sync?.({page, pageSize, selected, selection: [...selection.keys], reason:"select"});
       for (const node of masterNodes) {
         node.querySelectorAll(".lex-list-row[data-key]").forEach(row => {
           const active = [...selection.keys].some(key=>String(key)===String(row.dataset.key));
@@ -9516,52 +11839,63 @@ ${contents.path}`});
     // While the master builds its tables, tell them that this list owns the
     // order: a click on one of their headers re-sorts the list, then the list
     // re-renders through the plugin's own change callback.
-    const outerSortOwner = pagedSortOwner;
-    pagedSortOwner = typeof options.change === "function" ? {
-      state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
-      sort: (column, direction, compare) => {
-        pagedSortStates.set(rowPreferenceKey, {key: column.key, dir: direction, compare});
-        change("sort", {});
-      },
-    } : null;
-    try {
-      masterNodes = barrelRows.map((rows, index) => {
-        const node = typeof options.master === "function"
-          ? options.master({rows, selected, select, barrel: index, barrels})
-          : list({...options.list, rows, key: keyOf, selected, select});
-        node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
-          const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
-          row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
-          if(modOnly){
-            const record=rows.find(record=>String(keyOf(record))===row.dataset.key);
-            row.dataset.lexRecordProvenance='';
-            row.refreshRecordProvenance=()=>row.classList.toggle('lex-record-modified',
-              record!==undefined&&modOnly.available!==false&&Boolean(modOnly.changed(record)));
-            row.refreshRecordProvenance();
-          }
+    const buildMasters = () => {
+      const outerSortOwner = pagedSortOwner, outerPinOwner = pagedPinOwner, outerRenameOwner = pagedRenameOwner;
+      pagedPinOwner = typeof options.change === "function" ? pinOwner : null;
+      pagedRenameOwner = renameOwner;
+      pagedSortOwner = typeof options.change === "function" ? {
+        state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
+        sort: (column, direction, compare) => {
+          pagedSortStates.set(rowPreferenceKey, {key: column.key, dir: direction, compare});
+          change("sort", {});
+        },
+      } : null;
+      try {
+        return barrelRows.map((rows, index) => {
+          const node = typeof options.master === "function"
+            ? options.master({rows, selected, select, barrel: index, barrels})
+            : list({...options.list, rows, key: keyOf, selected, select});
+          node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
+            const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
+            row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+            if(modOnly){
+              const record=rows.find(record=>String(keyOf(record))===row.dataset.key);
+              row.dataset.lexRecordProvenance='';
+              row.refreshRecordProvenance=()=>row.classList.toggle('lex-record-modified',
+                record!==undefined&&modOnly.available!==false&&Boolean(modOnly.changed(record)));
+              row.refreshRecordProvenance();
+            }
+          });
+          node.setAttribute('aria-multiselectable','true');
+          fitBarrelTableColumns(node);
+          // Filler rows exist to square off a growable list. A slot table shows
+          // one row per real slot, so a short last page simply ends.
+          // Pad to the track count this table actually declares. Padding to the
+          // page size instead put forty rows into a ten-track grid whenever a
+          // table held less than one page: the ten declared tracks collapsed to
+          // zero and every real record painted on top of the others in one band.
+          if (!slotBased) padBarrelTable(node, rowCapacity);
+          node.classList.add("lex-page-sized-table");
+          // The track count never drops below the page's row target: a short
+          // page keeps fitted-height rows with empty tracks below it instead
+          // of stretching its rows to fill the panel. It never drops below
+          // the rows really there either, so padding and capacity cannot
+          // disagree and paint records on top of each other again.
+          node.style.setProperty("--lex-page-row-count",
+            String(Math.max(rowCapacity, node.querySelectorAll(":scope > .lex-column-list-row").length)));
+          node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
+          node.dataset.lexBarrel = String(index + 1);
+          if (index) node.classList.add("lex-fitted-page");
+          return node;
         });
-        node.setAttribute('aria-multiselectable','true');
-        fitBarrelTableColumns(node);
-        // Filler rows exist to square off a growable list. A slot table shows
-        // one row per real slot, so a short last page simply ends.
-        // Pad to the track count this table actually declares. Padding to the
-        // page size instead put forty rows into a ten-track grid whenever a
-        // table held less than one page: the ten declared tracks collapsed to
-        // zero and every real record painted on top of the others in one band.
-        if (!slotBased) padBarrelTable(node, rowCapacity);
-        node.classList.add("lex-page-sized-table");
-        // The track count is read back from the rows that are really there, so
-        // a padding rule and a capacity rule can never disagree again.
-        node.style.setProperty("--lex-page-row-count",
-          String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
-        node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
-        node.dataset.lexBarrel = String(index + 1);
-        if (index) node.classList.add("lex-fitted-page");
-        return node;
-      });
-    } finally {
-      pagedSortOwner = outerSortOwner;
-    }
+      } finally {
+        pagedSortOwner = outerSortOwner;
+        pagedPinOwner = outerPinOwner;
+        pagedRenameOwner = outerRenameOwner;
+        if (pinOwner.declined) detailNode?.querySelectorAll?.("[data-lex-auto-pin]").forEach(node => node.remove());
+      }
+    };
+    masterNodes = buildMasters();
     // The floor belongs to THIS table's record set. Leaving it set made an
     // unrelated table rendered afterwards inherit the padding.
     recordIdFloor = 1;
@@ -9587,6 +11921,60 @@ ${contents.path}`});
     }, element("span", {class: "lex-barrel-label"}, "BARRELS"),
     element("span", {class: "lex-barrel-buttons"}, decrease,
       element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(barrels)), increase));
+    // COLUMNS mirrors BARRELS on the other side of the same divider: how many
+    // columns the selected record's details flow into. Right-click: fit again.
+    // Each panel tab keeps its own column count: the key extends with the
+    // active tabs in the detail, outer to inner, so one item section and the
+    // next (or the GF's HP tab and its XP tab) can differ. Counts persist
+    // through the same saved preferences as before, one entry per tab.
+    const columnsBaseKey = detailColumnsKey(options);
+    const columnsKeyNow = () => {
+      const path = [...(detailNode?.querySelectorAll?.(".lex-subtab-bar") || [])]
+        .map(bar => bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab?.replace(/[^A-Za-z0-9_-]/g, "_"))
+        .filter(Boolean);
+      return path.length ? `${columnsBaseKey}:${path.join(":")}` : columnsBaseKey;
+    };
+    let columnsKey = columnsKeyNow();
+    let chosenColumns = readDetailColumns(columnsKey);
+    const shownColumns = () => {
+      const columns = [...(detailNode?.querySelectorAll?.(".lex-tweaks-paged .lex-tweak-column") || [])]
+        .filter(column => column.offsetParent && column.childElementCount);
+      return chosenColumns || Math.max(1, columns.length);
+    };
+    const columnTally = element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(chosenColumns || ""));
+    const fewerColumns = element("button", {
+      class: "lex-barrel-decrease", type: "button", title: "One fewer column of details",
+      "aria-label": "Decrease detail columns", onclick: () => changeColumns(shownColumns() - 1),
+    });
+    const moreColumns = element("button", {
+      class: "lex-barrel-increase", type: "button", title: "One more column of details",
+      "aria-label": "Increase detail columns", onclick: () => changeColumns(shownColumns() + 1),
+    });
+    const showColumnCount = () => {
+      columnsKey = columnsKeyNow();
+      chosenColumns = readDetailColumns(columnsKey);
+      const count = shownColumns();
+      columnTally.textContent = String(count);
+      columnTally.title = chosenColumns ? "Your column count. Right-click to fit to width again." : "Fitted to width";
+      fewerColumns.disabled = count <= 1;
+      moreColumns.disabled = count >= 6;
+    };
+    const changeColumns = requested => {
+      columnsKey = columnsKeyNow();
+      chosenColumns = Math.max(0, Math.min(6, Number(requested) || 0));
+      saveDetailColumns(columnsKey, chosenColumns);
+      if (chosenColumns) root.dataset.lexDetailColumns = String(chosenColumns);
+      else delete root.dataset.lexDetailColumns;
+      detailNode?.querySelectorAll?.(".lex-tweaks-paged").forEach(paged => paged.lexFitPage?.());
+      requestAnimationFrame(showColumnCount);
+    };
+    const columnControl = element("div", {
+      class: "lex-barrel-control lex-detail-column-control",
+      title: "Columns of details",
+      onmouseenter: showColumnCount,
+      oncontextmenu: event => { event.preventDefault(); event.stopPropagation(); changeColumns(0); },
+    }, element("span", {class: "lex-barrel-label"}, "COLUMNS"),
+    element("span", {class: "lex-barrel-buttons"}, fewerColumns, columnTally, moreColumns));
     const barrelGrid = element("div", {
       class: "lex-barrel-grid", style: `--lex-barrels:${masterNodes.length}`,
     }, ...masterNodes);
@@ -9601,7 +11989,7 @@ ${contents.path}`});
         minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
         storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
         dividerClass: "lex-list-detail-divider",
-        dividerAccessories: [null, barrelControl],
+        dividerAccessories: [null, [barrelControl, columnControl]],
         dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
         eventName: "lex-list-detail-resize",
       }) : trailingNode ? panelLayout([masterNode, detailNode, trailingNode],
@@ -9610,7 +11998,7 @@ ${contents.path}`});
         minSizes:[barrelPanelMinimum, Math.max(240, Number(options.minRight) || 300), Math.max(240, Number(options.minTrailing) || 360)],
         storageKey:options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",
         dividerClass:"lex-list-detail-divider",
-        dividerAccessories:[barrelControl,null],
+        dividerAccessories:[[barrelControl, columnControl],null],
         dividerLabels:["Resize list and detail panels","Resize detail and related records"],
         eventName:"lex-list-detail-resize",
       }) : listDetail(masterNode, detailNode, options.className || "", {
@@ -9618,15 +12006,33 @@ ${contents.path}`});
       defaultSplit: options.defaultSplit,
       minLeft: barrelPanelMinimum,
       minRight: options.minRight,
-      minimumSplit: Math.min(78, 22 * barrels),
-      dividerAccessories: [barrelControl],
+      // No fraction floor: barrels stand on the pixel minimum plus the
+      // tables' measured widths. A share of the window only stopped the
+      // panel shrinking on wide screens.
+      dividerAccessories: [[barrelControl, columnControl]],
       paneClass: options.paneClass,
     });
     root.classList.add("lex-paged-list-detail");
+    if (chosenColumns) root.dataset.lexDetailColumns = String(chosenColumns);
+    // The count is current when the control appears, not only once touched.
+    columnControl.closest(".lex-panel-layout-divider")?.addEventListener("mouseenter", showColumnCount);
     root.addEventListener("lex-column-sorted", event => {
       const index = masterNodes.indexOf(event.detail.previous);
       if (index >= 0) masterNodes[index] = event.target;
     });
+    // A pin changes columns, not records: rebuild the master barrels in
+    // place instead of the whole page, leaving the detail pane, its focus
+    // and scroll, and its giant dropdowns, alone.
+    root.refreshMaster = () => {
+      const scrollers = [masterNode, barrelGrid, ...masterNodes];
+      const scroll = scrollers.map(node => [node.scrollTop, node.scrollLeft]);
+      masterNodes = buildMasters();
+      barrelGrid.replaceChildren(...masterNodes);
+      [masterNode, barrelGrid, ...masterNodes].forEach((node, index) => {
+        if (node && scroll[index]) { node.scrollTop = scroll[index][0]; node.scrollLeft = scroll[index][1]; }
+      });
+    };
+    root.refreshValues = () => { for (const node of masterNodes) node.refreshValues?.(); };
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];
@@ -9696,7 +12102,7 @@ ${contents.path}`});
       event.preventDefault();
       showToast(addWhy);
     }, {capture: true});
-    masterNode.append(tableAdd);
+    hoverActions(masterNode, {label: "Table actions", align: "bottom-right", actions: [{node: tableAdd}]});
     if (emptyRow) {
       const toggle = element("input", {
         type: "checkbox", checked: hideEmpty, "aria-label": "Hide empty slots",
@@ -9727,7 +12133,7 @@ ${contents.path}`});
       };
       const rowControl = sharedSettingsSnapshot?.developerMode ? {
         value: pageSize,
-        max: fitCapacity?.capacity || null,
+        max: 80,
         defaultValue: globalPageSize,
         overridden: hasRowOverride,
         change: setPageSize,
@@ -9831,7 +12237,9 @@ ${contents.path}`});
         lists: masterNodes,
         available: root,
         pageSize,
-        fixedRows: fitMinimum ? Math.min(requestedPageSize, Math.max(1, records.length)) :
+        // A short table still declares a full page of fixed rows: capping the
+        // count at its own records stretched its rows to fill the panel.
+        fixedRows: fitMinimum ? requestedPageSize :
           searchActive ? pageSize : (pages === 1 ? Math.max(1, ...barrelRows.map(rows => rows.length)) : pageSize),
         minRowHeight: fitMinimum,
         visibleRows: () => searchActive ? pageSize : Math.max(1, ...barrelRows.map(rows => rows.length)),
@@ -9856,8 +12264,6 @@ ${contents.path}`});
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
-          if (typedRowsKey === rowPreferenceKey && nextSize < requestedPageSize)
-            showToast(`Only ${nextSize} rows fit this panel at a readable height.`);
           typedRowsKey = null;
           const selectedIndex = records.findIndex(record => keyOf(record) === selected);
           const anchor = selectedIndex >= 0 ? selectedIndex : groupStart;
@@ -9961,6 +12367,7 @@ ${contents.path}`});
         type: "button",
         class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),
         "data-reference-index": String(source.referenceIndex),
+        disabled: !!options.readOnly,
         title: `Use ${source.name}: ${exact}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
@@ -9972,6 +12379,20 @@ ${contents.path}`});
   // Games supply values and the apply callback; the shared framework owns the
   // source labels, comparison, compact layout, and restore interaction.
   const provenanceControl = options => {
+    // A value with a unit shows its references with that unit too ("V 16%"),
+    // whichever plugin built it: the unit comes from the unitField.
+    const unitHost = options.control instanceof Element
+      ? (options.control.matches("[data-lex-unit]") ? options.control : options.control.querySelector("[data-lex-unit]")) : null;
+    const unit = unitHost?.dataset.lexUnit || "";
+    if (unit && !options.format) {
+      const tight = /^[%×°'"]$/.test(unit);
+      options = {...options, format: value => {
+        if (typeof value !== "number") return typeof value === "boolean" ? booleanMark(value) : compactReferenceText(value ?? "");
+        const number = compactReferenceNumber(value);
+        if (unitHost.dataset.lexUnitPosition === "prefix") return `${unit}${number}`;
+        return tight ? `${number}${unit}` : `${number} ${unit}`;
+      }};
+    }
     const sources = [
       {name: options.vanillaName || "Vanilla", shortName: options.vanillaShortName || "V", value: options.vanilla},
       ...(options.references || []),
@@ -9989,6 +12410,8 @@ ${contents.path}`});
     const root = element("div", {
       class: ["lex-source-control", internal ? "lex-source-control-internal" : "", stacked ? "lex-source-control-stacked" : ""].filter(Boolean).join(" "),
     }, options.control);
+    const readOnly = () => (typeof options.readOnly === "function" ? options.readOnly() : options.readOnly === true)
+      || !!options.control?.matches?.(":disabled,[readonly]");
     // A number sharing its box with a reference gets its own up and down at
     // the box's right edge. The browser's arrows sit at the end of the text,
     // so the space kept for the reference showed as an empty band to the
@@ -10069,16 +12492,27 @@ ${contents.path}`});
       }
       const vanillaEntry = root.querySelector('.lex-reference-values .lex-reference-value[data-reference-index="0"]');
       if (vanillaEntry instanceof HTMLElement) { vanillaEntry.click(); return true; }
-      options.apply?.(options.vanilla, event, sources[0]);
+      if (!readOnly()) options.apply?.(options.vanilla, event, sources[0]);
       refresh();
       return true;
     };
+    let lastReferenceState;
     const refresh = () => {
-      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !(options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b)))(currentValue(),options.vanilla));
+      const value = currentValue(), locked = readOnly();
+      const same = options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b));
+      const referenceState = JSON.stringify([value, locked, sources,
+        sources.map(source => [painted(source), same(value, source.value)])]);
+      // Shell refreshes visit every control. Preserve unchanged strips so one
+      // edit does not replace hundreds of nodes and invalidate their layout.
+      if (referenceState === lastReferenceState && root.querySelector(
+          ":scope > :is(.lex-reference-values,.lex-reference-placeholder)")) return;
+      lastReferenceState = referenceState;
+      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !same(value,options.vanilla));
       root.querySelector(":scope > :is(.lex-reference-values,.lex-reference-placeholder)")?.remove();
       const reference = referenceDisplay({
-        current: currentValue(), sources, format: options.format, same: options.same,
+        current: value, sources, format: options.format, same: options.same, readOnly: locked,
         apply: (value, event, source) => {
+          if (readOnly()) return;
           const selector = "main,.lex-shell-main,.lex-panel-layout-pane,.lex-detail,.lex-barrelled-master,.lex-column-list,.lex-data-map-view";
           const ordinals = new Map();
           const scroll = [...document.querySelectorAll(selector)].map(node => {
@@ -10383,7 +12817,9 @@ ${contents.path}`});
      knows about a particular game.
 
      It stays quiet when no pad is attached: the loop only ticks while one
-     is, and a pad that throws cannot take the editor with it. `tick` and
+     is, and a pad that throws cannot take the editor with it. The loop also
+     stops while another app has the focus, so polling never holds the pad
+     away from a game started behind the editor. `tick` and
      `setPadSource` are the seam a check drives without hardware.
   ------------------------------------------------------------------ */
   const gamepadNavigation = (() => {
@@ -10418,6 +12854,7 @@ ${contents.path}`});
     const acceptsPadInput = () => document.hasFocus() && !document.hidden;
     const suspendPadInput = () => {
       awaitingNeutral = true;
+      adjusting = null;
       heldSince.clear();
       discreteDown.clear();
       lastRepeat.clear();
@@ -10561,34 +12998,65 @@ ${contents.path}`});
       return true;
     };
 
-    // Left and right on a bounded control change it instead of leaving it.
-    // A number or a slider with no way to move it is the one thing a pad
-    // cannot reach, and every value in this editor is bounded.
-    const stepControl = (node, direction) => {
-      const delta = direction === "left" ? -1 : 1;
-      if (node instanceof HTMLSelectElement) {
-        if (node.options.length < 2) return false;
-        const index = node.selectedIndex + delta;
-        if (index < 0 || index >= node.options.length) return false;
-        node.selectedIndex = index;
-        node.dispatchEvent(new Event("input", {bubbles: true}));
-        node.dispatchEvent(new Event("change", {bubbles: true}));
-        return true;
-      }
-      if (!numberish(node)) return false;
+    /* The d-pad walks; the left stick changes the value the ring is on, as
+       far and as fast as it is pushed. A light touch moves a step or two a
+       second, for exact values; full tilt crosses the whole range in about
+       two seconds. The rate climbs between the two on a log curve, so a
+       range of a million is as easy to steer as one of ten. While the stick
+       is held only input events go out, so the value, its fill and its
+       reference rail follow live; the change - the commit and the one undo
+       step - goes out when the stick comes back to the middle. On anything
+       that is not a value the stick walks like the d-pad. */
+    const ADJUST_DEADZONE = 0.2;
+    const valueControl = node => node instanceof HTMLElement && !node.disabled && !node.readOnly
+      && (numberish(node) || (node instanceof HTMLSelectElement && node.options.length > 1)) ? node : null;
+    let adjusting = null;
+    const finishAdjust = () => {
+      const done = adjusting;
+      adjusting = null;
+      if (done?.changed && done.node.isConnected) done.node.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+    const stepsOf = node => {
+      if (node instanceof HTMLSelectElement) return {step: 1, min: 0, max: node.options.length - 1, current: node.selectedIndex};
       const step = Math.abs(Number(node.step)) || 1;
-      const current = Number(node.value);
-      if (!Number.isFinite(current)) return false;
-      let next = current + delta * step;
-      const min = Number(node.min), max = Number(node.max);
-      if (node.min !== "" && Number.isFinite(min)) next = Math.max(min, next);
-      if (node.max !== "" && Number.isFinite(max)) next = Math.min(max, next);
-      if (next === current) return false;
-      // The same two events a typed edit sends, so every plugin's own dirty
-      // tracking, clamping and reference rail answer the pad identically.
-      node.value = String(next);
+      const min = node.min !== "" && Number.isFinite(Number(node.min)) ? Number(node.min) : -Infinity;
+      const max = node.max !== "" && Number.isFinite(Number(node.max)) ? Number(node.max) : Infinity;
+      return {step, min, max, current: Number(node.value)};
+    };
+    const setStepped = (node, value) => {
+      if (node instanceof HTMLSelectElement) { node.selectedIndex = value; return; }
+      const decimals = (String(node.step).split(".")[1] || "").length;
+      node.value = decimals ? value.toFixed(decimals) : String(Math.round(value));
+    };
+    const adjustWithStick = (pad, now) => {
+      const node = valueControl(padFocus?.isConnected ? padFocus : document.activeElement);
+      if (adjusting && adjusting.node !== node) finishAdjust();
+      if (!node) return false;
+      const [x = 0, y = 0] = pad.axes || [];
+      const push = Math.abs(x) >= Math.abs(y) ? x : -y;
+      if (Math.abs(push) < ADJUST_DEADZONE) { finishAdjust(); return true; }
+      const {step, min, max, current} = stepsOf(node);
+      if (!Number.isFinite(current)) return true;
+      const sign = Math.sign(push);
+      if (!adjusting || adjusting.sign !== sign) {
+        // The first step is immediate, so a flick moves the value by one.
+        adjusting = {node, sign, carry: sign * step, last: now, changed: adjusting?.changed || false};
+      } else {
+        const strength = (Math.abs(push) - ADJUST_DEADZONE) / (1 - ADJUST_DEADZONE);
+        const range = Number.isFinite(max - min) ? max - min : step * 400;
+        const slow = step * 2, fast = Math.max(range / 2, step * 4);
+        const rate = slow * Math.pow(fast / slow, strength);
+        adjusting.carry += sign * rate * Math.min(100, now - adjusting.last) / 1000;
+        adjusting.last = now;
+      }
+      const steps = Math.trunc(adjusting.carry / step);
+      if (!steps) return true;
+      adjusting.carry -= steps * step;
+      const next = Math.max(min, Math.min(max, current + steps * step));
+      if (next === current) return true;
+      setStepped(node, next);
+      adjusting.changed = true;
       node.dispatchEvent(new Event("input", {bubbles: true}));
-      node.dispatchEvent(new Event("change", {bubbles: true}));
       return true;
     };
 
@@ -10630,10 +13098,6 @@ ${contents.path}`});
       if (list.length && (!region || (region.matches(PANE) && from.matches(BAR_CONTROL)))) {
         return (region && enterRegion(region)) || enterFirstPanel(list);
       }
-      // In the menu bar and a pager, left and right walk the buttons; they
-      // never flip the mod selector or the page size under the player.
-      const bar = region?.matches(MENU_BAR) || from.closest(".lex-pager");
-      if ((direction === "left" || direction === "right") && !bar && stepControl(from, direction)) return true;
       const next = nearest(region ? reachable(pool, region) : pool, from, direction);
       return next ? setPadFocus(next) : false;
     };
@@ -10832,13 +13296,13 @@ ${contents.path}`});
       return button.pressed === true || Number(button.value) > 0.5;
     };
 
-    const directionState = pad => {
+    const directionState = (pad, stick = true) => {
       const down = new Set();
       if (held(pad, BUTTON.up)) down.add("up");
       if (held(pad, BUTTON.down)) down.add("down");
       if (held(pad, BUTTON.left)) down.add("left");
       if (held(pad, BUTTON.right)) down.add("right");
-      const [x = 0, y = 0] = pad.axes || [];
+      const [x = 0, y = 0] = stick ? pad.axes || [] : [];
       if (x <= -DEADZONE) down.add("left");
       if (x >= DEADZONE) down.add("right");
       if (y <= -DEADZONE) down.add("up");
@@ -10866,8 +13330,8 @@ ${contents.path}`});
     // One frame of pad input. `now` is a parameter so a check can drive the
     // repeat timing instead of waiting for real frames.
     const tick = (now = performance.now()) => {
-      // Gamepad polling continues while another native window has focus.
-      // Never turn those gameplay inputs into edits in the background page.
+      // The loop only runs while this page can take pad input; a direct call
+      // still refuses, so background gameplay inputs never become edits here.
       if (!acceptsPadInput()) { suspendPadInput(); return false; }
       let pads = [];
       try { pads = source() || []; } catch (_error) { pads = []; }
@@ -10887,8 +13351,8 @@ ${contents.path}`});
         else if (!down) discreteDown.delete(index);
       }
 
-      // The left stick and d-pad move within a region, the right stick
-      // between regions; each repeats on its own clock while held.
+      // The d-pad (and the left stick, off a value) moves within a region,
+      // the right stick between regions; each repeats on its own clock.
       const steer = (down, prefix) => {
         for (const direction of DIRECTIONS) {
           const key = prefix + direction;
@@ -10904,7 +13368,8 @@ ${contents.path}`});
           }
         }
       };
-      steer(directionState(pad), "");
+      const stickOnValue = adjustWithStick(pad, now);
+      steer(directionState(pad, !stickOnValue), "");
       steer(panelDirectionState(pad), "panel:");
       return true;
     };
@@ -10918,13 +13383,19 @@ ${contents.path}`});
     let pollHandle = 0;
     const frame = () => {
       if (!running) return;
+      // The pad belongs to the focused app: while this page cannot take pad
+      // input it must not poll at all. Polling keeps the browser's
+      // DirectInput acquire alive, which blocks a game started behind it
+      // (Dark Souls loses its gamepad for the session). The loop resumes on
+      // the next focus or gesture.
+      if (!acceptsPadInput()) { running = false; suspendPadInput(); return; }
       if (!attached()) { running = false; clearPadFocus(); return; }
       try { tick(); } catch (_error) { /* a broken pad must not break the page */ }
       frameHandle = requestAnimationFrame(frame);
     };
 
     const connect = () => {
-      if (running || !attached()) return false;
+      if (running || !acceptsPadInput() || !attached()) return false;
       running = true;
       frameHandle = requestAnimationFrame(frame);
       return true;
@@ -10981,19 +13452,22 @@ ${contents.path}`});
   })();
 
   // One panel per tweak mod, drawn from its settings schema. Every game's
-  // Tweaks page uses this: the switch, the fields, the trust prompt and the
-  // "not available yet" badge look and behave the same everywhere.
+  // Tweaks page uses this: the fields and the "not available yet" badge
+  // look and behave the same everywhere. There is no switch: a tweak is a
+  // mod, and the Mods tab enables it.
   const tweakPanel = (title, help, toggle, body = [], blocker = "") => {
     // A tweak that cannot be switched on yet says so where it stands: what it
     // does in the help bubble, why it is unavailable in the body.
     const heading = blocker
       ? inlineLabel(element("span", {}, title), badge("NOT AVAILABLE YET", {tone: "warning", title: blocker}))
       : title;
-    return detailPanel({title: heading, help, actions: toggle,
+    const panel = detailPanel({title: heading, help, actions: toggle,
       body: [...(blocker ? [detailNote(blocker)] : []), ...body]});
+    panel.classList?.add("lex-tweak-panel");
+    return panel;
   };
   const tweakModPanels = (options = {}) => {
-    const changed = () => options.change?.();
+    const changed = row => options.change?.(row);
     const number = options.number || ((value, min, max, step, onchange, attrs) => element("input", {
       ...attrs, type: "number", value, min, max, step,
       onchange: event => { if (event.target.checkValidity()) onchange(Number(event.target.value)); else event.target.reportValidity(); },
@@ -11006,7 +13480,7 @@ ${contents.path}`});
     });
     const field = (row, item) => {
       const values = row.values, label = item.label || item.key;
-      const set = value => { values[item.key] = value; changed(); };
+      const set = value => { values[item.key] = value; changed(row); };
       let control;
       if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
         "aria-label": label, disabled: !!options.readOnly, onchange: event => set(event.target.checked)});
@@ -11022,29 +13496,609 @@ ${contents.path}`});
     const toggles = new Map();
     const rows = [...(options.rows || [])].sort((a, b) =>
       (a.schema?.title || a.name).localeCompare(b.schema?.title || b.name));
-    const panels = rows.map(row => {
+    // A Tweaks page shows only switched-on mods with something to change:
+    // the Mods tab switches them, and a mod without settings has no panel.
+    // A mod whose settings failed to load still shows its error. The Mods
+    // tab's own settings section keeps every field, on or off, but a mod
+    // with nothing to show has no panel either, so the header never sits
+    // over blank space.
+    const hasContent = row => row.error || row.schema?.blocker
+      || (row.schema?.fields || []).some(item => !item.hidden);
+    const shown = options.fieldsOnly ? rows.filter(hasContent)
+      : rows.filter(row => row.enabled && hasContent(row));
+    const panels = shown.map(row => {
       const schema = row.schema || {fields: []}, blocker = schema.blocker || "";
-      const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": row.name,
-        disabled: !!options.readOnly || (Boolean(blocker) && !row.enabled),
-        onchange: event => { row.enabled = event.target.checked; changed(); }});
-      toggles.set(row.id, toggle);
       const body = [];
       if (row.error) body.push(detailNote(row.error));
-      if (row.trust !== "trusted") body.push(detailNote(row.trust === "changed"
-        ? "This tweak's script changed since you trusted it, so it will not build until you trust it again."
-        : "This tweak runs its own script when it builds. Trust it only if you know where it came from."),
-      actionRow(element("button", {type: "button", onclick: () => options.trust?.(row, true)}, "Trust this tweak")));
       body.push(...(schema.fields || []).filter(item => !item.hidden).map(item => field(row, item)));
-      return tweakPanel(schema.title || row.name.toUpperCase(), schema.help, toggle, body, blocker);
+      // A mod's own details pane already names the mod and has its switch.
+      if (options.fieldsOnly) return element("div", {class: "lex-tweak-fields"}, ...(blocker ? [detailNote(blocker)] : []), ...body);
+      // The heading is the mod’s own name, as in the Mods tab: a second
+      // title in the schema always drifts from it.
+      return tweakPanel(row.name, schema.help, null, body, blocker);
     });
     // A tweak another one requires greys out the dependent while it is off.
-    const bind = root => bindSettingDependencies(root, rows.flatMap(row =>
+    const bind = root => bindSettingDependencies(root, shown.flatMap(row =>
       (row.schema?.requires || []).filter(need => toggles.has(need))
         .map(need => ({key: `${need}->${row.id}`, dependency: toggles.get(need), dependent: toggles.get(row.id)}))));
     return {panels, toggles, bind};
   };
 
-window.LexeditorUI = {tweakPanel, tweakModPanels, panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+  // --- Mods tab and first run -------------------------------------------
+  // Every game gets the same Mods tab, always leftmost: its library's mods
+  // in a table, the selected one's details and settings beside it, and
+  // Lexer's Mod modules the reader has not downloaded, greyed, at the end.
+  const modsDialog = (title, build) => new Promise(resolve => {
+    const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
+    const dialog = element("section", {class: "lex-dialog lex-mods-dialog", role: "dialog", "aria-modal": "true", "aria-label": title});
+    const close = value => { backdrop.remove(); resolve(value); };
+    dialog.append(element("h2", {}, title), ...build(close));
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+  });
+  const watchDownload = async (pluginId, onProgress) => {
+    for (;;) {
+      const progress = await callWindow("lexmod_download_progress", pluginId);
+      onProgress?.(progress);
+      if (progress.state !== "running") return progress;
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
+  };
+  const progressText = progress => progress.state === "failed" ? progress.error
+    : progress.phase === "install" ? `Installing ${progress.done} of ${progress.total} modules…`
+    : progress.total ? `Downloading… ${Math.round(progress.done / progress.total * 100)}%`
+    : `Downloading… ${(progress.done / 1048576).toFixed(1)} MB`;
+
+  // A mod whose changes another switched-on mod overrides, or that overrides
+  // another's: a red "!" on its row, the list in its bubble. Every game's
+  // loader reports these the same way (core/mod_conflicts.py).
+  const conflictMark = lines => infoHelp(
+    element("ul", {class: "lex-conflict-list"}, ...lines.map(line => element("li", {}, line))),
+    {class: "lex-conflict-mark", symbol: "!", title: "",
+     "aria-label": `Conflicts with other mods: ${lines.join("; ")}`});
+  // One red "!" on a mod's row lists every flag on it: conflicts with other
+  // mods, then loader alerts (a mod changed since its last build). Hovering
+  // shows all of them. A conflicts-only row keeps its old label.
+  const modFlagsMark = (conflicts, alerts) => {
+    const lines = [...(conflicts || []), ...(alerts || [])];
+    if (!lines.length) return null;
+    if (!(alerts || []).length) return conflictMark(lines);
+    return infoHelp(
+      element("ul", {class: "lex-conflict-list"}, ...lines.map(line => element("li", {}, line))),
+      {class: "lex-conflict-mark", symbol: "!", title: "",
+       "aria-label": `Mod warnings: ${lines.join("; ")}`});
+  };
+
+  const modsPage = (pluginId, pluginName) => {
+    let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
+    let modDetailTab = "details", contentsMod = null, contentsResult = null, contentsFailed = false;
+    const contentsWraps = {files: null, records: null};
+    const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
+    const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
+    const load = async () => { data = await callWindow("mods_overview", pluginId); };
+    const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
+    const keyOf = row => row.path;
+    const replaceRow = fresh => { data.rows = data.rows.map(row => row.path === fresh.path ? fresh : row); };
+    // The Mods tab and the mod selector show one order: the library's load
+    // order, lowest first. A row moves within the full order, not the page,
+    // so a move stays correct while the list is searched, sorted or paged.
+    // A downloadable module is not in the library and cannot move.
+    const localPaths = () => (data?.rows || []).map(row => row.path);
+    const moveMod = async (path, delta) => {
+      try { await callWindow("move_mod", pluginId, path, delta); await load(); draw(); }
+      catch (error) { failure("Could not reorder the mods", error); }
+    };
+    const decorateModRow = (node, row) => {
+      if (row.remote) return;
+      const paths = localPaths();
+      // An existing row: handlers become properties, the rest attributes.
+      for (const [key, value] of Object.entries(modOrderGestures({
+        index: paths.indexOf(row.path),
+        movable: at => at >= 0 && at < paths.length,
+        move: (from, by) => moveMod(paths[from], by),
+      }))) {
+        if (key.startsWith("on")) node[key] = value;
+        else node.setAttribute(key, value);
+      }
+    };
+    const add = () => modsDialog("Add a mod", close => [
+      element("p", {}, "Create a new mod from this game's starter, or add one you already have."),
+      element("div", {class: "lex-dialog-actions"},
+        element("button", {type: "button", class: "lex-dialog-action", onclick: () => close(null)}, "Cancel"),
+        element("button", {type: "button", class: "lex-dialog-action", disabled: !data?.canManage,
+          title: data?.canManage ? "" : (data?.message || "This game's mod loader cannot add mods yet."),
+          onclick: () => close("folder")}, "Add a folder…"),
+        element("button", {type: "button", class: "lex-dialog-action", disabled: !data?.canManage,
+          onclick: () => close("zip")}, "Add a ZIP…"),
+        element("button", {type: "button", class: "lex-dialog-action primary", onclick: () => close("create")}, "Create a new mod"))
+    ]).then(async choice => {
+      if (!choice) return;
+      try {
+        if (choice === "create") { await createModProject(pluginId, {pluginName}); return; }
+        const picked = await callWindow("choose_mod_package", pluginId, choice);
+        if (!picked || picked.cancelled) return;
+        const inspected = await callWindow("inspect_mod_package", pluginId, picked.source, "", null);
+        const known = inspected.metadata || {};
+        // A mod is stored with its name, author and description; ask for
+        // whatever the package did not say about itself.
+        const named = await askProjectName(pluginName, {details: true, value: known.missing?.length ? "" : known.name,
+          author: known.author, about: known.description, createLabel: "Add",
+          description: "Name the mod. The author and description may stay blank."});
+        if (!named) return;
+        await callWindow("import_mod_package", pluginId, picked.source, named.name, "", null,
+          {...named.details, credits: known.credits || ""});
+        await load(); selected = data.rows.find(row => row.name === named.name)?.path || selected; draw();
+      } catch (error) { failure("Could not add the mod", error); }
+    });
+    const textControl = (row, key, label, multiline) => {
+      const control = (multiline ? textArea : options => element("input", {type: "text", ...options}))({
+        "aria-label": label, value: row[key] || "", placeholder: key === "name" ? "Required" : "Optional",
+        onchange: async event => {
+          const details = {name: row.name, author: row.author, description: row.description, credits: row.credits,
+            [key]: event.target.value};
+          try { replaceRow(await callWindow("save_mod_details", pluginId, row.path, details)); draw(); }
+          catch (error) { event.target.value = row[key] || ""; failure("Could not save the mod's details", error); }
+        }});
+      if (multiline) control.value = row[key] || "";
+      return control;
+    };
+    const download = async (row, button, note) => {
+      button.disabled = true;
+      try {
+        await callWindow("lexmod_download", pluginId, [row.folder]);
+        const result = await watchDownload(pluginId, progress => { note.textContent = progressText(progress); });
+        if (result.state === "failed") throw new Error(result.error);
+        await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
+      } catch (error) { button.disabled = false; failure("Could not download the module", error); }
+    };
+    const detail = () => {
+      const row = rows().find(item => keyOf(item) === selected);
+      if (!row) return detailPanel({title: "Mods", body: [detailNote(rows().length
+        ? "Select a mod." : "This game has no mods yet. Press + to create one or add one you already have.")]});
+      if (row.remote) {
+        const note = detailNote("");
+        const button = element("button", {type: "button", class: "lex-mods-detail-download", onclick: () => download(row, button, note)}, "Download");
+        return detailPanel({title: row.name, help: "A module of Lexer's Mod that is not in your library yet. Once downloaded it stays up to date.",
+          body: [detailSection({title: "DETAILS", body: [
+            detailField({label: "AUTHOR", control: readonlyField(row.author || "—")}),
+            detailField({label: "DESCRIPTION", control: readonlyField(row.description || "—")})]}),
+            actionRow(button), note]});
+      }
+      const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
+        onchange: async event => {
+          if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
+          try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
+          catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
+        }});
+      const copyMod = async () => {
+        const agreed = await confirmAction({title: "Create an editable copy?",
+          message: "Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel: "Make a copy"});
+        if (!agreed) return;
+        const named = await askProjectName(pluginName, {value: `${row.name} Copy`,
+          createLabel: "Create copy", description: "Choose a name for your independent editable copy. It will be stored in the mod library."});
+        if (!named) return;
+        try {
+          const result = await callWindow("copy_library_mod", pluginId, row.path, named.name);
+          if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
+        } catch (error) { failure("Could not copy the mod", error); }
+      };
+      const removeMod = async () => {
+        const agreed = await confirmAction({title: `Remove "${row.name}" from the library?`,
+          message: "Its files stay on disk; only the library entry goes. Import it again any time to bring it back.", confirmLabel: "Remove"});
+        if (!agreed) return;
+        try { await callWindow("remove_mod_project", pluginId, row.path); await load(); draw(); }
+        catch (error) { failure("Could not remove the mod", error); }
+      };
+      const duplicateTitle = `Make an editable copy of ${row.name}`;
+      const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
+        : `Remove ${row.name} from the library`;
+      const openTitle = `Open ${row.name}'s folder`;
+      const actions = [
+        element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
+          "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
+        element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
+          "aria-label": removeTitle, disabled: !!row.lexmod, onclick: removeMod}, removeIcon()),
+        element("button", {type: "button", class: "lex-header-icon", title: openTitle,
+          "aria-label": openTitle,
+          onclick: () => callWindow("open_mod_folder", pluginId, row.path)
+            .catch(error => failure("Could not open the folder", error))}, folderIcon()), toggle];
+
+      const sections = [];
+      const settingsPanels = [];
+      if (row.script) {
+        const {panels} = tweakModPanels({rows: [{id: row.folder, name: row.name, enabled: row.enabled, ...row.script}],
+          toggle: false, fieldsOnly: true,
+          change: async () => {
+            try { await callWindow("save_mod_settings", pluginId, row.path, row.script.values); await load(); draw(); }
+            catch (error) { failure("Could not save the mod's settings", error); await load(); draw(); }
+          }});
+        settingsPanels.push(...panels);
+      }
+      // A bundle's components are ordinary on/off settings from its schema,
+      // saved through the same call as a tweak mod's settings.
+      if (row.components) {
+        const {panels} = tweakModPanels({rows: [{id: row.folder, name: row.name, enabled: row.enabled, ...row.components}],
+          toggle: false, fieldsOnly: true,
+          change: async () => {
+            try { await callWindow("save_mod_settings", pluginId, row.path, row.components.values); await load(); draw(); }
+            catch (error) { failure("Could not save the mod's settings", error); await load(); draw(); }
+          }});
+        settingsPanels.push(...panels);
+      }
+      if (settingsPanels.length) sections.push(detailSection({title: "SETTINGS", body: settingsPanels}));
+      sections.push(
+        detailSection({title: "DETAILS", body: [
+          detailField({label: "NAME", control: textControl(row, "name", "Name")}),
+          detailField({label: "AUTHOR", control: textControl(row, "author", "Author")}),
+          detailField({label: "DESCRIPTION", control: textControl(row, "description", "Description", true)}),
+          detailField({label: "CREDITS", control: textControl(row, "credits", "Credits", true)})]}),
+        detailSection({title: "SOURCE", body: [
+          detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
+          ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
+        ]}));
+      if (selected !== contentsMod) {
+        contentsMod = selected;
+        contentsQuery.records = "";
+        contentsQuery.files = "";
+        contentsPage.records = 0;
+        contentsPage.files = 0;
+        contentsResult = null;
+        contentsFailed = false;
+        // One fetch per selected mod: tab switches redraw from the cache,
+        // so they never flash the loading line or refetch.
+        const fetched = selected;
+        callWindow("mod_contents", pluginId, row.path).then(result => {
+          if (selected !== fetched) return;
+          contentsResult = result || {};
+          paintWraps();
+        }).catch(() => {
+          if (selected !== fetched) return;
+          contentsFailed = true;
+          paintWraps();
+        });
+      }
+      const modChangeText = entry => (entry.fields || []).length ? entry.fields.join(", ")
+        : entry.before != null || entry.after != null
+          ? `${entry.before ?? "(nothing)"} \u2192 ${entry.after ?? "(nothing)"}` : "";
+      const modContentsTable = (tab, rows, columns, searchLabel, emptyNote, notes, rowClass, rowTitle) => {
+        const needle = String(contentsQuery[tab] || "").toLowerCase();
+        const filtered = needle ? rows.filter(row => JSON.stringify(row).toLowerCase().includes(needle)) : rows;
+        const size = 10;
+        const pages = Math.max(1, Math.ceil(filtered.length / size));
+        contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab] || 0, pages - 1));
+        const slice = filtered.slice(contentsPage[tab] * size, (contentsPage[tab] + 1) * size);
+        const pagerNode = pager({inline: true, page: contentsPage[tab], pages, total: filtered.length, pageSize: size,
+          change: next => { contentsPage[tab] = next; draw(); },
+          search: {key: `${pluginId}-mod-${tab}`, value: contentsQuery[tab] || "", label: searchLabel,
+            change: value => { contentsQuery[tab] = value; contentsPage[tab] = 0; draw(); }}});
+        const foot = notes.map(line => detailNote(line));
+        if (!rows.length) return element("div", {class: "lex-mod-contents"}, detailNote(emptyNote), ...foot);
+        if (!filtered.length) return element("div", {class: "lex-mod-contents"},
+          detailNote(`No ${tab === "records" ? "changes" : "files"} match this search.`), pagerNode, ...foot);
+        return element("div", {class: "lex-mod-contents"},
+          columnList({rows: slice, key: (row, index) => index, columns, rowClass, rowTitle}),
+          pagerNode, ...foot);
+      };
+      const modRecordsTable = result => {
+        const changes = result.changes || [];
+        if (result.note && !changes.length) return element("div", {class: "lex-mod-contents"}, detailNote(result.note));
+        const notes = [];
+        if (result.changesTruncated) notes.push(`Showing the first ${changes.length} changes.`);
+        if (result.note) notes.push(result.note);
+        return modContentsTable("records", changes, [
+          {key: "label", label: "Record", grow: 1},
+          {key: "location", label: "Table", sortValue: row => `${row.table} ${row.id}`,
+            render: row => `${row.table} ${row.id}`},
+          {key: "change", label: "Change", grow: 1, sortValue: modChangeText, render: modChangeText},
+          {key: "state", label: "State", width: "max-content",
+            sortValue: row => row.added ? "New" : row.removed ? "Removed" : "",
+            render: row => row.added ? "New" : row.removed ? "Removed" : ""},
+        ], "Search changed records", "No record changes compared to vanilla.", notes, null, null);
+      };
+      const modFilesTable = result => {
+        const files = result.files || [];
+        const notes = [];
+        if (result.truncated) notes.push(`Showing the first ${files.length} files.`);
+        if (!result.canDescribe) notes.push("Which files the loader reads is not known for this game.");
+        return modContentsTable("files", files, [
+          {key: "relative", label: "File", grow: 1},
+          {key: "sizeLabel", label: "Size", width: "max-content", align: "end", sortValue: row => row.size},
+          {key: "loaded", label: "Read", width: "max-content", align: "center",
+            sortValue: row => row.loaded ? 1 : 0, render: row => booleanMark(row.loaded)},
+        ], "Search files", "This mod has no files.", notes,
+          row => row.loaded ? "lex-mod-file-loaded" : "",
+          row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
+      };
+      const contentsNode = tab => {
+        if (contentsFailed) return detailNote("Could not read the mod's contents.");
+        if (!contentsResult) return loadingStatus("Reading mod contents");
+        return tab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
+      };
+      const paintWraps = () => {
+        if (contentsWraps.files) contentsWraps.files.replaceChildren(contentsNode("files"));
+        if (contentsWraps.records) contentsWraps.records.replaceChildren(contentsNode("records"));
+      };
+      const filesWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("files"));
+      const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
+      contentsWraps.files = filesWrap;
+      contentsWraps.records = recordsWrap;
+      const notes = [row.error ? detailNote(row.error) : null,
+        row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
+          conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
+        ...(row.alerts || []).map(line => detailNote(line)),
+        row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
+      // Panel tabs, not sections with a tab strip inside: Details, Files and
+      // Records work the way every other detail panel's tabs do. Each table
+      // carries its own inline pager, so no panel paging.
+      return detailPanel({title: row.name, actions, body: [...notes, tabbedPanel({
+        label: "Mod details",
+        active: modDetailTab,
+        paginate: false,
+        tabs: [
+          {id: "details", label: "Details"},
+          {id: "files", label: "Files",
+            help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
+          {id: "records", label: "Records",
+            help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
+        ],
+        change: id => { modDetailTab = id; draw(); },
+        content: modDetailTab === "details" ? sections : modDetailTab === "files" ? filesWrap : recordsWrap,
+      })], paginate: false});
+    };
+    const draw = () => {
+      if (!main) return;
+      if (!data) { main.replaceChildren(loadingPanel({label: "Loading mods"})); return; }
+      const filtered = rows().filter(row => `${row.name} ${row.author || ""}`.toLowerCase().includes(query.toLowerCase()));
+      if (!filtered.some(row => keyOf(row) === selected)) selected = filtered[0] ? keyOf(filtered[0]) : null;
+      const view = pagedListDetail({className: "lex-mods-page", rows: filtered, key: keyOf, selected, slots: false, noun: "mods",
+        order: "given",
+        page, pageSize, defaultSplit: 40, minLeft: 260, minRight: 360, splitKey: `${pluginId}-mods`, rowsKey: `${pluginId}-mods`,
+        search: {key: `${pluginId}-mods-search`, value: query, label: "Search mods", change: value => { query = value; page = 0; draw(); }},
+        sync: next => { page = next.page; pageSize = next.pageSize; if (next.selected !== selected) { selected = next.selected; draw(); } },
+        change: next => { page = next.page; pageSize = next.pageSize; draw(); },
+        add, addTitle: "Add a mod",
+        master: ({rows: listed, selected: current, select}) => columnList({
+          // The switch column below replaces the automatic on/off mark.
+          rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,
+          select: row => { select(row); selected = keyOf(row); draw(); },
+          decorateRow: decorateModRow,
+          // Load order, lowest first: the server returns it and the page
+          // keeps it (order "given"). The number makes the order visible;
+          // downloadable modules have none until imported.
+          columns: [
+            {key: "priority", label: "Priority", width: "max-content", align: "center", numeric: true,
+              help: "Load order: when two switched-on mods change the same thing, the higher number wins. Drag a row to move it.",
+              sortValue: row => row.remote ? Number.MAX_SAFE_INTEGER : localPaths().indexOf(row.path),
+              render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""},
+                row.remote ? "\u2014" : String(localPaths().indexOf(row.path) + 1))},
+            {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
+              element("span", {class: "lex-mods-name-text"}, row.name), modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
+            {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
+            {key: "on", label: "On", sortable: false, render: row => row.remote
+              ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,
+                  onclick: event => { event.stopPropagation(); selected = keyOf(row); draw();
+                    const button = document.querySelector(".lex-mods-page .lex-detail-panel .lex-mods-detail-download");
+                    button?.click(); }}, "Download")
+              : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
+                  onclick: event => event.stopPropagation(),
+                  onchange: async event => {
+                    if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
+                    try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
+                    catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
+                  }})}]}),
+        detail, emptyDetail: () => detail()});
+      main.replaceChildren(view);
+    };
+    let importing = false;
+    // A package dropped anywhere on the program lands here: the shell
+    // navigates to the Mods tab first, then hands over the drop. The
+    // bytes upload in chunks, the package is inspected with the same
+    // data-folder and file choice as any other import, and Import stores
+    // it. One import at a time: a second drop while this one is open is
+    // ignored rather than stacked.
+    const importDrop = async transfer => {
+      if (importing) return;
+      importing = true;
+      try {
+        try { if (!data) await load(); }
+        catch (error) { failure("Could not add the mod", error); return; }
+        if (!data?.canManage) {
+          failure("Could not add the mod", new Error(data?.message || "This game's mod loader cannot add mods yet."));
+          return;
+        }
+        let uploadToken = null, cancelled = false;
+        const status = element("p", {role: "status"}, "Reading dropped files…");
+        const preview = element("div");
+        const inspect = async (finish, actions, source) => {
+          let selectedFiles = null, rootValue = "", revision = 0;
+          const root = element("select", {"aria-label": "Package data folder"});
+          const name = element("input", {type: "text", "aria-label": "Mod name"});
+          const files = element("div", {style: "max-height:30vh;overflow:auto"});
+          const result = element("p", {role: "status"});
+          const importButton = element("button", {type: "button", class: "lex-dialog-action", disabled: true}, "Import mod");
+          const refresh = async (rebuild = false) => {
+            const request = ++revision;
+            importButton.disabled = true; result.textContent = "Checking package…";
+            try {
+              const report = await callWindow("inspect_mod_package", pluginId, source, rootValue, selectedFiles);
+              if (request !== revision) return;
+              if (!root.options.length) {
+                const folders = new Set([""]);
+                for (const path of report.files) {
+                  const parts = path.split("/"); parts.pop();
+                  while (parts.length) { folders.add(parts.join("/")); parts.pop(); }
+                }
+                root.replaceChildren(...[...folders].sort().map(value => element("option", {value}, value || "Package root")));
+              }
+              if (!name.value) name.value = report.metadata.name;
+              if (rebuild) {
+                files.replaceChildren(...report.rootFiles.map(path => {
+                  const box = element("input", {type: "checkbox", checked: true, value: path});
+                  box.onchange = () => {
+                    selectedFiles = [...files.querySelectorAll("input:checked")].map(node => node.value);
+                    refresh();
+                  };
+                  return element("label", {style: "display:block"}, box, path);
+                }));
+              }
+              result.textContent = report.valid
+                ? `${report.packages.length} PAK package(s) checked. Import does not activate the mod.`
+                : report.problems.join("\n");
+              result.style.whiteSpace = "pre-line";
+              importButton.disabled = !report.valid;
+            } catch (error) { if (request === revision) result.textContent = String(error?.message || error); }
+          };
+          root.onchange = () => { rootValue = root.value; selectedFiles = null; refresh(true); };
+          importButton.onclick = async () => {
+            importButton.disabled = true;
+            try {
+              await callWindow("import_mod_package", pluginId, source, name.value, rootValue, selectedFiles);
+              finish({imported: name.value});
+            } catch (error) { status.textContent = String(error?.message || error); importButton.disabled = false; }
+          };
+          preview.replaceChildren(element("p", {}, source), element("label", {}, "Data folder", root),
+            element("label", {}, "Name", name), files, result);
+          actions.append(importButton);
+          await refresh(true);
+        };
+        const upload = async (finish, actions) => {
+          const started = await callWindow("begin_mod_upload", pluginId);
+          uploadToken = started.token;
+          const items = [...transfer.items];
+          const dropped = [];
+          const visit = async (entry, parent = "") => {
+            if (entry.isFile) {
+              const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+              dropped.push({file, path: parent + file.name});
+            } else if (entry.isDirectory) {
+              const reader = entry.createReader();
+              for (;;) {
+                const children = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+                if (!children.length) break;
+                for (const child of children) await visit(child, parent + entry.name + "/");
+              }
+            }
+          };
+          for (const item of items) {
+            const entry = item.webkitGetAsEntry?.();
+            if (entry) await visit(entry);
+            else { const file = item.getAsFile(); if (file) dropped.push({file, path: file.name}); }
+          }
+          if (!dropped.length) throw Error("Drop a folder or ZIP archive.");
+          for (const {file, path} of dropped) {
+            for (let offset = 0; offset < file.size || offset === 0; offset += 3 * 1024 * 1024) {
+              if (cancelled) return;
+              status.textContent = `Reading ${path}: ${Math.min(offset, file.size).toLocaleString()} / ${file.size.toLocaleString()} bytes`;
+              const chunk = await new Promise((resolve, reject) => {
+                const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]);
+                reader.onerror = () => reject(reader.error); reader.readAsDataURL(file.slice(offset, offset + 3 * 1024 * 1024));
+              });
+              await callWindow("upload_mod_chunk", uploadToken, path, offset, chunk);
+            }
+          }
+          if (cancelled) return;
+          const source = dropped.length === 1 && dropped[0].path.toLowerCase().endsWith(".zip")
+            ? `${started.root}/${dropped[0].path}` : started.root;
+          status.textContent = "";
+          await inspect(finish, actions, source);
+        };
+        const done = await modsDialog("Add a mod", close => {
+          const finish = value => { cancelled = true; close(value); };
+          const actions = element("div", {class: "lex-dialog-actions"},
+            element("button", {type: "button", class: "lex-dialog-action", onclick: () => finish(null)}, "Cancel"));
+          upload(finish, actions).catch(error => { status.textContent = String(error?.message || error); });
+          return [status, preview, actions];
+        });
+        if (uploadToken) await callWindow("end_mod_upload", uploadToken).catch(() => {});
+        if (done?.imported) {
+          await load();
+          selected = data.rows.find(row => row.name === done.imported)?.path || selected;
+          draw();
+        }
+      } finally { importing = false; }
+    };
+    return {
+      async refresh() {
+        // A save rebuilds what the marks describe; a showing tab re-reads
+        // them so a rebuilt mod clears its alert without reopening.
+        // A failed re-read keeps the old rows: the save still succeeded.
+        if (!main?.isConnected) return;
+        try { await load(); } catch (_error) { return; }
+        if (main?.isConnected) draw();
+      },
+      async show(target) {
+        main = target;
+        draw();
+        try { await load(); } catch (error) { main.replaceChildren(notice({tone: "warning", message: error.message || String(error)})); return; }
+        if (data?.conflictError) showToast?.(`Could not check the mods for conflicts: ${data.conflictError}`, {tone: "warning"});
+        draw();
+        // Downloaded Lexer's Mod modules stay up to date.
+        callWindow("lexmod_update", pluginId).then(async result => {
+          if (result?.updated && main?.isConnected) { await load(); draw(); }
+        }).catch(() => {});
+      },
+      hide() { main = null; },
+      importDrop: transfer => importDrop(transfer),
+    };
+  };
+
+  const firstRun = async (pluginId, pluginName) => {
+    let status;
+    try { status = await callWindow("onboarding_status", pluginId); } catch (_error) { return; }
+    if (!status?.show) return;
+    const info = await callWindow("lexmod_info", pluginId).catch(() => ({available: false}));
+    const game = status.game || pluginName;
+    const backdrop = element("div", {class: "lex-dialog-backdrop lex-important-backdrop", "data-lex-history-control": true});
+    const dialog = element("section", {class: "lex-dialog lex-first-run", role: "dialog", "aria-modal": "true", "aria-label": `Welcome to ${game}`});
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    const link = (text, action) => element("button", {type: "button", class: "lex-dialog-link lex-inline-link", onclick: action}, text);
+    const step = (title, body, actions) => dialog.replaceChildren(element("h2", {}, title), ...body,
+      element("div", {class: "lex-dialog-actions"}, ...actions));
+    const next = (label, action) => element("button", {type: "button", class: "lex-dialog-action primary", onclick: action}, label);
+    const finish = async () => { backdrop.remove(); await callWindow("finish_onboarding", pluginId).catch(() => {}); };
+    const enjoy = () => step("Please enjoy!", [], [next("Done", finish)]);
+    const tweaks = () => step("Tweaks", [element("p", {}, "You can configure all your mod settings at a glance from the Tweaks tab on the right.")], [next("Next", enjoy)]);
+    const mods = () => step("Mods", [element("p", {}, "You can enable or disable mods from the Mods tab, or add your own from there.")], [next("Next", tweaks)]);
+    const ready = () => step(`Lexer's Mod for ${game} is ready to play!`, [element("p", {},
+      "I hope you enjoy it, and please ", link("contact me", () => callWindow("open_home_link", "twitter")),
+      " with any suggestions you have or bugs you may find!")], [next("Next", mods)]);
+    const downloading = async () => {
+      const bar = element("progress", {max: 1, value: 0, "aria-label": "Download progress"});
+      const text = element("p", {class: "lex-dialog-status", "aria-live": "polite"}, "Starting…");
+      const forward = next("Next", async () => {
+        try { await callWindow("activate_enabled_mods", pluginId); } catch (_error) { /* the Mods tab can still apply them */ }
+        ready();
+      });
+      forward.disabled = true;
+      const back = element("button", {type: "button", class: "lex-dialog-action", onclick: async () => {
+        back.disabled = true;
+        await callWindow("lexmod_download_cancel", pluginId).catch(() => {});
+        decide();
+      }}, "Back");
+      step(`Downloading Lexer's Mod for ${game}`, [bar, text], [back, forward]);
+      try {
+        await callWindow("lexmod_download", pluginId, null);
+        const result = await watchDownload(pluginId, progress => {
+          text.textContent = progressText(progress);
+          if (progress.total) { bar.max = progress.total; bar.value = progress.done; } else bar.removeAttribute("value");
+        });
+        if (result.state === "done") {
+          bar.max = 1; bar.value = 1;
+          text.textContent = `Installed ${result.installed.length} modules.`;
+          forward.disabled = false;
+        } else if (result.state === "failed") text.textContent = result.error;
+      } catch (error) { text.textContent = error.message || String(error); }
+    };
+    const decide = () => step(`Lexer's Mod for ${game}`, [
+      element("p", {}, "Download ", link("my mod", () => callWindow("open_lexmod", pluginId)), " for this game? It has:"),
+      element("ul", {class: "lex-first-run-features"}, ...(info.features || []).map(item => element("li", {}, item)))],
+      [element("button", {type: "button", class: "lex-dialog-action", onclick: mods}, "No thanks"), next("Download", downloading)]);
+    if (info.available && (info.features || []).length) decide(); else mods();
+  };
+
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
@@ -11067,7 +14121,8 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (!heading) return panel;
     if (panel.lexModelPreview) return panel;
     if (!icon) {
-      icon = ui.element('div',{class:'lex-detail-panel-icon'},ui.iconSlot({message:'No image'}));
+      const art = ui.noThumbnail(spec && spec.plugin, spec && spec.thumbnailLabel);
+      icon = ui.element('div',{class:'lex-detail-panel-icon'},ui.iconSlot({content:art}));
       heading.prepend(icon);
     }
     heading.classList.remove('no-icon');
@@ -11306,11 +14361,34 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   document.addEventListener('click', event => {
     const field = event.target.closest?.('.lex-boolean-field');
     if (!field || event.target.closest?.('input,button,a,select,textarea,.lex-info-help,.lex-reference-values,.lex-column-pin')) return;
+    // The label is its own control (double-click renames it in developer
+    // mode); only the value side of the row toggles the box.
+    if (!event.target.closest?.('.lex-detail-field-control,.lex-field-boolean-arrow')) return;
     const input = field.querySelector('.lex-detail-field-control input[type="checkbox"]');
     if (!input || input.disabled) return;
     event.preventDefault();
     input.click();
   });
+
+  let textDragSource = null;
+  document.addEventListener("dragstart", event => {
+    textDragSource = event.target?.matches?.("input,textarea") ? event.target : null;
+  }, true);
+  document.addEventListener("dragend", () => { textDragSource = null; }, true);
+  const otherTextBox = event => {
+    const box = event.target?.closest?.("input,textarea");
+    return box && textDragSource && box !== textDragSource;
+  };
+  document.addEventListener("dragover", event => {
+    if (!otherTextBox(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "none";
+  }, true);
+  document.addEventListener("drop", event => {
+    if (!otherTextBox(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 
   const syncRange = field => {
     if (!field) return;
@@ -11362,20 +14440,41 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     return Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect())
       .filter(box=>box.width||box.height).map(box=>left-box.left));
   };
-  const widenLabelLane = label => {
-    const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
-    if (!lane) return;
-    const needed = Math.ceil(label.scrollWidth + labelLeftOverflow(label) + 2);
-    const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
-    if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
+  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}|${label.classList.contains('lex-column-cell-text') ? label.closest('.lex-column-list-cell')?.clientWidth : ''}`;
+  const labelTextOutside = label => {
+    const text=label.querySelector(':scope > .lex-detail-field-label-text');
+    if(!text)return false;
+    const range=document.createRange();range.selectNodeContents(text);
+    const ink=range.getBoundingClientRect(),room=text.getBoundingClientRect();
+    return ink.right>room.right+1||ink.left<room.left-1;
   };
-  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
+  const placeBooleanHelp = label => {
+    if(!label.parentElement?.classList.contains('lex-boolean-field'))return;
+    const text=label.querySelector(':scope > .lex-detail-field-label-text');
+    const wrapper=label.querySelector(':scope > .lex-field-help');
+    const help=wrapper?.querySelector(':scope > .lex-info-help');
+    if(!text||!help)return;
+    const range=document.createRange();range.selectNodeContents(text);
+    const line=[...range.getClientRects()].filter(box=>box.width&&box.height).at(-1);
+    const box=wrapper.getBoundingClientRect();
+    if(!line||!box.width||!box.height)return;
+    // Keep the reserved help lane, but put the circle beside the final word
+    // rather than beside the centre of a wrapped name's whole rectangle.
+    const scaleX=box.width/(wrapper.offsetWidth||box.width);
+    const scaleY=box.height/(wrapper.offsetHeight||box.height);
+    const x=(line.right+4*scaleX-box.left)/scaleX;
+    const y=(line.top+line.height/2-box.top-box.height/2)/scaleY;
+    const transform=`translate(${x}px,${y}px)`;
+    if(help.style.transform!==transform)help.style.transform=transform;
+  };
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
     // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
-    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1) return;
+    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1 && !labelTextOutside(label)) return;
     label.style.fontSize = '';
+    const nameText = label.classList.contains('lex-detail-field-label') ? label.querySelector(':scope > .lex-detail-field-label-text') : null;
+    if (nameText) nameText.style.width = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
       // Main tabs and subtabs fit their labels inside a single row.
@@ -11419,50 +14518,54 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // pixel too wide pokes past the label edge every other name ends on.
     // A name is never shrunk past what can be read. The floor was one pixel,
     // and a long property name in a narrow lane came out as a smear. A name
-    // that still does not fit at the floor widens the lane instead - for its
-    // whole panel, so the names in it keep one edge.
+    // that still does not fit at the floor keeps the percentage lane.
     const overflows = () => {
       const box=label.getBoundingClientRect(),css=getComputedStyle(label);
       const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
+      if(labelTextOutside(label))return true;
       const outsidePadding=[...label.children].some(child=>{
         const bounds=child.getBoundingClientRect();
         return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
       });
       return outsidePadding || label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
     };
-    // A word wider than the lane widens the lane before anything shrinks, so
-    // one long name does not come out smaller than the names around it. The
-    // lane settles on the next pass, when the observer sees it resize.
-    // A name that only fits by wrapping asks for the room too: measured on one
-    // line, it widens the lane (the grid caps the lane at half the row) before
-    // it is broken over two lines and shrunk. "MDEF (RIGHT)" came out as two
-    // clipped 13px lines beside a value box six times wider than it needed.
-    if (label.classList.contains('lex-detail-field-label')) {
-      const wrap = label.style.whiteSpace;
-      label.style.whiteSpace = 'nowrap';
-      if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
-      label.style.whiteSpace = wrap;
-    }
     // A record's name stops shrinking at 14px while wrapping can still help;
     // one long word that fits nowhere keeps shrinking to the shared floor
     // rather than being clipped.
     for (const minimum of label.classList.contains('lex-detail-panel-name') ? [14, LABEL_MIN_PX] : [LABEL_MIN_PX]) {
       while (size > minimum && overflows()) {
-        size -= .5;
+        size = Math.max(minimum,size-.5);
         label.style.fontSize = `${size}px`;
       }
     }
-    if (label.classList.contains('lex-detail-field-label') && overflows()) {
-      // At the readable font floor, give wrapped labels space rather than
-      // letting their text consume the gap between adjacent properties.
-      const css=getComputedStyle(label);
-      const height=Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect().height));
-      label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
+    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) {
+      // At the font floor a long word and its help mark still overran the
+      // lane, and the mark sat on the value ("Requirement: STR" in DS1
+      // Stats). The pane's lane grows just enough (framework.css), so every
+      // name in it keeps one edge.
+      const pane=label.closest('.lex-tweak-card-grid')||label.parentElement?.parentElement;
+      const need=Math.ceil(label.scrollWidth+1);
+      if(pane&&need>(parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor'))||0))
+        pane.style.setProperty('--lex-detail-label-floor',`${need}px`);
     }
+    // A property row never grows for its label. Past the shrinking above,
+    // at the readable font floor, the text clips (framework.css) instead
+    // of taking extra vertical space.
+    // A wrapped name's box is as wide as its lane, not its longest line, so
+    // in a lane widened for a neighbour the help mark sat far past "Crit /
+    // bonus". The box hugs the longest line and the mark follows the name.
+    if (nameText && label.querySelector(':scope > .lex-field-help')) {
+      const range=document.createRange();range.selectNodeContents(nameText);
+      const lines=[...range.getClientRects()].filter(box=>box.width&&box.height);
+      const scale=nameText.getBoundingClientRect().width/(nameText.offsetWidth||1)||1;
+      if (lines.length>1) nameText.style.width=`${Math.ceil(Math.max(...lines.map(box=>box.width))/scale)+1}px`;
+    }
+    placeBooleanHelp(label);
 
-    // `contain:size` keeps the font size out of the box's own measurements, so
-    // the key is the same one computed above and the label settles in one pass.
-    fitted.set(label, key);
+    // Property labels use contain:size. A plain cell instead hugs its text,
+    // so remember its dimensions after fitting to avoid resetting that font
+    // when its own resize notification arrives.
+    fitted.set(label, label.classList.contains('lex-column-cell-text') ? fitKey(label) : key);
   };
   // The room a sub-tab leaves its name once padding, help mark and badges are
   // out, and whether the name's text fits it.
@@ -11516,7 +14619,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitted.set(bar,barKey(bar));
     labels.forEach(label=>fitted.set(label,fitKey(label)));
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name,.lex-column-cell-text';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   // Within the page-tab strip every tab is at least its own name's width, so a
   // game with twenty tabs wants a strip wider than its window. Shrinking one
@@ -11598,7 +14701,15 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitNavStrip(nav, laneChanged);
   }));
   const fitAllLabels = (root, reset) => {
-    const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
+    const fit = label => {
+      labelSizeObserver.observe(label);
+      // Plain cell text hugs its glyphs; after shrinking, its own box does not
+      // grow when the column does. Observe the cell so its font can grow back.
+      if(label.classList.contains('lex-column-cell-text')){
+        const cell=label.closest('.lex-column-list-cell');if(cell)labelSizeObserver.observe(cell);
+      }
+      fitLabel(label);
+    };
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
     const strips = new Set();
@@ -11662,7 +14773,13 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   window.addEventListener('resize', () => scheduleFit());
   // A panel split drag resizes the lane without adding a node or resizing the
   // window, so watch the region the fields actually live in as well.
-  new ResizeObserver(() => scheduleFit()).observe(document.documentElement);
+  let fitPageWidth = null;
+  new ResizeObserver(entries => {
+    const width = entries[0]?.contentRect.width;
+    if (width === fitPageWidth) return;
+    fitPageWidth = width;
+    scheduleFit();
+  }).observe(document.documentElement);
   // A label measured against the fallback font is re-laid-out when the real
   // face arrives, and the few extra pixels that brings are enough to clip a
   // line that had just fitted. Re-fit once the fonts are actually in.
@@ -11717,7 +14834,16 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     }
   };
   const schedule=()=>{if(!pending){pending=true;requestAnimationFrame(place);}};
-  new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+  const markerContext='.lex-shell-header nav,.lex-column-list-row';
+  new MutationObserver(records=>{
+    for(const record of records){
+      const target=record.target instanceof Element?record.target:record.target.parentElement;
+      if(target?.closest(markerContext)||(record.type==='attributes'&&target?.querySelector(markerContext))){schedule();return;}
+      for(const node of [...record.addedNodes,...record.removedNodes]){
+        if(node instanceof Element&&(node.matches(markerContext)||node.querySelector(markerContext))){schedule();return;}
+      }
+    }
+  }).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
   new ResizeObserver(schedule).observe(document.documentElement);
   window.addEventListener('resize',schedule);
   document.addEventListener('pointerup',schedule);
@@ -11799,9 +14925,15 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const scope = root instanceof Element || root instanceof Document ? root : document;
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    // A locked value is sized like an editable one, but only a value: fitted
+    // to one line, a sentence shrank to a few pixels high.
+    for (const box of scope.querySelectorAll(".lex-detail-field-control .lex-readonly-field")) {
+      const text = String(box.value ?? box.textContent ?? "").trim();
+      if (!box.__lexAutoFitUpdate && text.length <= 24) window.LexeditorUI.autoFitControlText(box,{minimum:8});
+    }
     for (const input of inputs) {
-      window.LexeditorUI.autoFitControlText(input,{minimum:8});
-      if (groupedBoxes.has(input) || !wantsGrouping(input)) continue;
+      if (!input.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(input,{minimum:8});
+      if (input.dataset.lexExactInteger || input.dataset.lexValidateNumber || groupedBoxes.has(input) || !wantsGrouping(input)) continue;
       groupedBoxes.add(input);
       const plain = () => String(input.value ?? "").replace(/,/g, "");
       // A text box does not enforce min and max the way a number box does, so

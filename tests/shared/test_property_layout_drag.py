@@ -73,7 +73,8 @@ def test_readers_use_saved_layout_but_cannot_drag(page):
     page.wait_for_timeout(150)
     assert order(page,'DEFENCE')==['armour','power']
     label(page,'Power').hover()
-    assert label(page,'Power').get_attribute('draggable')=='false'
+    # A property is dragged by its row; a reader's row never drags.
+    assert label(page,'Power').evaluate("n=>n.closest('.lex-detail-field').getAttribute('draggable')")=='false'
     assert len(page.evaluate('savedCalls'))==1
 
 

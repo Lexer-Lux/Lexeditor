@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 
 FORMATION_COUNT = 4
 MRT_SIZE = FORMATION_COUNT * 2
@@ -34,8 +36,8 @@ def apply_mrt_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
     for edit in edits:
         if not isinstance(edit, dict) or set(edit) != {"slot", "formation"}:
             raise ValueError("Field MRT edit needs only slot and formation")
-        slot = int(edit["slot"])
-        formation = int(edit["formation"])
+        slot = integer_value(edit["slot"], "Field encounter slot")
+        formation = integer_value(edit["formation"], "Field encounter formation")
         if slot in seen or not 0 <= slot < FORMATION_COUNT:
             raise ValueError("Field MRT edit has an invalid or duplicate slot")
         if not 0 <= formation <= 0xFFFF:
@@ -61,7 +63,7 @@ def read_rat(data: bytes) -> dict:
 
 def apply_rat_edit(data: bytes, rate: int) -> tuple[bytes, int]:
     document = read_rat(data)
-    rate = int(rate)
+    rate = integer_value(rate, "Field encounter rate")
     if not 0 <= rate <= 0xFF:
         raise ValueError("Field RAT rate must be an unsigned 8-bit value")
     encoded = bytes((rate,)) * RAT_SIZE

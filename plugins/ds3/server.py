@@ -340,22 +340,23 @@ class Handler(PluginRequestHandler):
             payload = _read_json(self)
             if path == "/api/edit":
                 table = str(payload.get("table", ""))
-                row_id = int(payload.get("id"))
+                row_id = payload.get("id")
                 field = str(payload.get("field", ""))
                 if table not in TARGET_TABLES:
                     raise ValueError(f"Unsupported DS3 table: {table}")
                 with _LOCK:
                     document = _document()
                     row = document.edit(table, row_id, field, payload.get("value"))
-                    self.send_json({"row": row, "dirtyCount": document.dirty_count})
+                    self.send_json({"row": row, "dirtyCount": document.dirty_count,
+                                      "modified": document.row_modified(table, row_id)})
             elif path == "/api/create":
                 table = str(payload.get("table", ""))
                 if table not in TARGET_TABLES:
                     raise ValueError(f"Unsupported DS3 table: {table}")
                 with _LOCK:
                     document = _document()
-                    row = document.create_row(table, int(payload.get("sourceId")), payload.get("id"), payload.get("name"))
-                    self.send_json({"row": row, "dirtyCount": document.dirty_count})
+                    row = document.create_row(table, payload.get("sourceId"), payload.get("id"), payload.get("name"))
+                    self.send_json({"row": row, "dirtyCount": document.dirty_count, "modified": True})
             elif path == "/api/save":
                 self.send_json(_save())
             elif path == "/api/discard":

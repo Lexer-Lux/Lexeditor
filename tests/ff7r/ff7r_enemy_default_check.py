@@ -27,7 +27,7 @@ def main():
    page.get_by_role('button',name='Enemies',exact=True).click()
    page.wait_for_function('state.data?.records?.length===509')
    page.get_by_role('tab',name='General',exact=True).wait_for(state='visible')
-   assert '509' in page.locator('.lex-page-summary').inner_text()
+   assert '509' in page.locator('.lex-pager:not(.lex-pager-inline) .lex-page-summary').inner_text()
    page.get_by_role('tab',name='010-MAKO1',exact=True).click()
    page.wait_for_function('state.data?.records?.length===1')
    assert 'Boss12' in page.locator('.ff7r-table').inner_text()

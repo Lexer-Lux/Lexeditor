@@ -5,13 +5,15 @@ from core.plugin_api import GamePlugin
 from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 
+from .mod_support import Ds1ModAdapter
+
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 
 
 def check() -> list[str]:
     problems = [f"Missing Dark Souls support file: {name}"
-            for name in ("editor.html", "editor.js", "editor.css", "server.py", "metadata/SOURCE.json", "project-template/.lexeditor-ds1-project")
+            for name in ("editor.html", "editor.js", "editor.css", "server.py", "data_map.py", "theme.py", "metadata/SOURCE.json", "project-template/.lexeditor-ds1-project")
             if not (PLUGIN_ROOT / name).is_file()]
     if not problems:
         from .formats import TABLES, schema
@@ -35,4 +37,5 @@ def launch() -> int:
 
 PLUGIN = GamePlugin(**plugin_defaults(__file__), check=check, launch=launch,
                     session_factory=DS1Session, installation=install_spec(__file__),
+                    mod_adapter=Ds1ModAdapter(),
                     projects=project_spec(__file__, default_root=Path.home() / 'Lexeditor Mods' / 'Dark Souls Remastered'))

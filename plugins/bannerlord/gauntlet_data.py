@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import xml.etree.ElementTree as ET
 
 from .paths import contained_project_path, is_contained_file
@@ -133,6 +134,78 @@ def save_prefab(
         )
     result = read_prefab(project, requested)
     result.update({"saved": changed, "backup": backup})
+    return result
+
+
+_PREFAB_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_. -]{0,78}")
+# A mod with no prefabs yet has nothing to copy, so its first prefab can start
+# from the smallest window the game loads: one widget filling the screen.
+BLANK_PREFAB = (
+    "<Prefab>\r\n"
+    "  <Window>\r\n"
+    "    <Widget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" />\r\n"
+    "  </Window>\r\n"
+    "</Prefab>\r\n"
+)
+
+
+def create_prefab(project: Path, source: str, name: str) -> dict:
+    """A new prefab, copied from an existing one into the same folder.
+
+    With no source it is a blank prefab directly under GUI/Prefabs. Never
+    overwrites: a name that is already taken is refused.
+    """
+    root = contained_project_path(project, "GUI", "Prefabs")
+    template = _prefab_path(project, source) if source else root / "Blank.xml"
+    stem = str(name or "").strip()
+    if stem.casefold().endswith(".xml"):
+        stem = stem[:-4]
+    if not _PREFAB_NAME.fullmatch(stem):
+        raise ValueError("A prefab name uses letters, digits, spaces, dots, dashes and underscores (1-79).")
+    target = template.with_name(stem + ".xml")
+    if root not in target.parents:
+        raise ValueError("Gauntlet prefabs are created under GUI/Prefabs")
+    content = template.read_bytes() if source else BLANK_PREFAB.encode("utf-8")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with target.open("xb") as stream:
+            stream.write(content)
+    except FileExistsError as error:
+        raise ValueError(f"A prefab named {target.name} already exists here.") from error
+    return read_prefab(project, target.relative_to(project.resolve()).as_posix())
+
+
+def duplicate_element(project: Path, requested: str, element_path: str,
+                      source_hash: str | None = None) -> dict:
+    """Copy an element, with everything inside it, to just after itself.
+
+    The copy is spliced in as text, indented like the original, so the rest of
+    the prefab keeps its exact formatting and comments.
+    """
+    path = _prefab_path(project, requested)
+    text, encoding, loaded_revision = read_utf8_source(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
+    element = next((row for row in _scan(text) if row["path"] == element_path), None)
+    if element is None:
+        raise ValueError(f"Gauntlet element changed or no longer exists: {element_path}")
+    if element["depth"] == 0:
+        raise ValueError("A prefab has one root element; copy an element inside it instead.")
+    left, right = element["_fullSpan"]
+    line_start = text.rfind("\n", 0, left) + 1
+    indent = text[line_start:left] if not text[line_start:left].strip() else ""
+    newline = "\r\n" if "\r\n" in text else "\n"
+    copy = newline + indent + text[left:right]
+    candidate = text[:right] + copy + text[right:]
+    try:
+        ET.fromstring(candidate)
+    except ET.ParseError as error:
+        raise ValueError(f"Copying would create invalid Gauntlet XML: {error}") from error
+    backup = replace_source_bytes(path, encode_utf8_source(candidate, encoding), source_hash or loaded_revision)
+    result = read_prefab(project, requested)
+    start = right + len(newline) + len(indent)
+    created = next((row for row in _scan(candidate) if row["_startTagSpan"][0] == start), None)
+    result.update({"created": created["path"] if created else "", "backup": backup})
     return result
 
 

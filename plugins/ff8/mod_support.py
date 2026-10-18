@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core import script_mods
+from core import memory_conflicts, script_mods
+from core.mod_conflicts import MAX_LISTED
 
 from . import runtime_layout
 
@@ -24,6 +25,72 @@ from . import runtime_layout
 IGNORED_SUFFIXES = frozenset({".txt", ".md", ".png", ".jpg", ".jpeg", ".ini", ".json"})
 IGNORED_NAMES = frozenset({"mod.json", "mod.xml"})
 ROOT_TEXT = "direct/, hext/, textures/, sfx/, voice/, ambient/, override/ or save/"
+CHANGE_LIMIT = 1000
+
+
+def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Two folder-to-lines reports as one, capped like lines_by_mod does."""
+    merged = {folder: list(lines) for folder, lines in first.items()}
+    for folder, lines in second.items():
+        merged.setdefault(folder, []).extend(lines)
+    for folder, lines in merged.items():
+        if len(lines) > MAX_LISTED:
+            merged[folder] = lines[:MAX_LISTED] + [f"…and {len(lines) - MAX_LISTED} more"]
+    return merged
+
+
+def _hext_spans(root: Path) -> list[tuple[int, int]] | None:
+    """Every address range the mod's Hext patches write, or None when unknowable.
+
+    Only the ``.txt`` patches the composer deploys count. A mod carrying a
+    native binary is unknowable without running it, and an unreadable patch
+    is left for enable time, so both give None. Variant folders count
+    whether or not they are active: an over-marked variant is rechecked when
+    the mod is enabled.
+    """
+    from . import iroj_archive
+    if root.is_file():
+        try:
+            archive = iroj_archive.Archive(root)
+        except (OSError, ValueError, iroj_archive.IrojError):
+            return None
+        members = list(archive.names())
+        if any(Path(name).suffix.casefold() in memory_conflicts.NATIVE_SUFFIXES
+               for name in members):
+            return None
+        spans: list[tuple[int, int]] = []
+        for name in members:
+            parts = name.replace("\\", "/").split("/")
+            if len(parts) < 2 or parts[0].casefold() != "hext":
+                continue
+            if Path(parts[-1]).suffix.casefold() != ".txt":
+                continue
+            try:
+                text = archive.read(name).decode("utf-8-sig")
+            except (KeyError, OSError, ValueError, UnicodeError):
+                return None
+            spans.extend(memory_conflicts.hext_ranges(text))
+        return spans
+    if memory_conflicts.carries_native_code(root):
+        return None
+    folder = root / "hext"
+    if not folder.is_dir():
+        return []
+    spans = []
+    try:
+        patches = sorted((item for item in folder.rglob("*") if item.is_file()),
+                         key=lambda item: item.as_posix().casefold())
+    except OSError:
+        return None
+    for patch in patches:
+        if patch.suffix.casefold() != ".txt":
+            continue
+        try:
+            text = patch.read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError):
+            return None
+        spans.extend(memory_conflicts.hext_ranges(text))
+    return spans
 
 
 class Ff8ModAdapter:
@@ -124,6 +191,92 @@ class Ff8ModAdapter:
                 "mods": [row["id"] for row in rows if row["enabled"]],
                 "runtimeRoot": str(runtime), "composition": composition,
                 "gameRoot": str(game_root), "libraryRoot": str(library)}
+
+    def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
+        """File and memory clashes between the mods, without enabling anything.
+
+        File clashes come from the last composition: semantic merges and the
+        ordered Hext stream combine their mods, so only a file kept whole
+        from one mod (the record says what was dropped) counts. Memory
+        clashes come from each mod's own Hext patches, read statically: two
+        mods patching the same address still load in order, but the earlier
+        mod's bytes never take effect, so both sides are marked.
+        """
+        from core.mod_conflicts import lines_by_mod
+        project, library, runtime, _ = self._roots()
+        rows = {row["id"]: row for row in runtime_layout.catalog(project, library)}
+        wanted = {Path(path).resolve() for path in mods}
+        names = {row["id"]: row.get("name") or row["id"] for row in rows.values()}
+        folders = {names[key]: str(Path(row["path"]).resolve()) for key, row in rows.items()
+                   if Path(row["path"]).resolve() in wanted}
+        found = []
+        for record in runtime_layout.read(runtime).get("conflicts", []):
+            if not isinstance(record, dict) or not record.get("warning"):
+                continue
+            found.append((str(record.get("path", "")),
+                          [names.get(str(claimant), str(claimant)) for claimant in record.get("claimants", [])]))
+        return _merge_marks(lines_by_mod(found, folders),
+                              self._memory_conflicts(rows, names, folders))
+
+    def _memory_conflicts(self, rows: dict[str, dict], names: dict[str, str],
+                          folders: dict[str, str]) -> dict[str, list[str]]:
+        """Hext address overlaps between the mods, found without enabling anything.
+
+        The ordered Hext stream lets the last mod win, so the pairs read as
+        ordinary last-wins marks. A mod whose patches cannot be parsed, or
+        which carries a native binary, is skipped: enabling stays the
+        authority for it.
+        """
+        from core.mod_conflicts import lines_by_mod
+        ordered = sorted(rows.values(), key=lambda row: (int(row["order"]),
+                                                         str(row.get("name") or row["id"]).casefold()))
+        spans = []
+        for row in ordered:
+            name = names[row["id"]]
+            if name not in folders:
+                continue
+            claimed = _hext_spans(Path(row["path"]).resolve())
+            if claimed:
+                spans.append((name, claimed))
+        if len(spans) < 2:
+            return {}
+        return lines_by_mod(memory_conflicts.overlaps(spans), folders)
+
+    def describe_changes(self, folder, game_root):
+        """One mod's changed records and loaded files, for its detail panel.
+
+        The records are the mod's fixed-record data files against the
+        extracted baseline; without extracted game data there is nothing
+        to compare, but the loaded files (what the composer deploys
+        from the folder) never needed it.
+        """
+        from . import fixed_data_merge, paths
+        folder = Path(folder)
+        names = sorted(path.relative_to(folder).as_posix() for path in folder.rglob("*")
+                       if path.is_file() and not path.is_symlink())
+        loaded = self.inspect(folder, [Path(name) for name in names])["packages"]
+        baseline = paths.BASELINE_ROOT
+        if not baseline.is_dir():
+            return {"changes": [], "loaded": loaded, "truncated": False,
+                    "note": "Extract the game's archives to compare records against vanilla."}
+        changes, notes = [], []
+        for key, spec in fixed_data_merge.SPECS.items():
+            mod_file, base_file = folder / key, baseline / spec["baseline"]
+            if not mod_file.is_file() or not base_file.is_file():
+                continue
+            try:
+                mine, base = mod_file.read_bytes(), base_file.read_bytes()
+            except OSError as error:
+                notes.append(f'{key} cannot be read ({error})')
+                continue
+            try:
+                changes += fixed_data_merge.diff(base, mine, spec, spec["baseline"])
+            except ValueError as error:
+                notes.append(str(error))
+        notes.append("Compares fixed-record data files; kernel, archives and media show under Files.")
+        truncated = len(changes) > CHANGE_LIMIT
+        return {"changes": changes[:CHANGE_LIMIT], "loaded": loaded,
+                "truncated": truncated, "note": " ".join(notes)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
         """Report the mods of the composed runtime, not the requested ones."""

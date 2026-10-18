@@ -8,12 +8,13 @@ import pytest
 from test_shared_ui_feedback import framework, page
 
 
-def mount_vanilla_shell(page, developer=True):
+def mount_vanilla_shell(page, developer=True, views=None):
     """A shell with no mod: Vanilla is the only, active project source."""
-    page.evaluate("""developer => {
+    page.evaluate("""([developer, views]) => {
       window.savedCalls = [];
       window.pywebview = {api: {
         lexeditor_settings: async () => ({developerMode: developer}),
+        default_views: async () => ({plugin: 'fixture', views: views || {}}),
         mod_library_status: async () => ({canManage: true}),
         save_default_view: async (...args) => {
           window.savedCalls.push(args);
@@ -28,7 +29,7 @@ def mount_vanilla_shell(page, developer=True):
         projectSnapshot: async () => ({canCreate: false, projects: []}),
         projectSources: () => [{key: 'vanilla', label: 'Vanilla', readOnly: true}],
         projectActiveSource: () => 'vanilla', sourcesReplaceProjects: true});
-    }""", developer)
+    }""", [developer, views or {}])
     page.wait_for_timeout(300)
 
 
@@ -95,8 +96,15 @@ def test_a_reader_who_is_not_the_developer_still_gets_the_mod_prompt(page):
     framework(page)
     mount_vanilla_shell(page, developer=False)
     mount_vanilla_field(page)
+    # Clicking the name edits nothing and asks nothing; reaching for the
+    # value is what offers a mod.
     name = page.locator(".lex-detail-field-label-text").first
     box = name.bounding_box()
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(200)
+    assert page.get_by_role("button", name="Create a mod", exact=True).count() == 0
+    value = page.locator(".lex-detail-field-control").first
+    box = value.bounding_box()
     page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     page.get_by_role("button", name="Create a mod", exact=True).wait_for()
     page.get_by_role("button", name="Cancel", exact=True).click()
@@ -168,3 +176,22 @@ def test_a_collapsible_sections_heading_is_not_renamed_in_place(page):
     page.wait_for_timeout(150)
     assert page.locator(".lex-label-rename").count() == 0
     assert page.evaluate("window.savedCalls") == []
+
+
+def test_a_shipped_tab_rename_reaches_the_bar_on_a_fresh_profile(page):
+    """Packaged defaults arrive after the tab bar is drawn (Lexer: the
+    DS1 sound tab rename to SFX never held). Seeding re-applies them. """
+    framework(page)
+    mount_vanilla_shell(page, views={"items": {"fixture-items.label": "Goods"}})
+    page.locator('[data-tab="items"] .lex-tab-label-text', has_text="Goods").wait_for(timeout=5000)
+    assert page.evaluate("localStorage.getItem('fixture-items.label')") == "Goods"
+
+
+def test_resetting_a_tab_view_keeps_its_shipped_rename(page):
+    """Right-click reset returns to the shipped default, not an empty view."""
+    framework(page)
+    mount_vanilla_shell(page, views={"items": {"fixture-items.label": "Goods"}})
+    page.locator('[data-tab="items"] .lex-tab-label-text', has_text="Goods").wait_for(timeout=5000)
+    page.locator('[data-tab="items"]').click(button="right")
+    page.wait_for_function("localStorage.getItem('fixture-items.label')==='Goods'", timeout=5000)
+    assert page.locator('[data-tab="items"] .lex-tab-label-text').text_content() == "Goods"

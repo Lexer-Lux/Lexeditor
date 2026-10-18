@@ -43,6 +43,12 @@ def main():
             page.get_by_role('menuitem',name='🔍 Find a Mod',exact=True).click()
             page.get_by_role('button',name='Layout sample',exact=True).click()
             assert 'Layout sample' in page.get_by_role('button',name='Active mod project',exact=True).inner_text()
+            # Home now opens the component catalogue. The control-spacing
+            # fixture is the existing full gallery, not catalogue metadata.
+            page.evaluate("navigate('one')")
+            # This part measures the supported arrow style. Wide boxes are the
+            # default now and intentionally hide the leader arrow.
+            page.evaluate("window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{booleanBoxStyle:false}}))")
             for width in (1600,1000,700):
                 page.set_viewport_size({'width':width,'height':1000})
                 page.wait_for_timeout(150)
@@ -119,17 +125,18 @@ def main():
                     if fill is not None:
                         assert fill[0]<=fill[1]+3,fill
                 # A boolean row lines up with the properties around it: its
-                # name ends on the shared label edge, its checkbox on the shared
+                # label lane ends on its column's shared edge, its checkbox on the shared
                 # value edge, the leader arrow points at the middle of the box
                 # whatever the row's height, the reading sits under the box
                 # inside its width, and the pin stays in the row.
-                names=page.evaluate('''()=>[...document.querySelectorAll('.lex-detail-field')]
-                  .map(f=>{const t=f.querySelector('.lex-detail-field-label-text');
-                    if(!t)return null;
-                    const r=document.createRange();r.selectNodeContents(t);
-                    return Math.round(r.getBoundingClientRect().right);}).filter(v=>v!==null)''')
-                if names:
-                    assert max(names)-min(names)<=1,names
+                names=page.evaluate('''()=>[...document.querySelectorAll('.lex-detail-field:not(.lex-detail-field-stacked)')]
+                  .map(f=>{const label=f.querySelector(':scope > .lex-detail-field-label');
+                    if(!label||!f.getClientRects().length)return null;
+                    const box=f.getBoundingClientRect(),lane=label.getBoundingClientRect();
+                    return {column:Math.round(box.left),right:Math.round(lane.right)};}).filter(Boolean)''')
+                for column in {entry['column'] for entry in names}:
+                    edges=[entry['right'] for entry in names if entry['column']==column]
+                    assert max(edges)-min(edges)<=1,(column,edges)
                 for field in page.locator('.lex-boolean-field').all():
                     if not field.is_visible():continue
                     row=field.evaluate('''e=>{
@@ -223,15 +230,23 @@ def main():
             page.mouse.move(0,0);page.wait_for_timeout(150)
             sort=page.locator('[data-lex-sort] .lex-field-type-rail').first
             # The sorted property's arrow rides its type marker, which sits just
-            # left of the property's name (8px of air), not in the far gutter.
+            # left of the property's name (the shared 4px inset).
             data=sort.evaluate("""e=>{const s=getComputedStyle(e,'::after'),r=e.getBoundingClientRect(),field=e.closest('.lex-detail-field'),f=field.getBoundingClientRect();
               const holder=field.querySelector(':scope > .lex-detail-field-label .lex-detail-field-label-text')||field.querySelector(':scope > .lex-detail-field-label');
               const text=[...holder.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());const range=document.createRange();range.selectNodeContents(text);
               return {y:r.top+parseFloat(s.top),center:f.top+f.height/2,air:range.getBoundingClientRect().left-r.right}}""")
-            assert abs(data['y']-data['center'])<1 and abs(data['air']-8)<1,data
+            assert abs(data['y']-data['center'])<1 and abs(data['air']-4)<1,data
             page.screenshot(path=str(OUT/'sorted-detail.png'))
             page.evaluate("navigate('one')")
             page.locator('.lex-detail-field').first.wait_for()
+            page.evaluate("window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{booleanBoxStyle:true}}))")
+            for field in page.locator('.lex-boolean-field').all():
+                if not field.is_visible():continue
+                wide=field.evaluate('''e=>{const box=e.querySelector('input[type=checkbox]'),arrow=e.querySelector('.lex-field-boolean-arrow');
+                  const r=box.getBoundingClientRect(),host=box.parentElement.getBoundingClientRect(),style=getComputedStyle(box.parentElement);
+                  return {width:r.width,available:host.width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-parseFloat(style.borderLeftWidth)-parseFloat(style.borderRightWidth),arrow:arrow?getComputedStyle(arrow).display:'none'};}''')
+                assert wide['arrow']=='none' and abs(wide['width']-wide['available'])<=1,wide
+            page.evaluate("window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{booleanBoxStyle:false}}))")
             page.mouse.move(0,0);page.wait_for_timeout(250)
             # A reference pillar reserves its room in advance. Nothing the
             # reader types may move a value box: not a rail appearing, not one
@@ -471,17 +486,15 @@ def main():
             # Park the pointer first: an earlier step can leave it over this
             # switch, which makes the at-rest state look like the hover state.
             page.mouse.move(0,0);page.wait_for_timeout(150)
-            # One rail contract for flags and for every other property:
-            # pointing at the SWITCH shows its type code, and only pointing at
-            # the RAIL swaps that code for its help mark.
-            assert not a.locator('.lex-info-help').is_visible()
+            # Help is beside the name; the type rail keeps its own BOOL code.
+            assert a.locator('.lex-toggle-name > .lex-info-help').is_visible()
             assert a.locator('.lex-toggle-type').is_visible()
             a.hover()
-            assert a.locator('.lex-toggle-type').is_visible() and not a.locator('.lex-info-help').is_visible()
+            assert a.locator('.lex-toggle-type').is_visible() and a.locator('.lex-info-help').is_visible()
             a.locator('.lex-toggle-rail').hover()
-            assert a.locator('.lex-info-help').is_visible() and not a.locator('.lex-toggle-type').is_visible()
+            assert a.locator('.lex-info-help').is_visible() and a.locator('.lex-toggle-type').is_visible()
             page.mouse.move(0,0);page.wait_for_timeout(150)
-            assert not b.locator('.lex-info-help').is_visible() and b.locator('.lex-toggle-type').is_visible()
+            assert b.locator('.lex-toggle-name > .lex-info-help').is_visible() and b.locator('.lex-toggle-type').is_visible()
             # Every property's rail sits just left of the name it annotates,
             # whether or not that property also carries a help mark.
             for field in page.locator('.lex-detail-field').all():
@@ -500,16 +513,30 @@ def main():
                   return range.getBoundingClientRect().left-rail.getBoundingClientRect().right;}''')
                 if offset is not None:
                     assert 0<=offset<=10,(field.inner_text()[:20],offset)
-            # Clicking the help mark must not leave the swap held open once
-            # the pointer has gone: the mark is focusable, and :focus-within
-            # kept it up for as long as focus sat there.
-            a.locator('.lex-toggle-rail').hover()
+            # Help opens its own text without changing the switch.
+            a.locator('.lex-info-help').hover()
+            page.locator('.lex-help-popover').wait_for()
+            assert page.locator('.lex-help-popover').inner_text()=='Target characters.'
             page.mouse.down();page.mouse.up()
+            assert not a.locator('input').is_checked()
             page.mouse.move(0,0);page.wait_for_timeout(150)
-            assert not a.locator('.lex-info-help').is_visible() and a.locator('.lex-toggle-type').is_visible()
+            assert a.locator('.lex-info-help').is_visible() and a.locator('.lex-toggle-type').is_visible()
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))
+            # An authored help action still runs, including keyboard activation,
+            # while the shared marker suppresses its containing label's action.
+            page.evaluate('''()=>{const U=LexeditorUI;window.__helpActions=0;
+              document.querySelector('#main').replaceChildren(U.el('label',{},
+                U.el('input',{type:'checkbox',id:'help-action-checkbox'}),
+                U.infoHelp('Fixture action',{id:'help-action',onclick:()=>window.__helpActions++})));}''')
+            action=page.locator('#help-action')
+            action.click()
+            assert page.evaluate('window.__helpActions')==1
+            assert not page.locator('#help-action-checkbox').is_checked()
+            action.focus();page.keyboard.press('Enter')
+            assert page.evaluate('window.__helpActions')==2
+            assert not page.locator('#help-action-checkbox').is_checked()
             assert not errors,errors
             browser.close()
     finally:server.shutdown()

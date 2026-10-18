@@ -198,10 +198,11 @@
     // The filters sit on the picture panel's own sides, not in panels of
     // their own (Lexer: "why did you create two panels for these buttons
     // instead of just putting those buttons on the sides of the panel").
-    return el("div",{class:"field-preview-sides"},
-      el("div",{class:"field-preview-layers"},toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})),
-      picture,
-      el("div",{class:"field-preview-states"},toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]})));
+    picture.lexSideControls({
+      left:el("div",{class:"field-preview-layers"},toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})),
+      right:el("div",{class:"field-preview-states"},toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]}))});
+    picture.classList.add("field-preview-sides");
+    return picture;
   }
   const fieldTileDefinitions=[
     ["x","DESTINATION X",-32768,32767,"Horizontal destination of this 16 by 16 tile."],["y","DESTINATION Y",-32768,32767,"Vertical destination of this 16 by 16 tile."],["z","DESTINATION Z",0,65535,"Draw-order depth stored by this tile."],["sourceX","SOURCE X",0,255,"Horizontal source coordinate in the MIM texture."],["sourceY","SOURCE Y",0,255,"Vertical source coordinate in the MIM texture."],["texture","TEXTURE",0,15,"MIM texture page selected by this tile."],["palette","PALETTE",0,15,"MIM palette selected by indexed-colour tiles."],["blend","ALPHA",0,3,"Two-bit alpha mode stored in the packed texture word."],["draw","DRAW",0,1,"When off, this tile draws black instead of its MIM pixels."],["depth","COLOUR TYPE",0,3,"Stored colour-depth selector used to read the MIM pixels."],["layer","LAYER",0,255,"New-format background layer used by the preview filter."],["blendType","ALPHA TYPE",0,4,"New-format pixel blend operation."],["parameter","PARAMETER",0,255,"Field-script background parameter. 255 is unconditional."],["state","STATE",0,255,"State paired with the background parameter."]
@@ -238,9 +239,22 @@
     showVertices(mesh.triangles[triangleId]);
     return detailPanel({title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
   }
-  const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
+  const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"The cameras for this field, in three pages. Position edits the fixed camera setups. Ranges limits how far the view scrolls. Movie edits the movie camera frames. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
   fieldDetailTabs.push({id:"worldToField",label:"World → Field",help:"Where the player arrives after entering a field from the world map. Select an entry to change its field, position or walkmesh triangle. The panel opens on an arrival for the selected field, when one exists. The table does not store a world-map position. Test changed arrivals in the game."});
-  function fieldDetailHelp(id){return infoHelp(fieldDetailTabs.find(tab=>tab.id===id).help)}
+  // The Camera tab holds three pages: the fixed camera setups (Position),
+  // the scroll ranges, and the movie camera frames. Ranges and Movie used
+  // to be tabs of their own beside Camera.
+  const fieldCameraSubtabs=[{id:"position",label:"Position",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"ranges",label:"Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."}];
+  function fieldDetailHelp(id){const tab=fieldDetailTabs.find(tab=>tab.id===id)||fieldCameraSubtabs.find(tab=>tab.id===id);return infoHelp(tab.help)}
+  function fieldCameraPanel(row){
+    const sub=fieldCameraSubtabs.some(tab=>tab.id===state.fieldCameraSubtab)?state.fieldCameraSubtab:"position";
+    state.fieldCameraSubtab=sub;
+    let body=sub==="ranges"?fieldRangesSection(row):sub==="movie"?fieldMovieSection(row):fieldCameraSection(row);
+    // The sub-tab already supplies its name and help, like the outer tabs.
+    const parts=LexeditorUI.sectionParts(body);
+    if(parts.content)body=parts.content;
+    return LexeditorUI.tabbedPanel({tabs:fieldCameraSubtabs,active:sub,label:"Camera",change:value=>{state.fieldCameraSubtab=value;rerenderFields()},content:body});
+  }
   function fieldCameraControl(row,camera,field,axis=null){
     const vector=field.startsWith("axis")?Number(field.slice(4)):null,vanilla=fieldMapRow(state.vanilla,row.key)?.camera?.cameras?.[camera.id];
     const read=value=>vector===null?(axis?value?.[field]?.[axis]:value?.[field]):value?.axis?.[vector]?.[axis],write=(target,val)=>{if(vector===null){if(axis)target[field][axis]=val;else target[field]=val}else target.axis[vector][axis]=val};
@@ -366,17 +380,17 @@
     if(active==="walkmesh")return fieldWalkmeshSection(row);
     if(active==="exits")return fieldExitsSection(row);
     if(active==="doors")return fieldDoorsSection(row);
-    if(active==="ranges")return fieldRangesSection(row);
-    if(active==="movie")return fieldMovieSection(row);
     if(active==="misc")return fieldMiscSection(row);
     if(active==="scripts")return fieldScriptsSection(row);
     if(active==="dialogue")return fieldDialogueSection(row);
     if(active==="triggers")return fieldTriggersSection(row);
-    return fieldCameraSection(row);
+    return fieldCameraPanel(row);
   }
   function fieldDetail(row,prefs){
     if(!row._loaded&&state.fieldDetailTab!=="worldToField"){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
     const tabs=[...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
+    if(state.fieldDetailTab==="ranges"){state.fieldDetailTab="camera";state.fieldCameraSubtab="ranges"}
+    if(state.fieldDetailTab==="movie"){state.fieldDetailTab="camera";state.fieldCameraSubtab="movie"}
     const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"camera";
     state.fieldDetailTab=active;
     if(active==='worldToField'){
@@ -410,7 +424,16 @@
   function rerenderWorldMap(){renderWorldMap()}
 
   function initOwner(dataset,kind,id=0){const init=dataset?.init;if(!init)return null;if(kind==="general"||kind==="config")return init[kind];if(kind==="gf")return init.gfs.rows.find(row=>Number(row.id)===Number(id));if(kind==="character")return init.characters.rows.find(row=>Number(row.id)===Number(id));return null}
-  function initFieldSource(field,kind,id=0){const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,value=>field.value=field.control==="boolean"?Boolean(value):Number(value))}
+  function initFieldSource(field,kind,id=0){
+    const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);
+    const set=value=>{
+      if(field.lookup?.type==="flags"){
+        const writable=field.lookup.entries.filter(entry=>!entry.readonly).reduce((mask,entry)=>mask|Number(entry.mask??entry.value),0);
+        field.value=(field.value&~writable)|(Number(value)&writable);
+      }else field.value=field.control==="boolean"?Boolean(value):Number(value);
+    };
+    return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,set);
+  }
   function startingFields(fields,kind,id=0){return LexeditorUI.tileGrid(fields.map(field=>detailField({label:field.label,help:field.help?infoHelp(field.help):null,control:initFieldSource(field,kind,id),dataType:field.control==="boolean"?"BOOL":field.lookup?.type==="enum"?"ENUM":field.lookup?.type==="flags"?"FLAGS":"INT",min:field.minimum,max:field.maximum})))}
   function startingPicker(label,value,rows,change){return detailField({label,control:selectControl(value,rows.map(row=>({id:row.id,name:row.name})),change)})}
   function initNestedReferences(read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(state.referenceData[reference.id]?.init)})).filter(entry=>entry.value!==undefined)}

@@ -1,0 +1,27 @@
+{
+  "source": "https://github.com/vawser/Smithbox",
+  "revision": "cbd477a8fd6d436b3e011c8548e1de8fd8876918",
+  "license": "MIT",
+  "notice": "../credits.md",
+  "scope": "Special-effect definitions, English annotations, row names and five additional enums. Other DS1 metadata retains the pins in SOURCE.json. No upstream executable code, dependencies or game data are included.",
+  "sourcePrefix": "src/Smithbox.Data/Assets/PARAM/DS1R/",
+  "artifact": {"run": 36932078460, "id": 11197230319, "sha256": "8837de4c4b4eff8602a84d8d83281e0e22239bff893b78fd57e7721e3a2531e2"},
+  "transformations": [
+    "UTF-8 BOM removed; UTF-16 XML metadata converted to UTF-8.",
+    "The definition retains ParamType, Unk06, endianness, Unicode, version, ordered Def declarations, Minimum, Maximum and Enum. Unused display text is omitted; English display text stays in annotations.",
+    "JSON and XML whitespace compacted. Semantic digests cover the exact fields the editor consumes, independent of whitespace and unused top-level display labels.",
+    "semanticSha256 is SHA-256 of the projection in tests/ds1/test_ds1_effect_metadata.py, serialized with sorted keys, ASCII escapes and compact separators."
+  ],
+  "files": {
+    "defs/SpEffectParam.xml": {"path": "Defs/SpEffect.xml", "sha256": "da39ee86833f3061733e22dd13b33e7b356e42bb93b4692d03df15ff8b97d818", "semanticSha256": "45a4fff13bf4e66494b03b73c0afeee7e07ead8694a37994afae3b18c3f6df4c"},
+    "meta/SpEffectParam.xml": {"path": "Param Meta/SpEffect.xml", "sha256": "f0e8b41cf1785636d53b6a36841f3cc07ba011bde38caba93aaecd8947b88f95", "semanticSha256": "46475412320b8522ce8927846a0b7943159e7664d40b490c69e9c11294969c75"},
+    "annotations/SP_EFFECT_PARAM_ST.json": {"path": "Param Annotations/English/SP_EFFECT_PARAM_ST.json", "sha256": "645e94d2fbb16c3a40f62aaa7818779d5d28692b38c7668fc305f2a2bac43ce1", "semanticSha256": "e74d11ec8b5bf98a493e62a5d0c9da740643ffc3c3ef053d79b36aed6ed9c89d"},
+    "row_names/SpEffectParam.json": {"path": "Param Row Names/English/SpEffectParam.json", "sha256": "f76498637688b1eb1e5b990e60a5a9758fc3d82b7a3f484806d201e4bd7313ec", "semanticSha256": "cf3c9baabaec66edcd599ebfc93cfa39828a4626a8b98f6810e7d1e21d72bd1d"},
+    "enums/ATKPARAM_REP_DMGTYPE.json": {"path": "Param Enums/ATKPARAM_REP_DMGTYPE.json", "sha256": "10e4db5791aeeff35696ff8e7fd2de671306b61f9952fad1136b85b541f44eb6", "semanticSha256": "e118a6fbb619ffb17965d9d9ca487545cbadbe0038b3ee69cf1c4b50fbf12e03"},
+    "enums/SP_EFE_WEP_CHANGE_PARAM.json": {"path": "Param Enums/SP_EFE_WEP_CHANGE_PARAM.json", "sha256": "a94fe74b7fbcc61ff76d593a928eed60495ae41d18d10f7c50c1d038b52c02dd", "semanticSha256": "29a6687b5d86413842dcb76814032bb5ff6516695121246cf6f6980635f958aa"},
+    "enums/SP_EFFECT_MOVE_TYPE.json": {"path": "Param Enums/SP_EFFECT_MOVE_TYPE.json", "sha256": "e3725142718a37e3f4a4607c289fc1d47ab33fea9ecedef5b634455915b5388c", "semanticSha256": "b869c996c2957d172fa6d9619fbf99b5c629c4465894b40c629889bd592833aa"},
+    "enums/SP_EFFECT_SPCATEGORY.json": {"path": "Param Enums/SP_EFFECT_SPCATEGORY.json", "sha256": "adbdf7ff93b51dcfb133b676f5e171dbee70b99074b4ca519243856e072dc501", "semanticSha256": "15a48c24966fc89bd99d0ecf1bcd39577efc82fe48efd8e26e153164d34c9eb4"},
+    "enums/SP_EFFECT_THROW_CONDITION_TYPE.json": {"path": "Param Enums/SP_EFFECT_THROW_CONDITION_TYPE.json", "sha256": "297f5af5954bf92415bcf61e9fbfb5afe62f34e6f422725f1760a60475f41f6b", "semanticSha256": "1f51dc141f444ad636d4361e6cfa7c5122cba3b16b4e250fef5a9cc229af75dd"}
+  },
+  "unavailableEnums": ["SP_EFFECT_SAVE_CATEGORY"]
+}

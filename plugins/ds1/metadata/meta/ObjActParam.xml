@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <actionEnableMsgId FmgRef="Event_Text" />
+    <actionFailedMsgId FmgRef="Event_Text" />
+    <spQualifiedPassEventFlag FlagAlias="" />
+    <validDist />
+    <playerAnimId />
+    <chrAnimId />
+    <spQualifiedId Refs="SpEffectParam(spQualifiedType=2),EquipParamGoods(spQualifiedType=1)" />
+    <spQualifiedId2 Refs="SpEffectParam(spQualifiedType2=2),EquipParamGoods(spQualifiedType2=1)" />
+    <objDummyId />
+    <objAnimId />
+    <validPlayerAngle />
+    <spQualifiedType Enum="OBJACT_SP_QUALIFIED_TYPE" />
+    <spQualifiedType2 Enum="OBJACT_SP_QUALIFIED_TYPE" />
+    <validObjAngle />
+    <chrSorbType Enum="OBJACT_CHR_SORB_TYPE" />
+    <eventKickTiming />
+    <pad1 Padding="" />
+  </Field>
+</PARAMMETA>

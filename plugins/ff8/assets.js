@@ -45,10 +45,10 @@
       return sharedDetail(row,prefs,[LexeditorUI.detailNote(row.note),
         detailSection({title:"MOD FILE",body:[
           detailField({label:"FILE",control:readonlyField(row.modFiles[0].file)}),
-          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})]);
+          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})],"",assetFileSize(row.bytes));
     const sections=[];
     if(row.valid)sections.push(detailSection({title:"PREVIEW",body:[
-      detailField({label:"",control:el("audio",{src:`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`,controls:true,"aria-label":`Play ${row.name}`})})]}));
+      soundPreview({src:`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`,label:`Play ${row.name}`})]}));
     const facts=[
       detailField({label:"FORMAT",control:readonlyField(row.valid?`${row.codec} · ${row.channels===1?"mono":"stereo"} · ${formatNumber(row.rate)} Hz · ${row.bits}-bit`:"—")}),
       detailField({label:"LENGTH",control:readonlyField(assetDuration(row.durationMs))}),
@@ -79,15 +79,22 @@
       sections.push(detailSection({title:"REPLACEMENT",body:replaceBody,
         help:infoHelp("Replace writes sfx/<id>.<ext> into this project; FFNx plays it instead of the shipped sound. Revert deletes the project override.")}));
     }
-    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
+    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections,"",assetFileSize(row.bytes));
   }
 
   function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function heavyLoadingView(label){
+    const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
+    $("#main").replaceChildren(state.heavyError
+      ?el("div",{class:"empty"},`Could not load ${label.toLocaleLowerCase()}: ${state.heavyError}`)
+      :LexeditorUI.loadingPanel({label}));
+  }
   function renderModels(){
+    if(!state.heavyReady?.[assetDataset()]){heavyLoadingView("Loading models");return}
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
       {key:"name",label:"Model",render:row=>assetName(row,modelOverridden(row))},
-      {key:"modelKind",label:"Kind",render:row=>modelKindName(row.modelKind)},
+      {key:"modelKind",label:"Kind",help:"What this battle file holds. Sound data is a sound container: its parts are listed, but the sound is not decoded, so it has no preview, no playback and no replacement. Unsupported means the contents are not decoded, so only whole-file replacement or reversion is offered.",render:row=>modelKindName(row.modelKind)},
       {key:"vertices",label:"Vertices",render:row=>row.vertices==null?"—":formatNumber(row.vertices)},
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
     showPaged("models",rows,columns,modelDetail,"110px minmax(150px,2fr) 90px 80px 70px");
@@ -166,19 +173,21 @@
     if(['effect','surface'].includes(row.modelKind)){
       const meshes=(row.effectMeshes||[]).filter(mesh=>mesh.triangles||mesh.quads);
       if(!meshes.length)return null;
+      let viewer=null;
       return {label:`${row.name} geometry`,openLabel:`Open the ${row.name} geometry`,closeLabel:`Close the ${row.name} geometry`,
         content:()=>{
           const host=el('div',{style:'display:contents'});
           const frames=el('div',{style:'display:contents'});
           let selected=meshes[0].id;
-          const draw=frame=>{const sprite=meshes.find(mesh=>String(mesh.id)===String(selected))?.kind==='sprite';host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:sprite?{yaw:0,pitch:0}:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}}));};
+          const draw=frame=>{const sprite=meshes.find(mesh=>String(mesh.id)===String(selected))?.kind==='sprite';viewer?.lexDispose?.();viewer=FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:selected,frame,initialView:sprite?{yaw:0,pitch:0}:row.modelKind==='surface'?{yaw:.55,pitch:-.6}:{}});host.replaceChildren(viewer);};
           const show=id=>{selected=id;frames.replaceChildren();const mesh=meshes.find(mesh=>String(mesh.id)===String(id));
             if(mesh.frameCount>1){const control=selectControl(0,Array.from({length:mesh.frameCount},(_,i)=>({value:i,name:`Frame ${i+1}`})),draw);control.setAttribute('aria-label','Surface frame');frames.append(detailField({label:'FRAME',control}));}draw(0);};
           const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:mesh.kind==='sprite'?`Sprite ${mesh.id} · ${mesh.frameCount} frames`:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
           control.setAttribute('aria-label','Summon mesh object');show(meshes[0].id);
           return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp(row.modelKind==='surface'?'Select an object and frame to inspect its shape. The effect\'s placement and timing are not shown. Surfaces without matching textures stay plain.':'Each object is shown separately, with textures from its first simulated appearance when known. Animation and placement within the summon are not shown. Morph targets have vertices but no standalone surface.')}),frames,host);
-        },onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
+        },onClose:drawer=>{viewer?.lexDispose?.();viewer=null;drawer.replaceChildren();}};
     }
+    let viewer=null;
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
@@ -187,13 +196,13 @@
         let selectedTexture=null;
         const host=el('div',{style:'display:contents'});
         const textureControls=el('div',{style:'display:contents'});
-        const show=id=>{selectedPart=id;host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id,textureSource:selectedTexture,onReady:(_canvas,scene)=>{
+        const show=id=>{selectedPart=id;viewer?.lexDispose?.();viewer=FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id,textureSource:selectedTexture,onReady:(_canvas,scene)=>{
           textureControls.replaceChildren();
           if(!scene.textureChoices?.length)return;
           const control=selectControl(selectedTexture||'', [{value:'',name:'Automatic'},...scene.textureChoices.map(name=>({value:name,name}))],value=>{selectedTexture=value||null;show(selectedPart);});
           control.setAttribute('aria-label','Model preview texture');
           textureControls.append(detailField({label:'TEXTURE',control,help:infoHelp('These images fit the same surfaces. Choose one for the preview and GLB export. Automatic leaves ambiguous surfaces plain.')}));
-        }}));};
+        }});host.replaceChildren(viewer);};
         const controls=[];
         if(row.modelParts?.length){
           const control=selectControl(selectedPart,row.modelParts.map(part=>({value:part.id,name:`Part ${part.id+1} · ${part.vertices} vertices`})),show);
@@ -205,7 +214,7 @@
         LexeditorUI.actionRow(infoHelp(row.modelKind==='stage'?'Drag to turn the stage and use the wheel to zoom. Arrow keys turn it, plus and minus zoom, and Home resets. This preview shows static geometry and textures.':row.modelKind==='effect-model'?'Drag or use arrow keys to turn the model. The wheel, plus and minus zoom, and Home resets the view. Export GLB includes matching textures, its skeleton and animations. Unmatched surfaces stay plain.':'Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
           ...(row.modelKind==='stage'?[]:[el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}${selectedPart==null?'':`&object=${selectedPart}`}${selectedTexture==null?'':`&textureSource=${encodeURIComponent(selectedTexture)}`}`,download:`${row.file.replace(/\.[^.]+$/,'')}${selectedPart==null?'':`-part-${Number(selectedPart)+1}`}.glb`}).click()},'Export GLB')]),...(extra?[extra]:[])),host);
       },
-      onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
+      onClose:drawer=>{viewer?.lexDispose?.();viewer=null;drawer.replaceChildren();}};
   }
   function modelDetail(row,prefs){
     const sections=[];
@@ -214,6 +223,8 @@
       {label:"VERTICES",control:readonlyField(formatNumber(row.counts.vertices))},
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
+    if(row.storedValue!=null)sections.push(detailSection({title:"CONTENTS",body:[
+      detailField({label:"STORED NUMBER",help:infoHelp("The one number this file holds. What the game uses it for is not decoded."),control:readonlyField(formatNumber(row.storedValue))})]}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
     if(row.motion?.length){
       const multiple=row.motion.length>1;
@@ -244,7 +255,8 @@
       if(row.modelKind!=='texture'&&!["dat","x"].includes(ext)){showAlert({title:"Unsupported model",message:`${file.name} is not a .dat or .x battle file.`});return null}
       return {datRevert:false};
     });
-    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||row.modelKind==='sound-data'||(row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))),onclick:()=>upload.click()},"Replace"),
+    const replaceBlocked=row.modelKind==='sound-data'?"Sound containers cannot be replaced.":row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))?"Only .dat, .x and texture files can be replaced.":null;
+    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||!!replaceBlocked,...(replaceBlocked?{title:replaceBlocked}:{}),onclick:()=>upload.click()},"Replace"),
       revert=el("button",{type:"button",disabled:state.activeSource!=="mine"||!row.override,onclick:()=>{row.datBase64="";row.datRevert=true;shell.refresh();render()}},"Revert"),
       exportLink=row.sha256?el("a",{href:`/assets/models/${row.file}?dataset=${encodeURIComponent(assetDataset())}`,download:row.file},"Export"):null,
       pending=assetPendingNote(row,"datBase64","Replacement"),
@@ -258,6 +270,7 @@
   }
 
   function renderTextures(){
+    if(!state.heavyReady?.[assetDataset()]){heavyLoadingView("Loading textures");return}
     const rows=filtered("textures",["name","id","ffnxBase","source"]),columns=[
       {key:"name",label:"Texture",render:row=>assetName(row,textureOverridden(row))},
       {key:"source",label:"Source"},
@@ -304,5 +317,7 @@
     }else if(row.editor==="world"){
       meta=hoverable({content:row.id,targetType:"world",targetId:row.timIndex,targetLabel:`World Texture ${row.timIndex+1} in Maps`,activate:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}});
     }
-    return detailPanel({title:assetName(row,textureOverridden(row)),meta,icon,body:sections});
+    // The subtitle carries the file size, like every other file-backed view.
+    const sized=row.sizeBytes==null?meta:LexeditorUI.inlineLabel(meta,` \u00b7 ${assetFileSize(row.sizeBytes)}`);
+    return detailPanel({title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections});
   }
