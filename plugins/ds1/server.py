@@ -33,6 +33,20 @@ _ICON_KEYS = {'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 LOCK = threading.RLock()
+IMMUTABLE = "public, max-age=31536000, immutable"
+
+def _warm_icon_table():
+    """Parse the icon layout under the caller's lock.
+
+    The first parse costs a second; concurrent icon requests must share
+    the one parse instead of each running their own.
+    """
+    if STORE.game_root is None:
+        return
+    try:
+        icons.load_icon_table(STORE.game_root)
+    except Exception:
+        pass
 STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED'),
                   None if os.environ.get('LEXEDITOR_NO_MOD') == '1' else os.environ.get('LEXEDITOR_DS1_PROJECT'),
                   os.environ.get('LEXEDITOR_MOD_READ_ONLY') == '1' or os.environ.get('LEXEDITOR_NO_MOD') == '1'
@@ -154,6 +168,7 @@ class Handler(PluginRequestHandler):
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx'):
             try:
                 with LOCK:
+                    _warm_icon_table()
                     if path == '/api/assets':
                         scope = query.get('scope', ['overrides'])[0]
                         if scope == 'game':
@@ -379,25 +394,29 @@ class Handler(PluginRequestHandler):
             return
         if path in ('/api/icon', '/api/label'):
             try:
-                with LOCK:
-                    if STORE.game_root is None:
-                        raise ValueError('Select the installed game before showing its icons')
-                    if path == '/api/label':
-                        self.send_bytes(icons.label_png(STORE.game_root, query.get('name', [''])[0]),
-                                        'image/png')
-                    else:
-                        table = query.get('table', [''])[0]
-                        key = _ICON_KEYS.get(table)
-                        if key is None:
-                            raise ValueError('That record has no item picture')
-                        try:
-                            row_id = int(query.get('id', [''])[0])
-                        except ValueError:
-                            raise ValueError('An item picture needs a numeric record') from None
+                if STORE.game_root is None:
+                    raise ValueError('Select the installed game before showing its icons')
+                if path == '/api/label':
+                    png = icons.label_png(STORE.game_root, query.get('name', [''])[0])
+                else:
+                    table = query.get('table', [''])[0]
+                    key = _ICON_KEYS.get(table)
+                    if key is None:
+                        raise ValueError('That record has no item picture')
+                    try:
+                        row_id = int(query.get('id', [''])[0])
+                    except ValueError:
+                        raise ValueError('An item picture needs a numeric record') from None
+                    # Only the record read takes the lock. The PNG work reads
+                    # immutable game files through thread-safe caches, so icon
+                    # requests run side by side instead of queueing behind it.
+                    with LOCK:
+                        _warm_icon_table()
                         icon_id = STORE.get().value(table, row_id, key)
-                        if not isinstance(icon_id, int) or icon_id <= 0:
-                            raise LookupError('That record has no item picture')
-                        self.send_bytes(icons.icon_png(STORE.game_root, icon_id), 'image/png')
+                    if not isinstance(icon_id, int) or icon_id <= 0:
+                        raise LookupError('That record has no item picture')
+                    png = icons.icon_png(STORE.game_root, icon_id)
+                self.send_bytes(png, 'image/png', cache=IMMUTABLE)
             except LookupError as error:
                 self.send_json({'error': str(error)}, 404)
             except (FormatError, icons.IconError, RuntimeError, ValueError, OSError,

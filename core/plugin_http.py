@@ -86,11 +86,12 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
         self.send_bytes(data, mimetypes.guess_type(Path(target).name)[0]
                         or "application/octet-stream", status)
 
-    def send_bytes(self, data: bytes, content_type: str, status: int = 200) -> None:
+    def send_bytes(self, data: bytes, content_type: str, status: int = 200,
+                   cache: str | None = None) -> None:
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Cache-Control", NO_STORE)
+            self.send_header("Cache-Control", cache or NO_STORE)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

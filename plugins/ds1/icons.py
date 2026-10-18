@@ -179,8 +179,12 @@ def icon_table(drb_plain):
     return table
 
 
+@lru_cache(maxsize=8)
 def load_icon_table(game_root):
-    """The installed game's icon catalog: layout first, then its archive."""
+    """The installed game's icon catalog: layout first, then its archive.
+
+    Parsed once per game: the parse costs a second and every icon needs it.
+    """
     menu = Path(game_root) / 'menu'
     plain = menu / 'menu.drb'
     if plain.is_file():
@@ -219,9 +223,9 @@ def crop_png(dds, rect):
         return out.getvalue()
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=1024)
 def icon_png(game_root, icon_id):
-    """One icon ID's picture as PNG bytes."""
+    """One icon ID's picture as PNG bytes. The cache covers the catalog."""
     table = load_icon_table(game_root)
     found = icon_rect(icon_id, table)
     if found is None:
