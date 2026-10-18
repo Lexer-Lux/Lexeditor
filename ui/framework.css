@@ -7660,6 +7660,12 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   margin:0;
   border:0;
   box-shadow:none;
+  overflow:auto;
+}
+.lex-tabbed-panel-content > .lex-column-list:not([hidden]) > .lex-column-list-header {
+  position:sticky;
+  top:0;
+  z-index:1;
 }
 .lex-boolean-mark {
    font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif;

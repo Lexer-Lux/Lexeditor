@@ -412,7 +412,10 @@
     const parts=LexeditorUI.sectionParts(body);
     const recordPanel=active==="tile"||active==="walkmesh";
     if(parts.content&&!recordPanel)body=parts.content;
-    const editor=LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel?body:LexeditorUI.detailPanel({paginate:{unpaged:true},heading:false,body})});
+    // A tab holding only a table hands the table over bare: the tab content's
+    // fill rules make it the whole panel, with no wrapper margins.
+    const tableOnly=body instanceof Element&&body.classList.contains("lex-column-list");
+    const editor=LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel||tableOnly?body:LexeditorUI.detailPanel({paginate:{unpaged:true},heading:false,body})});
     // Three columns by default: list, picture, tabs. The Deling-style setting
     // stacks the picture over the tabs instead, as Deling does.
     const deling=state.editorSettings?.delingFieldLayout===true;
