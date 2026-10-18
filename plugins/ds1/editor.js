@@ -2579,10 +2579,15 @@ function monsterModelSection(){
     onclick:event=>{LexeditorUI.choicePopover({label:"Attack",
       choices:attacks.map(entry=>({label:entry.name,value:entry.id})),select:pickAttack}).openFor(event.currentTarget);}},
     `Attack: ${attack?attack.name:"none"}`);
+  // The stage shows the hitboxes; the Attacks tab edits them. Without
+  // this button the viewed attack's slots were reachable only by
+  // hunting the Attacks tab by hand.
+  const editAttack=attack?el("button",{type:"button",title:`Edit ${attack.name}'s hitboxes in the Attacks tab`,
+    onclick:()=>openAttack(attack.id)},"Edit in Attacks"):null;
   const status=el("div",{class:"lex-viewport-status","data-chr-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading model"));
   const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE+"height:auto;flex:1 1 auto;"});
   requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(failMount(status,"Could not load the model."));});
-  return [el("div",{class:"lex-viewport-bar"},attackPicker),host,status];
+  return [el("div",{class:"lex-viewport-bar"},attackPicker,editAttack),host,status];
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";
