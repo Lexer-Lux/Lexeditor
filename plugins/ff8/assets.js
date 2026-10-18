@@ -33,12 +33,13 @@
     // A shipped sound has no name of its own - "Sound 12" only repeats its
     // ID - so the list shows the ID; a sound a mod adds shows its file name.
     const rows=filtered("sfx",["name","id"]),columns=[
+      LexeditorUI.audioColumn({src:row=>row.valid?`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`:null,name:row=>row.name}),
       {key:"id",label:"ID",render:row=>sfxFile(row)?row.name:row.id,
         cellClass:row=>sfxOverridden(row)?"lex-value-modified":""},
       {key:"durationMs",label:"Length",render:row=>assetDuration(row.durationMs)},
       {key:"loop",label:"Loop",render:row=>row.valid?(row.loop?"Yes":"No"):"—"},
       {key:"modFiles",label:"Replaced",render:row=>row.modFiles?.length?`Yes (${row.modFiles.length})`:"—"}];
-    showPaged("sfx",rows,columns,sfxDetail,"minmax(90px,1fr) 90px 70px 110px");
+    showPaged("sfx",rows,columns,sfxDetail,"44px minmax(90px,1fr) 90px 70px 110px");
   }
   function sfxDetail(row,prefs){
     if(String(row.id).startsWith("file:"))

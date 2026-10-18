@@ -52,6 +52,10 @@
       "terraria",
       "warband"
     ],
+    "audioColumn": [
+      "blank",
+      "ff8"
+    ],
     "autoFitControlText": [
       "bannerlord",
       "blank",

@@ -1343,24 +1343,48 @@
     const whole = Math.max(0, Math.floor(Number(seconds) || 0));
     return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
   };
-  const recordAudio = options => {
+  const claimRecordAudio = audio => {
+    if (playingRecordAudio && playingRecordAudio !== audio) playingRecordAudio.pause();
+    playingRecordAudio = audio;
+  };
+  const audioPlayButton = ({src, label} = {}) => {
     const audio = new Audio();
     audio.preload = "metadata";
-    audio.src = options.src;
-    const label = options.label || "sound";
+    audio.src = src;
+    const name = label || "sound";
     const glyph = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     glyph.setAttribute("viewBox", "0 0 24 24");
     glyph.setAttribute("aria-hidden", "true");
     const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
     glyph.append(shape);
     const button = element("button", {type: "button", class: "lex-audio-play"}, glyph);
-    const scrub = element("input", {type: "range", class: "lex-audio-scrub", min: "0", max: "0", step: "0.01",
-      value: "0", "aria-label": `Position in ${label}`, "data-lex-autofit": "false"});
     const paint = () => {
       const playing = !audio.paused && !audio.ended;
       shape.setAttribute("d", playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z");
-      button.title = `${playing ? "Pause" : "Play"} ${label}`;
+      button.title = `${playing ? "Pause" : "Play"} ${name}`;
       button.setAttribute("aria-label", button.title);
+    };
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      if (audio.paused || audio.ended) {
+        claimRecordAudio(audio);
+        audio.play().catch(() => showToast(`Could not play ${name}.`, true));
+      } else audio.pause();
+    });
+    // A cell that re-renders mid-play orphans its button; the orphan stops
+    // instead of playing on where no pause button can reach it.
+    audio.addEventListener("timeupdate", () => { if (!button.isConnected) audio.pause(); });
+    for (const type of ["play", "pause", "ended"])
+      audio.addEventListener(type, paint);
+    paint();
+    return {button, audio};
+  };
+  const recordAudio = options => {
+    const {button, audio} = audioPlayButton(options);
+    const label = options.label || "sound";
+    const scrub = element("input", {type: "range", class: "lex-audio-scrub", min: "0", max: "0", step: "0.01",
+      value: "0", "aria-label": `Position in ${label}`, "data-lex-autofit": "false"});
+    const paint = () => {
       const length = Number.isFinite(audio.duration) ? audio.duration : 0;
       scrub.max = String(length);
       if (!scrub.matches(":active")) scrub.value = String(audio.currentTime || 0);
@@ -1369,14 +1393,6 @@
       scrub.title = scrub.getAttribute("aria-valuetext");
     };
     const stopIfGone = () => { if (!button.isConnected) audio.pause(); };
-    button.addEventListener("click", event => {
-      event.stopPropagation();
-      if (audio.paused || audio.ended) {
-        if (playingRecordAudio && playingRecordAudio !== audio) playingRecordAudio.pause();
-        playingRecordAudio = audio;
-        audio.play().catch(() => showToast(`Could not play ${label}.`, true));
-      } else audio.pause();
-    });
     scrub.addEventListener("input", () => {
       audio.currentTime = Number(scrub.value) || 0;
       paint();
@@ -1386,6 +1402,16 @@
     paint();
     return {button, scrub, audio};
   };
+  // A table column of per-row play buttons: every sound row plays from the
+  // table, under the same one-sound-at-a-time policy as the detail header.
+  const audioColumn = ({key = "play", label = "", width = "44px", src, name} = {}) => ({key, label, width,
+    sortable: false,
+    render: row => {
+      const url = typeof src === "function" ? src(row) : src;
+      if (!url) return "\u2014";
+      const title = typeof name === "function" ? name(row) : (row?.name ?? label);
+      return audioPlayButton({src: url, label: title}).button;
+    }});
 
   // A panel whose body carries a sound player (FF8's SFX preview row) plays
   // from its heading instead: the player's source moves up, and the row that
@@ -14113,7 +14139,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

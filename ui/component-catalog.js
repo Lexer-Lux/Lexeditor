@@ -143,6 +143,25 @@
             body: [UI.soundPreview({src: beep, label: "Play example"})]})]}),
           UI.soundPreview({note: "No preview"}));
       }},
+    {id: "audioColumn", level: "molecule", summary: "A table column of per-row play buttons: every sound row plays from the table, one sound at a time across the page.",
+      sample: () => {
+        // A tenth-second 440 Hz beep, synthesized so the sample needs no game.
+        const rate = 8000, count = 800, data = new Uint8Array(44 + count * 2);
+        const view = new DataView(data.buffer);
+        const text = (at, string) => { for (let i = 0; i < string.length; i++) view.setUint8(at + i, string.charCodeAt(i)); };
+        text(0, "RIFF"); view.setUint32(4, 36 + count * 2, true); text(8, "WAVEfmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data");
+        view.setUint32(40, count * 2, true);
+        for (let i = 0; i < count; i++)
+          view.setInt16(44 + i * 2, Math.round(12000 * Math.sin(i / rate * 440 * 2 * Math.PI) * (1 - i / count)), true);
+        let binary = "";
+        for (let i = 0; i < data.length; i += 8192)
+          binary += String.fromCharCode.apply(null, data.subarray(i, i + 8192));
+        const beep = "data:audio/wav;base64," + btoa(binary);
+        return UI.audioColumn({src: beep}).render({name: "Example sound"});
+      }},
     {id: "stack", level: "template", summary: "A bar over the content it switches: the bar keeps its height, the content takes the rest."},
     {id: "bitmapText", level: "atom", summary: "Text in a game's own bitmap font, one masked glyph per character from --lex-bitmap-atlas."},
     {id: "imageMap", level: "organism", summary: "An image with selectable cells and point markers.", sample:()=>UI.imageMap({columns:4,rows:3,cells:Array.from({length:12},(_,id)=>({id,label:`Cell ${id+1}`,selected:id===3})),points:[{x:.5,y:.5,label:"Point"}]})},
