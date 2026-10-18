@@ -438,20 +438,23 @@
     return svg;
   };
 
-  // The remove mark beside the copy icon in record headings: the same X
-  // the text button drew, as SVG so it scales with its neighbours.
+  // The remove mark beside the copy icon in record headings: a bin, drawn
+  // in the same stroke as the copy icon and cropped to the drawing.
   const removeIcon = () => {
     const namespace = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(namespace, "svg");
-    svg.setAttribute("viewBox", "5 5 14 14");
+    svg.setAttribute("viewBox", "3 3 18 18");
     svg.setAttribute("aria-hidden", "true");
-    const path = document.createElementNS(namespace, "path");
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "currentColor");
-    path.setAttribute("stroke-width", "2");
-    path.setAttribute("stroke-linecap", "round");
-    path.setAttribute("d", "M8 8l8 8M16 8l-8 8");
-    svg.append(path);
+    for (const d of ["M4 7h16", "M9.5 7V5h5v2", "M6.5 7l.8 13h9.4l.8-13", "M10 10.5v7M14 10.5v7"]) {
+      const path = document.createElementNS(namespace, "path");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("d", d);
+      svg.append(path);
+    }
     return svg;
   };
 

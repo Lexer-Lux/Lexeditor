@@ -1060,7 +1060,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   display: flex;
   align-self: stretch;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 /* A header switch fills its header: it stretches to the actions area,
    staying a centred square with equal margins, so a roomy header gets
@@ -1101,7 +1101,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   min-width:0;
   min-height:16px;
   aspect-ratio:1;
-  margin:5px;
+  margin:2px;
   padding:0;
   display:inline-flex;
   align-items:center;
@@ -1119,7 +1119,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   line-height:1;
   font-weight:700;
 }
-.lex-header-icon{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+.lex-header-icon{background:var(--lex-input-bg,var(--lex-panel-2));border:var(--lex-input-border,1px solid var(--lex-border));padding:2px;cursor:pointer;color:inherit;opacity:.75;}
 .lex-header-icon:hover{opacity:1;}
 .lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}
 .lex-header-icon:disabled{opacity:.3;cursor:default;}
