@@ -549,6 +549,10 @@ const SECONDS=/\s*\(seconds?\)$/;
 const MS=/\s*\(ms\)$/;
 const POINTS=/\s*\(points\)$/;
 const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"");
+// Think distances say "In metres" in their help, not their labels, so no
+// label suffix can wire them. The fifteen distance fields of NpcThinkParam
+// (eleven annotated plus the four battle distances, the same family).
+const THINK_METRES=new Set(["nearDist","midDist","farDist","outDist","eye_dist","ear_dist","ear_soundcut_dist","nose_dist","maxBackhomeDist","backhomeDist","backhomeBattleDist","BackHome_LookTargetDist","BattleStartDist","callHelp_CallValidMinDistTarget","callHelp_CallValidRange"]);
 function controlFor(row,field){
   const plain=plainControlFor(row,field);
   const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
@@ -557,6 +561,7 @@ function controlFor(row,field){
     :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
     :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
     :POINTS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"pts")
+    :row.table==="NpcThinkParam"&&THINK_METRES.has(field.key)&&field.type==="number"?LexeditorUI.unitField(plain,"m")
     :row.table&&String(row.table).endsWith(".msb")&&/^Rotation [XYZ]$/.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0"):plain;
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
