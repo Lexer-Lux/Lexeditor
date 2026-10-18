@@ -23,9 +23,10 @@ def test_divider_split_is_per_tab():
 
 
 def test_record_details_flow_unpaged():
-    # Think record, asset file, both curve panels, the generic record panel
-    # and both add/delete forms and tabbed record details: nine flows, no pagers.
-    assert len(UNPAGED.findall(DS1)) == 9
+    # Think record, asset file, both curve panels, the generic record panel,
+    # both add/delete forms, tabbed record details, effect details and the
+    # map-selection early panel: eleven flows, no pagers.
+    assert len(UNPAGED.findall(DS1)) == 11
 
 
 def test_remove_button_uses_the_shared_icon():
