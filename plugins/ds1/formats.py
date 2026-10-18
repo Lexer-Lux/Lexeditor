@@ -853,6 +853,14 @@ class ItemDocument:
             fallback = f'AI {row_id}'
         return self.schemas[table]['names'].get(row_id) or row.name or fallback
 
+    def shipped_name(self, table, row_id):
+        """The name the game's own text gives the row, for blank-rename
+        restore. None when vanilla names nothing: there is no shipped
+        name to put back."""
+        if self.vanilla_texts is None:
+            return None
+        return self.vanilla_texts.name(table, row_id)
+
     def renamable(self, table):
         return bool(self.texts and self.texts.renamable(table))
 
@@ -1085,7 +1093,8 @@ class ItemDocument:
             result.append({'id': row.row_id, 'name': name, 'table': table,
                            'values': values, 'display': display,
                            'modified': self.row_modified(table, row.row_id),
-                           'created': (table, row.row_id) in self._added_rows})
+                           'created': (table, row.row_id) in self._added_rows,
+                           'shippedName': self.shipped_name(table, row.row_id)})
         if tab == 'spells':
             table = 'EquipParamGoods'
             for row in self.params[table].rows:
@@ -1094,7 +1103,8 @@ class ItemDocument:
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
                                    'values': values, 'display': display,
                                    'modified': self.row_modified(table, row.row_id),
-                                   'created': (table, row.row_id) in self._added_rows})
+                                   'created': (table, row.row_id) in self._added_rows,
+                                   'shippedName': self.shipped_name(table, row.row_id)})
         return result
 
     def _stats_rows(self, tab):
@@ -1120,7 +1130,8 @@ class ItemDocument:
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
                            'table': table, 'values': values, 'display': display,
                            'modified': self.row_modified(table, row.row_id),
-                           'created': (table, row.row_id) in self._added_rows})
+                           'created': (table, row.row_id) in self._added_rows,
+                           'shippedName': self.shipped_name(table, row.row_id)})
         return result
 
     def text_subtabs(self):
@@ -1378,7 +1389,8 @@ class ItemDocument:
             keep = set(only)
             fields = [field for field in fields if field['key'] in keep]
         result = {'id': row_id, 'table': table, 'name': self.display_name(table, row_id, row),
-                  'renamable': self.renamable(table), 'fields': fields}
+                  'renamable': self.renamable(table), 'fields': fields,
+                  'shippedName': self.shipped_name(table, row_id)}
         if table == EFFECT_TABLE:
             fields.sort(key=lambda field: EFFECT_GROUPS.index(field['group']))
             result['effectUsage'] = self.effect_references().incoming.get(row_id, [])

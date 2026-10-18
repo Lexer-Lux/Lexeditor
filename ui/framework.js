@@ -8639,9 +8639,12 @@ ${contents.path}`});
       finished = true;
       const typed = input.value.trim();
       input.replaceWith(node);
-      if (!accept || !typed || typed === before) return;
-      node.textContent = typed;
-      options.commit?.(typed);
+      // Clearing the name puts the shipped one back: a record is never
+      // left nameless. Without a shipped name a blank keeps the old one.
+      const final = !typed && accept && options.shipped ? options.shipped : typed;
+      if (!accept || !final || final === before) return;
+      node.textContent = final;
+      options.commit?.(final);
     };
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") { event.preventDefault(); finish(true); }
@@ -9613,6 +9616,10 @@ ${contents.path}`});
     edit: (row, value) => {
       const name = String(value ?? "").trim();
       if (name && name !== String(row.name ?? "") && owner.renamable(row)) owner.rename(row, name);
+      else if (!name && owner.renamable(row) && typeof owner.shippedName === "function") {
+        const shipped = owner.shippedName(row);
+        if (shipped && shipped !== String(row.name ?? "")) owner.rename(row, shipped);
+      }
     },
     editValue: row => row.name ?? "",
     cellClass: row => [typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "",
@@ -11870,7 +11877,7 @@ ${contents.path}`});
       change("pins",{});
     }};
     const renameOwner=typeof options.rename==="function"
-      ?{rename:options.rename,renamable:row=>typeof options.renamable==="function"?options.renamable(row)!==false:true}:null;
+      ?{rename:options.rename,shippedName:options.shippedName,renamable:row=>typeof options.renamable==="function"?options.renamable(row)!==false:true}:null;
     const makeDetail=record=>{
       const node=options.detail(record);
       // The heading's name renames the record too, by double-click.
@@ -11881,6 +11888,7 @@ ${contents.path}`});
           event.preventDefault();event.stopPropagation();
           if(shellIsReadonly()){requestModForEdit?.();return;}
           renameValue(heading,{value:String(record.name??heading.textContent),label:"this record",
+            shipped:typeof renameOwner.shippedName==="function"?renameOwner.shippedName(record):undefined,
             commit:name=>renameOwner.rename(record,name)});
         });
       }

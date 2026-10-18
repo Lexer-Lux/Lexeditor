@@ -1877,7 +1877,7 @@ function renderItems(){
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
-    rename:renameRecord,
+    rename:renameRecord,shippedName:row=>row.shippedName,
     // Items have in-game names; monsters, attacks, effects and load bands
     // have only reference names. Placements cannot be renamed either:
     // names: map files store names at fixed offsets, so renaming would
