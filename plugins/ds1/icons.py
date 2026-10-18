@@ -10,9 +10,10 @@ game's own numbering confirms (Stone Greataxe at 198, Bloated Head at 1314).
 Damage, defense and stat labels reuse the menus' own small icons from
 Menu04_2: the equipment screen's swords and shields, the armor screen's
 tolerance icons (poison, toxic, bleed, curse, poise), the level-up
-screen's stat and souls icons, and the attune screen's slot icon. Every
-rectangle is the layout's own sprite rect, read from menu.drb.
-Humanity rides the item-icon catalog (the Humanity goods picture).
+screen's stat, souls and humanity icons, and the attune screen's slot
+icon. Every rectangle is the layout's own sprite rect, read from
+menu.drb (humanity is the icon_9 sprite). Item references to humanity
+ride the item-icon catalog instead (the Humanity goods picture).
 Kinds the game shows no icon for (divine, occult, luck, HP and stamina
 bars) get none here either: no invented glyphs.
 """
@@ -65,9 +66,11 @@ LABELS = {
     'vit': (83, 172, 125, 214), 'att': (83, 215, 125, 257),
     'end': (83, 301, 125, 343), 'res': (82, 344, 124, 386),
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
+    'humanityStat': (125, 43, 167, 85),
 }
 # Label kinds served from the item-icon catalog instead of the label
-# sheet: the Humanity goods picture (EquipParamGoods row 350).
+# sheet: humanity drops are paid in Humanity goods (EquipParamGoods
+# row 350), so they show the item picture, not the stat icon.
 ICON_LABELS = {'humanity': 2066}
 LABEL_SHEET = 'Menu04_2'
 EQUICON = re.compile(r'EquIcon_(\d+)')
