@@ -52,6 +52,10 @@
 .ds1-model-thumbnail{max-width:100%;max-height:100%;object-fit:contain;}
 .ds1-item-icon{max-width:100%;max-height:100%;object-fit:contain;}
 .lex-ds1-label-art{flex:0 0 auto;width:14px;height:14px;display:block;}
+/* Detail lanes fit three across a 950px panel: measured spill-free
+   with zero new clips against the 400px default. Tweaks and settings
+   keep the shared width. */
+.lex-detail-panel .lex-tweak-card-grid{--lex-tweak-card-width:300px;}
 /* A shop row's sold-item picture fits a single table row. */
 .lex-ds1-shop-icon{width:28px;height:28px;object-fit:contain;display:block;}
 .lex-ds1-no-thumbnail{display:inline-grid;place-items:center;}
