@@ -9,7 +9,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, icons, shops, theme
+from . import assets, deployment, data_map, fsb, icons, shops, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore, parse_key
@@ -58,6 +58,27 @@ def _asset_bytes(relative, side):
     if not live.is_file():
         raise ValueError("The installed game has no such file")
     return live.read_bytes(), "game", relative.as_posix()
+
+
+def _sound_bank_path(relative):
+    """The bank file the game would load: the mod's override, else the installed file."""
+    relative = assets.check_relative(relative)
+    if assets.kind_of(relative.as_posix()) not in ("sound", "music"):
+        raise ValueError("Only sound banks list their streams")
+    lowered = relative.as_posix().lower()
+    inner = lowered[:-4] if lowered.endswith(".dcx") else lowered
+    if not inner.endswith(".fsb"):
+        raise ValueError("Only sound banks list their streams")
+    if STORE.project is not None:
+        own = Path(STORE.project) / relative
+        if own.is_file():
+            return own, "mod"
+    if STORE.game_root is None:
+        raise ValueError("Select the installed game before browsing its files")
+    live = Path(STORE.game_root) / relative
+    if not live.is_file():
+        raise ValueError("The installed game has no such file")
+    return live, "game"
 
 
 def _tweaks_flag() -> bool:
@@ -407,6 +428,31 @@ class Handler(PluginRequestHandler):
                         STORE.game_root, STORE.project, relative,
                         query.get('side', ['mod'])[0],
                         query.get('member', [''])[0] or None))
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/sound/bank':
+            try:
+                with LOCK:
+                    bank, source = _sound_bank_path(query.get('file', [''])[0])
+                    self.send_json({'file': bank.name, 'source': source,
+                                      'streams': [{"name": entry["name"],
+                                                   "duration": entry["duration"],
+                                                   "size": entry["size"]}
+                                                  for entry in fsb.parse_table(bank)]})
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/sound/stream':
+            try:
+                with LOCK:
+                    bank, _source = _sound_bank_path(query.get('file', [''])[0])
+                    wanted = query.get('stream', [''])[0]
+                    table = fsb.parse_table(bank)
+                    entry = next((item for item in table if item["name"] == wanted), None)
+                    if entry is None:
+                        raise ValueError("Unknown sound stream")
+                    self.send_bytes(fsb.extract_mp3(bank, entry), "audio/mpeg")
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return

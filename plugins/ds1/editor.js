@@ -1,6 +1,6 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor,soundPreview}=LexeditorUI;
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
@@ -220,10 +220,20 @@ async function loadDetail(){
   }
   if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;state.assetDetail=null;return;}
   if(row.table==="Asset"){
-    state.assetDetail=null;
+    state.assetDetail=null;state.assetSounds=null;
     const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
-    state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;return;
+    state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;
+    if((state.tab==="sound"||state.tab==="music")&&/\.fsb$/i.test(row.id)){
+      if(state.assetStreamFile!==row.id){state.assetStreamFile=row.id;state.assetStream=null;state.assetPage=0;}
+      try{
+        const sounds=await api(`/api/sound/bank?file=${encodeURIComponent(row.id)}`);
+        if(state.selected!==key(row))return;
+        state.assetSounds=sounds;
+        if(!state.assetStream&&sounds.streams.length)state.assetStream=sounds.streams[0].name;
+      }catch(error){state.assetSounds={file:row.id,streams:[],error:String(error?.message||error)};}
+    }
+    return;
   }
   if(row.table==="MapView"){
     state.mapView=null;
@@ -1029,6 +1039,30 @@ function bytesToBase64(buffer){
     text+=String.fromCharCode.apply(null,bytes.subarray(index,index+8192));
   return btoa(text);
 }
+function assetSoundPanel(row,info,body){
+  const help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
+  const sounds=state.assetSounds;
+  const note=text=>detailSection({title:"PREVIEW",body:[soundPreview({note:text,
+    help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]});
+  if(!/\.fsb$/i.test(row.id)){body.push(note("No preview"));return{help,audio:null};}
+  if(!sounds||state.assetStreamFile!==row.id){body.push(LexeditorUI.loadingPanel({label:"Loading sounds"}));return{help,audio:null};}
+  if(sounds.error||!sounds.streams.length){body.push(note(sounds.error?`This bank could not be read (${sounds.error}).`:"This bank holds no sounds."));return{help,audio:null};}
+  const file=row.id,selected=state.assetStream||sounds.streams[0].name;
+  const url=name=>`/api/sound/stream?file=${encodeURIComponent(file)}&stream=${encodeURIComponent(name)}`;
+  const size=state.pageSize,pages=Math.max(1,Math.ceil(sounds.streams.length/size));
+  const page=Math.min(state.assetPage||0,pages-1);state.assetPage=page;
+  const shown=sounds.streams.slice(page*size,(page+1)*size);
+  body.push(detailSection({title:"SOUNDS",body:[columnList({rows:shown,key:stream=>stream.name,
+    selected,select:name=>{state.assetStream=name;render();},
+    columns:[audioColumn({src:stream=>url(stream.name),name:stream=>stream.name}),
+      {key:"name",label:"Sound",grow:1,align:"start"},
+      {key:"duration",label:"Length",render:stream=>`${stream.duration.toFixed(2)} s`},
+      {key:"size",label:"Size",render:stream=>formatAssetSize(stream.size)}]}),
+    LexeditorUI.pager({inline:true,stacked:true,pages,page,total:sounds.streams.length,pageSize:size,
+      change:value=>{state.assetPage=value;render();}})],
+    help:infoHelp("Every stream the bank holds. Play one from its row, or click the row and play it from the heading.")}));
+  return{help,audio:{src:url(selected),label:selected}};
+}
 function renderAssetDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
   if(!row)return detailPanel({title:"File",body:[LexeditorUI.detailNote("Select a file.")]});
@@ -1045,19 +1079,20 @@ function renderAssetDetail(){
   // the panel carries no SOURCE row; files join the mod through the
   // list's add button, never a Replace action.
   const body=[];
-  let icon=null,preview=null,help="";
+  let icon=null,preview=null,help="",audio=null;
   if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
   else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
+  else if(state.tab==="sound"||state.tab==="music")({help,audio}=assetSoundPanel(row,info,body));
   else{
     help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
     body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
-      help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]}));
+      help:infoHelp("Files play in the game. They have no picture to show.")})]}));
   }
   const actions=[
     fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
     progress?el("span",{role:"status"},progress):null].filter(Boolean);
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
-  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},body});
+  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body});
 }
 async function uploadAsset(target,file){
   if(state.assetBusy)return;
