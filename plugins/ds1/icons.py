@@ -64,6 +64,7 @@ LABELS = {
     'poise': (213, 259, 255, 301),
     'vit': (83, 172, 125, 214), 'att': (83, 215, 125, 257),
     'end': (83, 301, 125, 343), 'res': (82, 344, 124, 386),
+    'hp': (126, 172, 168, 214), 'stamina': (126, 258, 168, 300),
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
 }
 # Label kinds served from the item-icon catalog instead of the label
