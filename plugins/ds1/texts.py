@@ -189,6 +189,10 @@ class TextDocument:
         self.entries = bnd3_entries(self.plain)
         self.tables: dict[int, tuple[list, dict]] = {}
         self.original_texts: dict[int, dict] = {}
+        # Memoized dirty sets: row_modified() consults them for every
+        # listed row, so recomputing the full FMG diff each time turned
+        # table loads into seconds. Every mutator below clears this.
+        self._dirty_cache: dict[str, set] = {}
         for position, entry in enumerate(self.entries):
             if self._parse_table(entry.name.replace('\\', '/').rsplit('/', 1)[-1]):
                 groups, texts = parse_fmg(entry.data)
@@ -262,6 +266,7 @@ class TextDocument:
             raise FormatError(f'A description is one line of up to {limit} characters.')
         for position in self._copies_of(DESC_TABLES[table][long]):
             self.tables[position][1][row_id] = text
+        self._dirty_cache = {}
         return text
 
     def rename(self, table: str, row_id: int, name: str) -> str:
@@ -272,19 +277,22 @@ class TextDocument:
             raise FormatError(f'A name is 1 to {MAX_NAME} characters on one line.')
         for position in self._copies(table):
             self.tables[position][1][row_id] = name
+        self._dirty_cache = {}
         return name
 
     @property
     def dirty(self) -> set[tuple[str, str, int]]:
-        changed = set()
-        kinds = [('name', table, NAME_TABLES[table]) for table in NAME_TABLES]
-        kinds += [(role, table, filename) for table, (short, full) in DESC_TABLES.items()
-                  for role, filename in (('description', short), ('longDescription', full))]
-        for kind, table, filename in kinds:
-            for position in self._copies_of(filename):
-                texts, before = self.tables[position][1], self.original_texts[position]
-                changed |= {(kind, table, item) for item in texts if texts.get(item) != before.get(item)}
-        return changed
+        if 'dirty' not in self._dirty_cache:
+            changed = set()
+            kinds = [('name', table, NAME_TABLES[table]) for table in NAME_TABLES]
+            kinds += [(role, table, filename) for table, (short, full) in DESC_TABLES.items()
+                      for role, filename in (('description', short), ('longDescription', full))]
+            for kind, table, filename in kinds:
+                for position in self._copies_of(filename):
+                    texts, before = self.tables[position][1], self.original_texts[position]
+                    changed |= {(kind, table, item) for item in texts if texts.get(item) != before.get(item)}
+            self._dirty_cache['dirty'] = changed
+        return self._dirty_cache['dirty']
 
     def export(self) -> bytes:
         if not self.dirty and not getattr(self, 'dirty_texts', set()):
@@ -354,17 +362,20 @@ class MenuDocument(TextDocument):
             raise FormatError(f'A menu label is 1 to {MAX_NAME} characters on one line.')
         for position in self._copies_of(MENU_LABEL_FILE):
             self.tables[position][1][text_id] = text
+        self._dirty_cache = {}
         return text
 
     @property
     def dirty(self) -> set[str]:
-        changed = set()
-        for key, (_display, text_id) in MENU_LABELS.items():
-            for position in self._copies_of(MENU_LABEL_FILE):
-                texts, before = self.tables[position][1], self.original_texts[position]
-                if texts.get(text_id) != before.get(text_id):
-                    changed.add(key)
-        return changed
+        if 'dirty' not in self._dirty_cache:
+            changed = set()
+            for key, (_display, text_id) in MENU_LABELS.items():
+                for position in self._copies_of(MENU_LABEL_FILE):
+                    texts, before = self.tables[position][1], self.original_texts[position]
+                    if texts.get(text_id) != before.get(text_id):
+                        changed.add(key)
+            self._dirty_cache['dirty'] = changed
+        return self._dirty_cache['dirty']
 
     def files(self) -> list[str]:
         """Every FMG member, each once, in archive order."""
@@ -415,20 +426,23 @@ class MenuDocument(TextDocument):
             raise FormatError(f'Menu text is up to {MAX_FMG_TEXT} characters.')
         for position in self._copies_of(filename):
             self.tables[position][1][text_id] = text
+        self._dirty_cache = {}
         return text
 
     @property
     def dirty_texts(self) -> set[tuple[str, int]]:
         """Changed (file, id) pairs outside the three menu labels, which
         dirty() already counts."""
-        changed = set()
-        label_ids = {text_id for _display, text_id in MENU_LABELS.values()}
-        for position, (groups, texts) in self.tables.items():
-            before = self.original_texts[position]
-            filename = self._file(position)
-            for text_id, text in texts.items():
-                if text_id in label_ids and filename == MENU_LABEL_FILE:
-                    continue
-                if text != before.get(text_id):
-                    changed.add((filename, text_id))
-        return changed
+        if 'dirty_texts' not in self._dirty_cache:
+            changed = set()
+            label_ids = {text_id for _display, text_id in MENU_LABELS.values()}
+            for position, (groups, texts) in self.tables.items():
+                before = self.original_texts[position]
+                filename = self._file(position)
+                for text_id, text in texts.items():
+                    if text_id in label_ids and filename == MENU_LABEL_FILE:
+                        continue
+                    if text != before.get(text_id):
+                        changed.add((filename, text_id))
+            self._dirty_cache['dirty_texts'] = changed
+        return self._dirty_cache['dirty_texts']
