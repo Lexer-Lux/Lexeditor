@@ -35,7 +35,7 @@
     if(LexeditorUI.sharedSettings()?.developerMode){
       body.push(detailSection({title:"PLUGIN SFX",body:[LexeditorUI.soundCoverageTable(dashboard.themeSounds?.rows||[])]}));
     }
-    $("#main").replaceChildren(detailPanel({className:"lex-information-panel ff8-information",
+    $("#main").replaceChildren(detailPanel({paginate:{unpaged:true},className:"lex-information-panel ff8-information",
       icon:infoIcon(),title:"Information",meta:"Installation, extracted game data, and the FFNx helper",body}));
   }
   function delingFieldToggle(){
@@ -189,7 +189,7 @@
     // tweaks scroll container; without it the lowest cards render below the
     // window with no way to reach them.
     // The Tweaks subtab bar sits above the scroll container, matching the Gameplay and FFNx lists, so the viewer can leave this subtab again.
-    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
+    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({paginate:{unpaged:true},heading:false,body:view}));
     // The shared stack keeps the bar's height; laid out loose in #main the
     // scroller rode up over the subtab names.
     return LexeditorUI.stack(subtabBar({tabs:tabProps.tabs,active:"formulae",label:tabProps.tabsLabel,change:tabProps.changeTab}),scroller);

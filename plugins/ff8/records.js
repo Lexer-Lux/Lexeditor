@@ -133,7 +133,7 @@
       junction:()=>detailSection({body:junctionRows}),
     };
     const active=sections[state.magicDetailTab]?state.magicDetailTab:"attack";
-    const body=[LexeditorUI.tabbedPanel({label:"Magic details",active,
+    const body=[LexeditorUI.tabbedPanel({paginate:{unpaged:true},label:"Magic details",active,
       tabs:[{id:"attack",label:"Attack data",help:"What this spell does when it is cast: animation, power, targeting, element and status."},
         {id:"junction",label:"Junction",help:"What this spell gives the character it is junctioned to: stat bonuses, elemental and status attack and defence."}],
       change:id=>{state.magicDetailTab=id;renderAbilities()},
@@ -277,7 +277,7 @@
       exe_card_texts:"Card text is saved as ff8/en/exe/card_texts.msd in this mod. FFNx replaces the two card-text pointers at runtime; Lexeditor never changes FF8_EN.exe.",
     };
     const boundary=boundaries[row.source]||"This text source is not writable.";
-    return detailPanel({heading:false,body:[
+    return detailPanel({paginate:{unpaged:true},heading:false,body:[
       LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key]),pin:prefs?.pinButton(key,label)})),{columns:4,stacked:true}),
       textTokenToolbar(input),
       detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,

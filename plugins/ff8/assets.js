@@ -266,7 +266,7 @@
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
     const location=LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"?row.override||null:null});
-    return detailPanel({title:assetName(row,modelOverridden(row)),icon:modelPageThumb(row)||LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row),actions:[location]});
+    return detailPanel({paginate:{unpaged:true},title:assetName(row,modelOverridden(row)),icon:modelPageThumb(row)||LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row),actions:[location]});
   }
 
   function renderTextures(){
@@ -316,5 +316,5 @@
     // The subtitle carries the file size, like every other file-backed view.
     const sized=row.sizeBytes==null?meta:LexeditorUI.inlineLabel(meta,` \u00b7 ${assetFileSize(row.sizeBytes)}`);
     const location=LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"&&row.modFiles?.length?`textures/${row.modFiles[0].file}`:null});
-    return detailPanel({title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections,actions:[location]});
+    return detailPanel({paginate:{unpaged:true},title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections,actions:[location]});
   }

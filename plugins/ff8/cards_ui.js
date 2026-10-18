@@ -106,7 +106,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     }
     // No NAME property. The name is the heading, and the heading is typed into
     // directly, so a card no longer carries its own name twice.
-    return detailPanel({
+    return detailPanel({paginate:{unpaged:true},
       // The card beside what it holds: the shared panel's own layout, asked for
       // by name rather than restyled from here.
       bodyLayout: "beside",
@@ -185,7 +185,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     if (playerAreas?.ready) return null;
     if (!playerAreas?.error) loadPlayerAreas();
     if (playerAreas?.error)
-      return detailPanel({className:"ff8-card-player-detail",title,body:[LexeditorUI.detailNote(`Could not find card players: ${playerAreas.error}`)]});
+      return detailPanel({paginate:{unpaged:true},className:"ff8-card-player-detail",title,body:[LexeditorUI.detailNote(`Could not find card players: ${playerAreas.error}`)]});
     // The shared, themed loading state; how far the scan is goes in its label.
     return LexeditorUI.loadingPanel({className:"ff8-card-player-detail",
       label:`Finding card players: ${playerAreas?.scanned || 0} of ${playerAreas?.total || "?"} areas read`});
@@ -260,7 +260,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       "Choose common-card levels. No selection uses level 1. Rare cards depend on ownership in your save."];
     const detail=entry=>{
       const map=state.data.fields.rows.find(row=>row.key===entry.map);
-      if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
+      if(!map)return detailPanel({paginate:{unpaged:true},title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
       if(!map._loaded&&!map._loading&&!map._error)
         queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
       // Where the opponent stands is the panel's subtitle, and it opens that
@@ -353,7 +353,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           }
         });
       }
-      return detailPanel({title:entry.name,meta:location,body});
+      return detailPanel({paginate:{unpaged:true},title:entry.name,meta:location,body});
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
       page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,addDisabledReason:'Card players are the people the game places in its world; each is fixed by the game and a new one has nowhere to stand.',fit:{minRowHeight:28},
@@ -369,7 +369,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           for(const row of rows){const map=state.data.fields.rows.find(value=>value.key===row.map);
             if(map&&!map._loaded&&!map._loading&&!map._error)queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()})}
         return columnList({rows,key:row=>row.key,selected,select,columns:playerColumnDefinitions(),columnPreferences:playerColumns()})},detail,
-      emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
+      emptyDetail:()=>detailPanel({paginate:{unpaged:true},title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   const deckView = {query:"",page:0,selected:null,modOnly:false};
   const cardDecks = () => {
@@ -422,7 +422,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     if(pending)return pending;
     const decks=cardDecks(),query=deckView.query.trim().toLowerCase();
     const rows=decks.filter(deck=>!query||`${deck.id} ${deck.members.map(member=>member.name).join(' ')}`.toLowerCase().includes(query));
-    const detail=deck=>detailPanel({title:`Deck ${deck.id}`,identity:recordId(deck.id),
+    const detail=deck=>detailPanel({paginate:{unpaged:true},title:`Deck ${deck.id}`,identity:recordId(deck.id),
       help:"Several opponents can share a deck number. These rare cards are the starting assignments, which can change owners during play. Each opponent's detail shows its common card pool. Deck zero uses no rare cards. This page does not read ownership from your save.",
       body:[rareCardsSection(deck.id,true),detailSection({title:'OPPONENTS',help:el('span',{},deckColumns().pinButton('count','Opponents'),deckColumns().pinButton('names','Used by'),infoHelp('Every opponent whose script names this deck. Open one to change its settings or its deck.')),
         body:[deck.members.length?columnList({rows:deck.members,key:member=>member.key,fill:true,localSort:false,class:'ff8-record-list',
@@ -444,7 +444,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       master:({rows,selected,select})=>columnList({rows,key:row=>row.id,selected,select,
         decorateRow:(node,row)=>LexeditorUI.decorateSearchCandidate(node,{type:'card-decks',value:row.id,label:`Deck ${row.id}`}),
         columns:deckColumnDefinitions(),columnPreferences:deckColumns()}),detail,
-      emptyDetail:()=>detailPanel({title:'Decks',body:[LexeditorUI.detailNote('No decks match this search.')]})});
+      emptyDetail:()=>detailPanel({paginate:{unpaged:true},title:'Decks',body:[LexeditorUI.detailNote('No decks match this search.')]})});
   };
   render = () => {
     if (state.tab !== "cards") return null;
@@ -525,7 +525,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const abilitiesContent=parts.content.querySelector(':scope > [data-gf-abilities]') || parts.content;
     parts.title?.remove();
     let spellbookReady=false;
-    const tabbed=LexeditorUI.tabbedPanel({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK',attrs:{'aria-disabled':'true'}}],content:[abilitiesContent,marker],change:id=>{
+    const tabbed=LexeditorUI.tabbedPanel({paginate:{unpaged:true},label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK',attrs:{'aria-disabled':'true'}}],content:[abilitiesContent,marker],change:id=>{
       if(id==='spellbook'&&!spellbookReady)return;
       abilitiesContent.hidden=id!=='abilities';marker.hidden=id!=='spellbook';
       tabs.querySelectorAll('[role="tab"]').forEach((tab,index)=>{const active=index===(id==='abilities'?0:1);tab.tabIndex=active?0:-1;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));});

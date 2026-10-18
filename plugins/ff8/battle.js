@@ -250,7 +250,7 @@
     // point is placed, with the magnifier over the picture on hover - the same
     // component every world preview uses.
     const map=LexeditorUI.imageMap({...spec(),place:null,magnifyOnClick:true,minSizes:[480,300],
-      details:({refresh})=>detailPanel({title:`Draw Point ${row.drawId}`,
+      details:({refresh})=>detailPanel({paginate:{unpaged:true},title:`Draw Point ${row.drawId}`,
         body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
       magnify:()=>({...spec(),note:editable()
         ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
@@ -289,7 +289,7 @@
       readout:point=>{const at=worldMapCoordinate(point);return `x ${formatNumber(at.x)}, z ${formatNumber(at.z)}`},
       place:editable()?point=>{const at=worldMapCoordinate(point);row.x=at.x;row.z=at.z;rerenderWorldMap();shell.refresh()}:null});
     const map=LexeditorUI.imageMap({...spec(),place:null,magnifyOnClick:true,minSizes:[480,300],
-      details:({refresh})=>detailPanel({title:`Field return ${row.id}`,
+      details:({refresh})=>detailPanel({paginate:{unpaged:true},title:`Field return ${row.id}`,
         body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
       magnify:()=>({...spec(),note:editable()
         ?`Click the map to place field return ${row.id}, or edit its position on the right.`
@@ -462,7 +462,7 @@
         return `(${point.column}, ${point.row})`;},
       select:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}});
     if(!state.worldMapTerrain)worldMapNavigation(map,map.lexStage);
-    return LexeditorUI.panelLayout([detailPanel({heading:false,className:"ff8-world-map-panel",body:map}),
+    return LexeditorUI.panelLayout([detailPanel({paginate:{unpaged:true},heading:false,className:"ff8-world-map-panel",body:map}),
       pickedSky?worldSkyDetail(pickedSky,null,worldSkyMapTitle(pickedSky),`World ${formatNumber(pickedSky.x)}, ${formatNumber(pickedSky.z)} · fade ${formatNumber(pickedSky.y)}`):picked?worldDrawPointDetail(picked,null,worldDrawPointMapTitle(picked)):worldSegmentDetail(row)],"world-map",
       {layoutKey:"ff8-world-map",defaultSizes:[1.6,1]});
   }

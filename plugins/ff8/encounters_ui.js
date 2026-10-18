@@ -171,7 +171,7 @@
   // ---- Group preview panel -------------------------------------------------
   function encounterGroupPreviewPanel(rule,refresh,origin){
     const group=encounterGroupById(rule?.encounterGroup);
-    if(!group)return detailPanel({title:"Encounter group",
+    if(!group)return detailPanel({paginate:{unpaged:true},title:"Encounter group",
       className:"ff8-encounter-group-preview",
       body:LexeditorUI.notice({message:"Select a group number in the table to preview the battles it holds."})});
     return encounterGroupPanel(group,refresh,origin,'ff8-encounter-group-preview',
@@ -330,7 +330,7 @@
       return strip;
     });
     const error=encounterChanceError(row);
-    return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
+    return detailPanel({paginate:{unpaged:true},title:'Encounter group',identity:recordId(row.id),className,...heading,
       attrs:{'data-encounter-chance-group':row.id},
       help:'All eight slots can use different formations. A repeated formation combines its slots\' chances. The game retries once if it chooses the previous battle. Hover a formation ID to replace that slot. Enemy edits affect every use of that formation. Special level uses a rule we do not yet understand.',
       body:[detailSection({title:'INITIAL CHANCES',

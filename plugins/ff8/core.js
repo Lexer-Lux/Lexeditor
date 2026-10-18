@@ -155,7 +155,7 @@
   // every list and property (itemDisplay).
   // `panelIcon` is the record's own picture in the panel's heading slot. It is
   // separate from `icon`, which decorates the name in the title line.
-  function sharedDetail(row,prefs,body,className="",note="",icon=null,actions=null,modelPreview=null,panelIcon=null){const named=row.titleContent??(icon?LexeditorUI.inlineLabel(icon,el("span",{},row.name)):row.name);icon=null;return detailPanel({className:`lex-detail detail ${className}`.trim(),title:named,identity:el("span",{class:"lex-pinnable-property"},prefs?.pinButton("id","ID"),recordId(row.id)),meta:note||null,icon:panelIcon,actions,body,modelPreview})}
+  function sharedDetail(row,prefs,body,className="",note="",icon=null,actions=null,modelPreview=null,panelIcon=null){const named=row.titleContent??(icon?LexeditorUI.inlineLabel(icon,el("span",{},row.name)):row.name);icon=null;return detailPanel({paginate:{unpaged:true},className:`lex-detail detail ${className}`.trim(),title:named,identity:el("span",{class:"lex-pinnable-property"},prefs?.pinButton("id","ID"),recordId(row.id)),meta:note||null,icon:panelIcon,actions,body,modelPreview})}
   function numberControl(value,min,max,step,onchange,attrs={}){
     const digits=String(step).includes(".")?String(step).split(".")[1].length:0;
     const display=number=>formatNumber(number,{minimumFractionDigits:0,maximumFractionDigits:digits});

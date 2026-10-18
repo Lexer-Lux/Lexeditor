@@ -76,7 +76,7 @@
     const content=active==='attack'?gfPanel('',routed.get('Attack'),row,'attack'):
       active==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):
       curve||LexeditorUI.detailNote('No leveling data for this GF.');
-    return tabbedPanel({tabs:[{id:'hp',label:'HP',help:'The HP graph controls maximum HP as this GF levels up. Edit the graph variables to change this curve.'},
+    return tabbedPanel({paginate:{unpaged:true},tabs:[{id:'hp',label:'HP',help:'The HP graph controls maximum HP as this GF levels up. Edit the graph variables to change this curve.'},
       {id:'xp',label:'XP',help:'The XP graph controls the total experience needed for each level. Edit the graph variables to change this curve.'},
       {id:'attack',label:'Attack',help:'Set the GF summon’s power, animation, targets, damage, elements and status effects.'},
       {id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],
@@ -505,7 +505,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const tabs=ai.scripts.map(value=>({id:value.id,label:value.name,help,
       attrs:{'aria-label':value.name,'aria-description':raw?'Raw code view':'Friendly view',oncontextmenu:event=>{event.preventDefault();switchMode(value.id)}}}));
     const content=raw?enemyAiSourceScript(row,script):enemyAiScript(row,script);
-    return tabbedPanel({tabs,active:script.id,label:'Enemy AI scripts',change:async id=>{if(!(await enemyAiBeforeLeave()))return;state.enemyAiScriptTab=id;renderEnemies()},content});
+    return tabbedPanel({paginate:{unpaged:true},tabs,active:script.id,label:'Enemy AI scripts',change:async id=>{if(!(await enemyAiBeforeLeave()))return;state.enemyAiScriptTab=id;renderEnemies()},content});
   }
   function enemyBattleTextPanel(row,prefs){
     const scan=enemyScanSection(row,prefs),document=enemyBattleTextRow(state.data,row.id);
@@ -521,7 +521,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemyActionsPanel(row){
     const tiers=[{id:'low',label:'Low'},{id:'medium',label:'Medium'},{id:'high',label:'High'}];
     const active=tiers.some(tier=>tier.id===state.enemyActionTier)?state.enemyActionTier:'low';
-    return tabbedPanel({tabs:tiers,active,label:'Enemy action tiers',
+    return tabbedPanel({paginate:{unpaged:true},tabs:tiers,active,label:'Enemy action tiers',
       change:value=>{state.enemyActionTier=value;renderEnemies()},
       content:tier=>enemyAbilitiesSection(row,tier)});
   }
@@ -529,7 +529,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const tabs=[{id:'mug',label:'Mug'},{id:'draw',label:'Draw'},{id:'drops',label:'Drops'},
       {id:'cards',label:'Cards'},{id:'devour',label:'Devour'}];
     const active=tabs.some(tab=>tab.id===state.enemyLootTab)?state.enemyLootTab:'mug';
-    return tabbedPanel({tabs,active,label:'Enemy loot types',
+    return tabbedPanel({paginate:{unpaged:true},tabs,active,label:'Enemy loot types',
       change:value=>{state.enemyLootTab=value;renderEnemies()},
       content:kind=>kind==='cards'?enemySimpleTables(row)[0]:kind==='devour'?enemySimpleTables(row)[1]
         :enemyPairSection(row,kind,kind.toUpperCase(),kind==='draw'?'Magic':'Item')});
@@ -555,6 +555,6 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
     else if(tab==='stats')body=[enemyStatGrowth(row.fields.filter(field=>field.group==='Stat curves'),row.id)];
     const openModel=model?el('button',{type:'button',onclick:()=>{state.selected.models=model.file;navigate('models')}},'Open in Models'):null;
-    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail','',null,null,model?modelPreviewSpec(model,openModel?LexeditorUI.actionRow(openModel):null,{inPlace:true}):null,modelPageThumb(model))});
+    return tabbedPanel({paginate:{unpaged:true},tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail','',null,null,model?modelPreviewSpec(model,openModel?LexeditorUI.actionRow(openModel):null,{inPlace:true}):null,modelPageThumb(model))});
   }
   function enemyLeadingPanel(row){return enemyAiPanel(row)}

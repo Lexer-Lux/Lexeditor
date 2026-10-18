@@ -237,7 +237,7 @@
     const cameras=row.camera?.cameras||[];
     const camera=cameras.length?detailField({label:"Overlay camera",help:infoHelp("The camera that projects the walkmesh, exits and triggers onto the picture. This is the same choice as on the Camera tab. It changes only the preview."),control:selectControl(fieldOverlayCameraId(row),cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()})}):null;
     showVertices(mesh.triangles[triangleId]);
-    return detailPanel({title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
+    return detailPanel({paginate:{unpaged:true},title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
   }
   const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"The cameras for this field, in three pages. Position edits the fixed camera setups. Ranges limits how far the view scrolls. Movie edits the movie camera frames. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
   fieldDetailTabs.push({id:"worldToField",label:"World → Field",help:"Where the player arrives after entering a field from the world map. Select an entry to change its field, position or walkmesh triangle. The panel opens on an arrival for the selected field, when one exists. The table does not store a world-map position. Test changed arrivals in the game."});
@@ -253,7 +253,7 @@
     // The sub-tab already supplies its name and help, like the outer tabs.
     const parts=LexeditorUI.sectionParts(body);
     if(parts.content)body=parts.content;
-    return LexeditorUI.tabbedPanel({tabs:fieldCameraSubtabs,active:sub,label:"Camera",change:value=>{state.fieldCameraSubtab=value;rerenderFields()},content:body});
+    return LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs:fieldCameraSubtabs,active:sub,label:"Camera",change:value=>{state.fieldCameraSubtab=value;rerenderFields()},content:body});
   }
   function fieldCameraControl(row,camera,field,axis=null){
     const vector=field.startsWith("axis")?Number(field.slice(4)):null,vanilla=fieldMapRow(state.vanilla,row.key)?.camera?.cameras?.[camera.id];
@@ -399,9 +399,9 @@
         const arrival=state.data.wm2field.rows.find(entry=>row.mapId!=null&&Number(entry.fieldId)===Number(row.mapId));
         state.selected.wm2field=arrival?.id??null;state.filters.wm2field='';state.pages.wm2field=0;
       }
-      return LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:renderWorldToField()});
+      return LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:renderWorldToField()});
     }
-    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
+    const preview=LexeditorUI.detailPanel({paginate:{unpaged:true},title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
     // The picture's help sits in its own corner, outside the heading that
     // fades away while the picture is hovered.
     preview.append(el("span",{class:"lex-media-help"},infoHelp("The picture shows the background, walkmesh, exits and triggers through the selected camera. On the Tile or Walkmesh tab, click the picture to select a tile or triangle. The filters beside the picture change only this preview.")));
@@ -412,7 +412,7 @@
     const parts=LexeditorUI.sectionParts(body);
     const recordPanel=active==="tile"||active==="walkmesh";
     if(parts.content&&!recordPanel)body=parts.content;
-    const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel?body:LexeditorUI.detailPanel({heading:false,body})});
+    const editor=LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel?body:LexeditorUI.detailPanel({paginate:{unpaged:true},heading:false,body})});
     // Three columns by default: list, picture, tabs. The Deling-style setting
     // stacks the picture over the tabs instead, as Deling does.
     const deling=state.editorSettings?.delingFieldLayout===true;
@@ -447,5 +447,5 @@
     }else if(state.startingTab==="inventory"){
       const rows=state.data.init.inventory.rows,pageSize=state.pageSizes.startingInventory,pages=Math.max(1,Math.ceil(rows.length/pageSize));state.pages.startingInventory=Math.min(state.pages.startingInventory,pages-1);const visible=rows.slice(state.pages.startingInventory*pageSize,(state.pages.startingInventory+1)*pageSize),controls=new Map(visible.map(slot=>[slot.slot,startingInventoryControls(slot)])),table=columnList({rows:visible,key:slot=>slot.slot,class:"starting-inventory-table ff8-record-list lex-page-sized-table",editable:true,template:"70px minmax(220px,1fr) minmax(90px,140px)",columns:[{key:"slot",label:"Slot",render:slot=>slot.slot+1},{key:"item",label:"Item",render:slot=>controls.get(slot.slot).item},{key:"quantity",label:"Quantity",numeric:true,render:slot=>controls.get(slot.slot).quantity}]});table.style.setProperty("--lex-page-row-count",String(pageSize));const pageBar=pager({inline:true,page:state.pages.startingInventory,pages,total:rows.length,pageSize,noun:"inventory slots",change:value=>{state.pages.startingInventory=value;renderStartingData()}});title="STARTING INVENTORY";body=LexeditorUI.pagedPane(table,pageBar);
     }else{title="STARTING DATA";body=[detailSection({title:"PARTY AND PROGRESS",body:startingFields(state.data.init.general.fields,"general")}),detailSection({title:"CONFIG",body:startingFields(state.data.init.config.fields,"config")})]}
-    $("#main").replaceChildren(detailPanel({heading:false,body}));
+    $("#main").replaceChildren(detailPanel({paginate:{unpaged:true},heading:false,body}));
   }
