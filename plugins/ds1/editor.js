@@ -267,6 +267,10 @@ async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
 async function navigate(tab,sub=state.sub,selected=null){
+  // Subtabs bypass the shell, so the switch announces itself here too:
+  // old content out, throbber in, before the first await.
+  document.querySelector("#main")?.replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${sub}`}));
+
   const token=++navigation;await edits;
   const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;state.taeForm=null;
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";

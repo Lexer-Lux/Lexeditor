@@ -8670,6 +8670,12 @@ ${contents.path}`});
         }
         shellPage = null;
         mods.hide();
+        // The new tab announces itself at once: the old content is replaced
+        // with a throbber synchronously, so a slow load never looks dead
+        // and the old tab is never shown as the new one. A plugin that
+        // renders synchronously replaces this before paint; no flash.
+        document.querySelector("#main")?.replaceChildren(loadingPanel({label: `Loading ${tab}`}));
+
         return pluginNavigate(tab);
       }};
     let refreshShellTabs = () => {};
