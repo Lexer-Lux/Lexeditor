@@ -124,7 +124,7 @@ function renderItems() {
 async function createNewItem(){
   if(isRO())return;
   const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
-  const key=el("input",{placeholder:"LEX_SULFUR",required:true}),name=el("input",{required:true}),description=el("textarea",{});
+  const key=el("input",{placeholder:"LEX_SULFUR",required:true}),name=el("input",{required:true}),description=LexeditorUI.textArea({});
   const choices=(field,preferred)=>{
     const values=[...new Set(state.catalog.items.map(item=>item[field]).filter(Boolean))].sort();
     const control=el("select",{},...values.map(value=>el("option",{value},value)));

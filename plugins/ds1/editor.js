@@ -665,7 +665,7 @@ function plainControlFor(row,field){
       if(field.required!==false&&!input.value.trim()||!input.checkValidity()){input.reportValidity();return;}
       commit(row,field,input.value,input);
     }});
-  if(field.type==="longtext")return el("textarea",{...attrs,value:field.value,rows:6,
+  if(field.type==="longtext")return LexeditorUI.textArea({...attrs,value:field.value,rows:6,
     maxlength:field.maxLength||2000,"aria-multiline":"true",onchange:event=>{
       const input=event.target;
       if(!input.checkValidity()){input.reportValidity();return;}

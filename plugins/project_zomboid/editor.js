@@ -304,7 +304,7 @@ function sharedControl(kind,row,spec){
     control=LexeditorUI.el("select",{disabled:availability.disabled,"aria-label":spec.label},...values.map(value=>{const option=LexeditorUI.el("option",{value},value);option.selected=value===raw;return option}));
     dataType="ENUM";
   }else if(spec.type==="textarea"){
-    control=LexeditorUI.el("textarea",{disabled:availability.disabled,"aria-label":spec.label});control.value=raw;dataType="TEXT";
+    control=LexeditorUI.textArea({disabled:availability.disabled,"aria-label":spec.label});control.value=raw;dataType="TEXT";
   }else{
     const attrs={type:spec.type==="number"?"number":"text",value:raw,disabled:availability.disabled,"aria-label":spec.label};
     if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;if(spec.step!==undefined)attrs.step=spec.step;

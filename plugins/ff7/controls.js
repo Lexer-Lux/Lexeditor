@@ -30,7 +30,7 @@
   function textControl(row,field){
     const capacity=row.byteCapacity??field.byteCapacity;
     const metered=Number.isInteger(capacity)&&capacity>0;
-    const input=el("textarea",{rows:field.language?12:3,spellcheck:"false",value:row.values[field.key],disabled:readonly(),
+    const input=LexeditorUI.textArea({rows:field.language?12:3,spellcheck:"false",value:row.values[field.key],disabled:readonly(),
       "aria-label":`${field.label} for ${row.name}`,oninput:event=>{
         if(readonly())return;
         row.values[field.key]=event.target.value;refreshMeter();shellRefresh();
@@ -214,7 +214,7 @@
   }
 
   function descriptionControl(row){
-    const input=el("textarea",{rows:3,spellcheck:"false",value:row.description||"",disabled:readonly(),
+    const input=LexeditorUI.textArea({rows:3,spellcheck:"false",value:row.description||"",disabled:readonly(),
       "aria-label":`Description for ${row.name}`,oninput:event=>{
         if(readonly())return;
         row.description=event.target.value;shellRefresh();
