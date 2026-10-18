@@ -5144,7 +5144,9 @@
       root.lexFittedColumns=fit;
       // A chosen count is a ceiling too: more columns than fit never
       // render, so the detail panel never grows a horizontal scrollbar.
-      if(options.inline&&chosen>0)return Math.max(1,Math.min(length,chosen,fit));
+      // Unpaged detail flows honor it as well; only pages without the
+      // divider control (tweaks, settings) never set one.
+      if(chosen>0)return Math.max(1,Math.min(length,chosen,fit));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
       // beside three empty columns. A page never has more columns than cards.
@@ -8064,6 +8066,20 @@ ${contents.path}`});
     if (!Array.isArray(order)) return;
     const byId = new Map([...state.groups.values()].map(group => [group.id, layoutSectionOf(group)]));
     const listed = [...new Set(order.map(id => byId.get(id)).filter(section => section?.parentNode))];
+    // A custom section belongs to the layout even when the wanted order does
+    // not name it: the page-level order is shared across record shapes, so it
+    // can name another shape's customs. One left out never joins the pager's
+    // cards, and the next deal drops it from the page. Each rejoins after the
+    // section it was added below.
+    for (const group of state.groups.values()) {
+      if (!group.custom) continue;
+      const section = layoutSectionOf(group);
+      if (!section?.parentNode || listed.includes(section)) continue;
+      const spec = (state.custom || []).find(item => item.id === group.name) || {};
+      const anchor = byId.get(spec.after);
+      const at = anchor ? listed.indexOf(anchor) : -1;
+      listed.splice(at < 0 ? listed.length : at + 1, 0, section);
+    }
     const movable = listed.filter(section => !listed.some(other => other !== section && other.contains(section)));
     const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
     if (pager) {

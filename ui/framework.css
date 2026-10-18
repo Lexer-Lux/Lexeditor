@@ -7349,7 +7349,10 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-boolean-field:where(:has(> .lex-detail-field-control > .lex-source-control)) {
   grid-template-columns:max(var(--lex-detail-label-width, 7.5%), var(--lex-detail-label-floor, 0px)) minmax(0,1fr);
 }
-.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) { padding-bottom:12px; }
+/* The provenance gutter below the box is reserved only while reference
+   values show. Reserving it for the placeholder too made every boolean
+   row taller than its siblings for nothing on screen. */
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) { padding-bottom:12px; }
 .lex-boolean-field > .lex-detail-field-label {
   min-width:0;
   overflow:visible;
@@ -7398,14 +7401,14 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-boolean-field .lex-field-boolean-arrow::after { content:none; }
 .lex-boolean-field > .lex-field-boolean-arrow { margin-left:24px; margin-right:10px; }
-/* The reference gutter below the box is always reserved, so a reference that
-   appears after an edit shifts nothing. Without this the name, arrow and box
-   park in the top of the row, reading as misaligned next to gutterless rows.
-   Dropping them half the gutter centres them in the full row; relative shifts
-   and inner padding move nothing in layout, so the row keeps its height. */
-.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-detail-field-label,
-.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-field-boolean-arrow,
-.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+/* While reference values show, their gutter drops the name, arrow and box
+   half the gutter to centre them in the full row; relative shifts and inner
+   padding move nothing in layout, so the row keeps its height. Without
+   values there is no gutter and everything parks at the top, as on every
+   other row. */
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-detail-field-label,
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-field-boolean-arrow,
+.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control > .lex-reference-values) > .lex-detail-field-control {
   top:6px;
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { grid-area:1/1; }
@@ -7431,7 +7434,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   justify-self:stretch;
   flex:1 1 auto;
   width:100%;
-  height:28px;
+  height:26px;
 }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
   position:absolute;
