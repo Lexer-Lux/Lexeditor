@@ -11558,11 +11558,11 @@ ${contents.path}`});
   // records and view-specific renderers; they do not assemble their own page
   // slice, selection fallback, fitted master, detail, and bottom pager.
   // Every Table declares whether its records are fixed SLOTS or a growable
-  // list, because the two behave differently in four visible ways: a growable
-  // list offers Add, a slot table never does; a slot table shows only real
-  // slots, so it is not padded out to fill the page; a slot table can hide its
+  // list, because the two behave differently in three visible ways: a growable
+  // list offers Add, a slot table never does; a slot table can hide its
   // empty slots; and once a slot table is sorted by anything but its ID, a
-  // first-to-last range no longer describes what is on screen.
+  // first-to-last range no longer describes what is on screen. Both pad a
+  // short page with empty rows so the grid reaches the panel bottom.
   const slotTablePreferenceKey = options =>
     `hide-empty:${String(options.rowsKey || options.splitKey || options.noun || "records")}`;
   const readHideEmpty = key => {
@@ -11883,13 +11883,14 @@ ${contents.path}`});
           });
           node.setAttribute('aria-multiselectable','true');
           fitBarrelTableColumns(node);
-          // Filler rows exist to square off a growable list. A slot table shows
-          // one row per real slot, so a short last page simply ends.
+          // Filler rows square off a short page the way a spreadsheet does,
+          // slot table or growable list alike: the grid keeps its rules to the
+          // bottom of the panel instead of ending in flat gray.
           // Pad to the track count this table actually declares. Padding to the
           // page size instead put forty rows into a ten-track grid whenever a
           // table held less than one page: the ten declared tracks collapsed to
           // zero and every real record painted on top of the others in one band.
-          if (!slotBased) padBarrelTable(node, rowCapacity);
+          padBarrelTable(node, rowCapacity);
           node.classList.add("lex-page-sized-table");
           // The track count never drops below the page's row target: a short
           // page keeps fitted-height rows with empty tracks below it instead

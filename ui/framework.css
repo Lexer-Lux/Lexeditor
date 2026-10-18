@@ -4195,14 +4195,11 @@ body:has(.lex-data-map-table) #main {
 .lex-column-list-cell[data-column-key="enabled"] { pointer-events:auto; }
 .lex-enabled-toggle { display:grid;place-items:center; }
 
-/* Filler rows hold a short page's fitted rows so they never stretch; they
-   paint nothing. A slot table simply ends after its last record (FF8's
-   clean gray slab), and a growable list's empty space matches it. */
+/* Filler rows square off a short page the way a spreadsheet does: the same
+   rules and background as real rows, but no text of their own. */
 .lex-column-list-row.lex-filler-row { pointer-events:none; }
 .lex-column-list-row.lex-filler-row > .lex-column-list-cell {
   color:transparent;
-  border-color:transparent;
-  background:transparent;
 }
 
 /* ---- Page toolbar ----------------------------------------------------
