@@ -196,7 +196,8 @@ never redistributed: the `Title` texture from
 `menu/<language>/menu_local.tpf.dcx` (rendered to PNG through the TPF/DDS
 preview pipeline), the menu font sources under `font/<language>/`
 (`DSFont24.ccm.dcx`, `TalkFont24.ccm.dcx` and `*.fnt`), and the interface
-sound banks `sound/frpg_sm*.fsb` with their `frpg_sm*.fev` event projects.
+sound banks `sound/frpg_sm*.fsb` and the menu bank `sound/frpg_main.fsb`,
+with their `.fev` event projects.
 `plugins/ds1/theme.py` extracts these into a private cache outside the
 checkout at serve time.
 
@@ -204,6 +205,5 @@ The `font/<language>/` layout follows the public ccm-changer notes:
 https://github.com/binamselerimir/ccm-changer
 FSB4 bank inventory (magic, stream count, 80-byte sample headers) was
 measured by read-only inspection of the installed banks; no FMOD code or
-documentation is copied. Stream payloads proved out as padded MPEG-1 Layer III (see `plugins/ds1/fsb.py`), extracted without copying any decoder. Bitmap-to-webfont conversion and menu event-name mapping
-are not integrated yet, so headings use an engraved serif fallback
-and the interface stays silent until proved menu sounds land.
+documentation is copied. Stream payloads proved out as padded MPEG Layer III, mostly MPEG-1 with MPEG-2 in the menu bank (see `plugins/ds1/fsb.py`), extracted without copying any decoder. Bitmap-to-webfont conversion
+is not integrated yet, so headings use an engraved serif fallback. Menu UI events map from proved FEV event paths (`/frpg_main/CURSOL_MOVE` and siblings) to shell sound slots; exit/save have no proved source and stay silent.

@@ -10,8 +10,9 @@ module builds a small, bounded theme cache from the local installation:
   not integrated, so the editor falls back to an engraved serif stack;
 - interface sounds: ``sound/frpg_sm*.fsb`` banks are inventoried through a
   read-only FSB4 header parse and their ``.fev`` projects cached raw; streams
-  extract to browser-playable MPEG on demand (``sfx_extract``), while menu
-  UI-event mapping still waits for proved event names, so nothing plays yet.
+  extract to browser-playable MPEG on demand (``sfx_extract``). The menu
+  bank ``frpg_main.fsb`` carries the proved UI events (``CURSOL_MOVE``,
+  ``CURSOL_SELECT``, ``CURSOL_CANCEL``), mapped to shell slots below.
 
 FSB payloads (up to 126 MB a bank) are never copied: only their stream counts
 and the small ``.fev`` project files land in the cache. Theme extraction is
@@ -78,14 +79,22 @@ def _sound_banks(game_root: Path) -> list[Path]:
     sound_dir = game_root / "sound"
     if not sound_dir.is_dir():
         return []
-    return sorted(path for path in sound_dir.glob("frpg_sm*.fsb") if path.is_file())
+    banks = [path for path in sound_dir.glob("frpg_sm*.fsb") if path.is_file()]
+    main = sound_dir / "frpg_main.fsb"
+    if main.is_file():
+        banks.append(main)
+    return sorted(banks)
 
 
 def _sound_projects(game_root: Path) -> list[Path]:
     sound_dir = game_root / "sound"
     if not sound_dir.is_dir():
         return []
-    return sorted(path for path in sound_dir.glob("frpg_sm*.fev") if path.is_file())
+    projects = [path for path in sound_dir.glob("frpg_sm*.fev") if path.is_file()]
+    main = sound_dir / "frpg_main.fev"
+    if main.is_file():
+        projects.append(main)
+    return sorted(projects)
 
 
 def _signature(game_root: Path | None) -> tuple[str, list[str]]:
@@ -255,9 +264,9 @@ def _sfx_part(game_root: Path, generation: Path) -> dict:
     part["cachedProjects"] = cached
     if banks:
         part["note"] = ("FMOD sound banks stream browser-playable MPEG once extracted; "
-                        "menu-sound mapping still waits for proved event names.")
+                        "the frpg_main menu bank feeds the shell sound slots.")
     else:
-        part["note"] = "No sound/frpg_sm sound banks were found."
+        part["note"] = "No sound/frpg_sm or frpg_main sound banks were found."
     return part
 
 
@@ -322,7 +331,7 @@ def build(cache_root: Path, game_root: Path | None) -> dict:
 # generations (and their sounds) are pruned by build().
 MAX_SFX_FILES = 256
 MAX_SFX_BYTES = 64 * 1024 * 1024
-_BANK_NAME = re.compile(r"frpg_sm\d+\.fsb\Z")
+_BANK_NAME = re.compile(r"(frpg_sm\d+|frpg_main)\.fsb\Z")
 _STREAM_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.wav\Z")
 
 
@@ -382,3 +391,44 @@ def asset_path(cache_root: Path, route: str) -> Path:
     if "browser" not in target.parts:
         raise FileNotFoundError("Raw theme sources are not web-served")
     return target
+
+
+# Menu UI events, proved against the installed frpg_main bank and its FEV
+# event paths (/frpg_main/CURSOL_MOVE and siblings): the cursor tick, the
+# confirm blip, the cancel sound and the game-start jingle. exit/save have
+# no proved source and stay silent.
+MENU_SOUNDS = {
+    "move": ("frpg_main.fsb", "CURSOL_MOVE.wav"),
+    "confirm": ("frpg_main.fsb", "CURSOL_SELECT.wav"),
+    "back": ("frpg_main.fsb", "CURSOL_CANCEL.wav"),
+    "launch": ("frpg_main.fsb", "GAMESTART.wav"),
+}
+
+
+def menu_sound_rows(cache_root, game_root):
+    """{ready, rows} for the six shell slots, mirroring core.theme_sounds."""
+    from core.theme_sounds import SOUND_SLOTS
+    rows = []
+    for slot in SOUND_SLOTS:
+        mapped = MENU_SOUNDS.get(slot)
+        if mapped is None or game_root is None or not Path(game_root).is_dir():
+            rows.append({"slot": slot, "available": False, "sourceId": None,
+                         "url": "", "message": "No proven source sound is mapped."})
+            continue
+        bank, stream = mapped
+        try:
+            url = sfx_extract(Path(cache_root), Path(game_root), bank, stream)
+        except (ValueError, OSError, FormatError) as error:
+            rows.append({"slot": slot, "available": False, "sourceId": stream,
+                         "url": "", "message": f"{bank} {stream} is unavailable ({error})."})
+            continue
+        duration = ""
+        try:
+            entry = next(item for item in sfx_streams(Path(cache_root), Path(game_root), bank)
+                         if item["name"] == stream)
+            duration = f", {entry['duration']:.2f}s"
+        except (ValueError, OSError, FormatError):
+            pass
+        rows.append({"slot": slot, "available": True, "sourceId": stream,
+                     "url": url, "message": f"From {bank} {stream}{duration}."})
+    return {"ready": any(row["available"] for row in rows), "rows": rows}

@@ -107,13 +107,18 @@ THEME_CACHE = theme.cache_root()
 def theme_status() -> dict:
     """Cosmetic installed-game theme; never a readiness gate."""
     if STORE.game_root is None:
-        return theme.fallback("Select the installed game before extracting its theme.")
+        state = theme.fallback("Select the installed game before extracting its theme.")
+    else:
+        try:
+            state = theme.build(THEME_CACHE, Path(STORE.game_root))
+        except (OSError, ValueError) as error:
+            state = theme.fallback("Installed-game theme extraction failed; fallback styling remains active.")
+            state["error"] = str(error)
     try:
-        return theme.build(THEME_CACHE, Path(STORE.game_root))
+        state["sounds"] = theme.menu_sound_rows(THEME_CACHE, STORE.game_root)
     except (OSError, ValueError) as error:
-        state = theme.fallback("Installed-game theme extraction failed; fallback styling remains active.")
-        state["error"] = str(error)
-        return state
+        state["sounds"] = {"ready": False, "rows": [], "error": str(error)}
+    return state
 
 
 class Handler(PluginRequestHandler):

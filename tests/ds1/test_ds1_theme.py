@@ -334,3 +334,70 @@ def test_theme_build_prunes_old_generations(tmp_path):
     assert second["token"] != first["token"]
     assert not old.exists()
     assert (cache / second["token"]).is_dir()
+
+
+MENU_STREAMS = ["CURSOL_MOVE.wav", "CURSOL_SELECT.wav", "CURSOL_CANCEL.wav",
+                "GAMESTART.wav"]
+
+
+def menu_bank():
+    """A frpg_main-shaped bank: framed MPEG payloads under CURSOL names."""
+    frame = bytes.fromhex("fffba060") + bytes(522 - 4)
+    primer = bytes.fromhex("0a00fffb") + bytes(12)
+    payloads = [primer + frame + b"\0\0" + frame for _name in MENU_STREAMS]
+    data = bytearray(struct.pack("<4sIII", b"FSB4", len(MENU_STREAMS), 0, 0) + bytes(32))
+    for name, payload in zip(MENU_STREAMS, payloads):
+        head = bytearray(80)
+        struct.pack_into("<H", head, 0, 80)
+        encoded = name.encode("ascii")
+        head[2:2 + len(encoded)] = encoded
+        struct.pack_into("<II", head, 32, 2304, len(payload))
+        struct.pack_into("<I", head, 52, 44100)
+        data += head
+    for payload in payloads:
+        data += payload
+    return bytes(data)
+
+
+def game_with_menu(tmp_path):
+    game = game_root(tmp_path)
+    (game / "sound" / "frpg_main.fsb").write_bytes(menu_bank())
+    (game / "sound" / "frpg_main.fev").write_bytes(b"FEV-PROJECT")
+    return game
+
+
+def test_menu_bank_counts_as_an_interface_bank(tmp_path):
+    game = game_with_menu(tmp_path)
+    state = theme.build(tmp_path / "cache", game)
+    assert state["sfx"]["recognizedBanks"] == 2
+    assert state["sfx"]["streams"] == 7
+    assert state["sfx"]["cachedProjects"] == 2
+    streams = theme.sfx_streams(tmp_path / "cache", game, "frpg_main.fsb")
+    assert [entry["name"] for entry in streams] == MENU_STREAMS
+
+
+def test_menu_slots_map_to_proved_main_bank_streams(tmp_path):
+    game = game_with_menu(tmp_path)
+    cache = tmp_path / "cache"
+    sounds = theme.menu_sound_rows(cache, game)
+    rows = {row["slot"]: row for row in sounds["rows"]}
+    assert sounds["ready"] is True
+    assert [(slot, rows[slot]["available"]) for slot in
+            ("move", "confirm", "back", "launch", "exit", "save")] == [
+        ("move", True), ("confirm", True), ("back", True), ("launch", True),
+        ("exit", False), ("save", False)]
+    frame = bytes.fromhex("fffba060") + bytes(522 - 4)
+    for slot in ("move", "confirm", "back", "launch"):
+        served = theme.asset_path(cache, rows[slot]["url"].removeprefix("/theme/")).read_bytes()
+        assert served == frame + frame
+        assert "frpg_main.fsb" in rows[slot]["message"]
+    assert rows["exit"]["url"] == ""
+    assert rows["save"]["url"] == ""
+
+
+def test_menu_slots_without_game_are_all_missing(tmp_path):
+    sounds = theme.menu_sound_rows(tmp_path / "cache", None)
+    assert sounds["ready"] is False
+    assert [(row["slot"], row["available"]) for row in sounds["rows"]] == [
+        ("confirm", False), ("back", False), ("move", False),
+        ("launch", False), ("exit", False), ("save", False)]

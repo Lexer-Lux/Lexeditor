@@ -80,3 +80,12 @@ def test_unproven_banks_raise(tmp_path):
     bank.write_bytes(struct.pack("<4sIII", b"FSB4", 1, 0, 0) + bytes(32) + bytes(79))
     with pytest.raises(fsb.FsbError):
         fsb.parse_table(bank)
+
+
+def test_extract_mp3_reads_mpeg2_layer3_frames(tmp_path):
+    """CURSOL_SELECT is MPEG-2 Layer III: 160 kbps at 22050 Hz."""
+    frame = bytes.fromhex("fff3e0c0") + bytes(522 - 4)
+    bank = tmp_path / "mpeg2.fsb"
+    bank.write_bytes(bank_bytes([("sel.wav", 6912, 22050, frame + b"\0\0" + frame)]))
+    (entry,) = fsb.parse_table(bank)
+    assert fsb.extract_mp3(bank, entry) == frame + frame

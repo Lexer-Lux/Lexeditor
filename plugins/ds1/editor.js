@@ -109,6 +109,7 @@ async function refreshState(){
   state.tabs=result.tabs;state.enemyTabs=result.enemyTabs;state.aiTabs=result.aiTabs;state.attackTabs=result.attackTabs;
   state.effectTabs=result.effectTabs||[];state.statsTabs=result.statsTabs||[];state.animTabs=result.animTabs||[];state.worldTabs=result.worldTabs||[];state.textTabs=result.textTabs||[];state.npcTabs=result.npcTabs||[];state.miscTabs=result.miscTabs||[];state.nativeRules=result.nativeRules;
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
+  if(result.theme&&result.theme.sounds)LexeditorUI.configureThemeSounds(result.theme.sounds.rows||[]);
 }
 function sortedRows(){
   const query=state.query.toLowerCase();

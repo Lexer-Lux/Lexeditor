@@ -58,27 +58,34 @@ def parse_table(path):
     return entries
 
 
-# MPEG-1 Layer III frame sizing, from the frame header: the installed
-# banks encode at 160 kbps / 44100 Hz, but the walker trusts each
-# header so variable bitrates stay aligned.
+# MPEG Layer III frame sizing, from the frame header: most installed
+# streams are MPEG-1 at 160 kbps / 44100 Hz, but the menu bank holds
+# MPEG-2 at 160 kbps / 22050 Hz (CURSOL_SELECT), so the walker reads
+# the version, trusts each header, and sizes each accordingly.
 _MPEG1_L3_BITRATE = (None, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160,
                      192, 224, 256, 320, None)
-_MPEG1_RATE = (44100, 48000, 32000, None)
+_MPEG2_L3_BITRATE = (None, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112,
+                     128, 144, 160, None)
+_MPEG_RATE = ((11025, 12000, 8000, None), (None, None, None, None),
+              (22050, 24000, 16000, None), (44100, 48000, 32000, None))
 _MAX_PAD = 16
 
 
 def _frame_length(head):
-    """One MPEG-1 Layer III frame's byte length, or None when the four
+    """One MPEG Layer III frame's byte length, or None when the four
     header bytes are not one."""
     if len(head) < 4 or head[0] != 0xFF or head[1] & 0xE0 != 0xE0:
         return None
-    if (head[1] >> 3) & 3 != 3 or (head[1] >> 1) & 3 != 1:
+    version = (head[1] >> 3) & 3
+    if version == 1 or (head[1] >> 1) & 3 != 1:
         return None
-    bitrate = _MPEG1_L3_BITRATE[(head[2] >> 4) & 15]
-    rate = _MPEG1_RATE[(head[2] >> 2) & 3]
+    table = _MPEG1_L3_BITRATE if version == 3 else _MPEG2_L3_BITRATE
+    bitrate = table[(head[2] >> 4) & 15]
+    rate = _MPEG_RATE[version][(head[2] >> 2) & 3]
     if bitrate is None or rate is None:
         return None
-    return (144 * bitrate * 1000) // rate + ((head[2] >> 1) & 1)
+    factor = 144 if version == 3 else 72
+    return (factor * bitrate * 1000) // rate + ((head[2] >> 1) & 1)
 
 
 def extract_mp3(path, entry):
