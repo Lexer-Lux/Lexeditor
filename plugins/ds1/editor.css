@@ -30,7 +30,7 @@
   --lex-section-title-fg:#e8c67a;--lex-section-title-font:17px/1.2 var(--lex-heading-font);
   --lex-section-title-border:1px solid #3a332a;
   --lex-detail-title-fg:#f6eeda;--lex-detail-id-fg:#a79b80;
-  --lex-heading-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-radius:3px;
+  --lex-heading-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-font:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;--lex-radius:3px;
   --lex-detail-icon-bg:#241f15;--lex-detail-icon-fg:#e8c67a;
   --lex-loading-color:#a4824c;
   /* The record's own picture stays with its name on the header's left,

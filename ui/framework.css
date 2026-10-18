@@ -1533,7 +1533,7 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-unit-field > select { min-width: 0; }
 
 .lex-unit-multiplier {
-  font-family:"Lexend", "Segoe UI Symbol", sans-serif;
+  font-family:var(--lex-font);
   font-size:1.08em;
   line-height:1;
 }
@@ -5736,7 +5736,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   top:0;
   max-height:100%;
   color:var(--lex-muted);
-  font:700 9px/1 "Lexend", "Segoe UI", sans-serif;
+  font:700 9px/1 var(--lex-font);
   letter-spacing:.08em;
   opacity:0;
 
@@ -6632,7 +6632,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    now, which is what the rotated code actually needs. */
 .lex-toggle-type {
 
-  font:700 8px/1 "Lexend","Segoe UI",sans-serif;
+  font:700 8px/1 var(--lex-font);
   letter-spacing:-.05em;
 
  writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap;
@@ -7701,7 +7701,7 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
   z-index:1;
 }
 .lex-boolean-mark {
-   font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif;
+   font:800 1.08em/1 var(--lex-font), "Segoe UI Symbol", sans-serif;
  display: block; font-size: 1.45em; text-align: center;
   /* A cell's content clips every span it holds, and the tick's ink is about a
      pixel wider than the box the cell gives it - so the mark lost a sliver of
