@@ -5368,9 +5368,9 @@
       let orderedLane=0;
       for(let index=0;index<visible.length;index++){
         const height=cardHeights.get(visible[index])||0;
-        let lane=options.columnMajor?orderedLane:loads.indexOf(Math.min(...loads));
+        let lane=orderedLane;
         if(loads[lane]>0&&loads[lane]+gap+height>available+1){
-          if(options.columnMajor&&lane<count-1)lane=++orderedLane;
+          if(lane<count-1)lane=++orderedLane;
           else {next.push(index);loads.fill(0);lane=0;orderedLane=0;}
         }
         loads[lane]+=(loads[lane]?gap:0)+height;
@@ -5391,7 +5391,7 @@
       // unless that share would run past the foot.
       const heights=onPage.map(card=>cardHeights.get(card));
       let lanesFor=null;
-      if(options.columnMajor&&heights.every(height=>height!==undefined)&&count>1){
+      if(heights.every(height=>height!==undefined)&&count>1){
         const total=heights.reduce((sum,height)=>sum+height,0)+gap*Math.max(0,onPage.length-count);
         const share=Math.max(Math.max(...heights),total/count);
         const lanes=[],sums=Array(count).fill(0);
@@ -5401,13 +5401,13 @@
           if(sums[at]>0&&at<count-1&&(sums[at]+gap+height>share+1||left<=count-1-at))at++;
           lanes.push(at);sums[at]+=(sums[at]?gap:0)+height;
         });
-        if(sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
+        if(options.unpaged||sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
       }
       onPage.forEach((card,index)=>{
         const measured=cardHeights.get(card);
-        let lane=measured===undefined?index%count:loads.indexOf(Math.min(...loads));
+        let lane=index%count;
         if(lanesFor)lane=lanesFor[index];
-        else if(options.columnMajor&&measured!==undefined){
+        else if(measured!==undefined){
           if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
           lane=orderedLane;
         }
