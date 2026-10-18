@@ -294,6 +294,7 @@
       "blank"
     ],
     "configureThemeSounds": [
+      "ds1",
       "ff7",
       "ff7r",
       "ff8"
@@ -680,6 +681,10 @@
       "blank",
       "ff8",
       "warband"
+    ],
+    "fileLocationButton": [
+      "blank",
+      "ff8"
     ],
     "finishPluginLoading": [
       "bannerlord",

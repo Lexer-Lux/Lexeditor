@@ -182,6 +182,8 @@
         action: UI.element("button", {type: "button", class: "lex-dialog-action primary"}, "Clear cache")})},
     {id: "detailNote", level: "molecule", summary: "A sentence inside a section that is not a property.",
       sample: () => UI.detailNote("Nothing in this section applies to this record.")},
+    {id: "fileLocationButton", level: "molecule", summary: "A folder glyph for a detail header that reveals the record's file in Explorer; a mod replacement wins, and with neither file it sits disabled.",
+      sample: () => UI.fileLocationButton({plugin: "blank", modFile: "textures/example.png"})},
     {id: "toggleRow", level: "molecule", summary: "detailRow whose parts are all switches, laid out as many to a line as fit.",
       sample: () => UI.toggleRow({toggles: [
         {key: "menu", label: "Menu", checked: true, change: () => {}},

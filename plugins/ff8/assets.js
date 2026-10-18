@@ -45,7 +45,8 @@
       return sharedDetail(row,prefs,[LexeditorUI.detailNote(row.note),
         detailSection({title:"MOD FILE",body:[
           detailField({label:"FILE",control:readonlyField(row.modFiles[0].file)}),
-          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})],"",assetFileSize(row.bytes));
+          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})],"",assetFileSize(row.bytes),null,
+        LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"?`sfx/${row.modFiles[0].file}`:null}));
     const sections=[];
     if(row.valid)sections.push(detailSection({title:"PREVIEW",body:[
       soundPreview({src:`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`,label:`Play ${row.name}`})]}));
@@ -55,13 +56,9 @@
       detailField({label:"LOOP",help:infoHelp("Looping sounds repeat until the game stops them. The flag comes from the shipped sound index."),control:readonlyField(row.valid?(row.loop?"Yes":"No"):"—")}),
       detailField({label:"USED BY",help:infoHelp("Battle actors proved to play this sound, from the battle actor sound table. Most sounds have no proven usage and show none."),control:readonlyField(row.usedBy?.length?row.usedBy.join("; "):"No proven battle usage")})];
     if(!row.valid)facts.push(detailField({label:"",control:LexeditorUI.detailNote(row.note)}));
+    for(const [flag,value] of Object.entries(row.config||{}))facts.push(detailField({label:String(flag).toUpperCase(),control:readonlyField(Array.isArray(value)?value.join(", "):String(value))}));
+    if(state.data.sfx.configError)facts.push(detailField({label:"",control:LexeditorUI.detailNote(state.data.sfx.configError)}));
     sections.push(detailSection({title:"SOUND",body:facts}));
-    const modBody=(row.modFiles||[]).map(entry=>detailField({label:"FILE",control:readonlyField(`${entry.file} · ${assetFileSize(entry.sizeBytes)}`)}));
-    if(!modBody.length)modBody.push(detailField({label:"",control:LexeditorUI.detailNote("No mod replaces this sound.")}));
-    for(const [flag,value] of Object.entries(row.config||{}))modBody.push(detailField({label:String(flag).toUpperCase(),control:readonlyField(Array.isArray(value)?value.join(", "):String(value))}));
-    if(state.data.sfx.configError)modBody.push(detailField({label:"",control:LexeditorUI.detailNote(state.data.sfx.configError)}));
-    sections.push(detailSection({title:"MOD FILES",body:modBody,
-      help:infoHelp("Mod files whose FFNx external name claims this sound. Global files are plain sound IDs; battle, menu, world, and field prefixes replace it in one context.")}));
     if(row.valid){
       const upload=el("input",{type:"file",accept:".ogg,.wav,.flac,.mp3,audio/ogg,audio/wav",hidden:true});
       upload.onchange=()=>assetStageUpload(row,"audioBase64",upload,null,file=>{
@@ -79,7 +76,8 @@
       sections.push(detailSection({title:"REPLACEMENT",body:replaceBody,
         help:infoHelp("Replace writes sfx/<id>.<ext> into this project; FFNx plays it instead of the shipped sound. Revert deletes the project override.")}));
     }
-    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections,"",assetFileSize(row.bytes));
+    const location=LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"&&row.modFiles?.length?`sfx/${row.modFiles[0].file}`:null});
+    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections,"",assetFileSize(row.bytes),null,location);
   }
 
   function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
@@ -266,7 +264,8 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:assetName(row,modelOverridden(row)),icon:modelPageThumb(row)||LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
+    const location=LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"?row.override||null:null});
+    return detailPanel({title:assetName(row,modelOverridden(row)),icon:modelPageThumb(row)||LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row),actions:[location]});
   }
 
   function renderTextures(){
@@ -303,10 +302,6 @@
     }
     // The texture's caveat is help, not a paragraph in the panel body.
     sections.push(detailSection({title:"TEXTURE",help:row.note?infoHelp(row.note):null,body:facts}));
-    const modBody=(row.modFiles||[]).map(entry=>detailField({label:"FILE",control:readonlyField(`${entry.file} · ${assetFileSize(entry.sizeBytes)}`)}));
-    if(!modBody.length)modBody.push(detailField({label:"",control:LexeditorUI.detailNote("No mod replaces this texture.")}));
-    sections.push(detailSection({title:"MOD FILES",body:modBody,
-      help:infoHelp("Mod files whose path extends this texture's FFNx external name. Files under any other path are listed as unmapped mod textures instead.")}));
     // The subtitle is the file this texture belongs to, and it goes where the
     // texture is edited: the Models tab for a model file, the Maps tab for a
     // world one. The hover card names the destination, so the line stays the
@@ -319,5 +314,6 @@
     }
     // The subtitle carries the file size, like every other file-backed view.
     const sized=row.sizeBytes==null?meta:LexeditorUI.inlineLabel(meta,` \u00b7 ${assetFileSize(row.sizeBytes)}`);
-    return detailPanel({title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections});
+    const location=LexeditorUI.fileLocationButton({plugin:"ff8",modFile:state.activeSource==="mine"&&row.modFiles?.length?`textures/${row.modFiles[0].file}`:null});
+    return detailPanel({title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections,actions:[location]});
   }

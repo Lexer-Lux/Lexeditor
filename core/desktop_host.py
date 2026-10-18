@@ -816,6 +816,26 @@ class HostApi:
                          ["explorer.exe", "/select,", str(target)])
         return {"path": str(target)}
 
+    def open_mod_file_location(self, plugin_id: str, relative: str) -> dict:
+        """Reveal one file of the open mod in Explorer, selected."""
+        if plugin_id not in self._plugins:
+            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
+        current = str(self._projects.snapshot(plugin_id).get("current") or "")
+        root = Path(current).expanduser().resolve() if current else None
+        if root is None or not root.is_dir():
+            raise RuntimeError("There is no open mod project to reveal a file from")
+        name = str(relative).strip().replace("\\", "/")
+        if not name or "\x00" in name or any(part == ".." for part in name.split("/")):
+            raise ValueError("Invalid mod file path")
+        target = (root / name).resolve()
+        if target != root and root not in target.parents:
+            raise ValueError("That file is outside this mod")
+        if not target.exists():
+            raise RuntimeError(f"That mod file is unavailable: {target}")
+        subprocess.Popen(["explorer.exe", str(target)] if target.is_dir() else
+                         ["explorer.exe", "/select,", str(target)])
+        return {"path": str(target)}
+
     def open_game_folder(self, plugin_id: str) -> dict:
         """Open one configured game root without accepting a page-supplied path."""
         if plugin_id not in self._plugins:
