@@ -1,5 +1,6 @@
 """DS1 menu icons on synthetic files: DRB catalog, DLC grid, crops, labels."""
 import io
+import re
 import sys
 from pathlib import Path
 
@@ -80,11 +81,49 @@ def test_crop_png_outside_texture_fails():
 def test_label_cells_cover_the_equipment_screen():
     assert set(icons.LABELS) == {'physical', 'magic', 'fire', 'lightning', 'critical',
                                  'physicalDef', 'magicDef', 'fireDef', 'lightningDef',
-                                 'str', 'dex', 'int', 'faith', 'weight', 'durability'}
+                                 'str', 'dex', 'int', 'faith', 'weight', 'durability',
+                                 'poison', 'toxic', 'bleed', 'curse', 'poise',
+                                 'vit', 'att', 'end', 'res', 'souls', 'slot'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
     assert icons.LABELS['lightning'] == (126, 430, 168, 472)
+    assert icons.LABELS['poison'] == (83, 43, 125, 85)
+    assert icons.LABELS['toxic'] == (83, 86, 125, 128)
+    assert icons.LABELS['bleed'] == (83, 0, 125, 42)
+    assert icons.LABELS['curse'] == (83, 129, 125, 171)
+    assert icons.LABELS['poise'] == (213, 259, 255, 301)
+    assert icons.LABELS['souls'] == (169, 44, 211, 86)
+    assert icons.LABELS['vit'] == (83, 172, 125, 214)
+    assert icons.LABELS['att'] == (83, 215, 125, 257)
+    assert icons.LABELS['end'] == (83, 301, 125, 343)
+    assert icons.LABELS['res'] == (82, 344, 124, 386)
+    assert icons.LABELS['slot'] == (125, 215, 167, 257)
+
+
+def test_item_art_labels_name_catalog_icons():
+    assert icons.ICON_LABELS == {'humanity': 2066}
+
+
+def test_label_png_serves_item_art_labels(tmp_path):
+    menu = tmp_path / 'menu'
+    menu.mkdir()
+    (menu / 'menu.drb').write_bytes(make_drb(['Icon20'], {
+        'Icon': [('EquIcon_2066', sprite_shape((0, 0, 0, 0), (0, 0, 80, 90), 0))]}))
+    (menu / 'menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([('Icon20', quadrant_dds())])))
+    with Image.open(io.BytesIO(icons.label_png(str(tmp_path), 'humanity'))) as image:
+        image.load()
+        assert image.size == (160, 180)
+    with pytest.raises(icons.IconError):
+        icons.label_png(str(tmp_path), 'missing-kind')
+
+
+def test_client_label_kinds_cover_every_game_art_kind():
+    editor = (Path(__file__).resolve().parents[2] / 'plugins' / 'ds1' / 'editor.js').read_text(encoding='utf-8')
+    match = re.search(r'ds1LabelKinds\s*=\s*new Set\(\[(.*?)\]\)', editor, re.S)
+    assert match, 'the client label-kind set moved'
+    client = set(re.findall(r'"([^"]+)"', match[1]))
+    assert set(icons.LABELS) | set(icons.ICON_LABELS) <= client
 
 
 def test_field_icons_follow_damage_defense_and_stats():
@@ -118,16 +157,18 @@ def test_status_icons_reuse_shared_fallback_glyphs():
     """Every icon kind renders: game art from icons.py, else a shared glyph.
 
     The detail field draws `field.icon` through the shared typeGlyph helper,
-    which shows nothing for an unknown kind. Kinds with equipment-screen art
-    are replaced by DS1 label art; the rest must name a shared glyph.
+    which shows nothing for an unknown kind. Kinds with menu art are
+    replaced by DS1 label art; the rest must name a shared glyph. Statuses
+    keep their shared glyphs for installs without menu files.
     """
-    import re
     framework = (Path(__file__).resolve().parents[2] / "ui" / "framework.js").read_text(encoding="utf-8")
     block = framework.split("const TYPE_GLYPHS = {", 1)[1].split("\n  };", 1)[0]
     shared = set(re.findall(r"^\s*(\w+):", block, re.M))
     assert {"poison", "toxic", "bleed", "curse"} <= shared
+    assert {"poison", "toxic", "bleed", "curse"} <= set(icons.LABELS)
+    art = set(icons.LABELS) | set(icons.ICON_LABELS)
     for kind in set(formats._FIELD_ICONS.values()) | set(formats.ABSORPTION_ICONS.values()):
-        assert kind in icons.LABELS or kind in shared, kind
+        assert kind in art or kind in shared, kind
 
 
 def test_sheet_bytes_finds_texture_across_archives(tmp_path):

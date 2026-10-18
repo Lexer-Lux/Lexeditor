@@ -112,7 +112,7 @@
     {
       "Field": "hormingOffsetRange",
       "Name": "Homing Correction Offset",
-      "Description": "If set to 0, the projectile will track with perfect accuracy. Otherwise, the target location is offset by this amount in the direction to victim is moving."
+      "Description": "If set to 0, the projectile tracks with perfect accuracy. Otherwise the target point shifts by this amount in the direction the victim is moving."
     },
     {
       "Field": "dmgHitRecordLifeTime",
@@ -177,7 +177,7 @@
     {
       "Field": "shootAngle",
       "Name": "Horizontal Firing Angle",
-      "Description": "Specify the horizontal angle at which the projectile should be fired, offset from the emitter origin. In degrees."
+      "Description": "Horizontal firing angle in degrees, measured from the emitter."
     },
     {
       "Field": "shootAngleInterval",

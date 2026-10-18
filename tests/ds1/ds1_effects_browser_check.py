@@ -53,15 +53,21 @@ def main():
                         page.get_by_role("searchbox",name="Search effects").fill("6890")
                         page.wait_for_function("state.row?.id===6890 && key(state.row)===state.selected")
 
+                    def panel_tabs():
+                        return page.locator('.lex-detail .lex-tabbed-panel [data-subtab]')
+                    def show_tab(index):
+                        tabs=panel_tabs()
+                        tab=tabs.nth(index)
+                        if tab.get_attribute('aria-selected')=='true':return
+                        tab_id=tab.get_attribute('data-subtab')
+                        tab.click()
+                        page.wait_for_function('(id)=>state.effectTab===id',arg=tab_id)
                     def control(key):
-                        first=page.locator(".lex-tweaks-pages").get_by_role("button",name="First page",exact=True)
-                        if first.count() and first.is_enabled():first.evaluate("button=>button.click()")
-                        for _ in range(60):
+                        tabs=panel_tabs()
+                        for index in range(tabs.count()):
+                            show_tab(index)
                             found=page.locator(f'[data-field-key="{key}"]:visible')
                             if found.count():return found.first
-                            following=page.locator(".lex-tweaks-pages").get_by_role("button",name="Next page",exact=True)
-                            if not following.count() or not following.is_enabled():break
-                            following.evaluate("button=>button.click()")
                         raise AssertionError("Effect property is not reachable: "+key)
 
                     def edit(key,value):
@@ -79,7 +85,7 @@ def main():
 
                     page.goto(session.url,wait_until="domcontentloaded");ready()
                     open_effect()
-                    assert page.locator('[data-subtab]').evaluate_all("nodes=>nodes.map(n=>n.dataset.subtab)") == [
+                    assert page.locator('.lex-subtab-bar:not(.lex-tabbed-panel .lex-subtab-bar) [data-subtab]').evaluate_all("nodes=>nodes.map(n=>n.dataset.subtab)") == [
                         "effects-all","effects-equipment","effects-items","effects-spells"]
                     units = {}
                     for key in ("maxHpRate", "motionInterval", "changeMpRate",
@@ -127,21 +133,19 @@ def main():
                     current=request_json(session.url+"api/row?table=SpEffectParam&id=6890")["row"]
                     assert next(f["value"] for f in current["fields"] if f["key"]==RECOVERY_KEY)==4
                     edit(RECOVERY_KEY,4)
-                    # Long groups use the shared scrolling fallback, with a fixed pager.
+                    # Every editable property is reachable through the panel tabs.
                     page.set_viewport_size({"width":1000,"height":700})
                     page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
-                    control("effectEndurance")
                     seen=set()
                     expected=set(page.evaluate("state.row.fields.filter(f=>f.editable).map(f=>f.key)"))
-                    for _ in range(60):
+                    tabs=panel_tabs()
+                    for index in range(tabs.count()):
+                        show_tab(index)
                         visible=page.locator("[data-field-key]:visible").evaluate_all(
                             "nodes=>nodes.map(node=>{node.scrollIntoView({block:'nearest'});const box=node.getBoundingClientRect();return {key:node.dataset.fieldKey,y:box.y,height:box.height};})")
                         for box in visible:
                             assert box["y"]>=0 and box["y"]+box["height"]<=701, box
                             seen.add(box["key"])
-                        next_page=page.locator(".lex-tweaks-pages").get_by_role("button",name="Next page",exact=True)
-                        if not next_page.count() or not next_page.is_enabled():break
-                        next_page.evaluate("button=>button.click()")
                     assert seen==expected, sorted(expected-seen)
                     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
                     assert not page.locator('[data-field-key="saveCategory"]').count()
@@ -164,11 +168,15 @@ def main():
                     page.wait_for_function("state.row?.table==='EquipParamWeapon' && state.row.id===100")
                     # An effect field opens its effect from the Open button beside it.
                     link=page.get_by_role("button",name="Open Grass Crest Shield in Effects",exact=True)
-                    for _ in range(60):
+                    item_tabs=page.locator('.lex-detail .lex-tabbed-panel [data-subtab]')
+                    for index in range(item_tabs.count()):
                         if link.count() and link.is_visible():break
-                        next_page=page.locator(".lex-tweaks-pages").get_by_role("button",name="Next page",exact=True)
-                        assert next_page.count() and next_page.is_enabled(),"Item effect link is not reachable"
-                        next_page.evaluate("button=>button.click()")
+                        tab=item_tabs.nth(index)
+                        if tab.get_attribute('aria-selected')!='true':
+                            tab_id=tab.get_attribute('data-subtab')
+                            tab.click()
+                            page.wait_for_function('(id)=>state.itemTab===id',arg=tab_id)
+                    assert link.count() and link.is_visible(),"Item effect link is not reachable"
                     link.click()
                     page.wait_for_function("state.tab==='effects' && state.row?.id===6890 && !state.error")
                     assert page.evaluate("state.page>0")

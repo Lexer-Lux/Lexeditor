@@ -40,7 +40,7 @@
         {key:'level',label:'Level rule',grow:2,render:slot=>source(slot,'level',encounterLevelControl(slot))}
       ]});
     return LexeditorUI.stack(
-      detailPanel({heading:false,body:formation}),
+      detailPanel({heading:false,body:formation,bodyLayout:'row'}),
       table
     );
   }
@@ -93,7 +93,7 @@
       {label:"Depth",control:readonlyField(`${row.depth} bits`)},
       {label:"Palettes",control:readonlyField(row.paletteCount)}]);
     const controls=LexeditorUI.stack({fill:false},detailField({label:"Preview palette",help:infoHelp("Choose the colours used to display this indexed image. This changes only the preview."),control:paletteSelect}),metadata,LexeditorUI.actionRow(exportLink,replace,upload),pending);
-    return sharedDetail(row,prefs,[detailSection({title:"World texture",body:LexeditorUI.tileGrid([LexeditorUI.figureGrid([{media:preview,caption:row.name}]),controls])})]);
+    return sharedDetail(row,prefs,[detailSection({title:"World texture",body:LexeditorUI.tileGrid([LexeditorUI.figureGrid([{media:preview,caption:row.name}]),controls])})],"",assetFileSize(row.timBytes));
 
   }
   // Packed block coordinates: FF8UltimateEditor/Cid/drawmapwidget.py.

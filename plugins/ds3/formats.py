@@ -827,9 +827,16 @@ class RegulationDocument:
         schema = self.schemas[table]
         return row.name or schema.row_names.get(row.row_id) or f"Row {row.row_id}"
 
+    def row_modified(self, table: str, row_id: int):
+        """Whether this session changed the row: an edited field or a created row."""
+        if (table, row_id) in self._created_ids:
+            return True
+        return any(entry[0] == table and entry[1] == row_id for entry in self._dirty)
+
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids,
+                 "modified":self.row_modified(table,r.row_id)} for r in param.rows]
 
     def create_row(self, table: str, source_id: int, new_id: int, name: str):
         schema = self.schemas[table]

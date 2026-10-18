@@ -121,6 +121,28 @@
     {id: "choicePopover",level:"molecule",summary:"An accessible menu of named choices.",sample:()=>{const menu=UI.choicePopover({choices:[{value:1,label:"First"},{value:2,label:"Second"}]});const button=el("button",{onclick:()=>menu.openFor(button)},"Choose");return button;}},
     {id: "mathFormula", level:"atom", summary:"A mathematical expression with fractions and powers.", sample:()=>UI.mathFormula("HP(L)=C+L*A+floor(10*L^2/B)")},
     {id: "controlGroup", level:"molecule", summary:"Any set of controls with aligned labels.", sample:()=>UI.controlGroup([{label:"Name",control:el("input",{value:"Potion"})},{label:"Count",control:el("input",{type:"number",min:0,max:99,value:2})}])},
+    {id: "soundPreview", level: "molecule", summary: "One sound's preview: a player when the game has a playable file for it, an honest note when it does not. A detail panel adopts the player into its heading with a scrubber.",
+      sample: () => {
+        // A quarter-second 440 Hz beep, synthesized so the sample needs no game.
+        const rate = 8000, count = 2000, data = new Uint8Array(44 + count * 2);
+        const view = new DataView(data.buffer);
+        const text = (at, string) => { for (let i = 0; i < string.length; i++) view.setUint8(at + i, string.charCodeAt(i)); };
+        text(0, "RIFF"); view.setUint32(4, 36 + count * 2, true); text(8, "WAVEfmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data");
+        view.setUint32(40, count * 2, true);
+        for (let i = 0; i < count; i++)
+          view.setInt16(44 + i * 2, Math.round(12000 * Math.sin(i / rate * 440 * 2 * Math.PI) * (1 - i / count)), true);
+        let binary = "";
+        for (let i = 0; i < data.length; i += 8192)
+          binary += String.fromCharCode.apply(null, data.subarray(i, i + 8192));
+        const beep = "data:audio/wav;base64," + btoa(binary);
+        return el("div", {},
+          UI.detailPanel({title: "Example Sound", body: [UI.detailSection({title: "PREVIEW",
+            body: [UI.soundPreview({src: beep, label: "Play example"})]})]}),
+          UI.soundPreview({note: "No preview"}));
+      }},
     {id: "stack", level: "template", summary: "A bar over the content it switches: the bar keeps its height, the content takes the rest."},
     {id: "bitmapText", level: "atom", summary: "Text in a game's own bitmap font, one masked glyph per character from --lex-bitmap-atlas."},
     {id: "imageMap", level: "organism", summary: "An image with selectable cells and point markers.", sample:()=>UI.imageMap({columns:4,rows:3,cells:Array.from({length:12},(_,id)=>({id,label:`Cell ${id+1}`,selected:id===3})),points:[{x:.5,y:.5,label:"Point"}]})},

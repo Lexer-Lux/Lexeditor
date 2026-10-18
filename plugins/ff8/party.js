@@ -1,4 +1,7 @@
-  function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No character records were found."}));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row)}))}
+  function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No character records were found."}));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row),
+    // Limit break is a top strip and stat growth fills below: flowing the two
+    // sections side by side left a tall empty column beside three small fields.
+    paginate:false}))}
   const GF_ATTACK_FIELDS=new Set(['attack_animation','attack_type','gf_power','status_window_flags','target_info','attack_flags_type','attack_flags','target_animation','hit_count','element','status_1','status_2','status_attack_enabler','power_mod','level_mod','boost_param_1','boost_param_2','ability1_unlocker']);
   const gfPanelOrder=["GF Compatibility","General","Attack","Abilities"];
   function gfFieldsByPanel(row){const routed=new Map(gfPanelOrder.map(group=>[group,[]])),seen=new Set();for(const field of row.fields){const group=GF_ATTACK_FIELDS.has(field.field)?'Attack':field.group;if(seen.has(field.field)||!routed.has(group))throw new Error(`GF field routing failed: ${field.field}`);seen.add(field.field);routed.get(group).push(field)}if(seen.size!==row.fields.length)throw new Error("GF field routing omitted a field");return routed}
@@ -23,12 +26,7 @@
   }
   const GF_CURVE_FIELDS=["gf_hp_modifier_1","gf_hp_modifier_2","gf_hp_modifier_3","gf_level_modifier_1","gf_level_modifier_2"];
   function gfPanel(title,fields,row,className){if(className==="compatibility")return compatibilityPanel(fields,"gfs",row.id);
-    // The five curve modifiers are the graphs' variables, so they are not also
-    // listed as loose numbers above them.
-    const curveFields=fields.filter(field=>GF_CURVE_FIELDS.includes(field.field));
-    const rest=fields.filter(field=>!GF_CURVE_FIELDS.includes(field.field));
-    const growth=className==="general"?gfStatGrowth(curveFields,row.id):null;
-    return detailSection({title,body:[growth,...(growth?rest:fields).map(field=>gfFieldRow(field,row))].filter(Boolean),attrs:{"data-gf-panel":className,"aria-label":title}})}
+    return detailSection({title,body:fields.map(field=>gfFieldRow(field,row)),attrs:{"data-gf-panel":className,"aria-label":title}})}
   // In "Ability" mode the stored number is 100 + the ability slot. Showing
   // that raw number made the prerequisite unreadable, so the slot is chosen
   // by name and the offset is applied here rather than by the reader.
@@ -67,21 +65,22 @@
     Object.assign(layout,{id:"gf-detail"});layout.setAttribute("role","tabpanel");layout.setAttribute("aria-labelledby",`gfs-tab-${row.id}`);layout.dataset.gf=row.id;$("#main").replaceChildren(layout);
   }
   function gfCenterPanel(row,routed,defaults){
-    const active=state.gfDetailTab||'properties';
+    // The Leveling tab split into HP and XP; a stale selection lands on HP.
+    if(state.gfDetailTab==='properties')state.gfDetailTab='hp';
+    const active=state.gfDetailTab||'hp';
+    // The five curve modifiers are the graphs' variables, so they are not
+    // also listed as loose numbers above them.
+    const curves=(active==='hp'||active==='xp')?gfCurveCards(routed.get('General').filter(field=>GF_CURVE_FIELDS.includes(field.field)),row.id):null;
+    const curve=active==='hp'?curves?.hp:active==='xp'?curves?.xp:null;
+    if(curve)curve.dataset.gfPanel="general";
     const content=active==='attack'?gfPanel('',routed.get('Attack'),row,'attack'):
       active==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):
-      gfLevelingPanel(routed.get('General'),row.id);
-    return tabbedPanel({tabs:[{id:'properties',label:'Leveling',help:'The HP graph controls maximum HP as this GF levels up. The XP graph controls the total experience needed for each level. Edit the graph variables to change these curves.'},
+      curve||LexeditorUI.detailNote('No leveling data for this GF.');
+    return tabbedPanel({tabs:[{id:'hp',label:'HP',help:'The HP graph controls maximum HP as this GF levels up. Edit the graph variables to change this curve.'},
+      {id:'xp',label:'XP',help:'The XP graph controls the total experience needed for each level. Edit the graph variables to change this curve.'},
       {id:'attack',label:'Attack',help:'Set the GF summon’s power, animation, targets, damage, elements and status effects.'},
       {id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],
       active,label:'GF details',change:id=>{state.gfDetailTab=id;renderGFs()},content});
-  }
-  // The shared curve grid owns graph sizing and the one-column layout.
-  function gfLevelingPanel(fields,rowId){
-    const curveFields=fields.filter(field=>GF_CURVE_FIELDS.includes(field.field));
-    const growth=gfStatGrowth(curveFields,rowId);
-    if(growth)growth.dataset.gfPanel="general";
-    return growth;
   }
   function fieldGroups(fields,view,rowId,collapsible=true,prefs=null){
     const groups=new Map();

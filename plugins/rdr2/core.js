@@ -230,12 +230,16 @@ function touchedRecords(maps = [], sets = [], segment = 0) {
   for (const set of sets) for (const key of (set || [])) out.add(String(key));
   return out;
 }
-function modOnlySpec(touched, resetPage, redraw) {
+function modOnlySpec(touched, resetPage, redraw, keyOf) {
+  // The shared table hands changed() the row, not its key: object rows
+  // compare by their record identity, callers with another shape pass how.
+  const key = row => typeof row === "object" && row !== null
+    ? (keyOf ? keyOf(row) : row.key ?? row.id ?? row.name) : row;
   return {
     available: !isRO(),
     value: state.modOnly === true,
-    changed: key => touched.has(String(key)),
-    change: value => { state.modOnly = value; resetPage(); redraw(); },
+    changed: row => touched.has(String(key(row))),
+    change: value => { state.modOnly = value; resetPage?.(); redraw(); },
   };
 }
 const ITEM_EDIT_MAPS = () => [state.moneyDrafts,state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,

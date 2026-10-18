@@ -204,6 +204,6 @@ The `font/<language>/` layout follows the public ccm-changer notes:
 https://github.com/binamselerimir/ccm-changer
 FSB4 bank inventory (magic, stream count, 80-byte sample headers) was
 measured by read-only inspection of the installed banks; no FMOD code or
-documentation is copied. Bitmap-to-webfont conversion and FSB sample
-decoding are not integrated yet, so headings use an engraved serif fallback
-and the interface stays silent until a proved decoder lands.
+documentation is copied. Stream payloads proved out as padded MPEG-1 Layer III (see `plugins/ds1/fsb.py`), extracted without copying any decoder. Bitmap-to-webfont conversion and menu event-name mapping
+are not integrated yet, so headings use an engraved serif fallback
+and the interface stays silent until proved menu sounds land.

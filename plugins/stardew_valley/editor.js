@@ -334,8 +334,11 @@ function addRecord() {
 }
 function objectsPanel() {
   const records = sortedRows();
+  // Saved rows compare against the loaded file, so saved mod contents need a vanilla copy this plugin does not keep yet.
   return pagedListDetail({
     order: "given",
+    modOnly: {available: false, changed: () => false,
+      unavailableTitle: "Stardew Valley compares against the loaded file, so saved mod contents cannot be listed yet."},
     rows: records, key: row => row.id, slots: false, add: addRecord, addTitle: "Add Data/Objects patch",
     addDisabled: state.busy, selected: state.selected, page: state.page, pageSize: state.pageSize, noun: "objects",
     splitKey: "stardew-objects", rowsKey: "stardew-objects", defaultSplit: 48,
@@ -473,6 +476,8 @@ function datasetPanel() {
   const columns = datasetColumns();
   const prefs = currentDatasetPrefs();
   return pagedListDetail({order:"given",addDisabledReason:"Lexeditor edits the entries this data asset already has here; adding one to this asset is not supported yet.",
+    modOnly: {available: false, changed: () => false,
+      unavailableTitle: "Stardew Valley compares against the loaded file, so saved mod contents cannot be listed yet."},
     rows: records, key: row => row.id, slots: false,
     selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
     noun: state.dataset?.schema?.noun || "records",

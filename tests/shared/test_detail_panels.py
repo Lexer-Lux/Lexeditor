@@ -21,11 +21,11 @@ def test_field_labels_never_grant_row_height():
     assert 'overflow:hidden;' in rule.replace(' ', '')
 
 
-def test_chosen_columns_clamp_to_fitted_width():
+def test_chosen_columns_beat_the_fitted_width():
     source = ui()
-    assert 'if(options.inline&&chosen>0)return Math.max(1,Math.min(length,chosen,fit));' in source
+    assert 'if(chosen>0)return Math.max(1,Math.min(length,chosen));' in source
     assert 'root.lexFittedColumns=fit;' in source
-    assert 'moreColumns.disabled = count >= 6 || (room > 0 && count >= room);' in source
+    assert 'moreColumns.disabled = count >= 6;' in source
 
 
 def test_detail_scroll_never_runs_sideways():

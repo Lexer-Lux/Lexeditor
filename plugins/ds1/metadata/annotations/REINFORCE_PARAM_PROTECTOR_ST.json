@@ -62,22 +62,22 @@
     {
       "Field": "residentSpEffectId1",
       "Name": "Resident SpEffect Offset: 1",
-      "Description": "The ID offset applied to the armor's residentSpEffectId1 field value."
+      "Description": "Added to the armor's first resident effect at this reinforcement level."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect Offset: 2",
-      "Description": "The ID offset applied to the armor's residentSpEffectId2 field value."
+      "Description": "Added to the armor's second resident effect at this reinforcement level."
     },
     {
       "Field": "residentSpEffectId3",
       "Name": "Resident SpEffect Offset: 3",
-      "Description": "The ID offset applied to the armor's residentSpEffectId3 field value."
+      "Description": "Added to the armor's third resident effect at this reinforcement level."
     },
     {
       "Field": "materialSetId",
       "Name": "Material Set Offset",
-      "Description": "The ID offset applied to the armor's materialSetId field value."
+      "Description": "Added to the armor's material set at this reinforcement level."
     }
   ]
 }

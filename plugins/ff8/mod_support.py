@@ -25,6 +25,7 @@ from . import runtime_layout
 IGNORED_SUFFIXES = frozenset({".txt", ".md", ".png", ".jpg", ".jpeg", ".ini", ".json"})
 IGNORED_NAMES = frozenset({"mod.json", "mod.xml"})
 ROOT_TEXT = "direct/, hext/, textures/, sfx/, voice/, ambient/, override/ or save/"
+CHANGE_LIMIT = 1000
 
 
 def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -240,6 +241,42 @@ class Ff8ModAdapter:
         if len(spans) < 2:
             return {}
         return lines_by_mod(memory_conflicts.overlaps(spans), folders)
+
+    def describe_changes(self, folder, game_root):
+        """One mod's changed records and loaded files, for its detail panel.
+
+        The records are the mod's fixed-record data files against the
+        extracted baseline; without extracted game data there is nothing
+        to compare, but the loaded files (what the composer deploys
+        from the folder) never needed it.
+        """
+        from . import fixed_data_merge, paths
+        folder = Path(folder)
+        names = sorted(path.relative_to(folder).as_posix() for path in folder.rglob("*")
+                       if path.is_file() and not path.is_symlink())
+        loaded = self.inspect(folder, [Path(name) for name in names])["packages"]
+        baseline = paths.BASELINE_ROOT
+        if not baseline.is_dir():
+            return {"changes": [], "loaded": loaded, "truncated": False,
+                    "note": "Extract the game's archives to compare records against vanilla."}
+        changes, notes = [], []
+        for key, spec in fixed_data_merge.SPECS.items():
+            mod_file, base_file = folder / key, baseline / spec["baseline"]
+            if not mod_file.is_file() or not base_file.is_file():
+                continue
+            try:
+                mine, base = mod_file.read_bytes(), base_file.read_bytes()
+            except OSError as error:
+                notes.append(f'{key} cannot be read ({error})')
+                continue
+            try:
+                changes += fixed_data_merge.diff(base, mine, spec, spec["baseline"])
+            except ValueError as error:
+                notes.append(str(error))
+        notes.append("Compares fixed-record data files; kernel, archives and media show under Files.")
+        truncated = len(changes) > CHANGE_LIMIT
+        return {"changes": changes[:CHANGE_LIMIT], "loaded": loaded,
+                "truncated": truncated, "note": " ".join(notes)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
         """Report the mods of the composed runtime, not the requested ones."""

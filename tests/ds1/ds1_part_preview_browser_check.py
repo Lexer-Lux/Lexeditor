@@ -208,6 +208,10 @@ def main():
                     toggle = page.locator('.lex-preview-gender-toggle')
                     assert toggle.inner_text() == '\u2642', toggle.inner_text()
                     assert toggle.get_attribute('aria-label') == 'Show female model'
+                    assert toggle.evaluate('button=>button.parentElement.className') == 'lex-model-view-modes'
+                    modes = page.locator('.lex-model-stage .lex-model-view-modes > button')
+                    assert modes.count() == 4
+                    assert 'lex-model-view-mode' in (toggle.get_attribute('class') or '')
                     page.wait_for_function(
                         'document.querySelector(".lex-preview-gender-toggle")'
                         '.dataset.lexTitle === "Show female model"')
@@ -283,7 +287,9 @@ def main():
                     assert page.evaluate(
                         "fetch('/api/label?name=physical').then(r => r.status)") == 200
                     assert page.evaluate(
-                        "fetch('/api/label?name=poison').then(r => r.status)") == 400
+                        "fetch('/api/label?name=poison').then(r => r.status)") == 200
+                    assert page.evaluate(
+                        "fetch('/api/label?name=divine').then(r => r.status)") == 400
                     # Enemy drawer: the placed character model renders plain.
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')

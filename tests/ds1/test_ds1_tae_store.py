@@ -134,3 +134,21 @@ def test_read_only_unknown_and_unreadable_targets_fail_closed(tmp_path):
     assert [row["id"] for row in store.list_chars()] == [f"char:{BINDER}"]
     with pytest.raises(TaeError):
         store.read("c0001.anibnd.dcx", f"{TAE}|0|0")
+
+
+def test_list_rows_mark_modified_after_edit(tmp_path):
+    _game, _mod, store = setup(tmp_path)
+    assert all(not row.get("modified") for row in store.list_chars())
+    assert all(not row.get("modified") for row in store.list_anims(BINDER))
+    assert all(not row.get("modified") for row in store.list_events(BINDER, TAE, 0))
+    store.get(BINDER)["taes"][TAE].edit(0, 0, "start", 0.25)
+    assert [row.get("modified") for row in store.list_chars()] == [True]
+    anims = {row["id"]: row.get("modified") for row in store.list_anims(BINDER)}
+    assert anims[f"anim:{TAE}|0"] is True
+    assert all(value is not True for key, value in anims.items() if key != f"anim:{TAE}|0")
+    events = {row["id"]: row.get("modified") for row in store.list_events(BINDER, TAE, 0)}
+    assert events[f"ev:{TAE}|0|0"] is True
+    # ev1 shares ev0's start slot, so its timestamp changed too; the rest did not.
+    assert events[f"ev:{TAE}|0|1"] is True
+    assert all(value is not True for key, value in events.items()
+               if key not in (f"ev:{TAE}|0|0", f"ev:{TAE}|0|1"))

@@ -509,7 +509,9 @@ function renderRecordDataset(key,host){
     return;
   }
   if(ds.selected==null||!ds.data.rows.some(row=>rowKey(row)===ds.selected))ds.selected=rowKey(rows[0]);
+  // The baseline is the loaded file, so saved mod contents need a vanilla copy this plugin does not keep yet.
   const view=pagedListDetail({order:"given",addDisabledReason:"These records are fixed tables the game reads by number; a new record has no slot.",
+    modOnly:{available:false,changed:()=>false,unavailableTitle:"FFX/X-2 compares against the loaded file, so saved mod contents cannot be listed yet."},
     rows:rows,key:row=>rowKey(row),slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"records",
     splitKey:"ffxx2-"+key,defaultSplit:46,minLeft:300,minRight:330,
     search:{key:"ffxx2-"+key,value:ds.query,label:"Search "+spec.label,placeholder:"Search "+spec.label.toLocaleLowerCase()+"…",

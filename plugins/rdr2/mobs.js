@@ -154,6 +154,17 @@ async function renderMobArchetypes(){
   const ordered=sortedRows("mobs",rows,getters);
   // names: Game profile identities stay fixed; changing their names would change runtime bindings.
   m.append(LexeditorUI.pagedListDetail({rows:ordered,key:mobRecordKey,selected:f.mobSelected?.[layer.file]||mobRecordKey(ordered[0]),renamable:false,page:f.mobPage?.[layer.file]||0,pageSize:15,noun:"archetypes",slots:false,splitKey:"rdr2-mobs",
+    // Mob edits name fields (file|path); a record owns the fields whose path
+    // shares its identity prefix, the same prefix mobRecordKey reads.
+    modOnly:(()=>{const touched=new Set();
+      for(const key of Object.keys(state.mobEdits||{})){
+        if(!key.startsWith(layer.file+"|"))continue;
+        const segments=key.slice(key.indexOf("|")+1).split(".");segments.pop();
+        touched.add(segments.join("."));
+      }
+      return {available:!isRO(),value:state.modOnly===true,
+        changed:record=>touched.has(mobRecordKey(record)),
+        change:value=>{state.modOnly=value;f.mobPage||={};f.mobPage[layer.file]=0;renderMobs();}};})(),
     search:{key:`rdr2-mobs-${layer.file}`,value:f.mobQ||"",label:"Search archetypes",change:value=>{f.mobQ=value;f.mobPage ||= {};f.mobPage[layer.file]=0;renderMobs()}},
     sync:view=>{f.mobSelected ||= {};f.mobSelected[layer.file]=view.selected;f.mobPage ||= {};f.mobPage[layer.file]=view.page},
     change:next=>{f.mobSelected ||= {};if(next.selected!==null)f.mobSelected[layer.file]=next.selected;f.mobPage ||= {};f.mobPage[layer.file]=next.page;renderMobs()},

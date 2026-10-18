@@ -212,6 +212,13 @@ async function renderChallenges() {
     return LexeditorUI.detailPanel({title:`Rank ${rank.rank}`,identity:String(rank.rank),body});
   };
   m.append(LexeditorUI.pagedListDetail({order:"given",addDisabledReason:"Lexeditor edits the existing challenge ranks. Adding another rank and its progression rules is not supported yet.",rows:strand.ranks,key:rank=>rank.rank,selected:f.challengeRank,
+    modOnly:(()=>{const touchedGoals=touchedRecords([state.challengeEdits,state.challengeSourceEdits,state.challengeConditionEdits]);
+      return {available:!isRO(),value:state.modOnly===true,
+        changed:rank=>Object.hasOwn(state.challengeRewardEdits,`${strand.name}|${rank.rank}`)
+          ||rank.goals.some(name=>touchedGoals.has(name))
+          ||[rank.descriptionLabel,...rank.goals.map(name=>goalByName[name]?.description)]
+            .some(key=>key&&Object.hasOwn(state.localizationEdits,key)),
+        change:value=>{state.modOnly=value;renderChallenges();}};})(),
     slots:false,page:0,pageSize:strand.ranks.length,splitKey:"rdr2-challenges",defaultSplit:35,
     master:({rows,selected,select})=>LexeditorUI.columnList({rows,key:rank=>rank.rank,selected,select,columns:[
       {key:"rank",label:"Rank",numeric:true,width:"4em"},{key:"name",label:"Challenge",render:rank=>localizedValue(rank.descriptionLabel)?.trim()||rank.descriptionLabel,

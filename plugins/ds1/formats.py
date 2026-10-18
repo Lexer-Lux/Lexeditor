@@ -15,7 +15,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
 from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES, BOSS_FAMILIES, classified_boss
-from .attacks import ATTACK_FIELDS, AttackReferences
+from .attacks import ATTACK_FIELDS, BULLET_GROUPS, AttackReferences
 from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
 from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set
@@ -102,16 +102,16 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
         'The absorption to apply to damage of the specified type when guarding.')
 
 
-# Label art per field: the damage, defense and stat icons the game's own
-# equipment screen uses (icons.py crops them from Menu04_2). Slash, strike
-# and thrust have no glyph of their own anywhere in the menu, HUD, font or
-# icon sheets (they are text wherever the game shows them), so they reuse
-# the physical shield: every one of these fields scales physical defense,
-# which is what the shield means. Statuses (poison, toxic, bleed, curse)
-# have no game art either, so they use the shared fallback glyphs: the
-# detail field shows the shared icon before the label. Divine, occult and
-# stamina guard stay unmapped: no invented glyphs, and no cure-item icons
-# that would read as the item instead of the status.
+# Label art per field: the damage, defense, status and stat icons the
+# game's own menus use (icons.py crops them from Menu04_2). Slash,
+# strike and thrust have no glyph of their own anywhere in the menu, HUD,
+# font or icon sheets (they are text wherever the game shows them), so
+# they reuse the physical shield: every one of these fields scales
+# physical defense, which is what the shield means. Divine, occult, luck
+# and stamina guard stay unmapped: no invented glyphs, and no cure-item
+# icons that would read as the item instead of the status. HP and stamina
+# bars have no menu art either (both screens show numbers), so vitals
+# borrow their stat's icon.
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
@@ -165,13 +165,26 @@ for _table, _keys, _kinds in (
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('poisonGuardResist', 'diseaseGuardResist', 'bloodGuardResist', 'curseGuardResist'),
          ('poison', 'toxic', 'bleed', 'curse')),
+        ('NpcParam', ('hp', 'mp', 'stamina', 'staminaRecoverBaseVel'),
+         ('vit', 'att', 'end', 'end')),
+        ('NpcParam', ('getSoul',), ('souls',)),
+        ('NpcParam', ('humanityLotId',), ('humanity',)),
+        ('EquipParamGoods', ('consumeHeroPoint',), ('humanity',)),
+        ('Magic', ('heroPoint',), ('humanity',)),
+        ('EquipParamWeapon', ('isLuckCorrect',), ('humanity',)),
+        ('NpcParam', ('superArmorDurability', 'superArmorRecoverCorrection',
+         'superArmorBrakeKnockbackDist'), ('poise', 'poise', 'poise')),
         ('SpEffectParam', ('registBlood', 'registCurse', 'registBloodChangeRate', 'registCurseChangeRate',
          'bloodDamageRate'), ('bleed', 'curse', 'bleed', 'curse', 'bleed')),
         ('SpEffectParam', ('disablePoison', 'disableDisease', 'disableBlood', 'disableCurse'),
          ('poison', 'toxic', 'bleed', 'curse')),
+        ('SpEffectParam', ('soulRate', 'soul', 'haveSoulRate', 'soulStealRate', 'clearSoul'),
+         ('souls', 'souls', 'souls', 'souls', 'souls')),
+        ('SpEffectParam', ('changeSuperArmorPoint',), ('poise',)),
+        ('Magic', ('slotLength',), ('slot',)),
         ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
-         'baseLuc', 'baseHp', 'baseMp', 'baseSp'),
-         ('vit', 'wil', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'vit', 'wil', 'end')),
+         'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul'),
+         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'vit', 'att', 'end', 'souls')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind
@@ -489,8 +502,13 @@ def schema(table):
             label, group, description = NPC_FIELDS[key]
         if table in ('AtkParam_Npc', 'AtkParam_Pc') and key in ATTACK_FIELDS:
             label, group, description = ATTACK_FIELDS[key]
+        if table == 'Bullet' and key in BULLET_GROUPS:
+            group = BULLET_GROUPS[key]
         if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
             label, group, description = ARMOR_FIELDS[key]
+        if table == 'EquipParamProtector' and key.startswith('invisibleFlag') and not description:
+            description = ('Hides part of the worn body model. '
+                           'Which part each mask hides is not documented.')
         if table == 'EquipParamWeapon' and key in WEAPON_FIELDS:
             label, group, description = WEAPON_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
@@ -681,6 +699,20 @@ class ItemDocument:
                 return ('NpcParam', row_id - ENEMY_ABSORPTION_BASE, 'absorption:' + key)
             return ('EquipParamProtector', (row_id - ABSORPTION_BASE) // 100 * 100, 'absorption:' + key)
         return (table, row_id, key)
+
+    def row_modified(self, table, row_id):
+        """Whether this session changed the row: an edited field, description or added row."""
+        if (table, row_id) in self._added_rows:
+            return True
+        for entry in self.dirty:
+            changed = self._change_key(*entry)
+            if (changed[0], changed[1]) == (table, row_id) or (entry[0], entry[1]) == (table, row_id):
+                return True
+        if self.texts:
+            for _kind, changed_table, item in self.texts.dirty:
+                if (changed_table, item) == (table, row_id):
+                    return True
+        return False
 
     @property
     def dirty_count(self):
@@ -1006,6 +1038,7 @@ class ItemDocument:
             name = self.display_name(table, row.row_id, row)
             result.append({'id': row.row_id, 'name': name, 'table': table,
                            'values': values, 'display': display,
+                           'modified': self.row_modified(table, row.row_id),
                            'created': (table, row.row_id) in self._added_rows})
         if tab == 'spells':
             table = 'EquipParamGoods'
@@ -1014,6 +1047,7 @@ class ItemDocument:
                     values, display = self.row_values(table, row.row_id)
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
                                    'values': values, 'display': display,
+                                   'modified': self.row_modified(table, row.row_id),
                                    'created': (table, row.row_id) in self._added_rows})
         return result
 
@@ -1039,6 +1073,7 @@ class ItemDocument:
             values, display = self.row_values(table, row.row_id)
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
                            'table': table, 'values': values, 'display': display,
+                           'modified': self.row_modified(table, row.row_id),
                            'created': (table, row.row_id) in self._added_rows})
         return result
 
@@ -1059,8 +1094,20 @@ class ItemDocument:
             return []
         return [{'id': text_id, 'table': filename,
                  'name': self._fmg_preview(text) or f'{filename} {text_id}',
-                 'values': {'text': text}, 'display': {}}
+                 'values': {'text': text}, 'display': {},
+                 'modified': self.text_row_modified(filename, text_id)}
                 for text_id, text in sorted(self.menu_texts.file_entries(filename).items())]
+
+    def text_row_modified(self, table, row_id):
+        """Whether this session changed the menu text: the entry or its label."""
+        if self.menu_texts is None:
+            return False
+        from .texts import MENU_LABEL_FILE, MENU_LABEL_IDS
+        if table == 'MenuText':
+            return MENU_LABEL_IDS.get(row_id) in self.menu_texts.dirty
+        if (table, row_id) in self.menu_texts.dirty_texts:
+            return True
+        return table == MENU_LABEL_FILE and MENU_LABEL_IDS.get(row_id) in self.menu_texts.dirty
 
     def _read_fmg(self, filename, row_id, only=None):
         from .texts import MAX_FMG_TEXT
@@ -1084,7 +1131,8 @@ class ItemDocument:
             return []
         from .texts import MENU_LABELS
         return [{'id': text_id, 'table': 'MenuText', 'name': self.menu_texts.label(key) or display,
-                 'values': {'label': self.menu_texts.label(key) or ''}, 'display': {}}
+                 'values': {'label': self.menu_texts.label(key) or ''}, 'display': {},
+                 'modified': key in self.menu_texts.dirty}
                 for key, (display, text_id) in MENU_LABELS.items()]
 
     def is_friend(self, row_id):
@@ -1230,7 +1278,7 @@ class ItemDocument:
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
-                           MATERIAL_TABLE, CHARA_TABLE) else '',
+                           MATERIAL_TABLE, CHARA_TABLE, 'Bullet') else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
@@ -1252,6 +1300,9 @@ class ItemDocument:
                     'protectedReason': '', 'editable': False, 'vanilla': None})
         if table in ('AtkParam_Npc', 'AtkParam_Pc'):
             order = {key: index for index, key in enumerate(ATTACK_FIELDS)}
+            fields.sort(key=lambda field: order[field['key']])
+        if table == 'Bullet':
+            order = {key: index for index, key in enumerate(BULLET_GROUPS)}
             fields.sort(key=lambda field: order[field['key']])
         if table in ('EquipParamProtector', 'NpcParam'):
             # With Armor Rework, absorption replaces flat defense: it takes the

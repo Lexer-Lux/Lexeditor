@@ -342,3 +342,17 @@ def test_armor_list_rows_omit_absorption_without_linked_effects():
         ItemDocument(make_archive()).list_rows("armor")[0]["values"]
     assert "absorption:thunderDamageCutRate" not in \
         ItemDocument(make_effects_archive()).list_rows("armor")[0]["values"]
+
+
+def test_list_rows_marks_modified_after_edit():
+    document = ItemDocument(make_archive())
+    for tab, _, _ in SUBTABS:
+        assert all(not row.get('modified') for row in document.list_rows(tab))
+    tab, _, _ = SUBTABS[0]
+    row = document.list_rows(tab)[0]
+    fields = document.read_row(row['table'], row['id'])['fields']
+    field = next(f for f in fields if f['editable'] and f['type'] == 'number' and f['minimum'] <= 1 <= f['maximum'])
+    document.edit(row['table'], row['id'], field['key'], 1)
+    flags = {r['id']: r.get('modified') for r in document.list_rows(tab)}
+    assert flags[row['id']] is True
+    assert all(value is not True for key, value in flags.items() if key != row['id'])

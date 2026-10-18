@@ -97,7 +97,7 @@
     {
       "Field": "overDexterity",
       "Name": "Dexterity over Start Value",
-      "Description": "Skill over start value"
+      "Description": "Unknown. Its effect is not documented."
     },
     {
       "Field": "goodsType",
@@ -251,7 +251,7 @@
     },
     {
       "Field": "disable_offline",
-      "Name": "",
+      "Name": "Disable Offline",
       "Description": ""
     },
     {

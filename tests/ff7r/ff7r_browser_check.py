@@ -563,6 +563,25 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             assert page.evaluate("state.tab") == expected, (target, expected)
         page.screenshot(path=str(output / "datamap-routing-1200.png"), full_page=True)
 
+        # Mod contents only on the Text tab leaves the one edited entry.
+        page.evaluate("target => { void openMapRow({target}); }", TEXT)
+        page.wait_for_function("state.tab==='text' && !state.textBusy")
+        trows = '.ff7r-layout .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+        assert page.locator(trows).count() == 6
+        page.evaluate("() => { state.textPacks[Object.keys(state.textPacks)[0]].data.records[0].text='Edited blade'; render(); }")
+        toggle = page.locator('#main .lex-pager-toggle input[aria-label="Mod contents only"]')
+        assert toggle.count() == 1
+        assert toggle.is_enabled()
+        toggle.check()
+        page.wait_for_function(
+            "() => document.querySelectorAll('" + trows + "').length===1")
+        assert page.locator(trows).count() == 1
+        assert 'Edited blade' in page.locator(trows).first.inner_text()
+        toggle.uncheck()
+        page.wait_for_function(
+            "() => document.querySelectorAll('" + trows + "').length===6")
+        page.evaluate("() => { state.textPacks[Object.keys(state.textPacks)[0]].data.records[0].text='Fixture Blade'; render(); }")
+
         page.locator("#plugin-info").click()
         page.wait_for_function("state.tab==='info'")
         expect(page.locator('.lex-detail-panel-title').filter(has_text='Information')).to_be_visible()

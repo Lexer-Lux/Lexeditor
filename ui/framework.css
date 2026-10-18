@@ -4195,9 +4195,15 @@ body:has(.lex-data-map-table) #main {
 .lex-column-list-cell[data-column-key="enabled"] { pointer-events:auto; }
 .lex-enabled-toggle { display:grid;place-items:center; }
 
-/* Filler rows exist only to carry the table's rules past the last record. */
+/* Filler rows hold a short page's fitted rows so they never stretch; they
+   paint nothing. A slot table simply ends after its last record (FF8's
+   clean gray slab), and a growable list's empty space matches it. */
 .lex-column-list-row.lex-filler-row { pointer-events:none; }
-.lex-column-list-row.lex-filler-row > .lex-column-list-cell { color:transparent; }
+.lex-column-list-row.lex-filler-row > .lex-column-list-cell {
+  color:transparent;
+  border-color:transparent;
+  background:transparent;
+}
 
 /* ---- Page toolbar ----------------------------------------------------
    The strip above main that some pages fill with their own controls. Empty,
@@ -4670,6 +4676,8 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1e
   gap:4px;
 }
 .lex-model-stage:has(> .lex-model-view-modes) > .lex-model-stage-hint { padding-left:104px; }
+.lex-model-stage:has(> .lex-model-view-modes > .lex-preview-gender-toggle) > .lex-model-stage-hint
+  { padding-left:134px; }
 .lex-model-view-mode {
   width:26px;
   height:26px;
@@ -7660,6 +7668,20 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   border: 0;
   background: transparent;
 }
+/* One row of detail fields: the encounter formation header (Stage, Flags,
+   Main/Secondary camera) reads as a single strip, not a stack. Fields wrap
+   on narrow panes instead of squeezing unreadably. */
+.lex-detail-panel-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: stretch;
+}
+.lex-detail-panel-row > .lex-detail-field {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 150px;
+}
 .lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-title { display: none; }
 .lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-content { min-width: 0; }
 .lex-detail-panel-beside:has(> .lex-detail-field .lex-record-card) {
@@ -8206,6 +8228,18 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
      gives the reader a way to reach the rest instead of hiding it. A theme
      that wants other edges can still say visible. */
   overflow-x: var(--lex-nav-overflow-x, auto);
+}
+/* A tab the reader never opened carries a pip until first viewed. Out of
+   flow against the tab button, so a dotted tab never stretches the strip. */
+.lex-tab-unviewed {
+  position:absolute;
+  left:50%;
+  bottom:3px;
+  transform:translateX(-50%);
+  width:.45em;
+  height:.45em;
+  border-radius:50%;
+  background:var(--lex-highlight,#d8a723);
 }
 .lex-shell-header nav button {
   font-family:var(--lex-heading-font,var(--lex-font));
@@ -8823,7 +8857,10 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-anim-slider { position:relative; flex:1 1 auto; min-width:120px; display:flex; }
 .lex-anim-slider input[type="range"] { flex:1 1 auto; min-width:0; width:100%; }
 .lex-anim-readout { white-space:nowrap; }
-.lex-anim-follow { white-space:nowrap; }
+.lex-viewport-host { overflow:hidden; }
+.lex-viewport-host > canvas { display:block; }
+.lex-anim-follow-button { width:auto; padding:0 10px; white-space:nowrap; }
+.lex-anim-follow-button[aria-pressed="true"] { color:var(--lex-text); border-color:var(--lex-highlight); background:color-mix(in srgb,var(--lex-accent) 55%,var(--lex-panel)); }
 .lex-anim-markers { position:absolute; left:0; right:0; top:50%; height:12px; margin-top:-6px; pointer-events:none; }
 .lex-anim-marker { position:absolute; top:0; width:4px; height:12px; padding:0; border:none; background:#b26a00; cursor:pointer; pointer-events:auto; }
 .lex-anim-transport { display:flex; gap:8px; justify-content:center; }

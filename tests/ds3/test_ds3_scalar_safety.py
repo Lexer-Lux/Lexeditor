@@ -80,3 +80,19 @@ def test_ds3_protected_fields_and_float_bounds_render(tmp_path):
             page.screenshot(path=str(tmp_path / 'ds3-scalar-controls.png'))
         finally:
             browser.close()
+
+
+def test_list_rows_marks_modified_after_edit():
+    document = RegulationDocument(_bnd4(), METADATA)
+    table = 'Magic'
+    rows = document.list_rows(table)
+    assert rows and all(not row.get('modified') for row in rows)
+    row_id = rows[0]['id']
+    fields = document.read_row(table, row_id)['fields']
+    known = next(field for field in fields if field['editable'] and field['type'] == 'number'
+                 and field['dtype'] in {'u8', 'u16', 'u32', 's8', 's16', 's32'})
+    value = known['value'] + 1 if known['value'] < known['maximum'] else known['value'] - 1
+    document.edit(table, row_id, known['key'], value)
+    flags = {row['id']: row.get('modified') for row in document.list_rows(table)}
+    assert flags[row_id] is True
+    assert all(value is not True for key, value in flags.items() if key != row_id)

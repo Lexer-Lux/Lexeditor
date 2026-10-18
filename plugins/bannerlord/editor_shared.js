@@ -95,7 +95,10 @@ function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Se
   const available=new Set(prepared.map(keyOf));
   if(selected!==null&&!available.has(selected))selected=prepared.length?keyOf(prepared[0]):null;
   ui.selected=selected;
+  // Every Bannerlord list shares this helper; saved rows compare against the loaded module files,
+  // so saved mod contents need a vanilla copy this plugin does not keep yet.
   return BLUI.pagedListDetail({order:"given",add,addDisabled,addDisabledReason:addDisabledReason||"Adding records in this view is not supported yet.",
+    modOnly:{available:false,changed:()=>false,unavailableTitle:"Bannerlord compares against the loaded module files, so saved mod contents cannot be listed yet."},
     rows:prepared,key:keyOf,slots:false,page:ui.page,pageSize:ui.pageSize,selected,noun,
     splitKey:`bannerlord-${key}`,
     search:{key:`bannerlord-${key}`,value:ui.query,placeholder,label:`Search ${noun}`,change:value=>{ui.query=value;ui.page=0;render()}},

@@ -44,6 +44,47 @@ ATTACK_FIELDS['hitStopTime'] = (
     'Hit pause', 'Impact',
     "How long the victim's animation pauses when hit, in seconds.")
 
+# Every editable Bullet property in presentation order: lifetime, how
+# it flies, how it homes, how it spreads, what it hits, what it
+# dampens, its flags, then its links. Annotations keep the labels;
+# this map only sorts the detail panel into sections.
+BULLET_GROUPS = {
+    'life': 'Lifetime & range', 'dist': 'Lifetime & range',
+    'dmgHitRecordLifeTime': 'Lifetime & range',
+    'initVellocity': 'Flight', 'accelInRange': 'Flight',
+    'accelOutRange': 'Flight', 'maxVellocity': 'Flight',
+    'minVellocity': 'Flight', 'accelTime': 'Flight',
+    'gravityInRange': 'Flight', 'gravityOutRange': 'Flight',
+    'homingBeginDist': 'Homing', 'homingAngle': 'Homing',
+    'hormingStopRange': 'Homing', 'hormingOffsetRange': 'Homing',
+    'autoSearchNPCThinkID': 'Homing',
+    'numShoot': 'Spread', 'shootInterval': 'Spread',
+    'shootAngle': 'Spread', 'shootAngleInterval': 'Spread',
+    'shootAngleXInterval': 'Spread', 'shootAngleXZ': 'Spread',
+    'spreadTime': 'Spread', 'expDelay': 'Spread',
+    'lockShootLimitAng': 'Spread',
+    'hitRadius': 'Hitbox', 'hitRadiusMax': 'Hitbox',
+    'isPenetrate': 'Hitbox', 'isPenetrateMap': 'Hitbox',
+    'isHitBothTeam': 'Hitbox', 'isEndlessHit': 'Hitbox',
+    'damageDamp': 'Damage', 'spelDamageDamp': 'Damage',
+    'fireDamageDamp': 'Damage', 'thunderDamageDamp': 'Damage',
+    'staminaDamp': 'Damage', 'knockbackDamp': 'Damage',
+    'isAttackSFX': 'Flags', 'isHitForceMagic': 'Flags',
+    'isHitDarkForceMagic': 'Flags',
+    'atkId_Bullet': 'Attack & effects',
+    'HitBulletID': 'Attack & effects',
+    'spEffectId0': 'Attack & effects',
+    'spEffectId1': 'Attack & effects',
+    'spEffectId2': 'Attack & effects',
+    'spEffectId3': 'Attack & effects',
+    'spEffectId4': 'Attack & effects',
+    'spEffectIDForShooter': 'Attack & effects',
+    'atkAttribute': 'Attack & effects',
+    'spAttribute': 'Attack & effects',
+    'launchConditionType': 'Attack & effects',
+    'FollowType': 'Attack & effects',
+}
+
 
 def hitbox_slots(document, attack_id):
     """One attack's four hit slots: radius, model points, and whether

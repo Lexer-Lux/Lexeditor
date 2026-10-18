@@ -383,3 +383,23 @@ def test_gains_live_in_the_stats_subtabs(tmp_path):
     tabs = ItemStore(game, mod, False).state()["statsTabs"]
     gains = next(entry for entry in tabs if entry["id"] == "levelup")
     assert (gains["label"], gains["table"]) == ("Level-up gains", "NativeRules")
+
+
+def test_native_list_rows_mark_modified_after_edit(rules):
+    assert all(not row.get("modified") for row in rules.list_rows("levelup"))
+    assert all(not row.get("modified") for row in rules.list_rows("encumbrance"))
+    assert all(not row.get("modified") for row in rules.list_rows("encumbrance-overrides"))
+    assert all(not row.get("modified") for row in rules.list_rows("misc"))
+    rules.edit_row(101, "vit", 0)
+    flags = {row["id"]: row.get("modified") for row in rules.list_rows("levelup")}
+    assert flags[101] is True
+    assert all(value is not True for key, value in flags.items() if key != 101)
+    band = rules.list_rows("encumbrance")[0]
+    rules.edit_row(band["id"], "recovery", 50)
+    flags = {row["id"]: row.get("modified") for row in rules.list_rows("encumbrance")}
+    assert flags[band["id"]] is True
+    assert all(value is not True for key, value in flags.items() if key != band["id"])
+    rules.edit_row(200, "forcedRecovery", 50)
+    assert [row.get("modified") for row in rules.list_rows("encumbrance-overrides")] == [True]
+    rules.edit_row(0, "baseRecovery", 60)
+    assert [row.get("modified") for row in rules.list_rows("misc")] == [True]

@@ -89,6 +89,7 @@ async function renderLootSounds(){
   state.lootSoundSelected=selected?.id;
   main.append(LexeditorUI.pagedListDetail({
     addDisabledReason:"Pickup sounds use the existing sound mappings. Lexeditor cannot create a new mapping yet.",
+    modOnly:modOnlySpec(touchedRecords([state.lootSoundEdits]),()=>{state.lootSoundPage=0;},renderLootSounds,row=>row.id),
     rows,key:row=>row.id,selected:selected?.id,noun:"mappings",pageSize:15,slots:true,
     page:state.lootSoundPage||0,change:view=>{
       state.lootSoundPage=view.page;state.lootSoundSelected=view.selected;

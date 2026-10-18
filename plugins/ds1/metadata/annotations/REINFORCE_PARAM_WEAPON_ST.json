@@ -107,37 +107,37 @@
     {
       "Field": "spEffectId1",
       "Name": "Hit SpEffect Offset: 1",
-      "Description": "The ID offset applied to the weapon's spEffectId1 field value."
+      "Description": "Added to the weapon's first hit effect at this reinforcement level."
     },
     {
       "Field": "spEffectId2",
       "Name": "Hit SpEffect Offset: 2",
-      "Description": "The ID offset applied to the weapon's spEffectId2 field value."
+      "Description": "Added to the weapon's second hit effect at this reinforcement level."
     },
     {
       "Field": "spEffectId3",
       "Name": "Hit SpEffect Offset: 3",
-      "Description": "The ID offset applied to the weapon's spEffectId3 field value."
+      "Description": "Added to the weapon's third hit effect at this reinforcement level."
     },
     {
       "Field": "residentSpEffectId1",
       "Name": "Resident SpEffect Offset: 1",
-      "Description": "The ID offset applied to the weapon's residentSpEffectId1 field value."
+      "Description": "Added to the weapon's first resident effect at this reinforcement level."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect Offset: 2",
-      "Description": "The ID offset applied to the weapon's residentSpEffectId1 field value."
+      "Description": "Added to the weapon's second resident effect at this reinforcement level."
     },
     {
       "Field": "residentSpEffectId3",
       "Name": "Resident SpEffect Offset: 3",
-      "Description": "The ID offset applied to the weapon's residentSpEffectId1 field value."
+      "Description": "Added to the weapon's third resident effect at this reinforcement level."
     },
     {
       "Field": "materialSetId",
       "Name": "Material Set Offset",
-      "Description": "The ID offset applied to the weapon's materialSetId field value."
+      "Description": "Added to the weapon's material set at this reinforcement level."
     },
     {
       "Field": "reinforcementLevel",

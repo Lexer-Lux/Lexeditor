@@ -12,6 +12,18 @@ from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds3.formats import write_field
 
 
+def test_drop_tables_say_which_slot_is_live():
+    label, group, description = NPC_FIELDS['itemLotId_1']
+    assert label == 'Drop table 1'
+    assert group == 'Value & rewards'
+    assert '-1' in description
+    for index in range(2, 7):
+        label, group, description = NPC_FIELDS[f'itemLotId_{index}']
+        assert label == f'Drop table {index}'
+        assert 'spare' in description.lower()
+        assert '-1' in description
+
+
 def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     doc = ItemDocument(make_archive())
     assert [row['id'] for row in doc.list_rows('monsters')] == [120000, 120100]
@@ -170,7 +182,15 @@ def test_defense_fields_carry_game_art_where_it_exists():
     assert fields['resist_curse'] == 'curse'
     assert fields['isWeakSaint'] is None
     assert fields['staminaGuardDef'] is None
-    assert fields['hp'] is None
+    assert fields['hp'] == 'vit'
+    assert fields['mp'] == 'att'
+    assert fields['stamina'] == 'end'
+    assert fields['staminaRecoverBaseVel'] == 'end'
+    assert fields['getSoul'] == 'souls'
+    assert fields['humanityLotId'] == 'humanity'
+    assert fields['superArmorDurability'] == 'poise'
+    assert fields['superArmorRecoverCorrection'] == 'poise'
+    assert fields['superArmorBrakeKnockbackDist'] == 'poise'
 
 
 

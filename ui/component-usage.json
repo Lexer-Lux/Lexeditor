@@ -1308,6 +1308,7 @@
     ],
     "pagedPane": [
       "blank",
+      "ds1",
       "ff8",
       "rdr2"
     ],
@@ -1818,6 +1819,11 @@
     "soundCoverageTable": [
       "blank",
       "ff7",
+      "ff8"
+    ],
+    "soundPreview": [
+      "blank",
+      "ds1",
       "ff8"
     ],
     "stack": [

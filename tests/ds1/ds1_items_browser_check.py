@@ -37,6 +37,14 @@ def main():
         (game / texts.RELATIVE).write_bytes((Path(real_root) / texts.RELATIVE).read_bytes() if real_root else make_text_archive())
         # Menu labels live in the game's menu archive, beside the item text.
         (game / texts.MENU_RELATIVE).write_bytes((Path(real_root) / texts.MENU_RELATIVE).read_bytes() if real_root else make_menu_archive())
+        if real_root:
+            # Item pictures need the installed menu sheets and catalog.
+            for entry in (Path(real_root) / 'menu').glob('menu*.tpf.dcx'):
+                (game / 'menu' / entry.name).parent.mkdir(parents=True, exist_ok=True)
+                (game / 'menu' / entry.name).write_bytes(entry.read_bytes())
+            layout = Path(real_root) / 'menu' / 'menu.drb'
+            if layout.is_file():
+                (game / 'menu' / 'menu.drb').write_bytes(layout.read_bytes())
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
@@ -53,14 +61,27 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     # Subtabs follow the shared alphabetical rule, not declaration order.
                     expected = [key for key, _label, _table in sorted(SUBTABS, key=lambda entry: entry[1].lower())]
-                    assert page.locator('[data-subtab]').evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == expected
+                    # The strip only: record details carry panel tabs with the
+                    # same marker now (an "upgrades" Upgrades tab included).
+                    strip = '.lex-subtab-bar:not(.lex-tabbed-panel .lex-subtab-bar) [data-subtab]'
+                    assert page.locator(strip).evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == expected
                     for tab, _, _ in SUBTABS:
-                        page.locator(f'[data-subtab="{tab}"]').click()
+                        page.locator(strip + f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && state.row && !state.error', arg=tab)
                         page.wait_for_timeout(200)
                         counts[tab] = page.evaluate('state.rows.length')
                         assert counts[tab] > 0
                         assert page.locator('.lex-column-list .lex-list-row').count() > 0
+                        cells = page.locator('.lex-column-list .lex-list-row').first.evaluate(
+                            'row=>row.children.length')
+                        assert cells == 2, (tab, cells)
+                        if real_root:
+                            done = ("()=>[...document.querySelectorAll("
+                                + "'.lex-column-list .lex-list-row img')].every(i=>i.complete)")
+                            page.wait_for_function(done)
+                            loaded = page.locator('.lex-column-list .lex-list-row img').evaluate_all(
+                                'imgs=>imgs.filter(img=>img.naturalWidth>0).length')
+                            assert loaded > 0, (tab, loaded)
                         panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
                         if panel_tabs.count():
                             for index in range(panel_tabs.count()):
@@ -84,9 +105,29 @@ def main():
                         assert next(f['value'] for f in row['fields'] if f['key'] == field) == value
                         changes.append((identity['table'], identity['id'], field, value))
                         if output: page.screenshot(path=str(output / f'{tab}.png'))
+                    # Mod contents only leaves the one edited armor out of three; unticking restores the list.
+                    page.locator(strip + '[data-subtab="armor"]').click()
+                    page.wait_for_function('state.sub==="armor" && state.row && !state.pending')
+                    real = '.lex-column-list .lex-list-row:not(.lex-filler-row)'
+                    toggle = page.locator('.lex-pager-toggle input[aria-label="Mod contents only"]')
+                    assert toggle.count() == 1
+                    assert toggle.is_enabled()
+                    full = page.locator(real).count()
+                    assert full > 1
+                    changed = page.evaluate('state.rows.find(row=>row.modified===true).id')
+                    toggle.check()
+                    page.wait_for_function('state.modOnly===true')
+                    filtered = ('(changed)=>{const rows=[...document.querySelectorAll('
+                        '".lex-column-list .lex-list-row:not(.lex-filler-row)")];'
+                        'return rows.length===1 && rows[0].dataset.key.endsWith(":"+changed)}')
+                    page.wait_for_function(filtered, arg=changed)
+                    toggle.uncheck()
+                    restored = ('(full)=>document.querySelectorAll('
+                        '".lex-column-list .lex-list-row:not(.lex-filler-row)").length===full')
+                    page.wait_for_function(restored, arg=full)
                     # Weapons and armor carry their upgrade paths on an Upgrades panel tab.
                     for tab, owned in (('weapons', True), ('armor', False)):
-                        page.locator(f'[data-subtab="{tab}"]').click()
+                        page.locator(strip + f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && ((tab==="weapons" && state.row?.table==="EquipParamWeapon") || (tab==="armor" && state.row?.table==="EquipParamProtector"))', arg=tab)
                         page.locator('.lex-tabbed-panel [data-subtab="upgrades"]').click()
                         page.wait_for_function('state.itemTab==="upgrades"')
@@ -99,17 +140,28 @@ def main():
                         assert ('disableBaseChangeReset' in keys) == owned, (tab, keys)
                         assert any(key.startswith('originEquip') for key in keys), (tab, keys)
                         if output: page.screenshot(path=str(output / f'{tab}-upgrades.png'))
-                    # Consumables have no upgrade path, so no panel tabs.
-                    page.locator('[data-subtab="consumables"]').click()
+                    # Consumables have no upgrade path, so section tabs but no Upgrades tab.
+                    page.locator(strip + '[data-subtab="consumables"]').click()
                     page.wait_for_function('state.sub==="consumables" && state.row?.table==="EquipParamGoods"')
-                    assert page.locator('.lex-tabbed-panel').count() == 0
+                    assert page.locator('.lex-tabbed-panel').count() == 1
+                    assert page.locator('.lex-tabbed-panel [data-subtab="upgrades"]').count() == 0
                     # Menu labels is the last subtab and holds one text field;
                     # the enum and checkbox controls live on the param rows.
-                    page.locator('[data-subtab="rings"]').click()
+                    page.locator(strip + '[data-subtab="rings"]').click()
                     page.wait_for_function('state.sub==="rings" && state.row && !state.pending')
-                    page.locator('select[data-field-key]').first.wait_for()
-                    assert page.locator('select[data-field-key]').count() > 0
-                    assert page.locator('input[type="checkbox"][data-field-key]').count() > 0
+                    rings_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+                    seen = set()
+                    for index in range(rings_tabs.count()):
+                        if page.locator('select[data-field-key]:visible').count():
+                            seen.add('select')
+                        if page.locator('input[type="checkbox"][data-field-key]:visible').count():
+                            seen.add('checkbox')
+                        if seen == {'select', 'checkbox'}:
+                            break
+                        tab_id = rings_tabs.nth(index).get_attribute('data-subtab')
+                        rings_tabs.nth(index).click()
+                        page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+                    assert seen == {'select', 'checkbox'}, seen
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload()
@@ -118,7 +170,7 @@ def main():
                     for table, row_id, field, value in changes:
                         assert reopened.value(table, row_id, field) == value
                     # An item is renamed in the table's Name cell, by double-click.
-                    page.locator('[data-subtab="consumables"]').click()
+                    page.locator(strip + '[data-subtab="consumables"]').click()
                     page.wait_for_function('state.sub==="consumables" && state.row && !state.pending')
                     renamed = page.evaluate('state.row.id')
                     cell = page.locator(f'.lex-list-row[data-key$="{renamed}"] [data-column-key="name"]').first
@@ -153,7 +205,7 @@ def main():
                         raise AssertionError('Invalid description accepted')
                     except HTTPError as error: assert error.code == 400
                     page.set_viewport_size({'width': 1000, 'height': 700})
-                    page.locator('[data-subtab="weapons"]').click()
+                    page.locator(strip + '[data-subtab="weapons"]').click()
                     page.wait_for_timeout(500)
                     assert page.locator('#main > .lex-stack .lex-column-list').first.is_visible()
                     expected = set(page.evaluate('state.row.fields.filter(f=>f.editable).map(f=>f.key)'))

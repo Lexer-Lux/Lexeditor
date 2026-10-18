@@ -126,6 +126,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.evaluate('switchProjectSource("mine")')
                 page.wait_for_function(
                     "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value.replaceAll(',','').replaceAll(' ','')==='1234'")
+                # Mod contents only leaves Cloud, whose saved HP differs from vanilla.
+                records = '.ff7r2-layout .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+                toggle = page.locator('.lex-pager-toggle input[aria-label="Mod contents only"]')
+                assert toggle.count() == 1
+                assert toggle.is_enabled()
+                assert page.locator(records).count() > 1
+                toggle.check()
+                page.wait_for_function(
+                    "() => document.querySelectorAll('" + records + "').length===1")
+                assert 'Cloud' in page.locator(records).first.inner_text()
+                toggle.uncheck()
+                page.wait_for_function(
+                    "() => document.querySelectorAll('" + records + "').length>1")
 
                 page.evaluate('navigate("battleparams")')
                 page.wait_for_selector(".ff7r2-battle-player-table")

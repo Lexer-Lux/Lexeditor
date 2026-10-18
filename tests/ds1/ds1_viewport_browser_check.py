@@ -143,10 +143,7 @@ def phase_readonly(play, game, output, errors):
             page = browser.new_page(viewport={'width': 1440, 'height': 900})
             page.on('pageerror', lambda error: errors.append(str(error)))
             open_viewport(page, session)
-            status = page.locator('[data-viewport-status]').inner_text()
-            for want in ('m10_01_00_00.msb', '5 parts', '6 triangles', '1 collision part',
-                         '1 navigation part', '1 part has no visible mesh'):
-                assert want in status, status
+            assert page.locator('[data-viewport-status]').count() == 0
             assert page.locator('canvas[data-viewport]').count() == 1
             rendered_pixels(page, 'm10_01_00_00.msb')
             textured_pixels(page, 'm10_01_00_00.msb')
@@ -185,16 +182,16 @@ def phase_readonly(play, game, output, errors):
             named = page.evaluate('state.mapList.find(r=>r.id==="m10_01_00_00.msb").name')
             assert named == 'Undead Burg (m10_01_00_00.msb)', named
             assert (counts['npcs'], counts['drops'], counts['enemies']) == (0, 1, 1), counts
+            gen = page.evaluate('viewportMount')
             page.locator('[data-maps-side] .lex-list-row', has_text='test2.msb').click()
-            page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='test2.msb', timeout=30000)
-            page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             rendered_pixels(page, 'test2.msb')
             # Same texture name, different bytes per model: the piece
             # stays blue and the object stays red. A per-name texture
             # cache paints both with the first model's bytes instead.
+            gen = page.evaluate('viewportMount')
             page.locator('[data-maps-side] .lex-list-row', has_text='m99_00_00_00.msb').click()
-            page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")?.textContent?.includes(want)', arg='m99_00_00_00.msb', timeout=30000)
-            page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             page.evaluate('viewportCtl.select(null)')
             red, blue = focused_colors(page, '0:0')
             assert blue > 100 and red < 10, ('piece', red, blue)
@@ -219,30 +216,28 @@ def phase_edit(play, game, mod, output, errors):
             page = browser.new_page(viewport={'width': 1440, 'height': 900})
             page.on('pageerror', lambda error: errors.append(str(error)))
             open_viewport(page, session)
+            gen = page.evaluate('viewportMount')
             page.locator('[data-maps-side] .lex-list-row', has_text='test.msb').click()
-            page.wait_for_function('(want)=>document.querySelector("[data-viewport-status]")'
-                                   '?.textContent?.includes(want)', arg='test.msb', timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
-            assert 'chest0' in page.locator('[data-viewport-status]').inner_text()
+            assert page.evaluate('state.mapInfo?.name') == 'chest0'
             duplicate = page.locator('[data-viewport-action="duplicate"]')
             remove = page.locator('[data-viewport-action="remove"]')
             assert not duplicate.is_disabled() and not remove.is_disabled()
             viewport_click(page, 'duplicate')
-            page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
-            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
-                                   '.includes("chest0_1")', timeout=30000)
-            assert '6 parts' in page.locator('[data-viewport-status]').inner_text()
+            page.wait_for_function('state.mapSelected==="1:1" && state.mapInfo?.name==="chest0_1"',
+                                   timeout=30000)
+            page.wait_for_function('state.mapView.parts.length===7', timeout=30000)
+            gen = page.evaluate('viewportMount')
             viewport_click(page, 'remove')
             page.locator('.lex-dialog').get_by_role('button', name='Remove').click()
             # Six view parts: the removed duplicate is gone, and the enemy
-            # without a model file never renders, so five parts show.
+            # without a model file never renders, so five parts show. The
+            # state lands before the remount renders; wait for the fresh map.
             page.wait_for_function('state.mapSelected===null && state.mapView.parts.length===6',
                                    timeout=30000)
-            # The state lands before the remount renders; the old status
-            # still shows the duplicate until the fresh map draws.
-            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
-                                   '.startsWith("test.msb: 5 parts")', timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             page.evaluate("viewportMove('test.msb','1:0',[9,8,7])")
             page.wait_for_function("state.pending===0 && state.mapView.parts.find(p=>p.key==='1:0').pos[0]===9",
                                    timeout=30000)
@@ -268,11 +263,12 @@ def phase_edit(play, game, mod, output, errors):
             page.mouse.up()
             page.wait_for_function('state.pending===0', timeout=30000)
             assert page.evaluate('state.mapSelected') == '1:0'
+            gen = page.evaluate('viewportMount')
             page.evaluate('viewportAdd(\'test.msb\',document.querySelector(\'[data-viewport-action="add"]\'))')
             page.locator('.lex-choice-popover button', has_text='m10piece').click()
             page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
-            page.wait_for_function('document.querySelector("[data-viewport-status]").textContent'
-                                   '.includes("6 parts")', timeout=30000)
+            page.wait_for_function('state.mapView.parts.length===7', timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             page.evaluate('viewportCtl.select("1:0")')
             page.wait_for_function('state.mapSelected==="1:0"', timeout=30000)
             page.wait_for_timeout(1200)

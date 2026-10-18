@@ -136,6 +136,40 @@ def _binder_plain(location):
     return plain
 
 
+def _stamp(location):
+    """A file's (mtime, size) stamp, or None when it cannot be statted."""
+    try:
+        stat = Path(location).stat()
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+@functools.lru_cache(maxsize=8)
+def _cached_binder_plain(location, stamp):
+    """A binder's inflated bytes, shared across a map's models. Every
+    model resolved its textures from the same containers, and
+    re-reading them per model made big maps open slowly. The file
+    stamp is part of the key, so a rebuilt mod still reloads.
+    Bounded small: binders are the biggest files the viewport
+    touches."""
+    return _binder_plain(location)
+
+
+def _shared_binder_plain(location):
+    stamp = _stamp(location)
+    if stamp is None:
+        return _binder_plain(location)
+    return _cached_binder_plain(str(location), stamp)
+
+
+@functools.lru_cache(maxsize=32)
+def _cached_bhf_table(location, stamp):
+    """One texture header's parsed table, shared across a map's
+    models. Headers are small; the stamp keys a rebuild."""
+    return parse_bhf(Path(location).read_bytes())
+
+
 def _split_tables(kind, location, member, game_root, project, area=None):
     """[(label, member table, data path)] plus notes: a character
     binder's companion archive, plus the map area's archives for
@@ -148,7 +182,7 @@ def _split_tables(kind, location, member, game_root, project, area=None):
         binder = Path(location)
         if binder.name.lower().endswith('.chrbnd.dcx'):
             stem = binder.name[:-len('.chrbnd.dcx')]
-            plain = _binder_plain(location)
+            plain = _shared_binder_plain(location)
             names = {}
             if plain is not None:
                 try:
@@ -188,7 +222,10 @@ def _split_tables(kind, location, member, game_root, project, area=None):
                     notes.append(f'{bdt.name}: companion texture archive not found')
                     continue
                 try:
-                    tables.append((bhd.name, parse_bhf(bhd.read_bytes()), bdt))
+                    stamp = _stamp(bhd)
+                    table = (_cached_bhf_table(str(bhd), stamp) if stamp is not None
+                             else parse_bhf(bhd.read_bytes()))
+                    tables.append((bhd.name, table, bdt))
                 except (BhfError, OSError) as error:
                     notes.append(f'{bhd.name}: {error}')
     return tables, notes
@@ -219,7 +256,7 @@ def _tpf_sources(kind, location, member):
     """(label, TPF bytes) candidates: the binder's same-stem TPF first,
     then its other TPFs; a standalone flver's same-stem sidecars."""
     if kind == 'member':
-        plain = _binder_plain(location)
+        plain = _shared_binder_plain(location)
         if plain is None:
             return
         try:

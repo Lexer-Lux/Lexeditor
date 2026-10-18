@@ -135,3 +135,34 @@ def test_fmg_read_edit_and_dirty_roundtrip():
         pass
     else:
         raise AssertionError('sprouted a new entry')
+
+
+def test_text_rows_mark_modified_after_edit():
+    document = ItemDocument(make_archive())
+    document.menu_texts = texts.MenuDocument(make_menu_archive())
+    tab = next(entry[0] for entry in FMG_SUBTABS if entry[2] in document.menu_texts.files())
+    rows = document.list_rows(tab)
+    assert rows and all(not row.get('modified') for row in rows)
+    first = rows[0]
+    document.edit(first['table'], first['id'], 'text',
+                  (document.menu_texts.text(first['table'], first['id']) or 'x') + '!')
+    flags = {row['id']: row.get('modified') for row in document.list_rows(tab)}
+    assert flags[first['id']] is True
+    assert all(value is not True for key, value in flags.items() if key != first['id'])
+    labels = ItemDocument(make_archive())
+    labels.menu_texts = texts.MenuDocument(make_menu_archive())
+    assert all(not row.get('modified') for row in labels.list_rows('menu-labels'))
+    labels.edit('MenuText', 102205, 'label', 'FireDEF!')
+    flags = {row['id']: row.get('modified') for row in labels.list_rows('menu-labels')}
+    assert flags[102205] is True
+    assert all(value is not True for key, value in flags.items() if key != 102205)
+
+
+def test_description_edit_marks_its_item_row_modified():
+    from ds1_fixture import make_text_archive
+    document = ItemDocument(make_archive())
+    document.texts = texts.TextDocument(make_text_archive())
+    row = document.list_rows('consumables')[0]
+    assert document.row_modified(row['table'], row['id']) is False
+    document.edit(row['table'], row['id'], 'description', 'A safer stone.')
+    assert document.row_modified(row['table'], row['id']) is True

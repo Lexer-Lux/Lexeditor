@@ -20,7 +20,8 @@ def test_placements_listed_with_models_and_links():
     assert (enemy["name"], enemy["model"], enemy["npc"], enemy["think"]) == ("enemy0", "c1200", 120000, 1000)
     assert enemy["pos"] == (1.0, 2.0, 3.0) and enemy["rot"] == (0.0, 90.0, 0.0)
     assert doc.read_placement((2, 0))["fields"][-1]["key"] == "npcId"
-    assert [f["key"] for f in doc.read_placement((4, 0))["fields"]] == ["posX", "posY", "posZ", "rotX", "rotY", "rotZ"]
+    assert [f["key"] for f in doc.read_placement((4, 0))["fields"]] == ["posX", "posY", "posZ", "rotX", "rotY", "rotZ",
+                                                                                  "scaleX", "scaleY", "scaleZ"]
 
 
 def test_edit_roundtrip_exact_byte_boundary_and_revert():
@@ -78,7 +79,8 @@ def test_object_placements_move_but_name_nothing():
     placement = next(p for p in doc.placements() if p["type"] == 1)
     assert (placement["partId"], placement["kind"], placement["name"]) == (0, "Object", "chest0")
     assert "npc" not in placement and "think" not in placement
-    assert [f["key"] for f in doc.read_placement((1, 0))["fields"]] == ["posX", "posY", "posZ", "rotX", "rotY", "rotZ"]
+    assert [f["key"] for f in doc.read_placement((1, 0))["fields"]] == ["posX", "posY", "posZ", "rotX", "rotY", "rotZ",
+                                                                                  "scaleX", "scaleY", "scaleZ"]
     doc.edit((1, 0), "posX", 10.5)
     doc.edit((1, 0), "rotY", -45.0)
     assert doc.dirty_count == 2
@@ -90,7 +92,8 @@ def test_object_placements_move_but_name_nothing():
     doc.edit((1, 0), "rotY", 90.0)
     assert doc.export() == raw and doc.dirty_count == 0
     units = [unit for unit in doc.merge_units() if unit[0] == (1, 0)]
-    assert {unit[1] for unit in units} == {"posX", "posY", "posZ", "rotX", "rotY", "rotZ"}
+    assert {unit[1] for unit in units} == {"posX", "posY", "posZ", "rotX", "rotY", "rotZ",
+                                                  "scaleX", "scaleY", "scaleZ"}
     with pytest.raises(MsbError):
         doc.edit((1, 0), "npcId", 120000, NPC_IDS)
     rubble = MsbDocument(build_msb(parts=(("rubble", 9, 0, 1, None),)))
@@ -160,3 +163,21 @@ def test_create_placement_takes_pasted_enemy_identity():
     row = doc.create_placement("c1200", [1, 2, 3], [0, 0, 0], npc=120100)
     fields = {item["key"]: item["value"] for item in row["fields"]}
     assert fields["npcId"] == 120100
+
+def test_scale_fields_read_and_edit_roundtrip():
+    doc = MsbDocument(build_msb())
+    assert [f["key"] for f in doc.read_placement((2, 0))["fields"]] == [
+        "posX", "posY", "posZ", "rotX", "rotY", "rotZ",
+        "scaleX", "scaleY", "scaleZ", "npcId"]
+    assert [f["value"] for f in doc.read_placement((4, 0))["fields"]
+            if f["key"].startswith("scale")] == [1.0, 1.0, 1.0]
+    raw = build_msb()
+    doc = MsbDocument(raw)
+    doc.edit((2, 0), "scaleX", 2.5)
+    assert next(f["value"] for f in doc.read_placement((2, 0))["fields"]
+                if f["key"] == "scaleX") == 2.5
+    assert 0 < sum(1 for a, b in zip(raw, doc.export()) if a != b) <= 4
+    doc.edit((2, 0), "scaleX", 1.0)
+    assert doc.export() == raw and doc.dirty_count == 0
+    with pytest.raises(MsbError):
+        doc.edit((2, 0), "scaleY", float("nan"))

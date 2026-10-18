@@ -108,3 +108,31 @@ def test_read_only_and_unknown_targets_fail_closed(tmp_path):
         store.read(MAP, "nope")
     with pytest.raises(MsbError):
         store.edit(MAP, "2:0", "npcId", 999001)
+
+def test_read_links_the_enemy_for_face_and_finder(tmp_path):
+    _game, _mod, store = setup(tmp_path)
+    row = store.read(MAP, "2:0")
+    (link,) = [entry for entry in row["recordLinks"] if entry["field"] == "npcId"]
+    assert (link["kind"], link["table"], link["id"]) == ("npc", "NpcParam", 120000)
+    assert link["resolved"] and link["name"]
+    assert (link["tab"], link["sub"]) == ("enemies", "monsters")
+    _game, _mod, bosses = setup(tmp_path / "bosses", npc=223000)
+    (boss,) = [entry for entry in bosses.read(MAP, "2:0")["recordLinks"]
+               if entry["field"] == "npcId"]
+    assert (boss["tab"], boss["sub"]) == ("enemies", "bosses")
+    _game, _mod, friends = setup(tmp_path / "friends", npc=251000)
+    (friend,) = [entry for entry in friends.read(MAP, "2:0")["recordLinks"]
+                 if entry["field"] == "npcId"]
+    assert (friend["tab"], friend["sub"]) == ("npcs", "npcs")
+    _game, _mod, dangling = setup(tmp_path / "dangling", npc=999001)
+    (missing,) = [entry for entry in dangling.read(MAP, "2:0")["recordLinks"]
+                  if entry["field"] == "npcId"]
+    assert not missing["resolved"]
+
+
+def test_list_rows_mark_modified_after_edit(tmp_path):
+    _game, _mod, store = setup(tmp_path)
+    assert all(not row.get("modified") for row in store.list_rows())
+    store.get(MAP).edit((2, 0), "posX", 10.5)
+    flags = {row["id"]: row.get("modified") for row in store.list_rows()}
+    assert flags == {"2:0": True}

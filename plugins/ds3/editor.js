@@ -11,7 +11,7 @@
   ];
   const state={booting:true,tab:"EquipParamWeapon",dirty:0,source:"",project:"",output:"",info:null,datamap:null,
     tables:{},details:{},map:{page:0,query:"",status:"",sort:["filename",1]},error:""};
-  for(const table of TABLES)state.tables[table.id]={rows:[],loaded:false,selected:null,page:0,pageSize:20,query:"",sort:["id",1]};
+  for(const table of TABLES)state.tables[table.id]={rows:[],loaded:false,selected:null,page:0,pageSize:20,query:"",sort:["id",1],modOnly:false};
 
   async function api(path,options){
     const response=await fetch(path,options);let value={};
@@ -59,7 +59,10 @@
     try{
       const result=await api("/api/edit",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({table,id:row.id,field:field.key,value})});
-      state.details[table]=result.row;state.dirty=result.dirtyCount||0;shell.refresh();render();
+      state.details[table]=result.row;state.dirty=result.dirtyCount||0;
+      const listed=tableState(table).rows.find(row=>row.id===result.row.id);
+      if(listed&&result.modified!==undefined)listed.modified=result.modified;
+      shell.refresh();render();
     }catch(error){
       LexeditorUI.showAlert({title:"Edit rejected",message:error.message||String(error)});
       await loadDetail(table,row.id,true);render();
@@ -140,7 +143,11 @@
     if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.loadingPanel({label:"Loading records"})]}));return}
     if(!table.rows.length){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("No records were found in this parameter table.")]}));return}
     if(state.creating?.table===id){renderCreation(id);return}
-    const view=pagedListDetail({order:"given",add:()=>{
+    // Mod contents only is the shared table toggle: the server marks every
+    // record row this session changed, so the filter is one comparison.
+    const modOnly={value:table.modOnly===true,changed:row=>row.modified===true,
+      change:value=>{table.modOnly=value;table.page=0;render();}};
+    const view=pagedListDetail({order:"given",modOnly,add:()=>{
       const source=table.rows.find(row=>row.id===table.selected)||table.rows[0];
       state.creating={table:id,sourceId:source.id,id:Math.min(2147483647,Math.max(...table.rows.map(row=>row.id))+1),name:source.name+' copy'};
       render();

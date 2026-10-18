@@ -12,7 +12,7 @@ from core.plugin_http import PluginRequestHandler
 from . import assets, deployment, data_map, icons, shops, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
-from .map_store import MapStore
+from .map_store import MapStore, parse_key
 from .msb import MsbError
 from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
@@ -125,7 +125,7 @@ class Handler(PluginRequestHandler):
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
-                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme'):
+                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx'):
             try:
                 with LOCK:
                     if path == '/api/assets':
@@ -143,8 +143,15 @@ class Handler(PluginRequestHandler):
                                                               query.get('side', ['mod'])[0])
                             model = assets.model_info(data, name) \
                                 if assets.kind_of(name) == 'models' else None
+                            if assets.is_split_archive(name):
+                                textures, reason = [], 'split-archive'
+                            else:
+                                try:
+                                    textures, reason = assets.list_textures(data, name), None
+                                except assets.AssetError:
+                                    textures, reason = [], 'unreadable'
                             result = {'file': name, 'source': source, 'size': len(data),
-                                      'textures': assets.list_textures(data, name),
+                                      'textures': textures, 'reason': reason,
                                       'model': model}
                         else:
                             result = {'files': assets.scan_project(STORE.project, strict=False,
@@ -156,15 +163,6 @@ class Handler(PluginRequestHandler):
                         result = STORE.state()
                         result['animTabs'] = [{'id': 'animations', 'label': 'Animations',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
-                        monsters = next(entry['count'] for entry in result['enemyTabs']
-                                        if entry['id'] == 'monsters')
-                        result['enemyTabs'].append({'id': 'model', 'label': 'Models',
-                                                    'table': 'EnemyModel', 'count': monsters,
-                                                    'help': 'See enemy bodies, hitboxes and attacks. '
-                                                            'Pick an enemy, then an attack. '
-                                                            'It shows where that swing lands. '
-                                                            'This screen only shows the game data. '
-                                                            'It changes nothing.'})
                         for entry in result.get('miscTabs', []):
                             try:
                                 entry['count'] = len(RULES.list_rows(entry['id']))
@@ -175,6 +173,10 @@ class Handler(PluginRequestHandler):
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True), theme_status())
                     elif path == '/api/theme':
                         self.send_json(theme_status())
+                        return
+                    elif path == '/api/theme/sfx':
+                        bank = query.get('bank', [''])[0]
+                        self.send_json({'bank': bank, 'streams': theme.sfx_streams(THEME_CACHE, STORE.game_root, bank)})
                         return
                     elif path == '/api/world/locate':
                         table = query.get('table', [''])[0]
@@ -310,14 +312,6 @@ class Handler(PluginRequestHandler):
                                 rows.append({'id': chr_id, 'table': 'AnimPlayback',
                                              'name': labels.get(chr_id, chr_id),
                                              'values': {'binder': f'{chr_id}.anibnd.dcx'}})
-                            result = {'rows': rows}
-                        elif tab == 'model':
-                            links = MAPSTORE.npc_models()
-                            rows = []
-                            for entry in STORE.get().list_rows('monsters'):
-                                models = links.get(entry['id'], [])
-                                rows.append({'id': entry['id'], 'table': 'EnemyModel', 'name': entry['name'],
-                                             'values': {'chr': ', '.join(models) or 'No placed model'}})
                             result = {'rows': rows}
                         elif tab == 'animations':
                             scope = query.get('scope', ['chars'])[0]
@@ -466,11 +460,14 @@ class Handler(PluginRequestHandler):
                     extra = {}
                     if payload.get('table') == 'NativeRules':
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
+                        extra = {'modified': RULES.row_modified(payload.get('id'))}
                     elif str(payload.get('table', '')).endswith('.msb'):
                         row = MAPSTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                         values, display, name = MAPSTORE.row_values(
                             payload.get('table'), payload.get('id'))
-                        extra = {'values': values, 'display': display, 'name': name}
+                        extra = {'values': values, 'display': display, 'name': name,
+                                 'modified': MAPSTORE.get(payload.get('table')).placement_modified(
+                                     parse_key(payload.get('id')))}
                     elif str(payload.get('table', '')).endswith('.anibnd.dcx'):
                         row = TAESTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                     else:
@@ -483,21 +480,25 @@ class Handler(PluginRequestHandler):
                             label = next((field['value'] for field in row['fields']
                                           if field['key'] == 'label'), None)
                             if label is not None:
-                                extra = {'values': {'label': label}, 'display': {}}
+                                extra = {'values': {'label': label}, 'display': {},
+                                         'modified': STORE.get().text_row_modified(table, payload.get('id'))}
                         elif table in FMG_TABLES:
                             text = next((field['value'] for field in row['fields']
                                          if field['key'] == 'text'), None)
                             if text is not None:
-                                extra = {'values': {'text': text}, 'display': {}}
+                                extra = {'values': {'text': text}, 'display': {},
+                                         'modified': STORE.get().text_row_modified(table, payload.get('id'))}
                         elif table in TABLES:
                             values, display = STORE.get().row_values(table, payload.get('id'))
                             extra = {'values': values, 'display': display,
-                                     'refreshRows': table == EFFECT_TABLE}
+                                     'refreshRows': table == EFFECT_TABLE,
+                                     'modified': STORE.get().row_modified(table, payload.get('id'))}
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count, **extra}
                 elif path == '/api/rename':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
-                    result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
+                    result = {'row': row, 'dirtyCount': STORE.get().dirty_count,
+                              'modified': STORE.get().row_modified(payload.get('table'), payload.get('id'))}
                 elif path == '/api/tae/add':
                     for key in ('table', 'tae', 'anim', 'type', 'start', 'end'):
                         if key not in payload:

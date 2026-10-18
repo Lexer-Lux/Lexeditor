@@ -47,11 +47,15 @@ PLACEMENT_FIELDS = {
     'rotX': ('Rotation X', 'Rotation', 'Rotation around the X axis, in degrees.'),
     'rotY': ('Rotation Y', 'Rotation', 'Rotation around the Y axis, in degrees.'),
     'rotZ': ('Rotation Z', 'Rotation', 'Rotation around the Z axis, in degrees.'),
+    'scaleX': ('Scale X', 'Scale', 'Scale along the X axis, as a multiplier. 1 is full size.'),
+    'scaleY': ('Scale Y', 'Scale', 'Scale along the Y axis, as a multiplier. 1 is full size.'),
+    'scaleZ': ('Scale Z', 'Scale', 'Scale along the Z axis, as a multiplier. 1 is full size.'),
     'npcId': ('Enemy', 'Placement', "Which enemy's stats and AI this placement uses. The model stays the same."),
 }
 FLOAT_FIELDS = {key: offset for key, offset in
                 (('posX', 0x14), ('posY', 0x18), ('posZ', 0x1c),
-                 ('rotX', 0x20), ('rotY', 0x24), ('rotZ', 0x28))}
+                 ('rotX', 0x20), ('rotY', 0x24), ('rotZ', 0x28),
+                 ('scaleX', 0x2c), ('scaleY', 0x30), ('scaleZ', 0x34))}
 
 
 def _cstr(data, offset, what):
@@ -245,6 +249,13 @@ class MsbDocument:
     def dirty_count(self):
         return len(self.dirty) + len(self.removed)
 
+    def placement_modified(self, part_key):
+        """Whether this session changed the placement: an edited field or an added copy."""
+        key = tuple(part_key)
+        if key in self.added:
+            return True
+        return any(entry[0] == key for entry in self.dirty)
+
     def merge_units(self):
         """Editable spans for mod merging: ((type, id), field, start, size,
         label, part name) per placement field."""
@@ -286,13 +297,16 @@ class MsbDocument:
                 if math.isfinite(saved) and float(f'{float(value):.7g}') == float(f'{saved:.7g}'):
                     value = saved
             self._write(start, 4, struct.pack('<f', value))
-            index = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ'].index(field)
-            target = list(part['pos']) if index < 3 else list(part['rot'])
+            index = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ',
+                     'scaleX', 'scaleY', 'scaleZ'].index(field)
+            target = list(part['pos']) if index < 3 else list(part['rot']) if index < 6 else list(part['scale'])
             target[index % 3] = struct.unpack_from('<f', self.plain, start)[0]
             if index < 3:
                 part['pos'] = tuple(target)
-            else:
+            elif index < 6:
                 part['rot'] = tuple(target)
+            else:
+                part['scale'] = tuple(target)
         elif field == 'npcId':
             if part['type'] not in ENEMY_TYPES:
                 raise MsbError('Only enemy placements name an enemy')
@@ -336,7 +350,8 @@ class MsbDocument:
         # Positions and rotations are unbounded floats, and the enemy is
         # bounded by its option list: none of them shows a numeric range.
         fields = []
-        for key in ('posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ'):
+        for key in ('posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ',
+                    'scaleX', 'scaleY', 'scaleZ'):
             label, group, description = PLACEMENT_FIELDS[key]
             fields.append({'key': key, 'label': label, 'description': description, 'group': group,
                            'dtype': 'f32', 'value': self._readback(part, key), 'type': 'number',

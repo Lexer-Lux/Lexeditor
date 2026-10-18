@@ -66,10 +66,10 @@
    at its minimum height in a tall empty drawer. */
 .lex-preview-variant-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
 .lex-preview-variant-wrap>button{align-self:flex-start;}
-/* The gender toggle is one sign, not a word: a square button with a
-   readable glyph in the symbol face, like the drawer's close mark. */
-.lex-preview-gender-toggle{font:400 1.3em/1 var(--lex-symbol-font);
-  min-width:2em;text-align:center;}
+/* The gender toggle is one sign in the view-mode bar: the mode class
+   gives the 26px box, this centers a readable glyph inside it. */
+.lex-preview-gender-toggle{display:flex;align-items:center;justify-content:center;
+  padding:0;font:400 16px/1 var(--lex-symbol-font);}
 .ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
 .lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
 /* A record link is a hoverable face (the linked record's name) plus a
@@ -83,4 +83,17 @@
 .ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
 .ds1-find-reference{flex:0 0 auto;}
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.lex-compact-pager [data-dir-local].lex-pager-toggle>span{writing-mode:horizontal-tb;transform:none;}
 .ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* The Selection pane is narrow, and its longest name-plus-help ("Enemy" plus
+   its mark) would otherwise shrink to the font floor. The floor is the
+   framework's own lane minimum: wide enough that the names settle with the
+   pane's other labels, narrow enough that the coordinate inputs still fit. */
+[data-maps-side]{--lex-detail-label-floor:68px;}
+/* The file tabs' texture thumbnails share one wrapping row of squares,
+   Models and Textures alike; each square is named under its picture. */
+.ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;}
+.ds1-texture-tile{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;max-width:160px;}
+.ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
+.ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
+.ds1-texture-help{flex:0 0 auto;display:flex;}

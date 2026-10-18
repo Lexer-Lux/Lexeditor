@@ -54,7 +54,7 @@ def test_effect_status_fields_have_icons():
 def test_starting_class_stats_have_icons():
     found = icons(ItemDocument(make_stats_archive()), 'CharaInitParam', 2000)
     assert found['baseVit'] == 'vit'
-    assert found['baseWil'] == 'wil'
+    assert found['baseWil'] == 'att'
     assert found['baseEnd'] == 'end'
     assert found['baseStr'] == 'str'
     assert found['baseDex'] == 'dex'
@@ -62,6 +62,58 @@ def test_starting_class_stats_have_icons():
     assert found['baseFai'] == 'faith'
     assert found['baseLuc'] == 'luc'
     assert found['baseHp'] == 'vit'
-    assert found['baseMp'] == 'wil'
+    assert found['baseMp'] == 'att'
     assert found['baseSp'] == 'end'
     assert found['soulLv'] is None
+    assert found['soul'] == 'souls'
+
+
+def test_souls_fields_have_icons():
+    found = icons(ItemDocument(make_stats_archive()), 'CharaInitParam', 2000)
+    assert found['soul'] == 'souls'
+    npc = ItemDocument(make_archive())
+    rows = npc._rows_by_id['NpcParam']
+    found = icons(npc, 'NpcParam', next(iter(rows)))
+    assert found['getSoul'] == 'souls'
+    found = icons(ItemDocument(make_effects_archive()), 'SpEffectParam', 6890)
+    assert found['soulRate'] == 'souls'
+    assert found['soul'] == 'souls'
+    assert found['haveSoulRate'] == 'souls'
+    assert found['soulStealRate'] == 'souls'
+    assert found['clearSoul'] == 'souls'
+
+
+def test_poise_and_humanity_fields_have_icons():
+    npc = ItemDocument(make_archive())
+    rows = npc._rows_by_id['NpcParam']
+    found = icons(npc, 'NpcParam', next(iter(rows)))
+    assert found['superArmorDurability'] == 'poise'
+    assert found['superArmorRecoverCorrection'] == 'poise'
+    assert found['superArmorBrakeKnockbackDist'] == 'poise'
+    assert found['humanityLotId'] == 'humanity'
+    found = icons(ItemDocument(make_effects_archive()), 'SpEffectParam', 6890)
+    assert found['changeSuperArmorPoint'] == 'poise'
+
+
+def test_enemy_vitals_have_stat_icons():
+    npc = ItemDocument(make_archive())
+    rows = npc._rows_by_id['NpcParam']
+    found = icons(npc, 'NpcParam', next(iter(rows)))
+    assert found['hp'] == 'vit'
+    assert found['mp'] == 'att'
+    assert found['stamina'] == 'end'
+    assert found['staminaRecoverBaseVel'] == 'end'
+
+
+def test_magic_slot_length_has_icon():
+    found = icons(ItemDocument(make_archive()), 'Magic', 100)
+    assert found['slotLength'] == 'slot'
+
+
+def test_item_humanity_fields_have_icons():
+    found = icons(ItemDocument(make_archive()), 'EquipParamGoods', 100)
+    assert found['consumeHeroPoint'] == 'humanity'
+    found = icons(ItemDocument(make_archive()), 'Magic', 100)
+    assert found['heroPoint'] == 'humanity'
+    found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
+    assert found['isLuckCorrect'] == 'humanity'

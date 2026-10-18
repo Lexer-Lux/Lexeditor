@@ -147,7 +147,7 @@
     {
       "Field": "TeamAttackEffectivity",
       "Name": "Team Attack Weight",
-      "Description": "A value used to determine the number of simultaneous attackers within a group of characters that share the same team.\n\nEach potential attacker adds thier TeamAttackEffectivity to a total value. If this total value is or exceeds 100, no more attackers will be allowed to attack.\n\nIn general, this means higher values reduce the number of potential attackers against a target."
+      "Description": "Share of the 100-point attacker budget this enemy takes. When attackers' shares reach 100, no more join in. Higher values mean fewer simultaneous attackers."
     },
     {
       "Field": "eye_angX",

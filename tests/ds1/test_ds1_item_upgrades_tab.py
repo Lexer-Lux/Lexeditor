@@ -72,7 +72,10 @@ def test_weapons_and_armor_open_an_upgrades_panel_tab():
     assert 'title==="Upgrades"' in EDITOR
     assert EDITOR.count("state.itemTab") >= 3
     assert ('if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"'
-            '||state.row.table==="EquipParamProtector"))') in EDITOR
+            '||state.row.table==="EquipParamProtector"'
+            '||state.row.table==="EquipParamAccessory"'
+            '||state.row.table==="Magic"'
+            '||state.row.table==="EquipParamGoods"))') in EDITOR
 
 
 def test_data_map_names_the_upgrades_tab(tmp_path):

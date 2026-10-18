@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive
+from bhf_fixture import make_bhf
 from flver_fixture import build_flver, make_chrbnd
 from plugins.ds1 import assets, deployment
 from plugins.ds1.assets import AssetError
@@ -287,7 +288,7 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
         done = request_json(session, "/api/assets/upload",
                             {"id": "up-1", "relative": TPF.as_posix(), "total": len(blob),
                              "offset": first["received"], "data": encoded[half:], "final": True})
-        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob), "kind": "textures",
+        assert done["files"] == [{"relative": TPF.as_posix(), "size": len(blob), "kind": "textures", "archive": False,
                                     "status": "modified"}]
         detail = request_json(session, f"/api/assets?scope=textures&file={TPF.as_posix()}")
         assert detail["source"] == "mod"
@@ -299,12 +300,33 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
         removed = request_json(session, "/api/assets/remove", {"relative": TPF.as_posix()})
         assert removed["files"] == [{"relative": TPF.as_posix(),
                                       "size": (game / TPF).stat().st_size,
-                                      "kind": "textures", "status": None}]
+                                      "kind": "textures", "archive": False, "status": None}]
         detail = request_json(session, f"/api/assets?scope=textures&file={TPF.as_posix()}")
         assert detail["source"] == "game"
         assert [row["name"] for row in detail["textures"]] == ["a_diffuse.dds"]
         with pytest.raises(HTTPError):
             request_json(session, "/api/assets/upload", {"id": "up-2"})
+    finally:
+        session.stop()
+
+
+def test_service_assets_textures_detail_explains_split_archives(tmp_path):
+    game, mod = service_project(tmp_path)
+    (game / "map" / "m10").mkdir(parents=True)
+    (game / "map" / "m10" / "m10.tpfbhd").write_bytes(make_bhf([("/tex0", 0, 8)]))
+    (game / "chr" / "c9999").mkdir(parents=True)
+    (game / "chr" / "c9999" / "junk.tpf").write_bytes(b"not a texture container")
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
+                          "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
+    try:
+        session.start()
+        rows = {row["relative"]: row for row in request_json(session, "/api/assets?scope=game")["files"]}
+        assert rows["map/m10/m10.tpfbhd"]["archive"] is True
+        assert rows["chr/c0000/c0000.tpf"]["archive"] is False
+        detail = request_json(session, "/api/assets?scope=textures&file=map/m10/m10.tpfbhd")
+        assert detail["textures"] == [] and detail["reason"] == "split-archive"
+        broken = request_json(session, "/api/assets?scope=textures&file=chr/c9999/junk.tpf")
+        assert broken["textures"] == [] and broken["reason"] == "unreadable"
     finally:
         session.stop()
 
@@ -326,6 +348,18 @@ def test_service_assets_vanilla_is_read_only(tmp_path):
         assert error.value.code == 403
     finally:
         session.stop()
+
+
+def test_is_split_archive_names_header_and_data_pairs():
+    assert assets.is_split_archive("map/m10/m10.tpfbhd")
+    assert assets.is_split_archive("map/m10/m10.tpfbdt")
+    assert assets.is_split_archive("map/m10/m10.tpfbdt.dcx")
+    assert assets.is_split_archive("chr/c0000/c0000.chrtpfbdt")
+    assert assets.is_split_archive("MAP\\M10\\M10.TPFBHD")
+    assert not assets.is_split_archive("chr/c0000/c0000.tpf")
+    assert not assets.is_split_archive("chr/c0000/c0000.tpf.dcx")
+    assert not assets.is_split_archive("other/picture.png")
+    assert not assets.is_split_archive("map/m10/m10.flver.dcx")
 
 
 def test_kind_of_sorts_assets_into_models_textures_sound_music_other():

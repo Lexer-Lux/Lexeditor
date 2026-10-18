@@ -116,7 +116,8 @@ for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic')
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),
                   ('thrustGuardCutRate', 'Thrust')]:
-    RESISTANCES[key] = (kind + ' (%)', 'Blocking', '')
+    RESISTANCES[key] = (kind + ' (%)', 'Blocking',
+        f'{kind} damage blocked while guarding, as a percentage off the hit.')
 
 # Reviewed combat stats, drops, passive effects and AI links. Damage
 # multipliers state their unchanged baseline of 1, the way effect
@@ -138,7 +139,8 @@ NPC_STATS = {
     'teamType': ('Team', 'Basics', 'Which side this enemy fights for.'),
     'weakPartsDamageRate': ('Damage taken: weak point (x)', 'Defense',
         'Multiplier on damage the weak point takes. 1 is unchanged.'),
-    'staminaGuardDef': ('Stamina guard (%)', 'Blocking', ''),
+    'staminaGuardDef': ('Stamina guard (%)', 'Blocking',
+        'Stamina damage blocked while guarding, as a percentage off the hit.'),
     'hitHeight': ('Body height', 'Defense',
         'Height of the body used for hits. Ignored for ragdoll bodies.'),
     'hitRadius': ('Body radius', 'Defense',
@@ -161,11 +163,17 @@ for index in range(1, 9):
         f'Multiplier on damage body part {index} takes. 1 is unchanged.')
 for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
                   ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
-    NPC_STATS[key] = (f'{kind} guard (%)', 'Blocking', '')
-for index in range(1, 7):
+    NPC_STATS[key] = (f'{kind} guard (%)', 'Blocking',
+        f'{kind} buildup blocked while guarding, as a percentage off the hit.')
+# Six slots, one live: vanilla fills only the first (399 of 400 lot users
+# across 556 NPC rows; the rest is a test row). The others wait for mods.
+NPC_STATS['itemLotId_1'] = (
+    'Drop table 1', 'Value & rewards',
+    'The lot this enemy drops from when it dies. Pick a lot ID from the Drops list. -1 drops nothing.')
+for index in range(2, 7):
     NPC_STATS[f'itemLotId_{index}'] = (
         f'Drop table {index}', 'Value & rewards',
-        'Item lot dropped on death, as a lot ID from the Drops list. -1 drops nothing.')
+        'A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing.')
 for index in range(8):
     NPC_STATS[f'spEffectID{index}'] = (
         f'Passive effect {index + 1}', 'Effects & references',

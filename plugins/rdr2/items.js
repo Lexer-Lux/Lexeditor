@@ -100,7 +100,7 @@ function renderItems() {
   // detail, fitted capacity, and fixed bottom pager.
   const view=LexeditorUI.pagedListDetail({
     modOnly:(()=>{const touched=touchedRecords(ITEM_EDIT_MAPS());
-      return modOnlySpec(touched,()=>{f.itemPage=0;},renderItems);})(),
+      return modOnlySpec(touched,()=>{f.itemPage=0;},renderItems,row=>row.key);})(),
     rows,key:it=>it.key,slots:false,page:f.itemPage,pageSize:f.itemPageSize,selected:f.itemSel,noun:"items",
     splitKey:"rdr2-items",defaultSplit:44,
     search:{key:"rdr2-items",value:f.q,placeholder:"Search items… (e.g. TONIC, PROVISION_)",label:"Search items",change:value=>{f.q=value;f.itemPage=0;renderItems();}},

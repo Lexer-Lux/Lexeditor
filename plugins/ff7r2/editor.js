@@ -249,10 +249,10 @@
   }
 
   // ---- PlayerParameter project data ----------------------------------------
-  let workspace=null, player=null, savedPlayer=null;
+  let workspace=null, player=null, savedPlayer=null, vanillaPlayer=null;
   let numericDrafts=new WeakMap();
   let playerError="", playerBusy=false, activeSource="mine";
-  let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
+  let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="", recordModOnly=false;
   let recordSort={key:"key",dir:1};
 
   // BattlePlayerParameter has a public storage schema, but the gameplay meaning
@@ -355,8 +355,13 @@
     try{
       const value=await api("/api/player-parameter?source="+encodeURIComponent(activeSource));
       installPlayer(value);
+      // Mod contents compares against vanilla, not against the loaded file:
+      // a saved edit is still mod contents after Save and reopen.
+      try{
+        vanillaPlayer=activeSource==="mine"?enrichPlayer(await api("/api/player-parameter?source=vanilla")):null;
+      }catch(_error){vanillaPlayer=null;}
     }catch(error){
-      player=null;savedPlayer=null;playerError=error.message;
+      player=null;savedPlayer=null;vanillaPlayer=null;playerError=error.message;
       if(error.payload?.workspace)workspace=error.payload.workspace;
     }finally{playerBusy=false}
   }
@@ -412,6 +417,14 @@
   }
 
   function fieldOf(row,name){return (row?.fields||[]).find(field=>field.name===name)}
+  function playerRowChanged(row){
+    const before=(vanillaPlayer?.records||[]).find(item=>item.id===row.id);
+    if(!before)return false;
+    return (row.fields||[]).some(field=>{
+      const was=(before.fields||[]).find(entry=>entry.name===field.name);
+      return was&&JSON.stringify(was.value)!==JSON.stringify(field.value);
+    });
+  }
   function savedRow(row){return (savedPlayer?.records||[]).find(item=>item.id===row.id)}
   function savedField(row,field){return fieldOf(savedRow(row),field.name)}
 
@@ -636,6 +649,9 @@
     const rows=playerRows();
     return pagedListDetail({order:"given",addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedRecord,page:recordPage,pageSize:recordPageSize,noun:"records",
+      modOnly:{available:activeSource==="mine"&&!!vanillaPlayer,value:recordModOnly===true,
+        changed:playerRowChanged,
+        change:value=>{recordModOnly=value;recordPage=0;render();}},
       className:"ff7r2-layout",splitKey:"ff7r2-player",rowsKey:"ff7r2-player",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-player-search",value:recordQuery,label:"Search PlayerParameter records",
         change:value=>{recordQuery=value;recordPage=0;render()}},

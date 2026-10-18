@@ -7,10 +7,14 @@ Remaster's doubled textures, so every rectangle is scaled by two. A few DLC
 icons have no entry; they continue their sheet's 12-column grid, which the
 game's own numbering confirms (Stone Greataxe at 198, Bloated Head at 1314).
 
-Damage, defense and stat labels reuse the equipment screen's own small icons
-from Menu04_2 (the sword by Physical attack, the shield by Magic defense).
-Kinds the game shows no icon for (poison, bleed, divine, occult and the
-rest) get none here either: no invented glyphs.
+Damage, defense and stat labels reuse the menus' own small icons from
+Menu04_2: the equipment screen's swords and shields, the armor screen's
+tolerance icons (poison, toxic, bleed, curse, poise), the level-up
+screen's stat and souls icons, and the attune screen's slot icon. Every
+rectangle is the layout's own sprite rect, read from menu.drb.
+Humanity rides the item-icon catalog (the Humanity goods picture).
+Kinds the game shows no icon for (divine, occult, luck, HP and stamina
+bars) get none here either: no invented glyphs.
 """
 from __future__ import annotations
 
@@ -41,7 +45,11 @@ SHEET_RANGES = (('Icon00', 0, 132), ('Icon01', 132, 205), ('Icon10', 1000, 1132)
                 ('Icon11', 1132, 1264), ('Icon12', 1264, 1316),
                 ('Icon20', 2000, 2132), ('Icon21', 2132, 2221),
                 ('Icon30', 3000, 3072), ('Icon40', 4000, 4043))
-# Label art on Menu04_2, in layout pixels: the equipment screen's own cells.
+# Label art on Menu04_2, in layout pixels: the menus' own cells, each the
+# layout's sprite rect. Tolerance icons are the armor screen's
+# icon_tolerance_* nodes; vit/att/end/res/souls are the level-up
+# screen's rows; slot is the attune screen's slot icon; souls doubles
+# as the shop price icon (icon_price).
 LABELS = {
     'physical': (127, 302, 169, 344), 'magic': (126, 387, 168, 429),
     'fire': (126, 345, 168, 387), 'lightning': (126, 430, 168, 472),
@@ -51,7 +59,16 @@ LABELS = {
     'str': (82, 387, 124, 429), 'dex': (83, 430, 125, 472),
     'int': (126, 0, 168, 42), 'faith': (83, 258, 125, 300),
     'weight': (169, 1, 211, 43), 'durability': (169, 431, 211, 473),
+    'poison': (83, 43, 125, 85), 'toxic': (83, 86, 125, 128),
+    'bleed': (83, 0, 125, 42), 'curse': (83, 129, 125, 171),
+    'poise': (213, 259, 255, 301),
+    'vit': (83, 172, 125, 214), 'att': (83, 215, 125, 257),
+    'end': (83, 301, 125, 343), 'res': (82, 344, 124, 386),
+    'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
 }
+# Label kinds served from the item-icon catalog instead of the label
+# sheet: the Humanity goods picture (EquipParamGoods row 350).
+ICON_LABELS = {'humanity': 2066}
 LABEL_SHEET = 'Menu04_2'
 EQUICON = re.compile(r'EquIcon_(\d+)')
 
@@ -216,7 +233,9 @@ def icon_png(game_root, icon_id):
 
 @lru_cache(maxsize=32)
 def label_png(game_root, name):
-    """One label kind's equipment-screen art as PNG bytes."""
+    """One label kind's menu art as PNG bytes."""
+    if name in ICON_LABELS:
+        return icon_png(game_root, ICON_LABELS[name])
     if name not in LABELS:
         raise IconError(f'There is no label art for {name}')
     menu = Path(game_root) / 'menu'

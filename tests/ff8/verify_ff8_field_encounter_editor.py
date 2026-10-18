@@ -133,19 +133,29 @@ def api_and_render() -> dict:
             # A sub-tab's text carries its help glyph as a trailing question
             # mark, so the name is read with the glyph and any full stop removed.
             shape = cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
-              buttons=[...document.querySelectorAll('#main .lex-subtab-button')];
+              bar=document.querySelector('#main .lex-tabbed-panel > .lex-subtab-bar'),
+              buttons=[...bar.querySelectorAll(':scope .lex-subtab-button')];
               return{labels:buttons.map(name),
                 miscRaw:(buttons.find(node=>name(node)==='Misc')||{textContent:''}).textContent,
                 ranges:buttons.some(node=>name(node)==='Camera Ranges')}})()""")
             assert shape["labels"] and shape["labels"][-1] == "Misc", shape
             assert shape["miscRaw"].startswith("Misc."), shape
-            assert shape["ranges"], shape
+            assert not shape["ranges"], shape
             cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
-              tab=[...document.querySelectorAll('#main .lex-subtab-button')]
-              .find(node=>name(node)==='Camera Ranges');tab.click()})()""")
+              bar=document.querySelector('#main .lex-tabbed-panel > .lex-subtab-bar'),
+              tab=[...bar.querySelectorAll(':scope .lex-subtab-button')]
+              .find(node=>name(node)==='Camera');tab.click()})()""")
             wait_eval(cdp, "(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),"
-                           "tab=[...document.querySelectorAll('#main .lex-subtab-button')]"
-                           ".find(node=>name(node)==='Camera Ranges');"
+                           "bar=document.querySelector('#main .lex-tabbed-panel-content .lex-tabbed-panel > .lex-subtab-bar');"
+                           "return !!bar})()", 60)
+            cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
+              bar=document.querySelector('#main .lex-tabbed-panel-content .lex-tabbed-panel > .lex-subtab-bar'),
+              tab=[...bar.querySelectorAll(':scope .lex-subtab-button')]
+              .find(node=>name(node)==='Ranges');tab.click()})()""")
+            wait_eval(cdp, "(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),"
+                           "bar=document.querySelector('#main .lex-tabbed-panel-content .lex-tabbed-panel > .lex-subtab-bar'),"
+                           "tab=[...bar.querySelectorAll(':scope .lex-subtab-button')]"
+                           ".find(node=>name(node)==='Ranges');"
                            "return !!tab&&tab.classList.contains('active')})()", 60)
             ranges = cdp.eval("""(()=>{const notes=[...document.querySelectorAll('#main .lex-detail-note')]
                 .map(node=>node.textContent.trim()).join(' | ');
@@ -156,7 +166,8 @@ def api_and_render() -> dict:
             assert ranges["help"], ranges
             # The rate edit below belongs to the Misc tab, so come back to it.
             cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
-              tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+              bar=document.querySelector('#main .lex-tabbed-panel > .lex-subtab-bar'),
+              tab=[...bar.querySelectorAll(':scope .lex-subtab-button')]
               .find(node=>name(node)==='Misc');tab.click()})()""")
             wait_eval(cdp, "document.querySelector('input[aria-label$=\"random encounter rate\"]')!==null", 60)
 

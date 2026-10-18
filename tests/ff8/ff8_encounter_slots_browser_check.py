@@ -46,6 +46,9 @@ const render=renderEncounters;
   assert page.locator('.lex-column-list-row').count()==8
   assert page.locator('.lex-detail-panel input:not([readonly])').count()==1
   assert page.locator('.lex-detail-panel .lex-readonly-field').count()==3
+  # Stage, Flags and both cameras read as one strip above the slots, not a stack.
+  tops=page.locator('.lex-detail-panel .lex-detail-field').evaluate_all('fields=>fields.map(field=>Math.round(field.getBoundingClientRect().top))')
+  assert len(set(tops))==1,tops
   page.get_by_label('Slot 1 x',exact=True).fill('1200')
   page.get_by_label('Slot 1 x',exact=True).press('Tab')
   assert page.evaluate('row.slots[0].x')==1200

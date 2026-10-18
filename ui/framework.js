@@ -1257,6 +1257,18 @@
     });
   };
 
+  // One sound's preview, the SFX layout every game shares: a playable
+  // sound renders an audio element the detail panel adopts into its
+  // heading player with a scrubber, and a sound with no playable file
+  // says so in its preview row instead.
+  const soundPreview = (options = {}) => detailField({
+    label: "",
+    control: options.src
+      ? element("audio", {src: options.src, controls: true, "aria-label": options.label || "Play sound"})
+      : readonlyField(options.note || "No preview"),
+    help: options.help || null,
+  });
+
   // Numbered record identity is a prefix unit. The shared helper owns the
   // hash, spacing, and muted tone in lists and detail headings.
   // Record ids are padded to the widest id in the active record set, so a
@@ -1297,7 +1309,7 @@
   // record identity, metadata, and actions. Games supply themed content.
   // Where a panel's body arranges its sections: stacked by default, or the
   // first section beside the others, for a record with a picture.
-  const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside"};
+  const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside", row: "lex-detail-panel-row"};
 
   // A NAME property whose value is the heading's text is the heading. Lexer:
   // "names should not be shown in the details panel as a property if the
@@ -5142,11 +5154,12 @@
       const target=asked||400;
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       root.lexFittedColumns=fit;
-      // A chosen count is a ceiling too: more columns than fit never
-      // render, so the detail panel never grows a horizontal scrollbar.
-      // Unpaged detail flows honor it as well; only pages without the
-      // divider control (tweaks, settings) never set one.
-      if(chosen>0)return Math.max(1,Math.min(length,chosen,fit));
+      // A chosen count is honored past the fit: the fit guards the
+      // default, never the maximum. Columns squeeze (flex, min-width 0),
+      // so the panel still grows no horizontal scrollbar. Unpaged detail
+      // flows honor it as well; only pages without the divider control
+      // (tweaks, settings) never set one.
+      if(chosen>0)return Math.max(1,Math.min(length,chosen));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
       // beside three empty columns. A page never has more columns than cards.
@@ -5446,8 +5459,10 @@
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
       // Embedded property panes need their own footer, not the window's list pager.
-      // Unpaged flows render no footer: every card is on the one page.
-      if (options.unpaged) footer.replaceChildren();
+      // Unpaged flows render no footer: every card is on the one page. A single
+      // page without a search needs none either: its footer would carry only
+      // a summary, the stray block from FF8's item details.
+      if (options.unpaged || (pages <= 1 && !options.search)) footer.replaceChildren();
       else footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
         search:options.search, change:turn}));
       if (label && focused?.matches("input")) {
@@ -6051,11 +6066,6 @@
     const markers = element("div", {class: "lex-anim-markers"});
     const sliderWrap = element("div", {class: "lex-anim-slider"}, slider, markers);
     const scrub = element("div", {class: "lex-anim-scrub"}, sliderWrap, readout);
-    if (options.follow) {
-      const box = element("input", {type: "checkbox", "aria-label": options.follow.label || "Follow"});
-      box.onchange = () => { state.follow = box.checked; options.follow.change?.(state.follow); };
-      scrub.append(element("label", {class: "lex-anim-follow"}, box, ` ${options.follow.label || "Follow"}`));
-    }
     for (const cue of frames.events || []) {
       const at = Number(cue.start) || 0;
       const tick = element("button", {type: "button", class: "lex-anim-marker",
@@ -6094,6 +6104,20 @@
       "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));
     const playButton = buttons[2];
     transport.append(...buttons);
+    // The follow switch is a transport toggle button, like every other
+    // viewer switch: a checkbox in the scrub row hid beside the slider.
+    if (options.follow) {
+      const followLabel = options.follow.label || "Follow";
+      const followButton = element("button", {type: "button",
+        class: "lex-anim-transport-button lex-anim-follow-button",
+        "aria-label": followLabel, title: followLabel, "aria-pressed": "false",
+        onclick: () => {
+          state.follow = !state.follow;
+          followButton.setAttribute("aria-pressed", String(state.follow));
+          options.follow.change?.(state.follow);
+        }}, followLabel);
+      transport.append(followButton);
+    }
     timeline.append(scrub, transport);
     slider.oninput = () => { state.time = parseFloat(slider.value) * frameDur; };
     if (status) status.textContent = options.statusText ?? "";
@@ -6105,6 +6129,7 @@
       toStart: () => goToFrame(0),
       toEnd: () => goToFrame(count - 1),
       get playing() { return state.playing; },
+      get follow() { return state.follow; },
       get frame() { return Math.round(state.time / frameDur); },
       get count() { return count; },
       stop: () => {
@@ -8662,7 +8687,7 @@ ${contents.path}`});
           changed = true;
         }
       }
-      if (changed) options.navigate(options.activeTab());
+      if (changed) { relabelTabBar(); options.navigate(options.activeTab()); }
     };
     if (window.pywebview?.api) installPackagedDefaults().catch(() => {});
     else window.addEventListener("pywebviewready", () => installPackagedDefaults().catch(() => {}), {once:true});
@@ -8689,6 +8714,44 @@ ${contents.path}`});
       return rank(left) - rank(right)
         || tabName(left).localeCompare(tabName(right), undefined, {numeric: true, sensitivity: "base"});
     });
+    const tabButtons = new Map();
+    // Tabs the reader never opened carry a dot until first viewed. The set
+    // persists per plugin; a first mount seeds it with the tabs at hand, so
+    // a fresh install shows no dots and only a tab that appears later (a new
+    // page) is dotted. Stale ids prune on the way in.
+    const viewedTabsKey = `lexeditor:viewed-tabs:${options.plugin.id}`;
+    let viewedTabs = null;
+    try {
+      const stored = localStorage.getItem(viewedTabsKey);
+      viewedTabs = stored === null ? null : new Set(JSON.parse(stored));
+    } catch (_error) { viewedTabs = new Set(); }
+    if (viewedTabs === null) {
+      viewedTabs = new Set(orderedTabs.map(tab => tab.id));
+    } else {
+      for (const id of [...viewedTabs]) {
+        if (!orderedTabs.some(tab => tab.id === id)) viewedTabs.delete(id);
+      }
+    }
+    const saveViewedTabs = () => {
+      try { localStorage.setItem(viewedTabsKey, JSON.stringify([...viewedTabs])); }
+      catch (_error) {}
+    };
+    saveViewedTabs();
+    // A shipped rename reaches an already-built bar: the packaged
+    // defaults arrive after the buttons are drawn, so seeding (and a
+    // view reset, which wipes the tab's own keys) re-applies the
+    // stored names. Only an override rewrites a label, so a drawn
+    // game font never becomes plain text.
+    const relabelTabBar = () => {
+      for (const [id, button] of tabButtons) {
+        let stored = null;
+        try { stored = localStorage.getItem(`${options.plugin.id}-${id}.label`); }
+        catch (_error) {}
+        if (stored === null || stored === "") continue;
+        const labelText = button.querySelector(".lex-tab-label-text");
+        if (labelText && labelText.textContent !== stored) labelText.textContent = stored;
+      }
+    };
     for (const [tabIndex, tab] of orderedTabs.entries()) {
       let defaultHoldTimer = 0;
       let savedDefault = false;
@@ -8734,7 +8797,7 @@ ${contents.path}`});
         },
         onpointerup: () => clearTimeout(defaultHoldTimer),
         onpointercancel: () => clearTimeout(defaultHoldTimer),
-        oncontextmenu: event => {
+        oncontextmenu: async event => {
           event.preventDefault();
           clearTimeout(defaultHoldTimer);
           if (savedDefault) { savedDefault = false; return; }
@@ -8745,17 +8808,29 @@ ${contents.path}`});
               if (key && key.includes(token)) localStorage.removeItem(key);
             }
           } catch (_error) {}
+          // Reset returns to the shipped default view, not to an empty
+          // one: the tab's packaged defaults come back at once, a renamed
+          // tab among them.
+          try {
+            const views = (await callWindow("default_views", options.plugin.id))?.views?.[tab.id] || {};
+            for (const [key, value] of Object.entries(views))
+              if (key.includes(token)) localStorage.setItem(key, String(value));
+          } catch (_error) {}
+          relabelTabBar();
           options.resetView?.(tab.id);
           window.dispatchEvent(new CustomEvent("lexeditor-view-reset", {detail: {plugin: options.plugin.id, tab: tab.id}}));
           options.navigate(tab.id);
         },
       }, element("span", {class: "lex-tab-label"},
           element("span", {class: "lex-tab-label-text"},
-            savedLabel(`${options.plugin.id}-${tab.id}.label`, tab.label))),
+            savedLabel(`${options.plugin.id}-${tab.id}.label`, tab.label)),
+          viewedTabs.has(tab.id) ? "" : element("span",
+            {class: "lex-tab-unviewed", "aria-hidden": "true", title: "Not opened yet"})),
         (key => key ? element("span", {
           class: "lex-tab-shortcut", "aria-hidden": "true",
         }, key) : "")(shortcutKeyFor(tabIndex + 1)));
       nav.append(button);
+      tabButtons.set(tab.id, button);
       // The handler is always attached and the mode is read when it fires:
       // settings arrive after the bar is built, so a developer-mode test at
       // build time would leave every tab unrenamable.
@@ -9121,6 +9196,14 @@ ${contents.path}`});
       }
       nav.querySelectorAll("button").forEach(button => button.classList.toggle("active",
         !githubWorkspace?.state.open && button.dataset.tab === options.activeTab()));
+      // Opening a tab marks it viewed wherever the navigation came from: a
+      // click, a record link, or the tab the plugin opened itself with.
+      const activeButton = tabButtons.get(options.activeTab());
+      if (activeButton?.querySelector(".lex-tab-unviewed")) {
+        viewedTabs.add(options.activeTab());
+        saveViewedTabs();
+        activeButton.querySelector(".lex-tab-unviewed").remove();
+      }
       if (nav.querySelector("button.active") !== shownNavTab) revealActiveTab();
       github.classList.toggle("active", !!githubWorkspace?.state.open);
       help?.classList.toggle("active", !!options.helpActive?.());
@@ -9502,7 +9585,16 @@ ${contents.path}`});
         "data-lex-pin-column": key, "aria-pressed": String(pinned),
         title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
         "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
-        onclick: event => { event.preventDefault(); event.stopPropagation(); owner.toggle(key, label, icon); },
+        onclick: event => {
+          event.preventDefault(); event.stopPropagation();
+          const inserting = !owner.store.pinned.some(entry => entry.key === key);
+          owner.toggle(key, label, icon);
+          const button = event.currentTarget;
+          button.classList.toggle("pinned", inserting);
+          button.setAttribute("aria-pressed", String(inserting));
+          button.title = inserting ? `Hide ${label} in the table` : `Show ${label} in the table`;
+          button.setAttribute("aria-label", inserting ? `Unpin ${label} column` : `Pin ${label} column`);
+        },
       }, pinIcon()));
     }
   };
@@ -11831,7 +11923,18 @@ ${contents.path}`});
       element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(barrels)), increase));
     // COLUMNS mirrors BARRELS on the other side of the same divider: how many
     // columns the selected record's details flow into. Right-click: fit again.
-    const columnsKey = detailColumnsKey(options);
+    // Each panel tab keeps its own column count: the key extends with the
+    // active tabs in the detail, outer to inner, so one item section and the
+    // next (or the GF's HP tab and its XP tab) can differ. Counts persist
+    // through the same saved preferences as before, one entry per tab.
+    const columnsBaseKey = detailColumnsKey(options);
+    const columnsKeyNow = () => {
+      const path = [...(detailNode?.querySelectorAll?.(".lex-subtab-bar") || [])]
+        .map(bar => bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab?.replace(/[^A-Za-z0-9_-]/g, "_"))
+        .filter(Boolean);
+      return path.length ? `${columnsBaseKey}:${path.join(":")}` : columnsBaseKey;
+    };
+    let columnsKey = columnsKeyNow();
     let chosenColumns = readDetailColumns(columnsKey);
     const shownColumns = () => {
       const columns = [...(detailNode?.querySelectorAll?.(".lex-tweaks-paged .lex-tweak-column") || [])]
@@ -11848,14 +11951,16 @@ ${contents.path}`});
       "aria-label": "Increase detail columns", onclick: () => changeColumns(shownColumns() + 1),
     });
     const showColumnCount = () => {
+      columnsKey = columnsKeyNow();
+      chosenColumns = readDetailColumns(columnsKey);
       const count = shownColumns();
       columnTally.textContent = String(count);
       columnTally.title = chosenColumns ? "Your column count. Right-click to fit to width again." : "Fitted to width";
       fewerColumns.disabled = count <= 1;
-      const room=Math.max(0,...[...(detailNode?.querySelectorAll?.(".lex-tweaks-paged")||[])].map(paged=>paged.lexFittedColumns||0));
-      moreColumns.disabled = count >= 6 || (room > 0 && count >= room);
+      moreColumns.disabled = count >= 6;
     };
     const changeColumns = requested => {
+      columnsKey = columnsKeyNow();
       chosenColumns = Math.max(0, Math.min(6, Number(requested) || 0));
       saveDetailColumns(columnsKey, chosenColumns);
       if (chosenColumns) root.dataset.lexDetailColumns = String(chosenColumns);
@@ -13394,9 +13499,13 @@ ${contents.path}`});
     // A Tweaks page shows only switched-on mods with something to change:
     // the Mods tab switches them, and a mod without settings has no panel.
     // A mod whose settings failed to load still shows its error. The Mods
-    // tab's own settings section keeps every field, on or off.
-    const shown = options.fieldsOnly ? rows : rows.filter(row =>
-      row.enabled && (row.error || (row.schema?.fields || []).some(item => !item.hidden)));
+    // tab's own settings section keeps every field, on or off, but a mod
+    // with nothing to show has no panel either, so the header never sits
+    // over blank space.
+    const hasContent = row => row.error || row.schema?.blocker
+      || (row.schema?.fields || []).some(item => !item.hidden);
+    const shown = options.fieldsOnly ? rows.filter(hasContent)
+      : rows.filter(row => row.enabled && hasContent(row));
     const panels = shown.map(row => {
       const schema = row.schema || {fields: []}, blocker = schema.blocker || "";
       const body = [];
@@ -13695,7 +13804,7 @@ ${contents.path}`});
           {key: "relative", label: "File", grow: 1},
           {key: "sizeLabel", label: "Size", width: "max-content", align: "end", sortValue: row => row.size},
           {key: "loaded", label: "Read", width: "max-content", align: "center",
-            sortValue: row => row.loaded ? 1 : 0, render: row => row.loaded ? "Yes" : ""},
+            sortValue: row => row.loaded ? 1 : 0, render: row => booleanMark(row.loaded)},
         ], "Search files", "This mod has no files.", notes,
           row => row.loaded ? "lex-mod-file-loaded" : "",
           row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
@@ -13988,7 +14097,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

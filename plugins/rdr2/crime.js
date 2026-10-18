@@ -250,6 +250,7 @@ async function renderHonorActions(){
     // names: Fixed runtime control identities cannot rename game honor actions.
     const list=LexeditorUI.pagedListDetail({rows,key:r=>r.id,selected:state.filters[selectedKey]||rows[0]?.id,renamable:false,
       pageSize:15,noun:"honor controls",slots:false,splitKey:"rdr2-honor",
+      modOnly:modOnlySpec(touchedRecords([state.honorActionEdits]),null,renderHonorActions,row=>row.id),
       sync:view=>{state.filters[selectedKey]=view.selected},
       master:view=>columnList({class:"honor-table",rows:view.rows,key:r=>r.id,selected:view.selected,select:view.select,
         columns:[{key:"name",label:"Honor control",render:r=>el("span",{},Object.hasOwn(r,"vanilla")?`Honor amount ${r.vanilla}`:safeDisplay(r.label),LexeditorUI.detailNote(r.id))},{key:"kind",label:"Kind",render:r=>Object.hasOwn(r,"vanilla")?"Shared amount":"Event"}],"aria-label":title}),
@@ -471,6 +472,8 @@ async function renderCrime() {
       (v)=>{if(editable)applyToControl(sev,v)}, v=>String(v)));
   };
   m.append(LexeditorUI.pagedListDetail({rows,key:c=>c.key,selected:f.crimeSelected||rows[0]?.key,
+    // Editor-only display names (labels.json) are not mod contents: only field edits filter.
+    modOnly:modOnlySpec(touchedRecords([state.crimeEdits]),()=>{f.crimePage=0;},renderCrime,row=>row.key),
     renamable:()=>!isRO(),rename:async(c,name)=>{try{await saveHumanName('crimes',c.key,name);}catch(error){showSaveFailure(error);}await renderCrime();},
     page:f.crimePage||0,pageSize:15,noun:"crimes",slots:false,splitKey:"rdr2-crime",defaultSplit:35,
     search:{value:f.crimeQ||"",label:"Search crimes",change:value=>{f.crimeQ=value;f.crimePage=0;renderCrime()}},

@@ -9,8 +9,9 @@ module builds a small, bounded theme cache from the local installation:
   ``*.fnt`` are recognized and cached raw; bitmap-to-webfont conversion is
   not integrated, so the editor falls back to an engraved serif stack;
 - interface sounds: ``sound/frpg_sm*.fsb`` banks are inventoried through a
-  read-only FSB4 header parse and their ``.fev`` projects cached raw; sample
-  decoding and UI-event mapping are not integrated, so nothing plays yet.
+  read-only FSB4 header parse and their ``.fev`` projects cached raw; streams
+  extract to browser-playable MPEG on demand (``sfx_extract``), while menu
+  UI-event mapping still waits for proved event names, so nothing plays yet.
 
 FSB payloads (up to 126 MB a bank) are never copied: only their stream counts
 and the small ``.fev`` project files land in the cache. Theme extraction is
@@ -23,6 +24,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 
@@ -252,8 +254,8 @@ def _sfx_part(game_root: Path, generation: Path) -> dict:
             cached += 1
     part["cachedProjects"] = cached
     if banks:
-        part["note"] = ("FMOD sound banks are inventoried locally with their event projects; "
-                        "browser playback waits for a proved sample decoder and proved menu-sound mapping.")
+        part["note"] = ("FMOD sound banks stream browser-playable MPEG once extracted; "
+                        "menu-sound mapping still waits for proved event names.")
     else:
         part["note"] = "No sound/frpg_sm sound banks were found."
     return part
@@ -313,6 +315,61 @@ def build(cache_root: Path, game_root: Path | None) -> dict:
             continue
         shutil.rmtree(sibling, ignore_errors=True)
     return payload
+
+
+# On-demand interface-sound extraction, bounded: at most this many
+# cached streams totalling this many bytes per generation. Old
+# generations (and their sounds) are pruned by build().
+MAX_SFX_FILES = 256
+MAX_SFX_BYTES = 64 * 1024 * 1024
+_BANK_NAME = re.compile(r"frpg_sm\d+\.fsb\Z")
+_STREAM_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.wav\Z")
+
+
+def _sfx_bank(game_root: Path, bank: str) -> Path:
+    """The bank file for a client-supplied bank name, or an error that
+    names no filesystem layout."""
+    if not _BANK_NAME.fullmatch(str(bank or "")):
+        raise ValueError("Unknown sound bank")
+    target = (Path(game_root) / "sound" / bank)
+    if not target.is_file():
+        raise ValueError("Unknown sound bank")
+    return target
+
+
+def sfx_streams(cache_root: Path, game_root: Path | None, bank: str) -> list[dict]:
+    """[{name, duration, size}] for one interface bank's proved streams."""
+    from . import fsb as _fsb
+    if game_root is None or not Path(game_root).is_dir():
+        raise ValueError("Select the installed game before listing its sounds")
+    return [{"name": entry["name"], "duration": entry["duration"], "size": entry["size"]}
+            for entry in _fsb.parse_table(_sfx_bank(Path(game_root), bank))]
+
+
+def sfx_extract(cache_root: Path, game_root: Path | None, bank: str, stream: str) -> str:
+    """Extract one interface stream to clean browser-playable MPEG in
+    the current generation's browser files, returning its theme URL."""
+    from . import fsb as _fsb
+    if game_root is None or not Path(game_root).is_dir():
+        raise ValueError("Select the installed game before extracting its sounds")
+    if not _STREAM_NAME.fullmatch(str(stream or "")):
+        raise ValueError("Unknown sound stream")
+    state = build(Path(cache_root), Path(game_root))
+    if state.get("source") != "installed-game":
+        raise ValueError("Select the installed game before extracting its sounds")
+    table = _fsb.parse_table(_sfx_bank(Path(game_root), bank))
+    entry = next((item for item in table if item["name"] == stream), None)
+    if entry is None:
+        raise ValueError("Unknown sound stream")
+    folder = Path(cache_root).resolve() / state["token"] / "browser" / "sfx" / Path(bank).stem
+    target = folder / (Path(stream).stem + ".mp3")
+    if target.is_file():
+        return f"/theme/{state['token']}/browser/sfx/{Path(bank).stem}/{target.name}"
+    cached = sorted(folder.glob("*.mp3")) if folder.is_dir() else []
+    if len(cached) >= MAX_SFX_FILES or sum(path.stat().st_size for path in cached) >= MAX_SFX_BYTES:
+        raise ValueError("The theme sound cache is full")
+    _atomic_bytes(target, _fsb.extract_mp3(_sfx_bank(Path(game_root), bank), entry))
+    return f"/theme/{state['token']}/browser/sfx/{Path(bank).stem}/{target.name}"
 
 
 def asset_path(cache_root: Path, route: str) -> Path:

@@ -143,6 +143,28 @@ def run(browser_path=None,screenshot=None):
             page.get_by_label('queen_est Trade rule', exact=True).select_option('3')
             assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===2).value') == 3
             if screenshot:page.screenshot(path=str(Path(screenshot).with_stem('ff8-card-rules')))
+            # Mod contents only leaves the edited opponent; the untouched one filters out.
+            page.get_by_role('tab',name='PLAYERS',exact=True).click()
+            prows='.ff8-card-players .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+            toggle=page.locator('.ff8-card-players .lex-pager-toggle input[aria-label="Mod contents only"]')
+            assert toggle.count()==1 and toggle.is_enabled()
+            assert page.locator(prows).count()==2
+            toggle.check()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+prows+'")].length===1')
+            assert 'queen_est' in page.locator(prows).first.inner_text()
+            toggle.uncheck()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+prows+'")].length===2')
+            # Decks follow their members and rare cards: deck 1 holds edited
+            # queen_est, deck 200 is untouched once the rare card is restored.
+            page.get_by_role('tab',name='DECKS',exact=True).click()
+            page.evaluate('state.data.cards.rows[1].startingOwner=200;cardsUI.render()')
+            drows='.ff8-card-decks .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+            dtoggle=page.locator('.ff8-card-decks .lex-pager-toggle input[aria-label="Mod contents only"]')
+            assert dtoggle.count()==1
+            assert page.locator(drows).count()==2
+            dtoggle.check()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+drows+'")].length===1')
+            assert page.locator(drows).first.get_attribute('data-key')=='1'
             assert not errors,errors
             print('PASS current Cards/Players tabs, rank edits, native identifier, editable literal, protected variable and read-only source')
         finally:browser.close()

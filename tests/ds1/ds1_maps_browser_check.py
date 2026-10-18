@@ -100,7 +100,9 @@ def main():
                     page.locator('[data-tabstrip-id="selection"]').click()
                     title = page.locator(".lex-detail-panel-title").inner_text()
                     assert ("Rat \u2014 " + MAP) in title if not root else map_name in title
-                    assert page.locator("[data-maps-side] .lex-multi-number").count() == 2
+                    assert page.locator("[data-maps-side] .lex-multi-number").count() == 3
+                    vectors = page.locator("[data-maps-side] .lex-detail-field:has(.lex-multi-number) .lex-detail-field-label-text").evaluate_all("nodes=>nodes.map(n=>n.textContent)")
+                    assert vectors == ["Position", "Rotation", "Scale"], vectors
                     rows = page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
                         "nodes=>nodes.map(n=>[...n.querySelectorAll('input')].map("
                         "i=>{const r=i.getBoundingClientRect();return r.top+r.height/2}))")

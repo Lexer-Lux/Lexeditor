@@ -44,6 +44,31 @@ def face(page, key):
     return page.locator(f'.ds1-reference-face[data-field-key="{key}"]:visible')
 
 
+def show_face(page, key):
+    """Click through the record's panel tabs until the link face shows."""
+    tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+    for index in range(tabs.count()):
+        if face(page, key).count():
+            return
+        tab_id = tabs.nth(index).get_attribute('data-subtab')
+        tabs.nth(index).click()
+        page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+    assert face(page, key).count() == 1, key
+
+
+def show_field(page, key):
+    """Click through the record's panel tabs until the field shows."""
+    tabs = page.locator('.lex-tabbed-panel [data-subtab]')
+    field = page.locator(f'[data-field-key="{key}"]:visible')
+    for index in range(tabs.count()):
+        if field.count():
+            return
+        tab_id = tabs.nth(index).get_attribute('data-subtab')
+        tabs.nth(index).click()
+        page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+    assert field.count() == 1, key
+
+
 def main():
     errors = []
     document = ItemDocument(make_archive({'SpEffectParam': [100, 101, 102],
@@ -79,11 +104,13 @@ def main():
                     select(page, 'EquipParamGoods', 100)
                     # Each record link is a hoverable face plus a finder button.
                     for key in ('replaceItemId', 'magicId'):
-                        assert face(page, key).count() == 1, key
+                        show_face(page, key)
                         assert page.locator(
                             '.ds1-reference-field .ds1-find-reference:visible').count() >= 1
+                    show_face(page, 'replaceItemId')
                     assert face(page, 'replaceItemId').locator('.lex-hoverable').count() == 1
                     # Hovering previews the linked record; clicking opens it.
+                    show_face(page, 'magicId')
                     face(page, 'magicId').locator('.lex-hoverable').hover()
                     page.locator('.lex-hover-preview').first.wait_for()
                     face(page, 'magicId').locator('.lex-hoverable').click()
@@ -96,6 +123,7 @@ def main():
                     page.locator('[data-subtab="consumables"]').click()
                     page.wait_for_function('state.sub === "consumables" && !state.pending')
                     select(page, 'EquipParamGoods', 100)
+                    show_face(page, 'replaceItemId')
                     field = face(page, 'replaceItemId')
                     field.scroll_into_view_if_needed()
                     finder = page.locator(
@@ -158,8 +186,10 @@ def main():
                         '(want) => state.sub === "consumables" && state.pending === 0'
                         ' && state.row?.fields?.find(item => item.key === "replaceItemId")?.value === want',
                         arg=wanted)
+                    show_face(page, 'replaceItemId')
                     assert picked[1] in face(page, 'replaceItemId').inner_text()
                     # The dialog line reads beside its number.
+                    show_field(page, 'yesNoDialogMessageId')
                     dialog = page.locator(
                         '.ds1-dialog-row [data-field-key="yesNoDialogMessageId"][data-lex-dialog]')
                     assert dialog.count() == 1
@@ -168,7 +198,7 @@ def main():
                     page.locator('[data-subtab="rings"]').click()
                     page.wait_for_function('state.sub === "rings" && state.row && !state.pending')
                     select(page, 'EquipParamAccessory', 100)
-                    assert face(page, 'refId').count() == 1
+                    show_face(page, 'refId')
                     effect_before = page.evaluate(
                         'state.row.fields.find(item => item.key === "refId").value')
                     page.locator(

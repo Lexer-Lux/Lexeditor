@@ -1,7 +1,7 @@
-"""Render the enemy Model view on synthetic data, never game files.
+"""Render the enemy Model tab on synthetic data, never game files.
 
 Runs read-only with no mod: viewing models must work for Vanilla readers,
-so the enemy and attack switchers must not count as edit attempts.
+so the attack switcher must not count as an edit attempt.
 """
 import io
 import sys
@@ -59,13 +59,14 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab==="enemies" && state.rows.length>0 && !state.error')
-                    page.wait_for_selector('[data-subtab="model"]')
+                    page.wait_for_function('state.row?.table==="NpcParam" && state.chrView && !state.error')
                     # Scoped to the Enemies strip: the monster detail pane
-                    # carries its own subtabs further down the page.
+                    # carries its own tabs further down the page, including
+                    # the Model tab that replaced the Models subtab.
                     strip = page.locator('[aria-label="Enemies"] [data-subtab]')
-                    assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['bosses', 'model', 'monsters']
-                    page.locator('[data-subtab="model"]').click()
-                    page.wait_for_function('state.tab==="enemies" && state.sub==="model" && state.chrView && !state.error')
+                    assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['bosses', 'monsters']
+                    page.locator('.lex-tabbed-panel [data-subtab="model"]').click()
+                    page.wait_for_function('state.monsterTab==="model" && !state.error')
                     page.wait_for_selector('[data-chr-host][data-ready="true"]', timeout=30000)
                     status = page.locator('[data-chr-status]').inner_text()
                     assert 'c1200' in status, status

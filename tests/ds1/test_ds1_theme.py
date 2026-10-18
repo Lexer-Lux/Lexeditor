@@ -116,6 +116,64 @@ def test_theme_builds_from_installed_game_without_touching_it(tmp_path):
     assert snapshot(game) == before
 
 
+def sfx_bank():
+    """A two-stream FSB4 bank with framed MPEG payloads and a primer."""
+    frame = bytes.fromhex("fffba060") + bytes(522 - 4)
+    primer = bytes.fromhex("0a00fffb") + bytes(12)
+    payloads = [primer + frame + b"\0\0" + frame, primer + frame]
+    data = bytearray(struct.pack("<4sIII", b"FSB4", 2, 0, 0) + bytes(32))
+    names = ["o7230.wav", "silen.wav"]
+    for name, payload in zip(names, payloads):
+        head = bytearray(80)
+        struct.pack_into("<H", head, 0, 80)
+        encoded = name.encode("ascii")
+        head[2:2 + len(encoded)] = encoded
+        struct.pack_into("<II", head, 32, 2304, len(payload))
+        struct.pack_into("<I", head, 52, 44100)
+        data += head
+    for payload in payloads:
+        data += payload
+    return bytes(data)
+
+
+def game_with_sfx(tmp_path):
+    game = game_root(tmp_path)
+    (game / "sound" / "frpg_sm17.fsb").write_bytes(sfx_bank())
+    return game
+
+
+def test_theme_sfx_inventory_lists_proved_streams(tmp_path):
+    game = game_with_sfx(tmp_path)
+    cache = tmp_path / "cache"
+    streams = theme.sfx_streams(cache, game, "frpg_sm17.fsb")
+    assert [(entry["name"], round(entry["duration"], 2)) for entry in streams] == [
+        ("o7230.wav", round(2304 / 44100, 2)), ("silen.wav", round(2304 / 44100, 2))]
+    assert all(entry["size"] > 0 for entry in streams)
+
+
+def test_theme_sfx_extract_serves_clean_mpeg(tmp_path):
+    game = game_with_sfx(tmp_path)
+    cache = tmp_path / "cache"
+    url = theme.sfx_extract(cache, game, "frpg_sm17.fsb", "o7230.wav")
+    served = theme.asset_path(cache, url.removeprefix("/theme/")).read_bytes()
+    frame = bytes.fromhex("fffba060") + bytes(522 - 4)
+    assert served == frame + frame
+    assert url.endswith(".mp3")
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game),
+                          "LEXEDITOR_DS1_THEME_CACHE": str(cache),
+                          "LEXEDITOR_NO_MOD": "1"})
+    try:
+        assert session.start()["pluginId"] == "ds1"
+        with urlopen(session.url.rstrip("/") + "/api/theme/sfx?bank=frpg_sm17.fsb") as reply:
+            payload = json.loads(reply.read().decode("utf-8"))
+        assert [entry["name"] for entry in payload["streams"]] == ["o7230.wav", "silen.wav"]
+        with urlopen(session.url.rstrip("/") + url) as reply:
+            assert reply.read() == frame + frame
+    finally:
+        session.stop()
+        assert session.wait_closed()
+
+
 def test_theme_without_game_is_editor_safe(tmp_path):
     for root in (None, tmp_path / "missing"):
         state = theme.build(tmp_path / "cache", root)
@@ -240,6 +298,7 @@ def test_palette_keeps_light_text_on_dark():
 def test_theme_wiring_references_each_layer():
     server = (DS1 / "server.py").read_text(encoding="utf-8")
     assert "'/api/theme'" in server
+    assert "'/api/theme/sfx'" in server
     assert '"/theme/"' in server
     assert "theme_status" in server
     assert "theme.build" in server

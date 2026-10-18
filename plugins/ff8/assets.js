@@ -45,10 +45,10 @@
       return sharedDetail(row,prefs,[LexeditorUI.detailNote(row.note),
         detailSection({title:"MOD FILE",body:[
           detailField({label:"FILE",control:readonlyField(row.modFiles[0].file)}),
-          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})]);
+          detailField({label:"SIZE",control:readonlyField(assetFileSize(row.bytes))})]})],"",assetFileSize(row.bytes));
     const sections=[];
     if(row.valid)sections.push(detailSection({title:"PREVIEW",body:[
-      detailField({label:"",control:el("audio",{src:`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`,controls:true,"aria-label":`Play ${row.name}`})})]}));
+      soundPreview({src:`/assets/sfx/${row.id}?dataset=${encodeURIComponent(assetDataset())}`,label:`Play ${row.name}`})]}));
     const facts=[
       detailField({label:"FORMAT",control:readonlyField(row.valid?`${row.codec} · ${row.channels===1?"mono":"stereo"} · ${formatNumber(row.rate)} Hz · ${row.bits}-bit`:"—")}),
       detailField({label:"LENGTH",control:readonlyField(assetDuration(row.durationMs))}),
@@ -79,7 +79,7 @@
       sections.push(detailSection({title:"REPLACEMENT",body:replaceBody,
         help:infoHelp("Replace writes sfx/<id>.<ext> into this project; FFNx plays it instead of the shipped sound. Revert deletes the project override.")}));
     }
-    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
+    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections,"",assetFileSize(row.bytes));
   }
 
   function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data","battle-data":"Battle resources",font:"Font",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
@@ -94,7 +94,7 @@
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
       {key:"name",label:"Model",render:row=>assetName(row,modelOverridden(row))},
-      {key:"modelKind",label:"Kind",render:row=>modelKindName(row.modelKind)},
+      {key:"modelKind",label:"Kind",help:"What this battle file holds. Sound data is a sound container: its parts are listed, but the sound is not decoded, so it has no preview, no playback and no replacement. Unsupported means the contents are not decoded, so only whole-file replacement or reversion is offered.",render:row=>modelKindName(row.modelKind)},
       {key:"vertices",label:"Vertices",render:row=>row.vertices==null?"—":formatNumber(row.vertices)},
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
     showPaged("models",rows,columns,modelDetail,"110px minmax(150px,2fr) 90px 80px 70px");
@@ -224,7 +224,7 @@
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
     if(row.storedValue!=null)sections.push(detailSection({title:"CONTENTS",body:[
-      detailField({label:"STORED NUMBER",control:readonlyField(formatNumber(row.storedValue))})]}));
+      detailField({label:"STORED NUMBER",help:infoHelp("The one number this file holds. What the game uses it for is not decoded."),control:readonlyField(formatNumber(row.storedValue))})]}));
     if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
     if(row.motion?.length){
       const multiple=row.motion.length>1;
@@ -255,7 +255,8 @@
       if(row.modelKind!=='texture'&&!["dat","x"].includes(ext)){showAlert({title:"Unsupported model",message:`${file.name} is not a .dat or .x battle file.`});return null}
       return {datRevert:false};
     });
-    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||row.modelKind==='sound-data'||(row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))),onclick:()=>upload.click()},"Replace"),
+    const replaceBlocked=row.modelKind==='sound-data'?"Sound containers cannot be replaced.":row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))?"Only .dat, .x and texture files can be replaced.":null;
+    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||!!replaceBlocked,...(replaceBlocked?{title:replaceBlocked}:{}),onclick:()=>upload.click()},"Replace"),
       revert=el("button",{type:"button",disabled:state.activeSource!=="mine"||!row.override,onclick:()=>{row.datBase64="";row.datRevert=true;shell.refresh();render()}},"Revert"),
       exportLink=row.sha256?el("a",{href:`/assets/models/${row.file}?dataset=${encodeURIComponent(assetDataset())}`,download:row.file},"Export"):null,
       pending=assetPendingNote(row,"datBase64","Replacement"),
@@ -316,5 +317,7 @@
     }else if(row.editor==="world"){
       meta=hoverable({content:row.id,targetType:"world",targetId:row.timIndex,targetLabel:`World Texture ${row.timIndex+1} in Maps`,activate:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}});
     }
-    return detailPanel({title:assetName(row,textureOverridden(row)),meta,icon,body:sections});
+    // The subtitle carries the file size, like every other file-backed view.
+    const sized=row.sizeBytes==null?meta:LexeditorUI.inlineLabel(meta,` \u00b7 ${assetFileSize(row.sizeBytes)}`);
+    return detailPanel({title:assetName(row,textureOverridden(row)),meta:sized,icon,body:sections});
   }

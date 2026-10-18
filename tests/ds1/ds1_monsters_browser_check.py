@@ -10,8 +10,11 @@ from urllib.error import HTTPError
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
+from flver_fixture import build_flver, make_chrbnd
+from msb_fixture import build_msb
 from plugins.ds1.formats import BEHAVIOR_EDITABLE, ENEMY_SUBTABS, THINK_EDITABLE, ItemDocument
 from plugins.ds1.monsters import NPC_FIELDS
+from plugins.ds1.msb import MAP_DIR
 from plugins.ds1.store import RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 from core.service_session import request_json
@@ -31,6 +34,11 @@ def main():
         game, mod = Path(temporary) / 'game', Path(temporary) / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
         (game / RELATIVE).write_bytes(raw)
+        # A placed, loadable model so the Model tab renders its full list.
+        (game / MAP_DIR).mkdir(parents=True)
+        (game / MAP_DIR / 'm0.msb').write_bytes(build_msb(parts=(('enemy', 2, 0, 0, 120000),)))
+        (game / 'chr').mkdir(parents=True)
+        (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
         mod.mkdir(); (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                               'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
@@ -47,15 +55,16 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     monsters()
-                    tabs = ENEMY_SUBTABS + (('model', 'Model', 'EnemyModel'),)
+                    tabs = ENEMY_SUBTABS
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(tabs, key=lambda entry: entry[1].lower())]
                     # Every section is a tab; Attacks joins them.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [
                         'ai', 'attacks', 'basics', 'behaviors', 'blocking', 'defense', 'effects-references',
-                        'value-rewards']
+                        'model', 'value-rewards']
                     assert page.evaluate('state.monsterTab') == 'basics'
                     page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
                     page.wait_for_function('state.monsterTab==="defense"')
+                    page.wait_for_function("()=>[...document.querySelectorAll('img.lex-ds1-label-art')].every(i=>i.complete)")
                     assert page.evaluate('state.row.id') == 120000
                     icons = page.evaluate("""() => {
                         const out = {};
@@ -117,7 +126,7 @@ def main():
                     saw_effective = False
                     tab_ids = page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)')
                     for tab_id in tab_ids:
-                        page.locator(f'.lex-tabbed-panel [data-subtab="{tab_id}"]').click()
+                        page.locator(f'.lex-tabbed-panel [data-subtab="{tab_id}"] > .lex-tab-label').click()
                         page.wait_for_function(f'state.monsterTab==="{tab_id}"')
                         for index in range(12):
                             if page.locator('input[aria-label="Effective HP"]:disabled').count():
@@ -244,7 +253,7 @@ def main():
                         page.evaluate('navigate("enemies","monsters","NpcParam:120000")')
                         page.wait_for_function('state.row?.table==="NpcParam" && state.row?.id===120000 && state.monsterBehaviors')
                     mid = page.evaluate('state.row.id')
-                    panel = lambda tab: (page.locator(f'.lex-tabbed-panel [data-subtab="{tab}"]').click(),
+                    panel = lambda tab: (page.locator(f'.lex-tabbed-panel [data-subtab="{tab}"] > .lex-tab-label').click(),
                                          page.wait_for_function(f'state.monsterTab==="{tab}"'))
                     panel('attacks')
                     attack_rows = page.evaluate('state.monsterAttacks.rows.length')

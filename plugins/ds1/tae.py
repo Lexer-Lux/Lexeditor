@@ -488,6 +488,16 @@ class TaeDocument:
     def dirty_count(self):
         return len(self.dirty) + len(self.removed)
 
+    def anim_modified(self, anim_index):
+        """Whether this session changed the animation: an edited or removed event."""
+        if any(entry['anim'] == anim_index for entry in self.removed):
+            return True
+        return any(key[0] == anim_index for key in self.dirty)
+
+    def event_modified(self, anim_index, event_index):
+        """Whether this session changed the event's fields."""
+        return any(key[0] == anim_index and key[1] == event_index for key in self.dirty)
+
     def _anim(self, anim_index):
         if (type(anim_index) is not int or isinstance(anim_index, bool)
                 or not 0 <= anim_index < len(self.anims)):

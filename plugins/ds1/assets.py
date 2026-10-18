@@ -48,6 +48,7 @@ MODEL_KINDS = {'.flver': 'piece', '.chrbnd': 'character', '.objbnd': 'object',
                '.partsbnd': 'part', '.fgbnd': 'face', '.remobnd': 'cutscene'}
 COLLISION_EXTENSIONS = frozenset({'.hkx', '.hkxbhd', '.hkxbdt'})
 TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
+SPLIT_ARCHIVE_EXTENSIONS = frozenset({'.tpfbhd', '.tpfbdt', '.chrtpfbdt'})
 SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
 # FMOD bank name tags that mark music: area themes (m), streamed themes
 # (sm) and the mix setup. Every other bank is sound effects.
@@ -70,6 +71,14 @@ def kind_of(relative):
     if extension in SOUND_EXTENSIONS:
         return 'sound'
     return 'other'
+
+
+def is_split_archive(relative):
+    """Split texture archives (header/data pairs) replace as whole files."""
+    lowered = str(relative).replace(chr(92), '/').lower()
+    inner = lowered[:-4] if lowered.endswith('.dcx') else lowered
+    leaf = inner.rsplit('/', 1)[-1]
+    return '.' in leaf and '.' + leaf.rsplit('.', 1)[-1] in SPLIT_ARCHIVE_EXTENSIONS
 
 
 DXGI_FORMATS = {70: "BC1", 71: "BC1", 72: "BC1", 73: "BC1", 74: "BC2", 75: "BC2",
@@ -166,7 +175,9 @@ def scan_project(project, strict=True, game_root=None):
             else:
                 status = 'modified' if (Path(game_root) / relative).is_file() else 'new'
             found.append({"relative": relative.as_posix(), "size": size,
-                          "kind": kind_of(relative.as_posix()), "status": status})
+                          "kind": kind_of(relative.as_posix()),
+                          "archive": is_split_archive(relative.as_posix()),
+                          "status": status})
     return found
 
 
@@ -193,7 +204,9 @@ def scan_game(game_root, project=None):
             else:
                 status = 'modified' if (Path(project) / relative).is_file() else None
             found.append({"relative": relative.as_posix(), "size": path.stat().st_size,
-                          "kind": kind_of(relative.as_posix()), "status": status})
+                          "kind": kind_of(relative.as_posix()),
+                          "archive": is_split_archive(relative.as_posix()),
+                          "status": status})
     return found
 
 

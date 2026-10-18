@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from PIL import Image
+from bhf_fixture import make_bhf
 from drb_fixture import make_dcx
 from ds1_fixture import make_archive, make_text_archive
 from flver_fixture import build_flver, make_chrbnd
@@ -20,6 +21,8 @@ from playwright.sync_api import sync_playwright
 
 TPF = "chr/c0000/c0000.tpf"
 PNG = "other/picture.png"
+BHD = "map/m10/m10.tpfbhd"
+BDT = "map/m10/m10.tpfbdt"
 MODEL_CHR = "chr/c0000/c0000.chrbnd.dcx"
 MODEL_OBJ = "obj/o1000.objbnd.dcx"
 MODEL_PIECE = "map/m10_00_00_00/m10piece.flver.dcx"
@@ -118,10 +121,14 @@ def main():
         (game / TPF).write_bytes(game_tpf)
         (game / PNG).parent.mkdir(parents=True, exist_ok=True)
         (game / PNG).write_bytes(make_png())
+        (game / "map" / "m10").mkdir(parents=True, exist_ok=True)
+        (game / "map" / "m10" / "m10.tpfbhd").write_bytes(make_bhf([("/tex0", 0, 8)]))
+        (game / "map" / "m10" / "m10.tpfbdt").write_bytes(b"12345678")
         (game / MODEL_CHR).parent.mkdir(parents=True, exist_ok=True)
         (game / MODEL_CHR).write_bytes(make_chrbnd(
             build_flver(), stem="c0000",
-            extra=[("c0000.tpf", make_tpf("c0000_diffuse.dds", 200, 200))]))
+            extra=[("c0000.tpf", make_tpf("c0000_diffuse.dds", 200, 200)),
+                   ("c0000_1.tpf", make_tpf("c0000_snormal.dds", 200, 200))]))
         (game / MODEL_OBJ).parent.mkdir(parents=True, exist_ok=True)
         (game / MODEL_OBJ).write_bytes(make_chrbnd(
             build_flver(), stem="o1000",
@@ -158,7 +165,7 @@ def main():
                         assert tab in tabs, tabs
                     assert "other" not in tabs, tabs
                     assert "assets" not in tabs, tabs
-                    for tab, wanted in (("models", 4), ("textures", 2), ("sound", 1),
+                    for tab, wanted in (("models", 4), ("textures", 4), ("sound", 1),
                                         ("music", 1)):
                         page.locator(f'[data-tab="{tab}"]').click()
                         page.wait_for_function(
@@ -177,7 +184,7 @@ def main():
                     page.locator(".lex-list-row", has_text=MODEL_CHR).click()
                     page.wait_for_function(
                         f'state.row?.id==="{MODEL_CHR}" && state.assetDetail?.model?.previewable===true'
-                        " && state.assetDetail.textures.length===1 && !state.error")
+                        " && state.assetDetail.textures.length===2 && !state.error")
                     assert section_titles(page)[0] == "GEOMETRY"
                     geo = geometry_text(page)
                     assert "MESHES" in geo and "BONES" in geo, geo
@@ -191,6 +198,17 @@ def main():
                         "#main .lex-detail-section-content img[alt='c0000_diffuse.dds']").evaluate(
                         "img=>getComputedStyle(img).maxWidth")
                     assert model_max == "160px", model_max
+                    thumbs = page.locator("#main .lex-detail-section-content img.lex-asset-thumbnail").evaluate_all(
+                        "nodes=>nodes.map(n=>n.getBoundingClientRect().top)")
+                    assert len(thumbs) == 2, thumbs
+                    assert max(thumbs) - min(thumbs) < 8, thumbs
+                    captions = page.locator(".ds1-texture-strip .ds1-texture-name").evaluate_all(
+                        "nodes=>nodes.map(n=>n.textContent)")
+                    assert captions == ["c0000_diffuse.dds", "c0000_snormal.dds"], captions
+                    stats = page.locator(".lex-detail-section", has_text="GEOMETRY").first.locator(
+                        ".lex-detail-part").evaluate_all(
+                        "nodes=>nodes.map(n=>n.getBoundingClientRect().top)")
+                    assert len(stats) == 2 and max(stats) - min(stats) < 4, stats
                     assert page.locator(".lex-detail-field-label-text", has_text="SOURCE").count() == 0
                     assert page.locator('[data-asset-action="replace"]').count() == 0
                     assert page.locator(".lex-detail-panel-meta").inner_text().strip() != ""
@@ -256,7 +274,7 @@ def main():
                     assert page.locator(".lex-ds1-no-thumbnail").count() == 1
                     # Textures show thumbnails; the magnifier shows them full-size.
                     page.locator('[data-tab="textures"]').click()
-                    page.wait_for_function('state.tab==="textures" && state.rows.length===2')
+                    page.wait_for_function('state.tab==="textures" && state.rows.length===4')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function(
                         'state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.source==="game"'
@@ -288,6 +306,19 @@ def main():
                         'state.row?.id==="other/picture.png"'
                         " && state.assetDetail?.textures.length===0 && !state.error")
                     assert page.locator(".lex-model-preview-trigger").count() == 0
+                    # Split archives name themselves instead of failing: no modal,
+                    # no stuck loader, and the Kind column tells them apart.
+                    page.locator(".lex-list-row", has_text=BHD).click()
+                    page.wait_for_function(
+                        'state.row?.id==="map/m10/m10.tpfbhd"'
+                        " && state.assetDetail?.reason==='split-archive' && !state.error")
+                    assert page.locator(".lex-detail-field-label-text", has_text="ARCHIVE").count() == 1
+                    note = page.locator(".lex-detail-section", has_text="PREVIEW").first.locator("input").input_value()
+                    assert note == "Split archive", note
+                    assert page.locator(".lex-model-preview-trigger").count() == 0
+                    kinds = page.evaluate("state.rows.map(r=>r.display?.kind)")
+                    assert kinds.count("Split archive") == 2 and kinds.count("Textures") == 2, kinds
+                    assert page.locator("#main .lex-list-row", has_text="Split archive").count() == 2
                     # Sounds and music have no picture and no source row.
                     for tab, wanted in (("sound", SFX), ("music", MUSIC)):
                         page.locator(f'[data-tab="{tab}"]').click()
@@ -304,7 +335,7 @@ def main():
                     page.locator(".lex-detail-panel-meta", has_text="16 B").wait_for()
                     # Adding a file at a listed path replaces it through the loader.
                     page.locator('[data-tab="textures"]').click()
-                    page.wait_for_function('state.tab==="textures" && state.rows.length===2')
+                    page.wait_for_function('state.tab==="textures" && state.rows.length===4')
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf" && state.assetDetail?.textures.length===1')
                     page.locator("#ds1-asset-picker").set_input_files(str(upload))
@@ -327,7 +358,7 @@ def main():
                     (mod / "chr" / "c9999" / "new.tpf").write_bytes(mod_tpf)
                     page.locator('[data-tab="models"]').click()
                     page.locator('[data-tab="textures"]').click()
-                    page.wait_for_function('state.sub==="files" && state.rows.length===3')
+                    page.wait_for_function('state.sub==="files" && state.rows.length===5')
                     assert page.locator(
                         ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
                     nib = page.locator(".lex-list-row", has_text="new.tpf").locator(".lex-record-source")
@@ -340,17 +371,17 @@ def main():
                     assert page.locator(
                         ".lex-list-row .lex-record-source", has_text=MODEL_CHR).count() == 0
                     page.locator('[data-tab="textures"]').click()
-                    page.wait_for_function("state.rows.length===3")
+                    page.wait_for_function("state.rows.length===5")
                     page.locator(".lex-list-row", has_text="new.tpf").click()
                     page.wait_for_function('state.row?.id==="chr/c9999/new.tpf"')
                     page.locator('[data-asset-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
-                    page.wait_for_function("state.rows.length===2 && !state.assetBusy && !state.error")
+                    page.wait_for_function("state.rows.length===4 && !state.assetBusy && !state.error")
                     page.locator(".lex-list-row", has_text=TPF).click()
                     page.wait_for_function('state.row?.id==="chr/c0000/c0000.tpf"')
                     page.locator('[data-asset-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
-                    page.wait_for_function("state.rows.length===2 && !state.assetBusy && !state.error")
+                    page.wait_for_function("state.rows.length===4 && !state.assetBusy && !state.error")
                     page.wait_for_function("state.assetDetail?.source==='game'"
                         " && state.assetDetail.textures.length===1 && !state.error")
                     assert page.locator(".lex-list-row.lex-record-modified").count() == 0

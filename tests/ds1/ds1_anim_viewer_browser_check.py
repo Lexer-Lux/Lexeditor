@@ -72,9 +72,29 @@ def main():
                     assert "Root motion" in page.locator("[data-anim-timeline]").inner_text()
                     assert page.locator("[data-anim-timeline] .lex-anim-marker").count() >= 1
                     buttons = page.locator("[data-anim-timeline] [data-anim-transport] button")
-                    assert buttons.count() == 5
+                    assert buttons.count() == 6
                     assert [buttons.nth(index).get_attribute("aria-label")
-                            for index in range(5)] == LABELS
+                            for index in range(6)] == LABELS + ["Root motion"]
+                    follow = page.locator(
+                        "[data-anim-timeline] [aria-label='Root motion']")
+                    assert follow.get_attribute("aria-pressed") == "false"
+                    assert page.evaluate(
+                        "document.querySelector('[data-anim-host]')"
+                        "._animViewer.follow") is False
+                    follow.click()
+                    assert follow.get_attribute("aria-pressed") == "true"
+                    assert page.evaluate(
+                        "document.querySelector('[data-anim-host]')"
+                        "._animViewer.follow") is True
+                    follow.click()
+                    assert follow.get_attribute("aria-pressed") == "false"
+                    overflow = page.evaluate(
+                        """() => { const host = document.querySelector(
+                            '[data-anim-host]');
+                            return {sw: host.scrollWidth, cw: host.clientWidth,
+                                    sh: host.scrollHeight, ch: host.clientHeight}; }""")
+                    assert overflow["sw"] <= overflow["cw"] + 1, overflow
+                    assert overflow["sh"] <= overflow["ch"] + 1, overflow
                     for index in range(5):
                         box = buttons.nth(index).bounding_box()
                         assert abs(box["width"] - box["height"]) < 1, (index, box)

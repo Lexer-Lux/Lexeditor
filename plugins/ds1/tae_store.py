@@ -176,9 +176,11 @@ class TaeStore:
             if not taes:
                 continue
             char = binder.split(".")[0]
+            modified = any(doc.dirty_count for doc in self.get(binder)["taes"].values())
             rows.append({"id": f"char:{binder}", "table": binder, "tae": None,
                          "name": labels.get(char, char),
-                         "values": {"binder": binder}, "display": {}})
+                         "values": {"binder": binder}, "display": {},
+                         "modified": modified})
         return rows
 
     def list_anims(self, binder):
@@ -190,7 +192,8 @@ class TaeStore:
                 rows.append({"id": f"anim:{tae}|{anim['index']}", "table": binder,
                              "tae": tae, "name": f"{anim['name']}",
                              "values": {"tae": tae, "animId": anim["id"],
-                                        "events": anim["events"]}, "display": {}})
+                                        "events": anim["events"]}, "display": {},
+                             "modified": taes[tae].anim_modified(anim["index"])})
         return rows
 
     def list_events(self, binder, tae, anim_index):
@@ -209,7 +212,8 @@ class TaeStore:
                          "name": f"{event['label']} at {event['start']:.2f}s",
                          "values": {"tae": tae, "anim": anim_index, "type": event["type"],
                                     "label": event["label"], "start": event["start"],
-                                    "end": event["end"]}, "display": {}})
+                                    "end": event["end"]}, "display": {},
+                         "modified": taes[tae].event_modified(anim_index, event["index"])})
         return rows
 
     def read(self, binder, key):

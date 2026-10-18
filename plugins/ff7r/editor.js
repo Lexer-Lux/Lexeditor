@@ -519,11 +519,27 @@
   }
   // The toggle itself, its place on the pagination bar and the page reset are
   // the shared table's job now. FF7R only says whether it can tell and how.
-  function modOnlySpec(recordOf){
-    return {available:modOnlyAvailable(),value:state.modOnly===true,
-      changed:row=>recordChangedFromVanilla(recordOf?recordOf(row):row),
+  function modOnlySpec(recordOf,changed,available){
+    return {available:available===undefined?modOnlyAvailable():available,
+      value:state.modOnly===true,
+      changed:changed||(row=>recordChangedFromVanilla(recordOf?recordOf(row):row)),
       change:value=>{state.modOnly=value;
         for(const key of Object.keys(state.pages))state.pages[key]=0;render()}};
+  }
+  // Text entries compare like a save would: the live text and subentries
+  // against the pack's baseline, the same comparison textDiff makes.
+  function textModOnlyAvailable(){
+    return state.activeSource==="mine"
+      && Object.values(state.textPacks||{}).some(pack=>pack&&pack.baseline);
+  }
+  function textRecordChanged(view){
+    const pack=state.textPacks?.[view?.asset];
+    const index=pack?.data.records.indexOf(view?.row)??-1;
+    const base=index>=0?pack.baseline?.records[index]:null;
+    if(!base)return false;
+    if(view.row.text!==base.text)return true;
+    const subs=new Map((base.subentries||[]).map(sub=>[sub.id,sub.text]));
+    return (view.row.subentries||[]).some(sub=>subs.has(sub.id)&&sub.text!==subs.get(sub.id));
   }
   function pagedTable(spec){
     return LexeditorUI.pagedListDetail({order:"given",addDisabledReason:"Final Fantasy VII Remake reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
@@ -813,6 +829,7 @@
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
   function textPanel(){if(!textAssets().length)return emptyPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);if(!state.textPacks)return emptyPanel("Text resources","No localized text resources have been loaded.");return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
+      modOnly:modOnlySpec(null,textRecordChanged,textModOnlyAvailable()),
       filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},

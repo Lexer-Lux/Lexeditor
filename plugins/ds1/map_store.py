@@ -265,11 +265,14 @@ class MapStore:
                   "model": placement["model"],
                   "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
                   "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
+                  "scaleX": placement["scale"][0], "scaleY": placement["scale"][1], "scaleZ": placement["scale"][2],
                   "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
+        modified = self.get(map_name).placement_modified((placement["type"], placement["partId"]))
         return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
                 "name": self._title(map_name, placement["name"], npc, names),
-                "range": placement["name"], "values": values, "display": display}
+                "range": placement["name"], "values": values, "display": display,
+                "modified": modified}
 
     def list_rows(self):
         _ids, names, types = self._npc()
@@ -291,8 +294,23 @@ class MapStore:
         row = self._placement_row(map_name, placement, names, types)
         return row["values"], row["display"], row["name"]
 
+    def _npc_tab(self, npc, types):
+        if types.get(npc) == 2:
+            return 'npcs', 'npcs'
+        try:
+            document = self.item_store.get() if self.item_store else None
+        except (OSError, FormatError):
+            document = None
+        if document is not None:
+            try:
+                if document.is_boss(npc):
+                    return 'enemies', 'bosses'
+            except (FormatError, KeyError, StopIteration):
+                pass
+        return 'enemies', 'monsters'
+
     def read(self, map_name, key):
-        _ids, names, _types = self._npc()
+        _ids, names, types = self._npc()
         part_key = parse_key(key)
         row = self.get(map_name).read_placement(part_key)
         try:
@@ -309,6 +327,13 @@ class MapStore:
             if item["key"] == "npcId":
                 item["type"] = "enum"
                 item["enum"] = {str(row_id): names[row_id] for row_id in sorted(names)}
+        row["recordLinks"] = []
+        if npc is not None:
+            tab, sub = self._npc_tab(npc, types)
+            row["recordLinks"].append({'kind': 'npc', 'table': 'NpcParam', 'id': npc,
+                                       'field': 'npcId', 'resolved': npc in names,
+                                       'name': names.get(npc, f'Missing NPC {npc}'),
+                                       'tab': tab, 'sub': sub})
         return row
 
     def edit(self, map_name, key, field, value):

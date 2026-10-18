@@ -15,7 +15,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     card.startingOwner=Number(value);noteFieldEdit('cards',{field:'startingOwner'});render();
   };
   let mode = "cards";
-  const playerView = {query:"",page:0,selected:null};
+  const playerView = {query:"",page:0,selected:null,modOnly:false};
   const rank = value => Number(value) === 10 ? "A" : String(value);
   const elementOptions = () => state.data.cards.elements || [];
   const elementName = value => elementOptions()
@@ -224,6 +224,26 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       deck:deckOfCall.has(entry.key)?[...deckOfCall.get(entry.key)].sort((a,b)=>a-b).join(', '):undefined}));
     return {players,deckOfCall};
   };
+  // Card players and decks are derived views: a player is its field map's
+  // script entries for one entity, a deck its rare cards plus its members.
+  // Field detail loads the vanilla copy alongside, so an unloaded map has
+  // no players on either side and compares unchanged.
+  const clean = row => {
+    const kept = {};
+    for (const key of Object.keys(row || {}).sort()) if (!key.startsWith("_")) kept[key] = row[key];
+    return JSON.stringify(kept);
+  };
+  const cardChanged = row => clean(row) !== clean(rowOf(state.vanilla, "cards", row.id));
+  const playerChanged = row => {
+    const map = state.data.fields.rows.find(value => value.key === row.map);
+    const before = state.vanilla?.fields?.rows?.find(value => value.key === row.map);
+    const now = (map?.players || []).filter(player => player.entity === row.entity);
+    const was = (before?.players || []).filter(player => player.entity === row.entity);
+    return clean(now) !== clean(was);
+  };
+  const deckChanged = row => row.members.some(playerChanged)
+    || state.data.cards.rows.some(card => card.id >= 77 && row.id !== 0
+      && card.startingOwner === row.id && cardChanged(card));
   const renderPlayers = () => {
     const pending=playerScanPending("Card players");
     if(pending)return pending;
@@ -337,6 +357,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
       page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,addDisabledReason:'Card players are the people the game places in its world; each is fixed by the game and a new one has nowhere to stand.',fit:{minRowHeight:28},
+      modOnly:{available:state.activeSource==='mine',value:playerView.modOnly===true,changed:playerChanged,
+        change:value=>{playerView.modOnly=value;playerView.page=0;render();}},
       className:'ff8-card-players',splitKey:'ff8-card-players',rowsKey:'ff8-card-players',
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
@@ -349,7 +371,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         return columnList({rows,key:row=>row.key,selected,select,columns:playerColumnDefinitions(),columnPreferences:playerColumns()})},detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
-  const deckView = {query:"",page:0,selected:null};
+  const deckView = {query:"",page:0,selected:null,modOnly:false};
   const cardDecks = () => {
     const decks=new Map();
     for(const card of state.data.cards.rows.filter(card=>card.id>=77))
@@ -413,6 +435,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // names: decks are numeric script references and have no stored names.
     return LexeditorUI.pagedListDetail({order:"given",rows,key:row=>row.id,selected:deckView.selected,
       page:deckView.page,pageSize:40,noun:'decks',maxBarrels:1,slots:true,
+      modOnly:{available:state.activeSource==='mine',value:deckView.modOnly===true,changed:deckChanged,
+        change:value=>{deckView.modOnly=value;deckView.page=0;render();}},
       addDisabledReason:'A deck exists only as a number an opponent\'s script names; choose a deck on the opponent instead.',fit:{minRowHeight:28},
       className:'ff8-card-decks',splitKey:'ff8-card-decks',rowsKey:'ff8-card-decks',
       search:{key:'ff8-card-decks',value:deckView.query,label:'Search decks',change:value=>{deckView.query=value;deckView.page=0;render()}},

@@ -85,6 +85,7 @@ async function renderAI() {
     const rows=sortedRows("ai",data.fields.filter(x=>!q||x.context.toUpperCase().includes(q)||x.field.toUpperCase().includes(q)),{context:x=>x.context,field:x=>x.field,value:x=>x.value});
     // names: These scalar identities belong to fixed game profiles and cannot be renamed.
     m.append(LexeditorUI.pagedListDetail({order:"given",rows,key:r=>r.path.join("."),selected:f.aiSelected?.[f.aiFile]||rows[0]?.path.join("."),renamable:false,pageSize:15,noun:"AI fields",slots:false,splitKey:"rdr2-ai",
+      modOnly:modOnlySpec(touchedRecords([state.aiEdits[f.aiFile]]),null,renderAI,row=>row.path.join(".")),
       sync:view=>{f.aiSelected ||= {};f.aiSelected[f.aiFile]=view.selected},
       master:view=>columnList({class:"ai-field-table",rows:view.rows,key:r=>r.path.join("."),selected:view.selected,select:view.select,"aria-label":"AI fields",columns:[{key:"context",label:"Profile / context"},{key:"field",label:"Field"}]}),
       detail:row=>LexeditorUI.detailPanel({title:row.field,help:fieldHelp(AI_PANEL_HELP),body:[LexeditorUI.detailField({label:"Value",control:aiValueControl(f.aiFile,row,data.fields,refByPath[row.path.join(".")])})]})}));

@@ -35,11 +35,11 @@ window.Ds1Viewport = (() => {
   // onRotate(key, rot), requestMod()}. Commits resolve false when refused,
   // and the part snaps back. Returns a controller with select(key),
   // moveTo(key, pos), turnTo(key, rot), setGizmoMode(mode), aim() and dispose().
-  async function mount(host, mapId, view, status, hooks = {}) {
+  async function mount(host, mapId, view, hooks = {}) {
     stop(host);
     const mine = ++session;
     if (!host.isConnected || !view) return null;
-    status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${view.parts.length} parts`));
+    const loading=LexeditorUI.loadingStatus(`Loading ${view.parts.length} parts`);host.replaceChildren(loading);
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     const {TransformControls} = await import("three/addons/controls/TransformControls.js");
@@ -129,19 +129,13 @@ window.Ds1Viewport = (() => {
       return matCache.get(key);
     };
     // Collision and navigation parts have no model to load and no honest
-    // drawing: their geometry is world-baked Havok data. Counted, not drawn.
+    // drawing: their geometry is world-baked Havok data. Skipped, not drawn.
     const isMarker = part => part.kind === "Collision" || part.kind === "Navigation";
-    const counts = {parts: 0, meshes: 0, tris: 0, missing: 0, sky: 0, effect: 0, collision: 0, navigation: 0};
     const wanted = [];
     for (const part of view.parts) {
-      if (isMarker(part)) {
-        if (part.kind === "Collision") counts.collision++;
-        else counts.navigation++;
-        continue;
-      }
+      if (isMarker(part)) continue;
       const info = view.models[part.model];
-      if (!info || !info.available) counts.missing++;
-      else wanted.push(part.model);
+      if (info && info.available) wanted.push(part.model);
     }
     const unique = [...new Set(wanted)];
     const loaded = await Promise.all(unique.map(async name => {
@@ -170,8 +164,6 @@ window.Ds1Viewport = (() => {
         geo.computeBoundingSphere();
         const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
         entry.mat = materialFor(mesh, data.textures, entry.fx);
-        if (entry.sky) counts.sky++;
-        if (entry.fx) counts.effect++;
         return entry;
       }));
     }
@@ -188,10 +180,7 @@ window.Ds1Viewport = (() => {
     };
     const skyMeshes = [];
     for (const part of view.parts) {
-      if (isMarker(part)) {
-        counts.parts++;
-        continue;
-      }
+      if (isMarker(part)) continue;
       const geos = geometries.get(part.model);
       if (!geos) continue;
       const group = new THREE.Group();
@@ -202,12 +191,9 @@ window.Ds1Viewport = (() => {
         mesh.userData.fx = entry.fx;
         group.add(mesh);
         if (entry.sky) skyMeshes.push(mesh);
-        counts.meshes++;
-        counts.tris += entry.geo.index.count / 3;
       }
       root.add(group);
       groups.set(part.key, group);
-      counts.parts++;
     }
     root.updateMatrixWorld(true);
     for (const mesh of skyMeshes) {
@@ -233,13 +219,7 @@ window.Ds1Viewport = (() => {
     };
     resize();
     window.addEventListener("resize", resize);
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    const short = n => +Number(n).toFixed(3);
-    const baseStatus = () => `${mapId}: ${plural(counts.parts, "part", "parts")}, ${plural(unique.length, "model", "models")}, ${plural(Math.round(counts.tris), "triangle", "triangles")}${counts.sky ? `, ${plural(counts.sky, "sky mesh", "sky meshes")}` : ""}${counts.effect ? `, ${plural(counts.effect, "effect", "effects")} transparent` : ""}${counts.collision ? `, ${plural(counts.collision, "collision part", "collision parts")}` : ""}${counts.navigation ? `, ${plural(counts.navigation, "navigation part", "navigation parts")}` : ""}${counts.missing ? `, ${plural(counts.missing, "part has", "parts have")} no visible mesh` : ""}.`;
-    let selected = null, selectedText = "";
-    const showStatus = () => {
-      status.textContent = selectedText ? `${baseStatus()} Selected: ${selectedText}.` : baseStatus();
-    };
+    let selected = null;
     // The highlight is a box, not a tint: the mesh materials are shared
     // across placements, so tinting one would tint them all.
     const highlight = new THREE.BoxHelper(new THREE.Object3D(), 0xffd34d);
@@ -255,11 +235,6 @@ window.Ds1Viewport = (() => {
       return [rect.left + (point.x + 1) / 2 * rect.width, rect.top + (1 - point.y) / 2 * rect.height];
     };
     const readOnly = hooks.readOnly !== false;
-    const describe = group => {
-      const info = group.userData.part;
-      const at = group.position;
-      return `${info.name} (${info.kind}, ${info.model}) at ${short(at.x)}, ${short(at.y)}, ${short(at.z)}`;
-    };
     const select = key => {
       selected = key && groups.has(key) ? key : null;
       const group = selected ? groups.get(selected) : null;
@@ -268,12 +243,7 @@ window.Ds1Viewport = (() => {
       if (group) {
         highlight.setFromObject(group);
         highlight.visible = true;
-        selectedText = describe(group);
-      } else {
-        highlight.visible = false;
-        selectedText = "";
-      }
-      showStatus();
+      } else highlight.visible = false;
       if (hooks.onSelect) hooks.onSelect(selected, group ? {...group.userData.part} : null);
     };
     let startPos = null, startRot = null, gizmoMode = "translate", spinStart = false;
@@ -289,15 +259,11 @@ window.Ds1Viewport = (() => {
       if (!selected) return;
       const group = groups.get(selected);
       highlight.setFromObject(group);
-      selectedText = describe(group);
-      showStatus();
     });
     const snapBack = (group, back, backRot) => {
       group.position.copy(back);
       if (backRot) group.rotation.copy(backRot);
       highlight.setFromObject(group);
-      selectedText = describe(group);
-      showStatus();
     };
     gizmo.addEventListener("mouseUp", () => {
       if (!selected || !startPos) return;
@@ -325,7 +291,7 @@ window.Ds1Viewport = (() => {
         });
       }
     });
-    showStatus();
+    loading.remove();resize();
     const ray = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let down = null, downPos = null, downRot = null;
@@ -378,21 +344,19 @@ window.Ds1Viewport = (() => {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.position.set(pos[0], pos[1], pos[2]);
-        if (key === selected) {
-          highlight.setFromObject(group);
-          selectedText = describe(group);
-          showStatus();
-        }
+        if (key === selected) highlight.setFromObject(group);
       },
       turnTo(key, rot) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
-        if (key === selected) {
-          highlight.setFromObject(group);
-          selectedText = describe(group);
-          showStatus();
-        }
+        if (key === selected) highlight.setFromObject(group);
+      },
+      scaleTo(key, scale) {
+        const group = key && groups.get(key);
+        if (!group || !group.userData.part.movable) return;
+        group.scale.set(scale[0], scale[1], scale[2]);
+        if (key === selected) highlight.setFromObject(group);
       },
       setGizmoMode(mode) {
         gizmoMode = mode === "rotate" ? "rotate" : "translate";

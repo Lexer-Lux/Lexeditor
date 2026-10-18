@@ -392,7 +392,7 @@
     {
       "Field": "guardStaminaCutRate",
       "Name": "Guard Stability %",
-      "Description": "Multiplies shield stability. Requires stateInfo 158 (magic shield) or stateInfo 204 (great magic shield) to work (VFX present). Note that stability values over 100 nullify all stamina damage."
+      "Description": "Multiplies shield stability. It needs the magic shield effect, and stability over 100 nullifies all stamina damage."
     },
     {
       "Field": "rayCastPassedTime",

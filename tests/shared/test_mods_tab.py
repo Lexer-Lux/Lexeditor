@@ -701,7 +701,11 @@ def test_mods_detail_lists_files_with_loader_marks(page):
     assert "lex-mod-file-loaded" in (rows.nth(0).get_attribute("class") or "")
     assert "lex-mod-file-loaded" not in (rows.nth(1).get_attribute("class") or "")
     assert "12 B" in rows.nth(0).inner_text()
-    assert "Yes" in rows.nth(0).inner_text()
+    read = table.locator('.lex-column-list-cell[data-column-key="loaded"]')
+    assert read.nth(0).locator(".lex-boolean-mark.true").inner_text() == "\u2713"
+    assert read.nth(0).locator(".lex-boolean-mark").get_attribute("aria-label") == "Yes"
+    assert read.nth(1).locator(".lex-boolean-mark.false").inner_text() == "\u00d7"
+    assert read.nth(1).locator(".lex-boolean-mark").get_attribute("aria-label") == "No"
     assert rows.nth(0).get_attribute("data-lex-title") == "The mod loader reads this file when the mod is on"
     assert detail.get_by_role("searchbox", name="Search files").count() == 1
 

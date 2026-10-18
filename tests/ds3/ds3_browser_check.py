@@ -112,6 +112,20 @@ def main(argv: list[str] | None = None) -> int:
                     diagnostics["browserErrors"] = list(errors)
                     raise RuntimeError(f"DS3 edit did not enable Save: {diagnostics}") from error
                 page.screenshot(path=str(output / "weapons-edited.png"), full_page=True)
+                real = '.ds3-layout .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+                toggle = page.locator('.lex-pager-toggle input[aria-label="Mod contents only"]')
+                assert toggle.count() == 1
+                assert toggle.is_enabled()
+                full = page.locator(real).count()
+                assert full > 1
+                toggle.check()
+                page.wait_for_function(
+                    "() => document.querySelectorAll('" + real + "').length===1", timeout=10000)
+                assert str(weapon_id) in (page.locator(real).first.get_attribute('data-key') or '')
+                toggle.uncheck()
+                page.wait_for_function(
+                    "(full) => document.querySelectorAll('" + real + "').length===full",
+                    arg=full, timeout=10000)
                 page.locator("#global-save").click()
                 page.wait_for_function(
                     """() => {

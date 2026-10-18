@@ -189,3 +189,10 @@
 /* A model thumbnail stays unseen until its snapshot is drawn: before that the
    browser painted the image's alt text, in the accent, for a moment (Models:
    "some weird red text that gets quickly replaced"). */
+/* The weapon's character portrait is 32 by 48. The card matches that
+   shape instead of the shared tall minimum, whose invisible letterbox
+   bands read as a squeezed face. */
+.lex-record-card.weapon-character-card{aspect-ratio:2/3;min-height:0;min-width:90px;}
+/* Junction stats hug their names: the shared part grid gives the name
+   lane half the part, which stranded each copy button across dead space. */
+.magic-junction-stats>.lex-detail-part{grid-template-columns:auto auto minmax(0,1fr);}

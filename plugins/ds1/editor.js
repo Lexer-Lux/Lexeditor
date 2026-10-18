@@ -1,9 +1,9 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor}=LexeditorUI;
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor,soundPreview}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
-  readOnly:true,query:"",page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
-  monsterTab:"basics",itemTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
+  readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
+  monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
   assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
@@ -18,8 +18,11 @@ const key=row=>`${row.table}:${row.id}`;
 const ASSET_TABS=new Set(["models","textures","sound","music"]);
 const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound effects",music:"Music"};
 const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.tab)
-  .map(file=>({table:"Asset",id:file.relative,name:file.relative,values:{size:file.size},
-    created:file.status==="new",modified:file.status==="modified"}));
+  .map(file=>{const kind=state.tab==="textures"?(file.archive?"archive":"textures"):null;
+    return {table:"Asset",id:file.relative,name:file.relative,
+      values:{size:file.size,...(kind?{kind}:{})},
+      ...(kind?{display:{kind:kind==="archive"?"Split archive":"Textures"}}:{}),
+      created:file.status==="new",modified:file.status==="modified"};});
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
@@ -47,7 +50,7 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
         const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side],sub:state.sub});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
-        patchRowValues(edit.table,edit.id,result.values,result.display,result.name);
+        patchRowValues(edit.table,edit.id,result.values,result.display,result.name,result.modified);
         refresh=refresh||result.refreshRows===true;
       }
       if(refresh)await loadItems();
@@ -109,7 +112,21 @@ async function refreshState(){
 }
 function sortedRows(){
   const query=state.query.toLowerCase();
-  const filtered=state.rows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  // The search reads the whole row: names, ids, ranges and every
+  // property value, raw and formatted. A behavior that costs 5 stamina
+  // answers '5' even when no name holds a 5.
+  const haystack=row=>{
+    const parts=[row.id,row.name,row.range||""];
+    for(const source of [row.values,row.display]){
+      if(!source||typeof source!=="object")continue;
+      for(const value of Object.values(source)){
+        if(value===null||value===undefined||typeof value==="object")continue;
+        parts.push(value);
+      }
+    }
+    return parts.join(" ").toLowerCase();
+  };
+  const filtered=state.rows.filter(row=>haystack(row).includes(query));
   if(state.tab==="misc"||(state.tab==="stats"&&state.sub==="levelup")||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
   // The game's own order (by record) breaks ties.
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
@@ -213,12 +230,6 @@ async function loadDetail(){
     if(state.selected!==key(row))return;
     state.row={table:"MapView",id:row.id,name:row.name};state.mapView=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;return;
   }
-  if(row.table==="EnemyModel"){
-    state.chrView=null;
-    const detail=await api(`/api/chr/view?npc=${row.id}`);
-    if(state.selected!==key(row))return;
-    state.row={table:"EnemyModel",id:row.id,name:row.name};state.chrView=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;return;
-  }
   if(row.table==="AnimPlayback"){
     state.animView=null;
     const detail=await api(`/api/anim/list?chr=${encodeURIComponent(row.id)}`);
@@ -228,13 +239,14 @@ async function loadDetail(){
   const detail=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(sub)}`);
   if(state.selected!==key(row))return;
   const isMonster=row.table==="NpcParam";
-  const [attacks,shop,think,behaviors]=await Promise.all([
+  const [attacks,shop,think,behaviors,chrView]=await Promise.all([
     isMonster?api(`/api/attacks?monster=${row.id}`):null,
     isMonster?api(`/api/shop?npc=${row.id}`):null,
     thinkRowFor(detail.row),
-    isMonster?api(`/api/behaviors?monster=${row.id}`):null]);
+    isMonster?api(`/api/behaviors?monster=${row.id}`):null,
+    isMonster?api(`/api/chr/view?npc=${row.id}`).catch(()=>null):null]);
   if(state.selected!==key(row))return;
-  state.row=detail.row;state.monsterAttacks=attacks;state.npcShop=shop;state.thinkRow=think;state.monsterBehaviors=behaviors;
+  state.row=detail.row;state.monsterAttacks=attacks;state.npcShop=shop;state.thinkRow=think;state.monsterBehaviors=behaviors;state.chrView=chrView;state.chrAttack=null;
 }
 async function loadTweaks(){
   state.tweaks=await api("/api/tweaks");
@@ -322,6 +334,7 @@ function openRecord(link){
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return openAttack(link.id);
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
+  if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -332,7 +345,8 @@ function openAsset(link){
 // rows become hold-to-choose candidates (see the master list's
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
-const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table"};
+const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table",npc:"NPC"};
+const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
 const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",EquipParamAccessory:"rings",Magic:"spells",EquipParamGoods:"consumables"};
 function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):LINK_NOUNS[link.kind]||"record";}
@@ -340,6 +354,7 @@ async function finderTarget(link,value){
   if(link.kind==="effect")return ["effects","effects-all"];
   if(link.kind==="attack")return ["attacks","attacks"];
   if(link.kind==="ai")return ["ai","ai"];
+  if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
@@ -423,16 +438,24 @@ function renameRecord(row,name){
       const result=await api("/api/rename",{table:row.table,id:row.id,name,sub:state.sub});
       state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
       if(state.row&&key(state.row)===key(row))state.row=result.row;
-      for(const listed of state.rows||[])if(key(listed)===key(row))listed.name=result.row.name;
+      for(const listed of state.rows||[])if(key(listed)===key(row)){listed.name=result.row.name;if(result.modified!==undefined)listed.modified=result.modified;}
     }catch(error){notify(error);}
     finally{state.pending--;render();}
   });
 }
-function patchRowValues(table,id,values,display,name){
+function patchRowValues(table,id,values,display,name,modified){
   const target=state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
   if(!target||!values)return;
   target.values=values;target.display=display||{};
   if(name!==undefined&&name!==null)target.name=name;
+  if(modified!==undefined)target.modified=modified;
+}
+// Mod contents only is the shared table toggle: the server marks every
+// record row it changed this session, so the filter is one comparison.
+function modOnlySpec(){
+  return {available:!state.readOnly&&!ASSET_TABS.has(state.tab),value:state.modOnly===true,
+    changed:row=>row.modified===true,
+    change:value=>{state.modOnly=value;state.page=0;render();}};
 }function syncDetailControl(propertyKey,value,control){
   // Computed fields (Effective HP, absorption) move when their inputs do;
   // their detail controls repaint in place, sliders included.
@@ -491,17 +514,18 @@ function commit(row,field,value,control,beforeOverride){
       syncDetailControl(field.key,changed.value,control);}
       if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
       else{
-        for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display,update.result.name);
+        for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display,update.result.name,update.result.modified);
         if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&["posX","posY","posZ","rotX","rotY","rotZ"].includes(field.key)){
           // A typed move or turn moves the scene part too; only the
           // gizmo did, so typed edits left the mesh standing behind.
           const fresh=updates[updates.length-1].result.values||{};
           if(row.table===state.mapView.map){
             const part=state.mapView.parts.find(entry=>entry.key===row.id);
-            const pos=[fresh.posX,fresh.posY,fresh.posZ],rot=[fresh.rotX,fresh.rotY,fresh.rotZ];
-            if(part){part.pos=pos;part.rot=rot;}
+            const pos=[fresh.posX,fresh.posY,fresh.posZ],rot=[fresh.rotX,fresh.rotY,fresh.rotZ],scale=[fresh.scaleX,fresh.scaleY,fresh.scaleZ];
+            if(part){part.pos=pos;part.rot=rot;part.scale=scale;}
             viewportCtl?.moveTo?.(row.id,pos);
             viewportCtl?.turnTo?.(row.id,rot);
+            viewportCtl?.scaleTo?.(row.id,scale);
           }
         }
         if(row.table.endsWith(".msb")&&field.key==="npcId"&&state.tab==="maps"){
@@ -634,7 +658,7 @@ function plainControlFor(row,field){
     }});
   if(field.type==="enum"){
     const link=(row.recordLinks||[]).find(entry=>entry.field===field.key);
-    if(link)return referenceFace(row,field);
+    if(link&&link.kind!=="npc")return referenceFace(row,field);
     const choices=Object.entries(field.enum);
     if(!choices.some(([value])=>value===String(field.value)))choices.unshift([String(field.value),`Unknown (${field.value})`]);
     const control=el("select",{...attrs,onchange:event=>commit(row,field,Number(event.target.value),event.target)});
@@ -684,11 +708,11 @@ function fieldSections(row){
   const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
   const shownLinks=new Set();
   // Placement coordinates ride one row per vector: Position, then
-  // Rotation in degrees. Detection is by field, not by tab, so any
-  // record carrying a coordinate triple renders the same way.
+  // Rotation in degrees, then Scale. Detection is by field, not by
+  // tab, so any record carrying a coordinate triple renders the same way.
   const byKey=new Map((row.fields||[]).map(field=>[field.key,field]));
   const vectored=new Set();
-  for(const [keys,label] of [[["posX","posY","posZ"],"Position"],[["rotX","rotY","rotZ"],"Rotation"]]){
+  for(const [keys,label] of [[["posX","posY","posZ"],"Position"],[["rotX","rotY","rotZ"],"Rotation"],[["scaleX","scaleY","scaleZ"],"Scale"]]){
     if(!keys.every(key=>byKey.has(key)))continue;
     keys.forEach(key=>vectored.add(key));
     const entries=keys.map(key=>{
@@ -722,11 +746,15 @@ function fieldSections(row){
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
     const assetLink=!textLink?(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved):null;
+    const npcLink=!textLink&&!assetLink?(row.recordLinks||[]).find(entry=>entry.kind==="npc"&&entry.field===field.key&&entry.resolved):null;
     const label=textLink?hoverable({content:shown,targetType:"ds1-text",targetId:textLink,
       targetLabel:`${shown} in Text`,preview:()=>textLabelPreview(textLink),activate:()=>openTextLabel(textLink)})
       :assetLink?hoverable({content:shown,targetType:"ds1-asset",targetId:assetLink.id,
       targetLabel:`${assetLink.name} in ${assetLink.tab==="textures"?"Textures":"Models"}`,
-      preview:()=>assetPreview(row,assetLink),activate:()=>openRecord(assetLink)}):shown;
+      preview:()=>assetPreview(row,assetLink),activate:()=>openRecord(assetLink)})
+      :npcLink?hoverable({content:shown,targetType:"ds1-npc",targetId:npcLink.id,
+      targetLabel:`${npcLink.name} in ${NPC_TAB_LABELS[npcLink.tab]||"Enemies"}`,
+      preview:()=>recordPreview(npcLink),activate:()=>openRecord(npcLink)}):shown;
     groups.get(group).push(detailField({label,property:field.key,control,icon:field.icon||null,
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
@@ -809,6 +837,19 @@ function shopIconCell(line){
   if(!line.item||!ds1IconTables.has(line.item.table))return "";
   const picture=el("img",{class:"lex-ds1-shop-icon",
     src:`/api/icon?table=${encodeURIComponent(line.item.table)}&id=${encodeURIComponent(line.item.id)}`,
+    alt:"",draggable:"false","data-lex-no-image":"off"});
+  picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+  return picture;
+}
+// A master-list row's menu picture, like the shop table's icon column:
+// Humanity rows show the wisp, weapons their blades. Rows without a
+// picture leave the cell empty; without game files every cell is empty.
+function recordIconCell(row){
+  if(!row||!ds1IconTables.has(row.table))return "";
+  const id=Number(row.id);
+  if(!Number.isInteger(id))return "";
+  const picture=el("img",{class:"lex-ds1-shop-icon",loading:"lazy",
+    src:`/api/icon?table=${encodeURIComponent(row.table)}&id=${id}`,
     alt:"",draggable:"false","data-lex-no-image":"off"});
   picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
   return picture;
@@ -921,6 +962,9 @@ function monsterDetail(groups){
   if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here; the item name opens the rest of the line below it. -1 stock means unlimited."});
   tabs.push({id:"ai",label:"AI",help:"The think record driving this enemy: senses, distances and goals. Swap it with the finder; think records are edited in the AI tab."});
   tabs.push({id:"behaviors",label:"Behaviors",help:"The behavior set this enemy uses. Every behavior in the set is one move it can choose; each move calls one attack, projectile or effect."});
+  // No model, no Model tab: an NPC without a placed, loadable character
+  // model showed an empty black stage here.
+  if(state.chrView&&(state.chrView.chrs||[]).some(entry=>entry.available))tabs.push({id:"model",label:"Model",help:"Character model, attacks and hitboxes. Pick an attack to see its hitboxes."});
   const active=tabs.some(tab=>tab.id===state.monsterTab)?state.monsterTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
   const content=active==="attacks"?monsterAttacksSection()
@@ -928,6 +972,7 @@ function monsterDetail(groups){
     :active==="shop"?npcShopSection()
     :active==="ai"?monsterThinkSection()
     :active==="behaviors"?monsterBehaviorsSection()
+    :active==="model"?monsterModelSection()
     :groups.get(section.label);
   return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.monsterTab=id;render();},content});
@@ -942,6 +987,31 @@ function itemDetail(groups){
   const section=tabs.find(tab=>tab.id===active);
   return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.itemTab=id;render();},content:groups.get(section.label)});
+}
+function effectDetail(groups){
+  // Every section is a tab; the tab is the header, so a section tab
+  // shows its fields with no repeated section title.
+  const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+  const tabs=[...groups].map(([title])=>({id:tabId(title),label:title}));
+  const active=tabs.some(tab=>tab.id===state.effectTab)?state.effectTab:tabs[0].id;
+  const section=tabs.find(tab=>tab.id===active);
+  return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},
+    change:id=>{state.effectTab=id;render();},content:groups.get(section.label)});
+}
+function msbDetail(row,groups){
+  // Identity first: the placement's own facts above its coordinates.
+  const identity=[
+    // (no Name row: the heading owns the name, like every other record)
+    detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
+    detailField({label:"Part",control:readonlyField(row.id,{format:false}),
+      help:infoHelp("This placement's identity. The type comes first, then the part ID.")}),
+    detailField({label:"Model",control:readonlyField(row.model,{format:false})})];
+  if(row.think!==null&&row.think!==undefined)identity.push(
+    detailField({label:"AI table",control:readonlyField(row.think,{format:false}),
+      help:infoHelp("Which AI table drives this enemy.")}));
+  const ordered=new Map([["Placement",[...identity,...(groups.get("Placement")||[])]]]);
+  for(const [title,body] of groups)if(title!=="Placement")ordered.set(title,body);
+  return [...ordered].map(([title,body])=>detailSection({title,body}));
 }
 function formatAssetSize(size){
   if(!(size>=0))return "Unknown size";
@@ -979,9 +1049,8 @@ function renderAssetDetail(){
   else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
   else{
     help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
-    body.push(detailSection({title:"PREVIEW",body:[
-      detailField({label:"TEXTURES",control:readonlyField("No preview"),
-        help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]}));
+    body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
+      help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]}));
   }
   const actions=[
     fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
@@ -1040,6 +1109,17 @@ const ASSET_MODEL_INFO={
   collision:["Collision data","Collision files shape where the player can walk. They hold no visible mesh."],
   "no-mesh":["No model mesh","This file holds no model mesh to preview. It still replaces as a whole file."],
   unreadable:["Unreadable model","This file does not open as a model. It still replaces as a whole file."]};
+// One shared thumbnail strip for the Models and Textures tabs: the
+// file's textures as squares in a wrapping row, each named under its
+// picture, instead of a vertical stack of label-plus-image rows.
+function assetPreviewStrip(textures,previewUrl,textureHelp){
+  return el("div",{class:"ds1-texture-strip",role:"list"},
+    ...textures.map(texture=>el("figure",{class:"ds1-texture-tile",role:"listitem"},
+      el("img",{src:previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
+      el("div",{class:"ds1-texture-caption"},
+        el("span",{class:"ds1-texture-name",title:texture.name},texture.name),
+        el("span",{class:"ds1-texture-help"},textureHelp(texture))))));
+}
 function assetModelPanel(row,info,body,previewUrl,textureHelp){
   const model=info.model;
   const counts=assetModelCounts(model);
@@ -1050,9 +1130,7 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
       detailField({label:"INFO",control:readonlyField(value),help:infoHelp(tip)})]}));
   }
   const textures=info.textures||[];
-  if(textures.length)body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
-    control:el("img",{src:previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
-    help:textureHelp(texture)}))}));
+  if(textures.length)body.push(detailSection({title:"PREVIEW",body:[assetPreviewStrip(textures,previewUrl,textureHelp)]}));
   else body.push(detailSection({title:"PREVIEW",body:[
     detailField({label:"TEXTURES",control:readonlyField("None in this file"),
       help:infoHelp("Only files with their own textures preview here. Character and map textures live in companion archives.")})]}));
@@ -1070,9 +1148,7 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
 function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
   if(textures.length){
-    body.push(detailSection({title:"PREVIEW",body:textures.map(texture=>detailField({label:texture.name,
-      control:el("img",{src:previewUrl(texture),alt:texture.name,loading:"lazy",class:"lex-asset-thumbnail"}),
-      help:textureHelp(texture)}))}));
+    body.push(detailSection({title:"PREVIEW",body:[assetPreviewStrip(textures,previewUrl,textureHelp)]}));
     const first=textures[0];
     return {icon:LexeditorUI.iconSlot({content:el("img",{src:previewUrl(first),alt:row.name,loading:"lazy"})}),
       preview:{label:`${row.name} textures`,
@@ -1083,7 +1159,13 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
         onClose:drawer=>drawer.replaceChildren()},
       help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. The magnifier shows every texture full-size. Remove drops the mod's copy."};
   }
-  body.push(detailSection({title:"PREVIEW",body:[
+  if(info.reason==="split-archive")body.push(detailSection({title:"PREVIEW",body:[
+    detailField({label:"ARCHIVE",control:readonlyField("Split archive"),
+      help:infoHelp("Many textures packed into one whole-file archive. It replaces as a whole file and has no per-texture preview; single .tpf and .dds files do.")})]}));
+  else if(info.reason==="unreadable")body.push(detailSection({title:"PREVIEW",body:[
+    detailField({label:"TEXTURES",control:readonlyField("No preview"),
+      help:infoHelp("This file does not open as textures. It still replaces as a whole file.")})]}));
+  else body.push(detailSection({title:"PREVIEW",body:[
     detailField({label:"TEXTURES",control:readonlyField("No preview"),
       help:infoHelp("Only TPF containers and DDS files preview.")})]}));
   return {icon:LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}),preview:null,
@@ -1348,7 +1430,7 @@ function detail(){
   const title=state.row.name;
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`${state.row.map} · model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
+  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
@@ -1365,8 +1447,16 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"))
+  if(msbRowEarly)return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},body:msbDetail(state.row,groups)}),state.row.table,state.row.id);
+  // Every catalog table renders through the same panel tabs: weapons and
+  // armor came first, then spells, rings and upgrade goods asked for the
+  // same treatment as the sections they share.
+  if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"||state.row.table==="EquipParamAccessory"||state.row.table==="Magic"||state.row.table==="EquipParamGoods"))
     return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[itemDetail(groups)]}),state.row.table,state.row.id);
+  // Effects render through the same panel tabs: one tab per SpEffect
+  // section, with its own remembered tab.
+  if(state.tab==="effects"&&state.row.table==="SpEffectParam")
+    return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[effectDetail(groups)]}),state.row.table,state.row.id);
   return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }
@@ -1375,7 +1465,9 @@ const ds1PreviewAvailability=new Map();
 // shared fallback glyph.
 const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
   "physicalDef","magicDef","fireDef","lightningDef",
-  "str","dex","int","faith","weight","durability"]);
+  "str","dex","int","faith","weight","durability",
+  "poison","toxic","bleed","curse","poise",
+  "vit","att","end","res","souls","slot","humanity"]);
 const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
   "EquipParamGoods","Magic","SpEffectParam"]);
 function ds1LabelArt(panel){
@@ -1386,11 +1478,16 @@ function ds1LabelArt(panel){
     if(field.querySelector(":scope > .lex-detail-field-label > img.lex-ds1-label-art"))continue;
     const art=el("img",{class:"lex-ds1-label-art",src:`/api/label?name=${encodeURIComponent(kind)}`,
       alt:"",draggable:"false","aria-hidden":"true","data-lex-no-image":"off"});
-    art.addEventListener("error",()=>art.remove(),{once:true});
     const label=field.querySelector(":scope > .lex-detail-field-label");
     const glyph=label&&label.querySelector(":scope > .lex-type-glyph");
-    if(glyph)glyph.replaceWith(art);
-    else if(label)label.prepend(art);
+    if(glyph){
+      const spare=glyph.cloneNode(true);
+      art.addEventListener("error",()=>art.replaceWith(spare),{once:true});
+      glyph.replaceWith(art);
+    }else{
+      art.addEventListener("error",()=>art.remove(),{once:true});
+      if(label)label.prepend(art);
+    }
   }
 }
 // A model that exists but has no still picture, in Dark Souls dress: UI
@@ -1481,16 +1578,18 @@ function ds1PreviewContent(target){
   const sign=entry=>GENDER_SIGN[entry.variant]||entry.variant||"?";
   const genderName=entry=>GENDER_NAME[entry.variant]||"other";
   const action=()=>`Show ${genderName(other())} model`;
-  const picker=el("button",{type:"button",class:"lex-preview-gender-toggle",
+  // The gender switch sits with the view-mode buttons, styled like one:
+  // no extra row above the stage.
+  const picker=el("button",{type:"button",class:"lex-model-view-mode lex-preview-gender-toggle",
     "aria-label":action(),title:action(),
     onclick:()=>{picked=other();
       picker.replaceChildren(sign(picked));
       picker.setAttribute("aria-label",action());picker.title=action();
       show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
     }},sign(picked));
-  const wrap=el("div",{class:"lex-preview-variant-wrap"},picker,stage);
+  stage.querySelector(":scope > .lex-model-view-modes")?.append(picker);
   show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
-  return wrap;
+  return stage;
 }
 function armDs1Preview(panel,table,id){
   if(!(panel instanceof Element))return panel;
@@ -1698,13 +1797,12 @@ function submitBandForm(form){
 function renderItems(){
   if(ASSET_TABS.has(state.tab))assetFilePicker();
   if(state.tab==="maps")return renderMaps();
-  if(state.tab==="enemies"&&state.sub==="model")return renderModel();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
   const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
-  const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,
+  const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
     // Asset files join the mod through the list's add button: adding at a
@@ -1733,6 +1831,10 @@ function renderItems(){
         if(!event?.shiftKey&&!event?.ctrlKey&&!event?.metaKey){state.selected=key(row);await loadDetail();}
         select(row,event);shell.refresh();},
       columns:(misc&&state.sub==="encumbrance")?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
+        state.tab==="items"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>recordIconCell(row)},
+          {key:"name",label:"Name",sortable:true,grow:1}]:
+        state.tab==="textures"?[{key:"name",label:"Name",sortable:true,grow:1},
+          {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
     rename:renameRecord,
@@ -1936,11 +2038,10 @@ async function reloadViewport(map,selectKey){
   await loadDetail().catch(notify);
   refreshMapSide();refreshDirectory();
   const host=document.querySelector("[data-viewport-host]");
-  const status=document.querySelector("[data-viewport-status]");
-  if(host&&status&&state.tab==="maps"){
+  if(host&&state.tab==="maps"){
     viewportCtl=null;
     const token=++viewportMount;
-    const ctl=await Ds1Viewport.mount(host,map,state.mapView,status,viewportHooks()).catch(failMount(status,"Could not load the map."));
+    const ctl=await Ds1Viewport.mount(host,map,state.mapView,viewportHooks()).catch(failMount(host,"Could not load the map."));
     if(token!==viewportMount){ctl?.dispose?.();return;}
     viewportCtl=ctl;
     viewportCtl?.setGizmoMode?.(state.mapGizmo);
@@ -2131,7 +2232,11 @@ function mapsStrip(){
 }
 function mapsPane(){
   if(state.mapTab==="placements")return placementsPane();
-  if(state.mapTab==="selection")return detail();
+  if(state.mapTab==="selection"){
+    const panel=detail();
+    panel.style.flex="1 1 auto";panel.style.minHeight="0";
+    return panel;
+  }
   return mapsListPane();
 }
 function mapsListPane(){
@@ -2371,26 +2476,25 @@ function renderMaps(){
     onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
     onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
-  const status=el("div",{class:"lex-viewport-status","data-viewport-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading map"));
-  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"});
+  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"},LexeditorUI.loadingStatus("Loading map"));
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
     const token=++viewportMount;
-    Ds1Viewport.mount(host,current.id,state.mapView,status,viewportHooks()).then(ctl=>{
+    Ds1Viewport.mount(host,current.id,state.mapView,viewportHooks()).then(ctl=>{
       if(token!==viewportMount)return;
       viewportCtl=ctl;
       viewportCtl?.setGizmoMode?.(state.mapGizmo);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       if(state.mapFocus&&viewportCtl){viewportCtl.focus(state.mapFocus);state.mapFocus=null;}
       refreshViewportBar();
-    }).catch(error=>{if(token===viewportMount)failMount(status,"Could not load the map.")(error);});
+    }).catch(error=>{if(token===viewportMount)failMount(host,"Could not load the map.")(error);});
   });
   // The buttons hover over the picture, not in a bar above it. They hang
   // on a wrapper: mounting clears the host itself for its canvas.
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
     actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
-  const viewPane=el("div",{style:"flex:1 1 auto;min-width:0;display:flex;flex-direction:column;"},wrap,status);
+  const viewPane=el("div",{style:"flex:1 1 auto;min-width:0;display:flex;flex-direction:column;"},wrap);
   // The table sets the floor: headers are never cut off, and the 400px
   // basis keeps narrower panes (placements, selection) from jumping.
   const side=el("div",{"data-maps-side":"",style:"flex:0 0 400px;min-width:min-content;display:flex;flex-direction:column;"},mapsStrip(),mapsPane());
@@ -2421,20 +2525,12 @@ function renderAnimPanels(){
     className:"ds1-anim-list",content:[animListPane()]});
   return el("div",{class:"ds1-anim"},characters,viewPane,animations);
 }
-function renderModel(){
-  const strip=subtabBar({tabs:subtabsFor("enemies"),active:state.sub,label:"Enemies",change:id=>navigate("enemies",id)});
-  const foes=state.rows.filter(row=>row.table==="EnemyModel");
-  if(!foes.length)return LexeditorUI.stack(strip,LexeditorUI.notice({tone:"warning",message:"No reviewed monsters found."}));
-  const current=foes.find(row=>key(row)===state.selected)||foes[0];
-  // Buttons, not selects: switching the viewed enemy or attack edits
+function monsterModelSection(){
+  const view=state.chrView;
+  if(!view)return LexeditorUI.detailNote("The character model could not be loaded.");
+  // Buttons, not selects: switching the viewed attack edits
   // nothing, and a select would ask Vanilla readers to create a mod
   // before looking around.
-  const choose=async id=>{const row=foes.find(entry=>entry.id===id);if(!row||key(row)===state.selected)return;state.selected=key(row);state.page=0;state.chrAttack=null;await loadDetail().catch(notify);render();};
-  const picker=el("button",{type:"button",class:"lex-viewport-picker","aria-label":"Enemy","aria-haspopup":"listbox",
-    onclick:event=>{LexeditorUI.choicePopover({label:"Enemy",
-      choices:foes.map(row=>({label:row.name,value:row.id})),select:choose}).openFor(event.currentTarget);}},
-    `Enemy: ${current.name}`);
-  const view=state.chrView;
   const attacks=(view&&view.attacks)||[];
   if(!attacks.some(attack=>attack.id===state.chrAttack))state.chrAttack=attacks.length?attacks[0].id:null;
   const attack=attacks.find(entry=>entry.id===state.chrAttack);
@@ -2446,7 +2542,7 @@ function renderModel(){
   const status=el("div",{class:"lex-viewport-status","data-chr-status":"",style:"flex:0 0 auto"},LexeditorUI.loadingStatus("Loading model"));
   const host=el("div",{class:"lex-viewport-host","data-chr-host":"",style:VIEWPORT_STYLE});
   requestAnimationFrame(()=>{Ds1Viewport.mountChr(host,view,state.chrAttack,status).catch(failMount(status,"Could not load the model."));});
-  return LexeditorUI.stack(strip,el("div",{class:"lex-viewport-bar"},picker,attackPicker),host,status);
+  return [el("div",{class:"lex-viewport-bar"},attackPicker),host,status];
 }
 function appliedLabel(deploy){
   if(!deploy.everApplied)return "No";

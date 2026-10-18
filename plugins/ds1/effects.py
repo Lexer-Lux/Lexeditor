@@ -29,7 +29,7 @@ OVERRIDES = {
     "effectEndurance": ("Duration (seconds)", "How long the effect lasts. -1 means permanent. 0 applies it once."),
     "motionInterval": ("Trigger interval (seconds)", "Time between repeated applications. 0 applies the effect every frame."),
     "conditionHp": ("Maximum HP to activate (%)", "Activates when remaining HP is below this percentage. -1 removes the HP condition."),
-    "maxHpRate": ("Maximum HP multiplier", "Multiplies maximum HP. 1 is unchanged. 0.5 halves it. The current-HP setting controls whether current HP changes too."),
+    "maxHpRate": ("Maximum HP multiplier", "Multiplies maximum HP. 1 is unchanged. 0.5 halves it."),
     "maxStaminaRate": ("Maximum stamina multiplier", "Multiplies maximum stamina. 1 is unchanged. 0.5 halves it."),
     "changeStaminaRate": ("Stamina damage (%)", "Removes this percentage of maximum stamina each application. Negative values restore stamina."),
     "changeStaminaPoint": ("Flat Stamina damage (points)", "Removes this much stamina each application. Negative values restore stamina."),
@@ -230,6 +230,7 @@ class EffectReferences:
             "effects-spells": {"Magic"},
             "effects-items": {"EquipParamGoods"},
         }.get(tab)
-        return [{"id": row.row_id, "name": self.document.row_name(TABLE, row.row_id), "table": TABLE}
+        return [{"id": row.row_id, "name": self.document.row_name(TABLE, row.row_id), "table": TABLE,
+                "modified": self.document.row_modified(TABLE, row.row_id)}
                 for row in self.document.params[TABLE].rows
                 if sources is None or any(link["table"] in sources for link in self.incoming.get(row.row_id, []))]

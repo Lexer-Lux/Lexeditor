@@ -158,10 +158,28 @@ class NativeRules:
                 "maxBands": load_bands.MAX_BANDS, "readOnly": self.read_only,
                 "native": dict(self.live), "migration": migration}
 
+    def row_modified(self, row_id):
+        """Whether this session changed the native rule row."""
+        if row_id >= 1001:
+            saved = {band["id"]: band for band in self.saved["bands"]}
+            current = next((band for band in self.value["bands"] if band["id"] == row_id - 1000), None)
+            return current is None or saved.get(row_id - 1000) != current
+        if row_id in levelup_gains.ROW_IDS.values():
+            output = next(name for name, identity in levelup_gains.ROW_IDS.items()
+                          if identity == row_id)
+            return self.value["levelupGains"][output] != self.saved["levelupGains"][output]
+        if row_id == 200:
+            return (self.value["specialLight"] != self.saved["specialLight"]
+                    or self.value["forcedRecovery"] != self.saved["forcedRecovery"])
+        if row_id == 0:
+            return self.value["baseRecovery"] != self.saved["baseRecovery"]
+        raise ValueError("Unknown native rule identity")
+
     def list_rows(self, tab):
         if tab == "levelup":
             return [{"id": levelup_gains.ROW_IDS[key], "table": "NativeRules",
-                     "name": label, "values": dict(self.value["levelupGains"][key])}
+                     "name": label, "values": dict(self.value["levelupGains"][key]),
+                     "modified": self.row_modified(levelup_gains.ROW_IDS[key])}
                     for key, label in levelup_gains.OUTPUTS]
         if tab == "encumbrance":
             lower, result = 0, []
@@ -171,13 +189,16 @@ class NativeRules:
                 if upper is not None:
                     label += f" to {upper:g}%"
                 result.append({"id": 1000 + band["id"], "table": "NativeRules",
-                               "name": band["name"], "range": label})
+                               "name": band["name"], "range": label,
+                               "modified": self.row_modified(1000 + band["id"])})
                 lower = upper
             return result
         if tab == "encumbrance-overrides":
-            return [{"id": 200, "table": "NativeRules", "name": "Effect-driven overrides"}]
+            return [{"id": 200, "table": "NativeRules", "name": "Effect-driven overrides",
+                     "modified": self.row_modified(200)}]
         if tab == "misc":
-            return [{"id": 0, "table": "NativeRules", "name": "Stamina"}]
+            return [{"id": 0, "table": "NativeRules", "name": "Stamina",
+                     "modified": self.row_modified(0)}]
         raise ValueError("Unknown native-rules tab")
 
     def read_row(self, row_id):
