@@ -8293,8 +8293,20 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
 }
 /* A tab the reader never opened carries a pip until first viewed. Out of
    flow against the tab button, so a dotted tab never stretches the strip. */
-.lex-tab-unviewed {
+/* A tab with no shipped default view wears a hollow dot up right. */
+.lex-shell-header nav button:has(> .lex-tab-no-default),
+.lex-subtab-button:has(> .lex-tab-no-default) { position:relative; }
+.lex-tab-no-default {
   position:absolute;
+  top:4px;
+  right:5px;
+  width:.42em;
+  height:.42em;
+  border-radius:50%;
+  border:1px solid var(--lex-muted);
+  pointer-events:none;
+}
+.lex-tab-unviewed {  position:absolute;
   left:50%;
   bottom:3px;
   transform:translateX(-50%);

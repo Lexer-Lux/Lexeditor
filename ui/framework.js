@@ -3675,8 +3675,42 @@
       },
     };
   };
-  const holdToSaveDefaultView = button => {
-    let timer = 0, saved = false;
+  // Packaged default views, fetched once per plugin.
+  const defaultViewsCache = new Map();
+  const packagedDefaults = pluginId => {
+    if (!defaultViewsCache.has(pluginId))
+      defaultViewsCache.set(pluginId,
+        callWindow("default_views", pluginId).then(result => result?.views || {}).catch(() => ({})));
+    return defaultViewsCache.get(pluginId);
+  };
+  // Reset returns to the shipped default view, not to an empty one: the
+  // stored keys under the token are cleared, then the packaged ones come
+  // back. Anyone may reset; only developers save.
+  const resetStoredView = async (pluginId, tabId, token) => {
+    try {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key && key.includes(token)) localStorage.removeItem(key);
+      }
+    } catch (_error) {}
+    try {
+      const views = await packagedDefaults(pluginId);
+      for (const [key, value] of Object.entries(views[tabId] || {}))
+        if (key.includes(token)) localStorage.setItem(key, String(value));
+    } catch (_error) {}
+  };
+  // A tab or subtab with no shipped default wears a hollow dot, so it is
+  // visible which ones reset to a curated view and which reset to bare.
+  const markMissingDefaultView = (button, pluginId, tabId, token) => {
+    packagedDefaults(pluginId).then(views => {
+      const entries = Object.entries(views[tabId] || {});
+      const has = token ? entries.some(([key]) => key.includes(token)) : entries.length > 0;
+      if (!has && button.isConnected && !button.querySelector(":scope > .lex-tab-no-default"))
+        button.append(element("span", {class: "lex-tab-no-default", "aria-hidden": "true",
+          title: "No saved default view"}));
+    }).catch(() => {});
+  };
+  const holdToSaveDefaultView = (button, onReset) => {    let timer = 0, saved = false;
     button.addEventListener("pointerdown", event => {
       if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
       saved = false;
@@ -3702,15 +3736,27 @@
     for (const type of ["pointerup", "pointercancel", "pointerleave"])
       button.addEventListener(type, () => clearTimeout(timer));
     button.addEventListener("contextmenu", event => {
-      if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
       clearTimeout(timer);
-      saved = false;
+      if (saved) { saved = false; return; }
+      const plugin = shellPluginId(), page = activePageTab();
+      const sub = button.dataset.subtab;
+      if (!plugin || !page || !sub || typeof onReset !== "function") return;
+      resetStoredView(plugin, page, `${plugin}-${page}-${sub}`).then(() => {
+        window.dispatchEvent(new CustomEvent("lexeditor-view-reset",
+          {detail: {plugin, tab: page, sub}}));
+        onReset(sub);
+      });
     });
   };
   const subtabBar = (options = {}) => {
     const bar = subtabBarSorted(options);
-    bar.querySelectorAll(".lex-subtab-button").forEach(holdToSaveDefaultView);
+    bar.querySelectorAll(".lex-subtab-button").forEach(button => {
+      holdToSaveDefaultView(button, sub => options.change?.(sub));
+      const plugin = shellPluginId(), page = activePageTab(), sub = button.dataset.subtab;
+      if (plugin && page && sub)
+        markMissingDefaultView(button, plugin, page, `${plugin}-${page}-${sub}`);
+    });
     return bar;
   };
   const subtabBarSorted = (options = {}) => {
@@ -8855,20 +8901,7 @@ ${contents.path}`});
           clearTimeout(defaultHoldTimer);
           if (savedDefault) { savedDefault = false; return; }
           const token = `${options.plugin.id}-${tab.id}`;
-          try {
-            for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-              const key = localStorage.key(index);
-              if (key && key.includes(token)) localStorage.removeItem(key);
-            }
-          } catch (_error) {}
-          // Reset returns to the shipped default view, not to an empty
-          // one: the tab's packaged defaults come back at once, a renamed
-          // tab among them.
-          try {
-            const views = (await callWindow("default_views", options.plugin.id))?.views?.[tab.id] || {};
-            for (const [key, value] of Object.entries(views))
-              if (key.includes(token)) localStorage.setItem(key, String(value));
-          } catch (_error) {}
+          await resetStoredView(options.plugin.id, tab.id, token);
           relabelTabBar();
           options.resetView?.(tab.id);
           window.dispatchEvent(new CustomEvent("lexeditor-view-reset", {detail: {plugin: options.plugin.id, tab: tab.id}}));
@@ -8884,6 +8917,7 @@ ${contents.path}`});
         }, key) : "")(shortcutKeyFor(tabIndex + 1)));
       nav.append(button);
       tabButtons.set(tab.id, button);
+      markMissingDefaultView(button, options.plugin.id, tab.id, "");
       // The handler is always attached and the mode is read when it fires:
       // settings arrive after the bar is built, so a developer-mode test at
       // build time would leave every tab unrenamable.
