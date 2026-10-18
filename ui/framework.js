@@ -2436,6 +2436,10 @@
     if (options.vanilla) return null;
     if (options.created) return element("span", {class:"lex-ui-symbol lex-record-source",
       role:"img", title:"Created in this mod", "aria-label":"Created in this mod"}, "✒️");
+    // A changed record is not a new one: the delta says its values differ
+    // from the game's own, while the pen stays reserved for added rows.
+    if (options.modified) return element("span", {class:"lex-ui-symbol lex-record-source",
+      role:"img", title:"Changed from vanilla", "aria-label":"Changed from vanilla"}, "Δ");
     if (!options.icon || !options.label) return null;
     return element("span", {class:"lex-record-source", role:"img",
       title:options.label, "aria-label":options.label}, options.icon);
@@ -10197,6 +10201,11 @@ ${contents.path}`});
     // callers, and require the explicit boolean rather than a field's value.
     const sourceColumn = columns.find(column => ["name", "title"].includes(String(column.key).toLowerCase()))?.key
       || columns.find(column => !["enabled", "status"].includes(String(column.key).toLowerCase()))?.key;
+    // A list whose rows cannot carry flags - FF8's signature compares the
+    // whole row object, so stamping one would mark everything - answers
+    // the same question with a predicate instead.
+    const rowCreated = row => typeof options.created === "function" ? !!options.created(row) : row?.created === true;
+    const rowModified = row => typeof options.modified === "function" ? !!options.modified(row) : row?.modified === true;
     const header = element("div", {
       class: ["lex-column-list-header", options.headerClass || ""].filter(Boolean).join(" "),
       role: "row",
@@ -10332,6 +10341,7 @@ ${contents.path}`});
       header: options.showHeader === false ? undefined : header,
       rowRole: "row",
       rowClass: row => ["lex-column-list-row",
+        rowModified(row) ? "lex-record-modified" : "",
         columns.some(column => String(column.key).toLocaleLowerCase() === "enabled") && row?.enabled === false ? "lex-row-disabled" : "",
         typeof options.rowClass === "function" ? options.rowClass(row) : options.rowClass || ""].filter(Boolean).join(" "),
       rowTitle: options.rowTitle,
@@ -10365,10 +10375,15 @@ ${contents.path}`});
           (typeof content === "string" || typeof content === "number")
             ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
             : content));
-        if (row?.created === true && column.key === sourceColumn &&
+        if (rowCreated(row) && column.key === sourceColumn &&
             !cell.querySelector(".lex-record-source")) {
           const value = cell.querySelector(".lex-column-cell-content");
           value.replaceChildren(inlineLabel(recordSource({created:true}), ...value.childNodes));
+        }
+        if (rowModified(row) && !rowCreated(row) && column.key === sourceColumn &&
+            !cell.querySelector(".lex-record-source")) {
+          const value = cell.querySelector(".lex-column-cell-content");
+          value.replaceChildren(inlineLabel(recordSource({modified:true}), ...value.childNodes));
         }
         // The double-click is caught once, at the document: a list whose
         // click selects the row re-renders between the two clicks, so the

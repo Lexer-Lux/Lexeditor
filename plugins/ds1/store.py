@@ -85,6 +85,11 @@ class ItemStore:
         self.text_hash = digest(self.text_source) if self.text_source else None
         self.text_output_hash = digest(self.text_output) if self.text_output else None
         document.texts = texts.TextDocument(self.text_source.read_bytes()) if self.text_source else None
+        # A mod's saved names are not vanilla: keep the game's own beside
+        # them, so changed rows stay marked after a save and reload.
+        document.vanilla_texts = (texts.TextDocument(vanilla.read_bytes())
+                                  if vanilla is not None and vanilla.is_file() and source != vanilla
+                                  else None)
 
     def _load_menu_texts(self, document):
         """The mod's menu labels if it has changed any, else the game's own."""
@@ -98,6 +103,9 @@ class ItemStore:
         self.menu_hash = digest(self.menu_source) if self.menu_source else None
         self.menu_output_hash = digest(self.menu_output) if self.menu_output else None
         document.menu_texts = texts.MenuDocument(self.menu_source.read_bytes()) if self.menu_source else None
+        document.vanilla_menu_texts = (texts.MenuDocument(vanilla.read_bytes())
+                                       if vanilla is not None and vanilla.is_file() and source != vanilla
+                                       else None)
 
     def get(self):
         return self.document if self.document is not None else self.load()

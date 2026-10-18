@@ -30,7 +30,9 @@
     return map;
   }
   function modOnlySpec(view){
-    const changed=(name,row)=>{const before=name==="text"&&row.source==="refine"?matchingTextRow(state.vanilla,row):(state.vanilla[name]?.rows||[]).find(entry=>name==="fields"?entry.key===row.key:entry.id===row.id);return before===undefined||signature(row)!==signature(before)};
+    const baseline=(name,row)=>name==="text"&&row.source==="refine"?matchingTextRow(state.vanilla,row):(state.vanilla[name]?.rows||[]).find(entry=>name==="fields"?entry.key===row.key:entry.id===row.id);
+    const changed=(name,row)=>{const before=baseline(name,row);return before===undefined||signature(row)!==signature(before)};
+    const datasetFor=row=>editableDatasets.find(name=>state.data[name]?.rows?.includes(row))||view;
     const itemEffectsChanged=row=>view==='items'&&[
       ['battleItems',(state.data.battleItems?.rows||[]).filter(entry=>Number(row.id)!==0&&entry.id===row.id)],
       ['ammoEffects',(state.data.ammoEffects?.rows||[]).filter(entry=>Number(entry.fields.find(field=>field.field==='used_item_index')?.value)===Number(row.id))],
@@ -40,7 +42,10 @@
     // assets that mod replaces.
     const assetView=view==="sfx"||view==="models"||view==="textures";
     return {available:state.activeSource==="mine"||(assetView&&state.activeSource.startsWith("mod:")),value:state.modOnly===true,
-      changed:row=>changed(editableDatasets.find(name=>state.data[name]?.rows?.includes(row))||view,row)||itemEffectsChanged(row)||(view==="enemies"&&["enemyTables","enemyAi","enemyBattleText"].some(name=>{const linked=state.data[name]?.rows?.find(entry=>entry.id===row.id);return linked&&changed(name,linked)})),
+      changed:row=>changed(datasetFor(row),row)||itemEffectsChanged(row)||(view==="enemies"&&["enemyTables","enemyAi","enemyBattleText"].some(name=>{const linked=state.data[name]?.rows?.find(entry=>entry.id===row.id);return linked&&changed(name,linked)})),
+      // A row is new only when its vanilla table is loaded and lacks it:
+      // without the guard every row of an unloaded table would take the pen.
+      created:row=>{const name=datasetFor(row);if(name==="text"&&row.source==="refine")return state.vanilla.text!=null&&baseline(name,row)===undefined;const rows=state.vanilla[name]?.rows;return Array.isArray(rows)&&rows.length>0&&baseline(name,row)===undefined;},
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length+(window.ff8SpellbookDrafts?.size||0)+encounterChanceDraftCount();for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}
@@ -105,7 +110,7 @@
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}
   function filtered(view,fields,source=state.data[view].rows){const query=state.filters[view].trim().toLocaleLowerCase();let rows=source.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,view==="gfAbilities"&&key==="id"?"abilityId":key)).localeCompare(String(rowSortValue(b,view==="gfAbilities"&&key==="id"?"abilityId":key)),undefined,{numeric:true,sensitivity:"base"}))}
   function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render()}
-  function listColumns(view,columns,template,prefs,forceTemplate=false,keyFor=row=>row.id){return ({rows,selected,select})=>columnList({rows,key:keyFor,columns:columns.map(column=>({...column,sortable:column.sortable??true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,row.abilityType?{type:"ability",value:row.abilityId,label:row.name}:{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
+  function listColumns(view,columns,template,prefs,forceTemplate=false,keyFor=row=>row.id){const only=modOnlySpec(view);return ({rows,selected,select})=>columnList({rows,key:keyFor,modified:only.changed,created:only.created,columns:columns.map(column=>({...column,sortable:column.sortable??true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,row.abilityType?{type:"ability",value:row.abilityId,label:row.name}:{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
   // Why a table's add button is off. FF8 keeps every one of these in a
   // fixed place the game reads by number, so a new record has nowhere to go;
   // each reason says where the limit is.

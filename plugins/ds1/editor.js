@@ -1859,7 +1859,7 @@ function renderItems(){
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.reason==="pins"&&state.pagedView?.refreshMaster)state.pagedView.refreshMaster();else render();},
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
-      return columnList({rows:listed,key,selected,rowClass:row=>row.modified?"lex-record-modified":"",
+      return columnList({rows:listed,key,selected,
       decorateRow:(node,row)=>LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name}),
       sortState:state.sort,
       sort:column=>{if(misc||(state.tab==="stats"&&state.sub==="levelup"))return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},

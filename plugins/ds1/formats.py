@@ -692,6 +692,10 @@ class ItemDocument:
         # field's vanilla value, for right-click restore. None means this
         # document was read from the game's own file, so its original is vanilla.
         self.vanilla_document = None
+        # The game's own names and menu text, for the same changed-row
+        # marking: without these a saved rename looks untouched on reload.
+        self.vanilla_texts = None
+        self.vanilla_menu_texts = None
         for table, (row_size, version) in TABLES.items():
             member = self.members.get(table + '.param')
             if member is None and table in OPTIONAL_TABLES:
@@ -728,7 +732,8 @@ class ItemDocument:
         return (table, row_id, key)
 
     def row_modified(self, table, row_id):
-        """Whether this session changed the row: an edited field, description or added row."""
+        """Whether the row differs from the game's own file: an edited
+        field, name or description, changed this session or loaded from a mod."""
         if (table, row_id) in self._added_rows:
             return True
         for entry in self.dirty:
@@ -739,6 +744,20 @@ class ItemDocument:
             for _kind, changed_table, item in self.texts.dirty:
                 if (changed_table, item) == (table, row_id):
                     return True
+        try:
+            _row, _start, data = self._row(table, row_id)
+        except FormatError:
+            data = None
+        if data is not None:
+            vanilla = self._vanilla_row(table, row_id)
+            if vanilla is None or bytes(data) != bytes(vanilla):
+                return True
+        if self.texts is not None and self.vanilla_texts is not None:
+            pairs = ((self.texts.name(table, row_id), self.vanilla_texts.name(table, row_id)),
+                     (self.texts.description(table, row_id), self.vanilla_texts.description(table, row_id)),
+                     (self.texts.description(table, row_id, True), self.vanilla_texts.description(table, row_id, True)))
+            if any(current != before for current, before in pairs):
+                return True
         return False
 
     @property
@@ -1126,15 +1145,24 @@ class ItemDocument:
                 for text_id, text in sorted(self.menu_texts.file_entries(filename).items())]
 
     def text_row_modified(self, table, row_id):
-        """Whether this session changed the menu text: the entry or its label."""
+        """Whether the menu text differs from the game's own, this session or loaded."""
         if self.menu_texts is None:
             return False
         from .texts import MENU_LABEL_FILE, MENU_LABEL_IDS
         if table == 'MenuText':
-            return MENU_LABEL_IDS.get(row_id) in self.menu_texts.dirty
+            key = MENU_LABEL_IDS.get(row_id)
+            if key in self.menu_texts.dirty:
+                return True
+            if key is None or self.vanilla_menu_texts is None:
+                return False
+            return self.menu_texts.label(key) != self.vanilla_menu_texts.label(key)
         if (table, row_id) in self.menu_texts.dirty_texts:
             return True
-        return table == MENU_LABEL_FILE and MENU_LABEL_IDS.get(row_id) in self.menu_texts.dirty
+        if table == MENU_LABEL_FILE and MENU_LABEL_IDS.get(row_id) in self.menu_texts.dirty:
+            return True
+        if self.vanilla_menu_texts is None:
+            return False
+        return self.menu_texts.text(table, row_id) != self.vanilla_menu_texts.text(table, row_id)
 
     def _read_fmg(self, filename, row_id, only=None):
         from .texts import MAX_FMG_TEXT
