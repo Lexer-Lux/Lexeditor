@@ -1484,11 +1484,9 @@ function detail(){
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
   if(msbRowEarly)return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},body:msbDetail(state.row,groups)}),state.row.table,state.row.id);
-  // Weapons and armor came first; spells, rings and upgrade goods share
-  // the same sections, so their subtabs render through the same panel
-  // tabs. Other goods (consumables, keys) keep the stacked detail.
-  const goodsSub=state.row.table==="EquipParamGoods"?catalogSub(state.row.table,state.row):null;
-  if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"||state.row.table==="EquipParamAccessory"||state.row.table==="Magic"||goodsSub==="upgrades"||goodsSub==="spells"))
+  // Every items subtab renders through the same panel tabs: weapons,
+  // armor, rings, spells and every kind of goods.
+  if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"||state.row.table==="EquipParamAccessory"||state.row.table==="Magic"||state.row.table==="EquipParamGoods"))
     return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[itemDetail(groups)]}),state.row.table,state.row.id);
   // Effects render through the same panel tabs: one tab per SpEffect
   // section, with its own remembered tab.

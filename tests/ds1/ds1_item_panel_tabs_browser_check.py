@@ -1,4 +1,4 @@
-"""DS1 Items: spells, rings and upgrade-items details use panel tabs."""
+"""DS1 Items: every subtab detail uses panel tabs."""
 import sys
 import tempfile
 from pathlib import Path
@@ -31,7 +31,8 @@ def main():
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    for tab in ('spells', 'rings', 'upgrades'):
+                    for tab in ('spells', 'rings', 'upgrades', 'consumables', 'keys',
+                                    'weapons', 'armor', 'ammo'):
                         page.locator(f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && state.row && !state.error', arg=tab)
                         page.wait_for_timeout(200)
@@ -44,6 +45,6 @@ def main():
                     browser.close()
         finally:
             session.stop()
-        print('DS1 item panel tabs: spells, rings and upgrade-items passed.')
+        print('DS1 item panel tabs: every subtab passed.')
 if __name__ == '__main__':
     main()
