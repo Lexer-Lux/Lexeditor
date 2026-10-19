@@ -20,6 +20,7 @@ import struct
 import time
 from pathlib import Path
 
+from . import fsb
 from .formats import FormatError, MAX_ARCHIVE, inflate, members  # noqa: F401
 
 MOD_ID = "lexeditor-ds1"
@@ -229,6 +230,57 @@ def scan_merged(game_root, project=None):
             else:
                 merged[entry["relative"]] = entry
     return [merged[key] for key in sorted(merged)]
+
+
+_SOUNDS_CACHE = {}
+
+
+def clear_sound_cache():
+    """Forget flattened bank streams; uploads and removals change them."""
+    _SOUNDS_CACHE.clear()
+
+
+def list_streams(game_root, project=None):
+    """Every FSB bank's streams, split by kind.
+
+    {"sound": [...], "music": [...], "unreadable": [...]}; each stream
+    carries its bank path, name, duration in seconds and payload size.
+    The table reads headers only, so the whole game scans in about a
+    second; the result is cached per game root and mod project. The
+    mod's bank wins over the installed one. Banks that fail to parse
+    list under "unreadable" instead of breaking the scan.
+    """
+    key = (str(game_root), str(project))
+    cached = _SOUNDS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    found = {"sound": [], "music": [], "unreadable": []}
+    for entry in scan_merged(game_root, project):
+        if entry["kind"] not in ("sound", "music"):
+            continue
+        relative = entry["relative"]
+        if not relative.lower().endswith(".fsb"):
+            continue
+        path = None
+        if project is not None:
+            own = Path(project) / relative
+            if own.is_file():
+                path = own
+        if path is None:
+            if game_root is None:
+                continue
+            path = Path(game_root) / relative
+        try:
+            streams = fsb.parse_table(path)
+        except fsb.FsbError:
+            found["unreadable"].append(relative)
+            continue
+        for stream in streams:
+            found[entry["kind"]].append({"bank": relative, "name": stream["name"],
+                                        "duration": round(stream["duration"], 2),
+                                        "size": stream["size"]})
+    _SOUNDS_CACHE[key] = found
+    return found
 
 
 def store_bytes(project, relative, data):

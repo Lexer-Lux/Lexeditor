@@ -450,6 +450,21 @@ class Handler(PluginRequestHandler):
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
+        if path == '/api/sounds':
+            try:
+                with LOCK:
+                    kind = query.get('kind', ['sfx'])[0]
+                    if kind not in ('sfx', 'music'):
+                        raise ValueError("Sounds list 'sfx' or 'music'")
+                    streams = assets.list_streams(STORE.game_root, STORE.project)
+                    rows = [{"table": "SoundStream", "id": f"{entry['bank']}::{entry['name']}",
+                             "name": entry["name"], "bank": entry["bank"],
+                             "duration": entry["duration"], "size": entry["size"]}
+                            for entry in (streams["music"] if kind == "music" else streams["sound"])]
+                    self.send_json({"rows": rows, "unreadable": streams["unreadable"]})
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
         if path == '/api/sound/bank':
             try:
                 with LOCK:
@@ -596,6 +611,8 @@ class Handler(PluginRequestHandler):
                     stored = assets.receive_chunk(STORE.project, payload['id'], payload['relative'],
                                                   payload['total'], payload['offset'], raw,
                                                   bool(payload.get('final')))
+                    if payload.get('final') and assets.kind_of(payload['relative']) in ("sound", "music"):
+                        assets.clear_sound_cache()
                     result = {'upload': stored,
                               'files': assets.scan_merged(STORE.game_root, STORE.project)}
                 elif path == '/api/assets/remove':
@@ -603,6 +620,8 @@ class Handler(PluginRequestHandler):
                         raise PermissionError('Replacing assets needs a writable mod project')
                     if 'relative' not in payload:
                         raise ValueError('Removing an override needs its file')
+                    if assets.kind_of(payload['relative']) in ("sound", "music"):
+                        assets.clear_sound_cache()
                     result = {'removed': assets.remove_override(STORE.project, payload['relative']),
                               'files': assets.scan_merged(STORE.game_root, STORE.project)}
                 elif path == '/api/rows/add':

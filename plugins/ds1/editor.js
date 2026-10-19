@@ -6,7 +6,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
-  assetTabs:[{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
+  assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"},{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
@@ -15,9 +15,9 @@ let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=nu
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 // File tabs share one browser: each tab id is the file kind it lists.
-const ASSET_TABS=new Set(["models","textures","sound","music"]);
-const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound effects",music:"Music"};
-const assetRows=files=>(files||[]).filter(file=>(file.kind||"other")===state.tab)
+const ASSET_TABS=new Set(["models","textures","sound"]);
+const ASSET_LABELS={models:"Models",textures:"Textures",sound:"Sound"};
+const assetRows=files=>(files||[]).filter(file=>state.tab==="sound"?file.kind==="sound"||file.kind==="music":(file.kind||"other")===state.tab)
   .map(file=>{const kind=state.tab==="textures"?(file.archive?"archive":"textures"):null;
     return {table:"Asset",id:file.relative,name:file.relative,
       values:{size:file.size,...(kind?{kind}:{})},
@@ -90,8 +90,7 @@ const shell=LexeditorUI.mountShell({
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
     {id:"textures",label:"Textures",help:"The images on the models. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
-    {id:"sound",label:"Sound effects",help:"Swings, hits, footsteps and voices: everything audible but the music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Add and Remove save at once. Vanilla is read-only."},
-    {id:"music",label:"Music",help:"Area themes and boss music. Tinted names replace an installed file; a pen nib marks files only the mod carries. Add and Remove save at once. Vanilla is read-only."},
+    {id:"sound",label:"Sound",help:"Every sound effect and music track, listed one by one. The streams live inside bank files. Files holds those banks, and Add and Remove replace them. Tinted names replace an installed file. A pen nib marks files only the mod carries. Vanilla is read-only."},
     {id:"misc",label:"Misc.",help:"Load ranges, base stamina recovery and effect overrides. Save and Apply to use your rules."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -103,7 +102,7 @@ const shell=LexeditorUI.mountShell({
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="drops"?state.worldTabs.filter(entry=>entry.id==="drops"):tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
   tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
-  ASSET_TABS.has(tab)?state.assetTabs:
+  tab==="sound"?state.soundTabs:ASSET_TABS.has(tab)?state.assetTabs:
   tab==="misc"?state.miscTabs.map(entry=>entry.id==="encumbrance"?{...entry,help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."}:entry.id==="misc"?{...entry,help:"Base stamina recovery before effects and load penalties. Save and Apply to use your value."}:entry.id==="encumbrance-overrides"?{...entry,help:"Special conditions that replace band recovery. They take priority over load ranges and do not create another range. Save and Apply to use your rules."}:entry):state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
@@ -189,11 +188,14 @@ async function loadItems(){
   const request=++recordsRequest;
   if(state.tab==="animations"){await loadAnims(request);return;}
   const sub=state.sub;
+  const wantSounds=state.tab==="sound"&&(sub==="sfx"||sub==="music");
   let url="/api/table?tab="+encodeURIComponent(sub);
-  if(ASSET_TABS.has(state.tab))url="/api/assets?scope=all";
+  if(wantSounds)url="/api/sounds?kind="+sub;
+  else if(ASSET_TABS.has(state.tab))url="/api/assets?scope=all";
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
-  if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);}
+  if(wantSounds)state.rows=(result.rows||[]).map(row=>({...row,values:{bank:row.bank,length:formatSoundLength(row.duration||0),size:row.size}}));
+  else if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);}
   else state.rows=result.rows;
   if(state.tab==="maps")await loadDirectory();
   state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
@@ -225,7 +227,7 @@ async function loadDetail(){
     const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
     state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;
-    if((state.tab==="sound"||state.tab==="music")&&/\.fsb$/i.test(row.id)){
+    if(state.tab==="sound"&&/\.fsb$/i.test(row.id)){
       if(state.assetStreamFile!==row.id){state.assetStreamFile=row.id;state.assetStream=null;state.assetPage=0;}
       try{
         const sounds=await api(`/api/sound/bank?file=${encodeURIComponent(row.id)}`);
@@ -235,6 +237,10 @@ async function loadDetail(){
       }catch(error){state.assetSounds={file:row.id,streams:[],error:String(error?.message||error)};}
     }
     return;
+  }
+  if(row.table==="SoundStream"){
+    state.row={table:"SoundStream",id:row.id,name:row.name,bank:row.bank,duration:row.duration,size:row.size};
+    state.assetDetail=null;state.assetSounds=null;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;return;
   }
   if(row.table==="MapView"){
     state.mapView=null;
@@ -285,13 +291,14 @@ async function navigate(tab,sub=state.sub,selected=null){
   // Without the curve table, Stats opens on the first list with rows instead of an error.
   else if(tab==="stats"&&!state.statsTabs.some(entry=>entry.id===sub))sub=(state.statsTabs.find(entry=>entry.id==="curves")||{}).count?"curves":((state.statsTabs.find(entry=>entry.count)||{}).id||"curves");
   else if(tab==="misc"&&!state.miscTabs.some(entry=>entry.id===sub))sub="encumbrance";
-  else if(ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="files";
+  else if(tab==="sound"&&!state.soundTabs.some(entry=>entry.id===sub))sub="sfx";
+  else if(tab!=="sound"&&ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="files";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="text"&&!state.textTabs.some(entry=>entry.id===sub))sub="menu-labels";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -1091,7 +1098,7 @@ function assetSoundPanel(row,info,body){
   const help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
   const sounds=state.assetSounds;
   const note=text=>detailSection({title:"PREVIEW",body:[soundPreview({note:text,
-    help:infoHelp(state.tab==="music"?"Music plays in the game. It has no picture to show.":"Sounds play in the game. They have no picture to show.")})]});
+    help:infoHelp("Audio plays in the game. It has no picture to show.")})]});
   if(!/\.fsb$/i.test(row.id)){body.push(note("No preview"));return{help,audio:null};}
   if(!sounds||state.assetStreamFile!==row.id){body.push(LexeditorUI.loadingPanel({label:"Loading sounds"}));return{help,audio:null};}
   if(sounds.error||!sounds.streams.length){body.push(note(sounds.error?`This bank could not be read (${sounds.error}).`:"This bank holds no sounds."));return{help,audio:null};}
@@ -1110,6 +1117,21 @@ function assetSoundPanel(row,info,body){
       change:value=>{state.assetPage=value;render();}})],
     help:infoHelp("Every stream the bank holds. Play one from its row, or click the row and play it from the heading.")}));
   return{help,audio:{src:url(selected),label:selected}};
+}
+const formatSoundLength=seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,"0")}`;
+function renderSoundDetail(row){
+  const bank=row.bank||"",stream=row.name||"";
+  const body=[
+    detailSection({title:"SOUND",body:[
+      detailField({label:"BANK",control:readonlyField(bank)}),
+      detailField({label:"LENGTH",control:readonlyField(formatSoundLength(row.duration||0))}),
+      detailField({label:"SIZE",control:readonlyField(formatAssetSize(row.size||0))})]}),
+    detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(
+      el("button",{type:"button",onclick:()=>navigate("sound","files",`Asset:${bank}`)},"Show in Files"))})]})];
+  return detailPanel({title:row.name,meta:formatSoundLength(row.duration||0),
+    help:"Streams live inside bank files. Show in Files opens this stream's bank, and replacing the bank replaces its sounds.",
+    audio:{src:`/api/sound/stream?file=${encodeURIComponent(bank)}&stream=${encodeURIComponent(stream)}`,label:stream},
+    paginate:{unpaged:true},body});
 }
 function renderAssetDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
@@ -1130,7 +1152,7 @@ function renderAssetDetail(){
   let icon=null,preview=null,help="",audio=null;
   if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
   else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
-  else if(state.tab==="sound"||state.tab==="music")({help,audio}=assetSoundPanel(row,info,body));
+  else if(state.tab==="sound")({help,audio}=assetSoundPanel(row,info,body));
   else{
     help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
     body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
@@ -1500,7 +1522,11 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
-  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="drops"?"Drop":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
+  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="drops"?"Drop":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):state.tab==="sound"?"Sound":"Item";
+  if(state.tab==="sound"&&state.row?.table==="SoundStream"){
+    const soundRow=state.rows.find(row=>key(row)===state.selected);
+    if(soundRow)return renderSoundDetail(soundRow);
+  }
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
@@ -1921,6 +1947,9 @@ function renderItems(){
         state.tab==="textures"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>textureIconCell(row)},
           {key:"name",label:"Name",sortable:true,grow:1},
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
+        state.tab==="sound"&&(state.sub==="sfx"||state.sub==="music")?[{key:"name",label:"Name",sortable:true,grow:1},
+          {key:"bank",label:"Bank",sortable:true,render:row=>row.bank||""},
+          {key:"length",label:"Length",sortable:true,render:row=>formatSoundLength(row.duration||0)}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
     rename:renameRecord,shippedName:row=>row.shippedName,
@@ -1947,7 +1976,7 @@ function renderItems(){
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
-  const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,change:id=>navigate(state.tab,id)});
+  const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,order:state.tab==="sound"?"given":undefined,change:id=>navigate(state.tab,id)});
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){

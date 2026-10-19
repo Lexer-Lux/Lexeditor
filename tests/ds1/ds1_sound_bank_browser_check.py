@@ -57,7 +57,7 @@ def main():
                     page.on("pageerror", lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
-                    page.evaluate('navigate("music", "files", "Asset:sound/frpg_main.fsb")')
+                    page.evaluate('navigate("sound", "files", "Asset:sound/frpg_main.fsb")')
                     page.wait_for_selector(".lex-detail-section .lex-audio-play", timeout=120000)
                     rows = page.locator(".lex-detail-section .lex-column-list-row[data-key]")
                     assert rows.count() == 2, rows.count()
