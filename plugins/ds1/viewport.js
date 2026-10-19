@@ -111,18 +111,46 @@ window.Ds1Viewport = (() => {
       }
       return texCache.get(key);
     };
+    const lightCache = new Map();
+    const lightTextureFor = async (tex, png) => {
+      const key = texKey(tex, png);
+      if (!lightCache.has(key)) {
+        try {
+          const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
+          image.colorSpace = THREE.SRGBColorSpace;
+          // Same DirectX bytes as the diffuse, but an atlas-ranged UV
+          // set on channel 1: clamp, never tile.
+          image.flipY = false;
+          image.wrapS = image.wrapT = THREE.ClampToEdgeWrapping;
+          image.channel = 1;
+          lightCache.set(key, image);
+          disposable.push(image);
+        } catch (_error) {
+          return null;
+        }
+      }
+      return lightCache.get(key);
+    };
     const materialFor = (mesh, texturesByName, fx) => {
       const plain = fx ? effect : mesh.cull !== false ? front : double;
       const png = mesh.map && texturesByName && texturesByName[mesh.map];
       const image = mesh.map && mesh.uv && png ? texCache.get(texKey(mesh.map, png)) : null;
       if (!image) return plain;
-      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}`;
+      const litPng = mesh.light && mesh.uv1 && texturesByName && texturesByName[mesh.light];
+      const lit = !fx && litPng ? lightCache.get(texKey(mesh.light, litPng)) : null;
+      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}`;
       if (!matCache.has(key)) {
+        // Baked meshes skip the scene rig exactly like the game: map
+        // times light, nothing else. Basic divides the light by pi, so
+        // the intensity puts the baked values back to authored levels.
         const textured = fx
           ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
               side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false})
-          : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
-              side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+          : lit
+            ? new THREE.MeshBasicMaterial({map: image, lightMap: lit,
+                lightMapIntensity: Math.PI})
+            : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
+                side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
         matCache.set(key, textured);
         disposable.push(textured);
       }
@@ -153,6 +181,17 @@ window.Ds1Viewport = (() => {
       }
     await Promise.all([...wantedPngs.values()].map(([tex, png]) => textureFor(tex, png)));
     if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
+    const wantedLights = new Map();
+    for (const [name, data] of loaded)
+      for (const mesh of data.meshes || []) {
+        const png = mesh.light && (data.textures || {})[mesh.light];
+        if (mesh.light && mesh.uv1 && png) {
+          const key = texKey(mesh.light, png);
+          if (!wantedLights.has(key)) wantedLights.set(key, [mesh.light, png]);
+        }
+      }
+    await Promise.all([...wantedLights.values()].map(([tex, png]) => lightTextureFor(tex, png)));
+    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const geometries = new Map();
     for (const [name, data] of loaded) {
       geometries.set(name, data.meshes.map(mesh => {
@@ -160,6 +199,7 @@ window.Ds1Viewport = (() => {
         geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
         geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
         if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
+        if (mesh.uv1) geo.setAttribute("uv1", new THREE.BufferAttribute(f32(mesh.uv1), 2));
         geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
         geo.computeBoundingSphere();
         const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
@@ -369,6 +409,7 @@ window.Ds1Viewport = (() => {
     host._viewportStop = () => {
       live = false;
       delete host._viewportProject;
+      delete host._viewportScene;
       window.removeEventListener("resize", resize);
       controls.dispose();
       gizmo.dispose();
@@ -392,6 +433,8 @@ window.Ds1Viewport = (() => {
       requestAnimationFrame(loop);
     };
     viewModes.bindScene(scene);
+    // Test seam: the checks find lightmapped materials through this.
+    host._viewportScene = scene;
     loop();
     return controller;
   }

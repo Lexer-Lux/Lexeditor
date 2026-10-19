@@ -36,7 +36,8 @@ def make_chrbnd(flver_bytes, stem='c1200', extra=()):
 
 
 def build_flver(strip=False, qloc=False, bones=None, skin=None,
-                pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False):
+                pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False,
+                light_tex=None):
     """A minimal FLVER2 0x2000C: 1 mesh (a quad), 1 material, N bones, 1 dummy.
 
     `strip` stores the faces as a triangle strip; `qloc` writes a lying
@@ -96,6 +97,10 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
 
     tex_at = len(out)  # texture
     out.extend(bytes(32))
+    tex2_at = None
+    if light_tex is not None:
+        tex2_at = len(out)
+        out.extend(bytes(32))
 
     def place(blob):
         at = len(out)
@@ -117,6 +122,9 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     bone_names = [place(name.encode('ascii') + b'\0') for name, *_ in bones]
     tex_path = place(b'tex0\0')
     tex_type = place(b'g_Diffuse\0')
+    if light_tex is not None:
+        light_path = place(light_tex.encode('ascii') + b'\0')
+        light_type = place(b'g_Lightmap\0')
     box_at = place(struct.pack('<6f', ox, oy, oz, ox + 1.0, oy + 1.0, oz))
     bone_list_at = place(struct.pack('<%di' % len(bone_list), *bone_list))
     face_idx_at = place(struct.pack('<i', 0))
@@ -157,9 +165,10 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     struct.pack_into('<2I', out, 64, 2, 2)
     struct.pack_into('<3B', out, 72, 16, 0, 0)
     struct.pack_into('<I', out, 76, 0)
-    struct.pack_into('<3I', out, 80, 1, 1, 1)
+    struct.pack_into('<3I', out, 80, 1, 1, 2 if light_tex is not None else 1)
     struct.pack_into('<I', out, 104, 0)
-    struct.pack_into('<7I', out, mat_at, mat_name, mtd, 1, 0, 0, 0, 0)
+    struct.pack_into('<7I', out, mat_at, mat_name, mtd, 2 if light_tex is not None else 1,
+                     0, 0, 0, 0)
     for index, name_at in enumerate(bone_names):
         struct.pack_into('<I', out, bone_at + index * 128 + 12, name_at)
     struct.pack_into('<B3xI8x8I', out, mesh_at, 1, 0, 0, len(bone_list), box_at, bone_list_at,
@@ -171,4 +180,7 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     struct.pack_into('<I8xI', out, layout_at, len(members), members_at)
     struct.pack_into('<2I2fBB2x3f', out, tex_at, tex_path, tex_type, 1.0, 1.0,
                      0, 0, 0.0, 0.0, 0.0)
+    if light_tex is not None:
+        struct.pack_into('<2I2fBB2x3f', out, tex2_at, light_path, light_type, 1.0, 1.0,
+                         0, 0, 0.0, 0.0, 0.0)
     return bytes(out)

@@ -105,6 +105,7 @@ def _read_flver(kind, location, member):
 
 
 DIFFUSE_TYPES = frozenset({'g_diffuse', 'gdiffuse'})
+LIGHTMAP_TYPES = frozenset({'g_lightmap'})
 MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
 TEXTURE_PREVIEW_CAP = 1024
 MAP_TEXTURE_CAP = 256
@@ -117,6 +118,18 @@ def _diffuse_name(material):
     for texture in material.get('textures', []):
         path = texture.get('path') or ''
         if texture.get('type', '').lower() in DIFFUSE_TYPES and path:
+            stem = path.replace('\\', '/').rsplit('/', 1)[-1]
+            return stem.rsplit('.', 1)[0] if '.' in stem else stem
+    return None
+
+
+def _lightmap_name(material):
+    """The material's baked-light texture stem, or None when it names
+    none. Same stem rule as the diffuse; the resolver treats both
+    alike."""
+    for texture in material.get('textures', []):
+        path = texture.get('path') or ''
+        if texture.get('type', '').lower() in LIGHTMAP_TYPES and path:
             stem = path.replace('\\', '/').rsplit('/', 1)[-1]
             return stem.rsplit('.', 1)[0] if '.' in stem else stem
     return None
@@ -508,7 +521,8 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
 
 def _textured(kind, location, member, stamp, skin, game_root, project, cap, area=None):
     encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
-    needed = sorted({mesh['map'] for mesh in encoded['meshes'] if mesh.get('map')})
+    needed = sorted({name for mesh in encoded['meshes']
+                     for name in (mesh.get('map'), mesh.get('light')) if name})
     if not needed:
         encoded['textures'] = {}
         return encoded
@@ -606,6 +620,7 @@ def _encode(doc, skin=False, textured=False):
             packed2 = struct.pack('<%df' % len(uvs2), *uvs2) if ok2 else b''
             entry['uv1'] = base64.b64encode(packed2).decode('ascii')
             entry['map'] = _diffuse_name(doc.meshes[index]['material'])
+            entry['light'] = _lightmap_name(doc.meshes[index]['material'])
         if skin:
             entry.update(_encode_skin(doc, mesh))
         meshes.append(entry)
