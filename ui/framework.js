@@ -3718,6 +3718,19 @@
           title: "No saved default view"}));
     }).catch(() => {});
   };
+  // A fresh save clears the hollow dots it earned: drop the cached
+  // packaged defaults, strip every dot, and re-mark, so only tabs
+  // still without a default keep theirs.
+  const refreshMissingDefaultViews = (pluginId, tabId) => {
+    defaultViewsCache.delete(pluginId);
+    document.querySelectorAll(".lex-tab-no-default").forEach(dot => dot.remove());
+    document.querySelectorAll(".lex-shell-header nav button[data-tab]").forEach(button =>
+      markMissingDefaultView(button, pluginId, button.dataset.tab, ""));
+    document.querySelectorAll(".lex-subtab-button").forEach(button => {
+      if (button.dataset.subtab)
+        markMissingDefaultView(button, pluginId, tabId, `${pluginId}-${tabId}-${button.dataset.subtab}`);
+    });
+  };
   const holdToSaveDefaultView = (button, onReset) => {    let timer = 0, saved = false;
     button.addEventListener("pointerdown", event => {
       if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
@@ -3735,7 +3748,10 @@
           const result = await callWindow("save_default_view", plugin, page, preferences);
           saved = !!result?.saved;
           const name = document.querySelector(".lex-shell-header nav button.active .lex-tab-label-text")?.textContent || page;
-          if (saved) showToast(`${name} is now the shipped default view.`);
+          if (saved) {
+            showToast(`${name} is now the shipped default view.`);
+            refreshMissingDefaultViews(plugin, page);
+          }
         } catch (error) {
           showAlert({title: "Could not save the default view", message: error.message || String(error)});
         }
@@ -8884,7 +8900,10 @@ ${contents.path}`});
         }
         const result = await callWindow("save_default_view", options.plugin.id, tab.id, preferences);
         savedDefault = !!result?.saved;
-        if (savedDefault) showToast(`${tab.label} is now the shipped default view.`);
+        if (savedDefault) {
+          showToast(`${tab.label} is now the shipped default view.`);
+          refreshMissingDefaultViews(options.plugin.id, tab.id);
+        }
       };
       const button = element("button", {
         "data-tab": tab.id,
