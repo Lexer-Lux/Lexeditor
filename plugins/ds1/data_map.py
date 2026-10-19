@@ -135,7 +135,7 @@ def payload(store, native_rules=None, theme=None):
             'status':'partial' if available else 'not-integrated', 'openable':available,
             'target':'items' if available else '', 'sub':tabs[0][0],
             'controls':'Items: '+', '.join(label for _,label in tabs),
-            'notes':'Rename items through their detail headings. NPC, place and feature text has no editor.' if available
+            'notes':'Rename items by double-clicking the table Name cell or the detail heading. NPC, place and feature text has no editor.' if available
                     else 'The item-text archive is missing. Item names cannot be renamed.'})
     for table, files in texts.DESC_TABLES.items():
         tabs = item_tables[table]

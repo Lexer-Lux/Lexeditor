@@ -84,6 +84,8 @@ def main():
                 if row['id'].startswith('desc:') and row['openable'])
             assert all(row['status']=='partial' for row in rows
                 if row['id'].startswith('name:') and row['openable'])
+            assert all('Name cell' in row['notes'] and 'detail heading' in row['notes'] for row in rows
+                if row['id'].startswith('name:') and row['openable'])
             assert all(row['status'] in ('partial','integrated') for row in rows if row['openable'])
             assert by_file['BehaviorParam.param']['coverage']=='structured'
             assert by_file['Bullet.param']['coverage']=='structured'
