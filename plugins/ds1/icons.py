@@ -50,7 +50,8 @@ SHEET_RANGES = (('Icon00', 0, 132), ('Icon01', 132, 205), ('Icon10', 1000, 1132)
 # layout's sprite rect. Tolerance icons are the armor screen's
 # icon_tolerance_* nodes; vit/att/end/res/souls are the level-up
 # screen's rows; slot is the attune screen's slot icon; souls doubles
-# as the shop price icon (icon_price).
+# as the shop price icon (icon_price). Vanilla has no MP frame, so mp
+# reuses the stamina cell and label_png tints it mana-mod blue.
 LABELS = {
     'physical': (127, 302, 169, 344), 'magic': (126, 387, 168, 429),
     'fire': (126, 345, 168, 387), 'lightning': (126, 430, 168, 472),
@@ -66,6 +67,7 @@ LABELS = {
     'vit': (83, 172, 125, 214), 'att': (83, 215, 125, 257),
     'end': (83, 301, 125, 343), 'res': (82, 344, 124, 386),
     'hp': (126, 172, 168, 214), 'stamina': (126, 258, 168, 300),
+    'mp': (126, 258, 168, 300),
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
     'divine': (126, 473, 168, 512), 'occult': (83, 473, 125, 512),
 }
@@ -238,6 +240,24 @@ def icon_png(game_root, icon_id):
     return crop_png(sheet_bytes(menu, sheet), rect)
 
 
+def _mp_bar(png):
+    """The stamina bar frame with its green interior mapped to blue.
+
+    Only green-dominant pixels move; the gold outline stays."""
+    from PIL import Image  # noqa: PLC0415 (Pillow ships with the app's previews)
+    with Image.open(io.BytesIO(bytes(png))) as image:
+        frame = image.convert('RGBA')
+    pixels = frame.load()
+    for y in range(frame.height):
+        for x in range(frame.width):
+            red, green, blue, alpha = pixels[x, y]
+            if green > red and green > blue:
+                pixels[x, y] = (red, blue, green, alpha)
+    out = io.BytesIO()
+    frame.save(out, format='PNG')
+    return out.getvalue()
+
+
 @lru_cache(maxsize=32)
 def label_png(game_root, name):
     """One label kind's menu art as PNG bytes."""
@@ -246,4 +266,5 @@ def label_png(game_root, name):
     if name not in LABELS:
         raise IconError(f'There is no label art for {name}')
     menu = Path(game_root) / 'menu'
-    return crop_png(sheet_bytes(menu, LABEL_SHEET), LABELS[name])
+    png = crop_png(sheet_bytes(menu, LABEL_SHEET), LABELS[name])
+    return _mp_bar(png) if name == 'mp' else png

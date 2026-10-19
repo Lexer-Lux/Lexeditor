@@ -111,7 +111,8 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
 # white ring and occult the black one (the sheet's bottom row); luck
 # stays unmapped, with no cure-item icon that would read as the item
 # instead of the status. HP and stamina take their bar frames (red and
-# green boxes, gold outline).
+# green boxes, gold outline); MP takes the stamina frame tinted
+# mana-mod blue (vanilla has no MP frame).
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
@@ -166,7 +167,7 @@ for _table, _keys, _kinds in (
         ('NpcParam', ('poisonGuardResist', 'diseaseGuardResist', 'bloodGuardResist', 'curseGuardResist'),
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('hp', 'mp', 'stamina', 'staminaRecoverBaseVel'),
-         ('hp', 'att', 'stamina', 'stamina')),
+         ('hp', 'mp', 'stamina', 'stamina')),
         ('NpcParam', ('getSoul',), ('souls',)),
         ('NpcParam', ('humanityLotId',), ('humanity',)),
         ('EquipParamGoods', ('consumeHeroPoint',), ('humanity',)),
@@ -186,7 +187,7 @@ for _table, _keys, _kinds in (
          ('divine', 'occult')),
         ('NpcParam', ('isWeakSaint', 'isWeakA'), ('divine', 'occult')),        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
          'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul'),
-         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'att', 'stamina', 'souls')),
+         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'mp', 'stamina', 'souls')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind

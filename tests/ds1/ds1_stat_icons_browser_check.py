@@ -1,7 +1,8 @@
-"""DS1 HP and stamina take their bar frames, not stat icons.
+"""DS1 HP, MP and stamina take their bar frames, not stat icons.
 
 NpcParam vitals and starting-class vitals map to the menu sheet's real
-frames (dark red and dark green boxes, gold outline); the detail shows
+frames (dark red and dark green boxes, gold outline, plus a mana-mod
+blue MP frame); the detail shows
 the loaded label art, not the vit/end stat glyphs.
 """
 import sys
@@ -20,12 +21,14 @@ from plugins.ds1.store import MARKER, RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
 
-VITALS = {'hp': 'hp', 'stamina': 'stamina'}
+VITALS = {'hp': 'hp', 'mp': 'mp', 'stamina': 'stamina'}
 
 
 def main():
     assert _FIELD_ICONS[('NpcParam', 'hp')] == 'hp'
     assert _FIELD_ICONS[('NpcParam', 'stamina')] == 'stamina'
+    assert _FIELD_ICONS[('NpcParam', 'mp')] == 'mp'
+    assert _FIELD_ICONS[('CharaInitParam', 'baseMp')] == 'mp'
     assert _FIELD_ICONS[('CharaInitParam', 'baseHp')] == 'hp'
     assert _FIELD_ICONS[('CharaInitParam', 'baseSp')] == 'stamina'
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-stat-icons-') as folder:

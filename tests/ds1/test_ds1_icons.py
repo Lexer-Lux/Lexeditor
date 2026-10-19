@@ -84,7 +84,7 @@ def test_label_cells_cover_the_equipment_screen():
                                  'str', 'dex', 'int', 'faith', 'weight', 'durability',
                                  'poison', 'toxic', 'bleed', 'curse', 'poise',
                                  'vit', 'att', 'end', 'res', 'souls', 'slot',
-                                 'hp', 'stamina', 'divine', 'occult'}
+                                 'hp', 'stamina', 'mp', 'divine', 'occult'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
@@ -102,6 +102,7 @@ def test_label_cells_cover_the_equipment_screen():
     assert icons.LABELS['slot'] == (125, 215, 167, 257)
     assert icons.LABELS['hp'] == (126, 172, 168, 214)
     assert icons.LABELS['stamina'] == (126, 258, 168, 300)
+    assert icons.LABELS['mp'] == icons.LABELS['stamina']
     assert icons.LABELS['divine'] == (126, 473, 168, 512)
     assert icons.LABELS['occult'] == (83, 473, 125, 512)
 
@@ -158,6 +159,25 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert ('NpcParam', 'staminaGuardDef') not in found
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
     assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
+    assert found[('NpcParam', 'mp')] == 'mp'
+    assert found[('CharaInitParam', 'baseMp')] == 'mp'
+    assert found[('CharaInitParam', 'baseWil')] == 'att'
+
+
+def test_mp_label_tints_the_stamina_frame_blue(tmp_path):
+    # Vanilla has no MP bar frame, so the MP label reuses the
+    # stamina cell with its green interior mapped to mana-mod
+    # blue; the gold outline (red-dominant) stays untouched.
+    menu = tmp_path / 'menu'
+    menu.mkdir()
+    green = make_dds_rgba(336, 608, [(10, 200, 10, 255)] * (336 * 608))
+    (menu / 'menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([('Menu04_2', green)])))
+    with Image.open(io.BytesIO(icons.label_png(str(tmp_path), 'mp'))) as image:
+        image.load()
+        assert image.size == (84, 84)
+        shot = image.copy()
+    red, green, blue, _alpha = shot.getpixel((42, 42))
+    assert blue > green and blue > red, (red, green, blue)
 
 
 def test_status_icons_reuse_shared_fallback_glyphs():
