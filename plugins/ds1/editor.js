@@ -2525,7 +2525,7 @@ function renderMaps(){
     onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
     onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
-  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"},LexeditorUI.loadingStatus("Loading map"));
+  const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"},LexeditorUI.loadingPanel({label:"Loading map"}));
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
     const token=++viewportMount;

@@ -39,7 +39,7 @@ window.Ds1Viewport = (() => {
     stop(host);
     const mine = ++session;
     if (!host.isConnected || !view) return null;
-    const loading=LexeditorUI.loadingStatus(`Loading ${view.parts.length} parts`);host.replaceChildren(loading);
+    const loading=LexeditorUI.loadingPanel({label:`Loading ${view.parts.length} parts`});host.replaceChildren(loading);
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     const {TransformControls} = await import("three/addons/controls/TransformControls.js");
@@ -407,12 +407,14 @@ window.Ds1Viewport = (() => {
     if (!chr) { status.textContent = `${view.name}: no placed character model.`; return; }
     if (!chr.available) { status.textContent = `${view.name}: ${chr.id} — ${chr.reason || "model unavailable"}.`; return; }
     status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${chr.id}`));
+    const loading = LexeditorUI.loadingPanel({label: `Loading ${chr.id}`});
+    host.replaceChildren(loading);
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     if (mine !== session || !host.isConnected) return;
     const response = await fetch(`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`);
     const data = await response.json();
-    if (!response.ok || data.error) throw new Error(data.error || response.statusText);
+    if (!response.ok || data.error) { loading.remove(); throw new Error(data.error || response.statusText); }
     if (mine !== session || !host.isConnected) return;
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -420,6 +422,7 @@ window.Ds1Viewport = (() => {
     canvas.dataset.viewport = "true";
     host.append(canvas);
     const viewModes = LexeditorUI.modelViewModes(host);
+    loading.remove();
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
     const controls = new OrbitControls(camera, canvas);
