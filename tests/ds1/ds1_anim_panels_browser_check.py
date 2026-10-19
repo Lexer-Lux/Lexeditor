@@ -89,6 +89,13 @@ def main():
                     page.wait_for_selector('[data-anim-host]')
                     page.wait_for_selector("[data-anim-host][data-ready='true']", timeout=30000)
                     page.wait_for_timeout(500)
+                    assert page.locator('.ds1-anim .lex-collapsible-handle').count() == 0
+                    widths = page.evaluate(
+                        """() => [document.querySelector('[data-anim-chars-panel]')
+                            .getBoundingClientRect().width,
+                          document.querySelector('[data-anim-list-panel]')
+                            .getBoundingClientRect().width]""")
+                    assert [round(width) for width in widths] == [300, 360], widths
                     for pane in ('[data-anim-chars]', '[data-anim-list]'):
                         assert page.locator(f'{pane} .lex-pager').count() == 1, pane
                         assert page.locator(f'{pane} .lex-pager.lex-pager-inline').count() == 1, pane

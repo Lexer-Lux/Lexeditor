@@ -2583,10 +2583,13 @@ function renderAnimPanels(){
       failMount(status,"Could not load the animation.")(error);
     });
   });
-  const characters=LexeditorUI.collapsiblePanel({label:"Characters",side:"left",viewKey:"ds1-anim-characters",width:"300px",
-    className:"ds1-anim-chars",content:[animCharsPane()]});
-  const animations=LexeditorUI.collapsiblePanel({label:"Animations",side:"right",viewKey:"ds1-anim-list",width:"360px",
-    className:"ds1-anim-list",content:[animListPane()]});
+  // Plain panels, not collapsible ones: the lists are the page, and
+  // collapsing them away only stranded readers. The collapsible
+  // component stays global for callers that still want it.
+  const characters=el("div",{"data-anim-chars-panel":"",class:"ds1-anim-chars","aria-label":"Characters",
+    style:"flex:0 0 300px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},animCharsPane());
+  const animations=el("div",{"data-anim-list-panel":"",class:"ds1-anim-list","aria-label":"Animations",
+    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},animListPane());
   return el("div",{class:"ds1-anim"},characters,viewPane,animations);
 }
 function monsterModelSection(){
