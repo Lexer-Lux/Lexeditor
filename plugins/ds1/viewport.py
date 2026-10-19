@@ -109,6 +109,7 @@ LIGHTMAP_TYPES = frozenset({'g_lightmap'})
 MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
 TEXTURE_PREVIEW_CAP = 1024
 MAP_TEXTURE_CAP = 256
+STRIP_TEXTURE_CAP = 256
 PNG_CACHE_SIZE = 128
 
 
@@ -328,7 +329,7 @@ def _tileset_singles(kind, location, game_root, project, area=None):
             yield f'{single.parent.name}/{single.name}', blob
 
 
-CHR_STEM = re.compile(r'^c(\\d+)', re.IGNORECASE)
+CHR_STEM = re.compile(r'^c(\d+)', re.IGNORECASE)
 
 
 def _sibling_binder(game_root, project, name):
@@ -429,13 +430,15 @@ def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
 
 
 def _resolve_textures(kind, location, member, needed, game_root=None, project=None,
-                      cap=TEXTURE_PREVIEW_CAP, area=None):
+                      cap=TEXTURE_PREVIEW_CAP, area=None, with_meta=False):
     """Diffuse PNGs by material name: the model's own textures, then
     its companion and area archives, then a sibling character's
     binder when the name is a character stem. Anything missing or
     undecodable stays out (the mesh renders gray, as before) with a
-    note saying why."""
+    note saying why. with_meta also returns per-texture source
+    names and sizes for the Models strip."""
     found, notes, missing = {}, [], list(needed)
+    meta = {} if with_meta else None
     saw = False
 
     def take(label, blob, names):
@@ -456,14 +459,19 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
             entry = by_name.get(name.lower())
             if entry is None:
                 continue
+            raw = blob[entry['offset']:entry['offset'] + entry['size']]
             try:
-                png = _dds_png(blob[entry['offset']:entry['offset'] + entry['size']], cap)
+                png = _dds_png(raw, cap)
             except (AssetError, FlverError, FormatError, ValueError,
                     struct.error, KeyError, OSError) as error:
                 notes.append(f'{name}: {error}')
                 continue
             found[name] = png
             missing.remove(name)
+            if meta is not None:
+                info = dds_info(raw)
+                meta[name] = {'name': entry['name'], 'width': info['width'],
+                              'height': info['height'], 'format': info['format']}
 
     for label, blob in _tpf_sources(kind, location, member):
         if not missing:
@@ -516,7 +524,32 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
         notes.append('no texture container found')
     for name in missing:
         notes.append(f'{name}: no texture with that name')
+    if with_meta:
+        return found, notes, meta
     return found, notes
+
+
+def model_strip_pngs(game_root, project, relative, side, member, wanted):
+    """Downscaled companion PNGs for one Models-tab file's strip.
+
+    ({stem: png bytes}, {stem: source name and size}) for the preview
+    member's texture maps, resolved exactly like the drawer's. Empty
+    when the file holds no previewable member.
+    """
+    resolved = resolve_asset_model(game_root, project, check_relative(relative),
+                                   side, member or None)
+    if resolved[0] == 'skip':
+        return {}, {}
+    kind, location = resolved[0], resolved[1]
+    shown = resolved[2] if kind == 'member' else ''
+    area = None
+    parts = check_relative(relative).parts
+    if len(parts) > 1 and parts[0] == 'map':
+        area = parts[1].split('_')[0] or None
+    found, _notes, meta = _resolve_textures(kind, str(location), shown, list(wanted),
+                                            game_root, project, STRIP_TEXTURE_CAP, area,
+                                            with_meta=True)
+    return found, meta
 
 
 def _textured(kind, location, member, stamp, skin, game_root, project, cap, area=None):

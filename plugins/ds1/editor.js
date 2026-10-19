@@ -479,7 +479,7 @@ function patchRowValues(table,id,values,display,name,modified){
 // Mod contents only is the shared table toggle: the server marks every
 // record row it changed this session, so the filter is one comparison.
 function modOnlySpec(){
-  return {available:!state.readOnly&&!ASSET_TABS.has(state.tab),value:state.modOnly===true,
+  return {available:!state.readOnly,value:state.modOnly===true,
     changed:row=>row.modified===true,
     change:value=>{state.modOnly=value;state.page=0;render();}};
 }function syncDetailControl(propertyKey,value,control){
@@ -1221,7 +1221,7 @@ const ASSET_MODEL_INFO={
 function assetPreviewStrip(textures,previewUrl,textureHelp){
   return el("div",{class:"ds1-texture-strip",role:"list"},
     ...textures.map(texture=>el("figure",{class:"ds1-texture-tile",role:"listitem"},
-      el("img",{src:previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
+      el("img",{src:texture.png||previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
       el("div",{class:"ds1-texture-caption"},
         el("span",{class:"ds1-texture-name",title:texture.name},texture.name),
         el("span",{class:"ds1-texture-help"},textureHelp(texture))))));
@@ -1238,8 +1238,8 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
   if(textures.length)body.push(detailSection({title:"PREVIEW",body:[assetPreviewStrip(textures,previewUrl,textureHelp)]}));
   else body.push(detailSection({title:"PREVIEW",body:[
-    detailField({label:"TEXTURES",control:readonlyField("None in this file"),
-      help:infoHelp("Only files with their own textures preview here. Character and map textures live in companion archives.")})]}));
+    detailField({label:"TEXTURES",control:readonlyField("None found"),
+      help:infoHelp("Model textures live in companion archives.")})]}));
   const previewable=!!(model&&model.previewable);
   const icon=LexeditorUI.iconSlot({content:previewable
     ?window.Ds1Preview.thumbnail({url:assetGeometryUrl(row.id,info.source,model.member),label:row.name})

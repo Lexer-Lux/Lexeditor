@@ -429,16 +429,42 @@ def render_png(blob):
         raise AssetError(f"That texture cannot be previewed: {error}") from error
 
 
+# Diffuse and lightmap texture types, mirrored from viewport (which
+# renders them); assets cannot import viewport.
+MODEL_TEXTURE_TYPES = frozenset({'g_diffuse', 'gdiffuse', 'g_lightmap'})
+
+
+def _material_maps(material):
+    """Diffuse and lightmap stems one mesh material names."""
+    found = []
+    for texture in material.get('textures', []):
+        if texture.get('type', '').lower() not in MODEL_TEXTURE_TYPES:
+            continue
+        path = texture.get('path') or ''
+        if not path:
+            continue
+        stem = path.replace(chr(92), '/').rsplit('/', 1)[-1]
+        found.append(stem.rsplit('.', 1)[0] if '.' in stem else stem)
+    return found
+
+
 def open_container(raw):
-    """Plain bytes and binder members, or (None, {}) for other files."""
+    """Plain bytes and binder members, or (None, {}) for other files.
+
+    Unwrapped binders open too: the game's FaceGen archive never got
+    a DCX wrapper.
+    """
     try:
         plain = bytes(inflate(raw))
     except FormatError:
-        return None, {}
+        plain = None
+    candidate = plain if plain is not None else bytes(raw)
     try:
-        return plain, members(plain)
+        found = members(candidate)
     except FormatError:
         return plain, {}
+    owned = found if isinstance(found, dict) else {entry.name: entry for entry in found}
+    return candidate, owned
 
 
 def list_textures(file_bytes, filename):
@@ -535,20 +561,21 @@ def model_info(data, filename):
     digest = (sha_short(data), str(filename).lower())
     hit = _MODEL_INFO_CACHE.get(digest)
     if hit is not None:
-        return dict(hit, members=list(hit['members']))
+        return dict(hit, members=list(hit['members']), maps=list(hit['maps']))
     extension = _inner_extension(filename)
     if extension in COLLISION_EXTENSIONS:
         info = {'kind': 'collision', 'previewable': False, 'members': [], 'member': '',
-                'objects': None, 'meshes': 0, 'bones': 0, 'reason': 'collision'}
+                'objects': None, 'meshes': 0, 'bones': 0, 'reason': 'collision',
+                'maps': []}
     else:
         plain, owned = open_container(bytes(data))
         if owned:
             blobs = sorted(name for name in owned if name.lower().endswith('.flver'))
             leaf = str(filename).replace(chr(92), '/').rsplit('/', 1)[-1]
             inner = leaf[:-4] if leaf.lower().endswith('.dcx') else leaf
-            default = _default_flver(inner.rsplit('.', 1)[0], blobs)
             meshes = bones = 0
             broken = set()
+            docs = {}
             for name in blobs:
                 entry = owned[name]
                 try:
@@ -559,39 +586,64 @@ def model_info(data, filename):
                     # marks the file unreadable.
                     broken.add(name)
                     continue
+                docs[name] = doc
                 meshes += len(doc.meshes)
                 bones += len(doc.bones)
+            with_mesh = [name for name in blobs if name in docs and any(
+                len(mesh['positions']) for mesh in docs[name].meshes)]
             if not blobs:
                 reason = 'no-mesh'
-            elif default in broken:
-                reason = 'unreadable'
-            else:
+                default = ''
+            elif with_mesh:
+                # The preview member holds visible geometry: the stem
+                # match when it has meshes, else the first that does.
+                # A skeleton-only default used to preview an empty stage.
+                default = _default_flver(inner.rsplit('.', 1)[0], with_mesh)
                 reason = None
+            elif len(broken) == len(blobs):
+                reason = 'unreadable'
+                default = ''
+            else:
+                reason = 'no-mesh'
+                default = ''
+            maps = sorted({stem for mesh in docs[default].meshes
+                           for stem in _material_maps(mesh['material'])}
+                          ) if reason is None else []
             info = {'kind': MODEL_KINDS.get(extension, 'model'),
                     'previewable': reason is None,
                     'members': blobs, 'member': default if reason is None else '',
                     'objects': len(blobs) if extension == '.objbnd' else None,
-                    'meshes': meshes, 'bones': bones, 'reason': reason}
+                    'meshes': meshes, 'bones': bones, 'reason': reason,
+                    'maps': maps}
         else:
             payload = plain if plain is not None else bytes(data)
             if extension == '.flver':
                 try:
                     doc = FlverDocument(payload)
                 except Exception:
+                    doc = None
+                if doc is None:
                     info = {'kind': 'piece', 'previewable': False, 'members': [],
                             'member': '', 'objects': None, 'meshes': 0, 'bones': 0,
-                            'reason': 'unreadable'}
+                            'reason': 'unreadable', 'maps': []}
+                elif not any(len(mesh['positions']) for mesh in doc.meshes):
+                    info = {'kind': 'piece', 'previewable': False, 'members': [],
+                            'member': '', 'objects': None, 'meshes': 0,
+                            'bones': len(doc.bones), 'reason': 'no-mesh', 'maps': []}
                 else:
                     info = {'kind': 'piece', 'previewable': True, 'members': [],
                             'member': '', 'objects': None,
                             'meshes': len(doc.meshes), 'bones': len(doc.bones),
-                            'reason': None}
+                            'reason': None,
+                            'maps': sorted({stem for mesh in doc.meshes
+                                            for stem in _material_maps(mesh['material'])})}
             else:
                 info = {'kind': MODEL_KINDS.get(extension, 'model'),
                         'previewable': False, 'members': [], 'member': '',
                         'objects': None, 'meshes': 0, 'bones': 0,
-                        'reason': 'unreadable'}
-    _MODEL_INFO_CACHE[digest] = dict(info, members=list(info['members']))
+                        'reason': 'unreadable', 'maps': []}
+    _MODEL_INFO_CACHE[digest] = dict(info, members=list(info['members']),
+                                          maps=list(info['maps']))
     while len(_MODEL_INFO_CACHE) > _MODEL_INFO_CACHE_SIZE:
         _MODEL_INFO_CACHE.pop(next(iter(_MODEL_INFO_CACHE)))
     return info

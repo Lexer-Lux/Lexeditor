@@ -161,20 +161,39 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     tabs = page.locator("[data-tab]").evaluate_all(
                         "nodes=>nodes.map(n=>n.dataset.tab)")
-                    for tab in ("models", "textures", "sound", "music"):
+                    for tab in ("models", "textures", "sound"):
                         assert tab in tabs, tabs
+                    assert "music" not in tabs, tabs
                     assert "other" not in tabs, tabs
                     assert "assets" not in tabs, tabs
-                    for tab, wanted in (("models", 4), ("textures", 4), ("sound", 1),
-                                        ("music", 1)):
+                    for tab, wanted in (("models", 4), ("textures", 4)):
                         page.locator(f'[data-tab="{tab}"]').click()
                         page.wait_for_function(
                             f'state.tab==="{tab}" && state.sub==="files"'
                             f" && state.rows.length==={wanted} && !state.error")
                         # Movies have no tab and list nowhere.
                         assert page.locator(".lex-list-row", has_text="intro.wmv").count() == 0
-                    # One merged list: no source subtabs anywhere.
+                    # One merged list: single-list tabs show no strip.
+                    page.locator('[data-tab="models"]').click()
+                    page.wait_for_function('state.tab==="models" && state.sub==="files"')
                     assert page.locator("[data-subtab]").count() == 0
+                    # Sound merges effects and music: streams first, files behind Files.
+                    page.locator('[data-tab="sound"]').click()
+                    page.wait_for_function(
+                        'state.tab==="sound" && state.sub==="files"'
+                        " && state.rows.length===2 && !state.error")
+                    subs = page.locator("[data-subtab]").evaluate_all(
+                        "nodes=>nodes.map(n=>n.dataset.subtab)")
+                    assert subs == ["sfx", "music", "files"], subs
+                    page.locator('[data-subtab="sfx"]').click()
+                    page.wait_for_function(
+                        'state.tab==="sound" && state.sub==="sfx"'
+                        " && state.rows.length===0 && !state.error")
+                    page.locator('[data-subtab="files"]').click()
+                    page.wait_for_function(
+                        'state.tab==="sound" && state.sub==="files"'
+                        " && state.rows.length===2 && !state.error")
+                    assert page.locator(".lex-list-row", has_text="intro.wmv").count() == 0
                     # Files join the mod through the list's add button.
                     assert page.locator(
                         '#main .lex-table-add[aria-label="Add file to mod"]').count() == 1
@@ -238,7 +257,7 @@ def main():
                     assert "PREVIEW" in section_titles(page)
                     no_tex = page.locator(".lex-detail-section", has_text="PREVIEW").first.locator(
                         "input").input_value()
-                    assert no_tex == "None in this file", no_tex
+                    assert no_tex == "None found", no_tex
                     open_drawer(page)
                     painted(page, "canvas[data-preview]")
                     picker = page.locator('button[aria-label="Model member"]')
@@ -319,11 +338,13 @@ def main():
                     kinds = page.evaluate("state.rows.map(r=>r.display?.kind)")
                     assert kinds.count("Split archive") == 2 and kinds.count("Textures") == 2, kinds
                     assert page.locator("#main .lex-list-row", has_text="Split archive").count() == 2
-                    # Sounds and music have no picture and no source row.
-                    for tab, wanted in (("sound", SFX), ("music", MUSIC)):
-                        page.locator(f'[data-tab="{tab}"]').click()
-                        page.wait_for_function(
-                            f'state.tab==="{tab}" && state.rows.length===1 && !state.error')
+                    # Sound files have no picture and no source row.
+                    page.locator('[data-tab="sound"]').click()
+                    page.locator('[data-subtab="files"]').click()
+                    page.wait_for_function(
+                        'state.tab==="sound" && state.sub==="files"'
+                        " && state.rows.length===2 && !state.error")
+                    for wanted in (SFX, MUSIC):
                         page.locator(".lex-list-row", has_text=wanted).click()
                         page.wait_for_function(
                             f'state.row?.id==="{wanted}" && state.assetDetail?.source==="game"'

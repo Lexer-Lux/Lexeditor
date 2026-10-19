@@ -180,8 +180,8 @@ class Handler(PluginRequestHandler):
                                       'hasProject': STORE.project is not None,
                                       'readOnly': STORE.read_only}
                         elif scope == 'textures':
-                            data, source, name = _asset_bytes(query.get('file', [''])[0],
-                                                              query.get('side', ['mod'])[0])
+                            side = query.get('side', ['mod'])[0]
+                            data, source, name = _asset_bytes(query.get('file', [''])[0], side)
                             model = assets.model_info(data, name) \
                                 if assets.kind_of(name) == 'models' else None
                             if assets.is_split_archive(name):
@@ -191,6 +191,19 @@ class Handler(PluginRequestHandler):
                                     textures, reason = assets.list_textures(data, name), None
                                 except assets.AssetError:
                                     textures, reason = [], 'unreadable'
+                            if model is not None and model.get('previewable') and model.get('maps'):
+                                found, meta = viewport.model_strip_pngs(
+                                    STORE.game_root, STORE.project, name, side,
+                                    model.get('member'), model['maps'])
+                                have = {tile['name'].lower() for tile in textures}
+                                for stem in model['maps']:
+                                    if stem in found and meta[stem]['name'].lower() not in have:
+                                        tile = meta[stem]
+                                        textures.append({
+                                            'name': tile['name'], 'width': tile['width'],
+                                            'height': tile['height'], 'format': tile['format'],
+                                            'png': 'data:image/png;base64,' + base64.b64encode(
+                                                found[stem]).decode('ascii')})
                             result = {'file': name, 'source': source, 'size': len(data),
                                       'textures': textures, 'reason': reason,
                                       'model': model}

@@ -466,7 +466,7 @@ def test_model_info_character_counts_meshes_and_bones():
     assert assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx") == {
         "kind": "character", "previewable": True, "members": ["c0000.flver"],
         "member": "c0000.flver", "objects": None, "meshes": 1, "bones": 1,
-        "reason": None}
+        "reason": None, "maps": ["tex0"]}
 
 
 def test_model_info_object_binder_counts_its_objects():
@@ -524,7 +524,7 @@ def test_service_assets_geometry_serves_model_mesh(tmp_path):
         assert detail["model"] == {"kind": "character", "previewable": True,
                                    "members": ["c0000.flver"], "member": "c0000.flver",
                                    "objects": None, "meshes": 1, "bones": 1,
-                                   "reason": None}
+                                   "reason": None, "maps": ["tex0"]}
         geometry = request_json(session, f"/api/assets/geometry?file={target.as_posix()}")
         assert len(geometry["meshes"]) == 1
         assert geometry["meshes"][0]["tris"] == 2
@@ -554,5 +554,70 @@ def test_service_assets_geometry_serves_model_mesh(tmp_path):
         assert hkx_detail["model"]["reason"] == "collision"
         with pytest.raises(HTTPError):
             request_json(session, f"/api/assets/geometry?file={hkx.as_posix()}")
+    finally:
+        session.stop()
+
+
+def test_model_info_skeleton_only_binder_reports_no_mesh():
+    blob = make_chrbnd(build_flver(mesh_count=0), stem="c0000")
+    info = assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")
+    assert info["previewable"] is False and info["reason"] == "no-mesh"
+    assert info["member"] == "" and info["maps"] == []
+    assert info["bones"] == 1 and info["meshes"] == 0
+
+
+def test_model_info_prefers_a_member_with_meshes():
+    blob = make_chrbnd(build_flver(mesh_count=0), stem="c0000",
+                       extra=[("cloak.flver", build_flver())])
+    info = assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")
+    assert info["previewable"] is True and info["reason"] is None
+    assert info["member"] == "cloak.flver"
+    assert info["members"] == ["c0000.flver", "cloak.flver"]
+
+
+def test_model_info_piece_without_meshes_reports_no_mesh():
+    info = assets.model_info(build_flver(mesh_count=0),
+                             "map/m10_00_00_00/m10piece.flver.dcx")
+    assert info["previewable"] is False and info["reason"] == "no-mesh"
+    assert info["maps"] == []
+
+
+def test_open_container_reads_unwrapped_binders():
+    blob = make_chrbnd(build_flver(), stem="c0000", dcx=False)
+    plain, owned = assets.open_container(blob)
+    assert sorted(owned) == ["c0000.flver"]
+    info = assets.model_info(blob, "facegen/FaceGen.fgbnd")
+    assert info["previewable"] is True and info["member"] == "c0000.flver"
+    assert assets.open_container(b"not a binder") == (None, {})
+
+
+def test_model_info_collects_default_member_texture_maps():
+    blob = make_chrbnd(build_flver(), stem="c0000")
+    assert assets.model_info(blob, "chr/c0000/c0000.chrbnd.dcx")["maps"] == ["tex0"]
+    lit = make_chrbnd(build_flver(light_tex="lm0"), stem="c0000")
+    assert assets.model_info(lit, "chr/c0000/c0000.chrbnd.dcx")["maps"] == ["lm0", "tex0"]
+
+
+def test_service_model_detail_lists_companion_textures(tmp_path):
+    game, mod = project(tmp_path)
+    main = Path("chr/c1200.chrbnd.dcx")
+    (game / main).parent.mkdir(parents=True, exist_ok=True)
+    (game / main).write_bytes(make_chrbnd(build_flver(tex_name="c9999_cloak.tga"),
+                                          stem="c1200"))
+    sibling = Path("chr/c9999.chrbnd.dcx")
+    (game / sibling).parent.mkdir(parents=True, exist_ok=True)
+    (game / sibling).write_bytes(make_chrbnd(
+        build_flver(), stem="c9999",
+        extra=[("c9999.tpf", make_tpf([("c9999_cloak", make_uncompressed_dds(8, 4))]))]))
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
+                          "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
+    try:
+        session.start()
+        detail = request_json(session, f"/api/assets?scope=textures&file={main.as_posix()}")
+        assert detail["model"]["maps"] == ["c9999_cloak"]
+        assert [tile["name"] for tile in detail["textures"]] == ["c9999_cloak"]
+        tile = detail["textures"][0]
+        assert tile["png"].startswith("data:image/png;base64,")
+        assert (tile["width"], tile["height"], tile["format"]) == (8, 4, "uncompressed")
     finally:
         session.stop()
