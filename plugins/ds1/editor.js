@@ -879,6 +879,15 @@ function recordIconCell(row){
   picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
   return picture;
 }
+function textureIconCell(row){
+  if(!row||row.table!=="Asset")return "";
+  if(row.values&&row.values.kind==="archive")return "";
+  const picture=el("img",{class:"lex-ds1-shop-icon",loading:"lazy",
+    src:`/api/assets/preview?file=${encodeURIComponent(row.id)}`,
+    alt:"",draggable:"false","data-lex-no-image":"off"});
+  picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
+  return picture;
+}
 function npcShopSection(){
   const full=el("div",{class:"lex-shop-line-full"});
   const rows=state.npcShop.rows.map(line=>({key:String(line.id),
@@ -1882,7 +1891,8 @@ function renderItems(){
       columns:(misc&&state.sub==="encumbrance")?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
         state.tab==="items"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>recordIconCell(row)},
           {key:"name",label:"Name",sortable:true,grow:1}]:
-        state.tab==="textures"?[{key:"name",label:"Name",sortable:true,grow:1},
+        state.tab==="textures"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>textureIconCell(row)},
+          {key:"name",label:"Name",sortable:true,grow:1},
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         [{key:"name",label:"Name",sortable:true,grow:1}]});
     },
