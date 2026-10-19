@@ -50,6 +50,45 @@ def test_area_texture_tables_parse_once(tmp_path, monkeypatch):
     assert len(calls) == 1, calls
 
 
+def game_with_many_tilesets(tmp_path, count=40):
+    game = tmp_path / 'game'
+    for index in range(10, 10 + count):
+        folder = game / 'map' / ('m%02d' % index)
+        folder.mkdir(parents=True)
+        (folder / 'm_x.tpfbdt').write_bytes(bytes(16))
+        (folder / 'm_x.tpfbhd').write_bytes(
+            make_bhf([(r'\m%02d\zz%d.tpf.dcx' % (index, index), 16, 8)]))
+    return game
+
+
+def resolve_missing_twice(game):
+    for _ in range(2):
+        found, _notes = viewport._resolve_textures(
+            'piece', str(game / 'map' / 'm10' / 'm10piece.flver.dcx'),
+            '', ['tex0'], str(game), None, viewport.MAP_TEXTURE_CAP, 'm10')
+        assert found == {}
+
+
+def test_tileset_sweep_parses_each_header_once(tmp_path, monkeypatch):
+    game = game_with_many_tilesets(tmp_path)
+    real = viewport.parse_bhf
+    calls = []
+    monkeypatch.setattr(viewport, 'parse_bhf',
+                        lambda blob: calls.append(1) or real(blob))
+    resolve_missing_twice(game)
+    assert len(calls) == 40, calls
+
+
+def test_shared_tpf_members_inflate_once(tmp_path, monkeypatch):
+    game = game_with_shared_area(tmp_path)
+    real = viewport.inflate_member
+    calls = []
+    monkeypatch.setattr(viewport, 'inflate_member',
+                        lambda bdt, off, size: calls.append(1) or real(bdt, off, size))
+    resolve_five_times(game)
+    assert len(calls) == 1, calls
+
+
 def test_shared_binder_inflates_once(tmp_path, monkeypatch):
     game = game_with_shared_area(tmp_path)
     real = viewport.inflate

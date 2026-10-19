@@ -247,7 +247,8 @@ class Handler(PluginRequestHandler):
                         if model is None:
                             raise MsbError('Unknown map model')
                         result = viewport.model_geometry(
-                            MAPSTORE.game_root, MAPSTORE.project, document.map_name, model)
+                            MAPSTORE.game_root, MAPSTORE.project, document.map_name, model,
+                            frozenset(filter(None, query.get('known', [''])[0].split(','))) or None)
                     elif path == '/api/chr/view':
                         npc = int(query.get('npc', [''])[0])
                         document = STORE.get()

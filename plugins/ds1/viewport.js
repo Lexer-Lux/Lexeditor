@@ -172,12 +172,34 @@ window.Ds1Viewport = (() => {
       if (info && info.available) wanted.push(part.model);
     }
     const unique = [...new Set(wanted)];
-    const loaded = await Promise.all(unique.map(async name => {
-      const response = await fetch(`/api/map/geometry?map=${encodeURIComponent(mapId)}&model=${encodeURIComponent(name)}`);
-      const data = await response.json();
-      if (!response.ok || data.error) throw new Error(data.error || response.statusText);
-      return [name, data];
-    }));
+    // Geometry loads in batches, each batch sending the texture
+    // content ids it already holds: a map repeats its textures per
+    // model, and responses omit known blobs (the id mapping stays,
+    // so per-model dicts rebuild from the shared store).
+    const pngById = new Map();
+    const seenIds = new Set();
+    const loaded = [];
+    for (let at = 0; at < unique.length; at += 8) {
+      if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
+      const known = [...seenIds].join(",");
+      const batch = await Promise.all(unique.slice(at, at + 8).map(async name => {
+        const response = await fetch(`/api/map/geometry?map=${encodeURIComponent(mapId)}&model=${encodeURIComponent(name)}` + (known ? `&known=${encodeURIComponent(known)}` : ""));
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || response.statusText);
+        for (const [tex, digest] of Object.entries(data.texture_ids || {})) {
+          if (data.textures && data.textures[tex]) {
+            pngById.set(digest, data.textures[tex]);
+            seenIds.add(digest);
+          }
+        }
+        const rebuilt = {};
+        for (const [tex, digest] of Object.entries(data.texture_ids || {}))
+          if (pngById.has(digest)) rebuilt[tex] = pngById.get(digest);
+        data.textures = rebuilt;
+        return [name, data];
+      }));
+      loaded.push(...batch);
+    }
     if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const wantedPngs = new Map();
     for (const [name, data] of loaded)

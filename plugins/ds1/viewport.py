@@ -111,6 +111,7 @@ TEXTURE_PREVIEW_CAP = 1024
 MAP_TEXTURE_CAP = 256
 STRIP_TEXTURE_CAP = 256
 PNG_CACHE_SIZE = 128
+MEMBER_CACHE_SIZE = 64
 
 
 def _diffuse_name(material):
@@ -177,10 +178,12 @@ def _shared_binder_plain(location):
     return _cached_binder_plain(str(location), stamp)
 
 
-@functools.lru_cache(maxsize=32)
+@functools.lru_cache(maxsize=256)
 def _cached_bhf_table(location, stamp):
     """One texture header's parsed table, shared across a map's
-    models. Headers are small; the stamp keys a rebuild."""
+    models. Headers are small; the stamp keys a rebuild. Sized past
+    a full tileset sweep (53 headers on the vanilla game) so one
+    map's models stop evicting each other's tables."""
     return parse_bhf(Path(location).read_bytes())
 
 
@@ -398,6 +401,25 @@ def _tpf_sources(kind, location, member):
 
 
 _PNG_CACHE = OrderedDict()
+_MEMBER_CACHE = OrderedDict()
+
+
+def _cached_member(bdt, offset, size):
+    """One archive member's inflated bytes, shared across a map's
+    models. Every model pulled the same tileset archives through
+    zlib again; the data-file stamp is part of the key, so a
+    rebuilt mod still reloads. Bounded: members are small
+    (median 85KB on the Depths) but many."""
+    key = (str(bdt), offset, size, _stamp(bdt))
+    hit = _MEMBER_CACHE.get(key)
+    if hit is not None:
+        _MEMBER_CACHE.move_to_end(key)
+        return hit
+    blob = inflate_member(bdt, offset, size)
+    _MEMBER_CACHE[key] = blob
+    while len(_MEMBER_CACHE) > MEMBER_CACHE_SIZE:
+        _MEMBER_CACHE.popitem(last=False)
+    return blob
 
 
 def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
@@ -499,20 +521,18 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
             tables.extend(more)
         if tables:
             saw = True
-        inflated = {}
+
         for name in list(missing):
             for label, table, bdt in tables:
                 slot = table.get(name.lower())
                 if slot is None:
                     continue
-                key = (label, name.lower())
                 try:
-                    if key not in inflated:
-                        inflated[key] = inflate_member(bdt, slot[0], slot[1])
+                    blob = _cached_member(bdt, slot[0], slot[1])
                 except BhfError as error:
                     notes.append(f'{label}: {error}')
                     continue
-                take(label, inflated[key], [name])
+                take(label, blob, [name])
                 if name in found:
                     break
     if missing:
@@ -566,12 +586,22 @@ def _textured(kind, location, member, stamp, skin, game_root, project, cap, area
     return encoded
 
 
-def _payload(cached):
+def _payload(cached, known=None):
     """A cached geometry with its PNGs base64-encoded for JSON. The
-    cache keeps the shared PNG bytes; only the copy goes over the wire."""
+    cache keeps the shared PNG bytes; only the copy goes over the wire.
+    texture_ids tags each PNG by content, and known skips blobs the
+    client already holds (a map repeats its textures per model)."""
+    nave = known or frozenset()
     payload = dict(cached)
-    payload['textures'] = {name: base64.b64encode(png).decode('ascii')
-                           for name, png in cached.get('textures', {}).items()}
+    ids, textures = {}, {}
+    for name, png in cached.get('textures', {}).items():
+        digest = hashlib.blake2b(png, digest_size=16).hexdigest()
+        ids[name] = digest
+        if digest not in nave:
+            textures[name] = base64.b64encode(png).decode('ascii')
+    payload['textures'] = textures
+    payload['texture_ids'] = ids
+
     return payload
 
 
@@ -663,9 +693,10 @@ def _encode(doc, skin=False, textured=False):
     return {'meshes': meshes, 'notes': doc.notes}
 
 
-def model_geometry(game_root, project, map_name, model):
+def model_geometry(game_root, project, map_name, model, known=None):
     """Base64 float32 geometry for one model, cached by file stamp,
-    with UVs and diffuse textures for the viewport."""
+    with UVs and diffuse textures for the viewport. known skips
+    texture blobs the caller already holds (content ids stay)."""
     resolved = resolve_model(game_root, project, map_name, model)
     if resolved[0] == 'skip':
         raise FlverError(resolved[1])
@@ -677,7 +708,7 @@ def model_geometry(game_root, project, map_name, model):
         raise FlverError(f'Cannot read {Path(location).name}') from error
     area = Path(map_name).stem.split('_')[0]
     return _payload(_cached_map(kind, str(location), member, (stat.st_mtime_ns, stat.st_size),
-                                  game_root, project, area))
+                                  game_root, project, area), known)
 
 
 CHR_ID = re.compile(r'^[A-Za-z0-9_]+$')
