@@ -45,3 +45,16 @@ def test_single_uv_mesh_has_empty_second_set():
     entry = _encode(doc, textured=True)['meshes'][0]
     assert base64.b64decode(entry['uv1']) == b''
     assert len(unpack(entry['uv'])) == 8
+
+
+def test_lightmapped_single_uv_mesh_reuses_diffuse_uvs():
+    # Depths pieces (m2130B0A10 et al) carry one UV pair per vertex
+    # and an [L]-suffixed lightmapped material: 0 of 688 meshes in
+    # m10_00_00_00 ship a second set. The game samples the lightmap
+    # with the diffuse interpolants, so the encoder repeats uv as
+    # uv1 instead of leaving the light path dead (fullbright map).
+    entry = _encode(FlverDocument(build_flver(light_tex='lit0')),
+                    textured=True)['meshes'][0]
+    assert entry['light'] == 'lit0'
+    assert base64.b64decode(entry['uv1']) != b''
+    assert unpack(entry['uv1']) == unpack(entry['uv'])

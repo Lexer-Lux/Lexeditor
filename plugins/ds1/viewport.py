@@ -651,9 +651,12 @@ def _encode(doc, skin=False, textured=False):
             uvs2 = [c for vertex in mesh['uvs2'] for c in vertex]
             ok2 = bool(uvs2) and len(mesh['uvs2']) == len(mesh['positions'])
             packed2 = struct.pack('<%df' % len(uvs2), *uvs2) if ok2 else b''
+            light = _lightmap_name(doc.meshes[index]['material'])
+            if light and not ok2 and ok:
+                packed2 = packed
             entry['uv1'] = base64.b64encode(packed2).decode('ascii')
             entry['map'] = _diffuse_name(doc.meshes[index]['material'])
-            entry['light'] = _lightmap_name(doc.meshes[index]['material'])
+            entry['light'] = light
         if skin:
             entry.update(_encode_skin(doc, mesh))
         meshes.append(entry)

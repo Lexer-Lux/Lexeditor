@@ -40,7 +40,8 @@ def make_chrbnd(flver_bytes, stem='c1200', extra=(), dcx=True):
 
 def build_flver(strip=False, qloc=False, bones=None, skin=None,
                 pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False,
-                light_tex=None, mesh_count=1, tex_name='tex0'):
+                light_tex=None, mesh_count=1, tex_name='tex0',
+                mtd_name='M[D].mtd'):
     """A minimal FLVER2 0x2000C: mesh_count quads, 1 material, N bones, 1 dummy.
 
     `strip` stores the faces as a triangle strip; `qloc` writes a lying
@@ -49,7 +50,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     the origin); `skin` is per-vertex (ids, weights) with ids indexing
     `bone_list` (default every model bone in order); `pos_offset` shifts
     the quad. `mesh_count` is 1 or 0 (a skeleton-only rig, like the
-    player base); `tex_name` is the diffuse texture's path.
+    player base); `tex_name` is the diffuse texture's path; `mtd_name`
+    is the material definition (water shaders name Water).
     """
     if bones is None:
         bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
@@ -130,7 +132,7 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
                                     for semantic, fmt, inst in members))
 
     mat_name = place(b'mat0\0')
-    mtd = place(b'M[D].mtd\0')
+    mtd = place(mtd_name.encode('ascii') + b'\0')
     bone_names = [place(name.encode('ascii') + b'\0') for name, *_ in bones]
     tex_path = place(tex_name.encode('ascii') + b'\0')
     tex_type = place(b'g_Diffuse\0')

@@ -71,6 +71,12 @@ window.Ds1Viewport = (() => {
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
+    // Water shaders ([We]) name no diffuse, only a bump map, so the
+    // gray fallback lit by the rig rendered lakes and sewers flat
+    // white. Translucent blue reads as water and stays out of the way.
+    const isWater = mesh => (mesh.mat_def || "").toLowerCase().includes("water");
+    const water = new THREE.MeshStandardMaterial({color: 0x2f6f9e, roughness: 0.35, metalness: 0,
+      side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false});
     // One texture per diffuse name AND content: two models in one map
     // can wear different bytes under one name (an object keeps its own
     // binder texture while a piece resolves the same name from the area
@@ -131,8 +137,8 @@ window.Ds1Viewport = (() => {
       }
       return lightCache.get(key);
     };
-    const materialFor = (mesh, texturesByName, fx) => {
-      const plain = fx ? effect : mesh.cull !== false ? front : double;
+    const materialFor = (mesh, texturesByName, fx, waterMesh) => {
+      const plain = waterMesh ? water : fx ? effect : mesh.cull !== false ? front : double;
       const png = mesh.map && texturesByName && texturesByName[mesh.map];
       const image = mesh.map && mesh.uv && png ? texCache.get(texKey(mesh.map, png)) : null;
       if (!image) return plain;
@@ -203,7 +209,7 @@ window.Ds1Viewport = (() => {
         geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
         geo.computeBoundingSphere();
         const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
-        entry.mat = materialFor(mesh, data.textures, entry.fx);
+        entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh));
         return entry;
       }));
     }
