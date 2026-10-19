@@ -99,7 +99,13 @@ def main():
                                                arg={"key": ":" + key.split(":")[1], "map": map_name})
                     page.locator('[data-tabstrip-id="selection"]').click()
                     title = page.locator(".lex-detail-panel-title").inner_text()
-                    assert ("Rat \u2014 " + MAP) in title if not root else map_name in title
+                    if not root:
+                        assert title.strip() == "Rat", title
+                    else:
+                        assert map_name not in title and title.strip(), title
+                    goto = page.locator('[data-maps-side] [data-row-action="goto"]')
+                    assert goto.count() == 1
+                    assert "lex-header-icon" in (goto.first.get_attribute("class") or "")
                     assert page.locator("[data-maps-side] .lex-multi-number").count() == 3
                     vectors = page.locator("[data-maps-side] .lex-detail-field:has(.lex-multi-number) .lex-detail-field-label-text").evaluate_all("nodes=>nodes.map(n=>n.textContent)")
                     assert vectors == ["Position", "Rotation", "Scale"], vectors

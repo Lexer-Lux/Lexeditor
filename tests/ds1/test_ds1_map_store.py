@@ -56,6 +56,8 @@ def test_read_returns_enum_choices_and_vanilla_values(tmp_path):
     _game, _mod, store = setup(tmp_path)
     row = store.read(MAP, "2:0")
     assert (row["id"], row["table"], row["map"]) == ("2:0", MAP, MAP)
+    assert row["name"] == "Rat \u2014 " + MAP
+    assert row["shortName"] == "Rat"
     npc = next(item for item in row["fields"] if item["key"] == "npcId")
     assert npc["type"] == "enum" and npc["enum"]["120000"] and npc["vanilla"] == 120000
     pos = next(item for item in row["fields"] if item["key"] == "posX")

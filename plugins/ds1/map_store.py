@@ -249,14 +249,17 @@ class MapStore:
             self._npc_models = {npc: sorted(models) for npc, models in links.items()}
         return self._npc_models
 
+    def _who(self, part_name, npc, names):
+        """Who stands there: the enemy's name, the bare part name for
+        things without an NPC id, or an Unknown fallback."""
+        if npc is None:
+            return part_name
+        return names.get(npc, "") or f"Unknown ({npc})"
+
     def _title(self, map_name, part_name, npc, names):
         """A placement's title: who stands there and in which map. The
         bare part name stays pinnable under values, never in the title."""
-        if npc is None:
-            who = part_name
-        else:
-            who = names.get(npc, "") or f"Unknown ({npc})"
-        return f"{who} \u2014 {self.display_name(map_name)}"
+        return f"{self._who(part_name, npc, names)} \u2014 {self.display_name(map_name)}"
 
     def _placement_row(self, map_name, placement, names, types):
         npc = placement.get("npc")
@@ -320,6 +323,7 @@ class MapStore:
             originals = {}
         row.update(id=f"{part_key[0]}:{part_key[1]}", table=map_name, map=map_name)
         npc = next((item["value"] for item in row["fields"] if item["key"] == "npcId"), None)
+        row["shortName"] = self._who(row["name"], npc, names)
         row["name"] = self._title(map_name, row["name"], npc, names)
         for item in row["fields"]:
             if item["key"] in originals:

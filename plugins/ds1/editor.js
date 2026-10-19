@@ -1338,11 +1338,11 @@ function rowActionButtons(kind){
   const playerStart=kind==="placement"&&state.row.kind==="Player";
   const nouns=kind==="placement"?["placement","map"]:["record","table"];
   const goTo=kind==="placement"
-    ?[el("button",{type:"button","data-row-action":"goto","data-row-kind":kind,
+    ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
       title:"Show this placement in the map viewport","aria-label":"Show this placement in the map viewport",
       onclick:()=>goToPlacement(state.row.table,key(state.row))},targetIcon())]
     :kind==="record"&&state.tab==="maps"&&state.row.table==="ItemLotParam"
-    ?[el("button",{type:"button","data-row-action":"goto","data-row-kind":kind,
+    ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
       title:"Show where this drops in the map viewport","aria-label":"Show where this drops in the map viewport",
       onclick:()=>goToDrop(state.row.id)},targetIcon())]
     :[];
@@ -1506,7 +1506,9 @@ function detail(){
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
-  if(msbRowEarly)return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},body:msbDetail(state.row,groups)}),state.row.table,state.row.id);
+  // The selection heading names the enemy only; the map it stands
+  // in stays on the row and in the lists, never in the heading.
+  if(msbRowEarly)return armDs1Preview(detailPanel({title:state.row.shortName||title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},body:msbDetail(state.row,groups)}),state.row.table,state.row.id);
   // Every items subtab renders through the same panel tabs: weapons,
   // armor, rings, spells and every kind of goods.
   if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"||state.row.table==="EquipParamProtector"||state.row.table==="EquipParamAccessory"||state.row.table==="Magic"||state.row.table==="EquipParamGoods"))
