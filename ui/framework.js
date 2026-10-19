@@ -5720,8 +5720,8 @@
     // list has not seen (a section the developer added) goes after the card
     // before it in the order.
     root.lexCards = () => [...cards];
-    root.lexOrderCards = wanted => {
-      joinSections();
+    root.lexOrderCards = (wanted, quiet = false) => {
+      if (!quiet) joinSections();
       const was = [...cards];
       const known = wanted.filter(card => cards.includes(card));
       const slots = known.map(card => cards.indexOf(card)).sort((a, b) => a - b);
@@ -5732,9 +5732,42 @@
         cards.splice(previous ? cards.indexOf(previous) + 1 : cards.length, 0, card);
       });
       if (cards.length === was.length && cards.every((card, index) => card === was[index])) return;
+      // A quiet re-sequence only retires the shipped order: the live DOM
+      // already shows it, and redealing now would churn the columns that
+      // the property schema keys on.
+      if (quiet) return;
       pagedCount = -1;
       refit();
     };
+    // A rebuild deals the stored arrangement first, not shipped order:
+    // with bare field cards the dealing decides the parents, so dealing
+    // shipped would key a stranger schema and orphan the layout.
+    try {
+      const probe = buildPropertyState(content, layoutFields(content));
+      const stored = readStoredLayout(probe);
+      if (stored) {
+        const byBase = new Map();
+        for (const card of cards) {
+          const id = probe.fields.get(card);
+          if (id === undefined) continue;
+          const base = propertyOf(id);
+          if (!byBase.has(base)) byBase.set(base, []);
+          byBase.get(base).push(card);
+        }
+        const wanted = [];
+        for (const key of Object.keys(stored).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}))) {
+          if (key === "sections" || key === "removed" || key === "order") continue;
+          const list = stored[key];
+          if (!Array.isArray(list)) continue;
+          for (const id of list) {
+            if (typeof id !== "string" || !id.includes("/")) continue;
+            const queue = byBase.get(propertyOf(id));
+            if (queue?.length) wanted.push(queue.shift());
+          }
+        }
+        if (wanted.length) root.lexOrderCards(wanted, true);
+      }
+    } catch (_error) {}
     render();
     if (options.notice) root.prepend(options.notice);
     if ((options.tabs || []).length > 1) root.prepend(subtabBar({
@@ -8308,18 +8341,53 @@ ${contents.path}`});
         return next;
       });
     }
-    const schema = JSON.stringify([...fieldMap.values()]);
+    // The schema is the sorted field-name multiset, never positions:
+    // column dealing shifts parents on every refit, and the key must
+    // survive it.
+    const schema = JSON.stringify([...fieldMap.values()].map(propertyOf).sort());
     return {root, fields: fieldMap, groups,
       tab: activePageTab(), plugin: shellPluginId(),
       key: `${shellPluginId()}-${activePageTab()}.property-layout.${textDigest(schema)}`};
   };
+  // Stored layouts outlive their schemas: a layout whose exact key is gone
+  // is adopted by field set (one transparent re-key), so shipped and older
+  // arrangements survive key changes instead of silently dropping.
+  const readStoredLayout = state => {
+    const parse = text => { try { return JSON.parse(text || "null"); } catch (_error) { return null; } };
+    const direct = parse(localStorage.getItem(state.key));
+    if (direct) return direct;
+    if (!state.plugin || !state.tab) return null;
+    const fingerprint = [...state.fields.values()].map(propertyOf).sort().join("\n");
+    const prefix = `${state.plugin}-${state.tab}.property-layout.`;
+    for (let index = 0; index < localStorage.length; index++) {
+      const candidate = localStorage.key(index);
+      if (!candidate || !candidate.startsWith(prefix) || candidate === state.key) continue;
+      const layout = parse(localStorage.getItem(candidate));
+      if (!layout || typeof layout !== "object") continue;
+      const names = [];
+      for (const [key, list] of Object.entries(layout)) {
+        if (key === "hidden" || key === "sections" || key === "removed" || key === "order") continue;
+        if (!Array.isArray(list)) continue;
+        for (const id of list) if (typeof id === "string" && id.includes("/")) names.push(propertyOf(id));
+      }
+      if (names.length === state.fields.size && names.sort().join("\n") === fingerprint) {
+        try { localStorage.setItem(state.key, JSON.stringify(layout)); } catch (_error) {}
+        return layout;
+      }
+    }
+    return null;
+  };
   const preparePropertyLayout = root => {
     const fields = layoutFields(root);
     const previous = propertyLayouts.get(root);
-    if (previous && fields.length === previous.fields.size && fields.every(field => previous.fields.has(field))) return previous;
+    // Only reuse the state while its group nodes are still in the
+    // document: a refit rebuilds the columns, and capturing against
+    // detached columns would see empty groups and skip the store.
+    if (previous && fields.length === previous.fields.size && fields.every(field => previous.fields.has(field)) &&
+        [...previous.groups.keys()].every(node => node.isConnected)) return previous;
     const state = buildPropertyState(root, fields);
     propertyLayouts.set(root, state);
-    try { applyPropertyLayout(state, JSON.parse(localStorage.getItem(state.key) || "null")); } catch (_error) {}
+    try { applyPropertyLayout(state, readStoredLayout(state)); } catch (_error) {}
     return state;
   };
   // A layout is each group's property order, plus the properties the
@@ -8466,6 +8534,19 @@ ${contents.path}`});
       state.groups.set(node, {id, name: spec.id, node, anchors: [], custom: true});
     }
   };
+  // Field drags sequence the pager cards to the live DOM order: deal()
+  // fills lanes in card order, so unsynced cards would put every refit
+  // back to shipped order and silently drop the developer arrangement.
+  const syncPagerCards = pager => {
+    if (!pager?.lexOrderCards) return;
+    let live = [...pager.querySelectorAll(".lex-tweak-column > *, .lex-tweak-off-page > *")];
+    if (!live.length) {
+      const grid = pager.querySelector(".lex-tweak-card-grid");
+      live = grid ? [...grid.children].filter(node => node instanceof Element &&
+        !node.classList.contains("lex-tweak-column") && !node.classList.contains("lex-tweak-off-page")) : [];
+    }
+    if (live.length) pager.lexOrderCards(live, true);
+  };
   const applyPropertyLayout = (state, layout) => {
     // No saved layout for this exact page still gets the page's hidden properties.
     if (!layout || typeof layout !== "object") layout = {};
@@ -8477,15 +8558,61 @@ ${contents.path}`});
     for (const [field, id] of state.fields)
       field.classList.toggle("lex-property-hidden", hidden.has(id) || byName.has(propertyOf(id)));
     const used = new Set();
+    // A refit re-deals columns, so a stored id's group prefix shifts with
+    // the window: the same property resolves by name when it misses exactly.
+    const byProp = new Map();
+    for (const [field, id] of state.fields) {
+      const prop = propertyOf(id);
+      if (!byProp.has(prop)) byProp.set(prop, []);
+      byProp.get(prop).push(field);
+    }
+    const resolveField = id => {
+      const exact = byId.get(id);
+      if (exact && !used.has(exact)) return exact;
+      const queue = byProp.get(propertyOf(id));
+      while (queue?.length) {
+        const field = queue.shift();
+        if (!used.has(field)) return field;
+      }
+      return null;
+    };
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
       if (!Array.isArray(ids)) continue;
       for (const [index, id] of ids.entries()) {
-        const field = byId.get(id);
-        if (!field || used.has(id) || field.contains(group.node)) continue;
-        used.add(id);
+        const field = resolveField(id);
+        if (!field || used.has(field) || field.contains(group.node)) continue;
+        used.add(field);
         const anchor = group.anchors[index] || group.anchors.at(-1);
         group.node.insertBefore(field, anchor?.parentNode === group.node ? anchor : null);
+      }
+    }
+    // Stored columns with no live group (the refit dealt a different count),
+    // and stored fields whose column moved, land by name in stored reading
+    // order: each slots before the next stored neighbor already home.
+    const groupById = new Map([...state.groups.values()].map(group => [group.id, group]));
+    const layoutKeys = new Set(["hidden", "sections", "removed", "order"]);
+    for (const [key, ids] of Object.entries(layout)) {
+      if (layoutKeys.has(key) || !Array.isArray(ids)) continue;
+      const target = groupById.get(key) ||
+        [...state.groups.values()].filter(group => sectionNameOf(group.id) === sectionNameOf(key)).at(-1);
+      if (!target) continue;
+      // Every stored field lands in stored order, moving when the live
+      // dealing already holds it somewhere else: a partial exact pass
+      // scatters worse than nothing, so this pass enforces the order.
+      let before = null;
+      for (let index = ids.length - 1; index >= 0; index--) {
+        const id = ids[index];
+        if (typeof id !== "string") continue;
+        const field = resolveField(id);
+        if (!field || used.has(field) || field.contains(target.node)) {
+          const home = byId.get(id);
+          if (home && home.parentNode === target.node) before = home;
+          continue;
+        }
+        used.add(field);
+        target.node.insertBefore(field, before);
+        before = field;
       }
     }
     const pageOrder = readSectionOrder(state.plugin, state.tab);
@@ -8493,6 +8620,12 @@ ${contents.path}`});
     // save, undo included, writes it), so it wins over an older layout's.
     orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
     hideRemovedSections(state);
+    const pagers = new Set();
+    for (const group of state.groups.values()) {
+      const pager = group.node.closest?.(".lex-tweaks-paged");
+      if (pager) pagers.add(pager);
+    }
+    pagers.forEach(syncPagerCards);
   };
   const storePropertyLayout = async (state, layout) => {
     const value = JSON.stringify(layout);
@@ -8742,6 +8875,7 @@ ${contents.path}`});
     event.preventDefault();
     const {state, field, before} = propertyDrag;
     propertyDrop.node.insertBefore(field, propertyDrop.before);
+    syncPagerCards(field.closest(".lex-tweaks-paged"));
     const after = capturePropertyLayout(state);
     clearPropertyDrop();
     if (JSON.stringify(before) === JSON.stringify(after)) return;
