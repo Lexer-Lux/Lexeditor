@@ -110,6 +110,16 @@ def main():
                             }""", pane)
                         assert box['inside'], (pane, 'pager escapes its panel')
                         assert not box['scrollable'], (pane, 'paginated list scrolls')
+                        gap = page.evaluate(
+                            """(pane) => {
+                                const rows = [...document.querySelectorAll(
+                                    pane + ' .lex-column-list-row')];
+                                const bar = document.querySelector(pane + ' .lex-pager')
+                                    .getBoundingClientRect();
+                                const last = rows[rows.length - 1].getBoundingClientRect();
+                                return bar.top - last.bottom;
+                            }""", pane)
+                        assert gap < 6, (pane, gap)
                     assert page.locator('.ds1-anim .lex-pager:not(.lex-pager-inline)').count() == 0
                     assert page.locator('[data-anim-chars] .lex-compact-pager').count() == 1
                     assert page.locator('[data-anim-list] .lex-compact-pager').count() == 1
@@ -180,6 +190,22 @@ def main():
                                  (0.0, 10.0, 12.0))
                     close_enough([by_name['sfx'][axis] - root[axis] for axis in range(3)],
                                  (0.0, 18.0, 0.0))
+                    for pane, last in (('[data-anim-chars]', "[data-anim-chars] .lex-pager"
+                                              " button[aria-label='Last page']"),
+                                       ('[data-anim-list]', "[data-anim-list] .lex-pager"
+                                             " button[aria-label='Last page']")):
+                        page.locator(last).click()
+                        page.wait_for_timeout(400)
+                        gap = page.evaluate(
+                            """(pane) => {
+                                const rows = [...document.querySelectorAll(
+                                    pane + ' .lex-column-list-row')];
+                                const bar = document.querySelector(pane + ' .lex-pager')
+                                    .getBoundingClientRect();
+                                const last = rows[rows.length - 1].getBoundingClientRect();
+                                return bar.top - last.bottom;
+                            }""", pane)
+                        assert gap < 6, (pane, gap)
                     assert not errors, errors
                 finally:
                     browser.close()

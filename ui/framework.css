@@ -4513,6 +4513,13 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1e
 /* ---- Paged panes and graph grids --------------------------------------- */
 .lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; overflow:hidden; gap:var(--lex-panel-gap); }
 .lex-paged-pane-content { min-width:0; min-height:0; overflow:auto; }
+/* A fitted table fills the paged pane stretched track: flex sizing is
+   meaningless inside the block wrapper, so without this the 1fr tracks
+   never engage and the leftover pools between the rows and the pager. */
+.lex-paged-pane-content > .lex-column-list.lex-page-sized-table { height:100%; }
+/* A fitted table meets its pager: the rhythm gap would read as leftover
+   emptiness between the last row and the bar. Unfitted content keeps it. */
+.lex-paged-pane:has(> .lex-paged-pane-content > .lex-column-list.lex-page-sized-table) { row-gap:0; }
 .lex-instruction-pane { height:100%; flex:1 1 0; gap:0; }
 .lex-tabbed-panel-content:has(> .lex-paged-pane, > .lex-detail-panel, > .lex-source-control > .lex-code-field) { display:flex; overflow:hidden; padding:0; }
 .lex-tabbed-panel-content > :is(.lex-detail-panel,.lex-source-control:has(> .lex-code-field)) { flex:1 1 0; min-width:0; min-height:0; align-items:stretch; }

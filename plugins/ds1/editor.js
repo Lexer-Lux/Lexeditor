@@ -2424,7 +2424,8 @@ function animPaneSize(which){
 // The fit measures the paged pane (list plus pager), and the wheel turns
 // pages through that same pane: fitted lists never scroll.
 function fitAnimList(list,which,size,available){
-  LexeditorUI.fitListPage({list,available:available||list,pageSize:size,minRowHeight:32,
+  LexeditorUI.fitListPage({list,available:available||list,pageSize:size,fixedRowHeight:32,
+    resize:(fittedHeight,geometry)=>{list.style.setProperty("--lex-fitted-row-height",`${geometry.rowHeight}px`);},
     change:value=>{
       if(which==="char"){if(state.animCharFit===value)return;state.animCharFit=value;}
       else if(which==="events"){if(state.animEventFit===value)return;state.animEventFit=value;}
@@ -2435,6 +2436,15 @@ function fitAnimList(list,which,size,available){
 }
 function stopAnimFit(pane){
   pane.querySelector(".lex-column-list")?.__lexFitListObserver?.disconnect?.();
+}
+// Fitted rows fill to the pager like paged tables: capacity tracks
+// stretch the leftover and filler rows square off a short page.
+function sizeAnimRows(list,size){
+  LexeditorUI.padBarrelTable(list,size);
+  list.classList.add("lex-page-sized-table");
+  list.style.setProperty("--lex-page-row-count",String(Math.max(size,
+    list.querySelectorAll(":scope > .lex-column-list-row").length)));
+  list.style.setProperty("--lex-page-font-row-count",String(size));
 }
 function animCharsPane(){
   const here=animCharMatches();
@@ -2449,6 +2459,7 @@ function animCharsPane(){
     change:value=>{state.animCharPage=value;refreshAnimChars();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizeAnimRows(list,size);
   fitAnimList(list,"char",size,both);
   return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
@@ -2476,6 +2487,7 @@ function animAnimsPane(){
     change:value=>{state.animPage=value;refreshAnimList();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizeAnimRows(list,size);
   fitAnimList(list,"anims",size,both);
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
@@ -2499,6 +2511,7 @@ function animEventsPane(){
     change:value=>{state.animPage=value;refreshAnimList();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizeAnimRows(list,size);
   fitAnimList(list,"events",size,both);
   return [back,
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
