@@ -3844,6 +3844,11 @@
             const key = localStorage.key(index);
             if (key && key.includes(token)) preferences[key] = localStorage.getItem(key);
           }
+          if (!Object.keys(preferences).length) {
+            const name = document.querySelector(".lex-shell-header nav button.active .lex-tab-label-text")?.textContent || page;
+            showToast(`${name} has no view settings to save.`);
+            return;
+          }
           const result = await callWindow("save_default_view", plugin, page, preferences);
           saved = !!result?.saved;
           const name = document.querySelector(".lex-shell-header nav button.active .lex-tab-label-text")?.textContent || page;
@@ -9047,6 +9052,10 @@ ${contents.path}`});
           const key = localStorage.key(index);
           if (key && key.includes(token)) preferences[key] = localStorage.getItem(key);
         }
+        if (!Object.keys(preferences).length) {
+          showToast(`${tab.label} has no view settings to save.`);
+          return;
+        }
         const result = await callWindow("save_default_view", options.plugin.id, tab.id, preferences);
         savedDefault = !!result?.saved;
         if (savedDefault) {
@@ -10715,18 +10724,47 @@ ${contents.path}`});
     };
     const defaults = sizesWithMinimums(options.defaultSizes);
     let sizes = [...defaults];
-    const storageKey = options.storageKey ||
+    let storageKey = options.storageKey ||
       (options.layoutKey ? `lexeditor:panel-layout:${options.layoutKey}` : "");
+    // Divider positions ship with their tab: a key without the tab token
+    // gains it when the divider moves (a drag means its tab is up, so
+    // the live token is trustworthy; at build time the nav may lag the
+    // content). Keys that already name their tab pass through.
+    const tokenizedKey = key => {
+      const plugin = shellPluginId(), tab = activePageTab();
+      if (!key || !plugin || !tab || key.includes(`${plugin}-${tab}`)) return key;
+      return key.replace("lexeditor:", `lexeditor:${plugin}-${tab}:`);
+    };
     if (storageKey) {
       try {
-        const stored = localStorage.getItem(storageKey);
-        const parsed = JSON.parse(stored || "null");
-        if (Array.isArray(parsed) && parsed.length === nodes.length) {
-          sizes = sizesWithMinimums(parsed);
-        } else if (nodes.length === 2 && Number.isFinite(Number.parseFloat(stored))) {
-          const first = Number.parseFloat(stored);
-          sizes = sizesWithMinimums([first, 100 - first]);
-        }
+        const readSizes = key => {
+          const stored = localStorage.getItem(key);
+          const parsed = JSON.parse(stored || "null");
+          if (Array.isArray(parsed) && parsed.length === nodes.length) return sizesWithMinimums(parsed);
+          if (nodes.length === 2 && Number.isFinite(Number.parseFloat(stored))) {
+            const first = Number.parseFloat(stored);
+            return sizesWithMinimums([first, 100 - first]);
+          }
+          return null;
+        };
+        const liveKey = tokenizedKey(storageKey);
+        // A migrated key answers under any nav state: the exact key,
+        // the live token guess, then whatever tokenized variant exists.
+        const scanKey = () => {
+          const rest = storageKey.replace(/^lexeditor:/, "");
+          if (!rest || rest === storageKey) return null;
+          let fallback = null;
+          for (let index = 0; index < localStorage.length; index++) {
+            const candidate = localStorage.key(index);
+            if (!candidate || candidate === storageKey || !candidate.endsWith(`:${rest}`)) continue;
+            if (candidate === liveKey) return candidate;
+            fallback ??= candidate;
+          }
+          return fallback;
+        };
+        const scanned = liveKey !== storageKey ? scanKey() : null;
+        sizes = readSizes(storageKey) || (liveKey !== storageKey ? readSizes(liveKey) : null) ||
+          (scanned ? readSizes(scanned) : null) || [...defaults];
       } catch (_error) {
         // Storage can be unavailable in a locked-down WebView. Resizing still
         // works for the current layout instance.
@@ -10886,7 +10924,10 @@ ${contents.path}`});
       if (options.eventName) root.dispatchEvent(new CustomEvent(options.eventName, {detail}));
       if (persist && storageKey) {
         try {
-          localStorage.setItem(storageKey, nodes.length === 2 ? String(sizes[0]) : JSON.stringify(sizes));
+          const writeKey = tokenizedKey(storageKey);
+          localStorage.setItem(writeKey, nodes.length === 2 ? String(sizes[0]) : JSON.stringify(sizes));
+          if (writeKey !== storageKey) localStorage.removeItem(storageKey);
+          storageKey = writeKey;
         } catch (_error) {}
       }
     };
