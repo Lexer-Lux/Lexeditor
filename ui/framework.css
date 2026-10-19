@@ -1123,6 +1123,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-header-icon:hover{opacity:1;}
 .lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}
 .lex-header-icon:disabled{opacity:.3;cursor:default;}
+/* The Add-section button renders always but shows in Developer Mode
+   only: players never see it, and it appears the moment the mode
+   switches on without waiting for a re-render. */
+.lex-detail-panel-actions > .lex-detail-add-header{display:none;}
+html[data-lex-developer-mode="true"] .lex-detail-panel-actions > .lex-detail-add-header{display:inline-flex;}
 /* A mod's changed records and files: compact rows in a capped list,
    with the loader-read files lit in the accent. */
 .lex-mod-change-list,.lex-mod-file-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:2px;}

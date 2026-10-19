@@ -1525,6 +1525,15 @@
   const detailTabsContext = box => {
     const dev = () => !!sharedSettingsSnapshot?.developerMode;
     const seen = new Map();
+    // Custom sections the developer added live in the property layout,
+    // so rebuild them before keying: then they deal into their recorded
+    // tab like shipped sections. Customs only, never a full restore:
+    // moving fields now would key later builds on a moved schema and
+    // orphan the stored layout. The later full restore adopts these.
+    const probe = buildPropertyState(box, layoutFields(box));
+    let customSpecs = null;
+    try { customSpecs = JSON.parse(localStorage.getItem(probe.key) || "null")?.sections; } catch (_error) {}
+    placeCustomSections(probe, customSpecs);
     const home = [...box.childNodes];
     const nodeByKey = new Map();
     const shells = new Map();
@@ -1553,7 +1562,10 @@
         fields.set(key, node);
       }
     }
-    const shape = textDigest([...nodeByKey.keys()].sort().join("\n"));
+    // The shape is the shipped nodes only: customs join the keys so they
+    // deal, but counting them would orphan every saved tab set.
+    const shape = textDigest([...nodeByKey].filter(([, node]) =>
+      node.dataset?.lexCustomSection !== "true").map(([key]) => key).sort().join("\n"));
     const stored = loadDetailLayouts().shapes[shape];
     const layout = stored && Array.isArray(stored.tabs) ? {
       tabs: stored.tabs.filter(tab => tab && tab.id).map(tab => ({id: String(tab.id), label: tab.label ?? String(tab.id)})),
@@ -1711,10 +1723,84 @@
       persistShared();
       render();
     };
+    const activeTab = () => validTab(layout.active);
+    // A section created after the first render joins the keys under the
+    // same rules, so it keeps this key on every rebuild and deals into
+    // its recorded tab. Registering twice answers the first key: the
+    // counter behind keyNodes must not advance for a known node.
+    const registerShell = (node, afterNode = null) => {
+      for (const [key, entry] of nodeByKey) if (entry === node) return key;
+      const key = keyNodes(node);
+      nodeByKey.set(key, node);
+      const afterKey = afterNode ? [...nodeByKey].find(([, entry]) => entry === afterNode)?.[0] : null;
+      const at = afterKey ? order.indexOf(afterKey) : -1;
+      if (at >= 0) order.splice(at + 1, 0, key);
+      else order.push(key);
+      const content = node.querySelector(":scope > .lex-detail-section-content") || node;
+      shells.set(key, {node, content, kids: [...content.childNodes], fields: []});
+      return key;
+    };
+    const adoptShell = (key, tab) => {
+      if (!shells.has(key)) return;
+      layout.shells[key] = validTab(tab);
+      persistShared();
+      render();
+      enableDrag();
+    };
+    // A removed custom leaves the keys as well as the store, so a later
+    // render cannot deal its detached node back onto the page.
+    const forgetShell = node => {
+      for (const [key, entry] of [...nodeByKey]) {
+        if (entry !== node) continue;
+        nodeByKey.delete(key);
+        shells.delete(key);
+        delete layout.shells[key];
+        const at = order.indexOf(key);
+        if (at >= 0) order.splice(at, 1);
+      }
+      persistShared();
+    };
     enableDrag();
-    return {render, addTab, hasTabs: () => layout.tabs.length > 0};
+    return {render, addTab, activeTab, registerShell, adoptShell, forgetShell,
+      hasTabs: () => layout.tabs.length > 0};
   };
 
+  // A custom section joins its panel active tab: placed at the body end
+  // by the property layout, it would otherwise sit outside the panes,
+  // visible on every tab. Panels without tabs keep it where it landed.
+  const adoptCustomIntoActivePane = (panel, specId, afterNode = null) => {
+    const ctx = panel._DetailTabs;
+    if (!ctx?.hasTabs?.()) return;
+    const node = panel.querySelector(`[data-lex-layout-section="${specId}"]`);
+    if (!node) return;
+    ctx.adoptShell(ctx.registerShell(node, afterNode), ctx.activeTab());
+  };
+  // The header button adds a section at the end of the active tab (or
+  // the panel, without tabs): double-click names it, drags fill it,
+  // exactly like the hold-right gesture it mirrors. One store serves
+  // both: the property layout owns the section, the detail tabs only
+  // record which tab shows it.
+  const addDetailHeader = panel => {
+    const fieldInside = panel.querySelector(".lex-detail-field[data-lex-layout-field]");
+    const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : panel);
+    const before = capturePropertyLayout(state);
+    const taken = new Set((state.custom || []).map(spec => spec.id));
+    let id = `custom-${Date.now().toString(36)}`;
+    if (taken.has(id)) {
+      let serial = 2;
+      while (taken.has(`${id}-${serial}`)) serial++;
+      id = `${id}-${serial}`;
+    }
+    const spec = {id, title: "New section", after: ""};
+    placeCustomSections(state, [...(state.custom || []), spec]);
+    adoptCustomIntoActivePane(panel, spec.id);
+    const after = capturePropertyLayout(state);
+    const apply = layout => storePropertyLayout(state, layout);
+    labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+    void apply(after);
+    showToast("Added a section. Double-click its heading to name it, and drag properties into it. "
+      + "To remove a section, drag its properties out, then hold right on its heading.");
+  };
   const detailPanel = (options = {}) => {
     options = adoptBodyAudio(options);
     const sound = options.audio?.src ? recordAudio(options.audio) : null;
@@ -1801,10 +1887,23 @@
       event.preventDefault();
       bodyBox._detailTabs?.addTab();
     });
-    return element("section", {
+    const panel = element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
     }, heading, bodyBox);
+    panel._DetailTabs = bodyBox._detailTabs;
+    if (heading) {
+      let actions = heading.querySelector(":scope > .lex-detail-panel-actions");
+      if (!actions) {
+        actions = element("div", {class: "lex-detail-panel-actions"});
+        heading.append(actions);
+        heading.classList.remove("no-actions");
+      }
+      actions.append(element("button", {type: "button", class: "lex-header-icon lex-detail-add-header",
+        title: "Add section (Developer Mode)", "aria-label": "Add section",
+        onclick: () => addDetailHeader(panel)}, "+"));
+    }
+    return panel;
   };
   // Every record pane lays its sections out the same way: in as many columns
   // as the pane is wide, a section too tall for its column going on in the
@@ -5996,6 +6095,7 @@
     sharedSettingsSnapshot = settings;
     if (settings.soundEnabled === false || themeSoundGain(settings.soundVolumePercent) <= 0) stopThemeSounds();
     document.documentElement.dataset.lexHoverableAltClick = settings.hoverableAltClick ? "true" : "false";
+    document.documentElement.dataset.lexDeveloperMode = settings.developerMode ? "true" : "false";
     // Lexer liked a boolean drawn as one wide box and asked for it as the
     // default, with the arrow-and-checkbox layout as the alternative.
     document.documentElement.dataset.lexBooleanStyle = settings.booleanBoxStyle === false ? "arrow" : "box";
@@ -8119,8 +8219,17 @@ ${contents.path}`});
   // field/section structure, never the selected record's name or number.
   const propertyLayouts = new WeakMap();
   const propertyRoot = field => field.closest(".lex-detail-panel") || field.closest(".lex-detail-section");
-  const layoutFields = root => [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")]
-    .filter(field => propertyRoot(field) === root && !field.parentElement.closest(".lex-detail-field"));
+  // A body box mid-render has no panel ancestor yet: its fields and
+  // sections answer to the box itself until it joins its panel. Nested
+  // panels still keep their own fields.
+  const isDetachedBody = root => !root.isConnected && !root.classList.contains("lex-detail-panel") &&
+    !root.classList.contains("lex-detail-section");
+  const layoutFields = root => {
+    const boxed = isDetachedBody(root);
+    return [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")].filter(field =>
+      (boxed ? !field.closest(".lex-detail-panel") : propertyRoot(field) === root) &&
+      !field.parentElement.closest(".lex-detail-field"));
+  };
   const hiddenKey = (plugin, tab) => `${plugin}-${tab}.hidden-properties`;
   // The section order is kept per page by section name too: a layout is keyed
   // by its record's exact fields, so an order set on one armor piece did not
@@ -8161,10 +8270,9 @@ ${contents.path}`});
     try { localStorage.setItem(key, value); } catch (_error) {}
     return {[key]: value};
   };
-  const preparePropertyLayout = root => {
-    const fields = layoutFields(root);
-    const previous = propertyLayouts.get(root);
-    if (previous && fields.length === previous.fields.size && fields.every(field => previous.fields.has(field))) return previous;
+  // Scan only: no restore. Detail tabs probe a mid-render box with this
+  // to learn its stored custom sections; the probe shares the exact key.
+  const buildPropertyState = (root, fields) => {
     const groups = new Map(), fieldMap = new Map(), identities = new Map();
     const addGroup = node => {
       if (groups.has(node)) return groups.get(node);
@@ -8175,9 +8283,11 @@ ${contents.path}`});
       groups.set(node, group);
       return group;
     };
+    const boxed = isDetachedBody(root);
     for (const section of root.querySelectorAll(".lex-detail-section-content")) {
-      if (!section.closest(".lex-detail-field") &&
-          (section.closest(".lex-detail-panel") || section.closest(".lex-detail-section")) === root) addGroup(section);
+      if (section.closest(".lex-detail-field")) continue;
+      const home = section.closest(".lex-detail-panel") || section.closest(".lex-detail-section");
+      if (home === root || (boxed && !section.closest(".lex-detail-panel"))) addGroup(section);
     }
     for (const field of fields) {
       const group = addGroup(field.parentElement);
@@ -8194,9 +8304,15 @@ ${contents.path}`});
       });
     }
     const schema = JSON.stringify([...fieldMap.values()]);
-    const state = {root, fields: fieldMap, groups,
+    return {root, fields: fieldMap, groups,
       tab: activePageTab(), plugin: shellPluginId(),
       key: `${shellPluginId()}-${activePageTab()}.property-layout.${textDigest(schema)}`};
+  };
+  const preparePropertyLayout = root => {
+    const fields = layoutFields(root);
+    const previous = propertyLayouts.get(root);
+    if (previous && fields.length === previous.fields.size && fields.every(field => previous.fields.has(field))) return previous;
+    const state = buildPropertyState(root, fields);
     propertyLayouts.set(root, state);
     try { applyPropertyLayout(state, JSON.parse(localStorage.getItem(state.key) || "null")); } catch (_error) {}
     return state;
@@ -8236,6 +8352,27 @@ ${contents.path}`});
       listed.splice(at < 0 ? listed.length : at + 1, 0, section);
     }
     const movable = listed.filter(section => !listed.some(other => other !== section && other.contains(section)));
+    // Sections dealt into detail panes keep their pane: order within
+    // each container, never across them, and never into the leftover
+    // pager (its refits were disconnected for the same reason).
+    if (movable.some(section => section.closest(".lex-detail-tabpane"))) {
+      const groups = new Map();
+      for (const section of movable) {
+        const parent = section.parentElement;
+        if (!groups.has(parent)) groups.set(parent, []);
+        groups.get(parent).push(section);
+      }
+      for (const siblings of groups.values()) {
+        if (siblings.length < 2) continue;
+        const slots = [...siblings].sort(byReadingOrder).map(section => {
+          const mark = document.createComment("");
+          section.before(mark);
+          return mark;
+        });
+        siblings.forEach((section, index) => slots[index].replaceWith(section));
+      }
+      return;
+    }
     const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
     if (pager) {
       pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager));
@@ -8272,17 +8409,21 @@ ${contents.path}`});
   // A section the developer added: a heading and an empty body that
   // properties are dragged into. It belongs to the layout, after the section
   // it was added below, and its title is the layout's, not a shipped label.
-  const customSectionNode = (state, spec) => {
+  const customSectionNode = (spec) => {
     const text = element("span", {class: "lex-detail-section-title-text"}, spec.title);
     text.addEventListener("dblclick", event => {
       if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
       event.stopPropagation();
       renameValue(text, {value: spec.title, label: "this section", commit: typed => {
-        const before = capturePropertyLayout(state);
-        spec.title = typed;
-        const after = capturePropertyLayout(state);
-        const apply = layout => storePropertyLayout(state, layout);
+        // The building state may be a discarded probe: rename against
+        // the live layout and the spec object it owns, found by id.
+        const live = preparePropertyLayout(section.closest(".lex-detail-panel") || section);
+        const target = (live.custom || []).find(item => item.id === spec.id) || spec;
+        const before = capturePropertyLayout(live);
+        target.title = typed;
+        const after = capturePropertyLayout(live);
+        const apply = layout => storePropertyLayout(live, layout);
         labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
         void apply(after);
       }});
@@ -8312,7 +8453,7 @@ ${contents.path}`});
         if (text && text.textContent !== spec.title) text.textContent = spec.title;
         continue;
       }
-      const section = customSectionNode(state, spec);
+      const section = customSectionNode(spec);
       const anchor = [...state.groups.values()].find(group => group.id === spec.after)?.node.closest(".lex-detail-section");
       if (anchor) anchor.after(section);
       else (state.root.querySelector(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body") || state.root).append(section);
@@ -8424,10 +8565,15 @@ ${contents.path}`});
       // that still holds properties gets a new section added below it.
       let specs = [...(state.custom || [])];
       const removing = group && !holdsFields;
-      if (removing && group.custom) specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+      let added = null;
+      if (removing && group.custom) {
+        specs = specs.filter(spec => `${spec.id}:0` !== group.id);
+        root._DetailTabs?.forgetShell?.(layoutSectionOf(group));
+      }
       else if (removing) state.removed = [...new Set([...(state.removed || []), group.id])];
-      else specs.push({id: `custom-${Date.now().toString(36)}`, title: "New section", after: group?.id || ""});
+      else { added = {id: `custom-${Date.now().toString(36)}`, title: "New section", after: group?.id || ""}; specs.push(added); }
       placeCustomSections(state, specs);
+      if (added) adoptCustomIntoActivePane(root, added.id, section);
       hideRemovedSections(state);
       const after = capturePropertyLayout(state);
       const apply = layout => storePropertyLayout(state, layout);

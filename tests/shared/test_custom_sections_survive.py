@@ -61,7 +61,8 @@ def test_custom_sections_survive_a_stale_page_order(page):
     page.wait_for_timeout(200)
     seen = page.evaluate('window.__seenKeys')
     keys = [key for key in seen if '.property-layout.' in key]
-    assert len(keys) == 1, seen
+    # One stable schema key, however often it is re-read while restoring.
+    assert len(set(keys)) == 1, seen
     page.evaluate('''([layoutKey, layout, orderKey, order]) => {
       localStorage.setItem(layoutKey, layout);
       localStorage.setItem(orderKey, order);
