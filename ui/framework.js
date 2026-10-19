@@ -6205,6 +6205,9 @@
     ].map(spec => element("button", {type: "button", class: "lex-anim-transport-button",
       "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));
     const playButton = buttons[2];
+    // The shell lets Space through to this button only, so its native
+    // click stays the one and only toggle.
+    playButton.dataset.animPlayButton = "";
     transport.append(...buttons);
     // The follow switch sits with the view-mode buttons, styled like
     // one: no extra control crowds the transport row. A host without a
@@ -9358,14 +9361,18 @@ ${contents.path}`});
           flashShortcut(animAction);
           return;
         }
+        // A modal dialog keeps every key, Space included.
+        if (document.querySelector("dialog[open]")) return;
         const target = event.target;
         const typing = target instanceof HTMLElement &&
           target.matches("input:not([type='checkbox']):not([type='range']),textarea,select,[contenteditable='true']");
         if (typing) return;
-        // A focused button owns Space: the transport's own play button
-        // toggles through its click, and nothing double-fires.
+        // Only the transport's own play button owns Space: it toggles
+        // through its native click, and nothing double-fires. Every
+        // other button - tabs, steppers, markers - yields Space to
+        // play/pause instead of re-firing itself.
         if ((event.key === " " || event.code === "Space") &&
-            target instanceof HTMLElement && target.matches("button")) return;
+            target instanceof HTMLElement && target.matches("button[data-anim-play-button]")) return;
         event.preventDefault();
         flashShortcut(animAction);
         ({ "anim-start": () => activeAnimationViewer.toStart(),

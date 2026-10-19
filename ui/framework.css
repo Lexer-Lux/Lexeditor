@@ -8947,3 +8947,6 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 .lex-anim-marker { position:absolute; top:0; width:4px; height:12px; padding:0; border:none; background:#b26a00; cursor:pointer; pointer-events:auto; }
 .lex-anim-transport { display:flex; gap:8px; justify-content:center; }
 .lex-anim-transport-button { width:32px; height:32px; padding:0; font-size:14px; line-height:1; }
+/* Mouse clicks leave no ring; keyboard focus gets the themed one. */
+.lex-anim-transport-button:focus { outline:none; }
+.lex-anim-transport-button:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:1px; }

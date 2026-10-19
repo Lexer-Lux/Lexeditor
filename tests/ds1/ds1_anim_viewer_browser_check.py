@@ -121,6 +121,11 @@ def main():
                     assert readout().startswith("1.0"), readout()
                     by_label["Back one frame"].click()
                     assert readout().startswith("0.0"), readout()
+                    outline = page.evaluate(
+                        """getComputedStyle(document.querySelector(
+                          "[data-anim-timeline] [aria-label='Back one frame']"))
+                        .outlineStyle""")
+                    assert outline == "none", outline
                     page.evaluate("document.activeElement?.blur()")
                     page.keyboard.press("ArrowRight")
                     assert readout().startswith("1.0"), readout()
@@ -135,6 +140,29 @@ def main():
                     paused_glyph = glyph()
                     page.keyboard.press("Space")
                     assert glyph() != paused_glyph
+                    # Space belongs to play/pause from anywhere: a
+                    # focused tab must not reopen, a focused step button
+                    # must not re-fire, and the play button itself must
+                    # still toggle exactly once through its own click.
+                    timeline = page.query_selector("[data-anim-timeline]")
+                    page.locator('button[data-tab="animations"]').focus()
+                    focused_glyph = glyph()
+                    page.keyboard.press("Space")
+                    assert glyph() != focused_glyph
+                    assert page.evaluate("(node) => node.isConnected", timeline)
+                    by_label["Back one frame"].click()
+                    stepped_glyph = glyph()
+                    page.keyboard.press("Space")
+                    assert glyph() != stepped_glyph
+                    ring = page.evaluate(
+                        """getComputedStyle(document.querySelector(
+                          "[data-anim-timeline] [aria-label='Back one frame']"))
+                        .outlineStyle""")
+                    assert ring == "solid", ring
+                    by_label["Play or pause"].focus()
+                    play_glyph = glyph()
+                    page.keyboard.press("Space")
+                    assert glyph() != play_glyph
                     if output:
                         page.wait_for_timeout(300)
                         page.screenshot(path=str(output / "ds1-anim-viewer.png"))
