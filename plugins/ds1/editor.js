@@ -1011,6 +1011,22 @@ function monsterDetail(groups){
   return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},
     change:id=>{state.monsterTab=id;render();},content});
 }
+// Ammo's Defense tab reads its guard block under three headers: the guard's
+// own settings, the damage it absorbs, the statuses it resists. Weapons
+// share the table but keep the one flat list. A field the table gains
+// later lands in Properties with the other settings.
+const AMMO_DEFENSE_HEADERS=[
+  ["Properties",["guardAngle","staminaGuardDef","guardmotionCategory","defenseBaseParry","guardBaseRepel","guardCutCancelRate","guardLevel","enableGuard"]],
+  ["Defenses",["physGuardCutRate","magGuardCutRate","fireGuardCutRate","thunGuardCutRate","slashGuardCutRate","blowGuardCutRate","thrustGuardCutRate"]],
+  ["Resistances",["poisonGuardResist","diseaseGuardResist","bloodGuardResist","curseGuardResist"]]];
+function ammoDefenseSections(fields){
+  const buckets=AMMO_DEFENSE_HEADERS.map(([title])=>[title,[]]);
+  for(const field of fields){
+    const at=AMMO_DEFENSE_HEADERS.findIndex(([,keys])=>keys.includes(field.dataset?.lexLayoutField));
+    buckets[at<0?0:at][1].push(field);
+  }
+  return buckets.filter(([,body])=>body.length).map(([title,body])=>detailSection({title,body}));
+}
 function itemDetail(groups){
   // Every section is a tab; the tab is the header, so a section tab
   // shows its fields with no repeated section title.
@@ -1019,8 +1035,11 @@ function itemDetail(groups){
     help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
   const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
+  const body=groups.get(section.label);
+  const content=section.label==="Defense"&&state.row&&catalogSub(state.row.table,state.row)==="ammo"
+    ?ammoDefenseSections(body):body;
   return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},
-    change:id=>{state.itemTab=id;render();},content:groups.get(section.label)});
+    change:id=>{state.itemTab=id;render();},content});
 }
 function effectDetail(groups){
   // Every section is a tab; the tab is the header, so a section tab
