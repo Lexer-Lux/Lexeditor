@@ -3897,6 +3897,30 @@
       || name(a).localeCompare(name(b), undefined, {numeric: true, sensitivity: "base"}));
     return subtabBarElement({...options, tabs});
   };
+  // A renamed subtab rejoins the bar in alphabetical order: the bar sorted
+  // itself when it was built, and the rename must not leave it unsorted.
+  // Given-order and image bars never sort, and the positional shortcut
+  // badges follow their slots (the keys themselves read DOM order).
+  const resortSubtabBar = bar => {
+    if (!(bar instanceof Element) || !bar.classList.contains("lex-subtab-bar")) return;
+    if (bar.classList.contains("lex-subtab-bar-images") || bar.dataset.lexSort === "given") return;
+    const rank = id => ({tweaks: 2, misc: 1})[String(id).toLocaleLowerCase()] || 0;
+    const buttons = [...bar.querySelectorAll(":scope > .lex-subtab-button")];
+    const name = button => button.querySelector(".lex-tab-label-text")?.textContent.trim()
+      || button.dataset.subtab || "";
+    buttons.sort((a, b) => rank(a.dataset.subtab) - rank(b.dataset.subtab)
+      || name(a).localeCompare(name(b), undefined, {numeric: true, sensitivity: "base"}));
+    buttons.forEach(button => bar.append(button));
+    const shortcuts = bar.dataset.lexSubtabShortcuts !== "false";
+    buttons.forEach((button, index) => {
+      const badge = button.querySelector(":scope > .lex-tab-shortcut");
+      const key = shortcutKeyFor(index + 1);
+      if (!shortcuts || !key) { badge?.remove(); return; }
+      if (badge) { badge.textContent = `⇧${key}`; return; }
+      button.append(element("span", {class: "lex-tab-shortcut", "aria-hidden": "true"}, `⇧${key}`));
+    });
+  };
+  const resortSubtabOf = node => resortSubtabBar(node?.closest?.(".lex-subtab-bar"));
   const subtabBarElement = (options = {}) => (options.tabs || []).length < (options.showSingle ? 1 : 2)
     ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
     : element("div", {
@@ -3906,6 +3930,7 @@
     role: "tablist",
     "data-lex-subtab-shortcuts": String(options.shortcuts !== false),
     "aria-label": options.label || "Subsections",
+    "data-lex-sort": options.order === "given" ? "given" : null,
     }, ...(options.tabs || []).map((tab, index) => {
       // A subtab is renamed in place the way a page tab is, and the name is
       // stored under the page tab that owns it, which is where the shippable
@@ -8230,6 +8255,7 @@ ${contents.path}`});
     }
     if (entry.node?.isConnected) entry.node.textContent = entry.before;
     relabelHeaders(entry.key, entry.before);
+    resortSubtabOf(entry.node);
     await storeLabel(entry.key, entry.tabId, entry.before, entry.shipped);
     labelRedo.push(entry);
     labelHistoryChanged();
@@ -8246,6 +8272,7 @@ ${contents.path}`});
     }
     if (entry.node?.isConnected) entry.node.textContent = entry.after;
     relabelHeaders(entry.key, entry.after);
+    resortSubtabOf(entry.node);
     await storeLabel(entry.key, entry.tabId, entry.after, entry.shipped);
     labelUndo.push(entry);
     labelHistoryChanged();
@@ -9003,6 +9030,7 @@ ${contents.path}`});
           text.textContent = label;
           input.replaceWith(text);
           relabelHeaders(key, label);
+          resortSubtabOf(text);
           // Remember it, so the shell's undo can take the name back: the
           // plugin's record history has no idea this happened.
           labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
