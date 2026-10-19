@@ -1106,7 +1106,9 @@
       const gap = (parseFloat(style.fontSize) || 12) * .12;
       // The right-hand limit is where the box stops reserving room for
       // whatever else lives in it - a reference, a lock, a stepper.
-      const reserved = parseFloat(getComputedStyle(field).getPropertyValue("--lex-unit-reserve")) || 0;
+      // The reserve is in em (it pads the box in CSS); the limit is in px.
+      const reserved = (parseFloat(getComputedStyle(field).getPropertyValue("--lex-unit-reserve")) || 0)
+        * (parseFloat(style.fontSize) || 16);
       const limit = Math.max(0, field.clientWidth - unitNode.offsetWidth - reserved);
       const left = Math.min(border + start + measured + gap, limit);
       const next = `${Math.round(left)}px`;
