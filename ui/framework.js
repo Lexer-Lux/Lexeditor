@@ -6182,9 +6182,9 @@
     };
     const buttons = [
       {label: "Go to animation start", glyph: "\u23EE", run: () => goToFrame(0)},
-      {label: "Back one frame", glyph: "\u25C0", run: () => goToFrame(Math.round(state.time / frameDur) - 1)},
+      {label: "Back one frame", glyph: "\u25C1", run: () => goToFrame(Math.round(state.time / frameDur) - 1)},
       {label: "Play or pause", glyph: glyph(state.playing), run: () => setPlaying(!state.playing)},
-      {label: "Forward one frame", glyph: "\u25B6", run: () => goToFrame(Math.round(state.time / frameDur) + 1)},
+      {label: "Forward one frame", glyph: "\u25B7", run: () => goToFrame(Math.round(state.time / frameDur) + 1)},
       {label: "Go to animation end", glyph: "\u23ED", run: () => goToFrame(count - 1)},
     ].map(spec => element("button", {type: "button", class: "lex-anim-transport-button",
       "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));

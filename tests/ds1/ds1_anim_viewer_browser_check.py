@@ -76,6 +76,9 @@ def main():
                     assert buttons.count() == 5
                     assert [buttons.nth(index).get_attribute("aria-label")
                             for index in range(5)] == LABELS
+                    glyphs = [buttons.nth(index).text_content() for index in range(5)]
+                    assert glyphs[1] == "\u25c1", glyphs
+                    assert glyphs[3] == "\u25b7", glyphs
                     follow = page.locator(
                         "[data-anim-host] .lex-model-view-modes [data-anim-follow]")
                     assert follow.count() == 1
