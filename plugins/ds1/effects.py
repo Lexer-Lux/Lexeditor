@@ -49,10 +49,8 @@ OVERRIDES = {
     "targetPriority": ("Enemy target preference", "Positive values encourage enemies to target the owner. Negative values encourage another target."),
 }
 GROUPS = (
-    "Activation and timing", "HP and stamina", "Damage dealt", "Damage received",
-    "Defence and resistances", "Status buildup", "Equipment", "Effect links",
-    "Targets", "Immunities", "Movement and perception", "Rewards",
-    "Covenants", "Other properties", "Protected properties",
+    "Timing", "Vitals", "Offense", "Defense", "Immunity", "Move",
+    "Links", "Gear", "Covenants", "Other", "Locked",
 )
 
 
@@ -129,41 +127,41 @@ def presentation(key, label, description):
         if "1 =" not in description and "1 mean" not in description and "1 is" not in description:
             description = description.rstrip(".") + ". 1 is unchanged."
     if key in PROTECTED:
-        group = "Protected properties"
+        group = "Locked"
     elif key.startswith("effectTarget"):
-        group = "Targets"
+        group = "Links"
         if key not in OVERRIDES and key not in PROTECTED:
             description = ""
     elif key.startswith("vowType"):
         group = "Covenants"
     elif key.startswith(("disable", "corrosionIgnore", "antiMagicIgnore", "noDead", "enableCharm")):
-        group = "Immunities"
+        group = "Immunity"
     elif key.endswith("SpEffectId") or key in ("behaviorId", "stateInfo", "useSpEffectEffect"):
-        group = "Effect links"
+        group = "Links"
     elif key.startswith(("condition", "effectEndurance", "motionInterval", "spCategory",
                           "categoryPriority", "saveCategory", "iconId", "dispIcon",
                           "isFireDamage", "isExtend", "enableLifeTime", "lifeReduction", "magicEffectTime")):
-        group = "Activation and timing"
+        group = "Timing"
     elif key in ("poizonAttackPower", "registIllness", "registBlood", "registCurse"):
-        group = "Status buildup"
+        group = "Offense"
     elif "Diffence" in key or key.startswith("regist"):
-        group = "Defence and resistances"
+        group = "Defense"
     elif "DamageCutRate" in key or key in ("NoGuardDamageRate", "vitalSpotChangeRate",
                                          "normalSpotChangeRate", "bloodDamageRate"):
-        group = "Damage received"
+        group = "Defense"
     elif "Attack" in key or key in ("atkAttribute", "spAttribute", "bAdjustMagicAblity",
                                    "bAdjustFaithAblity", "magParamChange", "miracleParamChange"):
-        group = "Damage dealt"
+        group = "Offense"
     elif any(word in key.lower() for word in ("hp", "mp", "stamina")):
-        group = "HP and stamina"
+        group = "Vitals"
     elif any(word in key.lower() for word in ("durability", "guard", "flick", "weight", "bowdist", "slot", "superarmor", "wepparam")):
-        group = "Equipment"
+        group = "Gear"
     elif any(word in key.lower() for word in ("move", "anim", "grabity", "targetpriority", "search", "raycast", "faketarget")):
-        group = "Movement and perception"
+        group = "Move"
     elif "soul" in key.lower() or key == "heroPointDamage":
-        group = "Rewards"
+        group = "Other"
     else:
-        group = "Other properties"
+        group = "Other"
     return label, group, description
 
 

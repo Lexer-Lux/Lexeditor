@@ -592,7 +592,7 @@ def schema(table):
             elif enum_name and not choices:
                 reason = 'The choices for this property are not documented.'
             if protected:
-                group = 'Protected properties'
+                group = 'Locked'
         if table == 'NpcParam' and key not in NPC_FIELDS:
             protected = True
         if table == 'BehaviorParam' and key not in BEHAVIOR_EDITABLE:

@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
 from ds1_effects_fixture import make_effects_archive, mutate_effect_header, wrap
 from plugins.ds1.formats import ItemDocument, FormatError, inflate, schema
-from plugins.ds1.effects import TABLE, RECOVERY_KEY, UNITS, presentation
+from plugins.ds1.effects import TABLE, RECOVERY_KEY, UNITS, GROUPS, presentation
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds1.plugin import DS1Session
 from plugins.ds1 import deployment
@@ -286,3 +286,27 @@ def test_shown_labels_stay_unique_once_units_move_to_the_control():
         short = shown(label)
         assert short not in seen, f'{label} collides with {seen[short]}'
         seen[short] = label
+
+
+def test_effect_panel_tabs_fit_the_strip():
+    assert len(GROUPS) <= 11, GROUPS
+    assert max(len(group) for group in GROUPS) <= 10, GROUPS
+    specs = effect_specs()
+    for key, spec in specs.items():
+        _label, group, _description = presentation(
+            key, spec.label, spec.description or '')
+        assert group in GROUPS, (key, group)
+
+
+def test_effect_groups_merge_small_neighbors():
+    specs = effect_specs()
+    group = lambda key: presentation(
+        key, specs[key].label, specs[key].description or '')[1]
+    assert group('poizonAttackPower') == 'Offense'
+    assert group('physicsAttackPowerRate') == 'Offense'
+    assert group('neutralDamageCutRate') == 'Defense'
+    assert group('physicsDiffenceRate') == 'Defense'
+    assert group('heroPointDamage') == 'Other'
+    assert group('replaceSpEffectId') == 'Links'
+    assert group('requestSOS') == 'Locked'
+    assert group('vowType0') == 'Covenants'
