@@ -47,6 +47,13 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       await edits;
       let refresh=false;
       for(const edit of entry.edits||[entry]){
+        if(edit.rename){
+          const renamed=await api("/api/rename",{table:edit.table,id:edit.id,name:edit[side],sub:state.sub});
+          state.dirty=renamed.dirtyCount;state.changes=renamed.changes||state.changes;
+          if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=renamed.row;
+          for(const listed of state.rows||[])if(key(listed)===`${edit.table}:${edit.id}`){listed.name=renamed.row.name;if(renamed.modified!==undefined)listed.modified=renamed.modified;}
+          continue;
+        }
         const result=await api("/api/edit",{table:edit.table,id:edit.id,field:edit.field,value:edit[side],sub:state.sub});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         if(state.row&&state.row.table===edit.table&&state.row.id===edit.id)state.row=result.row;
@@ -461,10 +468,12 @@ function renameRecord(row,name){
   state.pending++;shell.refresh();
   edits=edits.then(async()=>{
     try{
+      const before=String(row.name??"");
       const result=await api("/api/rename",{table:row.table,id:row.id,name,sub:state.sub});
       state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
       if(state.row&&key(state.row)===key(row))state.row=result.row;
       for(const listed of state.rows||[])if(key(listed)===key(row)){listed.name=result.row.name;if(result.modified!==undefined)listed.modified=result.modified;}
+      fieldHistory.record({table:row.table,id:row.id,rename:true,before,after:String(result.row.name??"")});
     }catch(error){notify(error);}
     finally{state.pending--;render();}
   });
