@@ -2522,6 +2522,10 @@
       // A sun: every face lit as if noon.
       shape("circle", {cx: "12", cy: "12", r: "4", fill: "currentColor", stroke: "none"});
       shape("path", {d: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"});
+    } else if (mode === "follow") {
+      // Crossed arrows: the root carries the skeleton through space.
+      shape("path", {d: "M12 3v18M3 12h18"});
+      shape("path", {d: "M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"});
     } else {
       // A grid square: edges only, no faces.
       shape("rect", {x: "4", y: "4", width: "16", height: "16"});
@@ -6186,19 +6190,29 @@
       "aria-label": spec.label, title: spec.label, onclick: spec.run}, spec.glyph));
     const playButton = buttons[2];
     transport.append(...buttons);
-    // The follow switch is a transport toggle button, like every other
-    // viewer switch: a checkbox in the scrub row hid beside the slider.
+    // The follow switch sits with the view-mode buttons, styled like
+    // one: no extra control crowds the transport row. A host without a
+    // view-mode bar keeps the old transport toggle instead, so bar-less
+    // callers still get their switch.
     if (options.follow) {
       const followLabel = options.follow.label || "Follow";
+      const modeBar = host.querySelector(":scope > .lex-model-view-modes");
       const followButton = element("button", {type: "button",
-        class: "lex-anim-transport-button lex-anim-follow-button",
+        class: modeBar ? "lex-model-view-mode" : "lex-anim-transport-button lex-anim-follow-button",
+        "data-anim-follow": "",
         "aria-label": followLabel, title: followLabel, "aria-pressed": "false",
         onclick: () => {
           state.follow = !state.follow;
           followButton.setAttribute("aria-pressed", String(state.follow));
+          if (modeBar) followButton.classList.toggle("active", state.follow);
           options.follow.change?.(state.follow);
-        }}, followLabel);
-      transport.append(followButton);
+        }}, modeBar ? modelViewModeIcon("follow") : followLabel);
+      if (modeBar) {
+        // Remounts re-attach the cached bar with its stale toggle, so
+        // the old switch goes before the fresh one takes its place.
+        modeBar.querySelectorAll("[data-anim-follow]").forEach(node => node.remove());
+        modeBar.append(followButton);
+      } else transport.append(followButton);
     }
     timeline.append(scrub, transport);
     slider.oninput = () => { state.time = parseFloat(slider.value) * frameDur; };

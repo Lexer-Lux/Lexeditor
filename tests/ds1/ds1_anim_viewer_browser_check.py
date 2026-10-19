@@ -63,20 +63,25 @@ def main():
                     assert page.evaluate("typeof LexeditorUI.animationViewer") == "function"
                     assert page.evaluate(
                         "!!document.querySelector('[data-anim-host]')._animViewer")
-                    modes = page.locator("[data-anim-host] .lex-model-view-modes button")
+                    modes = page.locator(
+                        "[data-anim-host] .lex-model-view-modes button:not([data-anim-follow])")
                     assert modes.count() == 3
                     assert [modes.nth(index).get_attribute("aria-label")
                             for index in range(3)] == ["Regular", "Fullbright", "Wireframe"]
                     status = page.locator("[data-anim-status]").inner_text()
                     assert status.strip() == "", status
-                    assert "Root motion" in page.locator("[data-anim-timeline]").inner_text()
+                    assert "Root motion" not in page.locator("[data-anim-timeline]").inner_text()
                     assert page.locator("[data-anim-timeline] .lex-anim-marker").count() >= 1
                     buttons = page.locator("[data-anim-timeline] [data-anim-transport] button")
-                    assert buttons.count() == 6
+                    assert buttons.count() == 5
                     assert [buttons.nth(index).get_attribute("aria-label")
-                            for index in range(6)] == LABELS + ["Root motion"]
+                            for index in range(5)] == LABELS
                     follow = page.locator(
-                        "[data-anim-timeline] [aria-label='Root motion']")
+                        "[data-anim-host] .lex-model-view-modes [data-anim-follow]")
+                    assert follow.count() == 1
+                    assert follow.get_attribute("aria-label") == "Root motion"
+                    assert follow.locator("svg").count() == 1
+                    assert follow.inner_text().strip() == ""
                     assert follow.get_attribute("aria-pressed") == "false"
                     assert page.evaluate(
                         "document.querySelector('[data-anim-host]')"
@@ -130,6 +135,8 @@ def main():
                     if output:
                         page.wait_for_timeout(300)
                         page.screenshot(path=str(output / "ds1-anim-viewer.png"))
+                        page.locator("[data-anim-host] .lex-model-view-modes").screenshot(
+                            path=str(output / "ds1-anim-viewmodes.png"))
                         page.locator("[data-anim-timeline]").screenshot(
                             path=str(output / "ds1-anim-transport.png"))
                     opener = page.locator("#lexeditor-shortcuts")
