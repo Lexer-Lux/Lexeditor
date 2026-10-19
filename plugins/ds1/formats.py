@@ -546,6 +546,15 @@ def schema(table):
         slot = key[-2:] if table == MATERIAL_TABLE else ''
         if slot in ('01', '02', '03', '04', '05'):
             group = f'Material {int(slot)}'
+        # A lot reads slot by slot: each slot's item, category, rate,
+        # amount and flags under its own Drop header, the four lot-level
+        # settings under Lot. The flat per-kind wall was unreadable.
+        if table == 'ItemLotParam':
+            slot = key[-2:]
+            if slot in ('01', '02', '03', '04', '05', '06', '07', '08'):
+                group = f'Drop {int(slot)}'
+            else:
+                group = 'Lot'
         if table == CHARA_TABLE and key in CHARA_GROUPS:
             group = CHARA_GROUPS[key]
         if table == EFFECT_TABLE:
@@ -1351,7 +1360,7 @@ class ItemDocument:
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
-                           MATERIAL_TABLE, CHARA_TABLE, 'Bullet', 'NpcThinkParam') else '',
+                           MATERIAL_TABLE, CHARA_TABLE, 'Bullet', 'NpcThinkParam', 'ItemLotParam') else '',
                            'dtype': field.dtype, 'value': value if finite else str(value),
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
