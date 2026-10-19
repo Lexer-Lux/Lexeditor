@@ -2555,13 +2555,16 @@ function renderMaps(){
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
     actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
-  const viewPane=el("div",{style:"flex:1 1 auto;min-width:0;display:flex;flex-direction:column;"},wrap);
-  // The table sets the floor: headers are never cut off, and the 400px
-  // basis keeps narrower panes (placements, selection) from jumping.
-  const side=el("div",{"data-maps-side":"",style:"flex:0 0 400px;min-width:min-content;display:flex;flex-direction:column;"},mapsStrip(),mapsPane());
+  const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
+  const side=el("div",{"data-maps-side":"",style:"display:flex;flex-direction:column;min-width:0;min-height:0;"},mapsStrip(),mapsPane());
   const directory=LexeditorUI.collapsiblePanel({label:"Directory",side:"left",viewKey:"ds1-maps-directory",width:"360px",
     className:"ds1-directory",content:[directoryPane()]});
-  return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,viewPane,side);
+  // The viewport and the side share one remembered divider, like every
+  // list-and-detail split: the table sets the floor through minSizes.
+  const split=LexeditorUI.panelLayout([viewPane,side],"ds1-maps-view",
+    {layoutKey:"ds1-maps-view-side",defaultSizes:[60,40],minSizes:[320,400]});
+  split.style.flex="1 1 auto";split.style.minWidth="0";
+  return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,split);
 }
 function renderAnimPanels(){
   const chars=state.animChars||[];

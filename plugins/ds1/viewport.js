@@ -274,7 +274,11 @@ window.Ds1Viewport = (() => {
       camera.updateProjectionMatrix();
     };
     resize();
-    window.addEventListener("resize", resize);
+    // The stage flexes with its panel, so divider drags resize it
+    // without a window resize: watch the host itself (as mountChr).
+    const resizer = typeof ResizeObserver === "function" ? new ResizeObserver(() => resize()) : null;
+    if (resizer) resizer.observe(host);
+    else window.addEventListener("resize", resize);
     let selected = null;
     // The highlight is a box, not a tint: the mesh materials are shared
     // across placements, so tinting one would tint them all.
@@ -424,6 +428,7 @@ window.Ds1Viewport = (() => {
     let frames = 0, live = true;
     host._viewportStop = () => {
       live = false;
+      if (resizer) resizer.disconnect();
       delete host._viewportProject;
       delete host._viewportScene;
       delete host._viewportCamera;
