@@ -1948,6 +1948,52 @@
     return root;
   };
 
+  // A property a developer dragged onto another panel tab lives there now.
+  // Caller-owned tabs render only the active one, so the move cannot be a
+  // DOM rearrangement: it is a membership override the caller honors when
+  // it rebuilds, keyed by the accepting tabs and the caller's own shape.
+  // Neither side's arrangement orphans: the tab a field left still finds
+  // its layout by counting the ghost, and the tab it joined finds its own
+  // by discounting the arrival (adoptFieldTabLayout). Only the override
+  // ships; every reader derives the same migrated layouts from it.
+  const fieldTabOverridesKey = shape => `${shellPluginId()}-${activePageTab()}.fieldtabs.${shape}`;
+  const readFieldTabOverrides = shape => {
+    if (!shape) return {};
+    try {
+      const stored = JSON.parse(localStorage.getItem(fieldTabOverridesKey(shape)) || "null");
+      return stored && typeof stored === "object" ? stored : {};
+    } catch (_error) { return {}; }
+  };
+  const writeFieldTabOverrides = (shape, map) => {
+    const key = fieldTabOverridesKey(shape);
+    const value = JSON.stringify(map);
+    try { localStorage.setItem(key, value); } catch (_error) {}
+    callWindow("save_default_view", shellPluginId(), activePageTab(), {[key]: value}).catch(() => {});
+  };
+  // Moves caller-built field nodes across its tab groups per the stored
+  // overrides, and answers the shape the panel marks itself with. A move
+  // whose target is gone (or whose field the record lacks) stays put.
+  const applyFieldTabOverrides = (groups, tabs, options = {}) => {
+    const accept = [...new Set(options.accept || [])];
+    const shape = textDigest([...accept].sort().join("\n") + "\n" + String(options.callerShape || ""));
+    const entries = Object.entries(readFieldTabOverrides(shape));
+    if (!entries.length) return shape;
+    const groupOf = id => groups.get((tabs || []).find(tab => tab.id === id)?.label);
+    const find = fieldKey => {
+      for (const list of groups.values()) {
+        const at = list.findIndex(node => node?.dataset?.lexLayoutField === fieldKey);
+        if (at >= 0) return {list, at};
+      }
+      return null;
+    };
+    for (const [fieldKey, rule] of entries) {
+      const target = groupOf(rule?.to);
+      const found = find(fieldKey);
+      if (!target || !found || found.list === target) continue;
+      target.push(...found.list.splice(found.at, 1));
+    }
+    return shape;
+  };
   const tabbedPanel = (options = {}) => {
     const suppliedTabs = options.tabs || [];
     const title = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
@@ -1974,17 +2020,27 @@
     const contentNodes = [content || []].flat(Infinity).filter(Boolean);
     const empty = contentNodes.length === 1 && contentNodes[0] instanceof Element
       && contentNodes[0].classList.contains("lex-notice");
-    return guardNestedTabs(element("section", {
-      ...(options.attrs || {}),
-      class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
-    }, subtabBar({
+    const bar = subtabBar({
       tabs,
       active,
       label: options.label || "Panel views",
       className: "lex-tabbed-panel-tabs",
       shortcuts: false,
       change: options.change,
-    }), element("div", {
+    });
+    // A caller that honors membership overrides marks its bar, so drops
+    // onto its tabs move properties there. Only its accepting tabs (its
+    // field groups, never its bespoke tabs) take the drop.
+    if (options.fieldTabs?.shape) {
+      bar.dataset.lexFieldtabs = options.fieldTabs.shape;
+      const accept = new Set(options.fieldTabs.accept || []);
+      for (const button of bar.querySelectorAll(":scope > .lex-subtab-button"))
+        if (accept.has(button.dataset.subtab)) button.dataset.lexAcceptFields = "true";
+    }
+    return guardNestedTabs(element("section", {
+      ...(options.attrs || {}),
+      class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
+    }, bar, element("div", {
       class: ["lex-tabbed-panel-content", empty ? "lex-tabbed-panel-empty" : "", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
@@ -8381,6 +8437,82 @@ ${contents.path}`});
   // Stored layouts outlive their schemas: a layout whose exact key is gone
   // is adopted by field set (one transparent re-key), so shipped and older
   // arrangements survive key changes instead of silently dropping.
+  // The tab a moved field left still finds its stored arrangement by
+  // counting the ghost, and the tab it joined finds its own by
+  // discounting the arrival. Both adoptions write their migrated layout
+  // for the next build; the override alone ships, and every reader
+  // derives the same layouts from it.
+  const adoptFieldTabLayout = state => {
+    const bar = [...(state.root.querySelectorAll?.(".lex-tabbed-panel-tabs[data-lex-fieldtabs]") || [])]
+      .find(candidate => (candidate.closest(".lex-detail-panel") || candidate.closest(".lex-detail-section")) === state.root);
+    if (!bar) return null;
+    const shape = bar.dataset.lexFieldtabs;
+    const tabId = bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab;
+    const entries = Object.entries(readFieldTabOverrides(shape));
+    if (!tabId || !entries.length) return null;
+    const present = [...state.fields.values()].map(propertyOf);
+    const names = new Set(present);
+    const ghosts = entries.filter(([field, rule]) => rule?.from === tabId && !names.has(field)).map(([field]) => field);
+    const arrivals = entries.filter(([field, rule]) => rule?.to === tabId && names.has(field)).map(([field]) => field);
+    if (!ghosts.length && !arrivals.length) return null;
+    const keyNames = [...present];
+    for (const ghost of ghosts) keyNames.push(ghost);
+    for (const arrival of arrivals) keyNames.splice(keyNames.indexOf(arrival), 1);
+    const key = `${state.plugin}-${state.tab}.property-layout.${textDigest(JSON.stringify(keyNames.sort()))}`;
+    let stored = null;
+    try { stored = JSON.parse(localStorage.getItem(key) || "null"); } catch (_error) {}
+    if (!stored || typeof stored !== "object") return null;
+    const meta = new Set(["hidden", "sections", "removed", "order"]);
+    const migrated = {};
+    for (const [listKey, list] of Object.entries(stored)) {
+      if (!Array.isArray(list) || meta.has(listKey)) { migrated[listKey] = list; continue; }
+      migrated[listKey] = list.filter(id => !ghosts.includes(propertyOf(id)));
+    }
+    const used = new Set();
+    for (const arrival of arrivals) {
+      const current = [...state.fields.values()].find(id => propertyOf(id) === arrival && !used.has(id));
+      if (!current) continue;
+      used.add(current);
+      const want = sectionNameOf(String(current).split("/")[0]);
+      const listKey = Object.keys(migrated).find(candidate =>
+        Array.isArray(migrated[candidate]) && !meta.has(candidate) && sectionNameOf(candidate) === want);
+      if (!listKey || migrated[listKey].some(id => propertyOf(id) === arrival)) continue;
+      migrated[listKey].push(current);
+    }
+    try { localStorage.setItem(state.key, JSON.stringify(migrated)); } catch (_error) {}
+    return migrated;
+  };
+  // Records a drop onto another tab's button: the override names both
+  // tabs, the undo restores the map and returns to the source tab, and the
+  // caller re-renders through the clicked button. The bar is found by its
+  // shape each time, never by a node a rebuild may have discarded.
+  const moveDetailFieldToTab = targetTab => {
+    const {field, sourceTab} = propertyDrag || {};
+    const fieldKey = field?.dataset?.lexLayoutField;
+    const bar = propertyDrag?.panel?.isConnected
+      ? propertyDrag.panel.querySelector(":scope > .lex-tabbed-panel-tabs[data-lex-fieldtabs]")
+      : null;
+    const shape = bar?.dataset.lexFieldtabs;
+    if (!shape || !fieldKey || !sourceTab || sourceTab === targetTab) return;
+    const beforeMap = readFieldTabOverrides(shape);
+    const afterMap = {...beforeMap, [fieldKey]: {from: sourceTab, to: targetTab}};
+    const clickTab = id => document.querySelector(
+      `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"] .lex-subtab-button[data-subtab="${id}"]`)?.click();
+    const activeTab = () => document.querySelector(
+      `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"] .lex-subtab-button.active`)?.dataset.subtab;
+    writeFieldTabOverrides(shape, afterMap);
+    labelUndo.push({before: beforeMap, after: afterMap, apply: layout => {
+      writeFieldTabOverrides(shape, layout);
+      const showId = layout === afterMap ? targetTab : sourceTab;
+      // Clicking the active tab rebuilds nothing, so bounce through the
+      // other one: the caller re-renders twice and lands on the move.
+      if (activeTab() === showId) clickTab(showId === targetTab ? sourceTab : targetTab);
+      clickTab(showId);
+    }});
+    labelRedo.length = 0;
+    labelHistoryChanged();
+    clickTab(targetTab);
+  };
   const readStoredLayout = state => {
     const parse = text => { try { return JSON.parse(text || "null"); } catch (_error) { return null; } };
     const direct = parse(localStorage.getItem(state.key));
@@ -8404,7 +8536,7 @@ ${contents.path}`});
         return layout;
       }
     }
-    return null;
+    return adoptFieldTabLayout(state);
   };
   const preparePropertyLayout = root => {
     const fields = layoutFields(root);
@@ -8763,7 +8895,7 @@ ${contents.path}`});
   }, true);
   let propertyDrag = null, propertyDrop = null;
   const clearPropertyDrop = () => {
-    propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after");
+    propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after", "lex-drop-target");
     propertyDrop = null;
   };
   // During a section or property drag, holding the pointer near the top or
@@ -8873,7 +9005,11 @@ ${contents.path}`});
     if (!sharedSettingsSnapshot?.developerMode || !root || field.querySelector(".lex-detail-field-label input")) { event.preventDefault(); return; }
     const state = preparePropertyLayout(root);
     if (!state.fields.has(field)) { event.preventDefault(); return; }
-    propertyDrag = {state, field, before: capturePropertyLayout(state)};
+    // A cross-tab move records where the field came from: the override
+    // names both tabs, and the undo returns to the source one.
+    const panel = field.closest(".lex-tabbed-panel");
+    const sourceTab = panel?.querySelector(".lex-tabbed-panel-tabs .lex-subtab-button.active")?.dataset.subtab || null;
+    propertyDrag = {state, field, before: capturePropertyLayout(state), panel, sourceTab};
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", field.dataset.lexLayoutField);
     field.classList.add("lex-property-dragging");
@@ -8884,6 +9020,18 @@ ${contents.path}`});
     clearPropertyDrop();
     if (!sharedSettingsSnapshot?.developerMode) return;
     const {state, field} = propertyDrag;
+    // Onto another accepting tab of the same panel: the field moves there
+    // when dropped. Bespoke tabs, and tabs of another panel, refuse it.
+    const button = event.target.closest?.(".lex-tabbed-panel-tabs .lex-subtab-button[data-lex-accept-fields]");
+    if (button && propertyDrag.panel?.isConnected && propertyDrag.panel.contains(button) &&
+        button.dataset.subtab !== propertyDrag.sourceTab &&
+        propertyDrag.panel.querySelector(`.lex-tabbed-panel-tabs .lex-subtab-button[data-subtab="${propertyDrag.sourceTab}"]`)?.dataset.lexAcceptFields) {
+      propertyDrop = {crossTab: button.dataset.subtab, marker: button, after: true};
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      button.classList.add("lex-drop-target");
+      return;
+    }
     const target = event.target.closest?.(".lex-detail-field");
     if (target === field) return;
     if (state.fields.has(target)) {
@@ -8902,6 +9050,11 @@ ${contents.path}`});
   document.addEventListener("drop", event => {
     if (!propertyDrag || !propertyDrop || !sharedSettingsSnapshot?.developerMode) return;
     event.preventDefault();
+    if (propertyDrop.crossTab) {
+      moveDetailFieldToTab(propertyDrop.crossTab);
+      clearPropertyDrop();
+      return;
+    }
     const {state, field, before} = propertyDrag;
     propertyDrop.node.insertBefore(field, propertyDrop.before);
     syncPagerCards(field.closest(".lex-tweaks-paged"));
@@ -14644,7 +14797,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with

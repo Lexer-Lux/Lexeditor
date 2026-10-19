@@ -1,6 +1,6 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection,tabbedPanel,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
@@ -991,6 +991,8 @@ function monsterDetail(groups){
   const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
   const tabs=[...groups].map(([title])=>({id:tabId(title),label:title,
     help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards. Each value is a percentage off the hit. Nothing here applies to a hit it does not block.":null}));
+  const accept=tabs.map(tab=>tab.id);
+  const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
   tabs.push({id:"attacks",label:"Attacks",help:attackHelp});
   if(effects)tabs.push({id:"effects",label:"Effects",help:"Effects this monster carries. Changing a shared effect changes every use of it."});
   if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here; the item name opens the rest of the line below it. -1 stock means unlimited."});
@@ -1008,7 +1010,7 @@ function monsterDetail(groups){
     :active==="behaviors"?monsterBehaviorsSection()
     :active==="model"?monsterModelSection()
     :groups.get(section.label);
-  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},
+  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
     change:id=>{state.monsterTab=id;render();},content});
 }
 // Ammo's Defense tab reads its guard block under three headers: the guard's
@@ -1035,10 +1037,12 @@ function itemDetail(groups){
     help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
   const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
+  const accept=tabs.map(tab=>tab.id);
+  const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
   const body=groups.get(section.label);
   const content=section.label==="Defense"&&state.row&&catalogSub(state.row.table,state.row)==="ammo"
     ?ammoDefenseSections(body):body;
-  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},
+  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
     change:id=>{state.itemTab=id;render();},content});
 }
 function effectDetail(groups){
@@ -1048,7 +1052,9 @@ function effectDetail(groups){
   const tabs=[...groups].map(([title])=>({id:tabId(title),label:title}));
   const active=tabs.some(tab=>tab.id===state.effectTab)?state.effectTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
-  return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},
+  const accept=tabs.map(tab=>tab.id);
+  const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
+  return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
     change:id=>{state.effectTab=id;render();},content:groups.get(section.label)});
 }
 function msbDetail(row,groups){

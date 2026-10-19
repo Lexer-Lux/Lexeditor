@@ -8935,6 +8935,7 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
    reuse the subtab look. */
 .lex-tabstrip { display:flex; gap:2px; flex-wrap:wrap; flex:0 0 auto; }
 .lex-tabstrip-button.lex-drop-target { outline:2px dashed var(--lex-highlight); outline-offset:-2px; }
+.lex-tabbed-panel-tabs .lex-subtab-button.lex-drop-target { outline:2px dashed var(--lex-highlight); outline-offset:-2px; }
 .lex-detail-tabpane[hidden] { display:none; }
 .lex-dragging { opacity:.4; }
 
