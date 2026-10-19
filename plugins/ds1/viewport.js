@@ -242,6 +242,22 @@ window.Ds1Viewport = (() => {
     }
     const box = new THREE.Box3();
     root.traverse(obj => { if (obj.isMesh && !obj.userData.sky && !obj.userData.fx) box.expandByObject(obj); });
+    const mapDiag = box.isEmpty() ? 0 : box.getSize(new THREE.Vector3()).length();
+    let skyDiag = 0;
+    for (const mesh of skyMeshes)
+      skyDiag = Math.max(skyDiag, mesh.userData.worldBox.getSize(new THREE.Vector3()).length());
+    // The depth buffer's precision dies with range: near 0.1 under a
+    // far plane past the horizon shimmered every distant overlap.
+    // Fit both planes to the map's own box instead, every frame, so
+    // coplanar ground patches stop fighting at any zoom.
+    const fitDepth = () => {
+      if (box.isEmpty()) return;
+      const dist = box.distanceToPoint(camera.position);
+      const span = Math.max(mapDiag, skyDiag);
+      camera.near = dist > 0 ? Math.max(dist * 0.5, 0.05) : 0.1;
+      camera.far = dist + span * 1.2 + 1;
+      camera.updateProjectionMatrix();
+    };
     if (!box.isEmpty()) {
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
@@ -410,6 +426,7 @@ window.Ds1Viewport = (() => {
       live = false;
       delete host._viewportProject;
       delete host._viewportScene;
+      delete host._viewportCamera;
       window.removeEventListener("resize", resize);
       controls.dispose();
       gizmo.dispose();
@@ -427,6 +444,7 @@ window.Ds1Viewport = (() => {
     const loop = () => {
       if (!live || mine !== session || !host.isConnected) { stop(host); return; }
       controls.update();
+      fitDepth();
       for (const mesh of skyMeshes) mesh.visible = mesh.userData.worldBox.containsPoint(camera.position);
       renderer.render(scene, camera);
       if (++frames === 2) host.dataset.ready = "true";
@@ -435,6 +453,7 @@ window.Ds1Viewport = (() => {
     viewModes.bindScene(scene);
     // Test seam: the checks find lightmapped materials through this.
     host._viewportScene = scene;
+    host._viewportCamera = camera;
     loop();
     return controller;
   }
