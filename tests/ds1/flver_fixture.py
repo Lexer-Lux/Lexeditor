@@ -36,7 +36,7 @@ def make_chrbnd(flver_bytes, stem='c1200', extra=()):
 
 
 def build_flver(strip=False, qloc=False, bones=None, skin=None,
-                pos_offset=(0.0, 0.0, 0.0), bone_list=None):
+                pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False):
     """A minimal FLVER2 0x2000C: 1 mesh (a quad), 1 material, N bones, 1 dummy.
 
     `strip` stores the faces as a triangle strip; `qloc` writes a lying
@@ -52,6 +52,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
         bone_list = list(range(len(bones)))
     if qloc and (len(bones) != 1 or skin is not None):
         raise ValueError('qloc covers the single-bone unskinned layout only')
+    if second_uv and (qloc or skin is not None):
+        raise ValueError('second_uv covers the plain unskinned layout only')
     ox, oy, oz = pos_offset
     out = bytearray()
     out.extend(b'\0' * 128)  # header
@@ -105,6 +107,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
         members = [(0, 0x02, 0), (2, 0x11, 0), (3, 0x13, 0), (10, 0x13, 0), (5, 0x15, 0)]
     elif skin is not None:
         members = [(0, 0x02, 0), (3, 0x13, 0), (2, 0x11, 0), (1, 0x13, 0), (5, 0x15, 0)]
+    if second_uv:
+        members = members + [(5, 0x15, 0)]
     members_at = place(b''.join(struct.pack('<5I', 0, 0, fmt, semantic, inst)
                                 for semantic, fmt, inst in members))
 
@@ -142,8 +146,10 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
             verts.extend(bytes(ids))
             verts.extend(bytes(round(min(max(w, 0.0), 1.0) * 255) for w in weights))
         verts.extend(struct.pack('<2h', round(x * 1024), round(y * 1024)))
+        if second_uv:
+            verts.extend(struct.pack('<2h', round((x + 10) * 1024), round((y + 20) * 1024)))
     vtx_at = place(bytes(verts))
-    stride = 32 if qloc else (28 if skin is not None else 20)
+    stride = 32 if qloc else (28 if skin is not None else (24 if second_uv else 20))
 
     struct.pack_into('<6s2sI', out, 0, b'FLVER\0', b'L\0', 0x2000C)
     struct.pack_into('<7I', out, 12, data_at, len(out) - data_at, 1, 1, len(bones), 1, 1)

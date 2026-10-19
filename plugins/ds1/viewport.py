@@ -174,8 +174,11 @@ def _split_tables(kind, location, member, game_root, project, area=None):
     """[(label, member table, data path)] plus notes: a character
     binder's companion archive, plus the map area's archives for
     pieces and for binders placed on a map (objects keep their
-    textures with the map, not in their own binder). A companion
-    header without its data file is reported once, here."""
+    textures with the map, not in their own binder). Maps borrow
+    across tilesets - Kiln pieces wear m10 shared textures - so
+    when an area is in play every other tileset is a fallback
+    after the area's own archives. A companion header without its
+    data file is reported once, here."""
     tables, notes = [], []
     areas = []
     if kind == 'member':
@@ -214,9 +217,11 @@ def _split_tables(kind, location, member, game_root, project, area=None):
     for root in (project, game_root):
         if root and str(root) not in roots:
             roots.append(str(root))
+    searched = set()
     for want in areas:
         for root in roots:
             for bhd in sorted((Path(root) / 'map' / want).glob('*.tpfbhd')):
+                searched.add(str(bhd))
                 bdt = bhd.with_suffix('.tpfbdt')
                 if not bdt.is_file():
                     notes.append(f'{bdt.name}: companion texture archive not found')
@@ -228,10 +233,89 @@ def _split_tables(kind, location, member, game_root, project, area=None):
                     tables.append((bhd.name, table, bdt))
                 except (BhfError, OSError) as error:
                     notes.append(f'{bhd.name}: {error}')
+    if areas:
+        for root in roots:
+            pattern = Path(root) / 'map'
+            if not pattern.is_dir():
+                continue
+            for bhd in sorted(pattern.glob('m??/*.tpfbhd')):
+                if str(bhd) in searched:
+                    continue
+                searched.add(str(bhd))
+                label = f'{bhd.parent.name}/{bhd.name}'
+                bdt = bhd.with_suffix('.tpfbdt')
+                if not bdt.is_file():
+                    notes.append(f'{label}: companion texture archive not found')
+                    continue
+                try:
+                    stamp = _stamp(bhd)
+                    table = (_cached_bhf_table(str(bhd), stamp) if stamp is not None
+                             else parse_bhf(bhd.read_bytes()))
+                    tables.append((label, table, bdt))
+                except (BhfError, OSError) as error:
+                    notes.append(f'{label}: {error}')
     return tables, notes
 
 
-CHR_STEM = re.compile(r'^c(\d+)', re.IGNORECASE)
+def _tileset_singles(kind, location, game_root, project, area=None):
+    """(label, TPF bytes) from single-file tileset archives: the map's
+    own tileset first, then every other tileset. A few props (m10's
+    ivy, its pot) ship in m10_9999.tpf.dcx instead of the split
+    archives. Reads lazily so the scan stops at the first hit."""
+    areas = []
+    if kind == 'member':
+        if area:
+            areas.append(area)
+    else:
+        areas.append(Path(location).parent.name.split('_')[0])
+    if not areas:
+        return
+    roots = []
+    for root in (project, game_root):
+        if root and str(root) not in roots:
+            roots.append(str(root))
+    seen = set()
+    for want in areas:
+        for root in roots:
+            for single in sorted((Path(root) / 'map' / want).glob('*.tpf*')):
+                if single.suffix == '.dcx':
+                    stem = single.name[:-len('.tpf.dcx')] if single.name.endswith('.tpf.dcx') else None
+                else:
+                    stem = single.name[:-len('.tpf')] if single.name.endswith('.tpf') else None
+                if stem is None or str(single) in seen:
+                    continue
+                seen.add(str(single))
+                try:
+                    blob = single.read_bytes()
+                except OSError:
+                    continue
+                if blob[:4] == b'DCX\0':
+                    try:
+                        blob = inflate(blob)
+                    except FormatError:
+                        continue
+                yield f'{single.parent.name}/{single.name}', blob
+    for root in roots:
+        pattern = Path(root) / 'map'
+        if not pattern.is_dir():
+            continue
+        for single in sorted(pattern.glob('m??/*.tpf')) + sorted(pattern.glob('m??/*.tpf.dcx')):
+            if str(single) in seen:
+                continue
+            seen.add(str(single))
+            try:
+                blob = single.read_bytes()
+            except OSError:
+                continue
+            if blob[:4] == b'DCX\0':
+                try:
+                    blob = inflate(blob)
+                except FormatError:
+                    continue
+            yield f'{single.parent.name}/{single.name}', blob
+
+
+CHR_STEM = re.compile(r'^c(\\d+)', re.IGNORECASE)
 
 
 def _sibling_binder(game_root, project, name):
@@ -410,6 +494,11 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
                 take(label, inflated[key], [name])
                 if name in found:
                     break
+    if missing:
+        for label, blob in _tileset_singles(kind, location, game_root, project, area):
+            if not missing:
+                break
+            take(label, blob, missing)
     if not saw:
         notes.append('no texture container found')
     for name in missing:
@@ -512,6 +601,10 @@ def _encode(doc, skin=False, textured=False):
             ok = bool(uvs) and len(mesh['uvs']) == len(mesh['positions'])
             packed = struct.pack('<%df' % len(uvs), *uvs) if ok else b''
             entry['uv'] = base64.b64encode(packed).decode('ascii')
+            uvs2 = [c for vertex in mesh['uvs2'] for c in vertex]
+            ok2 = bool(uvs2) and len(mesh['uvs2']) == len(mesh['positions'])
+            packed2 = struct.pack('<%df' % len(uvs2), *uvs2) if ok2 else b''
+            entry['uv1'] = base64.b64encode(packed2).decode('ascii')
             entry['map'] = _diffuse_name(doc.meshes[index]['material'])
         if skin:
             entry.update(_encode_skin(doc, mesh))

@@ -366,7 +366,8 @@ class FlverDocument:
                 'material': self.materials[header['material']],
                 'default_bone': header['default_bone'], 'triangles': [],
                 'cull': all(face_sets[face]['cull'] for face in faces) if faces else True,
-                'positions': [], 'normals': [], 'uvs': [], 'weights': [], 'bone_ids': []}
+                'positions': [], 'normals': [], 'uvs': [], 'uvs2': [],
+                'weights': [], 'bone_ids': []}
         for face in faces:
             mesh['triangles'].extend(face_sets[face]['triangles'])
         mtd = mesh['material']['mat_def'].rsplit('/', 1)[-1].rsplit('\\', 1)[-1]
@@ -412,9 +413,10 @@ class FlverDocument:
         for prefix, piece in CORRUPTED_PREFIXES:
             if blob[:32] == prefix:
                 self.notes.append(f'Known corrupted DSR vertex data ({piece}); values may be wrong')
-        positions, normals, uvs, weights, bone_ids = [], [], [], [], []
+        positions, normals, uvs, uvs2, weights, bone_ids = [], [], [], [], [], []
         for v in range(header['vcount']):
             cursor = v * stride
+            uv_seen = 0
             for semantic, fmt in members:
                 if semantic is None:
                     cursor += fmt
@@ -429,7 +431,15 @@ class FlverDocument:
                 elif semantic == NORMAL:
                     normals.extend(value)
                 elif semantic == UV:
-                    uvs.extend(value)
+                    # Map pieces carry a lightmap pair after the diffuse
+                    # pair; merging them doubled the list and the encoder
+                    # shipped no UVs at all. A third set has never been
+                    # seen; it is ignored rather than corrupting set two.
+                    if uv_seen == 0:
+                        uvs.extend(value)
+                    elif uv_seen == 1:
+                        uvs2.extend(value)
+                    uv_seen += 1
                 elif semantic == WEIGHTS:
                     weights.extend(value)
                 elif semantic == BONE_IDS:
@@ -439,6 +449,7 @@ class FlverDocument:
         mesh['positions'].extend(positions)
         mesh['normals'].extend(normals)
         mesh['uvs'].extend(uvs)
+        mesh['uvs2'].extend(uvs2)
         mesh['weights'].extend(weights)
         mesh['bone_ids'].extend(bone_ids)
 
@@ -466,6 +477,6 @@ class FlverDocument:
         return {'material': mesh['material']['name'], 'mat_def': mesh['material']['mat_def'],
                 'dynamic': mesh['dynamic'], 'cull': mesh['cull'], 'bbox': mesh['bbox'],
                 'positions': mesh['positions'], 'normals': mesh['normals'],
-                'uvs': mesh['uvs'], 'weights': mesh['weights'],
+                'uvs': mesh['uvs'], 'uvs2': mesh['uvs2'], 'weights': mesh['weights'],
                 'bone_ids': mesh['bone_ids'], 'bone_list': mesh['bone_list'],
                 'default_bone': mesh['default_bone'], 'triangles': mesh['triangles']}
