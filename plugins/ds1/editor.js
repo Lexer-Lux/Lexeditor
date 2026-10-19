@@ -1623,7 +1623,7 @@ async function ds1PreviewTarget(table,id){
     const chr=(view.chrs||[]).find(entry=>entry.available);
     return chr?{kind:"chr",name:`${view.name} model`,
       url:`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`}
-      :{reason:`${view.name} has no placed character model.`};
+      :{reason:`${view.name} has no character model.`};
   }
   if(!["EquipParamWeapon","EquipParamProtector","EquipParamGoods","EquipParamAccessory"].includes(table))return null;
   const view=await api(`/api/parts/view?table=${encodeURIComponent(table)}&id=${id}`);

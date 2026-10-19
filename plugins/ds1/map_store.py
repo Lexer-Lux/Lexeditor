@@ -229,12 +229,25 @@ class MapStore:
                                 'enemies': enemies}
         return counts
 
+    def chr_binder(self, stem):
+        """The live character binder for a model stem, mod override first."""
+        name = f"{stem}.chrbnd.dcx"
+        if self.project is not None:
+            own = self.project / "chr" / name
+            if own.is_file():
+                return own
+        live = self.game_root / "chr" / name
+        return live if live.is_file() else None
+
     def npc_models(self):
         """Each placed NPC ID with the character models it wears.
 
         Links come from every map's enemy parts. One map's broken bytes
         must not hide every other map's links, so unreadable maps are
-        skipped. NPC swaps and placement edits invalidate the cache."""
+        skipped. NPC swaps and placement edits invalidate the cache.
+        NPCs no map places (event and online spawns name no model)
+        fall back to their same-hundred character binder when one
+        exists; placements always win."""
         if self._npc_models is None:
             links = {}
             for map_name in self.maps():
@@ -246,6 +259,13 @@ class MapStore:
                     if part['type'] in ENEMY_TYPES:
                         links.setdefault(part['npc'], set()).add(
                             document.models[part['model']]['name'])
+            known, _names, _types = self._npc()
+            for npc in known:
+                if npc in links:
+                    continue
+                stem = f"c{npc // 100}"
+                if self.chr_binder(stem) is not None:
+                    links[npc] = {stem}
             self._npc_models = {npc: sorted(models) for npc, models in links.items()}
         return self._npc_models
 

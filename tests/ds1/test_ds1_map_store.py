@@ -138,3 +138,31 @@ def test_list_rows_mark_modified_after_edit(tmp_path):
     store.get(MAP).edit((2, 0), "posX", 10.5)
     flags = {row["id"]: row.get("modified") for row in store.list_rows()}
     assert flags == {"2:0": True}
+
+
+def test_npc_models_falls_back_to_same_hundred_binder(tmp_path):
+    game, mod, store = setup(tmp_path, npc=120000)
+    (game / "chr").mkdir(parents=True)
+    (game / "chr" / "c1201.chrbnd.dcx").write_bytes(b"fake binder")
+    (mod / "chr").mkdir(parents=True)
+    (mod / "chr" / "c2510.chrbnd.dcx").write_bytes(b"fake binder")
+    links = store.npc_models()
+    assert links[120000] == ["c1200"]
+    assert links[120100] == ["c1201"]
+    assert links[251000] == ["c2510"]
+    assert 999999 not in links
+
+
+def test_npc_models_placements_beat_the_fallback(tmp_path):
+    game, mod = tmp_path / "game", tmp_path / "mod"
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(make_archive())
+    (game / MAP_DIR).mkdir(parents=True)
+    (game / MAP_DIR / MAP).write_bytes(build_msb(parts=(("enemy", 2, 0, 0, 120000),),
+                                                  models=(("c9999", 0), ("m10piece", 0))))
+    (game / "chr").mkdir(parents=True)
+    (game / "chr" / "c1200.chrbnd.dcx").write_bytes(b"fake binder")
+    mod.mkdir()
+    (mod / MARKER).touch()
+    store = MapStore(game, mod, False, ItemStore(game, mod, False))
+    assert store.npc_models()[120000] == ["c9999"]
