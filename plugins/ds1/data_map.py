@@ -104,7 +104,7 @@ def payload(store, native_rules=None, theme=None):
         elif table == 'ObjActParam':
             row.update(coverage='structured',status='integrated',openable=True,
                 target='maps',sub='treasure',controls='Maps: treasure and pickup behavior',
-                notes='Edit how treasure chests and pickups behave in the directory.')
+                notes='Edit how treasure chests and pickups behave.')
         elif table == EFFECT_TABLE:
             editable = [f for f in document.schemas.get(table, {}).get('fields', []) if f['editable']]
             row.update(coverage='structured',status='partial',openable=True,
@@ -135,7 +135,7 @@ def payload(store, native_rules=None, theme=None):
             'status':'partial' if available else 'not-integrated', 'openable':available,
             'target':'items' if available else '', 'sub':tabs[0][0],
             'controls':'Items: '+', '.join(label for _,label in tabs),
-            'notes':'Rename items by double-clicking the table Name cell or the detail heading. NPC, place and feature text has no editor.' if available
+            'notes':'Rename items by double-clicking the table Name cell or the detail heading.' if available
                     else 'The item-text archive is missing. Item names cannot be renamed.'})
     for table, files in texts.DESC_TABLES.items():
         tabs = item_tables[table]
@@ -217,10 +217,10 @@ def payload(store, native_rules=None, theme=None):
                 'notes': f'No browser shows {UNTARGETED_ASSETS[top]}. Apply still installs files the mod carries here.'})
             continue
         controls = 'Assets: whole-file replacement with previews'
-        notes = 'Add game files to the mod to replace them. Models and textures preview; sounds replace without one. Files owned by another editor change there instead.'
+        notes = 'Add game files to the mod to replace them. Models and textures preview. Sounds replace without a preview. Files owned by another editor change there instead.'
         if top == 'parts':
-            controls = 'Assets: whole-file replacement; models preview in Items'
-            notes = ('Add game files to the mod to replace them. Models and textures preview; weapon and armor models also preview '
+            controls = 'Assets: whole-file replacement with previews'
+            notes = ('Add game files to the mod to replace them. Models and textures preview. Weapon and armor models also preview '
                      'in their Items detail. Files owned by another editor change there instead.')
         rows.append({'id': 'assets:' + top, 'filename': top + '/', 'path': str(folder),
             'coverage': 'structured', 'status': 'partial', 'openable': True,
@@ -230,17 +230,19 @@ def payload(store, native_rules=None, theme=None):
     parts = []
     if isinstance(theme, dict):
         if theme.get('title', {}).get('ready'):
-            parts.append('title art active')
-        if theme.get('font', {}).get('recognized'):
-            parts.append(f"{theme['font']['recognized']} font source(s) recognized")
-        if theme.get('sfx', {}).get('recognizedBanks'):
-            parts.append(f"{theme['sfx']['recognizedBanks']} sound bank(s) recognized")
+            parts.append('Title art active')
+        recognized = theme.get('font', {}).get('recognized')
+        if recognized:
+            parts.append(f"{recognized} font source{'s' if recognized != 1 else ''} recognized")
+        banks = theme.get('sfx', {}).get('recognizedBanks')
+        if banks:
+            parts.append(f"{banks} sound bank{'s' if banks != 1 else ''} recognized")
     rows.append({'id': 'theme:installed-game',
         'filename': 'menu/ + font/ + sound/ (theme)',
         'path': str(store.game_root) if store.game_root else '',
         'coverage': 'game-derived-theme', 'openable': False,
         'controls': 'Private installed-game theme cache',
-        'notes': '; '.join(parts) or 'Theme extraction falls back safely when cosmetic source assets are unavailable.',
+        'notes': '. '.join(parts) + '.' if parts else 'Theme extraction falls back safely when cosmetic source assets are unavailable.',
         'status': 'partial' if isinstance(theme, dict) and theme.get('source') == 'installed-game' else 'not-integrated'})
     # The Data Map names its open buttons from these labels ("Open Effects").
     for row in rows:
