@@ -5,7 +5,7 @@ from . import assets, texts
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'ai':'AI', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.',
               'maps':'Maps', 'animations':'Animations', 'text':'Text',
-              'npcs':'NPCs',
+              'npcs':'NPCs', 'drops':'Drops',
               'models':'Models', 'textures':'Textures', 'sound':'Sound effects',
               'music':'Music'}
 
@@ -95,8 +95,8 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit starting classes and what each starting gift grants. Other rows in this table stay read-only.')
         elif table == 'ItemLotParam':
             row.update(coverage='structured',status='integrated',openable=True,
-                target='maps',sub='drops',controls='Maps: enemy and corpse drops',
-                notes='Edit dropped items and their rates in the directory. One lot may be shared by several enemies.')
+                target='drops',sub='drops',controls='Drops: enemy and corpse drops',
+                notes='Edit dropped items and their rates. One lot may be shared by several enemies.')
         elif table == 'ShopLineupParam':
             row.update(coverage='structured',status='integrated',openable=True,
                 target='npcs',sub='npcs',controls='NPCs: merchant stock and prices',

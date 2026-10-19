@@ -121,7 +121,7 @@ def main():
                         const label = field && field.querySelector('.lex-detail-field-label-text');
                         return [unit && unit.textContent, label && label.textContent];
                     }""")
-                    assert stamina == ['stamina/second', 'Stamina recovery'], stamina
+                    assert stamina == ['/sec', 'Stamina recovery'], stamina
                     seen, edited = set(), set()
                     saw_effective = False
                     tab_ids = page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)')

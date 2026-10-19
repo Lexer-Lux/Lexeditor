@@ -81,6 +81,7 @@ const shell=LexeditorUI.mountShell({
     {id:"text",label:"Text",help:"Edit the game's menu text: NPC dialogue, event and system messages, help and menu labels. Item names and descriptions edit on the item."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops and effects. A monster's Attacks tab lists the attack records its parameters reference; its brains live in the AI tab. Vanilla is read-only. Save changes the mod project."},
     {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Each merchant's Shop tab holds their stock and prices. Vanilla is read-only. Save changes the mod project."},
+    {id:"drops",label:"Drops",help:"Edit enemy and corpse drop tables: what each lot drops and at what rates. One lot may serve several enemies. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"ai",label:"AI",help:"Enemy brains. AI tables are how enemies sense and answer the player; behaviors are the moves each one can choose from. Vanilla is read-only. Save changes the mod project."},
     {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
@@ -100,7 +101,7 @@ const shell=LexeditorUI.mountShell({
   pendingChanges:()=>[...(state.changes||[]),...(state.tweaksNeedRebuild?[{label:"Installed tweaks",before:"Last build",after:"Rebuilt"}]:[])],
   save,discard,history:fieldHistory
 });
-const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
+const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="drops"?state.worldTabs.filter(entry=>entry.id==="drops"):tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
   tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
   ASSET_TABS.has(tab)?state.assetTabs:
   tab==="misc"?state.miscTabs.map(entry=>entry.id==="encumbrance"?{...entry,help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."}:entry.id==="misc"?{...entry,help:"Base stamina recovery before effects and load penalties. Save and Apply to use your value."}:entry.id==="encumbrance-overrides"?{...entry,help:"Special conditions that replace band recovery. They take priority over load ranges and do not create another range. Save and Apply to use your rules."}:entry):state.tabs;
@@ -276,6 +277,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";
   else if(tab==="ai"&&!state.aiTabs.some(entry=>entry.id===sub))sub="ai";
   else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
+  else if(tab==="drops"&&!state.worldTabs.some(entry=>entry.id===sub))sub="drops";
     else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
   else if(tab==="maps"){if(DIRECTORY_TABS.includes(sub))state.dirTab=sub;sub="placements";}
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
@@ -289,7 +291,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","npcs","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","music","text"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -318,7 +320,7 @@ async function textLabelPreview(id){
 }
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 const openBehavior=id=>navigate("ai","behaviors",`BehaviorParam:${id}`);
-const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items",ai:"AI"};
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops"};
 const recordRows=new Map();
 async function recordRow(table,id){
   const cacheKey=`${table}:${id}`;
@@ -350,6 +352,7 @@ function openRecord(link){
   if(link.kind==="attack")return openAttack(link.id);
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
   if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
+  if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -360,7 +363,7 @@ function openAsset(link){
 // rows become hold-to-choose candidates (see the master list's
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
-const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table",npc:"NPC"};
+const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table"};
 const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
 const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",EquipParamAccessory:"rings",Magic:"spells",EquipParamGoods:"consumables"};
@@ -370,6 +373,7 @@ async function finderTarget(link,value){
   if(link.kind==="attack")return ["attacks","attacks"];
   if(link.kind==="ai")return ["ai","ai"];
   if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
+  if(link.kind==="drop")return ["drops","drops"];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
@@ -527,7 +531,12 @@ function commit(row,field,value,control,beforeOverride){
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(changed){if(control?.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
       syncDetailControl(field.key,changed.value,control);}
-      if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)){await loadItems();render();}
+      // A link appearing or disappearing swaps the control itself (a
+      // picker becomes a record face, or back), so the panel rebuilds
+      // the way it does when an edit changes another control's shape.
+      const hadLink=(row.recordLinks||[]).some(entry=>entry.field===field.key);
+      const hasLink=(latest.row.recordLinks||[]).some(entry=>entry.field===field.key);
+      if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)||hadLink!==hasLink){await loadItems();render();}
       else{
         for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display,update.result.name,update.result.modified);
         if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&["posX","posY","posZ","rotX","rotY","rotZ"].includes(field.key)){
@@ -1457,7 +1466,7 @@ function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
-  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
+  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="drops"?"Drop":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):"Item";
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
@@ -1839,8 +1848,8 @@ function renderItems(){
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
-  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,

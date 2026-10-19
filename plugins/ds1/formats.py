@@ -630,7 +630,7 @@ def _shown(value, field):
     return value
 
 
-LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'ai': 'AI table'}
+LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'ai': 'AI table', 'drop': 'drop table'}
 
 
 def field_link(document, table, row_id, spec):
@@ -643,7 +643,7 @@ def field_link(document, table, row_id, spec):
     The first linkable table wins: a projectile's attack falls
     through its PC entry to the NPC one the Attacks tab shows.
     Kinds: effect, goods, catalog (equipment and spells), attack,
-    ai (think records). Anything else (projectiles, PC attacks and
+    ai (think records), drop (drop tables). Anything else (projectiles, PC attacks and
     behavior variations) has no picker or tab to open, so it stays a
     number.
     """
@@ -664,6 +664,8 @@ def field_link(document, table, row_id, spec):
             return ('attack', name)
         if name == 'NpcThinkParam':
             return ('ai', name)
+        if name == 'ItemLotParam':
+            return ('drop', name)
     return None
 
 
@@ -1045,6 +1047,8 @@ class ItemDocument:
         if kind == 'attack':
             return self.attack_references().choices
         if kind == 'ai':
+            return self.catalog_references(target).choices
+        if kind == 'drop':
             return self.catalog_references(target).choices
         raise FormatError('Unknown reference kind')
 
