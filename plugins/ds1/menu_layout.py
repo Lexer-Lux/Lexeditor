@@ -18,7 +18,9 @@ moved by `dy` and `dx`, its font, colour and alignment) and `hold` dynamic
 text of a
 given length, empty until the game or a hook sets it; `left` widens the
 rectangle leftwards, and `from` borrows the text node from another dialog
-when the target has none to look like. It can also copy an existing sprite (an icon) from any
+when the target has none to look like. Any new node may name `before`, an
+existing node of its dialog it goes in front of in the dialog's order, so
+it is drawn under that node instead of over everything. It can also copy an existing sprite (an icon) from any
 dialog, placed like a node moved by `dy` and `dx`, tinted, and optionally
 resized with `size` [width, height]: a sprite's last four
 bytes (32-35) are its colour: alpha, blue, green, red (vanilla icons are
@@ -246,7 +248,7 @@ class Drb:
 
     def add_sprite(self, dialog: str, name: str, sprite: tuple[str, str], place_like: str, dy: int,
                    color: str, dx: int = 0, size: list | tuple | None = None,
-                   uv: list | tuple | None = None) -> None:
+                   uv: list | tuple | None = None, before: str | None = None) -> None:
         """A copy of an existing sprite, placed like `place_like` moved by (dx, dy), tinted.
 
         `uv` [left, top, right, bottom] repoints the copy at another region of
@@ -273,10 +275,12 @@ class Drb:
         if uv is not None:
             struct.pack_into("<4h", shape, 16, *uv)
         sprite_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
-        self._insert(dialog, name, sprite_type, bytes(shape), *self._static_control(dialog, place))
+        self._insert(dialog, name, sprite_type, bytes(shape), *self._static_control(dialog, place),
+                     before=before)
 
     def add_text(self, dialog: str, name: str, look_like: str, dy: int, length: int,
-                 left: int | None = None, dx: int = 0, source_dialog: str | None = None) -> None:
+                 left: int | None = None, dx: int = 0, source_dialog: str | None = None,
+                 before: str | None = None) -> None:
         """Dynamic text styled and placed like `look_like`, moved by (dx, dy).
 
         `source_dialog` names another dialog holding `look_like`, for a
@@ -294,9 +298,10 @@ class Drb:
         shape = self._moved(blob[:TEXT_PREFIX], dy, dx, left)
         shape += bytes([DYNAMIC]) + struct.pack("<ii", TEXT_TAIL, length) + b"\0" * 6
         text_type = struct.unpack_from("<i", self.sections["SHAP"][0], source.shape)[0]
-        self._insert(dialog, name, text_type, bytes(shape), static_type, control)
+        self._insert(dialog, name, text_type, bytes(shape), static_type, control, before=before)
 
-    def add_clone(self, dialog: str, name: str, source: str, rect, text_id: int | None = None) -> None:
+    def add_clone(self, dialog: str, name: str, source: str, rect, text_id: int | None = None,
+                  source_dialog: str | None = None, before: str | None = None) -> None:
         """A copy of an existing node under a new name and rectangle.
 
         The clone shares its source's shape and control bytes (and so a
@@ -304,7 +309,8 @@ class Drb:
         cell, never a strip whose reference varies per index. `text_id`
         repoints a menu-text node (not dynamic text) at another menu text
         entry (shape bytes 40-43), such as a template whose <?tag?> the
-        game fills.
+        game fills. `source_dialog` takes the source from another dialog,
+        as text's does.
         """
         self._check_name(dialog, name)
         if not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect):
@@ -312,18 +318,20 @@ class Drb:
         left, top, right, bottom = rect
         if not all(-32768 <= value <= 32767 for value in rect) or not left < right or not top < bottom:
             raise LayoutError(f"{dialog}/{name} has a rectangle outside the layout's range")
-        node = self.node(dialog, source)
+        source_dialog = dialog if source_dialog is None else source_dialog
+        node = self.node(source_dialog, source)
         _kind, blob = self._blob("SHAP", "SHPR", node.shape)
         if len(blob) < 8:
-            raise LayoutError(f"{dialog}/{source} has no rectangle to place")
+            raise LayoutError(f"{source_dialog}/{source} has no rectangle to place")
         shape = bytearray(blob)
         struct.pack_into("<4h", shape, 0, left, top, right, bottom)
         if text_id is not None:
             if _kind != "Text" or len(blob) < TEXT_ID_AT + 4 or blob[31] == DYNAMIC:
-                raise LayoutError(f"{dialog}/{source} is not a menu-text node, so it has no text id")
+                raise LayoutError(f"{source_dialog}/{source} is not a menu-text node, so it has no text id")
             struct.pack_into("<i", shape, TEXT_ID_AT, text_id)
         shape_type = struct.unpack_from("<i", self.sections["SHAP"][0], node.shape)[0]
-        self._insert(dialog, name, shape_type, bytes(shape), *self._static_control(dialog, node))
+        self._insert(dialog, name, shape_type, bytes(shape), *self._static_control(source_dialog, node),
+                     before=before)
 
     def move(self, dialog: str, name: str, rect) -> None:
         """Reposition and resize an existing node, rewriting its rectangle in place."""
@@ -339,12 +347,16 @@ class Drb:
         struct.pack_into("<4h", self.sections["SHPR"][0], start, left, top, right, bottom)
 
     def _insert(self, dialog: str, name: str, shape_type: int, shape: bytes,
-                control_type: int, control: bytes) -> None:
-        """One new object at the end of a dialog: its name, shape and control."""
+                control_type: int, control: bytes, before: str | None = None) -> None:
+        """One new object at the end of a dialog, or just before its node
+        `before` (drawn under it): its name, shape and control."""
         if self.sections["SHAP"][1] != self.sections["CTRL"][1]:
             raise LayoutError("Shape and control tables are not parallel")
         dlg = self._dialog(dialog)
         count, start = struct.unpack_from("<ii", self.sections["DLG"][0], dlg + 32)
+        anchor = None if before is None else self.node(dialog, before)
+        if anchor is not None and anchor.shape != anchor.control:
+            raise LayoutError(f"{dialog}/{before} has unpaired shape and control entries")
 
         # Names, shape and control data go at the ends of their sections.
         self._trim("STR", self._strings_end())
@@ -362,7 +374,7 @@ class Drb:
         # dialog's last one and every later reference moves along.
         owned = [struct.unpack_from("<i", self.sections["DLG"][0], dlg + 4)[0]]
         owned += [item.shape for item in self.nodes(dialog)]
-        entry = max(owned) + 8
+        entry = max(owned) + 8 if anchor is None else anchor.shape
         self._shift_entries(entry)
         for tag, kind, data in (("SHAP", shape_type, shape_data), ("CTRL", control_type, control_data)):
             self._trim(tag, self.sections[tag][1] * 8)
@@ -374,7 +386,7 @@ class Drb:
         # The object goes after the dialog's last one; later dialogs move along.
         objects = self.sections["DLGO"]
         self._trim("DLGO", objects[1] * DLGO_SIZE)
-        insert = start + count * DLGO_SIZE
+        insert = start + count * DLGO_SIZE if anchor is None else anchor.offset
         objects[0][insert:insert] = struct.pack("<iii", name_offset, shape_entry, control_entry) + b"\0" * 20
         objects[1] += 1
         self._pad("DLGO")
@@ -437,24 +449,22 @@ def validate(spec: object, owner: str) -> dict:
     text = {"dialog", "name", "lookLike", "dy", "length"}
     sprite = {"dialog", "name", "sprite", "lookLike", "dy", "color"}
     clone = {"dialog", "name", "clone", "rect"}
-    clone_keys = (clone, clone | {"textId"})
-    text_keys = tuple(text | set(extra) for extra in
-                      ((), ("left",), ("dx",), ("left", "dx"), ("from",), ("left", "from"),
-                       ("dx", "from"), ("left", "dx", "from")))
-    sprite_keys = tuple(sprite | set(extra) for extra in
-                        ((), ("dx",), ("size",), ("uv",), ("dx", "size"), ("dx", "uv"),
-                         ("size", "uv"), ("dx", "size", "uv")))
+    optional = {"text": {"left", "dx", "from", "before"},
+                "sprite": {"dx", "size", "uv", "before"},
+                "clone": {"textId", "from", "before"}}
     clean = []
     for node in nodes:
         keys = set(node) if isinstance(node, dict) else set()
-        if keys not in text_keys + sprite_keys + clone_keys:
+        kind = "sprite" if "sprite" in keys else "clone" if "clone" in keys else "text"
+        required = {"text": text, "sprite": sprite, "clone": clone}[kind]
+        if not required <= keys or keys - required - optional[kind]:
             raise LayoutError(f"{owner}: a layout node is text "
-                              f"({', '.join(sorted(text))}, optional left, dx and from), "
-                              f"a sprite ({', '.join(sorted(sprite))}, optional dx, size and uv) "
-                              f"or a clone ({', '.join(sorted(clone))}, optional textId)")
+                              f"({', '.join(sorted(text))}, optional left, dx, from and before), "
+                              f"a sprite ({', '.join(sorted(sprite))}, optional dx, size, uv and before) "
+                              f"or a clone ({', '.join(sorted(clone))}, optional textId, from and before)")
         if not all(isinstance(node[key], str) and node[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout node names must be text")
-        for key in ("lookLike", "clone", "from"):
+        for key in ("lookLike", "clone", "from", "before"):
             if key in node and not (isinstance(node[key], str) and node[key]):
                 raise LayoutError(f"{owner}: layout node names must be text")
         if "rect" in node:
@@ -513,14 +523,14 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
         try:
             if "clone" in node:
                 layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"],
-                                 node.get("textId"))
+                                 node.get("textId"), node.get("from"), node.get("before"))
             elif "sprite" in node:
                 layout.add_sprite(node["dialog"], node["name"], tuple(node["sprite"]), node["lookLike"],
                                   node["dy"], node["color"], node.get("dx", 0), node.get("size"),
-                                  node.get("uv"))
+                                  node.get("uv"), node.get("before"))
             else:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
-                                node.get("left"), node.get("dx", 0), node.get("from"))
+                                node.get("left"), node.get("dx", 0), node.get("from"), node.get("before"))
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     moved = {}

@@ -123,6 +123,30 @@ placement `compose` does not offer (it moves nodes vertically only).
   so nodes added to `R00-00` resolve with one `0xED6020` from it. The
   `category_LR` strip inside it is a sub-dialog instanced by twelve
   menus; `0xED6020` on a sub-dialog's control does not search inside it.
+- The start menu's help and key-guide lines are R00's `R04-02` and
+  `R04-03` (two instances of DLG `R04-02`, a ScrollText `text_help0`).
+  The root creates them as named instances `Ins_linehelp` and
+  `Ins_keyguid` (sic); `0x66F3A0` finds each with `0xEDDFE0(handle,
+  name)` (handle = the dialog's vtable `+0x78`), then `text_help0`, and
+  sets property 6000 (Single_line_help id) or 6001 (Key_guide id) through
+  the control's `+0xD8` setter, both `10001 + category`. It runs only when
+  the root's byte `[dialog+0x248]` is set (every category change). The
+  hovered category is state channel `0x4B` (`0x71ABD0`): 0 Inventory,
+  1 Equipment, 2 Status, 3 System (titles Ingame_menu_ 110000, 110001,
+  110003, 110006).
+- Message banks: Item_name_ (BND member 10) sits at `[0x1C7E3E8] +
+  0x380` and Place_name_ (19) at `+0x3C8`, consistent with `+0x330 + 8 *
+  member id` for item.msgbnd's base banks; other banks are unverified.
+  The GoodsName getter falls back to a patch bank at `+0x58`, which is
+  where DLC goods names are expected.
+- Event flags: manager `[0x1C7C5F0]` (ready byte `+0x224`). `0x4F23D0`
+  tests one flag, `0x4F2590(manager, flag, bits, 0)` reads and
+  `0x4F24B0(manager, flag, bits, value)` writes a multi-bit value starting
+  at a flag (EMEVD event values). Both look the 1000-flag block up with
+  `0x4F39A0`: group = id / 10^7, area = (id / 10^5) % 100, then
+  (id / 10^4) % 10 and the thousands digit; area 0 with that digit 0 (or
+  area 99) is the group's global block. A missing block makes reads 0 and
+  writes no-ops.
 - Inventory entries (`player data + 0x280`, layout in
   `codex/ds1/ammunition-hud.md`) start with a category word,
   `category << 28`: weapons 0, armour `0x10000000`, rings `0x20000000`,

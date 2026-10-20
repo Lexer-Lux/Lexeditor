@@ -457,6 +457,38 @@ class OffsetTests(unittest.TestCase):
         with self.assertRaises(menu_layout.LayoutError):
             menu_layout.validate({"version": 1, "nodes": [{**spec["nodes"][0], "from": ""}]}, "Bad")
 
+    def test_before_inserts_under_a_named_node(self):
+        layout = menu_layout.Drb(drb())
+        before = snapshot(layout)
+        first = layout.nodes("data_simple_arms")[0].name
+        layout.add_sprite("data_simple_arms", "icon_under", ("list_armor", "icon_tolerance_sa"),
+                          "icon_receive", 0, "ffffffff", before=first)
+        layout.add_clone("data_simple_arms", "text_cloned", "text_name", [1, 2, 30, 40],
+                         source_dialog="list_armor", before="icon_receive")
+        again = menu_layout.Drb(layout.to_bytes())
+        names = [node.name for node in again.nodes("data_simple_arms")]
+        self.assertEqual(names[0], "icon_under")
+        self.assertEqual(names.index("text_cloned") + 1, names.index("icon_receive"))
+        self.assertEqual(again.text("data_simple_arms", "text_cloned")["rect"], [1, 2, 30, 40])
+        # Every other node keeps its own shape and control; serialization order holds.
+        after = snapshot(again)
+        for dialog, rows in before.items():
+            kept = [row for row in after[dialog] if row[0] not in ("icon_under", "text_cloned")]
+            self.assertEqual(kept, rows, dialog)
+        self.assertEqual(shape_order(again), sorted(shape_order(again)))
+        spec = menu_layout.validate({"version": 1, "nodes": [
+            {"dialog": "data_simple_arms", "name": "icon_under", "sprite": ["list_armor", "icon_tolerance_sa"],
+             "lookLike": "icon_receive", "dy": 0, "color": "ffffffff", "before": first},
+            {"dialog": "data_simple_arms", "name": "text_cloned", "clone": "text_name", "from": "list_armor",
+             "rect": [1, 2, 30, 40], "before": "icon_receive"}]}, "Under")
+        composed = menu_layout.Drb(formats.inflate(menu_layout.compose(dcx(drb()), [spec])))
+        self.assertEqual([node.name for node in composed.nodes("data_simple_arms")], names)
+        with self.assertRaises(menu_layout.LayoutError):
+            layout.add_sprite("data_simple_arms", "icon_lost", ("list_armor", "icon_tolerance_sa"),
+                              "icon_receive", 0, "ffffffff", before="missing")
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.validate({"version": 1, "nodes": [{**spec["nodes"][0], "textId": 5}]}, "Bad")
+
     def test_left_applies_after_dx(self):
         layout = menu_layout.Drb(drb())
         layout.add_text("data_simple_arms", "text_wide", "text_param_receive", 30, 32, left=400, dx=50)

@@ -36,7 +36,12 @@ length to 16 bytes:
 - For a dialog with no text node of its own (the start menu's `R00-00`), a
   layout text node names a source dialog with `from` and copies that
   dialog's node bytes, its rectangle moved by `dx`/`dy` into the target's
-  space.
+  space. Clones take `from` the same way.
+- New nodes go at the end of their dialog unless they name `before`, an
+  existing node they are inserted in front of (its DLGO entry, shape and
+  control references shift along). Nodes appended last were drawn on top in
+  the start menu (Tool Belt v2, 2026-10-17); `before` puts a plate under a
+  dialog's own content.
 
 ### Text shapes
 
