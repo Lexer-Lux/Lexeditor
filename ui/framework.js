@@ -15217,7 +15217,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     return Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect())
       .filter(box=>box.width||box.height).map(box=>left-box.left));
   };
-  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}|${label.classList.contains('lex-column-cell-text') ? label.closest('.lex-column-list-cell')?.clientWidth : ''}`;
+  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const labelTextOutside = label => {
     const text=label.querySelector(':scope > .lex-detail-field-label-text');
     if(!text)return false;
@@ -15339,10 +15339,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     }
     placeBooleanHelp(label);
 
-    // Property labels use contain:size. A plain cell instead hugs its text,
-    // so remember its dimensions after fitting to avoid resetting that font
-    // when its own resize notification arrives.
-    fitted.set(label, label.classList.contains('lex-column-cell-text') ? fitKey(label) : key);
+    // `contain:size` keeps the font size out of the box's own measurements, so
+    // the key is the same one computed above and the label settles in one pass.
+    fitted.set(label, key);
   };
   // The room a sub-tab leaves its name once padding, help mark and badges are
   // out, and whether the name's text fits it.
@@ -15396,7 +15395,71 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitted.set(bar,barKey(bar));
     labels.forEach(label=>fitted.set(label,fitKey(label)));
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name,.lex-column-cell-text';
+  // Plain table text is fitted as one size per list, the way a sub-tab bar's
+  // names are: every row name in a list takes one size, only as small as the
+  // longest needs. Fitted one row at a time, a long name shrank while a short
+  // neighbour kept full size - and each row's inline size froze the row font
+  // of the moment it was fitted, so when the page geometry settled to a
+  // smaller row height the fitted rows stayed larger than their neighbours
+  // (DS1 consumables: "Soul of a Nameless Soldier" at 14px beside 11px rows).
+  // The scope's key carries the row font it was fitted from, so a row font
+  // that changes afterwards refits instead of leaving stale sizes behind.
+  const CELL_TEXT_SELECTOR = '.lex-column-cell-text';
+  const cellTextScope = label => {
+    const list = label.closest('.lex-column-list');
+    // Barrels of one master are direct children of their grid, so the whole
+    // master shares one size; a table nested anywhere else keeps its own.
+    return list?.parentElement?.classList.contains('lex-barrel-grid')
+      ? list.parentElement : list;
+  };
+  const scopeLabels = scope => [...scope.querySelectorAll(CELL_TEXT_SELECTOR)]
+    .filter(label => cellTextScope(label) === scope);
+  const cellTextFits = label =>
+    label.scrollWidth <= label.clientWidth + 1 &&
+    label.scrollHeight <= label.clientHeight + 1 &&
+    labelLeftOverflow(label) < 1;
+  const cellTextBase = scope => {
+    const row = scope.querySelector('.lex-column-list-row');
+    return parseFloat(row && getComputedStyle(row).fontSize) || 12;
+  };
+  const scopeLanes = scope => {
+    const lists = scope.classList.contains('lex-barrel-grid')
+      ? [...scope.querySelectorAll(':scope > .lex-column-list')] : [scope];
+    return lists.map(list => {
+      for (const row of list.querySelectorAll(':scope > .lex-column-list-row:not(.lex-filler-row)')) {
+        const cells = row.querySelectorAll(':scope > .lex-column-list-cell');
+        if (cells.length) return [...cells].map(cell => Math.round(cell.clientWidth)).join(',');
+      }
+      return '';
+    }).join(';');
+  };
+  const cellScopeKey = (scope, labels) =>
+    `${cellTextBase(scope)}|${scope.clientWidth}|${scopeLanes(scope)}|${labels.map(label => label.textContent).join('|')}`;
+  const fitCellTextScope = scope => {
+    if (!(scope instanceof Element) || !scope.isConnected) return;
+    const labels = scopeLabels(scope);
+    if (!labels.length) return;
+    if (fitted.get(scope) === cellScopeKey(scope, labels) && labels.every(cellTextFits)) return;
+    labels.forEach(label => { label.style.fontSize = ''; });
+    if (labels.every(cellTextFits)) { fitted.set(scope, cellScopeKey(scope, labels)); return; }
+    // One ratio round first: a narrow lane can need far less than the base,
+    // and half-pixel steps would re-lay-out the list for every one of them.
+    const base = cellTextBase(scope);
+    let size = base;
+    for (const label of labels) {
+      if (label.scrollWidth <= label.clientWidth + 1) continue;
+      size = Math.min(size, base * label.clientWidth / Math.max(1, label.scrollWidth));
+    }
+    size = Math.max(LABEL_MIN_PX, Math.floor(size * 2) / 2);
+    labels.forEach(label => { label.style.fontSize = `${size}px`; });
+    let guard = 0;
+    while (size > LABEL_MIN_PX && guard++ < 12 && !labels.every(cellTextFits)) {
+      size = Math.max(LABEL_MIN_PX, size - .5);
+      labels.forEach(label => { label.style.fontSize = `${size}px`; });
+    }
+    fitted.set(scope, cellScopeKey(scope, labels));
+  };
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   // Within the page-tab strip every tab is at least its own name's width, so a
   // game with twenty tabs wants a strip wider than its window. Shrinking one
@@ -15478,17 +15541,22 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     fitNavStrip(nav, laneChanged);
   }));
   const fitAllLabels = (root, reset) => {
-    const fit = label => {
+    const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
+    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
+    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
+    const scopes = new Set();
+    const collect = label => {
       labelSizeObserver.observe(label);
       // Plain cell text hugs its glyphs; after shrinking, its own box does not
       // grow when the column does. Observe the cell so its font can grow back.
-      if(label.classList.contains('lex-column-cell-text')){
-        const cell=label.closest('.lex-column-list-cell');if(cell)labelSizeObserver.observe(cell);
-      }
-      fitLabel(label);
+      const cell = label.closest('.lex-column-list-cell');
+      if (cell) labelSizeObserver.observe(cell);
+      const scope = cellTextScope(label);
+      if (scope) scopes.add(scope);
     };
-    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
-    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
+    if (root instanceof Element && root.matches?.(CELL_TEXT_SELECTOR)) collect(root);
+    root.querySelectorAll?.(CELL_TEXT_SELECTOR).forEach(collect);
+    scopes.forEach(fitCellTextScope);
     const strips = new Set();
     const own = root instanceof Element ? root.closest?.('.lex-shell-header nav') : null;
     if (own) strips.add(own);
@@ -15563,6 +15631,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   document.fonts?.ready?.then(() => scheduleFit());
   document.fonts?.addEventListener?.('loadingdone', () => {
     document.querySelectorAll(LABEL_SELECTOR).forEach(label => fitted.delete(label));
+    document.querySelectorAll('.lex-column-list,.lex-barrel-grid').forEach(scope => fitted.delete(scope));
     scheduleFit();
   });
   // A page whose header is written into the served HTML fires no mutation for
