@@ -81,6 +81,12 @@
 .ds1-reference-face{flex:1 1 auto;min-width:0;display:flex;}
 .ds1-reference-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
 .ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* A linked face shares its box with the Vanilla reference like an input
+   does: without the lane the reference paints over the linked name. */
+.lex-source-control-internal>.ds1-reference-face{box-sizing:border-box;
+  padding-right:calc(var(--lex-internal-reference-width) + .95em);}
+.lex-source-control-internal>.lex-reference-values .lex-reference-text{overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .ds1-find-reference{flex:0 0 auto;}
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
 .ds1-asset-field{display:flex;align-items:center;gap:6px;}

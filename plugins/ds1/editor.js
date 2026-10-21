@@ -403,6 +403,12 @@ async function finderTarget(link,value){
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
 async function recordPreview(link){
+  if(link.field==="materialSetId"&&Array.isArray(link.path)&&link.path.length){
+    const table=el("div",{style:"display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;"});
+    table.replaceChildren(...link.path.flatMap(entry=>[el("span",{style:"white-space:nowrap;opacity:.75;"},`+${entry.level}`),
+      el("span",{},entry.description||"Empty set")]));
+    return LexeditorUI.stack({fill:false,compact:true},el("strong",{},link.name),table);
+  }
   const row=await recordRow(link.table,link.id);
   const parts=[el("strong",{},row.name)];
   if(ds1IconTables.has(link.table)){
@@ -667,7 +673,8 @@ function controlFor(row,field){
   const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));
   return LexeditorUI.provenanceControl({control,current,vanilla:field.type==="bool"?Number(field.vanilla):field.vanilla,
     internal:true,
-    format:field.type==="enum"?value=>field.enum[String(value)]||String(value):undefined,
+    format:field.type==="enum"?value=>(field.key==="materialSetId"&&field.vanillaDisplay!==undefined
+      &&Number(value)===Number(field.vanilla)?field.vanillaDisplay:field.enum[String(value)]||String(value)):undefined,
     same:(left,right)=>Number(left)===Number(right),
     apply:value=>commit(row,field,value,input)});
 }

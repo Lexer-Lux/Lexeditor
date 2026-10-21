@@ -18,7 +18,7 @@ from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, d
 from .attacks import ATTACK_FIELDS, BULLET_GROUPS, AttackReferences
 from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
-from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set
+from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set, describe_path, path_table
 from .charainit import (TABLE as CHARA_TABLE, CLASS_ROWS, GIFT_ROWS, TWINS, UNMIRRORED,
                         GIFT_FIELDS, GROUPS as CHARA_GROUPS, REF_NOUNS as CHARA_REF_NOUNS,
                         CatalogReferences)
@@ -213,6 +213,12 @@ MAGIC_FIELDS = {
                 'Each cast of this spell spends this much stamina. 0 is free, as in vanilla. '
                 'The Spell Stamina Costs tweak sets each spell\'s Elden Ring value.'),
 }
+
+# What the Source ID fields mean. Every armor piece and weapon names, per
+# upgrade level, what the blacksmith treats that level as derived from;
+# armor usually names itself, which reads as if per-level records exist.
+ORIGIN_HELP = ('Names the item the blacksmith treats this level as derived from. '
+               'This item usually names itself. Upgrade levels are not separate records.')
 
 # Armor Rework gives every armor piece its own absorption effect in slot 3,
 # one per upgrade level: effect ID = 30,000,000 + armor ID + level.
@@ -554,6 +560,10 @@ def schema(table):
             label, group, description = WEAPON_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
             label, group, description = MAGIC_FIELDS[key]
+        if table == 'EquipParamProtector' and key.startswith('originEquipPro'):
+            description = ORIGIN_HELP
+        if table == 'EquipParamWeapon' and key.startswith('originEquipWep'):
+            description = ORIGIN_HELP
         slot = key[-2:] if table == MATERIAL_TABLE else ''
         if slot in ('01', '02', '03', '04', '05'):
             group = f'Material {int(slot)}'
@@ -837,7 +847,7 @@ class ItemDocument:
                     # The precision the field shows: at one decimal, 3.95% and
                     # 4.04% both read "4.0% -> 4.0%", a change that looked like none.
                     percent = lambda rate: f'{(1 - rate) * 100:.3f}'.rstrip('0').rstrip('.') + '%'
-                    rows.append({'label': f'{name} · {kind} absorption',
+                    rows.append({'label': f'{name} Â· {kind} absorption',
                                  'before': percent(before), 'after': percent(after)})
                     continue
                 item = next(f for f in self.schemas[table]['fields'] if f['spec'].key == key)
@@ -846,25 +856,25 @@ class ItemDocument:
                 added = (table, row_id) in self._added_rows
                 before = None if added else _shown(read_field(bytes(self.original_plain[start:start + len(data)]), field, '<'), field)
                 after = _shown(read_field(data, field, '<'), field)
-                rows.append({'label': f'{name} · {field.label}', 'before': before, 'after': after})
+                rows.append({'label': f'{name} Â· {field.label}', 'before': before, 'after': after})
             except (FormatError, StopIteration, KeyError):
-                rows.append({'label': f'{table} {row_id} · {key}'})
+                rows.append({'label': f'{table} {row_id} Â· {key}'})
         for gone in self._removed_rows:
             rows.append({'label': f"{gone['name']} (removed)",
                          'before': f"{gone['table']} {gone['id']}", 'after': 'removed'})
         if self.texts:
             from .texts import KIND_LABELS
             for kind, table, item in sorted(self.texts.dirty, key=str)[:limit]:
-                rows.append({'label': f'{KIND_LABELS[kind]} · {table} {item}'})
+                rows.append({'label': f'{KIND_LABELS[kind]} Â· {table} {item}'})
         if self.menu_texts:
             from .texts import MENU_LABELS
             for filename, text_id in sorted(self.menu_texts.dirty_texts):
-                rows.append({'label': f'{FMG_LABELS.get(filename, filename)} · {text_id}',
+                rows.append({'label': f'{FMG_LABELS.get(filename, filename)} Â· {text_id}',
                              'before': self.menu_texts.original_text(filename, text_id) or '',
                              'after': self.menu_texts.text(filename, text_id) or ''})
             for key in sorted(self.menu_texts.dirty):
                 display, _text_id = MENU_LABELS[key]
-                rows.append({'label': f'Menu label · {display}',
+                rows.append({'label': f'Menu label Â· {display}',
                              'before': self.menu_texts.original_label(key) or '',
                              'after': self.menu_texts.label(key) or ''})
         return rows
@@ -977,7 +987,14 @@ class ItemDocument:
             elif field.key in links:
                 kind, target = links[field.key]
                 catalog = self.link_choices(kind, target)
-                display[field.key] = catalog.get(str(value), f'Unknown ({value})')
+                if (field.key == 'materialSetId' and table in ('EquipParamWeapon', 'EquipParamProtector')
+                        and catalog.get(str(value)) not in (None, 'None')):
+                    try:
+                        display[field.key] = describe_path(self, table, row_id)
+                    except Exception:
+                        display[field.key] = catalog.get(str(value), f'Unknown ({value})')
+                else:
+                    display[field.key] = catalog.get(str(value), f'Unknown ({value})')
             elif item['enum']: display[field.key] = item['enum'].get(str(value), f'Unknown ({value})')
         if table in ('EquipParamProtector', 'NpcParam'):
             # Pinned absorption columns read row values, like every other
@@ -1399,7 +1416,7 @@ class ItemDocument:
             else:
                 options = item['enum']
             # A float the PARAMDEF leaves unbounded shows no range: dtype
-            # extremes (±3.4e38) are not bounds the reader can act on.
+            # extremes (Â±3.4e38) are not bounds the reader can act on.
             unbounded = field.dtype in ('f32', 'f64', 'angle32') and (item['min'], item['max']) in (
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
@@ -1413,6 +1430,28 @@ class ItemDocument:
                            'editable': item['editable'] and finite, 'vanilla': original, 'icon': item.get('icon'),
                            'sliderMin': spans.get(field.key, (None, None))[0],
                            'sliderMax': spans.get(field.key, (None, None))[1]})
+            if (field.key == 'materialSetId' and table in ('EquipParamWeapon', 'EquipParamProtector')
+                    and fields[-1]['vanilla'] is not None):
+                try:
+                    if self.vanilla_document is not None:
+                        vanilla_doc = self.vanilla_document
+                        try:
+                            vanilla_reinforce = int(vanilla_doc.value(table, row_id, 'reinforceTypeId'))
+                        except Exception:
+                            vanilla_reinforce = None
+                        fields[-1]['vanillaDisplay'] = describe_path(
+                            vanilla_doc, table, row_id, int(fields[-1]['vanilla']), vanilla_reinforce)
+                    elif vanilla is not None:
+                        try:
+                            spec = next(f['spec'] for f in self.schemas[table]['fields']
+                                        if f['spec'].key == 'reinforceTypeId')
+                            vanilla_reinforce = int(read_field(vanilla, spec, '<'))
+                        except Exception:
+                            vanilla_reinforce = None
+                        fields[-1]['vanillaDisplay'] = describe_path(
+                            self, table, row_id, int(fields[-1]['vanilla']), vanilla_reinforce)
+                except Exception:
+                    pass
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(NPC_FIELDS)}
             fields.sort(key=lambda field: order[field['key']])
@@ -1465,9 +1504,17 @@ class ItemDocument:
             if choices.get(str(current)) == 'None':
                 continue
             noun = self.link_noun(kind, target)
-            record_links.append({'kind': kind, 'table': target, 'id': current,
-                                 'field': field['key'], 'resolved': str(current) in choices,
-                                 'name': choices.get(str(current), f'Missing {noun} {current}')})
+            entry = {'kind': kind, 'table': target, 'id': current,
+                       'field': field['key'], 'resolved': str(current) in choices,
+                       'name': choices.get(str(current), f'Missing {noun} {current}')}
+            if (field['key'] == 'materialSetId' and table in ('EquipParamWeapon', 'EquipParamProtector')
+                    and entry['resolved']):
+                try:
+                    entry['name'] = describe_path(self, table, row_id)
+                    entry['path'] = path_table(self, table, row_id)
+                except Exception:
+                    pass
+            record_links.append(entry)
         result['recordLinks'] = record_links
         result['recordLinks'] += self._asset_links(table, row_id, fields, game_root)
         dialogs = []

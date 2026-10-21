@@ -324,3 +324,52 @@ def test_spell_and_treasure_dialogs_preview_event_text():
         {'field': 'actionEnableMsgId', 'id': 10010500, 'text': 'Kick ladder'},
         {'field': 'actionFailedMsgId', 'id': 10010710,
          'text': 'Return to the last bonfire?'}]
+
+
+def test_upgrade_material_summarizes_the_whole_path():
+    # The base set alone is empty for most gear, which read as if upgrades
+    # cost nothing. The face names every level the reinforce rows reach,
+    # grouped by material, and carries the per-level table for the preview.
+    document = ItemDocument(make_archive(table_ids={
+        'EquipMtrlSetParam': [1000, 1001, 1002],
+        'ReinforceParamWeapon': [100, 101, 102],
+        'ReinforceParamProtector': [200, 201, 202]}))
+    for row_id, offset in ((100, 0), (101, 1), (102, 2), (200, 0), (201, 1), (202, 2)):
+        table = 'ReinforceParamWeapon' if row_id < 200 else 'ReinforceParamProtector'
+        poke(document, table, row_id, 'materialSetId', offset)
+    for set_id in (1000, 1001, 1002):
+        for slot in ('01', '02', '03', '04', '05'):
+            poke(document, 'EquipMtrlSetParam', set_id, 'materialId' + slot, -1)
+            poke(document, 'EquipMtrlSetParam', set_id, 'itemNum' + slot, -1)
+    poke(document, 'EquipMtrlSetParam', 1001, 'materialId01', 100)
+    poke(document, 'EquipMtrlSetParam', 1001, 'itemNum01', 1)
+    poke(document, 'EquipMtrlSetParam', 1002, 'materialId01', 100)
+    poke(document, 'EquipMtrlSetParam', 1002, 'itemNum01', 2)
+    expected = '+1-2: White Sign Soapstone 1/2'
+    for table, reinforce_id in (('EquipParamWeapon', 100), ('EquipParamProtector', 200)):
+        poke(document, table, 100, 'materialSetId', 1000)
+        poke(document, table, 100, 'reinforceTypeId', reinforce_id)
+        found = links(document, table, 100)
+        assert (found['materialSetId']['kind'], found['materialSetId']['table']) == ('stat', 'EquipMtrlSetParam')
+        assert found['materialSetId']['id'] == 1000 and found['materialSetId']['resolved']
+        assert found['materialSetId']['name'] == expected
+        path = found['materialSetId']['path']
+        assert [(entry['level'], entry['setId']) for entry in path] == [(1, 1001), (2, 1002)]
+        assert [entry['description'] for entry in path] == [
+            'White Sign Soapstone x 1', 'White Sign Soapstone x 2']
+        _values, display = document.row_values(table, 100)
+        assert display['materialSetId'] == expected
+        by_key = {field['key']: field for field in document.read_row(table, 100)['fields']}
+        assert isinstance(by_key['materialSetId'].get('vanillaDisplay'), str)
+
+
+def test_source_id_help_names_derivation():
+    # Source IDs name what the blacksmith treats the level as derived from;
+    # they usually name the item itself, which is not a per-level record.
+    document = ItemDocument(make_archive())
+    for table, key in (('EquipParamProtector', 'originEquipPro'),
+                       ('EquipParamWeapon', 'originEquipWep')):
+        description = next(item['spec'].description
+                           for item in document.schemas[table]['fields'] if item['spec'].key == key)
+        assert 'blacksmith' in description
+        assert 'not separate records' in description
