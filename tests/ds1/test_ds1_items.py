@@ -264,14 +264,15 @@ def test_editing_an_upgrade_multiplier_rebuilds_the_armor_using_it():
         pytest.approx([10, 10.2, 15], abs=1e-4)
 
 
-def test_armor_absorption_zero_stays_zero_and_negative_moves_toward_zero():
-    document, base = armor_with_upgrades([(1, 1, 1, 1), (1.02, 1, 1, 1), (1.5, 1, 1, 1)])
+def test_armor_absorption_zero_stays_zero_and_negative_is_divided():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (2, 1, 1, 1), (1.5, 1, 1, 1)])
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 0)
     assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
         pytest.approx([0, 0, 0, 0], abs=1e-4)
+    # A weakness shrinks by the multiplier that grows a resistance: x2 halves it.
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', -5)
     assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
-        pytest.approx([-5, -4.9, -2.5, -5], abs=1e-4)
+        pytest.approx([-5, -2.5, -5 / 1.5, -5], abs=1e-4)
     for bad in (-101, 100):
         with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
 

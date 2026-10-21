@@ -1526,13 +1526,15 @@ class ItemDocument:
         reinforce_id = self.value('EquipParamProtector', row_id, 'reinforceTypeId') if table != 'NpcParam' else None
         for effect in levels:
             # An upgrade level scales the +0 absorption by the armor upgrade
-            # table's multiplier for that level; 0 stays 0, a negative value
-            # moves toward zero by the same step. Without a row, no scaling.
+            # table's multiplier for that level; 0 stays 0, and a weakness
+            # (negative value) is divided by it instead, so the same upgrade
+            # that doubles a resistance halves a weakness. Without a row, no scaling.
             level = effect - levels[0]
             multiplier = 1.0
             if reinforce_id is not None and reinforce_id + level in reinforce_rows:
                 multiplier = self.value('ReinforceParamProtector', reinforce_id + level, reinforce_key)
-            absorbed = min(99.0, max(-100.0, value + abs(value) * (multiplier - 1) if level else value))
+            scaled = value * multiplier if value >= 0 else value / multiplier
+            absorbed = min(99.0, max(-100.0, scaled if level else value))
             # Back to the saved percentage, as shown (three decimals), is back
             # to the saved rate exactly - undo sends the shown value.
             _r, start, data = self._row(EFFECT_TABLE, effect)
