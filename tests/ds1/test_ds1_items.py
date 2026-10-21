@@ -369,3 +369,194 @@ def test_list_rows_marks_modified_after_edit():
     flags = {r['id']: r.get('modified') for r in document.list_rows(tab)}
     assert flags[row['id']] is True
     assert all(value is not True for key, value in flags.items() if key != row['id'])
+
+
+def test_unit_labels_carry_their_control_suffix():
+    """Units consistency pass: every field with an established physical unit
+    ends its label with the suffix the detail panel turns into a unit
+    control, and every suffix has its control wired in the panel script.
+    Unconfirmed quantities stay bare."""
+    import re
+    from plugins.ds1.formats import schema
+    # Mirror of the unit patterns in plugins/ds1/editor.js (controlFor).
+    patterns = {
+        '(%)': re.compile(r'\s*\(%\)$'),
+        '(x)': re.compile(r'\s*\(x\)$'),
+        '(degrees/second)': re.compile(r'\s*\(degrees/second\)$'),
+        '(seconds)': re.compile(r'\s*\(seconds?\)$'),
+        '(ms)': re.compile(r'\s*\(ms\)$'),
+        '(degrees)': re.compile(r'\s*\(degrees?\)$'),
+        '(metres)': re.compile(r'\s*\(metres?\)$'),
+        '(m/s)': re.compile(r'\s*\(m/s\)$'),
+        '(m/s^2)': re.compile(r'\s*\(m/s\^2\)$'),
+        '(frames)': re.compile(r'\s*\(frames?\)$'),
+        '(kg)': re.compile(r'\s*\(kg\)$'),
+        '(%/s)': re.compile(r'\s*\(%/s\)$'),
+    }
+    expected = {
+        ('Bullet', 'life'): '(seconds)',
+        ('Bullet', 'dist'): '(metres)',
+        ('Bullet', 'shootInterval'): '(seconds)',
+        ('Bullet', 'gravityInRange'): '(m/s^2)',
+        ('Bullet', 'gravityOutRange'): '(m/s^2)',
+        ('Bullet', 'hormingStopRange'): '(metres)',
+        ('Bullet', 'initVellocity'): '(m/s)',
+        ('Bullet', 'accelInRange'): '(m/s^2)',
+        ('Bullet', 'accelOutRange'): '(m/s^2)',
+        ('Bullet', 'maxVellocity'): '(m/s)',
+        ('Bullet', 'minVellocity'): '(m/s)',
+        ('Bullet', 'accelTime'): '(seconds)',
+        ('Bullet', 'homingBeginDist'): '(metres)',
+        ('Bullet', 'hitRadius'): '(metres)',
+        ('Bullet', 'hitRadiusMax'): '(metres)',
+        ('Bullet', 'spreadTime'): '(seconds)',
+        ('Bullet', 'expDelay'): '(seconds)',
+        ('Bullet', 'hormingOffsetRange'): '(metres)',
+        ('Bullet', 'dmgHitRecordLifeTime'): '(seconds)',
+        ('Bullet', 'homingAngle'): '(degrees/second)',
+        ('Bullet', 'shootAngle'): '(degrees)',
+        ('Bullet', 'shootAngleInterval'): '(degrees)',
+        ('Bullet', 'shootAngleXInterval'): '(degrees)',
+        ('Bullet', 'damageDamp'): '(%/s)',
+        ('Bullet', 'spelDamageDamp'): '(%/s)',
+        ('Bullet', 'fireDamageDamp'): '(%/s)',
+        ('Bullet', 'thunderDamageDamp'): '(%/s)',
+        ('Bullet', 'staminaDamp'): '(%/s)',
+        ('Bullet', 'knockbackDamp'): '(%/s)',
+        ('Bullet', 'shootAngleXZ'): '(degrees)',
+        ('Bullet', 'lockShootLimitAng'): '(degrees)',
+        ('NpcThinkParam', 'nearDist'): '(metres)',
+        ('NpcThinkParam', 'midDist'): '(metres)',
+        ('NpcThinkParam', 'farDist'): '(metres)',
+        ('NpcThinkParam', 'outDist'): '(metres)',
+        ('NpcThinkParam', 'BackHomeLife_OnHitEneWal'): '(seconds)',
+        ('NpcThinkParam', 'eye_dist'): '(metres)',
+        ('NpcThinkParam', 'ear_dist'): '(metres)',
+        ('NpcThinkParam', 'ear_soundcut_dist'): '(metres)',
+        ('NpcThinkParam', 'nose_dist'): '(metres)',
+        ('NpcThinkParam', 'maxBackhomeDist'): '(metres)',
+        ('NpcThinkParam', 'backhomeDist'): '(metres)',
+        ('NpcThinkParam', 'backhomeBattleDist'): '(metres)',
+        ('NpcThinkParam', 'nonBattleActLife'): '(seconds)',
+        ('NpcThinkParam', 'BackHome_LookTargetTime'): '(seconds)',
+        ('NpcThinkParam', 'BackHome_LookTargetDist'): '(metres)',
+        ('NpcThinkParam', 'SightTargetForgetTime'): '(frames)',
+        ('NpcThinkParam', 'SoundTargetForgetTime'): '(frames)',
+        ('NpcThinkParam', 'BattleStartDist'): '(metres)',
+        ('NpcThinkParam', 'eye_angX'): '(degrees)',
+        ('NpcThinkParam', 'eye_angY'): '(degrees)',
+        ('NpcThinkParam', 'ear_angX'): '(degrees)',
+        ('NpcThinkParam', 'ear_angY'): '(degrees)',
+        ('NpcThinkParam', 'callHelp_CallValidMinDistTarget'): '(metres)',
+        ('NpcThinkParam', 'callHelp_CallValidRange'): '(metres)',
+        ('NpcThinkParam', 'callHelp_ForgetTimeByArrival'): '(seconds)',
+        ('NpcThinkParam', 'callHelp_MinWaitTime'): '(ms)',
+        ('NpcThinkParam', 'callHelp_MaxWaitTime'): '(ms)',
+        ('ObjActParam', 'validPlayerAngle'): '(degrees)',
+        ('ObjActParam', 'validObjAngle'): '(degrees)',
+        ('ReinforceParamWeapon', 'physicsAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'magicAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'fireAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'thunderAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'staminaAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'saWeaponAtkRate'): '(x)',
+        ('ReinforceParamWeapon', 'saDurabilityRate'): '(x)',
+        ('ReinforceParamWeapon', 'correctStrengthRate'): '(x)',
+        ('ReinforceParamWeapon', 'correctAgilityRate'): '(x)',
+        ('ReinforceParamWeapon', 'correctMagicRate'): '(x)',
+        ('ReinforceParamWeapon', 'correctFaithRate'): '(x)',
+        ('ReinforceParamWeapon', 'physicsGuardCutRate'): '(x)',
+        ('ReinforceParamWeapon', 'magicGuardCutRate'): '(x)',
+        ('ReinforceParamWeapon', 'fireGuardCutRate'): '(x)',
+        ('ReinforceParamWeapon', 'thunderGuardCutRate'): '(x)',
+        ('ReinforceParamWeapon', 'poisonGuardResistRate'): '(x)',
+        ('ReinforceParamWeapon', 'diseaseGuardResistRate'): '(x)',
+        ('ReinforceParamWeapon', 'bloodGuardResistRate'): '(x)',
+        ('ReinforceParamWeapon', 'curseGuardResistRate'): '(x)',
+        ('ReinforceParamWeapon', 'staminaGuardDefRate'): '(x)',
+        ('ReinforceParamProtector', 'physicsDefRate'): '(x)',
+        ('ReinforceParamProtector', 'magicDefRate'): '(x)',
+        ('ReinforceParamProtector', 'fireDefRate'): '(x)',
+        ('ReinforceParamProtector', 'thunderDefRate'): '(x)',
+        ('ReinforceParamProtector', 'slashDefRate'): '(x)',
+        ('ReinforceParamProtector', 'blowDefRate'): '(x)',
+        ('ReinforceParamProtector', 'thrustDefRate'): '(x)',
+        ('ReinforceParamProtector', 'resistPoisonRate'): '(x)',
+        ('ReinforceParamProtector', 'resistDiseaseRate'): '(x)',
+        ('ReinforceParamProtector', 'resistBloodRate'): '(x)',
+        ('ReinforceParamProtector', 'resistCurseRate'): '(x)',
+        ('CalcCorrectGraph', 'stageMaxGrowVal0'): '(%)',
+        ('CalcCorrectGraph', 'stageMaxGrowVal1'): '(%)',
+        ('CalcCorrectGraph', 'stageMaxGrowVal2'): '(%)',
+        ('CalcCorrectGraph', 'stageMaxGrowVal3'): '(%)',
+        ('CalcCorrectGraph', 'stageMaxGrowVal4'): '(%)',
+        ('CharaInitParam', 'baseRec_mp'): '(seconds)',
+        ('CharaInitParam', 'baseRec_sp'): '(seconds)',
+        ('CharaInitParam', 'red_Falldam'): '(%)',
+        ('EquipParamWeapon', 'weight'): '(kg)',
+        ('EquipParamWeapon', 'guardAngle'): '(degrees)',
+        ('EquipParamWeapon', 'parryDamageLife'): '(frames)',
+        ('EquipParamWeapon', 'antiDemonDamageRate'): '(x)',
+        ('EquipParamWeapon', 'antSaintDamageRate'): '(x)',
+        ('EquipParamWeapon', 'antWeakA_DamageRate'): '(x)',
+        ('EquipParamWeapon', 'antWeakB_DamageRate'): '(x)',
+        ('EquipParamWeapon', 'staminaGuardDef'): '(%)',
+        ('EquipParamWeapon', 'guardCutCancelRate'): '(%)',
+        ('EquipParamWeapon', 'physGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'magGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'fireGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'thunGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'slashGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'blowGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'thrustGuardCutRate'): '(%)',
+        ('EquipParamProtector', 'weight'): '(kg)',
+        ('EquipParamProtector', 'partsDamageRate'): '(x)',
+        ('EquipParamProtector', 'flickDamageCutRate'): '(%)',
+        ('EquipParamGoods', 'weight'): '(kg)',
+        ('EquipParamAccessory', 'weight'): '(kg)',
+        ('NpcParam', 'hitHeight'): '(metres)',
+        ('NpcParam', 'hitRadius'): '(metres)',
+        ('NpcParam', 'hitYOffset'): '(metres)',
+    }
+    for table in ('AtkParam_Npc', 'AtkParam_Pc'):
+        for slot in range(4):
+            expected[(table, f'hit{slot}_Radius')] = '(metres)'
+        expected[(table, 'hitStopTime')] = '(seconds)'
+    assert len(expected) == 133, len(expected)
+    for (table, key), suffix in sorted(expected.items()):
+        label = next(item['spec'].label for item in schema(table)['fields']
+                     if item['spec'].key == key)
+        assert label.endswith(suffix), (table, key, label)
+        assert patterns[suffix].search(label), (table, key, label)
+    # Unconfirmed quantities stay bare: no suffix may match them.
+    bare = [
+        ('EquipParamWeapon', 'correctStrength'),
+        ('EquipParamWeapon', 'throwAtkRate'),
+        ('EquipParamWeapon', 'bowDistRate'),
+        ('SpEffectParam', 'bowDistRate'),
+        ('SpEffectParam', 'soulStealRate'),
+        ('EquipParamProtector', 'knockBack'),
+        ('EquipParamProtector', 'knockbackBounceRate'),
+        ('EquipParamProtector', 'faceScaleM_ScaleX'),
+        ('NpcThinkParam', 'targetSys_DmgEffectRate'),
+        ('ObjActParam', 'validDist'),
+        ('AtkParam_Npc', 'knockbackDist'),
+        ('AtkParam_Pc', 'knockbackDist'),
+        ('NpcParam', 'superArmorBrakeKnockbackDist'),
+        ('NpcParam', 'weight'),
+        ('ItemLotParam', 'lotItemBasePoint01'),
+        ('CharaInitParam', 'bodyScaleHead'),
+        ('CalcCorrectGraph', 'boundry_value'),
+    ]
+    for table, key in bare:
+        label = next(item['spec'].label for item in schema(table)['fields']
+                     if item['spec'].key == key)
+        assert not any(pattern.search(label) for pattern in patterns.values()), (table, key, label)
+    # The panel script wires every suffix above, plus placement coordinates.
+    editor = (ROOT / 'plugins' / 'ds1' / 'editor.js').read_text('utf-8')
+    for needle in ('const DEGREES=', 'const DEGREES_PER_SEC=', 'const METRES=',
+                   'const VEL=', 'const ACCEL=', 'const FRAMES=', 'const KG=',
+                   'const PCT_PER_SEC='):
+        assert needle in editor, needle
+    assert 'MSB_UNITS={posX:"m",posY:"m",posZ:"m"' in editor
+    assert 'rotX:"\\u00b0"' in editor and 'scaleX:"\\u00d7"' in editor

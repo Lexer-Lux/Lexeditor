@@ -31,27 +31,27 @@
     },
     {
       "Field": "stageMaxGrowVal0",
-      "Name": "Threshold Coefficient [0]",
+      "Name": "Threshold Coefficient [0] (%)",
       "Description": "Share of total scaling reached at this growth stage, as a percentage. 100 completes the curve here, but values can exceed 100. The matching Stat Level Cap sets the stage's level."
     },
     {
       "Field": "stageMaxGrowVal1",
-      "Name": "Threshold Coefficient [1]",
+      "Name": "Threshold Coefficient [1] (%)",
       "Description": "Share of total scaling reached at this growth stage, as a percentage. 100 completes the curve here, but values can exceed 100. The matching Stat Level Cap sets the stage's level."
     },
     {
       "Field": "stageMaxGrowVal2",
-      "Name": "Threshold Coefficient [2]",
+      "Name": "Threshold Coefficient [2] (%)",
       "Description": "Share of total scaling reached at this growth stage, as a percentage. 100 completes the curve here, but values can exceed 100. The matching Stat Level Cap sets the stage's level."
     },
     {
       "Field": "stageMaxGrowVal3",
-      "Name": "Threshold Coefficient [3]",
+      "Name": "Threshold Coefficient [3] (%)",
       "Description": "Share of total scaling reached at this growth stage, as a percentage. 100 completes the curve here, but values can exceed 100. The matching Stat Level Cap sets the stage's level."
     },
     {
       "Field": "stageMaxGrowVal4",
-      "Name": "Threshold Coefficient [4]",
+      "Name": "Threshold Coefficient [4] (%)",
       "Description": "Share of total scaling reached at this growth stage, as a percentage. 100 completes the curve here, but values can exceed 100. The matching Stat Level Cap sets the stage's level."
     },
     {

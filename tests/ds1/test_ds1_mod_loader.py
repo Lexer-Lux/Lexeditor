@@ -290,7 +290,7 @@ def test_reinforce_rows_merge_by_field_and_conflict_by_name():
     assert merged.value("ReinforceParamWeapon", 100, "magicAtkRate") == 3.5
     c = mod("C", edited(("ReinforceParamWeapon", 100, "physicsAtkRate", 4.5)))
     result = mod_loader.compose(GAME, [a, c])
-    assert [(c.part, c.mods) for c in result.conflicts] == [("Weapon upgrades 100, Physical Damage", ["A", "C"])]
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Weapon upgrades 100, Physical Damage (x)", ["A", "C"])]
     assert ItemDocument(result.files[RELATIVE]).value("ReinforceParamWeapon", 100, "physicsAtkRate") == 4.5
 
 

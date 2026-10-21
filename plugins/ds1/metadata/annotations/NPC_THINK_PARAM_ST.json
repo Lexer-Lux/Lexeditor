@@ -16,27 +16,27 @@
     },
     {
       "Field": "nearDist",
-      "Name": "Battle Distance: Short",
+      "Name": "Battle Distance: Short (metres)",
       "Description": "The distance between this character and the target that is treated as 'short' for combat distance calculations."
     },
     {
       "Field": "midDist",
-      "Name": "Battle Distance: Medium",
+      "Name": "Battle Distance: Medium (metres)",
       "Description": "The distance between this character and the target that is treated as 'medium' for combat distance calculations."
     },
     {
       "Field": "farDist",
-      "Name": "Battle Distance: Long",
+      "Name": "Battle Distance: Long (metres)",
       "Description": "The distance between this character and the target that is treated as 'long' for combat distance calculations."
     },
     {
       "Field": "outDist",
-      "Name": "Battle Distance: End",
+      "Name": "Battle Distance: End (metres)",
       "Description": "The distance between this character and the target that ends combat aggression. A character outside of this range will no longer attempt combat actions."
     },
     {
       "Field": "BackHomeLife_OnHitEneWal",
-      "Name": "Goal Duration on Wall Collision",
+      "Name": "Goal Duration on Wall Collision (seconds)",
       "Description": "The duration of the BackToHome goal when this character hits an enemy wall collision (which blocks movement). In seconds."
     },
     {
@@ -66,67 +66,67 @@
     },
     {
       "Field": "eye_dist",
-      "Name": "Visual Search Distance",
+      "Name": "Visual Search Distance (metres)",
       "Description": "The maximum extent to check for when searching visually (sight) for this character. In metres."
     },
     {
       "Field": "ear_dist",
-      "Name": "Auditory Search Distance",
+      "Name": "Auditory Search Distance (metres)",
       "Description": "The maximum extent to check for when searching aurally (sound) for this character. In metres."
     },
     {
       "Field": "ear_soundcut_dist",
-      "Name": "Auditory Dampening Distance",
+      "Name": "Auditory Dampening Distance (metres)",
       "Description": "The distance at which the size of a sound source will be reduced. Sounds below this distance will no longer be heard. In metres."
     },
     {
       "Field": "nose_dist",
-      "Name": "Olfactory Search Distance",
+      "Name": "Olfactory Search Distance (metres)",
       "Description": "The maximum extent to check for when searching olfactorily (smell) for this character. This method of searching is never blocked by any obstacle. In metres."
     },
     {
       "Field": "maxBackhomeDist",
-      "Name": "Battle Act: Return Home Distance",
+      "Name": "Battle Act: Return Home Distance (metres)",
       "Description": "The distance after which this character will always return home. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
     },
     {
       "Field": "backhomeDist",
-      "Name": "Battle Act: Return Home Distance (Combat)",
+      "Name": "Battle Act: Return Home Distance (Combat) (metres)",
       "Description": "The distance after which this character will return home if in combat with a target. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
     },
     {
       "Field": "backhomeBattleDist",
-      "Name": "Battle Act: Return Home Abort Distance",
+      "Name": "Battle Act: Return Home Abort Distance (metres)",
       "Description": "The distance whilst in combat, after which an attempt to return home will be aborted. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
     },
     {
       "Field": "nonBattleActLife",
-      "Name": "Battle Act: Non-Combat Act Duration",
+      "Name": "Battle Act: Non-Combat Act Duration (seconds)",
       "Description": "The duration for non-combat acts whilst this character is aware of a target. In seconds.\nA parameter for the COMMON_SetBattleActLogic script. "
     },
     {
       "Field": "BackHome_LookTargetTime",
-      "Name": "Return Home: Target Look-At Duration",
+      "Name": "Return Home: Target Look-At Duration (seconds)",
       "Description": "When this character is returning home, this is the duration they keep looking at their current target for. In seconds."
     },
     {
       "Field": "BackHome_LookTargetDist",
-      "Name": "Return Home: Target Look-At Distance",
+      "Name": "Return Home: Target Look-At Distance (metres)",
       "Description": "When this character is returning home, this is the distance at which they keep looking at their current target for. In metres."
     },
     {
       "Field": "SightTargetForgetTime",
-      "Name": "Visual Target Forget Duration",
+      "Name": "Visual Target Forget Duration (frames)",
       "Description": "The duration after a visual target has been acquired in which it will be forgotten. In frames."
     },
     {
       "Field": "SoundTargetForgetTime",
-      "Name": "Auditory Target Forget Duration",
+      "Name": "Auditory Target Forget Duration (frames)",
       "Description": "The duration after a aural target has been acquired in which it will be forgotten. In frames."
     },
     {
       "Field": "BattleStartDist",
-      "Name": "Battle Start Distance",
+      "Name": "Battle Start Distance (metres)",
       "Description": "The distance at which this character will start combat after acquiring a target. In metres."
     },
     {
@@ -151,47 +151,47 @@
     },
     {
       "Field": "eye_angX",
-      "Name": "Visual Search: Horizontal Angle",
+      "Name": "Visual Search: Horizontal Angle (degrees)",
       "Description": "The horizontal cone within which the visual search is performed. In degrees."
     },
     {
       "Field": "eye_angY",
-      "Name": "Visual Search: Vertical Angle",
+      "Name": "Visual Search: Vertical Angle (degrees)",
       "Description": "The vertical cone within which the visual search is performed. In degrees."
     },
     {
       "Field": "ear_angX",
-      "Name": "Auditory Search: Horizontal Angle",
+      "Name": "Auditory Search: Horizontal Angle (degrees)",
       "Description": "The horizontal cone within which the aural search is performed. In degrees."
     },
     {
       "Field": "ear_angY",
-      "Name": "Auditory Search: Vertical Angle",
+      "Name": "Auditory Search: Vertical Angle (degrees)",
       "Description": "The vertical cone within which the aural search is performed. In degrees."
     },
     {
       "Field": "callHelp_CallValidMinDistTarget",
-      "Name": "Call for Help: Minimum Distance to Target",
+      "Name": "Call for Help: Minimum Distance to Target (metres)",
       "Description": "If a character is closer than this distance to their target, they cannot call for friends. In metres."
     },
     {
       "Field": "callHelp_CallValidRange",
-      "Name": "Call for Help: Maximum Distance to Friend",
+      "Name": "Call for Help: Maximum Distance to Friend (metres)",
       "Description": "If a character is further than this distance to a friend, they cannot call the friend. In metres."
     },
     {
       "Field": "callHelp_ForgetTimeByArrival",
-      "Name": "Call for Help: Respond Duration",
+      "Name": "Call for Help: Respond Duration (seconds)",
       "Description": "When a friend is called, this is the duration it takes to answer and then forget the call. In seconds."
     },
     {
       "Field": "callHelp_MinWaitTime",
-      "Name": "Call for Help: Minimum Delay",
+      "Name": "Call for Help: Minimum Delay (ms)",
       "Description": "The minimum duration after a call that any friend responses can occur. In milliseconds."
     },
     {
       "Field": "callHelp_MaxWaitTime",
-      "Name": "Call for Help: Maximum Delay",
+      "Name": "Call for Help: Maximum Delay (ms)",
       "Description": "The maximum duration after a call that any friend responses can occur. In milliseconds."
     },
     {

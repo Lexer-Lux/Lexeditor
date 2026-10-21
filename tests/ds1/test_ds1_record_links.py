@@ -59,19 +59,23 @@ def test_switch_decides_the_targets_table():
     found = links(document, 'EquipParamAccessory', 100)
     assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
     assert found['refId']['resolved']
+    poke(document, 'EquipParamAccessory', 100, 'refId', 6890)
+    found = links(document, 'EquipParamAccessory', 100)
+    assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
+    assert found['refId']['resolved'] is False
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 0)
     assert 'refId' not in links(document, 'EquipParamAccessory', 100)
     row = document.read_row('EquipParamAccessory', 100)
     assert next(field for field in row['fields'] if field['key'] == 'refId')['type'] == 'number'
 
 
-def test_behavior_refid_links_attacks_and_effects():
+def test_behavior_refid_links_attacks_projectiles_and_effects():
     document = ItemDocument(make_effects_archive())
     found = links(document, 'BehaviorParam', 100)
     assert (found['refId']['kind'], found['refId']['table']) == ('attack', 'AtkParam_Npc')
     found = links(document, 'BehaviorParam', 101)
     assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
-    assert found['refId']['resolved']
+    assert found['refId']['id'] == 100 and found['refId']['resolved']
     poke(document, 'BehaviorParam', 101, 'refType', 2)
     poke(document, 'BehaviorParam', 101, 'refId', 6890)
     found = links(document, 'BehaviorParam', 101)
@@ -256,3 +260,67 @@ def test_spell_calls_link_to_player_attacks():
     assert '101' in by_key['refId']['enum']
     with pytest.raises(FormatError):
         document._write('Magic', 100, 'refId', 5555)
+
+
+def test_projectile_hit_id_links_to_child_projectiles():
+    document = ItemDocument(make_archive())
+    found = links(document, 'Bullet', 100)
+    assert (found['HitBulletID']['kind'], found['HitBulletID']['table']) == ('bullet', 'Bullet')
+    assert found['HitBulletID']['id'] == 101 and found['HitBulletID']['resolved']
+    assert found['HitBulletID']['name'] == document.display_name('Bullet', 101)
+    assert document.link_noun('bullet', 'Bullet') == 'projectile'
+    by_key = {field['key']: field for field in document.read_row('Bullet', 100)['fields']}
+    assert by_key['HitBulletID']['type'] == 'enum'
+    assert set(by_key['HitBulletID']['enum']) >= {'-1', '100', '101', '102'}
+    _values, display = document.row_values('Bullet', 100)
+    assert display['HitBulletID'] == document.display_name('Bullet', 101)
+    document.edit('Bullet', 100, 'HitBulletID', 102)
+    with pytest.raises(FormatError):
+        document.edit('Bullet', 100, 'HitBulletID', 999999)
+
+
+def test_effect_behavior_links_npc_behaviors_but_not_pc_ones():
+    document = ItemDocument(make_effects_archive())
+    poke(document, 'SpEffectParam', 6890, 'stateInfo', 142)
+    poke(document, 'SpEffectParam', 6890, 'behaviorId', 101)
+    found = links(document, 'SpEffectParam', 6890)
+    assert (found['behaviorId']['kind'], found['behaviorId']['table']) == ('behavior', 'BehaviorParam')
+    assert found['behaviorId']['id'] == 101 and found['behaviorId']['resolved']
+    assert document.link_noun('behavior', 'BehaviorParam') == 'behavior'
+    by_key = {field['key']: field for field in document.read_row('SpEffectParam', 6890)['fields']}
+    assert by_key['behaviorId']['type'] == 'enum'
+    document.edit('SpEffectParam', 6890, 'behaviorId', 100)
+    with pytest.raises(FormatError):
+        document.edit('SpEffectParam', 6890, 'behaviorId', 999999)
+    poke(document, 'SpEffectParam', 6890, 'stateInfo', 171)
+    assert 'behaviorId' not in links(document, 'SpEffectParam', 6890)
+
+
+def test_magic_replace_id_links_to_spells():
+    document = ItemDocument(make_archive())
+    poke(document, 'Magic', 100, 'replaceMagicId', 101)
+    found = links(document, 'Magic', 100)
+    assert (found['replaceMagicId']['kind'], found['replaceMagicId']['table']) == ('catalog', 'Magic')
+    assert found['replaceMagicId']['id'] == 101 and found['replaceMagicId']['resolved']
+    _values, display = document.row_values('Magic', 100)
+    assert display['replaceMagicId'] == document.display_name('Magic', 101)
+    document.edit('Magic', 100, 'replaceMagicId', 102)
+    with pytest.raises(FormatError):
+        document.edit('Magic', 100, 'replaceMagicId', 999999)
+
+
+def test_spell_and_treasure_dialogs_preview_event_text():
+    document = ItemDocument(make_archive())
+    document.menu_texts = texts.MenuDocument(make_menu_archive(
+        extra={'Event_text_.fmg': {10010500: 'Kick ladder',
+                                   10010710: 'Return to the last bonfire?'}}))
+    poke(document, 'Magic', 100, 'yesNoDialogMessageId', 10010710)
+    poke(document, 'ObjActParam', 100, 'actionEnableMsgId', 10010500)
+    poke(document, 'ObjActParam', 100, 'actionFailedMsgId', 10010710)
+    assert document.read_row('Magic', 100)['dialogLinks'] == [
+        {'field': 'yesNoDialogMessageId', 'id': 10010710,
+         'text': 'Return to the last bonfire?'}]
+    assert document.read_row('ObjActParam', 100)['dialogLinks'] == [
+        {'field': 'actionEnableMsgId', 'id': 10010500, 'text': 'Kick ladder'},
+        {'field': 'actionFailedMsgId', 'id': 10010710,
+         'text': 'Return to the last bonfire?'}]

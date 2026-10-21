@@ -56,7 +56,7 @@
     },
     {
       "Field": "validPlayerAngle",
-      "Name": "Valid Player Angle",
+      "Name": "Valid Player Angle (degrees)",
       "Description": "The usage cone where a player can trigger this interaction (on the player's side). Effective angular difference between the player's orientation vector and the object's orientation vector. In degrees."
     },
     {
@@ -71,7 +71,7 @@
     },
     {
       "Field": "validObjAngle",
-      "Name": "Valid Object Angle",
+      "Name": "Valid Object Angle (degrees)",
       "Description": "The usage cone where a player can trigger this interaction (on the object's side). Effective angular difference between the player's orientation vector and the object's orientation vector. In degrees."
     },
     {

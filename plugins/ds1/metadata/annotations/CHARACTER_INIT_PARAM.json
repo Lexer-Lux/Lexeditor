@@ -6,17 +6,17 @@
   "Fields": [
     {
       "Field": "baseRec_mp",
-      "Name": "MP recovery",
+      "Name": "MP recovery (seconds)",
       "Description": "Seconds to recover 1 MP. Classes store 0."
     },
     {
       "Field": "baseRec_sp",
-      "Name": "Stamina recovery",
+      "Name": "Stamina recovery (seconds)",
       "Description": "Seconds to recover 1 stamina. Classes store 0."
     },
     {
       "Field": "red_Falldam",
-      "Name": "Fall damage cut",
+      "Name": "Fall damage cut (%)",
       "Description": "Fall damage reduction in percent. Classes store 0."
     },
     {

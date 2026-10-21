@@ -124,7 +124,7 @@ def main():
                         assert max(tops) - min(tops) < 4, tops
                     units = page.locator("[data-maps-side] .lex-unit").evaluate_all(
                         "nodes=>nodes.map(n=>n.textContent)")
-                    assert units == ["\u00b0", "\u00b0", "\u00b0"], units
+                    assert units == ["m", "m", "m", "\u00b0", "\u00b0", "\u00b0", "\u00d7", "\u00d7", "\u00d7"], units
                     assert page.get_by_text(f"model {enemy['model']}", exact=False).count() >= 1
                     if output:
                         page.wait_for_timeout(250)

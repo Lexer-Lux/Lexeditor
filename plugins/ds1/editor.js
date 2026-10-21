@@ -336,7 +336,7 @@ async function textLabelPreview(id){
 }
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 const openBehavior=id=>navigate("ai","behaviors",`BehaviorParam:${id}`);
-const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats"};
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats",behavior:"AI"};
 const ATTACK_SUBS={AtkParam_Npc:"attacks",AtkParam_Pc:"player-attacks"};
 const STAT_SUBS={EquipMtrlSetParam:"upgrade-materials",ReinforceParamWeapon:"weapon-upgrades",ReinforceParamProtector:"armor-upgrades",CalcCorrectGraph:"curves"};
 const recordRows=new Map();
@@ -373,6 +373,7 @@ function openRecord(link){
   if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
   if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
   if(link.kind==="stat")return navigate("stats",STAT_SUBS[link.table],`${link.table}:${link.id}`);
+  if(link.kind==="behavior")return openBehavior(link.id);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -383,7 +384,7 @@ function openAsset(link){
 // rows become hold-to-choose candidates (see the master list's
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
-const LINK_NOUNS={effect:"effect",attack:"attack",bullet:"projectile",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table"};
+const LINK_NOUNS={effect:"effect",attack:"attack",bullet:"projectile",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table",behavior:"behavior"};
 const STAT_NOUNS={EquipMtrlSetParam:"material set",ReinforceParamWeapon:"weapon upgrade table",ReinforceParamProtector:"armor upgrade table",CalcCorrectGraph:"scaling curve"};
 const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
@@ -397,6 +398,7 @@ async function finderTarget(link,value){
   if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
   if(link.kind==="drop")return ["drops","drops"];
   if(link.kind==="stat")return ["stats",STAT_SUBS[link.table]];
+  if(link.kind==="behavior")return ["ai","behaviors"];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
@@ -623,22 +625,43 @@ const RATE=/\s*\(([A-Za-z]+\/second)\)$/;
 const SECONDS=/\s*\(seconds?\)$/;
 const MS=/\s*\(ms\)$/;
 const POINTS=/\s*\(points\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"");
-// Think distances say "In metres" in their help, not their labels, so no
-// label suffix can wire them. The fifteen distance fields of NpcThinkParam
-// (eleven annotated plus the four battle distances, the same family).
-const THINK_METRES=new Set(["nearDist","midDist","farDist","outDist","eye_dist","ear_dist","ear_soundcut_dist","nose_dist","maxBackhomeDist","backhomeDist","backhomeBattleDist","BackHome_LookTargetDist","BattleStartDist","callHelp_CallValidMinDistTarget","callHelp_CallValidRange"]);
+const DEGREES=/\s*\(degrees?\)$/;
+const DEGREES_PER_SEC=/\s*\(degrees\/second\)$/;
+const METRES=/\s*\(metres?\)$/;
+const VEL=/\s*\(m\/s\)$/;
+const ACCEL=/\s*\(m\/s\^2\)$/;
+const FRAMES=/\s*\(frames?\)$/;
+const KG=/\s*\(kg\)$/;
+const PCT_PER_SEC=/\s*\(%\/s\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"");
+// Think distances carry their metre suffix in their labels, like every
+// other unit below (fifteen fields: eleven annotated plus the four
+// battle distances, the same family).
+
+// Placement coordinates keep their conflict-list labels, so their units
+// wire off field keys here instead of label suffixes.
+const MSB_UNITS={posX:"m",posY:"m",posZ:"m",rotX:"\u00b0",rotY:"\u00b0",rotZ:"\u00b0",scaleX:"\u00d7",scaleY:"\u00d7",scaleZ:"\u00d7"};
 function controlFor(row,field){
   const plain=plainControlFor(row,field);
-  const control=PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
+  const msbUnit=row.table&&String(row.table).endsWith(".msb")?MSB_UNITS[field.key]:null;
+  const control=msbUnit&&field.type==="number"?LexeditorUI.unitField(plain,msbUnit)
+    :PERCENT.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%")
     :TIMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00d7")
+    // Degrees per second keeps its degree; the generic rate below would not.
+    :DEGREES_PER_SEC.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0/s")
     // The quantity names the row already; the unit only says per second.
     :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"/sec")
     :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
     :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
     :POINTS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"pts")
-    :row.table==="NpcThinkParam"&&THINK_METRES.has(field.key)&&field.type==="number"?LexeditorUI.unitField(plain,"m")
-    :row.table&&String(row.table).endsWith(".msb")&&/^Rotation [XYZ]$/.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0"):plain;
+    :DEGREES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0")
+    :METRES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"m")
+    :VEL.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"m/s")
+    :ACCEL.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"m/s\u00b2")
+    :FRAMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"frames")
+    :KG.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"kg")
+    :PCT_PER_SEC.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%/s"):plain;
+
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;
   const input=plain;
   const current=()=>field.type==="bool"?(input.checked?1:0):Number(String(input.value).replace(/,/g,""));

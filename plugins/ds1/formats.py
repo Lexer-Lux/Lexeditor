@@ -651,7 +651,12 @@ def _shown(value, field):
 
 
 LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'bullet': 'projectile',
-            'ai': 'AI table', 'drop': 'drop table'}
+              'ai': 'AI table', 'drop': 'drop table', 'behavior': 'behavior'}
+# Event-text prompts by table: an item's yes/no question, a spell's, a
+# treasure's use prompts. Each carries FmgRef="Event_Text" in metadata.
+DIALOG_TEXT_FIELDS = {'EquipParamGoods': {'yesNoDialogMessageId'},
+                      'Magic': {'yesNoDialogMessageId'},
+                      'ObjActParam': {'actionEnableMsgId', 'actionFailedMsgId'}}
 # Stats-tab records a gear field points at: the upgrade material sets and the
 # weapon and armor upgrade-level tables.
 STAT_REF_NOUNS = {'EquipMtrlSetParam': 'material set', 'ReinforceParamWeapon': 'weapon upgrade table',
@@ -670,11 +675,11 @@ def field_link(document, table, row_id, spec):
     and only a reference with no NPC entry (a spell's call) links
     the player table.
     Kinds: effect, goods, catalog (equipment and spells), attack
-    (enemy and player attacks), bullet (projectiles), ai (think
-    records), drop (drop tables), stat (upgrade material sets and
-    upgrade-level tables). Anything else (PC behavior tables,
-    knockback and world tendency) has no picker or tab to open, so
-    it stays a number.
+    (enemy and player attacks), bullet (projectiles), behavior
+    (NPC behaviors), ai (think records), drop (drop tables), stat
+    (upgrade material sets and upgrade-level tables). Anything
+    else (PC behavior tables, knockback and world tendency) has
+    no picker or tab to open, so it stays a number.
     """
     fallback = None
     for expression in (spec.reference or '').split(','):
@@ -699,6 +704,8 @@ def field_link(document, table, row_id, spec):
             return ('bullet', name)
         if name == 'NpcThinkParam':
             return ('ai', name)
+        if name == 'BehaviorParam':
+            return ('behavior', name)
         if name == 'ItemLotParam':
             return ('drop', name)
         if name in STAT_REF_NOUNS:
@@ -1089,7 +1096,7 @@ class ItemDocument:
             return self.catalog_references(target).choices
         if kind == 'ai':
             return self.catalog_references(target).choices
-        if kind in ('drop', 'stat', 'bullet'):
+        if kind in ('drop', 'stat', 'bullet', 'behavior'):
             return self.catalog_references(target).choices
         raise FormatError('Unknown reference kind')
 
@@ -1464,9 +1471,10 @@ class ItemDocument:
         result['recordLinks'] = record_links
         result['recordLinks'] += self._asset_links(table, row_id, fields, game_root)
         dialogs = []
-        if table in ('EquipParamGoods', 'Magic') and self.menu_texts is not None:
+        wanted = DIALOG_TEXT_FIELDS.get(table, ()) if self.menu_texts is not None else ()
+        if wanted:
             for field in fields:
-                if field['key'] != 'yesNoDialogMessageId':
+                if field['key'] not in wanted:
                     continue
                 dialogs.append({'field': field['key'], 'id': field['value'],
                                 'text': self.menu_texts.event_text(field['value']) or ''})

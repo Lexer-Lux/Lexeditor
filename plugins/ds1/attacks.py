@@ -23,7 +23,7 @@ ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
 # documented well enough to expose.
 for _slot in range(4):
     ATTACK_FIELDS[f'hit{_slot}_Radius'] = (
-        f'Hit {_slot}: Size', 'Hitbox',
+        f'Hit {_slot}: Size (metres)', 'Hitbox',
         f"How large hit slot {_slot}'s hitbox is. Larger values hit a wider area.")
     ATTACK_FIELDS[f'hit{_slot}_DmyPoly1'] = (
         f'Hit {_slot}: First point', 'Hitbox',
@@ -41,7 +41,7 @@ ATTACK_FIELDS['knockbackDist'] = (
     'Knockback', 'Impact',
     'How hard this attack knocks the victim back. Higher values throw the victim further.')
 ATTACK_FIELDS['hitStopTime'] = (
-    'Hit pause', 'Impact',
+    'Hit pause (seconds)', 'Impact',
     "How long the victim's animation pauses when hit, in seconds.")
 
 # Every editable Bullet property in presentation order: lifetime, how

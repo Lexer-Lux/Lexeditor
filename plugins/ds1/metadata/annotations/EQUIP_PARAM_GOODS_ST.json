@@ -16,7 +16,7 @@
     },
     {
       "Field": "weight",
-      "Name": "Weight",
+      "Name": "Weight (kg)",
       "Description": "Weight. In kilograms."
     },
     {

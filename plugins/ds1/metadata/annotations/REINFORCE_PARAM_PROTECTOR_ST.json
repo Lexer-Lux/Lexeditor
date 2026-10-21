@@ -6,57 +6,57 @@
   "Fields": [
     {
       "Field": "physicsDefRate",
-      "Name": "Physical Defense",
+      "Name": "Physical Defense (x)",
       "Description": "The multiplier to apply to base physical defense for this tier of reinforcement."
     },
     {
       "Field": "magicDefRate",
-      "Name": "Magic Defense",
+      "Name": "Magic Defense (x)",
       "Description": "The multiplier to apply to base magic defense for this tier of reinforcement."
     },
     {
       "Field": "fireDefRate",
-      "Name": "Fire Defense",
+      "Name": "Fire Defense (x)",
       "Description": "The multiplier to apply to base fire defense for this tier of reinforcement."
     },
     {
       "Field": "thunderDefRate",
-      "Name": "Lightning Defense",
+      "Name": "Lightning Defense (x)",
       "Description": "The multiplier to apply to base lightning defense for this tier of reinforcement."
     },
     {
       "Field": "slashDefRate",
-      "Name": "Slash Defense",
+      "Name": "Slash Defense (x)",
       "Description": "The multiplier to apply to base slash defense for this tier of reinforcement."
     },
     {
       "Field": "blowDefRate",
-      "Name": "Strike Defense",
+      "Name": "Strike Defense (x)",
       "Description": "The multiplier to apply to base strike defense for this tier of reinforcement."
     },
     {
       "Field": "thrustDefRate",
-      "Name": "Thrust Defense",
+      "Name": "Thrust Defense (x)",
       "Description": "The multiplier to apply to base thrust defense for this tier of reinforcement."
     },
     {
       "Field": "resistPoisonRate",
-      "Name": "Poison Resistance",
+      "Name": "Poison Resistance (x)",
       "Description": "The multiplier to apply to base poison resistance for this tier of reinforcement."
     },
     {
       "Field": "resistDiseaseRate",
-      "Name": "Toxic Resistance",
+      "Name": "Toxic Resistance (x)",
       "Description": "The multiplier to apply to base toxic resistance for this tier of reinforcement."
     },
     {
       "Field": "resistBloodRate",
-      "Name": "Bleed Resistance",
+      "Name": "Bleed Resistance (x)",
       "Description": "The multiplier to apply to base bleed resistance for this tier of reinforcement."
     },
     {
       "Field": "resistCurseRate",
-      "Name": "Curse Resistance",
+      "Name": "Curse Resistance (x)",
       "Description": "The multiplier to apply to base curse resistance for this tier of reinforcement."
     },
     {

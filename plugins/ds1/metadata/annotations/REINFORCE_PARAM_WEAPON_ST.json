@@ -6,102 +6,102 @@
   "Fields": [
     {
       "Field": "physicsAtkRate",
-      "Name": "Physical Damage",
+      "Name": "Physical Damage (x)",
       "Description": "The multiplier to apply to base physical damage for this tier of reinforcement."
     },
     {
       "Field": "magicAtkRate",
-      "Name": "Magic Damage",
+      "Name": "Magic Damage (x)",
       "Description": "The multiplier to apply to base magic damage for this tier of reinforcement."
     },
     {
       "Field": "fireAtkRate",
-      "Name": "Fire Damage",
+      "Name": "Fire Damage (x)",
       "Description": "The multiplier to apply to base fire damage for this tier of reinforcement."
     },
     {
       "Field": "thunderAtkRate",
-      "Name": "Lightning Damage",
+      "Name": "Lightning Damage (x)",
       "Description": "The multiplier to apply to base lightning damage for this tier of reinforcement."
     },
     {
       "Field": "staminaAtkRate",
-      "Name": "Stamina Damage",
+      "Name": "Stamina Damage (x)",
       "Description": "The multiplier to apply to base stamina damage for this tier of reinforcement."
     },
     {
       "Field": "saWeaponAtkRate",
-      "Name": "Poise Damage",
+      "Name": "Poise Damage (x)",
       "Description": "The multiplier to apply to base poise damage for this tier of reinforcement."
     },
     {
       "Field": "saDurabilityRate",
-      "Name": "Poise",
+      "Name": "Poise (x)",
       "Description": "The multiplier to apply to base poise for this tier of reinforcement."
     },
     {
       "Field": "correctStrengthRate",
-      "Name": "Correction: STR",
+      "Name": "Correction: STR (x)",
       "Description": "The multiplier to apply to base STR correction for this tier of reinforcement."
     },
     {
       "Field": "correctAgilityRate",
-      "Name": "Correction: DEX",
+      "Name": "Correction: DEX (x)",
       "Description": "The multiplier to apply to base DEX correction for this tier of reinforcement."
     },
     {
       "Field": "correctMagicRate",
-      "Name": "Correction: INT",
+      "Name": "Correction: INT (x)",
       "Description": "The multiplier to apply to base INT correction for this tier of reinforcement."
     },
     {
       "Field": "correctFaithRate",
-      "Name": "Correction: FTH",
+      "Name": "Correction: FTH (x)",
       "Description": "The multiplier to apply to base FTH correction for this tier of reinforcement."
     },
     {
       "Field": "physicsGuardCutRate",
-      "Name": "Guard Absorption %: Physical",
+      "Name": "Guard Absorption: Physical (x)",
       "Description": "The multiplier to apply to base physical guard absorption for this tier of reinforcement."
     },
     {
       "Field": "magicGuardCutRate",
-      "Name": "Guard Absorption %: Magic",
+      "Name": "Guard Absorption: Magic (x)",
       "Description": "The multiplier to apply to base magic guard absorption for this tier of reinforcement."
     },
     {
       "Field": "fireGuardCutRate",
-      "Name": "Guard Absorption %: Fire",
+      "Name": "Guard Absorption: Fire (x)",
       "Description": "The multiplier to apply to base fire guard absorption for this tier of reinforcement."
     },
     {
       "Field": "thunderGuardCutRate",
-      "Name": "Guard Absorption %: Lightning",
+      "Name": "Guard Absorption: Lightning (x)",
       "Description": "The multiplier to apply to base lightning guard absorption for this tier of reinforcement."
     },
     {
       "Field": "poisonGuardResistRate",
-      "Name": "Guard Absorption %: Poison",
+      "Name": "Guard Absorption: Poison (x)",
       "Description": "The multiplier to apply to base poison guard absorption for this tier of reinforcement."
     },
     {
       "Field": "diseaseGuardResistRate",
-      "Name": "Guard Absorption %: Toxic",
+      "Name": "Guard Absorption: Toxic (x)",
       "Description": "The multiplier to apply to base toxic guard absorption for this tier of reinforcement."
     },
     {
       "Field": "bloodGuardResistRate",
-      "Name": "Guard Absorption %: Bleed",
+      "Name": "Guard Absorption: Bleed (x)",
       "Description": "The multiplier to apply to base bleed guard absorption for this tier of reinforcement."
     },
     {
       "Field": "curseGuardResistRate",
-      "Name": "Guard Absorption %: Curse",
+      "Name": "Guard Absorption: Curse (x)",
       "Description": "The multiplier to apply to base curse guard absorption for this tier of reinforcement."
     },
     {
       "Field": "staminaGuardDefRate",
-      "Name": "Guard Stability",
+      "Name": "Guard Stability (x)",
       "Description": "The multiplier to apply to base guard stability for this tier of reinforcement."
     },
     {
