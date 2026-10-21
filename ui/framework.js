@@ -5851,6 +5851,17 @@
     // list has not seen (a section the developer added) goes after the card
     // before it in the order.
     root.lexCards = () => [...cards];
+    // Cards the layout moved out of the columns leave the dealing: dealt
+    // again, the pager would otherwise pull a property back out of the
+    // custom section it was dropped into.
+    root.lexRemoveCards = (...gone) => {
+      if (!gone.length) return;
+      const drop = new Set(gone);
+      const before = cards.length;
+      for (let index = cards.length - 1; index >= 0; index--)
+        if (drop.has(cards[index])) cards.splice(index, 1);
+      if (cards.length !== before) pagedCount = -1;
+    };
     root.lexOrderCards = (wanted, quiet = false) => {
       if (!quiet) joinSections();
       const was = [...cards];
@@ -8657,7 +8668,11 @@ ${contents.path}`});
     }
     const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
     if (pager) {
-      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager));
+      // A custom section living in tab content outside the dealt grid keeps
+      // its place there: carding it would narrow it into a column. Sections
+      // without a tabbed ancestor still join the grid the way they always did.
+      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager &&
+        (section.closest(".lex-tweak-card-grid") || !section.closest(".lex-tabbed-panel-content"))));
       return;
     }
     if (movable.length < 2) return;
@@ -8715,6 +8730,22 @@ ${contents.path}`});
     section.dataset.lexCustomSection = "true";
     return section;
   };
+  // A body holding one tabbed panel carries that panel's bar along the
+  // panel's top edge (the :only-child rules), so a custom section belongs
+  // inside the tab's own content: in its scroll box below the dealt grid
+  // when paged (never in the grid, whose deals detach a non-card), else at
+  // the content end. Beside the panel it would drop the bar below the
+  // heading and collapse the tab content to nothing.
+  const tabbedCustomHome = root => {
+    const body = root.classList?.contains("lex-detail-panel-body") ? root
+      : root.querySelector(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body");
+    const tabbed = body?.querySelector(":scope > .lex-tabbed-panel");
+    if (!tabbed || [...body.children].some(kid => kid !== tabbed &&
+        !kid.classList.contains("lex-multi-edit-notice") && kid.dataset?.lexCustomSection !== "true")) return null;
+    const content = tabbed.querySelector(":scope > .lex-tabbed-panel-content");
+    if (!content) return null;
+    return {body, home: content.querySelector(":scope > .lex-tweaks-paged > .lex-tweaks-scroll") || content};
+  };
   const placeCustomSections = (state, specs) => {
     state.custom = (Array.isArray(specs) ? specs : []).filter(spec => spec && typeof spec.id === "string")
       .map(spec => ({id: spec.id, title: String(spec.title || "New section"), after: String(spec.after || "")}));
@@ -8727,17 +8758,23 @@ ${contents.path}`});
       node.closest(".lex-detail-section")?.remove();
       state.groups.delete(node);
     }
+    const tabbed = tabbedCustomHome(state.root);
     for (const spec of state.custom) {
       const id = `${spec.id}:0`;
       const existing = [...state.groups.values()].find(group => group.id === id);
       if (existing) {
-        const text = existing.node.closest(".lex-detail-section")?.querySelector(".lex-detail-section-title-text");
+        const section = existing.node.closest(".lex-detail-section");
+        const text = section?.querySelector(".lex-detail-section-title-text");
         if (text && text.textContent !== spec.title) text.textContent = spec.title;
+        // A section an earlier build left beside the tabbed panel rejoins
+        // the tab content, restoring the bar and the tab's height at once.
+        if (tabbed && section?.parentElement === tabbed.body) tabbed.home.append(section);
         continue;
       }
       const section = customSectionNode(spec);
       const anchor = [...state.groups.values()].find(group => group.id === spec.after)?.node.closest(".lex-detail-section");
       if (anchor) anchor.after(section);
+      else if (tabbed) tabbed.home.append(section);
       else (state.root.querySelector(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body") || state.root).append(section);
       const node = section.querySelector(".lex-detail-section-content") || section;
       state.groups.set(node, {id, name: spec.id, node, anchors: [], custom: true});
@@ -8878,6 +8915,17 @@ ${contents.path}`});
       if (pager) pagers.add(pager);
     }
     pagers.forEach(syncPagerCards);
+    // A card the layout moved out of its pager's columns (a property now
+    // living in a custom section) leaves that pager's dealing, or the next
+    // refit pulls it back out. Cards merely unlisted by the stored layout
+    // stay exactly where they are.
+    for (const pager of state.root.querySelectorAll(".lex-tweaks-paged")) {
+      const gone = (pager.lexCards?.() || []).filter(card => card.isConnected &&
+        card.parentElement?.closest(".lex-tweaks-paged") === pager &&
+        !card.parentElement.classList.contains("lex-tweak-column") &&
+        !card.parentElement.classList.contains("lex-tweak-off-page"));
+      if (gone.length) pager.lexRemoveCards?.(...gone);
+    }
   };
   const storePropertyLayout = async (state, layout) => {
     const value = JSON.stringify(layout);

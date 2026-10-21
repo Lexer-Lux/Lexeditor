@@ -5,7 +5,9 @@ button that appends a new custom header to the current panel tab. It
 writes the same custom-section store the hold-right gesture writes,
 so double-click rename, drag-in and hold-right removal keep working.
 The new header survives a restart inside its recorded tab, and adding
-one never drops the panel's existing tabs.
+one never drops the panel's existing tabs. On a tabbed panel the new
+section lands inside the current tab: the tab bar stays on top and
+every field stays rendered.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401  (fixture)
 from test_tab_rename import mount_shell
@@ -146,3 +148,177 @@ def test_removed_section_stays_gone_after_a_restart(page):
     titles = page.locator(
         ".lex-detail-tabpane .lex-detail-section-title").all_text_contents()
     assert [title.strip() for title in titles] == ["Alpha", "Beta", "Gamma"]
+
+
+TABBED_BUILD = """() => {
+  const U = LexeditorUI;
+  const main = document.querySelector('main');
+  main.style.cssText = 'display:block;width:900px;min-height:600px;height:600px';
+  const SPECS = [
+    {tab: 'Combat', key: 'physAtk', label: 'Physical attack'},
+    {tab: 'Combat', key: 'magAtk', label: 'Magic attack'},
+    {tab: 'Combat', key: 'fireAtk', label: 'Fire attack'},
+    {tab: 'Combat', key: 'thunAtk', label: 'Lightning attack'},
+    {tab: 'Combat', key: 'stamAtk', label: 'Stamina attack'},
+    {tab: 'Combat', key: 'poiseAtk', label: 'Poise attack'},
+    {tab: 'Basics', key: 'weight', label: 'Weight'},
+    {tab: 'Basics', key: 'price', label: 'Price'}];
+  window.drawMock = (active) => {
+    const groups = new Map();
+    for (const spec of SPECS) {
+      if (!groups.has(spec.tab)) groups.set(spec.tab, []);
+      groups.get(spec.tab).push(U.detailField({label: spec.label, property: spec.key,
+        control: U.el('input', {type: 'number', value: 0})}));
+    }
+    const tabs = [...groups].map(([title]) => ({id: title.toLowerCase(), label: title}));
+    const shape = U.applyFieldTabOverrides(groups, tabs,
+      {accept: ['combat', 'basics'], callerShape: 'mock'});
+    const section = tabs.find(tab => tab.id === (active || 'combat'));
+    main.replaceChildren(U.detailPanel({title: 'Standard Arrow', body: [U.tabbedPanel(
+      {label: 'Item details', active: section.id, tabs,
+        fieldTabs: {shape, accept: ['combat', 'basics']},
+        paginate: {unpaged: true}, change: id => drawMock(id),
+        content: groups.get(section.label)})]}));
+  };
+  drawMock('combat');
+}"""
+
+
+def mount_tabbed(page):
+    framework(page)
+    mount_shell(page, developer=True)
+    page.evaluate(TABBED_BUILD)
+    page.wait_for_timeout(400)
+
+
+def tabbed_geometry(page):
+    return page.evaluate("""() => {
+      const panel = document.querySelector('.lex-detail-panel');
+      const top = panel.getBoundingClientRect().top;
+      const bar = panel.querySelector('.lex-tabbed-panel-tabs');
+      const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
+      const content = panel.querySelector('.lex-tabbed-panel-content');
+      const fields = [...content.querySelectorAll('.lex-detail-field')];
+      return {
+        barTop: bar.getBoundingClientRect().top - top,
+        headingTop: heading.getBoundingClientRect().top - top,
+        contentHeight: content.getBoundingClientRect().height,
+        labels: fields.map(
+          f => f.querySelector('.lex-detail-field-label-text').textContent),
+        heights: fields.map(f => f.getBoundingClientRect().height),
+      };
+    }""")
+
+
+def tabbed_custom_parents(page):
+    return page.evaluate("""() => [...document.querySelectorAll(
+      '[data-lex-custom-section="true"]')].map(n => n.parentElement.className)""")
+
+
+def test_adding_a_section_to_a_tab_keeps_every_field_and_the_bar(page):
+    # DS1 Items -> Ammo -> Combat: the section used to land beside the
+    # tabbed panel, dropping the bar below the heading and collapsing the
+    # tab's content to nothing. It lands inside the tab now instead.
+    mount_tabbed(page)
+    before = tabbed_geometry(page)
+    assert before['barTop'] < before['headingTop']
+    assert len(before['labels']) == 6
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section-title",
+                 has_text="New section").wait_for()
+    page.wait_for_timeout(300)
+    after = tabbed_geometry(page)
+    assert after['labels'] == before['labels']
+    assert all(height > 0 for height in after['heights']), after
+    assert after['contentHeight'] > 100, after
+    assert after['barTop'] == before['barTop'], (before, after)
+    assert after['headingTop'] == before['headingTop'], (before, after)
+    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll']
+
+
+def test_damaged_tab_layout_heals_on_a_restart(page):
+    # A layout stored while the section landed beside the panel (bar below
+    # the heading, tab collapsed) recovers on reload: the section rejoins
+    # the tab content and every field shows again.
+    mount_tabbed(page)
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section-title",
+                 has_text="New section").wait_for()
+    keep = {**shipped(page, ".property-layout."),
+            **shipped(page, ".section-order")}
+    assert len(keep) == 2, keep
+    damaged = page.evaluate("""() => {
+      const panel = document.querySelector('.lex-detail-panel');
+      const body = panel.querySelector(':scope > .lex-detail-panel-body');
+      body.append(panel.querySelector('[data-lex-custom-section="true"]'));
+      const top = panel.getBoundingClientRect().top;
+      const bar = panel.querySelector('.lex-tabbed-panel-tabs').getBoundingClientRect();
+      const heading = panel.querySelector(
+        ':scope > .lex-detail-panel-heading').getBoundingClientRect();
+      const content = panel.querySelector(
+        '.lex-tabbed-panel-content').getBoundingClientRect();
+      return {barTop: bar.top - top, headingTop: heading.top - top,
+              contentHeight: content.height};
+    }""")
+    assert damaged['barTop'] > damaged['headingTop'], damaged
+    assert damaged['contentHeight'] < 100, damaged
+    page.evaluate("""entries => {
+      const keep = Object.entries(entries);
+      localStorage.clear();
+      for (const [key, value] of keep) localStorage.setItem(key, value);
+      document.querySelector('main').replaceChildren();
+    }""", keep)
+    page.evaluate("drawMock('combat')")
+    page.wait_for_timeout(400)
+    after = tabbed_geometry(page)
+    assert after['labels'] == ['Physical attack', 'Magic attack', 'Fire attack',
+                               'Lightning attack', 'Stamina attack', 'Poise attack']
+    assert all(height > 0 for height in after['heights']), after
+    assert after['barTop'] < after['headingTop'], after
+    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll']
+
+
+def test_damaged_live_panel_heals_on_the_next_section_add(page):
+    # The same recovery without a restart: placing another section pulls a
+    # stray one back into the tab content beside it.
+    mount_tabbed(page)
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section-title",
+                 has_text="New section").wait_for()
+    page.evaluate("""() => {
+      const panel = document.querySelector('.lex-detail-panel');
+      panel.querySelector(':scope > .lex-detail-panel-body')
+        .append(panel.querySelector('[data-lex-custom-section="true"]'));
+    }""")
+    page.locator(ADD).click()
+    page.wait_for_timeout(300)
+    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll', 'lex-tweaks-scroll']
+    after = tabbed_geometry(page)
+    assert after['barTop'] < after['headingTop'], after
+    assert len(after['labels']) == 6
+
+
+def test_fields_missing_from_a_stored_tab_layout_still_show(page):
+    # Whatever a stored layout omits (or a schema gains later) renders in
+    # place: only a card that actually left the columns leaves the dealing.
+    mount_tabbed(page)
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section-title",
+                 has_text="New section").wait_for()
+    page.evaluate("""() => {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.includes('.property-layout.')) continue;
+        const layout = JSON.parse(localStorage.getItem(key));
+        for (const [name, list] of Object.entries(layout)) {
+          if (Array.isArray(list) && name.includes(':')) layout[name] = list.slice(0, 1);
+        }
+        localStorage.setItem(key, JSON.stringify(layout));
+      }
+      document.querySelector('main').replaceChildren();
+    }""")
+    page.evaluate("drawMock('combat')")
+    page.wait_for_timeout(400)
+    after = tabbed_geometry(page)
+    assert len(after['labels']) == 6, after
+    assert all(height > 0 for height in after['heights']), after
