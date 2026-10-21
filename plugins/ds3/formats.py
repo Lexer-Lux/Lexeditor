@@ -412,15 +412,31 @@ class ParamView:
 
     def copy_row(self, source_id: int, new_id: int, name: str, row_size: int) -> bytes:
         """Extend the directory and data region, preserving existing payloads."""
-        if type(new_id) is not int or not -(2**31) <= new_id < 2**31:
-            raise DS3FormatError("A PARAM row ID must be a signed 32-bit integer")
-        if any(row.row_id == new_id for row in self.rows):
+        return self.copy_rows([(source_id, new_id, name)], row_size)
+
+    def copy_rows(self, copies, row_size: int) -> bytes:
+        """Append several duplicated rows in one rebuild.
+
+        `copies` is a list of (source_id, new_id, name). The directory grows
+        by one entry per copy and the new payloads join the end of the data
+        region (not the strings offset: shipped tables can leave padding
+        between the two, which would break the even row spacing).
+        """
+        if not copies:
+            return bytes(self.data)
+        count = len(copies)
+        new_ids = [new_id for _source, new_id, _name in copies]
+        for new_id in new_ids:
+            if type(new_id) is not int or not -(2**31) <= new_id < 2**31:
+                raise DS3FormatError("A PARAM row ID must be a signed 32-bit integer")
+        if len(set(new_ids)) != count or any(row.row_id in set(new_ids) for row in self.rows):
             raise DS3FormatError("That PARAM row ID already exists")
-        if self.row_count == 65535:
+        if self.row_count + count > 65535:
             raise DS3FormatError("PARAM already has the maximum number of rows")
-        if not isinstance(name, str) or '\0' in name or len(name) > 1024:
-            raise DS3FormatError("Invalid PARAM row name")
-        source = self.row(source_id)
+        for _source, _new, name in copies:
+            if not isinstance(name, str) or '\0' in name or len(name) > 1024:
+                raise DS3FormatError("Invalid PARAM row name")
+        sources = [self.row(source_id) for source_id, _new, _name in copies]
         extended = bool(self.format2d & 4 or self.format2d & 3 == 3)
         header_end = 64 if extended else 48
         stride = 24 if self.long_offsets else 12
@@ -430,36 +446,44 @@ class ParamView:
             raise DS3FormatError("PARAM data/string boundaries are inconsistent")
         if any(not directory_end <= row.data_offset or row.data_offset + row_size > strings for row in self.rows):
             raise DS3FormatError("PARAM row overlaps its directory or strings")
+        data_end = max(row.data_offset for row in self.rows) + row_size
         encoding = ('utf-16-be' if self.big_endian else 'utf-16-le') if self.format2e & 1 else 'shift_jis'
+        terminator = b'\0\0' if self.format2e & 1 else b'\0'
         try:
-            encoded_name = name.encode(encoding) + (b'\0\0' if self.format2e & 1 else b'\0')
+            encoded_names = [name.encode(encoding) + terminator for _source, _new, name in copies]
         except UnicodeEncodeError as error:
             raise DS3FormatError("Row name cannot be represented in this PARAM encoding") from error
-        payload = self.data[source.data_offset:source.data_offset + row_size]
-        result = bytearray(self.data[:directory_end] + bytes(stride)
-                           + self.data[directory_end:strings] + payload + self.data[strings:])
-        name_offset = len(result)
-        result.extend(encoded_name)
+        payloads = b''.join(self.data[source.data_offset:source.data_offset + row_size] for source in sources)
+        added_dir, added_data = stride * count, row_size * count
+        result = bytearray(self.data[:directory_end] + bytes(added_dir) + self.data[directory_end:data_end]
+                           + payloads + self.data[data_end:])
         def relocated(offset):
-            return offset + (stride if offset >= directory_end else 0) + (row_size if offset >= strings else 0)
-        struct.pack_into(self.endian + 'H', result, 10, self.row_count + 1)
-        struct.pack_into(self.endian + 'I', result, 0, strings + stride + row_size)
+            return offset + (added_dir if offset >= directory_end else 0) + (added_data if offset >= data_end else 0)
+        struct.pack_into(self.endian + 'H', result, 10, self.row_count + count)
+        struct.pack_into(self.endian + 'I', result, 0, strings + added_dir + added_data)
         data_code, data_position = ('q', 48) if self.long_offsets else ('I', 48) if extended else ('H', 4)
         data_start = self._unpack(data_code, data_position)
+        if data_code == 'H' and relocated(data_start) > 0xFFFF:
+            raise DS3FormatError("PARAM data start no longer fits its 16-bit header field")
         struct.pack_into(self.endian + data_code, result, data_position, relocated(data_start))
         if self.format2d & 0x80:
             struct.pack_into(self.endian + 'q', result, 16, relocated(self._unpack('q', 16)))
         code = 'q' if self.long_offsets else 'I'
+        width = 8 if self.long_offsets else 4
         for index in range(self.row_count):
-            pos = header_end + index * stride + (8 if self.long_offsets else 4)
-            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+            pos = header_end + index * stride + width
+            for offset_position in (pos, pos + width):
                 offset = self._unpack(code, offset_position)
                 if offset:
                     struct.pack_into(self.endian + code, result, offset_position, relocated(offset))
-        struct.pack_into(self.endian + 'i', result, directory_end, new_id)
-        pos = directory_end + (8 if self.long_offsets else 4)
-        struct.pack_into(self.endian + code, result, pos, strings + stride)
-        struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
+        name_offset = len(result)
+        for index, (new_id, encoded) in enumerate(zip(new_ids, encoded_names)):
+            entry = directory_end + index * stride
+            struct.pack_into(self.endian + 'i', result, entry, new_id)
+            struct.pack_into(self.endian + code, result, entry + width, data_end + added_dir + index * row_size)
+            struct.pack_into(self.endian + code, result, entry + 2 * width, name_offset)
+            name_offset += len(encoded)
+        result.extend(b''.join(encoded_names))
         return bytes(result)
 
     def delete_row(self, row_id: int, row_size: int) -> bytes:

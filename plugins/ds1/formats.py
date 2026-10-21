@@ -1296,11 +1296,15 @@ class ItemDocument:
             return cache[table]
         source = self.vanilla_document if self.vanilla_document is not None else self
         plain = source.plain if source is not self else self.original_plain
-        offset, size = source.members[table + '.param'].offset, TABLES[table][0]
+        # Our own rows are read from the file as opened, so a row added or
+        # removed since (which moves every offset) cannot misplace them.
+        shipped = members(plain) if source is self else source.members
+        offset, size = shipped[table + '.param'].offset, TABLES[table][0]
+        rows = ParamView(bytes(plain[offset:offset + shipped[table + '.param'].size])).rows if source is self else source.params[table].rows
         fields = [item['spec'] for item in self.schemas[table]['fields']
                   if not item['spec'].padding and item['spec'].array_length == 1 and not item['spec'].is_bool]
         found = {}
-        for row in source.params[table].rows:
+        for row in rows:
             data = bytes(plain[offset + row.data_offset:offset + row.data_offset + size])
             for field in fields:
                 value = read_field(data, field, '<')
@@ -1718,50 +1722,68 @@ class ItemDocument:
 
     def add_row(self, table, source_id, new_id=None):
         """Duplicate a row under a fresh ID, appended last. Returns the record."""
-        if type(source_id) is not int or isinstance(source_id, bool):
-            raise FormatError('Invalid item identity')
+        return self.add_rows(table, [(source_id, new_id)])[0]
+
+    def add_rows(self, table, copies):
+        """Duplicate several rows, `(source_id, new_id)` each, in one rebuild.
+
+        `new_id` may be None for the next free ID. Nothing changes unless
+        every copy is valid. Returns the new records in order."""
         view = self._current_param(table)
+        taken_names = {row.name for row in view.rows if row.name}
+        taken_ids = {row.row_id for row in view.rows}
+        next_id = max(taken_ids) + 1
+        plan = []
+        for source_id, new_id in copies:
+            if type(source_id) is not int or isinstance(source_id, bool):
+                raise FormatError('Invalid item identity')
+            try:
+                source = view.row(source_id)
+            except DS3FormatError:
+                raise FormatError(f'Expected one row ID {source_id}; found 0') from None
+            if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id) or self.is_merchant(source_id) or self.is_boss(source_id)):
+                raise FormatError('This record is not a reviewed monster or NPC')
+            if new_id is None:
+                new_id = next_id
+            if type(new_id) is not int or isinstance(new_id, bool) or not -(2 ** 31) <= new_id < 2 ** 31:
+                raise FormatError('A row ID is a whole number from -2147483648 to 2147483647')
+            if new_id in taken_ids:
+                raise FormatError('That row ID is already taken')
+            reference = self.schemas[table].get('names', {}).get(source_id)
+            if table == 'NpcParam':
+                # The duplicate stays openable as a monster or boss only under a
+                # family stem; the source gate guarantees one of these is a family.
+                stem = next((candidate for candidate in (base_stem(source.name), reference)
+                             if candidate in MONSTER_FAMILIES or candidate in BOSS_FAMILIES),
+                            reference or base_stem(source.name) or f'Row {source_id}')
+            else:
+                stem = base_stem(source.name) or reference or f'Row {source_id}'
+            name, suffix = f'{stem} ({new_id})', 2
+            while name in taken_names:
+                name, suffix = f'{stem} ({new_id}) {suffix}', suffix + 1
+            try:
+                name.encode('shift_jis')
+            except UnicodeEncodeError:
+                name = f'Row {new_id}'
+            taken_ids.add(new_id)
+            taken_names.add(name)
+            next_id = max(next_id, new_id + 1)
+            plan.append((source_id, new_id, name))
+        if not plan:
+            return []
         try:
-            source = view.row(source_id)
-        except DS3FormatError:
-            raise FormatError(f'Expected one row ID {source_id}; found 0') from None
-        if table == 'NpcParam' and not (self.is_monster(source_id) or self.is_friend(source_id) or self.is_merchant(source_id) or self.is_boss(source_id)):
-            raise FormatError('This record is not a reviewed monster or NPC')
-        if new_id is None:
-            new_id = max(row.row_id for row in view.rows) + 1
-        if type(new_id) is not int or isinstance(new_id, bool) or not -(2 ** 31) <= new_id < 2 ** 31:
-            raise FormatError('A row ID is a whole number from -2147483648 to 2147483647')
-        if any(row.row_id == new_id for row in view.rows):
-            raise FormatError('That row ID is already taken')
-        taken = {row.name for row in view.rows if row.name}
-        reference = self.schemas[table].get('names', {}).get(source_id)
-        if table == 'NpcParam':
-            # The duplicate stays openable as a monster or boss only under a
-            # family stem; the source gate guarantees one of these is a family.
-            stem = next((candidate for candidate in (base_stem(source.name), reference)
-                         if candidate in MONSTER_FAMILIES or candidate in BOSS_FAMILIES),
-                        reference or base_stem(source.name) or f'Row {source_id}')
-        else:
-            stem = base_stem(source.name) or reference or f'Row {source_id}'
-        name, suffix = f'{stem} ({new_id})', 2
-        while name in taken:
-            name, suffix = f'{stem} ({new_id}) {suffix}', suffix + 1
-        try:
-            name.encode('shift_jis')
-        except UnicodeEncodeError:
-            name = f'Row {new_id}'
-        try:
-            rebuilt = view.copy_row(source_id, new_id, name, TABLES[table][0])
+            rebuilt = view.copy_rows(plan, TABLES[table][0])
         except DS3FormatError as error:
             raise FormatError(str(error)) from None
         self._repack_table(table, rebuilt)
-        self._added_rows.add((table, new_id))
         fields = self.schemas[table]['fields']
         key = next((item['spec'].key for item in fields if item['editable']), fields[0]['spec'].key)
-        dirty_key = (table, new_id, key)
-        self.dirty.add(dirty_key)
-        self._edited_at[dirty_key] = len(self._edited_at) + 1
-        return self.read_row(table, new_id)
+        for _source, new_id, _name in plan:
+            self._added_rows.add((table, new_id))
+            dirty_key = (table, new_id, key)
+            self.dirty.add(dirty_key)
+            self._edited_at[dirty_key] = len(self._edited_at) + 1
+        return [self.read_row(table, new_id) for _source, new_id, _name in plan]
 
     def remove_row(self, table, row_id):
         """Drop a row's directory entry and payload. Its name stays orphaned."""

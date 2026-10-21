@@ -316,3 +316,41 @@ def test_added_rows_read_as_created():
     rows = {row["id"]: row for row in document.list_rows("consumables")}
     assert rows[row["id"]]["created"] is True
     assert rows[100]["created"] is False
+
+
+def test_add_rows_in_bulk_survive_export_with_padding_before_strings():
+    """Shipped tables (SpEffectParam) leave padding between the last row and
+    the strings offset; copies must join the data, not follow the padding."""
+    _, payload = goods_member()
+    size = TABLES["EquipParamGoods"][0]
+    view = ParamView(payload)
+    pad = 12
+    strings = view.strings_offset
+    padded = bytearray(payload[:strings] + bytes(pad) + payload[strings:])
+    struct.pack_into("<I", padded, 0, strings + pad)
+    view = ParamView(bytes(padded))
+    copies = [(100 + index % 3, 7000 + index, f"Copy ({7000 + index})") for index in range(500)]
+    grown = ParamView(view.copy_rows(copies, size))
+    assert len(grown.rows) == len(view.rows) + 500
+    offsets = sorted(row.data_offset for row in grown.rows)
+    assert all(b - a == size for a, b in zip(offsets, offsets[1:]))
+    assert offsets[0] >= 48 + len(grown.rows) * 12
+    assert offsets[-1] + size <= grown.strings_offset
+    for source_id, new_id, name in copies[:5] + copies[-5:]:
+        new = next(row for row in grown.rows if row.row_id == new_id)
+        old = next(row for row in view.rows if row.row_id == source_id)
+        assert new.name == name
+        assert grown.data[new.data_offset:new.data_offset + size] == view.data[old.data_offset:old.data_offset + size]
+
+
+def test_document_add_rows_batch_exports_and_reopens():
+    document = ItemDocument(make_archive())
+    rows = document.add_rows("EquipParamGoods", [(100, 6000 + index) for index in range(500)])
+    assert [row["id"] for row in rows] == list(range(6000, 6500))
+    assert document.dirty_count == 500
+    reopened = ItemDocument(document.export())
+    assert len(reopened.params["EquipParamGoods"].rows) == 503
+    assert reopened._row("EquipParamGoods", 6499)[2] == reopened._row("EquipParamGoods", 100)[2]
+    with pytest.raises(FormatError, match="already taken"):
+        document.add_rows("EquipParamGoods", [(100, 7000), (100, 7000)])
+    assert len(document.params["EquipParamGoods"].rows) == 503
