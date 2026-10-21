@@ -14605,7 +14605,7 @@ ${contents.path}`});
       const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
         : `Remove ${row.name} from the library`;
       const openTitle = `Open ${row.name}'s folder`;
-      const actions = [
+      const actions = [toggle, // The switch opens the header row, ahead of the icon buttons.
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
@@ -14613,7 +14613,7 @@ ${contents.path}`});
         element("button", {type: "button", class: "lex-header-icon", title: openTitle,
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
-            .catch(error => failure("Could not open the folder", error))}, folderIcon()), toggle];
+            .catch(error => failure("Could not open the folder", error))}, folderIcon())];
 
       const sections = [];
       const settingsPanels = [];
