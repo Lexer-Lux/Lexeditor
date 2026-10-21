@@ -610,6 +610,7 @@
     return bar;
   };
 
+  // Kept for later use: no screen uses collapsible panels right now.
   // A side panel that shrinks to a clickable handle and expands pushing its
   // siblings over. {tabs:[{id,label,content}], active, onChange, side, label,
   // width, collapsed, viewKey, className, attrs}. Collapse state stays

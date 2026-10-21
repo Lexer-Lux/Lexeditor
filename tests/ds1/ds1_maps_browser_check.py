@@ -76,7 +76,14 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
+                    page.wait_for_selector('[data-maps-dir] .lex-column-list.lex-list-fill',
+                                           timeout=30000)
                     assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
+                    assert page.locator('.lex-collapsible-handle').count() == 0
+                    width = page.evaluate(
+                        "() => document.querySelector('[data-maps-directory-panel]')"
+                        ".getBoundingClientRect().width")
+                    assert round(width) == 360, width
                     counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
                     assert set(counts) == {'npcs', 'drops', 'enemies'}, counts
                     if not root:

@@ -2637,8 +2637,11 @@ function renderMaps(){
     actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
   const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
   const side=el("div",{"data-maps-side":"",style:"display:flex;flex-direction:column;min-width:0;min-height:0;"},mapsStrip(),mapsPane());
-  const directory=LexeditorUI.collapsiblePanel({label:"Directory",side:"left",viewKey:"ds1-maps-directory",width:"360px",
-    className:"ds1-directory",content:[directoryPane()]});
+  // Plain panel, not a collapsible one: the directory is the page, and
+  // collapsing it away only stranded readers. The collapsible
+  // component stays global for later use.
+  const directory=el("div",{"data-maps-directory-panel":"",class:"ds1-directory","aria-label":"Directory",
+    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},directoryPane());
   // The viewport and the side share one remembered divider, like every
   // list-and-detail split: the table sets the floor through minSizes.
   const split=LexeditorUI.panelLayout([viewPane,side],"ds1-maps-view",

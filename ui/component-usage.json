@@ -31,6 +31,9 @@
       "blank",
       "ds1"
     ],
+    "applyFieldTabOverrides": [
+      "ds1"
+    ],
     "applyTheme": [
       "bannerlord",
       "blank",
@@ -234,9 +237,7 @@
       "terraria",
       "warband"
     ],
-    "collapsiblePanel": [
-      "ds1"
-    ],
+    "collapsiblePanel": [],
     "columnList": [
       "bannerlord",
       "blank",
@@ -1295,6 +1296,27 @@
     "openSettings": [
       "blank"
     ],
+    "padBarrelTable": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "pagedListDetail": [
       "bannerlord",
       "blank",
@@ -1916,10 +1938,16 @@
       "warband"
     ],
     "textArea": [
+      "bannerlord",
       "blank",
+      "chrono_trigger",
+      "ds1",
+      "ff7",
       "ff7r",
       "ff8",
       "palworld",
+      "project_zomboid",
+      "rdr",
       "rdr2",
       "terraria",
       "warband"
@@ -2134,6 +2162,7 @@
     "noImage",
     "notice",
     "numberValue",
+    "padBarrelTable",
     "pagedListDetail",
     "pagedPane",
     "pager",
