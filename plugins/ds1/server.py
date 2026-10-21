@@ -425,6 +425,11 @@ class Handler(PluginRequestHandler):
                 else:
                     table = query.get('table', [''])[0]
                     key = _ICON_KEYS.get(table)
+                    asked = query.get('key', [''])[0]
+                    if asked:
+                        if asked not in ('iconId', 'iconIdM', 'iconIdF'):
+                            raise ValueError('That record has no such item picture')
+                        key = asked
                     if key is None:
                         raise ValueError('That record has no item picture')
                     try:

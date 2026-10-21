@@ -109,3 +109,12 @@ def test_asset_links_open_through_the_field_label():
     assert 'targetType:"ds1-asset"' in EDITOR
     assert EDITOR.count('entry.kind!=="asset"') == 2
     assert 'assetPreview(row,assetLink)' in EDITOR
+
+
+def test_asset_faces_show_beside_their_numbers():
+    # The number input stays editable; the icon picture / binder name
+    # shows beside it, previews on hover and opens the file on click.
+    assert 'function assetFace(row,field,entry){' in EDITOR
+    assert 'class:"ds1-asset-field"' in EDITOR
+    assert '&key=${encodeURIComponent(field.key)}&v=${field.value}`' in EDITOR
+    assert 'targetLabel:`${entry.name} in Models`' in EDITOR

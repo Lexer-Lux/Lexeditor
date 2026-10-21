@@ -55,6 +55,11 @@ def test_switch_decides_the_targets_table():
     found = links(document, 'EquipParamAccessory', 100)
     assert (found['refId']['kind'], found['refId']['table']) == ('effect', 'SpEffectParam')
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 1)
+    poke(document, 'EquipParamAccessory', 100, 'refId', 100)
+    found = links(document, 'EquipParamAccessory', 100)
+    assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
+    assert found['refId']['resolved']
+    poke(document, 'EquipParamAccessory', 100, 'refCategory', 0)
     assert 'refId' not in links(document, 'EquipParamAccessory', 100)
     row = document.read_row('EquipParamAccessory', 100)
     assert next(field for field in row['fields'] if field['key'] == 'refId')['type'] == 'number'
@@ -64,7 +69,9 @@ def test_behavior_refid_links_attacks_and_effects():
     document = ItemDocument(make_effects_archive())
     found = links(document, 'BehaviorParam', 100)
     assert (found['refId']['kind'], found['refId']['table']) == ('attack', 'AtkParam_Npc')
-    assert 'refId' not in links(document, 'BehaviorParam', 101)
+    found = links(document, 'BehaviorParam', 101)
+    assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
+    assert found['refId']['resolved']
     poke(document, 'BehaviorParam', 101, 'refType', 2)
     poke(document, 'BehaviorParam', 101, 'refId', 6890)
     found = links(document, 'BehaviorParam', 101)
@@ -161,6 +168,11 @@ def test_dialog_link_shows_the_yes_no_prompt():
     poke(document, 'EquipParamGoods', 101, 'yesNoDialogMessageId', 0)
     assert document.read_row('EquipParamGoods', 101)['dialogLinks'] == [
         {'field': 'yesNoDialogMessageId', 'id': 0, 'text': ''}]
+    # Spells ask too: two vanilla scrolls reuse the bonfire prompt.
+    poke(document, 'Magic', 100, 'yesNoDialogMessageId', 10010710)
+    assert document.read_row('Magic', 100)['dialogLinks'] == [
+        {'field': 'yesNoDialogMessageId', 'id': 10010710,
+         'text': 'Return to the last bonfire?'}]
 
 
 def test_field_link_ignores_unlinked_tables():
@@ -204,3 +216,43 @@ def test_weapon_scaling_curves_link_to_stats_curves():
     found = links(document, 'EquipParamWeapon', 100)
     assert (found['correctType']['kind'], found['correctType']['table']) == ('stat', 'CalcCorrectGraph')
     assert found['correctType']['resolved']
+
+
+def test_projectile_calls_link_to_the_projectiles_tab():
+    # Goods, ring and spell refId at refCategory 1 names a projectile,
+    # so it shows what it points to like any other reference (kind
+    # "bullet") instead of a bare number.
+    document = ItemDocument(make_archive())
+    for table in ('EquipParamGoods', 'EquipParamAccessory', 'Magic'):
+        poke(document, table, 100, 'refCategory', 1)
+        poke(document, table, 100, 'refId', 101)
+        found = links(document, table, 100)
+        assert (found['refId']['kind'], found['refId']['table']) == ('bullet', 'Bullet')
+        assert found['refId']['id'] == 101 and found['refId']['resolved']
+        assert found['refId']['name'] == document.display_name('Bullet', 101)
+        assert document.link_noun('bullet', 'Bullet') == 'projectile'
+        by_key = {field['key']: field for field in document.read_row(table, 100)['fields']}
+        assert by_key['refId']['type'] == 'enum'
+        assert '101' in by_key['refId']['enum']
+        _values, display = document.row_values(table, 100)
+        assert display['refId'] == document.display_name('Bullet', 101)
+        with pytest.raises(FormatError):
+            document._write(table, 100, 'refId', 5555)
+
+
+def test_spell_calls_link_to_player_attacks():
+    # Magic refId at refCategory 0 names a player attack. Behavior and
+    # projectile references name the player table too but keep
+    # preferring the enemy one (see the attack tests above).
+    document = ItemDocument(make_archive())
+    poke(document, 'Magic', 100, 'refCategory', 0)
+    poke(document, 'Magic', 100, 'refId', 101)
+    found = links(document, 'Magic', 100)
+    assert (found['refId']['kind'], found['refId']['table']) == ('attack', 'AtkParam_Pc')
+    assert found['refId']['resolved']
+    assert document.link_noun('attack', 'AtkParam_Pc') == 'attack'
+    by_key = {field['key']: field for field in document.read_row('Magic', 100)['fields']}
+    assert by_key['refId']['type'] == 'enum'
+    assert '101' in by_key['refId']['enum']
+    with pytest.raises(FormatError):
+        document._write('Magic', 100, 'refId', 5555)

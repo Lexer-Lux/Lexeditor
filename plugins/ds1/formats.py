@@ -650,7 +650,8 @@ def _shown(value, field):
     return value
 
 
-LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'ai': 'AI table', 'drop': 'drop table'}
+LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'bullet': 'projectile',
+            'ai': 'AI table', 'drop': 'drop table'}
 # Stats-tab records a gear field points at: the upgrade material sets and the
 # weapon and armor upgrade-level tables.
 STAT_REF_NOUNS = {'EquipMtrlSetParam': 'material set', 'ReinforceParamWeapon': 'weapon upgrade table',
@@ -665,19 +666,26 @@ def field_link(document, table, row_id, spec):
     SpEffectParam only when its refCategory is 2); the switch reads
     from this row, so the same field links differently per record.
     The first linkable table wins: a projectile's attack falls
-    through its PC entry to the NPC one the Attacks tab shows.
-    Kinds: effect, goods, catalog (equipment and spells), attack,
-    ai (think records), drop (drop tables), stat (upgrade material sets and
-    upgrade-level tables). Anything else (projectiles, PC attacks and
-    behavior variations) has no picker or tab to open, so it stays a
-    number.
+    through its PC entry to the NPC one the Attacks tab shows,
+    and only a reference with no NPC entry (a spell's call) links
+    the player table.
+    Kinds: effect, goods, catalog (equipment and spells), attack
+    (enemy and player attacks), bullet (projectiles), ai (think
+    records), drop (drop tables), stat (upgrade material sets and
+    upgrade-level tables). Anything else (PC behavior tables,
+    knockback and world tendency) has no picker or tab to open, so
+    it stays a number.
     """
+    fallback = None
     for expression in (spec.reference or '').split(','):
         match = re.fullmatch(r'(\w+)(?:\((\w+)=(-?\d+)\))?', expression.strip())
         if not match:
             continue
         name, switch, want = match.groups()
         if switch is not None and document.value(table, row_id, switch) != int(want):
+            continue
+        if name == 'AtkParam_Pc':
+            fallback = ('attack', name)
             continue
         if name == EFFECT_TABLE:
             return ('effect', name)
@@ -687,13 +695,15 @@ def field_link(document, table, row_id, spec):
             return ('catalog', name)
         if name == 'AtkParam_Npc':
             return ('attack', name)
+        if name == 'Bullet':
+            return ('bullet', name)
         if name == 'NpcThinkParam':
             return ('ai', name)
         if name == 'ItemLotParam':
             return ('drop', name)
         if name in STAT_REF_NOUNS:
             return ('stat', name)
-    return None
+    return fallback
 
 
 class ItemDocument:
@@ -1074,10 +1084,12 @@ class ItemDocument:
         if kind == 'catalog':
             return self.catalog_references(target).choices
         if kind == 'attack':
-            return self.attack_references().choices
+            if target == 'AtkParam_Npc':
+                return self.attack_references().choices
+            return self.catalog_references(target).choices
         if kind == 'ai':
             return self.catalog_references(target).choices
-        if kind in ('drop', 'stat'):
+        if kind in ('drop', 'stat', 'bullet'):
             return self.catalog_references(target).choices
         raise FormatError('Unknown reference kind')
 
@@ -1452,7 +1464,7 @@ class ItemDocument:
         result['recordLinks'] = record_links
         result['recordLinks'] += self._asset_links(table, row_id, fields, game_root)
         dialogs = []
-        if table == 'EquipParamGoods' and self.menu_texts is not None:
+        if table in ('EquipParamGoods', 'Magic') and self.menu_texts is not None:
             for field in fields:
                 if field['key'] != 'yesNoDialogMessageId':
                     continue

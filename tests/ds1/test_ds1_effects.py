@@ -116,7 +116,8 @@ def test_effect_options_validate_and_reflect_actual_consumers():
     assert not any(u["table"]==TABLE and u["id"]==6890 for u in doc.read_row(TABLE,6920)["effectUsage"])
     users=doc.read_row(TABLE,6890)["effectUsage"]
     assert {(u["table"],u["id"]) for u in users} == {("EquipParamWeapon",100),("EquipParamAccessory",100)}
-    assert not doc.read_row("EquipParamAccessory",101)["recordLinks"]
+    alone = doc.read_row("EquipParamAccessory",101)["recordLinks"]
+    assert [(link["kind"], link["table"], link["resolved"]) for link in alone] == [("bullet", "Bullet", False)]
     doc.edit("EquipParamWeapon",100,"residentSpEffectId",99001)
     assert next(link["id"] for link in doc.read_row("EquipParamWeapon",100)["recordLinks"]
                 if link["field"] == "residentSpEffectId") == 99001

@@ -335,7 +335,8 @@ async function textLabelPreview(id){
 }
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 const openBehavior=id=>navigate("ai","behaviors",`BehaviorParam:${id}`);
-const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats"};
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats"};
+const ATTACK_SUBS={AtkParam_Npc:"attacks",AtkParam_Pc:"player-attacks"};
 const STAT_SUBS={EquipMtrlSetParam:"upgrade-materials",ReinforceParamWeapon:"weapon-upgrades",ReinforceParamProtector:"armor-upgrades",CalcCorrectGraph:"curves"};
 const recordRows=new Map();
 async function recordRow(table,id){
@@ -365,7 +366,8 @@ async function openCatalog(table,id){
 }
 function openRecord(link){
   if(link.kind==="effect")return openEffect(link);
-  if(link.kind==="attack")return openAttack(link.id);
+  if(link.kind==="attack")return navigate("attacks",ATTACK_SUBS[link.table]||"attacks",`${link.table}:${link.id}`);
+  if(link.kind==="bullet")return navigate("attacks","projectiles",`Bullet:${link.id}`);
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
   if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
   if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
@@ -380,7 +382,7 @@ function openAsset(link){
 // rows become hold-to-choose candidates (see the master list's
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
-const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table"};
+const LINK_NOUNS={effect:"effect",attack:"attack",bullet:"projectile",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table"};
 const STAT_NOUNS={EquipMtrlSetParam:"material set",ReinforceParamWeapon:"weapon upgrade table",ReinforceParamProtector:"armor upgrade table",CalcCorrectGraph:"scaling curve"};
 const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
@@ -388,7 +390,8 @@ const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",Equip
 function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):link.kind==="stat"?STAT_NOUNS[link.table]:LINK_NOUNS[link.kind]||"record";}
 async function finderTarget(link,value){
   if(link.kind==="effect")return ["effects","effects-all"];
-  if(link.kind==="attack")return ["attacks","attacks"];
+  if(link.kind==="attack")return ["attacks",ATTACK_SUBS[link.table]||"attacks"];
+  if(link.kind==="bullet")return ["attacks","projectiles"];
   if(link.kind==="ai")return ["ai","ai"];
   if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
   if(link.kind==="drop")return ["drops","drops"];
@@ -416,7 +419,7 @@ async function recordPreview(link){
 // or the worn model's first available mesh. Failures show why, never throw.
 async function assetPreview(row,entry){
   if(entry.tab!=="models"){
-    const picture=el("img",{src:`/api/icon?table=${encodeURIComponent(row.table)}&id=${encodeURIComponent(row.id)}`,
+    const picture=el("img",{src:`/api/icon?table=${encodeURIComponent(row.table)}&id=${encodeURIComponent(row.id)}&key=${encodeURIComponent(entry.field)}`,
       alt:"",draggable:"false",style:"width:40px;height:40px;","data-lex-no-image":"off"});
     picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
     return picture;
@@ -583,6 +586,8 @@ function commit(row,field,value,control,beforeOverride){
         if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
         else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
+        // An icon or model edit repaints its face (the picture or name beside the number).
+        else if(field.key.startsWith("iconId")||field.key==="equipModelId")render();
         else if(field.key==="aiThinkId"||field.key==="behaviorVariationId"){await refreshMonsterPanels();render();}
         else if(String(state.sort?.key||"").startsWith("pin:"))render();
         else state.pagedView?.refreshValues?.();
@@ -681,6 +686,26 @@ function referencePicker(row,field,face,knownLink){
     origin:()=>navigate(source.tab,source.sub,source.selected),
     accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),face);face.value=String(picked);}});
 }
+// An asset face shows what an Icon or Model ID points to beside its
+// number: the menu picture itself, or the parts binder name. Hover
+// previews it (the icon larger, the model as the Models tab would);
+// clicking opens the containing file. The number stays editable, so
+// no finder joins the face: a picked file could never write back.
+function assetFace(row,field,entry){
+  if(entry.tab!=="models"){
+    if(!(typeof field.value==="number"&&field.value>0))return null;
+    const src=`/api/icon?table=${encodeURIComponent(row.table)}&id=${row.id}&key=${encodeURIComponent(field.key)}&v=${field.value}`;
+    const thumb=el("img",{class:"lex-ds1-shop-icon",src,alt:"",draggable:"false","data-lex-no-image":"off"});
+    const face=hoverable({content:thumb,targetType:"ds1-asset",targetId:entry.id,
+      targetLabel:`${entry.name} in Textures`,
+      preview:()=>el("img",{src,alt:"",draggable:"false",style:"width:80px;height:80px;object-fit:contain;","data-lex-no-image":"off"}),
+      activate:()=>openRecord(entry)});
+    thumb.addEventListener("error",()=>{if(face.isConnected)face.remove();},{once:true});
+    return face;
+  }
+  return hoverable({content:entry.name,targetType:"ds1-asset",targetId:entry.id,
+    targetLabel:`${entry.name} in Models`,preview:()=>assetPreview(row,entry),activate:()=>openRecord(entry)});
+}
 function plainControlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
   const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly||field.disabled};
@@ -777,6 +802,7 @@ function fieldSections(row){
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
     if(help.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())help="";
     const link=field.editable&&links.get(field.key);
+    const fieldAssetLink=(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved)||null;
     let control=controlFor(row,field);
     if(link){
       shownLinks.add(field.key);
@@ -789,6 +815,8 @@ function fieldSections(row){
       readonlyField(dialog.text||`(no dialog text ${dialog.id})`,
         {"aria-label":`${field.label} text`,"data-field-key":field.key,"data-lex-dialog":"",
           title:dialog.text||"",format:false}));
+    const assetDisplay=fieldAssetLink?assetFace(row,field,fieldAssetLink):null;
+    if(assetDisplay)control=el("span",{class:"ds1-asset-field"},control,assetDisplay);
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
     const assetLink=!textLink?(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved):null;
@@ -1051,6 +1079,12 @@ function ammoDefenseSections(fields){
   return buckets.filter(([,body])=>body.length).map(([title,body])=>detailSection({title,body}));
 }
 function itemDetail(groups){
+  // Basics folds into Properties: one tab, the Basics fields first.
+  // Enemies keep their own Basics tab (monsterDetail never merges).
+  if(groups.has("Basics")){
+    const basics=groups.get("Basics");groups.delete("Basics");
+    groups.set("Properties",[...basics,...(groups.get("Properties")||[])]);
+  }
   // Every section is a tab; the tab is the header, so a section tab
   // shows its fields with no repeated section title.
   const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
