@@ -202,3 +202,35 @@ def test_damage_taken_labels_carry_multiplier_unit():
     for index in range(1, 9):
         assert labels[f'partsDamageRate{index}'] == f'Damage taken: Part {index} (x)'
     assert labels['staminaRecoverBaseVel'] == 'Stamina recovery (stamina/second)'
+
+
+PLACED_BOSS_PART_IDS = (273100, 342100, 342200, 343100, 347200, 353100, 353101, 451100,
+                        520100, 520200, 526100, 535200, 535300, 535301, 540000, 540100)
+
+
+def test_placed_rows_are_admitted_by_id_and_other_parts_stay_out():
+    ids = [120000, 342101, *PLACED_BOSS_PART_IDS, 342201, 273101, 502]
+    doc = ItemDocument(make_archive({'NpcParam': ids}))
+    monsters = {row['id'] for row in doc.list_rows('monsters')}
+    bosses = {row['id'] for row in doc.list_rows('bosses')}
+    assert 342101 in monsters and 342101 not in bosses
+    assert doc.schemas['NpcParam']['names'][342101] == 'Bounding Demon of Izalith'
+    assert set(PLACED_BOSS_PART_IDS) <= bosses
+    assert not set(PLACED_BOSS_PART_IDS) & monsters
+    # 342100 keeps its reference name, distinct from 342101.
+    assert doc.schemas['NpcParam']['names'][342100] == 'Undead Dragon - Legs'
+    # An unplaced part of the same boss, a sibling ID and a test row stay shut.
+    for excluded in (342201, 273101, 502):
+        assert not doc.is_monster(excluded) and not doc.is_boss(excluded)
+        with pytest.raises(FormatError, match='not a reviewed'):
+            doc.read_row('NpcParam', excluded)
+
+
+def test_bounding_demon_takes_armor_rework_absorption_edits():
+    base = 40_000_000 + 342101
+    doc = ItemDocument(make_effects_archive(extra_ids=(base,), table_ids={'NpcParam': [120000, 342101]}))
+    _row, start, data = doc._row('NpcParam', 342101)
+    spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == 'spEffectID0')
+    doc.plain[start:start + len(data)] = write_field(data, spec, base, '<')
+    doc.edit('NpcParam', 342101, 'absorption:thunderDamageCutRate', -50)
+    assert doc.row_values('NpcParam', 342101)[0]['absorption:thunderDamageCutRate'] == -50.0

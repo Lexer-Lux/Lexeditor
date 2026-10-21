@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
-from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES, BOSS_FAMILIES, classified_boss
+from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES, BOSS_FAMILIES, classified_boss, NAME_OVERRIDES
 from .attacks import ATTACK_FIELDS, BULLET_GROUPS, AttackReferences
 from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
@@ -503,6 +503,8 @@ def schema(table):
     annotations = {field['Field']: field for field in annotations['Fields']}
     rows = json.loads((METADATA / 'row_names' / (table + '.json')).read_text('utf-8'))
     names = {int(row['ID']): row['Entries'][0] for row in rows['Entries'] if row['Entries']}
+    if table == 'NpcParam':
+        names.update(NAME_OVERRIDES)
     fields = []
     offset = 0
     bit_width = bit_used = bit_start = 0

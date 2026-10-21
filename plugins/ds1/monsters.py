@@ -7,7 +7,10 @@ monsters; bosses fight at types 0 and 1 instead, with Gwyndolin alone at
 the friendly type (2). Mixed families (Capra/Taurus, Pinwheel, Butterfly,
 Sanctuary Guardian) list every variant under Bosses: the rows are one
 enemy, and the tab says which. Boss body parts (tails, heads, arms, legs,
-wings), named NPCs, test rows, and unknown/custom IDs are admitted nowhere.
+wings) are admitted only by the row IDs in PLACED_BOSS_PARTS and
+PLACED_MONSTERS: those rows are placed in vanilla maps and take hits, so
+the player fights them. Every other body part, named NPCs, test rows, and
+unknown/custom IDs are admitted nowhere.
 Egg Carrier's named NPC variant (321001) is type 2 and therefore excluded.
 These are parameter variants, not proof of individual map placements.
 """
@@ -36,7 +39,23 @@ MONSTER_FAMILIES = frozenset({
 })
 
 
+# Placed rows the name families cannot admit, admitted by row ID.
+# 342101 is named "Undead Dragon - Legs" in the pinned reference, but it is
+# the standalone Bounding Demon of Izalith (1,408 HP, placed in Lost Izalith),
+# not a boss limb: NAME_OVERRIDES gives it the name the player knows.
+PLACED_MONSTERS = frozenset({342101})
+NAME_OVERRIDES = {342101: 'Bounding Demon of Izalith'}
+# Boss body parts the player hits in vanilla maps; they list with their boss.
+# 342100 is the 2-HP leg limb of the Undead Dragon boss, distinct from 342101.
+PLACED_BOSS_PARTS = frozenset({
+    273100, 342100, 342200, 343100, 347200, 353100, 353101, 451100, 520100,
+    520200, 526100, 535200, 535300, 535301, 540000, 540100,
+})
+
+
 def classified_monster(row_id, reference_name, npc_type):
+    if row_id in PLACED_MONSTERS:
+        return True
     return row_id >= 120000 and reference_name in MONSTER_FAMILIES and npc_type == 0
 
 
@@ -56,6 +75,8 @@ BOSS_FAMILIES = frozenset({
 
 
 def classified_boss(row_id, reference_name, npc_type):
+    if row_id in PLACED_BOSS_PARTS:
+        return True
     if row_id < 120000 or reference_name not in BOSS_FAMILIES:
         return False
     # Bosses fight as Standard Enemy (0) or boss type (1); Gwyndolin

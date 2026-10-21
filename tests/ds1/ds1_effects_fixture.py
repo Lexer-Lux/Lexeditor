@@ -14,9 +14,9 @@ def wrap(plain, header):
     return bytes(result) + compressed
 
 
-def make_effects_archive(*, effect_size=368, version=2, extra_ids=()):
+def make_effects_archive(*, effect_size=368, version=2, extra_ids=(), table_ids=None):
     """Append an independently specified effect table to the existing fixture."""
-    source = make_archive()
+    source = make_archive(table_ids)
     document = ItemDocument(source)
     references = [
         ("EquipParamWeapon", 100, "residentSpEffectId", 6890),
