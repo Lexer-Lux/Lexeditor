@@ -679,7 +679,8 @@ function controlFor(row,field){
     apply:value=>commit(row,field,value,input)});
 }
 // A record link is a hoverable face: it names the linked record, previews
-// it on hover and opens it on click. The finder button that picks another
+// it on hover and opens it on click, with the target's menu icon when its
+// table has item art. The finder button that picks another
 // target joins it outside the provenance wrapper, where the reference
 // rail cannot cover it. The face carries a value property like the select
 // it replaces, so commits, provenance and detail sync treat it the same way.
@@ -692,7 +693,8 @@ function referenceFace(row,field){
     const label=entry?entry.name:(field.enum[String(value)]||`Unknown (${value})`);
     face.replaceChildren(entry&&entry.resolved?hoverable({content:label,targetType:`ds1-${entry.kind}`,
       targetId:entry.id,targetLabel:`${entry.name} in ${LINK_TAB_LABELS[entry.kind]||"Items"}`,
-      preview:()=>recordPreview(entry),activate:()=>openRecord(entry)})
+      preview:()=>recordPreview(entry),activate:()=>openRecord(entry),
+      icon:ds1IconTables.has(entry.table)?`/api/icon?table=${encodeURIComponent(entry.table)}&id=${encodeURIComponent(entry.id)}`:null})
       :el("span",{class:"lex-readonly-field"},label));
   };
   let current=String(field.value);
@@ -799,6 +801,23 @@ function groupFor(field,table){
   if(/motion|anim|spatk|hold/.test(name))return "Use behavior";
   return "Properties";
 }
+// Starting kits, upgrade materials and drop slots keep each item and its
+// count in parallel fields; the detail shows them as one pair row through
+// the same controlGroup the FF8 weapon upgrade editor uses for its
+// materials, instead of two rows far apart. The row is keyed by the item,
+// pin included, like the flat rows it replaces.
+const ITEM_COUNT_PAIRS={
+  CharaInitParam:{match:/^item_(\d+)$/,count:number=>`itemNum_${number}`,
+    singles:{equip_Arrow:"arrowNum",equip_Bolt:"boltNum",equip_SubArrow:"subArrowNum",equip_SubBolt:"subBoltNum"}},
+  EquipMtrlSetParam:{match:/^materialId(\d+)$/,count:number=>`itemNum${number}`},
+  ItemLotParam:{match:/^lotItemId(\d+)$/,count:number=>`lotItemNum${number}`}};
+function pairCountKey(table,itemKey){
+  const spec=ITEM_COUNT_PAIRS[table];
+  if(!spec)return null;
+  if(spec.singles&&spec.singles[itemKey])return spec.singles[itemKey];
+  const found=spec.match?spec.match.exec(itemKey):null;
+  return found?spec.count(found[1]):null;
+}
 function fieldSections(row){
   const groups=new Map();
   // A field that is itself a record link opens that record from its own row;
@@ -815,6 +834,22 @@ function fieldSections(row){
   // One help bubble serves the whole row: three copies of the same text,
   // one per axis, squeezed the numbers they describe.
   const byKey=new Map((row.fields||[]).map(field=>[field.key,field]));
+  // An item/count pair renders as one row at the item's place; the count
+  // field is consumed and skipped when its own turn comes.
+  const pairedCounts=new Set();
+  const pairFor=field=>{
+    if(field.type!=="enum")return null;
+    const countKey=pairCountKey(row.table,field.key);
+    if(!countKey||pairedCounts.has(countKey))return null;
+    const count=byKey.get(countKey);
+    if(!count||count.type!=="number")return null;
+    // Anything beyond a plain link plus a number stays two rows: a dialog
+    // line, an asset face or a label link has no place in the pair.
+    if(dialogs.has(field.key)||dialogs.has(countKey))return null;
+    const exotic=key=>(row.recordLinks||[]).some(entry=>entry.field===key&&(entry.kind==="asset"||entry.kind==="npc"));
+    if(exotic(field.key)||exotic(countKey))return null;
+    return count;
+  };
   const vectored=new Set();
   for(const [keys,label] of [[["posX","posY","posZ"],"Position"],[["rotX","rotY","rotZ"],"Rotation"],[["scaleX","scaleY","scaleZ"],"Scale"]]){
     if(!keys.every(key=>byKey.has(key)))continue;
@@ -831,6 +866,34 @@ function fieldSections(row){
   }
   for(const field of row.fields){
     if(vectored.has(field.key))continue;
+    if(pairedCounts.has(field.key))continue;
+    const pairCount=pairFor(field);
+    if(pairCount){
+      pairedCounts.add(pairCount.key);
+      const pairGroup=groupFor(field,row.table);if(!groups.has(pairGroup))groups.set(pairGroup,[]);
+      let pairHelp=field.description.trim();
+      if(!field.editable)pairHelp=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
+      if(pairHelp.replace(/[.\s]/g,"").toLowerCase()===field.label.replace(/[.\s]/g,"").toLowerCase())pairHelp="";
+      // The count's own description says how many, which the pairing shows;
+      // only a sentence saying more (materials' "-1 leaves the slot empty")
+      // joins the row's bubble.
+      const extra=pairCount.description.trim().split(/(?<=[.!?])\s+/).filter(sentence=>sentence&&!/how many|the amount|how much/i.test(sentence)).join(" ");
+      if(extra)pairHelp=pairHelp?`${pairHelp} ${extra}`:extra;
+      let pairControl=controlFor(row,field);
+      const pairLink=field.editable&&links.get(field.key);
+      if(pairLink){
+        shownLinks.add(field.key);
+        const face=pairControl.matches?.(".ds1-reference-face")?pairControl
+          :pairControl.querySelector?.(".ds1-reference-face")??pairControl;
+        pairControl=el("span",{class:"ds1-reference-field"},pairControl,referencePicker(row,field,face));
+      }
+      // A pair item is a record link by construction, never a label link,
+      // so the label keeps the item's own name with no hoverable.
+      groups.get(pairGroup).push(detailField({label:shownLabel(field),property:field.key,
+        control:LexeditorUI.controlGroup([pairControl,controlFor(row,pairCount)],{className:"ds1-item-count-pair"}),
+        icon:field.icon||null,help:pairHelp?infoHelp(pairHelp):null}));
+      continue;
+    }
     const group=groupFor(field,row.table);if(!groups.has(group))groups.set(group,[]);
     let help=field.description.trim();
     if(!field.editable)help=field.protectedReason||"This property is preserved. Its choices or behavior are not sufficiently documented for editing.";
@@ -1666,7 +1729,7 @@ const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
   "physicalDef","magicDef","fireDef","lightningDef",
   "str","dex","int","faith","weight","durability",
   "poison","toxic","bleed","curse","poise",
-  "vit","att","end","res","souls","slot","humanity","hp","stamina","mp",
+  "vit","att","end","res","soulLv","souls","slot","humanity","hp","stamina","mp",
   "divine","occult","stability"]);const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
   "EquipParamGoods","Magic","SpEffectParam"]);
 function ds1LabelArt(panel){

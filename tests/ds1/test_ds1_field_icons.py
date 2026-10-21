@@ -60,11 +60,12 @@ def test_starting_class_stats_have_icons():
     assert found['baseDex'] == 'dex'
     assert found['baseMag'] == 'int'
     assert found['baseFai'] == 'faith'
+    assert found['baseDurability'] == 'res'
     assert found['baseLuc'] == 'luc'
     assert found['baseHp'] == 'hp'
     assert found['baseMp'] == 'att'
     assert found['baseSp'] == 'stamina'
-    assert found['soulLv'] is None
+    assert found['soulLv'] == 'soulLv'
     assert found['soul'] == 'souls'
 
 

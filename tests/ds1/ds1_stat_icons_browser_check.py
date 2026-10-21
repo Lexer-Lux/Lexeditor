@@ -3,7 +3,8 @@
 NpcParam vitals and starting-class vitals map to the menu sheet's real
 frames (dark red and dark green boxes, gold outline, plus a mana-mod
 blue MP frame); the detail shows
-the loaded label art, not the vit/end stat glyphs.
+the loaded label art, not the vit/end stat glyphs. Resistance and
+Soul Level take the level-up screen's crossed-arms and face icons.
 """
 import sys
 import tempfile
@@ -13,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from drb_fixture import make_dcx
-from ds1_fixture import make_archive, make_menu_archive, make_text_archive
+from ds1_fixture import make_menu_archive, make_text_archive
+from ds1_stats_fixture import make_stats_archive
 from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1 import texts
 from plugins.ds1.formats import _FIELD_ICONS
@@ -31,17 +33,20 @@ def main():
     assert _FIELD_ICONS[('CharaInitParam', 'baseMp')] == 'mp'
     assert _FIELD_ICONS[('CharaInitParam', 'baseHp')] == 'hp'
     assert _FIELD_ICONS[('CharaInitParam', 'baseSp')] == 'stamina'
+    assert _FIELD_ICONS[('CharaInitParam', 'baseDurability')] == 'res'
+    assert _FIELD_ICONS[('CharaInitParam', 'soulLv')] == 'soulLv'
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-stat-icons-') as folder:
         temp = Path(folder)
         game, mod = temp / 'game', temp / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
-        (game / RELATIVE).write_bytes(make_archive())
+        (game / RELATIVE).write_bytes(make_stats_archive())
         (game / texts.RELATIVE).parent.mkdir(parents=True)
         (game / texts.RELATIVE).write_bytes(make_text_archive())
         (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive())
         menu = game / 'menu'
         menu.mkdir(parents=True)
-        sheet = make_dds_rgba(336, 608, [(255, 0, 0, 255)] * (336 * 608))
+        # The real Menu04_2 size, so every label cell fits, including res.
+        sheet = make_dds_rgba(512, 1024, [(255, 0, 0, 255)] * (512 * 1024))
         (menu / 'menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([('Menu04_2', sheet)])))
         mod.mkdir()
         (mod / MARKER).touch()
@@ -78,6 +83,20 @@ def main():
                             'img.lex-ds1-label-art\'); return img && img.naturalWidth > 0; })()' % field_key)
                         assert field.locator('.lex-type-glyph').count() == 0, \
                             f'{field_key} falls back to a stat glyph'
+                    page.locator('button[data-tab="stats"]').click()
+                    page.wait_for_function('state.tab==="stats" && state.rows.length>0 && !state.error')
+                    page.locator('[data-subtab="starting-classes"]').click()
+                    page.wait_for_function('state.sub==="starting-classes" && state.rows.length>0 && state.row && !state.error')
+                    for field_key, kind in (('baseDurability', 'res'), ('soulLv', 'soulLv')):
+                        field = page.locator(f'[data-lex-property="{field_key}"]')
+                        page.wait_for_selector(f'[data-lex-property="{field_key}"]')
+                        art = field.locator('img.lex-ds1-label-art')
+                        assert art.count() == 1, f'{field_key} shows no label art'
+                        assert f'name={kind}' in (art.get_attribute('src') or ''), \
+                            art.get_attribute('src')
+                        page.wait_for_function(
+                            '(() => { const img = document.querySelector(\'[data-lex-property="%s"] '
+                            'img.lex-ds1-label-art\'); return img && img.naturalWidth > 0; })()' % field_key)
                     assert not errors, f'page errors: {errors[:3]}'
                 finally:
                     browser.close()

@@ -6387,6 +6387,13 @@
       element("td", {}, row.message || "")))));
   const hoverable = options => {
     const target = String(options.targetLabel || options.label || "linked record");
+    // A link may carry its target's picture before its name: an item link
+    // shows the item's icon. A picture that fails to load leaves no placeholder.
+    const hoverIcon = options.icon instanceof Element ? options.icon
+      : options.icon ? element("img", {class: "lex-hoverable-icon", src: String(options.icon),
+        "data-lex-no-image": "off",
+        alt: "", draggable: "false"}) : null;
+    if (hoverIcon?.tagName === "IMG") hoverIcon.addEventListener("error", () => hoverIcon.remove(), {once: true});
     // A link that is also editable waits out a second click before it follows:
     // one click opens the record, two clicks rename it. Every other link keeps
     // its instant click, because waiting is only worth paying where a double
@@ -6418,7 +6425,7 @@
         if (waiting) { clearTimeout(waiting); waiting = null; }
         options.edit(button);
       } : undefined,
-    }, options.content ?? options.label ?? target);
+    }, hoverIcon, options.content ?? options.label ?? target);
     // Flex buttons cannot ellipsize anonymous text nodes.
     [...button.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => {
       const label = element("span", {class: "lex-hoverable-label"}, node.textContent);

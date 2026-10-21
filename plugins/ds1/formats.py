@@ -194,8 +194,8 @@ for _table, _keys, _kinds in (
         ('EquipParamWeapon', ('antSaintDamageRate', 'antWeakA_DamageRate'),
          ('divine', 'occult')),
         ('NpcParam', ('isWeakSaint', 'isWeakA'), ('divine', 'occult')),        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
-         'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul'),
-         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'mp', 'stamina', 'souls')),
+         'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul', 'baseDurability', 'soulLv'),
+         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'mp', 'stamina', 'souls', 'res', 'soulLv')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind

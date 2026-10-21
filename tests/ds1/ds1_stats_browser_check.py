@@ -88,6 +88,23 @@ def main():
                             assert set(keys) == {name for name, _, _ in levelup_gains.INPUTS}, keys
                         else:
                             assert set(keys) == set(STATS_FIELDS[table]), keys
+                        if tab == 'starting-classes':
+                            # Each starting item shares its row with its
+                            # count; no count stands alone anymore.
+                            for item, num in (('item_09', 'itemNum_09'), ('item_10', 'itemNum_10')):
+                                pair = page.locator(f'[data-lex-property="{item}"]')
+                                assert pair.count() == 1
+                                assert pair.locator(f'[data-field-key="{item}"]').count() == 1
+                                assert pair.locator(f'input[data-field-key="{num}"]').count() == 1
+                            assert page.locator('[data-lex-property="itemNum_09"]').count() == 0
+                        elif tab == 'starting-gifts':
+                            pair = page.locator('[data-lex-property="item_01"]')
+                            assert pair.count() == 1
+                            assert pair.locator('input[data-field-key="itemNum_01"]').count() == 1
+                        elif tab == 'upgrade-materials':
+                            pair = page.locator('[data-lex-property="materialId01"]')
+                            assert pair.count() == 1
+                            assert pair.locator('input[data-field-key="itemNum01"]').count() == 1
                         control = reveal(page, page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))

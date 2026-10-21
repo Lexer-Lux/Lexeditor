@@ -7162,6 +7162,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 }
 .lex-hoverable-label { display:block;box-sizing:border-box;padding:.2em .15em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .lex-hoverable > :is(img,svg) { flex-shrink:0; }
+.lex-hoverable > img.lex-hoverable-icon { width:22px; height:22px; object-fit:contain; }
 .lex-hoverable:has(> .lex-stack) { display:flex; width:100%; }
 .lex-hoverable > .lex-stack { width:100%; }
 

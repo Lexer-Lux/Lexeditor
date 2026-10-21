@@ -42,6 +42,9 @@ def main():
                     field = page.locator('[data-field-key="lotItemId01"]:visible')
                     assert field.count() == 1 and field.is_enabled()
                     assert field.evaluate('n=>n.tagName') == 'SELECT'
+                    pair = page.locator('[data-lex-property="lotItemId01"]')
+                    assert pair.count() == 1
+                    assert pair.locator('input[data-field-key="lotItemNum01"]').count() == 1
                     field.select_option('101')
                     page.wait_for_function('state.pending===0 && state.dirty>0', timeout=60000)
                     page.evaluate("navigate('npcs','npcs')")

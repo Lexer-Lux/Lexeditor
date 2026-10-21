@@ -10,8 +10,10 @@ game's own numbering confirms (Stone Greataxe at 198, Bloated Head at 1314).
 Damage, defense and stat labels reuse the menus' own small icons from
 Menu04_2: the equipment screen's swords and shields, the armor screen's
 tolerance icons (poison, toxic, bleed, curse, poise), the level-up
-screen's stat and souls icons, and the attune screen's slot icon. Every
-rectangle is the layout's own sprite rect, read from menu.drb.
+screen's stat, soul-level and souls icons, and the attune screen's slot icon.
+Every rectangle is the layout's own sprite rect, read from menu.drb. Soul Level is
+the status lists' first row (icon_10 on C01_03_bg and R02-04_text, above the
+souls row; the creation detail footer reuses it): the hollow face.
 Humanity rides the item-icon catalog (the Humanity goods picture).
 The sheet's bottom row holds white, black and gold rings: divine takes
 the white ring and occult the black one. Luck stays unmapped: no
@@ -48,7 +50,7 @@ SHEET_RANGES = (('Icon00', 0, 132), ('Icon01', 132, 205), ('Icon10', 1000, 1132)
                 ('Icon30', 3000, 3072), ('Icon40', 4000, 4043))
 # Label art on Menu04_2, in layout pixels: the menus' own cells, each the
 # layout's sprite rect. Tolerance icons are the armor screen's
-# icon_tolerance_* nodes; vit/att/end/res/souls are the level-up
+# icon_tolerance_* nodes; vit/att/end/res/soulLv/souls are the level-up
 # screen's rows; slot is the attune screen's slot icon; souls doubles
 # as the shop price icon (icon_price). Vanilla has no MP frame, so mp
 # reuses the stamina cell and label_png tints it mana-mod blue.
@@ -71,6 +73,7 @@ LABELS = {
     'mp': (126, 258, 168, 300),
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
     'divine': (126, 473, 168, 512), 'occult': (83, 473, 125, 512),
+    'soulLv': (125, 129, 167, 171),
 }
 # Label kinds served from the item-icon catalog instead of the label
 # sheet: the Humanity goods picture (EquipParamGoods row 350).

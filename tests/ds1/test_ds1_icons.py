@@ -83,7 +83,7 @@ def test_label_cells_cover_the_equipment_screen():
                                  'physicalDef', 'magicDef', 'fireDef', 'lightningDef',
                                  'str', 'dex', 'int', 'faith', 'weight', 'durability',
                                  'poison', 'toxic', 'bleed', 'curse', 'poise',
-                                 'vit', 'att', 'end', 'res', 'souls', 'slot',
+                                 'vit', 'att', 'end', 'res', 'soulLv', 'souls', 'slot',
                                  'hp', 'stamina', 'mp', 'divine', 'occult', 'stability'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
@@ -99,6 +99,7 @@ def test_label_cells_cover_the_equipment_screen():
     assert icons.LABELS['att'] == (83, 215, 125, 257)
     assert icons.LABELS['end'] == (83, 301, 125, 343)
     assert icons.LABELS['res'] == (82, 344, 124, 386)
+    assert icons.LABELS['soulLv'] == (125, 129, 167, 171)
     assert icons.LABELS['slot'] == (125, 215, 167, 257)
     assert icons.LABELS['hp'] == (126, 172, 168, 214)
     assert icons.LABELS['stamina'] == (126, 258, 168, 300)
@@ -167,6 +168,8 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('NpcParam', 'mp')] == 'mp'
     assert found[('CharaInitParam', 'baseMp')] == 'mp'
     assert found[('CharaInitParam', 'baseWil')] == 'att'
+    assert found[('CharaInitParam', 'baseDurability')] == 'res'
+    assert found[('CharaInitParam', 'soulLv')] == 'soulLv'
 
 
 def test_mp_label_tints_the_stamina_frame_blue(tmp_path):

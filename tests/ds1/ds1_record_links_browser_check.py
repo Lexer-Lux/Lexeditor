@@ -5,7 +5,8 @@ hoverable face plus a finder button for each record link (clicking the
 face opens the linked record; the button opens the shared thing finder
 to hold-to-choose another target), and the dialog line beside its
 number. An accessory's effect link is picked from the Effects tab and
-opens it from its face.
+opens it from its face. Linked items show their menu icons; a
+missing target stays text with no icon.
 """
 import os
 import sys
@@ -15,7 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tests' / 'ds1'))
+from drb_fixture import make_dcx, make_drb, sprite_shape  # noqa: E402
 from ds1_fixture import make_archive, make_menu_archive  # noqa: E402
+from tpf_fixture import make_dds_rgba, make_tpf  # noqa: E402
 from plugins.ds1 import texts  # noqa: E402
 from plugins.ds1.formats import ItemDocument  # noqa: E402
 from plugins.ds1.store import RELATIVE, MARKER  # noqa: E402
@@ -78,6 +81,9 @@ def main():
     poke(document, 'EquipParamGoods', 100, 'yesNoDialogMessageId', 10010710)
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 2)
     poke(document, 'EquipParamAccessory', 100, 'refId', 101)
+    poke(document, 'EquipParamGoods', 100, 'iconId', 1)
+    poke(document, 'Magic', 102, 'iconId', 1)
+    poke(document, 'EquipParamGoods', 103, 'magicId', 400)
     raw = document.export()
     menu = make_menu_archive(extra={'Event_text_.fmg': {10010710: 'Use it? Yes or no?'}})
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-links-') as temp:
@@ -87,6 +93,12 @@ def main():
         (game / RELATIVE).write_bytes(raw)
         (game / texts.MENU_RELATIVE).parent.mkdir(parents=True)
         (game / texts.MENU_RELATIVE).write_bytes(menu)
+        menu_dir = game / 'menu'
+        menu_dir.mkdir(parents=True)
+        menu_dir.joinpath('menu.drb').write_bytes(make_drb(['Icon00'], {
+            'Icon': [('EquIcon_0001', sprite_shape((0, 0, 0, 0), (83, 1, 163, 91), 0))]}))
+        sheet = make_dds_rgba(512, 512, [(0, 255, 0, 255)] * (512 * 512))
+        menu_dir.joinpath('menu_0.tpf.dcx').write_bytes(make_dcx(make_tpf([('Icon00', sheet)])))
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game),
@@ -109,6 +121,20 @@ def main():
                             '.ds1-reference-field .ds1-find-reference:visible').count() >= 1
                     show_face(page, 'replaceItemId')
                     assert face(page, 'replaceItemId').locator('.lex-hoverable').count() == 1
+                    # Linked items show their menu icons once the menu files are installed.
+                    for key in ('replaceItemId', 'magicId'):
+                        show_face(page, key)
+                        icon = face(page, key).locator('.lex-hoverable img.lex-hoverable-icon')
+                        assert icon.count() == 1, key
+                        assert (icon.get_attribute('src') or '').startswith('/api/icon?table='), key
+                        page.wait_for_function('(key) => { const img = document.querySelector(`.ds1-reference-face[data-field-key="${key}"] .lex-hoverable img.lex-hoverable-icon`); return img && img.naturalWidth > 0; }', arg=key)
+                    # A missing target stays text: no hoverable, no icon.
+                    select(page, 'EquipParamGoods', 103)
+                    show_face(page, 'magicId')
+                    missing = face(page, 'magicId')
+                    assert missing.locator('.lex-hoverable').count() == 0
+                    assert missing.locator('img').count() == 0
+                    select(page, 'EquipParamGoods', 100)
                     # Hovering previews the linked record; clicking opens it.
                     show_face(page, 'magicId')
                     face(page, 'magicId').locator('.lex-hoverable').hover()
