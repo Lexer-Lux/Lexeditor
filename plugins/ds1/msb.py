@@ -41,15 +41,17 @@ class MsbError(FormatError):
 
 
 PLACEMENT_FIELDS = {
-    'posX': ('Position X', 'Position', 'Position along the X axis, in metres.'),
-    'posY': ('Position Y', 'Position', 'Position along the Y axis, in metres.'),
-    'posZ': ('Position Z', 'Position', 'Position along the Z axis, in metres.'),
-    'rotX': ('Rotation X', 'Rotation', 'Rotation around the X axis, in degrees.'),
-    'rotY': ('Rotation Y', 'Rotation', 'Rotation around the Y axis, in degrees.'),
-    'rotZ': ('Rotation Z', 'Rotation', 'Rotation around the Z axis, in degrees.'),
-    'scaleX': ('Scale X', 'Scale', 'Scale along the X axis, as a multiplier. 1 is full size.'),
-    'scaleY': ('Scale Y', 'Scale', 'Scale along the Y axis, as a multiplier. 1 is full size.'),
-    'scaleZ': ('Scale Z', 'Scale', 'Scale along the Z axis, as a multiplier. 1 is full size.'),
+    # One text per vector: the UI shows each triple as one row with one
+    # help bubble, so all three axes share the row's wording.
+    'posX': ('Position X', 'Position', 'Position along each axis, in metres.'),
+    'posY': ('Position Y', 'Position', 'Position along each axis, in metres.'),
+    'posZ': ('Position Z', 'Position', 'Position along each axis, in metres.'),
+    'rotX': ('Rotation X', 'Rotation', 'Rotation around each axis, in degrees.'),
+    'rotY': ('Rotation Y', 'Rotation', 'Rotation around each axis, in degrees.'),
+    'rotZ': ('Rotation Z', 'Rotation', 'Rotation around each axis, in degrees.'),
+    'scaleX': ('Scale X', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
+    'scaleY': ('Scale Y', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
+    'scaleZ': ('Scale Z', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
     'npcId': ('Enemy', 'Placement', "Which enemy's stats and AI this placement uses. The model stays the same."),
 }
 FLOAT_FIELDS = {key: offset for key, offset in
@@ -353,10 +355,16 @@ class MsbDocument:
         for key in ('posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ',
                     'scaleX', 'scaleY', 'scaleZ'):
             label, group, description = PLACEMENT_FIELDS[key]
+            # Display precision only: a float32's decimal expansion carries
+            # dust past three places (179.99998 for 180 degrees). The stored
+            # bytes keep full precision; only the shown value is rounded.
+            # Added placements have no vanilla value to round.
+            raw_vanilla = self._original_value(part, key)
             fields.append({'key': key, 'label': label, 'description': description, 'group': group,
-                           'dtype': 'f32', 'value': self._readback(part, key), 'type': 'number',
+                           'dtype': 'f32', 'value': round(self._readback(part, key), 3), 'type': 'number',
                            'minimum': None, 'maximum': None,
-                           'enum': {}, 'editable': True, 'vanilla': self._original_value(part, key),
+                           'enum': {}, 'editable': True,
+                           'vanilla': None if raw_vanilla is None else round(raw_vanilla, 3),
                            'sliderMin': None, 'sliderMax': None})
         if part['type'] in ENEMY_TYPES:
             label, group, description = PLACEMENT_FIELDS['npcId']

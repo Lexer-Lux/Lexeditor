@@ -510,15 +510,12 @@ def test_mods_detail_switch_fits_its_header(page):
         }""")
         box, head, actions = geometry["box"], geometry["head"], geometry["actions"]
         assert box["width"] == box["height"] > 0, box
+        # Compact and fixed, roomy header or short: the name owns the
+        # heading's width, and controls no longer grow with it.
+        assert abs(box["height"] - 28) <= 1, (box, head)
         assert box["y"] >= head["y"] - 1 and box["y"] + box["height"] <= head["y"] + head["height"] + 1, (box, head)
         assert box["x"] >= head["x"] and box["x"] + box["width"] <= head["x"] + head["width"], (box, head)
-        if not short:
-            # A roomy header gets a roomy switch, not a fixed small box.
-            assert box["height"] >= 21, (box, head)
-            assert abs(actions["height"] - 10 - box["height"]) <= 2, (box, actions)
-            top, bottom = box["y"] - actions["y"], actions["y"] + actions["height"] - box["y"] - box["height"]
-            assert abs(top - bottom) <= 2, (box, actions)
-        # A short header shrinks the switch instead of clipping it.
+        # A short header keeps the same fixed switch without clipping it.
         page.evaluate("""() => {
           const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
           head.style.padding = "0";

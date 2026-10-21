@@ -805,6 +805,8 @@ function fieldSections(row){
   // Placement coordinates ride one row per vector: Position, then
   // Rotation in degrees, then Scale. Detection is by field, not by
   // tab, so any record carrying a coordinate triple renders the same way.
+  // One help bubble serves the whole row: three copies of the same text,
+  // one per axis, squeezed the numbers they describe.
   const byKey=new Map((row.fields||[]).map(field=>[field.key,field]));
   const vectored=new Set();
   for(const [keys,label] of [[["posX","posY","posZ"],"Position"],[["rotX","rotY","rotZ"],"Rotation"],[["scaleX","scaleY","scaleZ"],"Scale"]]){
@@ -812,12 +814,13 @@ function fieldSections(row){
     keys.forEach(key=>vectored.add(key));
     const entries=keys.map(key=>{
       const field=byKey.get(key);
-      return {label:key.slice(-1),control:controlFor(row,field),title:field.label,
-        help:field.description&&field.description.trim()?infoHelp(field.description.trim()):null};
+      return {label:key.slice(-1),control:controlFor(row,field),title:field.label};
     });
     const group=groupFor(byKey.get(keys[0]),row.table);
     if(!groups.has(group))groups.set(group,[]);
-    groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3,nowrap:true})}));
+    const vectorHelp=(byKey.get(keys[0]).description||"").trim();
+    groups.get(group).push(detailField({label,control:LexeditorUI.multiNumberRow(entries,{columns:3,nowrap:true}),
+      help:vectorHelp?infoHelp(vectorHelp):null}));
   }
   for(const field of row.fields){
     if(vectored.has(field.key))continue;
@@ -1137,7 +1140,10 @@ function effectDetail(groups){
     change:id=>{state.effectTab=id;render();},content:groups.get(section.label)});
 }
 function msbDetail(row,groups){
-  // Identity first: the placement's own facts above its coordinates.
+  // Coordinates first, with no header above them: the placement's own
+  // position, rotation and scale are the instance, and the Placement
+  // group below names what stands there.
+  const vectors=["Position","Rotation","Scale"].flatMap(title=>groups.get(title)||[]);
   const identity=[
     // (no Name row: the heading owns the name, like every other record)
     detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
@@ -1148,8 +1154,8 @@ function msbDetail(row,groups){
     detailField({label:"AI table",control:readonlyField(row.think,{format:false}),
       help:infoHelp("Which AI table drives this enemy.")}));
   const ordered=new Map([["Placement",[...identity,...(groups.get("Placement")||[])]]]);
-  for(const [title,body] of groups)if(title!=="Placement")ordered.set(title,body);
-  return [...ordered].map(([title,body])=>detailSection({title,body}));
+  for(const [title,body] of groups)if(title!=="Placement"&&title!=="Position"&&title!=="Rotation"&&title!=="Scale")ordered.set(title,body);
+  return [...vectors,...[...ordered].map(([title,body])=>detailSection({title,body}))];
 }
 function formatAssetSize(size){
   if(!(size>=0))return "Unknown size";

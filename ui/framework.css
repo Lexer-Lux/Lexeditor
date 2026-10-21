@@ -1062,21 +1062,16 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 4px;
 }
-/* A header switch fills its header: it stretches to the actions area,
-   staying a centred square with equal margins, so a roomy header gets
-   a roomy switch. A fixed 18px box sat small in every header.
-   Short headers cap it instead of clipping it.
-   The tick scales with the box (the 10:6:2 proportions of the 18px box
-   it was drawn for), so the mark fills a roomy switch too.
+/* A header switch is the same compact fixed square as the header's icon
+   buttons. A switch that stretched to fill the header grew with it and
+   squeezed the record name like the buttons did. The tick scales with
+   the box (the 10:6:2 proportions of the 18px box it was drawn for).
 */
 .lex-detail-panel-actions > input[type="checkbox"] {
-  align-self:stretch;
-  width:auto;
-  height:auto;
-  max-height:100%;
-  min-height:16px;
-  aspect-ratio:1;
-  margin:5px;
+  flex:none;
+  width:28px;
+  height:28px;
+  margin:0;
   container-type:size;
 }
 /* A fractional cqw border truncates instead of rounding, so a switch
@@ -1089,29 +1084,24 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */
-/* A header icon button fills its header the way the switch does: it
-   stretches to the actions area, staying a centred square with equal
-   margins, and its picture scales with it. One global rule, not one per
-   panel: whatever icons a header carries behave the same. */
+/* A header icon button is a compact fixed square, like the icon buttons
+   elsewhere in the app. Buttons that stretched to fill the header grew to
+   sixty-pixel squares and squeezed the record name to a sliver. */
 .lex-detail-panel-actions > .lex-header-icon {
-  align-self:stretch;
-  width:auto;
-  height:auto;
-  max-height:100%;
-  min-width:0;
-  min-height:16px;
-  aspect-ratio:1;
-  margin:2px;
-  padding:0;
+  flex:none;
+  width:28px;
+  height:28px;
+  margin:0;
+  padding:3px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   overflow:hidden;
-  font-size:var(--lex-detail-title-size,clamp(21px,2.5vw,32px));
+  font-size:16px;
 }
 .lex-detail-panel-actions > .lex-header-icon > svg {
-  width:0.95em;
-  height:0.95em;
+  width:16px;
+  height:16px;
   flex:none;
 }
 .lex-detail-panel-actions > .lex-header-icon:not(:has(> svg)) {
@@ -6349,9 +6339,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part:last-child { flex:1 1 auto; }
 .lex-column-list-cell .lex-detail-parts-fixed-first > .lex-detail-part:first-child { flex:none; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
-/* A coordinate triple stays one row even in a narrow pane: X, Y and Z are
-   read as one value, so wrapping them apart reads as three properties. */
+/* A coordinate triple stays one row while its numbers fit: X, Y and Z are
+   read as one value. Past that the axes stack, one per row: three readable
+   rows beat one row of clipped boxes. */
 .lex-detail-parts-nowrap { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
+.lex-detail-field:has(> .lex-detail-field-control > .lex-detail-parts-nowrap) > .lex-detail-field-control {
+  container:lex-vector-row / inline-size;
+}
+@container lex-vector-row (max-width:17em) {
+  .lex-detail-parts-nowrap { grid-template-columns:minmax(0,1fr); }
+}
 /* The lane keeps its name: with three parts across, the box minimum
    would otherwise squeeze single-letter names to nothing. */
 .lex-detail-parts-nowrap > .lex-detail-part { grid-template-columns:auto auto minmax(0,1fr); }
