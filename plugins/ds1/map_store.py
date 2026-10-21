@@ -435,28 +435,30 @@ class MapStore:
             return part_name
         return names.get(npc, "") or f"Unknown ({npc})"
 
-    def _title(self, map_name, part_name, npc, names):
-        """A placement's title: who stands there and in which map. The
+    def _title(self, part_name, npc, names, displays):
+        """A placement's title: who stands there, never the map. The map
+        belongs in the list's own Map column (values "mapNames"). The
         bare part name stays pinnable under values, never in the title."""
-        return f"{self._who(part_name, npc, names)} \u2014 {self.display_name(map_name)}"
+        return strip_owner_suffix(self._who(part_name, npc, names), displays)
 
     def _placement_row(self, map_name, placement, names, types, displays=None):
         npc = placement.get("npc")
         if displays is None:
             displays = self.place_display_names()
         enemy = names.get(npc, "") if npc is not None else ""
+        who = self._title(placement["name"], npc, names, displays)
         values = {"map": map_name, "part": placement["name"], "kind": placement["kind"],
                   "model": placement["model"],
                   "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
                   "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
                   "scaleX": placement["scale"][0], "scaleY": placement["scale"][1], "scaleZ": placement["scale"][2],
                   "npcId": npc, "npcType": types.get(npc) if npc is not None else None,
-                  "who": strip_owner_suffix(self._who(placement["name"], npc, names), displays),
+                  "who": who,
                   "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
         modified = self.get(map_name).placement_modified((placement["type"], placement["partId"]))
         return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
-                "name": self._title(map_name, placement["name"], npc, names),
+                "name": who,
                 "range": placement["name"], "values": values, "display": display,
                 "modified": modified}
 
@@ -508,8 +510,8 @@ class MapStore:
             originals = {}
         row.update(id=f"{part_key[0]}:{part_key[1]}", table=map_name, map=map_name)
         npc = next((item["value"] for item in row["fields"] if item["key"] == "npcId"), None)
-        row["shortName"] = self._who(row["name"], npc, names)
-        row["name"] = self._title(map_name, row["name"], npc, names)
+        row["shortName"] = self._title(row["name"], npc, names, self.place_display_names())
+        row["name"] = row["shortName"]
         for item in row["fields"]:
             if item["key"] in originals:
                 item["vanilla"] = originals[item["key"]]

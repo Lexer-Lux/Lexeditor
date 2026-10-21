@@ -30,12 +30,13 @@ def setup(tmp_path, maps=(MAP,), npc=120000):
 def test_list_rows_link_enemy_names_with_unknown_fallback(tmp_path):
     _game, _mod, store = setup(tmp_path, npc=120000)
     rows = store.list_rows()
-    assert [(row["id"], row["table"], row["name"]) for row in rows] == [("2:0", MAP, "Rat \u2014 " + MAP)]
+    assert [(row["id"], row["table"], row["name"]) for row in rows] == [("2:0", MAP, "Rat")]
     assert rows[0]["values"]["npcId"] == 120000 and rows[0]["display"]["npcId"]
     assert rows[0]["values"]["part"] == "enemy0"
+    assert rows[0]["values"]["mapNames"] == [MAP]
     _game, _mod, dangling = setup(tmp_path / "other", npc=999001)
     assert dangling.list_rows()[0]["display"]["npcId"] == "Unknown (999001)"
-    assert dangling.list_rows()[0]["name"] == "Unknown (999001) \u2014 " + MAP
+    assert dangling.list_rows()[0]["name"] == "Unknown (999001)"
 
 
 def test_list_rows_carry_npc_type_for_the_directory_split(tmp_path):
@@ -56,7 +57,7 @@ def test_read_returns_enum_choices_and_vanilla_values(tmp_path):
     _game, _mod, store = setup(tmp_path)
     row = store.read(MAP, "2:0")
     assert (row["id"], row["table"], row["map"]) == ("2:0", MAP, MAP)
-    assert row["name"] == "Rat \u2014 " + MAP
+    assert row["name"] == "Rat"
     assert row["shortName"] == "Rat"
     npc = next(item for item in row["fields"] if item["key"] == "npcId")
     assert npc["type"] == "enum" and npc["enum"]["120000"] and npc["vanilla"] == 120000

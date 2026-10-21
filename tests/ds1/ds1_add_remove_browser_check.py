@@ -80,7 +80,7 @@ def main():
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
                     page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===3")
                     first = page.locator('.lex-list-row[data-key="%s:2:0"]' % MAP)
-                    assert "Rat \u2014 " + MAP in first.inner_text()
+                    assert first.inner_text().split() == ["Rat"]
                     first.click()
                     page.wait_for_function('state.row?.id==="2:0" && !state.error')
                     page.locator('[data-tabstrip-id="selection"]').click()
@@ -102,7 +102,7 @@ def main():
                     assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 4
                     page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===4")
                     dupe = page.locator('.lex-list-row[data-key="%s:2:1"]' % MAP)
-                    assert "Rat \u2014 " + MAP in dupe.inner_text()
+                    assert dupe.inner_text().split() == ["Rat"]
                     dupe.click()
                     page.wait_for_function('state.row?.id==="2:1" && !state.error')
                     page.locator('[data-tabstrip-id="selection"]').click()

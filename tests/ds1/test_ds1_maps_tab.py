@@ -56,3 +56,18 @@ def test_selection_avoids_remount():
     body = source[source.index('async function selectPlacement'):source.index('function refreshMapSide')]
     assert 'refreshMapSide();' in body
     assert 'render();' not in body.replace('renderMaps();', '')
+
+
+def test_placements_list_hides_its_map_column_on_one_map():
+    source = editor()
+    pane = source[source.index('function placementsPane(){'):source.index('function animCharMatches(){')]
+    assert 'label:"Map"' in pane
+    assert 'new Set(here.map(row=>row.table)).size>1' in pane
+    assert 'dirRowMap(row)' in pane
+    assert 'Show ${row.name} in the map viewport' in pane
+
+
+def test_placements_search_still_matches_the_map_name():
+    source = editor()
+    haystack = source[source.index('const haystack=row=>{'):source.index('const filtered=state.rows.filter')]
+    assert 'mapNames' in haystack

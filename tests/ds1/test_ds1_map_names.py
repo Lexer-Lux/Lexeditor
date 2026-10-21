@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive, make_text_archive
+from msb_fixture import build_msb
 from plugins.ds1 import texts
 from plugins.ds1.map_store import (
     MapStore, describe_directory_name, describe_treasure_name, strip_owner_suffix)
@@ -128,3 +129,32 @@ def test_describe_treasure_falls_back_to_the_whole_name(tmp_path):
         'owner': '', 'item': 'church gate lever', 'mapNames': ['Undead Burg']}
     assert maps.describe_treasure('Treasure Chest') == {
         'owner': '', 'item': 'Treasure Chest', 'mapNames': []}
+
+
+def make_placed_maps(root):
+    game, mod = root / 'game', root / 'mod'
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(make_archive())
+    blob = make_text_archive(extra={'Place_name_.fmg': dict(PLACES)})
+    (game / texts.RELATIVE).parent.mkdir(parents=True)
+    (game / texts.RELATIVE).write_bytes(blob)
+    (game / MAP_DIR).mkdir(parents=True)
+    (game / MAP_DIR / 'm10_01_00_00.msb').write_bytes(
+        build_msb(parts=(('enemy', 2, 0, 0, 120000),)))
+    mod.mkdir()
+    (mod / MARKER).touch()
+    store = ItemStore(game, mod, False)
+    store.load()
+    return MapStore(game, mod, False, store)
+
+
+def test_placement_title_names_who_without_the_map(tmp_path):
+    maps = make_placed_maps(tmp_path)
+    (row,) = maps.list_rows()
+    assert row['name'] == 'Rat'
+    assert row['values']['who'] == 'Rat'
+    assert row['values']['mapNames'] == ['Undead Burg']
+    assert row['values']['part'] == 'enemy0'
+    detail = maps.read('m10_01_00_00.msb', '2:0')
+    assert detail['name'] == 'Rat'
+    assert detail['shortName'] == 'Rat'

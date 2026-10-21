@@ -62,7 +62,7 @@ def test_map_undo_is_surgical():
                     page.wait_for_function('state.mapTab==="placements"')
                     page.get_by_role('searchbox', name='Search placements').fill('Rat')
                     page.wait_for_function(
-                        'state.selected.endsWith(":0") && state.row?.name.startsWith("Rat ")')
+                        'state.selected.endsWith(":0") && state.row?.name==="Rat"')
                     page.locator('[data-tabstrip-id="selection"]').click()
                     field = page.locator('[data-field-key="posX"]:visible')
                     before = field.input_value()
@@ -117,7 +117,7 @@ def test_map_undo_is_surgical():
                     assert any('tab=viewport' in url for url in requests), requests
                     title = page.evaluate(
                         'state.rows.find(r=>r.table==="%s" && r.id==="2:0").name' % MAP)
-                    assert title.startswith('Rat '), title
+                    assert title == 'Rat', title
                 finally:
                     browser.close()
         finally:

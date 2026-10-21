@@ -123,9 +123,10 @@ function sortedRows(){
   const query=state.query.toLowerCase();
   // The search reads the whole row: names, ids, ranges and every
   // property value, raw and formatted. A behavior that costs 5 stamina
-  // answers '5' even when no name holds a 5.
+  // answers '5' even when no name holds a 5. Placement titles name no
+  // map, so their map names join the haystack outright.
   const haystack=row=>{
-    const parts=[row.id,row.name,row.range||""];
+    const parts=[row.id,row.name,row.range||"",...((row.values?.mapNames)||[])];
     for(const source of [row.values,row.display]){
       if(!source||typeof source!=="object")continue;
       for(const value of Object.values(source)){
@@ -2474,9 +2475,14 @@ function placementsPane(){
     selectPlacement(key(row),false);
   };
   selectVisibleRecord=select;
-  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
-    columns:[{key:"name",label:"Name",grow:1},
-      goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row)))]});
+  const columns=[{key:"name",label:"Name",grow:1}];
+  // Names never carry the map: it gets its own column, shared with the
+  // directory, but only when the rows span more than one map. This list
+  // is scoped to the open map, so the column stays hidden here.
+  if(new Set(here.map(row=>row.table)).size>1)columns.push({key:"map",label:"Map",grow:1,
+    sortValue:row=>dirRowMap(row),render:row=>dirRowMap(row)});
+  columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",columns});
   const pager=LexeditorUI.compactPager({pages,page:state.page,total:here.length,pageSize:size,
     change:value=>{state.page=value;refreshMapSide();}});
   const both=LexeditorUI.pagedPane(list,pager);

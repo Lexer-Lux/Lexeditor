@@ -92,17 +92,17 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
                     if not root:
-                        titled = ["Rat \u2014 " + MAP, "Small Rat \u2014 " + MAP,
-                                  "chest0 \u2014 " + MAP, "player0 \u2014 " + MAP]
+                        titled = ["Rat", "Small Rat",
+                                  "chest0", "player0"]
                         assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == sorted(titled)
                     else:
                         assert page.evaluate("state.rows.length") > 0
                     page.get_by_role("searchbox", name="Search placements").fill(enemy["name"])
                     if not root:
                         page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.name===e.name",
-                                               arg={"key": ":" + key.split(":")[1], "name": "Rat \u2014 " + MAP})
+                                               arg={"key": ":" + key.split(":")[1], "name": "Rat"})
                     else:
-                        page.wait_for_function("(e) => state.selected.endsWith(e.key) && (state.row?.name||'').includes(e.map)",
+                        page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.table===e.map",
                                                arg={"key": ":" + key.split(":")[1], "map": map_name})
                     page.locator('[data-tabstrip-id="selection"]').click()
                     title = page.locator(".lex-detail-panel-title").inner_text()
@@ -150,9 +150,9 @@ def main():
                         box.click(); box.press("ControlOrMeta+a"); box.press("Backspace"); box.fill(chest["name"])
                         if not root:
                             page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.name===c.name",
-                                                   arg={"partId": chest["partId"], "name": "chest0 \u2014 " + MAP})
+                                                   arg={"partId": chest["partId"], "name": "chest0"})
                         else:
-                            page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && (state.row?.name||'').includes(c.map)",
+                            page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.table===c.map",
                                                    arg={"partId": chest["partId"], "map": map_name})
                         page.locator('[data-tabstrip-id="selection"]').click()
                         assert page.locator('[data-field-key="npcId"]:visible').count() == 0
