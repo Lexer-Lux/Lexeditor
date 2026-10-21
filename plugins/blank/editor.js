@@ -113,7 +113,7 @@
     threePage=Math.max(0,Math.min(threePage,pages-1));
     const shown=all.slice(threePage*size,threePage*size+size);
     return LexeditorUI.pagedPane(tablePanel(shown),
-      pager({page:threePage,pages,total:all.length,pageSize:size,noun:"records",
+      pager({inline:true,page:threePage,pages,total:all.length,pageSize:size,noun:"records",
         change:next=>{threePage=next;render()}}));
   }
   function recordPanel(withPins=true,row=selectedRow()){

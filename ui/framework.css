@@ -4516,8 +4516,12 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) { display:grid; place-item
 .lex-record-card-action > button svg,
 button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1em; }
 /* ---- Paged panes and graph grids --------------------------------------- */
-.lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; overflow:hidden; gap:var(--lex-panel-gap); }
+/* The one column fills the pane but never outgrows it: an auto column
+   sized to the pager's min-content and pushed the bar past the panel's
+   edge in narrow side panels. Both children may shrink to the track. */
+.lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; grid-template-columns:minmax(0,1fr); min-height:0; overflow:hidden; gap:var(--lex-panel-gap); }
 .lex-paged-pane-content { min-width:0; min-height:0; overflow:auto; }
+.lex-paged-pane > .lex-pager { min-width:0; }
 /* A fitted table fills the paged pane stretched track: flex sizing is
    meaningless inside the block wrapper, so without this the 1fr tracks
    never engage and the leftover pools between the rows and the pager. */

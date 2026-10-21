@@ -10,7 +10,8 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
-  dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null};
+  dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
+  dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
@@ -1805,7 +1806,7 @@ function submitTaeForm(form){
       state.taeForm=null;state.selected=key(result.row);state.animQuery="";
       await loadItems();
       const index=animListMatches().findIndex(row=>key(row)===state.selected);
-      state.animPage=Math.max(0,Math.floor(index/animPaneSize("events")));
+      state.animPage=Math.max(0,Math.floor(index/paneSize("events")));
     }catch(error){
       state.taeForm=null;await refreshState();await loadItems();notify(error);
     }finally{
@@ -2265,6 +2266,7 @@ function refreshMapSide(){
   if(state.tab!=="maps")return;
   const side=document.querySelector("[data-maps-side]");
   if(!side){render();return;}
+  stopPaneFit(side);
   side.replaceChildren(mapsStrip(),mapsPane());
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
@@ -2316,6 +2318,7 @@ function refreshDirectory(){
   if(state.tab!=="maps")return;
   const pane=document.querySelector("[data-maps-dir]");
   if(!pane){render();return;}
+  stopPaneFit(pane);
   pane.replaceChildren(directoryStrip(),...directoryList());
 }
 function directoryStrip(){
@@ -2337,9 +2340,10 @@ function directoryLocalRow(){
 }
 function directoryList(){
   const matches=directoryMatches();
-  const pages=Math.max(1,Math.ceil(matches.length/state.pageSize));
+  const size=paneSize("dir");
+  const pages=Math.max(1,Math.ceil(matches.length/size));
   if(state.dirPage>pages-1)state.dirPage=pages-1;
-  const shown=matches.slice(state.dirPage*state.pageSize,(state.dirPage+1)*state.pageSize);
+  const shown=matches.slice(state.dirPage*size,(state.dirPage+1)*size);
   const param=DIRECTORY_PARAM_TABS.has(state.dirTab);
   const select=(row,event)=>{
     if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
@@ -2357,13 +2361,17 @@ function directoryList(){
   else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${dirRowName(row)} drops`,row=>goToDrop(row.id)));
   // Search on its own row up top, like the animations panes; the pager
   // below the list only pages and filters.
+  const list=columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"});
+  const pager=LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:size,
+    filters:[directoryLocalRow()],
+    change:value=>{state.dirPage=value;refreshDirectory();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizePaneRows(list,size,false);
+  fitPaneList(list,"dir",size,both);
   return [LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
       change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
-    LexeditorUI.stack(
-      columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"}),
-      LexeditorUI.compactPager({pages,page:state.dirPage,total:matches.length,pageSize:state.pageSize,
-        filters:[directoryLocalRow()],
-        change:value=>{state.dirPage=value;refreshDirectory();}}))];
+    both];
 }
 async function selectDirectoryParam(row){
   if(key(row)===state.selected&&state.mapTab==="selection")return;
@@ -2386,24 +2394,58 @@ function mapsPane(){
 }
 function mapsListPane(){
   selectVisibleRecord=null;
-  return LexeditorUI.stack(
-    columnList({rows:state.mapList,key:row=>row.id,selected:state.mapId,select:row=>chooseMap(row.id),
-      columns:[
-        {key:"name",label:"Name",sortable:true,grow:1},
-        {key:"npcs",label:"NPCs",sortable:true,numeric:true,sortValue:row=>row.values.npcs,render:row=>String(row.values.npcs)},
-        {key:"drops",label:"Drops",sortable:true,numeric:true,sortValue:row=>row.values.drops,render:row=>String(row.values.drops)},
-        {key:"enemies",label:"Enemies",sortable:true,numeric:true,sortValue:row=>row.values.enemies,render:row=>String(row.values.enemies)}]}));
+  const columns=[
+    {key:"name",label:"Name",sortable:true,grow:1},
+    {key:"npcs",label:"NPCs",sortable:true,numeric:true,sortValue:row=>row.values.npcs,render:row=>String(row.values.npcs)},
+    {key:"drops",label:"Drops",sortable:true,numeric:true,sortValue:row=>row.values.drops,render:row=>String(row.values.drops)},
+    {key:"enemies",label:"Enemies",sortable:true,numeric:true,sortValue:row=>row.values.enemies,render:row=>String(row.values.enemies)}];
+  // The order belongs to the whole list, not to the page: sort before slicing.
+  const sort=state.mapListSort;
+  const here=sort?[...state.mapList].sort((left,right)=>{
+    const column=columns.find(entry=>entry.key===sort.key)||columns[0];
+    const value=row=>typeof column.sortValue==="function"?column.sortValue(row):row[column.key];
+    const first=value(left),second=value(right);
+    const result=typeof first==="number"&&typeof second==="number"?first-second
+      :String(first).localeCompare(String(second),undefined,{numeric:true,sensitivity:"base"});
+    return result*sort.dir;
+  }):state.mapList;
+  const size=paneSize("maps");
+  const pages=Math.max(1,Math.ceil(here.length/size));
+  if(state.mapListPage>pages-1)state.mapListPage=pages-1;
+  const shown=here.slice(state.mapListPage*size,(state.mapListPage+1)*size);
+  const list=columnList({rows:shown,key:row=>row.id,selected:state.mapId,select:row=>chooseMap(row.id),
+    class:"lex-list-fill",sortState:sort||undefined,
+    sort:columnKey=>{state.mapListSort={key:columnKey,
+      dir:state.mapListSort?.key===columnKey?-state.mapListSort.dir:1};state.mapListPage=0;refreshMapSide();},
+    columns});
+  const pager=LexeditorUI.compactPager({pages,page:state.mapListPage,total:here.length,pageSize:size,
+    change:value=>{state.mapListPage=value;refreshMapSide();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizePaneRows(list,size,false);
+  fitPaneList(list,"maps",size,both);
+  return both;
 }
 function placementsPane(){
   const here=sortedRows().filter(row=>row.table===state.mapId);
-  const pages=Math.max(1,Math.ceil(here.length/state.pageSize));
+  const size=paneSize("placements");
+  const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.page>pages-1)state.page=pages-1;
-  const shown=here.slice(state.page*state.pageSize,(state.page+1)*state.pageSize);
+  const shown=here.slice(state.page*size,(state.page+1)*size);
   const select=(row,event)=>{
     if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
     selectPlacement(key(row),false);
   };
   selectVisibleRecord=select;
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
+    columns:[{key:"name",label:"Name",grow:1},
+      goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row)))]});
+  const pager=LexeditorUI.compactPager({pages,page:state.page,total:here.length,pageSize:size,
+    change:value=>{state.page=value;refreshMapSide();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizePaneRows(list,size,false);
+  fitPaneList(list,"placements",size,both);
   return LexeditorUI.stack(
     LexeditorUI.bottomSearch({key:"maps-placements",value:state.query,label:"Search placements",
       change:value=>{state.query=value;state.page=0;
@@ -2416,11 +2458,7 @@ function placementsPane(){
           void loadDetail().catch(notify);
         }
         refreshMapSide();}}),
-    columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
-      columns:[{key:"name",label:"Name",grow:1},
-        goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row)))]}),
-    LexeditorUI.pager({pages,page:state.page,total:here.length,pageSize:state.pageSize,
-      change:value=>{state.page=value;refreshMapSide();}}));
+    both);
 }
 function animCharMatches(){
   const needle=state.animCharQuery.trim().toLocaleLowerCase();
@@ -2500,31 +2538,39 @@ function remountAnim(){
   });
 }
 // A panel pages only what fits it: the fitted size caps the global
-// row count, so a paginated list never grows its own scrollbar.
-function animPaneSize(which){
-  const fit=which==="char"?state.animCharFit:which==="events"?state.animEventFit:state.animFit;
-  return Math.max(1,Math.min(state.pageSize,fit||Infinity));
+// row count, so a paginated list never grows its own scrollbar. One set
+// of sizing rules for every side panel: animations and maps alike.
+const PANE_FITS={char:"animCharFit",anims:"animFit",events:"animEventFit",
+  dir:"dirFit",maps:"mapListFit",placements:"mapFit"};
+function paneSize(which){
+  return Math.max(1,Math.min(state.pageSize,state[PANE_FITS[which]]||Infinity));
 }
 // The fit measures the paged pane (list plus pager), and the wheel turns
 // pages through that same pane: fitted lists never scroll.
-function fitAnimList(list,which,size,available){
+function fitPaneList(list,which,size,available){
   LexeditorUI.fitListPage({list,available:available||list,pageSize:size,fixedRowHeight:32,
     resize:(fittedHeight,geometry)=>{list.style.setProperty("--lex-fitted-row-height",`${geometry.rowHeight}px`);},
     change:value=>{
-      if(which==="char"){if(state.animCharFit===value)return;state.animCharFit=value;}
-      else if(which==="events"){if(state.animEventFit===value)return;state.animEventFit=value;}
-      else{if(state.animFit===value)return;state.animFit=value;}
+      if(state[PANE_FITS[which]]===value)return;
+      state[PANE_FITS[which]]=value;
+      if(which==="dir"||which==="maps"||which==="placements"){
+        if(state.tab!=="maps")return;
+        if(which==="dir")refreshDirectory();else refreshMapSide();
+        return;
+      }
       if(state.tab!=="animations")return;
       if(which==="char")refreshAnimChars();else refreshAnimList();
     }});
 }
-function stopAnimFit(pane){
+function stopPaneFit(pane){
   pane.querySelector(".lex-column-list")?.__lexFitListObserver?.disconnect?.();
 }
 // Fitted rows fill to the pager like paged tables: capacity tracks
-// stretch the leftover and filler rows square off a short page.
-function sizeAnimRows(list,size){
-  LexeditorUI.padBarrelTable(list,size);
+// stretch the leftover and filler rows square off a short page. Maps
+// side panels skip the filler rows, so a short or empty panel shows
+// only its records.
+function sizePaneRows(list,size,pad=true){
+  if(pad)LexeditorUI.padBarrelTable(list,size);
   list.classList.add("lex-page-sized-table");
   list.style.setProperty("--lex-page-row-count",String(Math.max(size,
     list.querySelectorAll(":scope > .lex-column-list-row").length)));
@@ -2532,7 +2578,7 @@ function sizeAnimRows(list,size){
 }
 function animCharsPane(){
   const here=animCharMatches();
-  const size=animPaneSize("char");
+  const size=paneSize("char");
   const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animCharPage>pages-1)state.animCharPage=pages-1;
   const shown=here.slice(state.animCharPage*size,(state.animCharPage+1)*size);
@@ -2543,8 +2589,8 @@ function animCharsPane(){
     change:value=>{state.animCharPage=value;refreshAnimChars();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
-  sizeAnimRows(list,size);
-  fitAnimList(list,"char",size,both);
+  sizePaneRows(list,size);
+  fitPaneList(list,"char",size,both);
   return el("div",{"data-anim-chars":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},
     LexeditorUI.bottomSearch({key:"anims-characters",value:state.animCharQuery,label:"Search characters",
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
@@ -2560,7 +2606,7 @@ function animEventsCell(){
 }
 function animAnimsPane(){
   const here=animListMatches();
-  const size=animPaneSize("anims");
+  const size=paneSize("anims");
   const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animPage>pages-1)state.animPage=pages-1;
   const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
@@ -2571,8 +2617,8 @@ function animAnimsPane(){
     change:value=>{state.animPage=value;refreshAnimList();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
-  sizeAnimRows(list,size);
-  fitAnimList(list,"anims",size,both);
+  sizePaneRows(list,size);
+  fitPaneList(list,"anims",size,both);
   return [
     LexeditorUI.bottomSearch({key:"anims-list",value:state.animQuery,label:"Search animations",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
@@ -2580,7 +2626,7 @@ function animAnimsPane(){
 }
 function animEventsPane(){
   const here=animListMatches();
-  const size=animPaneSize("events");
+  const size=paneSize("events");
   const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.animPage>pages-1)state.animPage=pages-1;
   const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
@@ -2595,8 +2641,8 @@ function animEventsPane(){
     change:value=>{state.animPage=value;refreshAnimList();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
-  sizeAnimRows(list,size);
-  fitAnimList(list,"events",size,both);
+  sizePaneRows(list,size);
+  fitPaneList(list,"events",size,both);
   return [back,
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
@@ -2611,14 +2657,14 @@ function refreshAnimChars(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-chars]");
   if(!pane)return;
-  stopAnimFit(pane);
+  stopPaneFit(pane);
   pane.replaceWith(animCharsPane());
 }
 function refreshAnimList(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-list]");
   if(!pane){render();return;}
-  stopAnimFit(pane);
+  stopPaneFit(pane);
   pane.replaceWith(animListPane());
 }
 function renderMaps(){
