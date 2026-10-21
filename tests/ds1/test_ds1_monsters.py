@@ -234,3 +234,24 @@ def test_bounding_demon_takes_armor_rework_absorption_edits():
     doc.plain[start:start + len(data)] = write_field(data, spec, base, '<')
     doc.edit('NpcParam', 342101, 'absorption:thunderDamageCutRate', -50)
     assert doc.row_values('NpcParam', 342101)[0]['absorption:thunderDamageCutRate'] == -50.0
+
+
+def test_enemy_absorption_and_blocking_percentages_accept_100():
+    """Full immunity (absorption) and full block (guard) are real values."""
+    base = 40_000_000 + 342101
+    doc = ItemDocument(make_effects_archive(extra_ids=(base,), table_ids={'NpcParam': [120000, 342101]}))
+    _row, start, data = doc._row('NpcParam', 342101)
+    spec = next(f['spec'] for f in doc.schemas['NpcParam']['fields'] if f['spec'].key == 'spEffectID0')
+    doc.plain[start:start + len(data)] = write_field(data, spec, base, '<')
+    doc.edit('NpcParam', 342101, 'absorption:thunderDamageCutRate', 100)
+    assert doc.row_values('NpcParam', 342101)[0]['absorption:thunderDamageCutRate'] == 100.0
+    assert doc.value('SpEffectParam', base, 'thunderDamageCutRate') == 0.0
+    fields = {f['key']: f for f in doc.read_row('NpcParam', 342101)['fields']}
+    assert fields['absorption:thunderDamageCutRate']['maximum'] == 100.0
+    guards = ['physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate',
+              'slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate',
+              'poisonGuardResist', 'diseaseGuardResist', 'bloodGuardResist', 'curseGuardResist']
+    for key in guards:
+        assert fields[key]['maximum'] == 100, key
+        doc.edit('NpcParam', 342101, key, 100)
+        assert doc.value('NpcParam', 342101, key) == 100, key
