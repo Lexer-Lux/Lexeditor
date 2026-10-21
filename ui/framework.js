@@ -461,6 +461,28 @@
     return svg;
   };
 
+  // The section mark on the dev-mode Add-section header button: a panel
+  // block with a header divider, drawn in the same stroke as the copy
+  // and remove icons. A bare plus here read as the record add button
+  // that lives in the list panel.
+  const sectionIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "3 3 18 18");
+    svg.setAttribute("aria-hidden", "true");
+    for (const d of ["M4 4h16v16H4z", "M4 9h16"]) {
+      const path = document.createElementNS(namespace, "path");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("d", d);
+      svg.append(path);
+    }
+    return svg;
+  };
+
   // One "no image" mark for every place a picture is missing: a record with
   // no art of its own, or an image that failed to load. It replaces the
   // browser's broken-image glyph and alt text ("[mapid] composed background").
@@ -1903,7 +1925,7 @@
       }
       actions.append(element("button", {type: "button", class: "lex-header-icon lex-detail-add-header",
         title: "Add section (Developer Mode)", "aria-label": "Add section",
-        onclick: () => addDetailHeader(panel)}, "+"));
+        onclick: () => addDetailHeader(panel)}, sectionIcon()));
     }
     return panel;
   };
@@ -8737,6 +8759,50 @@ ${contents.path}`});
       }
       return null;
     };
+    const layoutKeys = new Set(["hidden", "sections", "removed", "order"]);
+    // Bare fields dealt into columns name their group after the column, so
+    // the group count IS the column count: a layout stored with one column
+    // cannot apply by group id to a two-column dealing. That pulled every
+    // property into the first column and left the rest empty, with no
+    // property to drag onto. When the counts differ, the stored columns
+    // become one reading order, dealt across the live columns the way the
+    // pager dealt them.
+    {
+      const liveBySection = new Map();
+      for (const group of state.groups.values()) {
+        if (layoutSectionOf(group)) continue;
+        const name = sectionNameOf(group.id);
+        if (!liveBySection.has(name)) liveBySection.set(name, []);
+        liveBySection.get(name).push(group);
+      }
+      const byIdText = (a, b) => a.localeCompare(b, undefined, {numeric: true});
+      let migrated = null;
+      for (const live of liveBySection.values()) {
+        live.sort((a, b) => byIdText(a.id, b.id));
+        const name = sectionNameOf(live[0].id);
+        const storedKeys = Object.keys(layout).filter(key =>
+          !layoutKeys.has(key) && Array.isArray(layout[key]) && sectionNameOf(key) === name)
+          .sort(byIdText);
+        if (!storedKeys.length || storedKeys.length === live.length) continue;
+        const reading = [];
+        for (const key of storedKeys) for (const id of layout[key]) if (typeof id === "string") reading.push(id);
+        if (!reading.length) continue;
+        const sizes = live.map(group => [...group.node.children].filter(field => state.fields.has(field)).length);
+        const total = sizes.reduce((sum, size) => sum + size, 0);
+        migrated = migrated || {...layout};
+        for (const key of storedKeys) delete migrated[key];
+        let at = 0, run = 0;
+        live.forEach((group, index) => {
+          run += sizes[index];
+          const end = index === live.length - 1 ? reading.length
+            : total ? Math.round(reading.length * run / total)
+            : Math.round(reading.length * (index + 1) / live.length);
+          migrated[group.id] = reading.slice(at, Math.max(at, Math.min(reading.length, end)));
+          at += migrated[group.id].length;
+        });
+      }
+      if (migrated) layout = migrated;
+    }
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
       if (!Array.isArray(ids)) continue;
@@ -8752,7 +8818,6 @@ ${contents.path}`});
     // and stored fields whose column moved, land by name in stored reading
     // order: each slots before the next stored neighbor already home.
     const groupById = new Map([...state.groups.values()].map(group => [group.id, group]));
-    const layoutKeys = new Set(["hidden", "sections", "removed", "order"]);
     for (const [key, ids] of Object.entries(layout)) {
       if (layoutKeys.has(key) || !Array.isArray(ids)) continue;
       const target = groupById.get(key) ||
@@ -9039,8 +9104,19 @@ ${contents.path}`});
       propertyDrop = {node: target.parentElement, before: after ? target.nextSibling : target, marker: target, after};
     } else {
       const section = event.target.closest?.(".lex-detail-section");
-      const node = section?.querySelector(":scope > .lex-detail-section-content");
-      if (state.groups.has(node)) propertyDrop = {node, before: null, marker: section, after: true};
+      const sectionNode = section?.querySelector(":scope > .lex-detail-section-content");
+      if (state.groups.has(sectionNode)) {
+        propertyDrop = {node: sectionNode, before: null, marker: section, after: true};
+      } else {
+        // An emptied column holds no property to land before or after, so
+        // the column itself is the target. Non-empty columns still take
+        // drops on their properties, never here, so aiming between two
+        // rows keeps landing between them.
+        const column = event.target.closest?.(".lex-tweak-column");
+        const empty = column && state.groups.has(column) &&
+          ![...column.children].some(child => state.fields.has(child));
+        if (empty) propertyDrop = {node: column, before: null, marker: column, after: true};
+      }
     }
     if (!propertyDrop) return;
     event.preventDefault();

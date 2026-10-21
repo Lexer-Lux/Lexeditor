@@ -61,6 +61,16 @@ def test_no_add_section_button_outside_developer_mode(page):
     assert not page.locator(ADD).is_visible()
 
 
+def test_add_section_button_shows_a_section_glyph_not_a_plus(page):
+    # It sits among the record actions, where a bare "+" reads as the
+    # record add button that lives in the list panel.
+    mount(page, developer=True)
+    button = page.locator(ADD)
+    button.wait_for()
+    assert button.locator("svg").count() == 1
+    assert "+" not in button.text_content()
+
+
 def test_adding_a_section_lands_in_the_active_tab_and_ships(page):
     mount(page)
     add_tab(page, "Combat")

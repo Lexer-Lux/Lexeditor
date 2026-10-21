@@ -7360,6 +7360,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* Cards inherit the same percentage name lane as other detail panels. */
 .lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
+/* An emptied column keeps a drop height: with none it could never take a property again. */
+.lex-tweak-column:empty { min-height:96px; }
 .lex-tweak-column > .lex-detail-panel {
   --lex-detail-title-size:1em;
   --lex-detail-id-size:1em;
