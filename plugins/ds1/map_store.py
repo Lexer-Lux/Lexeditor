@@ -275,12 +275,15 @@ class MapStore:
                     continue
         return set(names), names, types
 
-    def locate_drop(self, lot_id):
-        """The first placement of an enemy dropping this lot, for go-to.
+    def locate_drop(self, lot_id, prefer_map=None):
+        """A placement of an enemy dropping this lot, for go-to.
 
         ItemLotParam rows name no map, but NpcParam rows name their lots,
         and placements name their NPC. Without readable parameters there is
         nothing to resolve, so the directory shows no go-to button.
+        prefer_map names the open map: a dropper standing there wins over
+        the first alphabetical match, so go-to focuses in place instead
+        of mounting another map's whole viewport as a side effect.
         """
         try:
             document = self.item_store.get() if self.item_store else None
@@ -301,7 +304,10 @@ class MapStore:
                     break
         if not droppers:
             return None
-        for map_name in self.maps():
+        names = self.maps()
+        ordered = [prefer_map] + [name for name in names if name != prefer_map] \
+            if prefer_map in names else names
+        for map_name in ordered:
             try:
                 placements = self.get(map_name).placements()
             except (MsbError, OSError):

@@ -1382,9 +1382,12 @@ async function goToPlacement(map,placementKey){
   else state.mapFocus=row.id;
 }
 async function goToDrop(lotId){
-  const found=await api(`/api/world/locate?table=ItemLotParam&id=${lotId}`).catch(notify);
+  const here=state.mapId?`&map=${encodeURIComponent(state.mapId)}`:"";
+  const found=await api(`/api/world/locate?table=ItemLotParam&id=${lotId}${here}`).catch(notify);
   if(!found)return;
-  if(!found.map){notify(new Error("No placed enemy drops this lot."));return;}
+  // A lot no placed enemy drops has nowhere to fly to: a short toast,
+  // not a modal, since there is nothing for the reader to act on.
+  if(!found.map){LexeditorUI.showToast("No placed enemy drops this lot.");return;}
   await goToPlacement(found.map,`${found.map}:${found.key}`);
 }
 function mapsNoun(){

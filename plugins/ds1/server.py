@@ -234,7 +234,9 @@ class Handler(PluginRequestHandler):
                         return
                     elif path == '/api/world/locate':
                         table = query.get('table', [''])[0]
-                        found = MAPSTORE.locate_drop(int(query.get('id', [''])[0])) \
+                        prefer = query.get('map', [''])[0] or None
+                        found = MAPSTORE.locate_drop(int(query.get('id', [''])[0]),
+                                                     prefer_map=prefer) \
                             if table == 'ItemLotParam' else None
                         result = {'map': found['map'], 'key': found['key']} if found \
                             else {'map': None, 'key': None}
