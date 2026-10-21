@@ -1520,13 +1520,13 @@ class ItemDocument:
             original = round((1 - read_field(saved, specs[cut], '<')) * 100, 3)
             fields.append({'key': 'absorption:' + cut, 'label': f'{kind} absorption (%)',
                            'description': (f'Share of {kind.lower()} damage this enemy takes off every hit, from its '
-                                           'Armor Rework effect. Negative values make it take more damage.'
+                                           'Armor Rework effect. 100 takes no damage of that type; negative values make it take more damage.'
                                            if table == 'NpcParam' else
                                            f'Share of {kind.lower()} damage this piece absorbs, from its Armor Rework '
-                                           'effect. Pieces multiply. Negative values make the wearer take more damage. '
+                                           'effect. Pieces multiply. 100 takes no damage of that type; negative values make the wearer take more damage. '
                                            'Upgrade levels scale from this value by the armor upgrade table.'),
                            'group': 'Absorption', 'dtype': 'f32', 'value': round((1 - rate) * 100, 3),
-                           'type': 'number', 'minimum': -100.0, 'maximum': 99.0, 'enum': {},
+                           'type': 'number', 'minimum': -100.0, 'maximum': 100.0, 'enum': {},
                            'protectedReason': '', 'editable': True, 'vanilla': original,
                            'icon': ABSORPTION_ICONS.get(cut)})
         return fields
@@ -1535,8 +1535,8 @@ class ItemDocument:
         levels = self._absorption_levels(row_id, table)
         if not levels or cut not in dict(ABSORPTION_CUTS):
             raise FormatError('This record has no Armor Rework absorption')
-        if type(value) not in (int, float) or isinstance(value, bool) or not math.isfinite(value) or not -100 <= value <= 99:
-            raise FormatError('Absorption must be between -100 and 99')
+        if type(value) not in (int, float) or isinstance(value, bool) or not math.isfinite(value) or not -100 <= value <= 100:
+            raise FormatError('Absorption must be between -100 and 100')
         spec = next(f['spec'] for f in self.schemas[EFFECT_TABLE]['fields'] if f['spec'].key == cut)
         reinforce_key = UPGRADE_MULTIPLIERS[cut]
         reinforce_rows = self._rows_by_id.get('ReinforceParamProtector', {})
@@ -1551,7 +1551,7 @@ class ItemDocument:
             if reinforce_id is not None and reinforce_id + level in reinforce_rows:
                 multiplier = self.value('ReinforceParamProtector', reinforce_id + level, reinforce_key)
             scaled = value * multiplier if value >= 0 else value / multiplier
-            absorbed = min(99.0, max(-100.0, scaled if level else value))
+            absorbed = min(100.0, max(-100.0, scaled if level else value))
             # Back to the saved percentage, as shown (three decimals), is back
             # to the saved rate exactly - undo sends the shown value.
             _r, start, data = self._row(EFFECT_TABLE, effect)
@@ -1646,7 +1646,7 @@ class ItemDocument:
                 continue
             for cut in cuts:
                 base = round((1 - self.value(EFFECT_TABLE, levels[0], cut)) * 100, 3)
-                self._edit_absorption(armor_id, cut, min(99.0, max(-100.0, base)))
+                self._edit_absorption(armor_id, cut, min(100.0, max(-100.0, base)))
 
     def _write(self, table, row_id, key, value):
         """Validate and store one field. The caller reads the record back."""

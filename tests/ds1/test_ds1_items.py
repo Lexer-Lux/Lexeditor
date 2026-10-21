@@ -273,8 +273,20 @@ def test_armor_absorption_zero_stays_zero_and_negative_is_divided():
     document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', -5)
     assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
         pytest.approx([-5, -2.5, -5 / 1.5, -5], abs=1e-4)
-    for bad in (-101, 100):
+    for bad in (-101, 101):
         with pytest.raises(FormatError): document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', bad)
+
+
+def test_armor_absorption_accepts_full_immunity():
+    document, base = armor_with_upgrades([(1, 1, 1, 1), (2, 1, 1, 1), (1.5, 1, 1, 1)])
+    document.edit('EquipParamProtector', 100, 'absorption:slashDamageCutRate', 100)
+    assert document.value('SpEffectParam', base, 'slashDamageCutRate') == 0.0
+    # Upgrade levels clamp at 100 instead of overshooting.
+    assert [absorbed(document, base + level, 'slashDamageCutRate') for level in range(4)] == \
+        pytest.approx([100, 100, 100, 100], abs=1e-4)
+    shown = next(f for f in document.read_row('EquipParamProtector', 100)['fields']
+                 if f['key'] == 'absorption:slashDamageCutRate')
+    assert shown['value'] == 100 and shown['maximum'] == 100.0
 
 
 def test_armor_and_shield_guard_fields_carry_no_icons():
