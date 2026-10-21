@@ -29,6 +29,89 @@ def parse_key(key):
         raise MsbError("Select an enemy or player-start placement") from error
 
 
+# Smithbox reference names pin a lot's owner and ground into the name:
+# '[Hollow - New Londo Ruins] None', '[Anor Londo] Great Magic Weapon'.
+# The directory shows owner, item and map in their own columns instead.
+_BRACKET = re.compile(r'\A\[([^\]]+)\](.*)\Z')
+_TREASURE_STEM = re.compile(r'\A\?{0,2}m(\d{2})_(\d{2})(?:_|\s)')
+
+# Informal area spellings in reference names, to the area id whose map
+# file names the directory's Map column. 'Royal Garden' has no id: the
+# names use it across both m12 files, so it shows as written.
+_PLACE_ALIASES = {'firelink': 1020, 'painted world': 1100, 'asylum': 1810,
+                  'catacombs': 1300, 'tomb of giants': 1310,
+                  'royal garden': None}
+
+
+def _norm_place(text):
+    """' The Depths) ' -> 'depths': area spellings compare without case,
+    a leading The, or the stray closing paren in some Sen's Fortress
+    reference names."""
+    cleaned = (text or '').strip()
+    while cleaned.endswith(')') and cleaned.count(')') > cleaned.count('('):
+        cleaned = cleaned[:-1].strip()
+    lowered = cleaned.lower()
+    return lowered[4:] if lowered.startswith('the ') else lowered
+
+
+def split_owner_place(inside):
+    """'Hollow - New Londo Ruins' -> ('Hollow', 'New Londo Ruins');
+    'Vagrant' -> ('Vagrant', None). Splits on the last dash, so an
+    owner carrying its own dash keeps it."""
+    owner, dash, place = (inside or '').rpartition(' - ')
+    if not dash or not owner.strip() or not place.strip():
+        return (inside or '').strip(), None
+    return owner.strip(), place.strip()
+
+
+def describe_directory_name(name, displays):
+    """Owner, item and map of a Smithbox reference name.
+
+    displays maps normalized area spellings to the map list's display
+    name (MapStore.place_display_names). A bracket holding only a
+    place ('[Anor Londo] ...') has no owner; a ' - suffix' that names
+    no area stays with the owner ('Ingward - Have Lordvessel',
+    'Vagrant (Aggressive) - 1'). The map is the bracket's area as the
+    map list spells it, or as written when it names no single map.
+    """
+    match = _BRACKET.match(name or '')
+    if not match:
+        return '', name or '', ''
+    inside, item = match.group(1).strip(), match.group(2).strip()
+    owner, place = split_owner_place(inside)
+    if place is None:
+        if _norm_place(inside) in displays:
+            return '', item, displays[_norm_place(inside)] or inside
+        return inside, item, ''
+    if _norm_place(place) in displays:
+        return owner, item, displays[_norm_place(place)] or place
+    return inside, item, ''
+
+
+def strip_owner_suffix(text, displays):
+    """A placement owner's name without its map: 'Griggs of Vinheim
+    (Hollow) - Blighttown' -> 'Griggs of Vinheim (Hollow)'. Suffixes
+    that name no area stay ('Forest Hunter - Bandit'); names without
+    a dash ('Drake (Flying)') pass through."""
+    owner, place = split_owner_place(text or '')
+    if place is not None and _norm_place(place) in displays:
+        return owner
+    return text or ''
+
+
+def describe_treasure_name(name, stems):
+    """Item and map of a treasure reference name: 'm10_01_ church gate
+    lever' -> ('church gate lever', 'Undead Burg'). stems maps the
+    map-stem prefix to the map list's display name
+    (MapStore.stem_display_names); names without a stem keep the whole
+    name and no map."""
+    match = _TREASURE_STEM.match(name or '')
+    if not match:
+        return name or '', ''
+    return ((name or '')[match.end():].strip(),
+            stems.get((match.group(1), match.group(2)), ''))
+
+
 class MapStore:
     def __init__(self, game_root, project=None, read_only=True, item_store=None):
         from .tweak_mods import checked
@@ -58,8 +141,8 @@ class MapStore:
         return sorted(path.name for path in live.glob("*.msb"))
 
     def display_name(self, map_id: str) -> str:
-        """'Undead Burg (m10_01_00_00.msb)', 'Test map (...)' for the m99
-        test block without area text, or the bare id otherwise."""
+        """'Undead Burg', 'Test map m99_80_00_00' for the m99 test block
+        without area text, or the bare id otherwise."""
         match = _MAP_AREA.match(map_id or '')
         document = getattr(self.item_store, 'document', None)
         texts = document.texts if document is not None else None
@@ -68,10 +151,80 @@ class MapStore:
             for area_id in range(first, first + 10):
                 name = texts.place_name(area_id)
                 if name:
-                    return f'{name} ({map_id})'
+                    return name
         if match and match.group(1) == '99':
-            return f'Test map ({map_id})'
+            return f'Test map {map_id[:-len(".msb")]}'
         return map_id
+
+    def stem_display_names(self):
+        """('10','01') -> 'Undead Burg': map-stem prefixes to the map
+        list's names, for treasure reference names."""
+        stems = {}
+        for map_id in self.maps():
+            match = _MAP_AREA.match(map_id)
+            if match:
+                stems.setdefault((match.group(1), match.group(2)),
+                                 self.display_name(map_id))
+        return stems
+
+    def place_display_names(self):
+        """Normalized area spellings to the map list's display names.
+
+        Canonical map names first, then every numbered area (1000-1999)
+        under its map file's name ('Valley of Drakes' -> 'New Londo
+        Ruins'), then the reference names' informal spellings
+        ('Firelink' -> 'Firelink Shrine'). Warp-only names (2000+) stay
+        out: '[Daughter of Chaos]' names the covenant, not the bonfire.
+        """
+        displays = {}
+        for map_id in self.maps():
+            displays[_norm_place(self.display_name(map_id))] = self.display_name(map_id)
+        stems = self.stem_display_names()
+        document = getattr(self.item_store, 'document', None)
+        texts = document.texts if document is not None else None
+        if texts is not None:
+            for area_id in range(1000, 2000):
+                name = texts.place_name(area_id)
+                if not name:
+                    continue
+                display = stems.get((f'{area_id // 100:02d}',
+                                     f'{(area_id % 100) // 10:02d}'))
+                if display is not None:
+                    displays.setdefault(_norm_place(name), display)
+        for alias, area_id in _PLACE_ALIASES.items():
+            if area_id is None:
+                displays.setdefault(alias, None)
+                continue
+            display = stems.get((f'{area_id // 100:02d}',
+                                 f'{(area_id % 100) // 10:02d}'))
+            if display is not None:
+                displays.setdefault(alias, display)
+        return displays
+
+    def describe_drop(self, name, link_ids, displays=None):
+        """A drop row's directory columns: owner, item and map names.
+        Links name real placements, so linked maps win; the bracket's
+        area is the fallback for gifts and corpse lots no enemy drops."""
+        if displays is None:
+            displays = self.place_display_names()
+        owner, item, place = describe_directory_name(name, displays)
+        if link_ids:
+            ordered = []
+            for map_id in link_ids:
+                display = self.display_name(map_id)
+                if display not in ordered:
+                    ordered.append(display)
+            return {'owner': owner, 'item': item, 'mapNames': ordered}
+        return {'owner': owner, 'item': item, 'mapNames': [place] if place else []}
+
+    def describe_treasure(self, name, stems=None):
+        """A treasure row's directory columns: item and map names. The
+        reference names carry their map as a stem prefix ('m10_01_
+        church gate lever'); names without one keep the whole name."""
+        if stems is None:
+            stems = self.stem_display_names()
+        item, display = describe_treasure_name(name, stems)
+        return {'owner': '', 'item': item, 'mapNames': [display] if display else []}
 
     def _load(self, map_name):
         from .tweak_mods import checked
@@ -281,15 +434,19 @@ class MapStore:
         bare part name stays pinnable under values, never in the title."""
         return f"{self._who(part_name, npc, names)} \u2014 {self.display_name(map_name)}"
 
-    def _placement_row(self, map_name, placement, names, types):
+    def _placement_row(self, map_name, placement, names, types, displays=None):
         npc = placement.get("npc")
+        if displays is None:
+            displays = self.place_display_names()
         enemy = names.get(npc, "") if npc is not None else ""
         values = {"map": map_name, "part": placement["name"], "kind": placement["kind"],
                   "model": placement["model"],
                   "posX": placement["pos"][0], "posY": placement["pos"][1], "posZ": placement["pos"][2],
                   "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
                   "scaleX": placement["scale"][0], "scaleY": placement["scale"][1], "scaleZ": placement["scale"][2],
-                  "npcId": npc, "npcType": types.get(npc) if npc is not None else None}
+                  "npcId": npc, "npcType": types.get(npc) if npc is not None else None,
+                  "who": strip_owner_suffix(self._who(placement["name"], npc, names), displays),
+                  "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
         modified = self.get(map_name).placement_modified((placement["type"], placement["partId"]))
         return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
@@ -299,10 +456,11 @@ class MapStore:
 
     def list_rows(self):
         _ids, names, types = self._npc()
+        displays = self.place_display_names()
         rows = []
         for map_name in self.maps():
             for placement in self.get(map_name).placements():
-                rows.append(self._placement_row(map_name, placement, names, types))
+                rows.append(self._placement_row(map_name, placement, names, types, displays))
         return rows
 
     def row_values(self, map_name, key):
@@ -314,7 +472,8 @@ class MapStore:
                           if (entry["type"], entry["partId"]) == part_key), None)
         if placement is None:
             raise MsbError("Unknown placement")
-        row = self._placement_row(map_name, placement, names, types)
+        row = self._placement_row(map_name, placement, names, types,
+                                  self.place_display_names())
         return row["values"], row["display"], row["name"]
 
     def _npc_tab(self, npc, types):

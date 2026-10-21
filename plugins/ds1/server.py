@@ -385,8 +385,16 @@ class Handler(PluginRequestHandler):
                             result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
                             if tab == 'drops':
                                 links = MAPSTORE.lot_maps()
+                                displays = MAPSTORE.place_display_names()
                                 for row in result['rows']:
                                     row['values']['maps'] = links.get(row['id'], [])
+                                    row['values'].update(MAPSTORE.describe_drop(
+                                        row['name'], links.get(row['id'], []), displays))
+                            elif tab == 'treasure':
+                                stems = MAPSTORE.stem_display_names()
+                                for row in result['rows']:
+                                    row['values'].update(
+                                        MAPSTORE.describe_treasure(row['name'], stems))
                     else:
                         table = query.get('table', [''])[0]
                         if table.endswith('.msb'):

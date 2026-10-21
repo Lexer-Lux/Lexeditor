@@ -180,7 +180,7 @@ def phase_readonly(play, game, output, errors):
             assert overflow <= 1, overflow
             counts = page.evaluate('state.mapList.find(r=>r.id==="test.msb").values')
             named = page.evaluate('state.mapList.find(r=>r.id==="m10_01_00_00.msb").name')
-            assert named == 'Undead Burg (m10_01_00_00.msb)', named
+            assert named == 'Undead Burg', named
             assert (counts['npcs'], counts['drops'], counts['enemies']) == (0, 1, 1), counts
             gen = page.evaluate('viewportMount')
             page.locator('[data-maps-side] .lex-list-row', has_text='test2.msb').click()
@@ -190,7 +190,7 @@ def phase_readonly(play, game, output, errors):
             # stays blue and the object stays red. A per-name texture
             # cache paints both with the first model's bytes instead.
             gen = page.evaluate('viewportMount')
-            page.locator('[data-maps-side] .lex-list-row', has_text='m99_00_00_00.msb').click()
+            page.locator('[data-maps-side] .lex-list-row', has_text='Test map m99_00_00_00').click()
             page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
             page.evaluate('viewportCtl.select(null)')
             red, blue = focused_colors(page, '0:0')

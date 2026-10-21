@@ -2286,12 +2286,23 @@ function directoryTabs(){
     {id:"npcs",label:"NPCs",help:"Named characters who do not fight you: merchants, blacksmiths and quest givers. Pick one to see it in the map."},
     {id:"enemies",label:"Enemies",help:"Everything placed that fights you, bosses included. Pick one to see it in the map."}];
 }
+// The directory shows a reference name split across columns: the item (or
+// the enemy standing there) under Name, its owner under Owner, and the map
+// list's own name under Map. The row's full name stays untouched for
+// sorting and the detail pane.
+function dirRowName(row){
+  if(DIRECTORY_PARAM_TABS.has(state.dirTab))return row.values.item||row.name;
+  return row.values.who||row.display?.npcId||row.values.part||row.name;
+}
+function dirRowMap(row){
+  return (row.values.mapNames||[]).join(", ");
+}
 function directoryMatches(){
   const query=state.dirQuery.toLowerCase();
-  let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")).toLowerCase().includes(query));
+  let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")+" "+dirRowMap(row)).toLowerCase().includes(query));
   // Local keeps only rows from the open map. Placements name their map;
-  // lots resolve through their dropping NPCs. Treasure rows name no
-  // map, so the toggle stays off for them.
+  // lots resolve through their dropping NPCs. Treasure rows link to no
+  // placements, so the toggle stays off for them.
   if(state.dirLocal){
     if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
     else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
@@ -2335,9 +2346,15 @@ function directoryList(){
     if(param)void selectDirectoryParam(row);
     else void selectPlacement(key(row),false);
   };
-  const columns=[{key:"name",label:"Name",grow:1}];
-  if(!param)columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
-  else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${row.name} drops`,row=>goToDrop(row.id)));
+  const columns=[{key:"name",label:"Name",grow:1,render:row=>dirRowName(row)}];
+  if(state.dirTab==="drops")columns.push({key:"owner",label:"Owner",grow:1,
+    sortValue:row=>row.values.owner||"",render:row=>row.values.owner||""});
+  // Local shows only the open map's rows, so the Map column would repeat
+  // the same map on every row; it returns when unticked.
+  if(!state.dirLocal)columns.push({key:"map",label:"Map",grow:1,
+    sortValue:row=>dirRowMap(row),render:row=>dirRowMap(row)});
+  if(!param)columns.push(goToCell(row=>`Show ${dirRowName(row)} in the map viewport`,row=>goToPlacement(row.table,key(row))));
+  else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${dirRowName(row)} drops`,row=>goToDrop(row.id)));
   // Search on its own row up top, like the animations panes; the pager
   // below the list only pages and filters.
   return [LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
