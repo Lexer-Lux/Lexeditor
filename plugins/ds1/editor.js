@@ -334,7 +334,8 @@ async function textLabelPreview(id){
 }
 const openAttack=id=>navigate("attacks","attacks",`AtkParam_Npc:${id}`);
 const openBehavior=id=>navigate("ai","behaviors",`BehaviorParam:${id}`);
-const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops"};
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats"};
+const STAT_SUBS={EquipMtrlSetParam:"upgrade-materials",ReinforceParamWeapon:"weapon-upgrades",ReinforceParamProtector:"armor-upgrades",CalcCorrectGraph:"curves"};
 const recordRows=new Map();
 async function recordRow(table,id){
   const cacheKey=`${table}:${id}`;
@@ -367,6 +368,7 @@ function openRecord(link){
   if(link.kind==="ai")return navigate("ai","ai",`${link.table}:${link.id}`);
   if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
   if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
+  if(link.kind==="stat")return navigate("stats",STAT_SUBS[link.table],`${link.table}:${link.id}`);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -378,16 +380,18 @@ function openAsset(link){
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
 const LINK_NOUNS={effect:"effect",attack:"attack",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table"};
+const STAT_NOUNS={EquipMtrlSetParam:"material set",ReinforceParamWeapon:"weapon upgrade table",ReinforceParamProtector:"armor upgrade table",CalcCorrectGraph:"scaling curve"};
 const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
 const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",EquipParamAccessory:"rings",Magic:"spells",EquipParamGoods:"consumables"};
-function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):LINK_NOUNS[link.kind]||"record";}
+function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):link.kind==="stat"?STAT_NOUNS[link.table]:LINK_NOUNS[link.kind]||"record";}
 async function finderTarget(link,value){
   if(link.kind==="effect")return ["effects","effects-all"];
   if(link.kind==="attack")return ["attacks","attacks"];
   if(link.kind==="ai")return ["ai","ai"];
   if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
   if(link.kind==="drop")return ["drops","drops"];
+  if(link.kind==="stat")return ["stats",STAT_SUBS[link.table]];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }

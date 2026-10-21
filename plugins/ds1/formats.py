@@ -643,6 +643,10 @@ def _shown(value, field):
 
 
 LINK_NOUNS = {'effect': 'effect', 'goods': 'item', 'attack': 'attack', 'ai': 'AI table', 'drop': 'drop table'}
+# Stats-tab records a gear field points at: the upgrade material sets and the
+# weapon and armor upgrade-level tables.
+STAT_REF_NOUNS = {'EquipMtrlSetParam': 'material set', 'ReinforceParamWeapon': 'weapon upgrade table',
+                  'ReinforceParamProtector': 'armor upgrade table', 'CalcCorrectGraph': 'scaling curve'}
 
 
 def field_link(document, table, row_id, spec):
@@ -655,7 +659,8 @@ def field_link(document, table, row_id, spec):
     The first linkable table wins: a projectile's attack falls
     through its PC entry to the NPC one the Attacks tab shows.
     Kinds: effect, goods, catalog (equipment and spells), attack,
-    ai (think records), drop (drop tables). Anything else (projectiles, PC attacks and
+    ai (think records), drop (drop tables), stat (upgrade material sets and
+    upgrade-level tables). Anything else (projectiles, PC attacks and
     behavior variations) has no picker or tab to open, so it stays a
     number.
     """
@@ -678,6 +683,8 @@ def field_link(document, table, row_id, spec):
             return ('ai', name)
         if name == 'ItemLotParam':
             return ('drop', name)
+        if name in STAT_REF_NOUNS:
+            return ('stat', name)
     return None
 
 
@@ -858,6 +865,8 @@ class ItemDocument:
             fallback = f'Attack {row_id}'
         elif table == 'ItemLotParam':
             fallback = f'Drop {row_id}'
+        elif table in ('ReinforceParamWeapon', 'ReinforceParamProtector'):
+            fallback = f'Upgrade table {row_id}'
         elif table == 'ShopLineupParam':
             fallback = f'Shop entry {row_id}'
         elif table == 'ObjActParam':
@@ -1060,13 +1069,15 @@ class ItemDocument:
             return self.attack_references().choices
         if kind == 'ai':
             return self.catalog_references(target).choices
-        if kind == 'drop':
+        if kind in ('drop', 'stat'):
             return self.catalog_references(target).choices
         raise FormatError('Unknown reference kind')
 
     def link_noun(self, kind, target):
         if kind == 'catalog':
             return CHARA_REF_NOUNS[target]
+        if kind == 'stat':
+            return STAT_REF_NOUNS[target]
         return LINK_NOUNS[kind]
 
     def list_rows(self, tab):

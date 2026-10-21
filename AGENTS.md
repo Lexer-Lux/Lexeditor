@@ -31,6 +31,8 @@ work, even if your tool does not load skills on its own.
   (`tests/shared/test_list_names_decided.py`). Every property of a
   list-and-detail page can be pinned as a table column; the framework adds
   the pins, and rows carry the values (`row.values` / `row.display`).
+- A field that stores another record's ID is never shown as a bare number:
+  show what it points to, preview it on hover, and link to it.
 - Give a field, section or tab a question-mark bubble only when its label and
   control do not already say everything. Write it per the help-text skill.
 - Necessary information belongs in the question-mark help, not in a paragraph

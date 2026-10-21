@@ -169,3 +169,38 @@ def test_field_link_ignores_unlinked_tables():
     spec = next(item['spec'] for item in schemas if item['spec'].key == 'refId')
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 0)
     assert field_link(document, 'EquipParamAccessory', 100, spec) is None
+
+
+def test_gear_upgrade_fields_link_to_stats_records():
+    # materialSetId and reinforceTypeId name Stats-tab records, so they show
+    # what they point to, preview it and open it (kind "stat"), never a bare ID.
+    document = ItemDocument(make_archive(table_ids={
+        'EquipMtrlSetParam': [1000, 1001], 'ReinforceParamWeapon': [0, 100],
+        'ReinforceParamProtector': [0, 200]}))
+    for table, set_id, reinforce_id, reinforce_table, noun in (
+            ('EquipParamWeapon', 1000, 100, 'ReinforceParamWeapon', 'weapon upgrade table'),
+            ('EquipParamProtector', 1001, 200, 'ReinforceParamProtector', 'armor upgrade table')):
+        poke(document, table, 100, 'materialSetId', set_id)
+        poke(document, table, 100, 'reinforceTypeId', reinforce_id)
+        found = links(document, table, 100)
+        assert (found['materialSetId']['kind'], found['materialSetId']['table']) == ('stat', 'EquipMtrlSetParam')
+        assert found['materialSetId']['id'] == set_id and found['materialSetId']['resolved']
+        assert found['materialSetId']['name'] == document.display_name('EquipMtrlSetParam', set_id)
+        assert (found['reinforceTypeId']['kind'], found['reinforceTypeId']['table']) == ('stat', reinforce_table)
+        assert found['reinforceTypeId']['resolved']
+        assert document.link_noun('stat', reinforce_table) == noun
+        by_key = {field['key']: field for field in document.read_row(table, 100)['fields']}
+        assert by_key['materialSetId']['type'] == by_key['reinforceTypeId']['type'] == 'enum'
+        assert str(set_id) in by_key['materialSetId']['enum']
+        _values, display = document.row_values(table, 100)
+        assert display['reinforceTypeId'] == document.display_name(reinforce_table, reinforce_id)
+        with pytest.raises(FormatError):
+            document._write(table, 100, 'materialSetId', 5555)
+
+
+def test_weapon_scaling_curves_link_to_stats_curves():
+    document = ItemDocument(make_archive(table_ids={'CalcCorrectGraph': [0, 5]}))
+    poke(document, 'EquipParamWeapon', 100, 'correctType', 5)
+    found = links(document, 'EquipParamWeapon', 100)
+    assert (found['correctType']['kind'], found['correctType']['table']) == ('stat', 'CalcCorrectGraph')
+    assert found['correctType']['resolved']
