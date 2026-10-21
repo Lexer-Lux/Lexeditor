@@ -1993,9 +1993,9 @@ function renderItems(){
         if(!event?.shiftKey&&!event?.ctrlKey&&!event?.metaKey){state.selected=key(row);await loadDetail();}
         select(row,event);shell.refresh();},
       columns:(misc&&state.sub==="encumbrance")?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
-        state.tab==="items"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>recordIconCell(row)},
+        state.tab==="items"?[{key:"icon",label:"",width:"var(--lex-fitted-row-height,36px)",sortable:false,render:row=>recordIconCell(row)},
           {key:"name",label:"Name",sortable:true,grow:1}]:
-        state.tab==="textures"?[{key:"icon",label:"",width:"36px",sortable:false,render:row=>textureIconCell(row)},
+        state.tab==="textures"?[{key:"icon",label:"",width:"var(--lex-fitted-row-height,36px)",sortable:false,render:row=>textureIconCell(row)},
           {key:"name",label:"Name",sortable:true,grow:1},
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         state.tab==="sound"&&(state.sub==="sfx"||state.sub==="music")?[{key:"name",label:"Name",sortable:true,grow:1},

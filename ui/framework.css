@@ -4454,6 +4454,28 @@ body:has(.lex-data-map-table) #main {
 .lex-inline-label:not(:has(> select)) { padding-inline-start:.08em; }
 .lex-table-fill .lex-column-list-cell:has(.lex-inline-label-row-image > img) { container-type:size; }
 .lex-table-fill .lex-inline-label-row-image > img { height:100cqh; width:auto; max-width:4em; }
+/* A list cell holding one picture and nothing else is an icon column's
+   cell: its picture fills the row, as tall as the row allows minus a
+   small padding, keeping its aspect ratio, and never below 70% of the
+   row on squeezed rows. The plugin declares the column track from the
+   same fitted height, so the cell stays square as the window resizes.
+   The whole column keeps narrow padding - empty cells and the header
+   included - so no cell forces the square track open at short rows.
+   Tables without fitted rows keep a fixed size. */
+.lex-column-list:has([data-column-key="icon"] > .lex-column-cell-content > :is(img, svg, canvas)) :is(.lex-column-list-cell, .lex-column-list-head-cell)[data-column-key="icon"] {
+  padding-inline:2px;
+  --lex-icon-row-height:var(--lex-fitted-row-height, 36px);
+}
+.lex-column-list-cell:has(> .lex-column-cell-content > :is(img, svg, canvas):only-child) > .lex-column-cell-content {
+  padding:0;
+}
+.lex-column-list-cell:has(> .lex-column-cell-content > :is(img, svg, canvas):only-child) > .lex-column-cell-content > :is(img, svg, canvas) {
+  height:max(calc(var(--lex-icon-row-height) - 8px), calc(var(--lex-icon-row-height) * 0.7));
+  width:auto;
+  max-width:100%;
+  object-fit:contain;
+  display:block;
+}
 .lex-inline-label:has(> select) { display:block; position:relative; width:100%; text-align:left; }
 .lex-inline-label:has(> select) > :first-child { position:absolute; left:.4em; top:50%; transform:translateY(-50%); width:1.35em; z-index:1; pointer-events:none; }
 .lex-inline-label > select { width:100%; min-width:0; text-align:left; padding-inline-start:2.1em; }
