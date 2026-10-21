@@ -8,10 +8,15 @@ import base64
 import functools
 import hashlib
 import io
+import json
+import os
 import re
+import shutil
 import struct
 from collections import OrderedDict
 from pathlib import Path
+
+from core.plugin_files import atomic_write
 
 from .assets import (AssetError, COLLISION_EXTENSIONS, MODEL_KINDS, check_relative, dds_info,
                        parse_tpf)
@@ -110,8 +115,12 @@ MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
 TEXTURE_PREVIEW_CAP = 1024
 MAP_TEXTURE_CAP = 256
 STRIP_TEXTURE_CAP = 256
-PNG_CACHE_SIZE = 128
-MEMBER_CACHE_SIZE = 64
+PNG_CACHE_SIZE = 1024
+MEMBER_CACHE_SIZE = 256
+B64_CACHE_SIZE = 2048
+MAP_CACHE_ENV = 'LEXEDITOR_DS1_MAP_CACHE'
+MAP_CACHE_SIZE_ENV = 'LEXEDITOR_DS1_MAP_CACHE_MB'
+MAP_CACHE_DEFAULT_MB = 1024
 
 
 def _diffuse_name(material):
@@ -402,6 +411,7 @@ def _tpf_sources(kind, location, member):
 
 _PNG_CACHE = OrderedDict()
 _MEMBER_CACHE = OrderedDict()
+_B64_CACHE = OrderedDict()
 
 
 def _cached_member(bdt, offset, size):
@@ -425,7 +435,9 @@ def _cached_member(bdt, offset, size):
 def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
     """A DDS blob as PNG bytes, capped for previews. Decodes are
     cached by content hash: one map shows the same texture on many
-    models, and decoding it once keeps map opens fast."""
+    models, and decoding it once keeps map opens fast. Sized past a
+    big map's textures (Anor Londo wears about 400), so one map's
+    models stop evicting each other's PNGs."""
     info = dds_info(blob)
     if info['width'] * info['height'] > MAX_TEXTURE_PIXELS:
         raise AssetError('That texture is too large to preview')
@@ -572,17 +584,204 @@ def model_strip_pngs(game_root, project, relative, side, member, wanted):
     return found, meta
 
 
+def map_cache_root():
+    """The private map-geometry cache, outside the checkout and the game.
+
+    Mirrors theme.cache_root: a per-user cache with an override for
+    tests. 'off' disables the disk cache; the in-memory caches still
+    apply."""
+    override = os.environ.get(MAP_CACHE_ENV)
+    if override:
+        return None if override.lower() == 'off' else Path(override)
+    base = os.environ.get('LOCALAPPDATA') or str(Path.home())
+    return Path(base) / 'Lexeditor' / 'cache' / 'ds1-mapgeom'
+
+
+_PIPELINE_FILES = ('viewport.py', 'flver.py', 'assets.py', 'bhf.py', 'formats.py')
+_pipeline_digest = None
+_pruned = False
+_disk_size = None
+
+
+def _pipeline_key():
+    """A digest of the geometry pipeline's own sources, so any reader
+    or encoder change invalidates the disk cache without a manual
+    version bump. Cached per process; 'v1' when the sources cannot
+    be read."""
+    global _pipeline_digest
+    if _pipeline_digest is None:
+        try:
+            hasher = hashlib.blake2b(digest_size=8)
+            for leaf in _PIPELINE_FILES:
+                hasher.update((Path(__file__).parent / leaf).read_bytes())
+            try:
+                import PIL
+                hasher.update(getattr(PIL, '__version__', '?').encode())
+            except Exception:
+                hasher.update(b'?')
+            _pipeline_digest = hasher.hexdigest()
+        except OSError:
+            _pipeline_digest = 'v1'
+    return _pipeline_digest
+
+
+def _cache_dir():
+    """The current pipeline's cache directory, or None when the disk
+    cache is unavailable. Stale pipelines are pruned once per process,
+    so reader updates cannot strand unbounded old entries."""
+    global _pruned
+    root = map_cache_root()
+    if root is None:
+        return None
+    try:
+        current = root / _pipeline_key()
+        current.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    if not _pruned:
+        _pruned = True
+        try:
+            for child in root.iterdir():
+                if child.is_dir() and child.name != current.name:
+                    shutil.rmtree(child, ignore_errors=True)
+        except OSError:
+            pass
+    return current
+
+
+def _disk_key(kind, location, member, stamp, skin, game_root, project, cap, area):
+    blob = repr((kind, str(location), member, tuple(stamp), bool(skin),
+                 str(game_root), str(project), cap, area))
+    return hashlib.blake2b(blob.encode(), digest_size=16).hexdigest()
+
+
+_PNG_NAME = re.compile(r'[0-9a-f]{32}\Z')
+
+
+def _disk_read(entry):
+    """A cached _textured result, or None on any miss or corruption.
+    Hits refresh mtimes for LRU eviction."""
+    folder = _cache_dir()
+    if folder is None:
+        return None
+    try:
+        stored = json.loads((folder / 'geom' / (entry + '.json')).read_bytes())
+        if not isinstance(stored.get('meshes'), list) or not isinstance(
+                stored.get('notes'), list) or not isinstance(stored.get('maps'), dict):
+            return None
+        textures = {}
+        for name, digest in stored['maps'].items():
+            if not isinstance(name, str) or not isinstance(digest, str):
+                return None
+            if not _PNG_NAME.match(digest):
+                return None
+            textures[name] = (folder / 'png' / (digest + '.png')).read_bytes()
+    except (OSError, ValueError, KeyError):
+        return None
+    try:
+        os.utime(folder / 'geom' / (entry + '.json'))
+        for digest in stored['maps'].values():
+            os.utime(folder / 'png' / (digest + '.png'))
+    except OSError:
+        pass
+    return {'meshes': stored['meshes'], 'textures': textures, 'notes': stored['notes']}
+
+
+def _disk_cap():
+    try:
+        mb = int(os.environ.get(MAP_CACHE_SIZE_ENV, MAP_CACHE_DEFAULT_MB))
+        return max(64, mb) * 1024 * 1024
+    except ValueError:
+        return MAP_CACHE_DEFAULT_MB * 1024 * 1024
+
+
+def _disk_evict(folder):
+    """Evict least-recently-read entries while the cache is over its
+    cap. The total is tracked incrementally and re-scanned only when
+    evicting, so stores stay cheap."""
+    global _disk_size
+    cap = _disk_cap()
+    if _disk_size is None:
+        total = 0
+        for sub in ('geom', 'png'):
+            part = folder / sub
+            if part.is_dir():
+                with os.scandir(part) as entries:
+                    for found in entries:
+                        if found.is_file():
+                            total += found.stat().st_size
+        _disk_size = total
+    if _disk_size <= cap:
+        return
+    scored = []
+    for sub in ('geom', 'png'):
+        part = folder / sub
+        if not part.is_dir():
+            continue
+        with os.scandir(part) as entries:
+            for found in entries:
+                if found.is_file():
+                    stat = found.stat()
+                    scored.append((stat.st_mtime_ns, part / found.name, stat.st_size))
+    scored.sort()
+    target = int(cap * 0.9)
+    for _mtime, old, size in scored:
+        if _disk_size <= target:
+            break
+        try:
+            old.unlink()
+        except OSError:
+            continue
+        _disk_size -= size
+
+
+def _disk_write(entry, encoded):
+    """Store a _textured result: one geometry file plus
+    content-addressed PNGs shared across models and maps (an evicted
+    PNG only fails that entry's next read, which recomputes).
+    Best-effort: a full or read-only disk leaves the in-memory
+    result untouched."""
+    folder = _cache_dir()
+    if folder is None:
+        return
+    global _disk_size
+    try:
+        maps = {}
+        for name, png in encoded.get('textures', {}).items():
+            digest = hashlib.blake2b(bytes(png), digest_size=16).hexdigest()
+            maps[name] = digest
+            target = folder / 'png' / (digest + '.png')
+            if not target.is_file():
+                atomic_write(target, bytes(png))
+                if _disk_size is not None:
+                    _disk_size += target.stat().st_size
+        body = json.dumps({'meshes': encoded['meshes'], 'notes': encoded['notes'],
+                           'maps': maps}).encode()
+        atomic_write(folder / 'geom' / (entry + '.json'), body)
+        if _disk_size is not None:
+            _disk_size += len(body)
+        _disk_evict(folder)
+    except (OSError, ValueError):
+        return
+
+
 def _textured(kind, location, member, stamp, skin, game_root, project, cap, area=None):
+    entry = _disk_key(kind, location, member, stamp, skin, game_root, project, cap, area)
+    hit = _disk_read(entry)
+    if hit is not None:
+        return hit
     encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
     needed = sorted({name for mesh in encoded['meshes']
                      for name in (mesh.get('map'), mesh.get('light')) if name})
     if not needed:
         encoded['textures'] = {}
+        _disk_write(entry, encoded)
         return encoded
     found, notes = _resolve_textures(kind, location, member, needed, game_root, project, cap,
                                      area)
     encoded['textures'] = found
     encoded['notes'].extend(notes)
+    _disk_write(entry, encoded)
     return encoded
 
 
@@ -598,7 +797,15 @@ def _payload(cached, known=None):
         digest = hashlib.blake2b(png, digest_size=16).hexdigest()
         ids[name] = digest
         if digest not in nave:
-            textures[name] = base64.b64encode(png).decode('ascii')
+            hit = _B64_CACHE.get(digest)
+            if hit is None:
+                hit = base64.b64encode(png).decode('ascii')
+                _B64_CACHE[digest] = hit
+                while len(_B64_CACHE) > B64_CACHE_SIZE:
+                    _B64_CACHE.popitem(last=False)
+            else:
+                _B64_CACHE.move_to_end(digest)
+            textures[name] = hit
     payload['textures'] = textures
     payload['texture_ids'] = ids
 
@@ -614,12 +821,12 @@ def _cached_textured(kind, location, member, stamp, skin=False, game_root=None, 
                      TEXTURE_PREVIEW_CAP)
 
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=320)
 def _cached_map(kind, location, member, stamp, game_root=None, project=None, area=None):
-    """Textured geometry for the map viewport: room for a map's models
-    at a small texture cap, since maps show acres at a time. The area
-    is part of the key: one binder's objects wear different textures
-    on different maps."""
+    """Textured geometry for the map viewport: room for the biggest
+    map's models at a small texture cap, since maps show acres at a
+    time (Undead Burg places 270). The area is part of the key: one
+    binder's objects wear different textures on different maps."""
     return _textured(kind, location, member, stamp, False, game_root, project,
                      MAP_TEXTURE_CAP, area)
 

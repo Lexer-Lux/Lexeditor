@@ -163,7 +163,8 @@ class Handler(PluginRequestHandler):
         query = parse_qs(parsed.query)
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
-                    '/api/map/view', '/api/map/geometry', '/api/chr/view', '/api/chr/geometry',
+                    '/api/map/view', '/api/map/geometry', '/api/map/geometries',
+                    '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx'):
             try:
@@ -251,6 +252,33 @@ class Handler(PluginRequestHandler):
                         result = viewport.model_geometry(
                             MAPSTORE.game_root, MAPSTORE.project, document.map_name, model,
                             frozenset(filter(None, query.get('known', [''])[0].split(','))) or None)
+                    elif path == '/api/map/geometries':
+                        # One request per progressive batch instead of one per
+                        # model: fewer round trips, and the known-texture set
+                        # builds across the batch, so repeated blobs are sent
+                        # once. Capped so one request stays small and one
+                        # broken model fails its own item, never the batch.
+                        document = MAPSTORE.get(query.get('map', [''])[0])
+                        by_name = {entry['name']: entry for entry in document.models}
+                        wanted = list(dict.fromkeys(
+                            name for name in query.get('models', [''])[0].split(',') if name))[:64]
+                        seen = set(filter(None, query.get('known', [''])[0].split(',')))
+                        items = {}
+                        for name in wanted:
+                            model = by_name.get(name)
+                            if model is None:
+                                items[name] = {'error': 'Unknown map model'}
+                                continue
+                            try:
+                                payload = viewport.model_geometry(
+                                    MAPSTORE.game_root, MAPSTORE.project, document.map_name,
+                                    model, frozenset(seen) or None)
+                            except (FormatError, OSError, ValueError) as error:
+                                items[name] = {'error': str(error)}
+                                continue
+                            items[name] = payload
+                            seen.update(payload.get('texture_ids', {}).values())
+                        result = {'items': items}
                     elif path == '/api/chr/view':
                         npc = int(query.get('npc', [''])[0])
                         document = STORE.get()

@@ -11,10 +11,30 @@ window.Ds1Viewport = (() => {
   // MSB rotation application order; axis-aligned pieces render the same
   // under any order, so multi-axis rotations are the unverified case.
   const ORDER = "XYZ";
+  // Base64 straight into bytes: atob plus a charCodeAt pass over
+  // some 200MB of geometry showed up in map opens, and one pass over
+  // the encoded text decodes several times faster. Inputs are the
+  // server's own padded base64, always a multiple of four chars.
+  const B64TABLE = (() => {
+    const table = new Uint8Array(256).fill(255);
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for (let i = 0; i < chars.length; i++) table[chars.charCodeAt(i)] = i;
+    table[61] = 0;
+    return table;
+  })();
   function b64(text) {
-    const raw = atob(text);
-    const out = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    const length = text.length;
+    const pad = length >= 2 && text.charCodeAt(length - 1) === 61
+      ? (text.charCodeAt(length - 2) === 61 ? 2 : 1) : 0;
+    const out = new Uint8Array((length * 3 >> 2) - pad);
+    let at = 0;
+    for (let i = 0; i < length; i += 4) {
+      const a = B64TABLE[text.charCodeAt(i)], b = B64TABLE[text.charCodeAt(i + 1)];
+      const c = B64TABLE[text.charCodeAt(i + 2)], d = B64TABLE[text.charCodeAt(i + 3)];
+      out[at++] = (a << 2) | (b >> 4);
+      if (at < out.length) out[at++] = ((b & 15) << 4) | (c >> 2);
+      if (at < out.length) out[at++] = ((c & 3) << 6) | d;
+    }
     return out;
   }
   const f32 = text => {
@@ -48,7 +68,6 @@ window.Ds1Viewport = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
-    host.append(canvas);
     const viewModes = LexeditorUI.modelViewModes(host);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 10000);
@@ -186,72 +205,23 @@ window.Ds1Viewport = (() => {
       if (info && info.available) wanted.push(part.model);
     }
     const unique = [...new Set(wanted)];
-    // Geometry loads in batches, each batch sending the texture
-    // content ids it already holds: a map repeats its textures per
-    // model, and responses omit known blobs (the id mapping stays,
-    // so per-model dicts rebuild from the shared store).
+    // Progressive loading: geometry streams in batches and each batch
+    // renders as it arrives, so the view is usable before the whole
+    // map has loaded. The canvas mounts on the first batch (the
+    // loading panel stays until then); data-ready still means every
+    // model is in and the camera is framed.
+    const BATCH = 16;
     const pngById = new Map();
     const seenIds = new Set();
-    const loaded = [];
-    for (let at = 0; at < unique.length; at += 8) {
-      if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
-      const known = [...seenIds].join(",");
-      const batch = await Promise.all(unique.slice(at, at + 8).map(async name => {
-        const response = await fetch(`/api/map/geometry?map=${encodeURIComponent(mapId)}&model=${encodeURIComponent(name)}` + (known ? `&known=${encodeURIComponent(known)}` : ""));
-        const data = await response.json();
-        if (!response.ok || data.error) throw new Error(data.error || response.statusText);
-        for (const [tex, digest] of Object.entries(data.texture_ids || {})) {
-          if (data.textures && data.textures[tex]) {
-            pngById.set(digest, data.textures[tex]);
-            seenIds.add(digest);
-          }
-        }
-        const rebuilt = {};
-        for (const [tex, digest] of Object.entries(data.texture_ids || {}))
-          if (pngById.has(digest)) rebuilt[tex] = pngById.get(digest);
-        data.textures = rebuilt;
-        return [name, data];
-      }));
-      loaded.push(...batch);
-    }
-    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
-    const wantedPngs = new Map();
-    for (const [name, data] of loaded)
-      for (const [tex, png] of Object.entries(data.textures || {})) {
-        const key = texKey(tex, png);
-        if (!wantedPngs.has(key)) wantedPngs.set(key, [tex, png]);
-      }
-    await Promise.all([...wantedPngs.values()].map(([tex, png]) => textureFor(tex, png)));
-    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
-    const wantedLights = new Map();
-    for (const [name, data] of loaded)
-      for (const mesh of data.meshes || []) {
-        const png = mesh.light && (data.textures || {})[mesh.light];
-        if (mesh.light && mesh.uv1 && png) {
-          const key = texKey(mesh.light, png);
-          if (!wantedLights.has(key)) wantedLights.set(key, [mesh.light, png]);
-        }
-      }
-    await Promise.all([...wantedLights.values()].map(([tex, png]) => lightTextureFor(tex, png)));
-    if (mine !== session || !host.isConnected) { renderer.dispose(); return null; }
     const geometries = new Map();
-    for (const [name, data] of loaded) {
-      geometries.set(name, data.meshes.map(mesh => {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
-        geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
-        if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
-        if (mesh.uv1) geo.setAttribute("uv1", new THREE.BufferAttribute(f32(mesh.uv1), 2));
-        geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
-        geo.computeBoundingSphere();
-        const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
-        entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh), isCutout(mesh));
-        return entry;
-      }));
-    }
     const root = new THREE.Group();
     scene.add(root);
     const groups = new Map();
+    const skyMeshes = [];
+    const box = new THREE.Box3();
+    let mapDiag = 0, skyDiag = 0;
+    let canvasOn = false, fullyLoaded = false, userMoved = false, progress = null;
+    controls.addEventListener("start", () => { userMoved = true; });
     const MOVABLE = new Set([1, 2, 4, 9, 10]);
     const place = (group, part) => {
       group.position.set(part.pos[0], part.pos[1], part.pos[2]);
@@ -260,34 +230,16 @@ window.Ds1Viewport = (() => {
       group.userData.part = {key: part.key, name: part.name, kind: part.kind, model: part.model,
         movable: MOVABLE.has(Number(String(part.key).split(":")[0]))};
     };
-    const skyMeshes = [];
-    for (const part of view.parts) {
-      if (isMarker(part)) continue;
-      const geos = geometries.get(part.model);
-      if (!geos) continue;
-      const group = new THREE.Group();
-      place(group, part);
-      for (const entry of geos) {
-        const mesh = new THREE.Mesh(entry.geo, entry.mat);
-        mesh.userData.sky = entry.sky;
-        mesh.userData.fx = entry.fx;
-        group.add(mesh);
-        if (entry.sky) skyMeshes.push(mesh);
-      }
-      root.add(group);
-      groups.set(part.key, group);
-    }
-    root.updateMatrixWorld(true);
-    for (const mesh of skyMeshes) {
-      mesh.geometry.computeBoundingBox();
-      mesh.userData.worldBox = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
-    }
-    const box = new THREE.Box3();
-    root.traverse(obj => { if (obj.isMesh && !obj.userData.sky && !obj.userData.fx) box.expandByObject(obj); });
-    const mapDiag = box.isEmpty() ? 0 : box.getSize(new THREE.Vector3()).length();
-    let skyDiag = 0;
-    for (const mesh of skyMeshes)
-      skyDiag = Math.max(skyDiag, mesh.userData.worldBox.getSize(new THREE.Vector3()).length());
+    const frameCamera = () => {
+      if (box.isEmpty()) return;
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z + size * 0.6);
+      camera.far = Math.max(1000, size * 10);
+      camera.updateProjectionMatrix();
+      controls.target.copy(center);
+      controls.update();
+    };
     // The depth buffer's precision dies with range: near 0.1 under a
     // far plane past the horizon shimmered every distant overlap.
     // Fit both planes to the map's own box instead, every frame, so
@@ -300,15 +252,6 @@ window.Ds1Viewport = (() => {
       camera.far = dist + span * 1.2 + 1;
       camera.updateProjectionMatrix();
     };
-    if (!box.isEmpty()) {
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z + size * 0.6);
-      camera.far = Math.max(1000, size * 10);
-      camera.updateProjectionMatrix();
-      controls.target.copy(center);
-      controls.update();
-    }
     const resize = () => {
       const width = host.clientWidth || 800, height = host.clientHeight || 520;
       renderer.setSize(width, height);
@@ -393,7 +336,6 @@ window.Ds1Viewport = (() => {
         });
       }
     });
-    loading.remove();resize();
     const ray = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let down = null, downPos = null, downRot = null;
@@ -480,6 +422,7 @@ window.Ds1Viewport = (() => {
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
+      if (progress) progress.remove();
       delete host.dataset.ready;
       for (const geos of geometries.values()) for (const entry of geos) entry.geo.dispose();
       front.dispose();
@@ -494,14 +437,136 @@ window.Ds1Viewport = (() => {
       fitDepth();
       for (const mesh of skyMeshes) mesh.visible = mesh.userData.worldBox.containsPoint(camera.position);
       renderer.render(scene, camera);
-      if (++frames === 2) host.dataset.ready = "true";
+      if (fullyLoaded && ++frames === 2) host.dataset.ready = "true";
       requestAnimationFrame(loop);
     };
     viewModes.bindScene(scene);
     // Test seam: the checks find lightmapped materials through this.
     host._viewportScene = scene;
     host._viewportCamera = camera;
-    loop();
+    const mountCanvas = () => {
+      if (canvasOn) return;
+      canvasOn = true;
+      host.append(canvas);
+      loading.remove();
+      resize();
+      frameCamera();
+      loop();
+    };
+    const showProgress = (done, total) => {
+      if (!progress) {
+        progress = document.createElement("div");
+        progress.style.cssText = "position:absolute;right:8px;bottom:8px;z-index:5;pointer-events:none;";
+        host.append(progress);
+      }
+      progress.replaceChildren(LexeditorUI.loadingStatus(`Loading models ${done}/${total}`));
+    };
+    const ingest = async batch => {
+      if (mine !== session || !host.isConnected) return false;
+      mountCanvas();
+      const fresh = new Map();
+      for (const [name, data] of batch)
+        for (const [tex, png] of Object.entries(data.textures || {})) {
+          const key = texKey(tex, png);
+          if (!texCache.has(key) && !fresh.has(key)) fresh.set(key, [tex, png]);
+        }
+      await Promise.all([...fresh.values()].map(([tex, png]) => textureFor(tex, png)));
+      if (mine !== session || !host.isConnected) return false;
+      const freshLit = new Map();
+      for (const [name, data] of batch)
+        for (const mesh of data.meshes || []) {
+          const png = mesh.light && (data.textures || {})[mesh.light];
+          if (mesh.light && mesh.uv1 && png) {
+            const key = texKey(mesh.light, png);
+            if (!lightCache.has(key) && !freshLit.has(key)) freshLit.set(key, [mesh.light, png]);
+          }
+        }
+      await Promise.all([...freshLit.values()].map(([tex, png]) => lightTextureFor(tex, png)));
+      if (mine !== session || !host.isConnected) return false;
+      for (const [name, data] of batch) {
+        geometries.set(name, data.meshes.map(mesh => {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
+          geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+          if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
+          if (mesh.uv1) geo.setAttribute("uv1", new THREE.BufferAttribute(f32(mesh.uv1), 2));
+          geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
+          geo.computeBoundingSphere();
+          geo.computeBoundingBox();
+          const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
+          entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh), isCutout(mesh));
+          return entry;
+        }));
+      }
+      const names = new Set(batch.map(([name]) => name));
+      for (const part of view.parts) {
+        if (isMarker(part) || groups.has(part.key)) continue;
+        const geos = geometries.get(part.model);
+        if (!geos || !names.has(part.model)) continue;
+        const group = new THREE.Group();
+        place(group, part);
+        for (const entry of geos) {
+          const mesh = new THREE.Mesh(entry.geo, entry.mat);
+          mesh.userData.sky = entry.sky;
+          mesh.userData.fx = entry.fx;
+          group.add(mesh);
+          if (entry.sky) skyMeshes.push(mesh);
+        }
+        root.add(group);
+        groups.set(part.key, group);
+        group.updateWorldMatrix(true, true);
+        for (const mesh of group.children) {
+          if (mesh.userData.sky) {
+            mesh.userData.worldBox = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+          } else if (!mesh.userData.fx) {
+            box.expandByObject(mesh);
+          }
+        }
+      }
+      if (!box.isEmpty()) mapDiag = box.getSize(new THREE.Vector3()).length();
+      for (const mesh of skyMeshes)
+        skyDiag = Math.max(skyDiag, mesh.userData.worldBox.getSize(new THREE.Vector3()).length());
+      // Keep the growing scene framed unless the reader already took
+      // the camera; the final frame still matches a full load exactly.
+      if (!userMoved) frameCamera();
+      return true;
+    };
+    // One request per batch of models instead of one per model; each
+    // batch renders as it arrives. Texture blobs ride the shared
+    // content-id store as before, so repeats cross the wire once.
+    for (let at = 0; at < unique.length; at += BATCH) {
+      if (mine !== session || !host.isConnected) { stop(host); return null; }
+      const names = unique.slice(at, at + BATCH);
+      const known = [...seenIds].join(",");
+      const response = await fetch(`/api/map/geometries?map=${encodeURIComponent(mapId)}&models=${names.map(encodeURIComponent).join(",")}` + (known ? `&known=${encodeURIComponent(known)}` : ""));
+      const data = await response.json();
+      if (!response.ok || data.error) { stop(host); throw new Error(data.error || response.statusText); }
+      const batch = [];
+      for (const name of names) {
+        const item = (data.items || {})[name];
+        if (!item || item.error) continue;
+        for (const [tex, digest] of Object.entries(item.texture_ids || {})) {
+          if (item.textures && item.textures[tex]) {
+            pngById.set(digest, item.textures[tex]);
+            seenIds.add(digest);
+          }
+        }
+        const rebuilt = {};
+        for (const [tex, digest] of Object.entries(item.texture_ids || {}))
+          if (pngById.has(digest)) rebuilt[tex] = pngById.get(digest);
+        item.textures = rebuilt;
+        batch.push([name, item]);
+      }
+      if (!await ingest(batch)) { stop(host); return null; }
+      showProgress(Math.min(at + BATCH, unique.length), unique.length);
+    }
+    if (mine !== session || !host.isConnected) { stop(host); return null; }
+    mountCanvas();
+    // The final frame matches a full load exactly unless the reader
+    // already orbited the partial view; then their camera stands.
+    if (!userMoved) frameCamera();
+    if (progress) { progress.remove(); progress = null; }
+    fullyLoaded = true;
     return controller;
   }
   // Read-only character view: bind-pose mesh, dummy points, the
