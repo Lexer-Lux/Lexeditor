@@ -15269,8 +15269,164 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const transform=`translate(${x}px,${y}px)`;
     if(help.style.transform!==transform)help.style.transform=transform;
   };
+  // Field labels in one pane take one size, the way one sub-tab bar's names
+  // and one list's row text already do: every label is only as small as the
+  // longest needs. Fitted one at a time, a renamed label kept the size its
+  // old text needed while its neighbours kept full size (DS1 Items > Ammo >
+  // Standard Arrow > Defense showed "Strike" at 10px beside 15px neighbours
+  // after "Strike Guard Cut Rate" was shortened). The entry carries the base
+  // font beside the box and text, so a later base change refits instead of
+  // leaving stale sizes behind. A stacked field's label spans the whole row
+  // instead of the shared lane, so it keeps its own size and fits alone.
+  const FIELD_LABEL_SELECTOR = '.lex-detail-field-label';
+  const fieldLabelScope = label =>
+    label.closest('.lex-detail-panel') ||
+    label.closest('.lex-dialog') ||
+    label.closest('.lex-tweak-card-grid') ||
+    label.closest('.lex-detail-section') ||
+    label.closest('main') ||
+    document.body;
+  const scopeFieldLabels = scope => [...scope.querySelectorAll(FIELD_LABEL_SELECTOR)]
+    .filter(label => fieldLabelScope(label) === scope &&
+      !label.parentElement?.classList.contains('lex-detail-field-stacked') &&
+      label.getClientRects().length);
+  // A label's base size is what it inherits: no rule sets a field label's
+  // own font size, so the field it sits in reads the same without clearing
+  // the fitted size first.
+  const fieldLabelBase = label => parseFloat(getComputedStyle(label.parentElement).fontSize) || 12;
+  const scopedFieldKey = (label, base) => `${fitKey(label)}|${base}`;
+  // Width gets no slack: a word may no longer wrap mid-way, so a name one
+  // pixel too wide pokes past the label edge every other name ends on.
+  // A name is never shrunk past what can be read. The floor was one pixel,
+  // and a long property name in a narrow lane came out as a smear. A name
+  // that still does not fit at the floor keeps the percentage lane.
+  const labelFits = label => {
+    const box=label.getBoundingClientRect(),css=getComputedStyle(label);
+    const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
+    if(labelTextOutside(label))return false;
+    const outsidePadding=[...label.children].some(child=>{
+      const bounds=child.getBoundingClientRect();
+      return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
+    });
+    return !outsidePadding && label.scrollHeight <= label.clientHeight + 1 && label.scrollWidth <= label.clientWidth && labelLeftOverflow(label)<=1;
+  };
+  // The lane width that lays this name out on at most two lines at its
+  // size now: the narrowest width its words split into two lines on, plus
+  // the help mark and padding. Each candidate line is measured as one range
+  // so the spaces between its words count; a range per word left them out
+  // (a trailing space has no box) and the lane came out four pixels short.
+  // A name that is not plain words (a chip with an icon in it) asks for
+  // nothing.
+  const needTwoLines = label => {
+    const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
+    const node = nameText?.childNodes.length === 1 && nameText.firstChild.nodeType === Node.TEXT_NODE
+      ? nameText.firstChild : null;
+    if (!node) return 0;
+    const words = [...node.data.matchAll(/\S+/g)].map(match => ({at: match.index, to: match.index + match[0].length}));
+    if (!words.length) return 0;
+    const range = document.createRange();
+    const ink = (from, to) => {
+      range.setStart(node, from);
+      range.setEnd(node, to);
+      return range.getBoundingClientRect().width;
+    };
+    let best = ink(words[0].at, words[words.length - 1].to);
+    for (let split = 0; split + 1 < words.length; split++) {
+      best = Math.min(best, Math.max(ink(words[0].at, words[split].to), ink(words[split + 1].at, words[words.length - 1].to)));
+    }
+    const css = getComputedStyle(label);
+    const help = label.querySelector(':scope > .lex-field-help');
+    const mark = help ? help.getBoundingClientRect().width + (parseFloat(css.columnGap) || 0) : 0;
+    return Math.ceil(best + mark + (parseFloat(css.paddingLeft) || 0) + (parseFloat(css.paddingRight) || 0) + 2);
+  };
+  const fitFieldLabelScope = (scope, hint) => {
+    if (!(scope instanceof Element) || !scope.isConnected) return;
+    // The common pass: the label that asked still fits at the size it has,
+    // for the box, text and base it has now. Reads only, so the whole sweep
+    // answers from one layout.
+    if (hint instanceof HTMLElement && fieldLabelScope(hint) === scope &&
+        !hint.parentElement?.classList.contains('lex-detail-field-stacked')) {
+      const base = fieldLabelBase(hint);
+      if (fitted.get(hint) === scopedFieldKey(hint, base) && labelFits(hint)) return;
+    }
+    const labels = scopeFieldLabels(scope);
+    if (!labels.length) return;
+    const base = fieldLabelBase(labels[0]);
+    if (labels.every(label => fitted.get(label) === scopedFieldKey(label, base) && labelFits(label))) return;
+    labels.forEach(label => {
+      label.style.fontSize = '';
+      const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
+      if (nameText) nameText.style.width = '';
+    });
+    // Names that all fit at full size keep it. Wrapping comes before
+    // shrinking, so a name that fits on two lines never shrinks for it.
+    if (labels.every(labelFits)) {
+      labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
+      return;
+    }
+    // A name that only fits on three lines asks for the room first: the
+    // lane grows to lay every name out on at most two lines at full size,
+    // capped at half the row. Past the cap the shrink below applies.
+    const pane = labels[0].closest('.lex-tweak-card-grid') || labels[0].parentElement?.parentElement;
+    const cap = Math.min(...labels.map(label => label.parentElement.clientWidth)) / 2;
+    if (pane && cap > 0) {
+      const needy = labels.filter(label => !labelFits(label));
+      let need = 0;
+      if (needy.length) {
+        // Line inks must be measured unwrapped: a range over a wrapped line
+        // reads its longest line, not the line being asked for, and the lane
+        // came out forty pixels short.
+        needy.forEach(label => { label.style.whiteSpace = 'nowrap'; });
+        for (const label of needy) need = Math.max(need, needTwoLines(label));
+        needy.forEach(label => { label.style.whiteSpace = ''; });
+      }
+      const floor = Math.min(cap, need);
+      if (floor > (parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0)) {
+        pane.style.setProperty('--lex-detail-label-floor', `${Math.ceil(floor)}px`);
+        if (labels.every(labelFits)) {
+          labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
+          return;
+        }
+      }
+    }
+    let size = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
+    while (size > LABEL_MIN_PX && !labels.every(labelFits)) {
+      size = Math.max(LABEL_MIN_PX, size - .5);
+      labels.forEach(label => { label.style.fontSize = `${size}px`; });
+    }
+    for (const label of labels) {
+      if (label.scrollWidth > label.clientWidth) {
+        // At the font floor a long word and its help mark still overran the
+        // lane, and the mark sat on the value ("Requirement: STR" in DS1
+        // Stats). The pane's lane grows just enough (framework.css), so every
+        // name in it keeps one edge.
+        const pane=label.closest('.lex-tweak-card-grid')||label.parentElement?.parentElement;
+        const need=Math.ceil(label.scrollWidth+1);
+        if(pane&&need>(parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor'))||0))
+          pane.style.setProperty('--lex-detail-label-floor',`${need}px`);
+      }
+      // A wrapped name's box is as wide as its lane, not its longest line, so
+      // in a lane widened for a neighbour the help mark sat far past "Crit /
+      // bonus". The box hugs the longest line and the mark follows the name.
+      const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
+      if (nameText && label.querySelector(':scope > .lex-field-help')) {
+        const range=document.createRange();range.selectNodeContents(nameText);
+        const lines=[...range.getClientRects()].filter(box=>box.width&&box.height);
+        const scale=nameText.getBoundingClientRect().width/(nameText.offsetWidth||1)||1;
+        if (lines.length>1) nameText.style.width=`${Math.ceil(Math.max(...lines.map(box=>box.width))/scale)+1}px`;
+      }
+      placeBooleanHelp(label);
+      fitted.set(label, scopedFieldKey(label, base));
+    }
+  };
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
+    // A label in the shared lane is fitted with its pane, never alone.
+    if (label.classList.contains('lex-detail-field-label') &&
+        !label.parentElement?.classList.contains('lex-detail-field-stacked')) {
+      fitFieldLabelScope(fieldLabelScope(label), label);
+      return;
+    }
     // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
     if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1 && !labelTextOutside(label)) return;
@@ -15316,26 +15472,11 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       fitted.set(label,fitKey(label));
       return;
     }
-    // Width gets no slack: a word may no longer wrap mid-way, so a name one
-    // pixel too wide pokes past the label edge every other name ends on.
-    // A name is never shrunk past what can be read. The floor was one pixel,
-    // and a long property name in a narrow lane came out as a smear. A name
-    // that still does not fit at the floor keeps the percentage lane.
-    const overflows = () => {
-      const box=label.getBoundingClientRect(),css=getComputedStyle(label);
-      const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
-      if(labelTextOutside(label))return true;
-      const outsidePadding=[...label.children].some(child=>{
-        const bounds=child.getBoundingClientRect();
-        return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
-      });
-      return outsidePadding || label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
-    };
     // A record's name stops shrinking at 14px while wrapping can still help;
     // one long word that fits nowhere keeps shrinking to the shared floor
     // rather than being clipped.
     for (const minimum of label.classList.contains('lex-detail-panel-name') ? [14, LABEL_MIN_PX] : [LABEL_MIN_PX]) {
-      while (size > minimum && overflows()) {
+      while (size > minimum && !labelFits(label)) {
         size = Math.max(minimum,size-.5);
         label.style.fontSize = `${size}px`;
       }
@@ -15625,7 +15766,25 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const added = [];
     const strips = new Set();
     for (const record of records) {
-      for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+      for (const node of record.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        added.push(node);
+        // A node added inside a fitted label is not a label itself and holds
+        // none, so the pass below would find nothing in it: an in-place
+        // rename swapping its name span back in. The label around it is what
+        // must refit.
+        const outer = node.closest(LABEL_SELECTOR) || node.closest('.lex-column-cell-text');
+        if (outer && outer !== node) added.push(outer);
+      }
+      // A rename, undo or language swap changes text and adds no element; the
+      // label holding that text is what must refit. Plain row text is its own
+      // label.
+      if (record.type === 'characterData' ||
+          [...record.addedNodes, ...record.removedNodes].some(node => !(node instanceof Element))) {
+        const host = record.target instanceof Element ? record.target : record.target.parentElement;
+        const label = host?.closest?.(LABEL_SELECTOR) || host?.closest?.('.lex-column-cell-text');
+        if (label) added.push(label);
+      }
       // The strip is fitted here, in the mutation itself, rather than in the
       // next animation frame like the rest of the pass. A frame that has not
       // painted yet never receives one, and FF7's editor page can sit in that
@@ -15639,7 +15798,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     strips.forEach(nav => fitNavStrip(nav, true));
     if (added.length) scheduleFit(added);
   });
-  labelObserver.observe(document.documentElement, {childList: true, subtree: true});
+  labelObserver.observe(document.documentElement, {childList: true, subtree: true, characterData: true});
   window.addEventListener('resize', () => scheduleFit());
   // A panel split drag resizes the lane without adding a node or resizing the
   // window, so watch the region the fields actually live in as well.
