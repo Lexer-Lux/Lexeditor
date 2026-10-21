@@ -2721,25 +2721,50 @@
   // What each material looked like before any mode touched it, so Regular
   // restores exactly that. Keyed weakly: a disposed scene takes its entries.
   const modelViewModeStash = new WeakMap();
+  const modelViewModeLightStash = new WeakMap();
   const applyModelViewMode = (scene, mode) => {
     if (!scene || typeof scene.traverse !== "function") return;
+    const bright = mode === "fullbright";
     scene.traverse(obj => {
+      if (!obj || typeof obj !== "object") return;
+      // Fullbright is unlit: the lamps go out while it lasts, so a
+      // shaded material shows only its own glow. Regular and
+      // Wireframe put the rig back exactly as it was.
+      if (obj.isLight) {
+        if (!modelViewModeLightStash.has(obj))
+          modelViewModeLightStash.set(obj, {visible: obj.visible});
+        obj.visible = bright ? false : modelViewModeLightStash.get(obj).visible;
+      }
       const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
       for (const mat of mats) {
         if (!mat || typeof mat !== "object") continue;
-        if (!modelViewModeStash.has(mat)) modelViewModeStash.set(mat, {
-          emissive: mat.emissive && typeof mat.emissive.getHex === "function" ? mat.emissive.getHex() : null,
-          emissiveMap: mat.emissiveMap || null,
-          emissiveIntensity: mat.emissiveIntensity ?? 1,
-          wireframe: !!mat.wireframe,
-        });
+        if (!modelViewModeStash.has(mat)) {
+          const saved = {
+            emissive: mat.emissive && typeof mat.emissive.getHex === "function" ? mat.emissive.getHex() : null,
+            emissiveMap: mat.emissiveMap || null,
+            emissiveIntensity: mat.emissiveIntensity ?? 1,
+            wireframe: !!mat.wireframe,
+          };
+          // Only what the material actually carries, so lighter
+          // fakes and helper materials pass through untouched.
+          for (const key of ["lightMap", "aoMap", "vertexColors"])
+            if (key in mat) saved[key] = mat[key];
+          modelViewModeStash.set(mat, saved);
+        }
         const saved = modelViewModeStash.get(mat);
         if ("wireframe" in mat) mat.wireframe = mode === "wireframe" ? true : saved.wireframe;
+        // Baked and darkened surfaces join the glow: no light or
+        // occlusion map and no darkening vertex colours, so an
+        // unlit material shows its own map at full brightness.
+        if ("lightMap" in saved) mat.lightMap = bright ? null : saved.lightMap;
+        if ("aoMap" in saved) mat.aoMap = bright ? null : saved.aoMap;
+        if ("vertexColors" in saved) mat.vertexColors = bright ? false : saved.vertexColors;
         if (mat.emissive && typeof mat.emissive.setHex === "function") {
-          // Fullbright without touching the light rig: the material glows in
-          // its own colors, textured or flat. Lines and points have no
-          // emissive and are unlit already, so they are left alone.
-          if (mode === "fullbright") {
+          // The material glows in its own colors, textured or flat,
+          // and with the lamps out that glow is the whole picture.
+          // Lines and points have no emissive and are unlit already,
+          // so they are left alone.
+          if (bright) {
             if (mat.map) { mat.emissive.setHex(0xffffff); mat.emissiveMap = mat.map; }
             else if (mat.color && typeof mat.color.getHex === "function") {
               mat.emissive.setHex(mat.color.getHex()); mat.emissiveMap = null;
@@ -2751,7 +2776,7 @@
             if ("emissiveIntensity" in mat) mat.emissiveIntensity = saved.emissiveIntensity;
           }
         }
-        // Swapping the emissive map changes the compiled shader.
+        // Swapping maps changes the compiled shader.
         mat.needsUpdate = true;
       }
     });

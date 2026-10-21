@@ -66,9 +66,16 @@ window.Ds1Viewport = (() => {
     // Matched by material name, the only sky signal in the format.
     const isSky = mesh => (mesh.mat_def || "").toLowerCase().includes("sky");
     // Additive-blend effects (light shafts, clouds, glows) are transparent
-    // in the game; opaque here they would occlude the map. Alpha-test (_Alp)
-    // materials stay opaque: most are foliage cutouts, solid without textures.
+    // in the game; opaque here they would occlude the map.
     const isEffect = mesh => (mesh.mat_def || "").toLowerCase().includes("_add");
+    // Alpha-test (_Alp) materials are cutouts in the game: foliage
+    // leaves and damage, stain and water decals floating just above
+    // a surface. Opaque here they draw their empty texels as black
+    // quads and fight the surface beneath (a fully transparent
+    // Depths decal drew black everywhere), so textured ones cut at
+    // half alpha and sit slightly above their surface. Untextured
+    // ones stay solid, as before.
+    const isCutout = mesh => (mesh.mat_def || "").toLowerCase().includes("_alp");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
     // Water shaders ([We]) name no diffuse, only a bump map, so the
@@ -137,26 +144,33 @@ window.Ds1Viewport = (() => {
       }
       return lightCache.get(key);
     };
-    const materialFor = (mesh, texturesByName, fx, waterMesh) => {
+    const materialFor = (mesh, texturesByName, fx, waterMesh, cutout) => {
       const plain = waterMesh ? water : fx ? effect : mesh.cull !== false ? front : double;
       const png = mesh.map && texturesByName && texturesByName[mesh.map];
       const image = mesh.map && mesh.uv && png ? texCache.get(texKey(mesh.map, png)) : null;
       if (!image) return plain;
       const litPng = mesh.light && mesh.uv1 && texturesByName && texturesByName[mesh.light];
       const lit = !fx && litPng ? lightCache.get(texKey(mesh.light, litPng)) : null;
-      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}`;
+      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}`;
       if (!matCache.has(key)) {
         // Baked meshes skip the scene rig exactly like the game: map
         // times light, nothing else. Basic divides the light by pi, so
         // the intensity puts the baked values back to authored levels.
+        // Cutouts discard their empty texels instead of drawing them
+        // black, and the offset lifts them off the surface beneath.
+        // Effects already blend, so they cut nothing.
+        const cut = cutout && !fx
+          ? {alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -1,
+             polygonOffsetUnits: -1}
+          : {};
         const textured = fx
           ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
               side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false})
           : lit
             ? new THREE.MeshBasicMaterial({map: image, lightMap: lit,
-                lightMapIntensity: Math.PI})
+                lightMapIntensity: Math.PI, ...cut})
             : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
-                side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide});
+                side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut});
         matCache.set(key, textured);
         disposable.push(textured);
       }
@@ -231,7 +245,7 @@ window.Ds1Viewport = (() => {
         geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
         geo.computeBoundingSphere();
         const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
-        entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh));
+        entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh), isCutout(mesh));
         return entry;
       }));
     }

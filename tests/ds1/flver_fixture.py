@@ -41,7 +41,7 @@ def make_chrbnd(flver_bytes, stem='c1200', extra=(), dcx=True):
 def build_flver(strip=False, qloc=False, bones=None, skin=None,
                 pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False,
                 light_tex=None, mesh_count=1, tex_name='tex0',
-                mtd_name='M[D].mtd'):
+                mtd_name='M[D].mtd', packed_uv=False):
     """A minimal FLVER2 0x2000C: mesh_count quads, 1 material, N bones, 1 dummy.
 
     `strip` stores the faces as a triangle strip; `qloc` writes a lying
@@ -52,6 +52,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     the quad. `mesh_count` is 1 or 0 (a skeleton-only rig, like the
     player base); `tex_name` is the diffuse texture's path; `mtd_name`
     is the material definition (water shaders name Water).
+    `packed_uv` stores both UV sets in one 0x16 member, the way
+    Depths map pieces do, instead of two 0x15 members.
     """
     if bones is None:
         bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
@@ -61,6 +63,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
         raise ValueError('qloc covers the single-bone unskinned layout only')
     if second_uv and (qloc or skin is not None):
         raise ValueError('second_uv covers the plain unskinned layout only')
+    if packed_uv and (qloc or skin is not None or strip or second_uv):
+        raise ValueError('packed_uv covers the plain unskinned layout only')
     if mesh_count not in (0, 1):
         raise ValueError('mesh_count is 1 or 0')
     if not mesh_count and (strip or qloc or skin is not None or second_uv):
@@ -119,7 +123,7 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
         out.extend(blob)
         return at
 
-    members = [(0, 0x02, 0), (3, 0x13, 0), (5, 0x15, 0)]
+    members = [(0, 0x02, 0), (3, 0x13, 0), (5, 0x16 if packed_uv else 0x15, 0)]
     if qloc:
         members = [(0, 0x02, 0), (2, 0x11, 0), (3, 0x13, 0), (10, 0x13, 0), (5, 0x15, 0)]
     elif skin is not None:
@@ -170,11 +174,16 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
                 ids, weights = skin[num]
                 verts.extend(bytes(ids))
                 verts.extend(bytes(round(min(max(w, 0.0), 1.0) * 255) for w in weights))
-            verts.extend(struct.pack('<2h', round(x * 1024), round(y * 1024)))
+            if packed_uv:
+                verts.extend(struct.pack('<4h', round(x * 1024), round(y * 1024),
+                                        round((x + 10) * 1024), round((y + 20) * 1024)))
+            else:
+                verts.extend(struct.pack('<2h', round(x * 1024), round(y * 1024)))
             if second_uv:
                 verts.extend(struct.pack('<2h', round((x + 10) * 1024), round((y + 20) * 1024)))
         vtx_at = place(bytes(verts))
-        stride = 32 if qloc else (28 if skin is not None else (24 if second_uv else 20))
+        stride = 32 if qloc else (28 if skin is not None
+                                 else (24 if (second_uv or packed_uv) else 20))
         data_len = len(out) - data_at
     else:
         while len(out) % 16:

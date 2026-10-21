@@ -152,18 +152,25 @@ def _decode_member(semantic, format_enum, chunk):
             return [struct.unpack('<2f', chunk)]
         if format_enum == 0x02:
             return [struct.unpack('<3f', chunk)[:2]]
+        # Four-component members pack the lightmap pair after the
+        # diffuse pair (every 0x16 array in the Depths sits on a
+        # lightmapped material, its second pair inside [0, 1] while
+        # the first tiles). Both pairs ship; the vertex array routes
+        # the second to the lightmap set.
         if format_enum == 0x03:
-            u0, v0, _u1, _v1 = struct.unpack('<4f', chunk)
-            return [(u0, v0)]
+            u0, v0, u1, v1 = struct.unpack('<4f', chunk)
+            return [(u0, v0), (u1, v1)]
         if format_enum in (0x10, 0x11, 0x12, 0x13, 0x15):
             u, v = struct.unpack('<2h', chunk)
             return [(u / UV_FACTOR, v / UV_FACTOR)]
         if format_enum == 0x16:
-            u, v, _u1, _v1 = struct.unpack('<4h', chunk)
-            return [(u / UV_FACTOR, v / UV_FACTOR)]
+            u, v, u1, v1 = struct.unpack('<4h', chunk)
+            return [(u / UV_FACTOR, v / UV_FACTOR),
+                    (u1 / UV_FACTOR, v1 / UV_FACTOR)]
         if format_enum in (0x1A, 0x2E):
-            u, v, _a, _b = struct.unpack('<4h', chunk)
-            return [(u / UV_FACTOR, v / UV_FACTOR)]
+            u, v, u1, v1 = struct.unpack('<4h', chunk)
+            return [(u / UV_FACTOR, v / UV_FACTOR),
+                    (u1 / UV_FACTOR, v1 / UV_FACTOR)]
     elif semantic == WEIGHTS:
         if format_enum == 0x10:
             return [tuple(v / 127.0 for v in struct.unpack('<4b', chunk))]
@@ -432,13 +439,16 @@ class FlverDocument:
                     normals.extend(value)
                 elif semantic == UV:
                     # Map pieces carry a lightmap pair after the diffuse
-                    # pair; merging them doubled the list and the encoder
-                    # shipped no UVs at all. A third set has never been
+                    # pair, either as a second member or packed into one
+                    # four-component member. A third set has never been
                     # seen; it is ignored rather than corrupting set two.
                     if uv_seen == 0:
-                        uvs.extend(value)
+                        uvs.extend(value[:1])
+                        if len(value) > 1:
+                            uvs2.extend(value[1:2])
+                            uv_seen += 1
                     elif uv_seen == 1:
-                        uvs2.extend(value)
+                        uvs2.extend(value[:1])
                     uv_seen += 1
                 elif semantic == WEIGHTS:
                     weights.extend(value)

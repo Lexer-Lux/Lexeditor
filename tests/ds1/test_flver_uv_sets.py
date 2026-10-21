@@ -48,13 +48,31 @@ def test_single_uv_mesh_has_empty_second_set():
 
 
 def test_lightmapped_single_uv_mesh_reuses_diffuse_uvs():
-    # Depths pieces (m2130B0A10 et al) carry one UV pair per vertex
-    # and an [L]-suffixed lightmapped material: 0 of 688 meshes in
-    # m10_00_00_00 ship a second set. The game samples the lightmap
-    # with the diffuse interpolants, so the encoder repeats uv as
-    # uv1 instead of leaving the light path dead (fullbright map).
+    # A lightmapped mesh with genuinely one UV set (a lone 0x15
+    # member) has no lightmap interpolants of its own, so the
+    # encoder repeats uv as uv1 instead of leaving the light path
+    # dead (fullbright map).
     entry = _encode(FlverDocument(build_flver(light_tex='lit0')),
                     textured=True)['meshes'][0]
     assert entry['light'] == 'lit0'
     assert base64.b64decode(entry['uv1']) != b''
     assert unpack(entry['uv1']) == unpack(entry['uv'])
+
+
+def test_packed_uv_member_splits_into_both_sets():
+    # Depths pieces (m2080B0 et al) pack the lightmap pair into
+    # the same 0x16 member as the diffuse pair. The parser used
+    # to drop the second pair, so the whole map sampled its
+    # lightmap atlases with tiling diffuse UVs: black walls and
+    # glitched ceilings. Both pairs survive now.
+    mesh = FlverDocument(build_flver(packed_uv=True)).mesh_data(0)
+    assert len(mesh['positions']) == 4
+    assert mesh['uvs'] == [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    assert mesh['uvs2'] == [(10.0, 20.0), (11.0, 20.0), (11.0, 21.0), (10.0, 21.0)]
+
+
+def test_encode_ships_packed_second_set_as_uv1():
+    entry = _encode(FlverDocument(build_flver(packed_uv=True, light_tex='lit0')),
+                    textured=True)['meshes'][0]
+    assert unpack(entry['uv']) == (0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0)
+    assert unpack(entry['uv1']) == (10.0, 20.0, 11.0, 20.0, 11.0, 21.0, 10.0, 21.0)
