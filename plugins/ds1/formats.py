@@ -113,6 +113,8 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
 # instead of the status. HP and stamina take their bar frames (red and
 # green boxes, gold outline); MP takes the stamina frame tinted
 # mana-mod blue (vanilla has no MP frame).
+# Every guard-stability field (shields, enemies, upgrade tiers, effects, attacks)
+# takes the crested shield the weapon screen shows beside Stability.
 _FIELD_ICONS = {}
 for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
@@ -168,6 +170,12 @@ for _table, _keys, _kinds in (
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('hp', 'mp', 'stamina', 'staminaRecoverBaseVel'),
          ('hp', 'mp', 'stamina', 'stamina')),
+        ('NpcParam', ('staminaGuardDef',), ('stability',)),
+        ('EquipParamWeapon', ('staminaGuardDef',), ('stability',)),
+        ('ReinforceParamWeapon', ('staminaGuardDefRate',), ('stability',)),
+        ('SpEffectParam', ('guardStaminaCutRate',), ('stability',)),
+        ('AtkParam_Npc', ('guardStaminaCutRate',), ('stability',)),
+        ('AtkParam_Pc', ('guardStaminaCutRate',), ('stability',)),
         ('NpcParam', ('getSoul',), ('souls',)),
         ('NpcParam', ('humanityLotId',), ('humanity',)),
         ('EquipParamGoods', ('consumeHeroPoint',), ('humanity',)),

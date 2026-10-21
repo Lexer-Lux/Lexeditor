@@ -84,7 +84,7 @@ def test_label_cells_cover_the_equipment_screen():
                                  'str', 'dex', 'int', 'faith', 'weight', 'durability',
                                  'poison', 'toxic', 'bleed', 'curse', 'poise',
                                  'vit', 'att', 'end', 'res', 'souls', 'slot',
-                                 'hp', 'stamina', 'mp', 'divine', 'occult'}
+                                 'hp', 'stamina', 'mp', 'divine', 'occult', 'stability'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
@@ -156,7 +156,12 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('NpcParam', 'isWeakA')] == 'occult'
     assert found[('EquipParamWeapon', 'antSaintDamageRate')] == 'divine'
     assert found[('EquipParamWeapon', 'antWeakA_DamageRate')] == 'occult'
-    assert ('NpcParam', 'staminaGuardDef') not in found
+    for table, key in (('NpcParam', 'staminaGuardDef'), ('EquipParamWeapon', 'staminaGuardDef'),
+                       ('ReinforceParamWeapon', 'staminaGuardDefRate'),
+                       ('SpEffectParam', 'guardStaminaCutRate'),
+                       ('AtkParam_Npc', 'guardStaminaCutRate'), ('AtkParam_Pc', 'guardStaminaCutRate')):
+        assert found[(table, key)] == 'stability', (table, key)
+    assert icons.LABELS['stability'] == (169, 87, 211, 129)
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
     assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
     assert found[('NpcParam', 'mp')] == 'mp'

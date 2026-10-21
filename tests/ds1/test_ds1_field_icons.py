@@ -91,6 +91,7 @@ def test_poise_and_humanity_fields_have_icons():
     assert found['superArmorRecoverCorrection'] == 'poise'
     assert found['superArmorBrakeKnockbackDist'] == 'poise'
     assert found['humanityLotId'] == 'humanity'
+    assert found['staminaGuardDef'] == 'stability'
     found = icons(ItemDocument(make_effects_archive()), 'SpEffectParam', 6890)
     assert found['changeSuperArmorPoint'] == 'poise'
 
