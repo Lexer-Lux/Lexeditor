@@ -2779,8 +2779,12 @@ function renderMaps(){
     style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},directoryPane());
   // The viewport and the side share one remembered divider, like every
   // list-and-detail split: the table sets the floor through minSizes.
+  // Floors that fit an 1100px window: past the 360px directory the split
+  // keeps about 710px, so the view and side floors plus their divider must
+  // stay under it. The side's vectors stack below a 340px control, so 320px
+  // still shows every value at full size instead of clipping three across.
   const split=LexeditorUI.panelLayout([viewPane,side],"ds1-maps-view",
-    {layoutKey:"ds1-maps-view-side",defaultSizes:[60,40],minSizes:[320,400]});
+    {layoutKey:"ds1-maps-view-side",defaultSizes:[60,40],minSizes:[280,320]});
   split.style.flex="1 1 auto";split.style.minWidth="0";
   return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,split);
 }

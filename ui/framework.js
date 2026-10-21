@@ -2100,21 +2100,61 @@
   // first fits are therefore gathered and done together: every reset, then
   // every read, then every write.
   const autoFitQueue = new Set();
+  // Numbers that share a row - and rows that share a panel - share one size.
+  // Fitted one input at a time, a long value shrank while a short neighbour
+  // kept full size, so one coordinate row held three different fonts (DS1
+  // maps: "-170.125" small beside full-size "-100.5" and "30.25"). The scope
+  // is every vector row in the panel, the way list text is fitted per list;
+  // a row outside any panel is its own scope. Unscoped controls fit alone,
+  // as before, so editing one value never refits untouched controls.
+  const autoFitScope = control => {
+    if (!control.closest?.(".lex-multi-number")) return null;
+    return control.closest(".lex-detail-panel") || control.closest(".lex-multi-number");
+  };
+  const autoFitMates = control => {
+    const scope = autoFitScope(control);
+    if (!scope) return [control];
+    const rows = scope.classList.contains("lex-multi-number")
+      ? [scope] : [...scope.querySelectorAll(".lex-multi-number")];
+    const mates = rows.flatMap(row =>
+      [...row.querySelectorAll("input,select,textarea,.lex-readonly-field")])
+      .filter(node => node.__lexAutoFitUpdate && node.isConnected);
+    return mates.length ? mates : [control];
+  };
+  const addAutoFit = control => {
+    autoFitQueue.add(control);
+    if (autoFitScope(control)) autoFitMates(control).forEach(mate => autoFitQueue.add(mate));
+  };
   const flushAutoFit = () => {
     const controls = [...autoFitQueue].filter(control => control.isConnected);
     autoFitQueue.clear();
     controls.forEach(control => control.__lexAutoFitReset());
-    const sizes = controls.map(control => control.__lexAutoFitMeasure());
-    controls.forEach((control, index) => control.__lexAutoFitApply(sizes[index]));
+    const fits = controls.map(control => control.__lexAutoFitMeasure());
+    const scopeSizes = new Map();
+    controls.forEach((control, index) => {
+      if (!fits[index]) return;
+      const scope = autoFitScope(control);
+      if (!scope) return;
+      if (!scopeSizes.has(scope)) scopeSizes.set(scope, []);
+      scopeSizes.get(scope).push(fits[index].size);
+    });
+    const scopeMin = new Map([...scopeSizes].map(([scope, sizes]) => [scope, Math.min(...sizes)]));
+    controls.forEach((control, index) => {
+      const fit = fits[index];
+      if (!fit) return;
+      const scope = autoFitScope(control);
+      const size = scope && scopeMin.has(scope) ? scopeMin.get(scope) : fit.size;
+      control.__lexAutoFitApply({size, height: size > fit.natural ? fit.height : 0});
+    });
   };
   const queueAutoFit = control => {
     if (!autoFitQueue.size) requestAnimationFrame(flushAutoFit);
-    autoFitQueue.add(control);
+    addAutoFit(control);
   };
   // One observer for every fitted control, held here for the life of the page.
   const autoFitObserver = typeof ResizeObserver === "function"
     ? new ResizeObserver(entries => {
-      entries.forEach(entry => autoFitQueue.add(entry.target));
+      entries.forEach(entry => addAutoFit(entry.target));
       flushAutoFit();
     })
     : null;
@@ -2156,14 +2196,28 @@
       if (!context || !value) return null;
       context.font = `${style.fontStyle} ${style.fontWeight} ${maximum}px ${style.fontFamily}`;
       const measured = context.measureText(value).width;
-      const size = Math.max(minimum,Math.min(maximum,maximum*available/Math.max(1,measured)));
+      const natural = Number.parseFloat(style.fontSize) || 0;
+      // Padding in em grows with the font, so a size that fits at the natural
+      // size can overflow once applied: the box that measured room for "0"
+      // grew its own padding past the digit. The padded bound holds padding
+      // proportional to the size, which is exact for em padding and
+      // conservative for pixels; it only ever binds when growing, so
+      // shrinking a long value fits exactly as before.
+      const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+      const rate = measured / Math.max(1, maximum);
+      const padded = natural > 0 && rate > 0
+        ? (available + paddingRight) / (rate + paddingRight / natural) : maximum;
+      const size = Math.max(minimum,Math.min(maximum,
+        maximum*available/Math.max(1,measured),padded));
       // The ceiling above is read from the box's natural height, and that
       // height comes from the text. Enlarged digits would make the box taller,
       // the next fit would read a taller box, and every numeric property grew
       // instead of filling. Text larger than the natural font therefore keeps
       // the natural box: the digits fill it, the box stays where it was.
-      const natural = Number.parseFloat(style.fontSize) || 0;
-      return {size, height: size > natural ? control.getBoundingClientRect().height : 0};
+      // The scope fit may apply a smaller size than this control asked
+      // for, so the height is captured unconditionally and the caller
+      // decides whether the applied size outgrew the natural box.
+      return {size, natural, height: control.getBoundingClientRect().height};
     };
     const reset = () => {
       control.style.fontSize = "";
@@ -2179,8 +2233,16 @@
       control.style.fontSize = `${fit.size}px`;
     };
     const update = () => {
-      reset();
-      apply(measure());
+      const mates = autoFitMates(control).filter(node => node.isConnected);
+      mates.forEach(node => node.__lexAutoFitReset());
+      const fits = mates.map(node => node.__lexAutoFitMeasure());
+      const asked = fits.filter(Boolean).map(fit => fit.size);
+      if (!asked.length) return;
+      const size = Math.min(...asked);
+      mates.forEach((node, index) => {
+        if (fits[index]) node.__lexAutoFitApply({size,
+          height: size > fits[index].natural ? fits[index].height : 0});
+      });
     };
     // An edit commonly emits both events. Fit once in the next frame so
     // handlers do not repeatedly force layout across a large detail panel.

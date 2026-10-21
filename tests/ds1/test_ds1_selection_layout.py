@@ -5,8 +5,16 @@ listed Position/Rotation/Scale under separate headers below the Placement
 group, and clipped coordinate values: each vector row split a narrow panel
 into three tiny inputs with a help bubble per axis, and float32 tails
 (179.99998 for 180 degrees) overflowed the boxes. Coordinates now come
-first with no header above them, one help bubble serves each row,
-rotations show at sensible precision, and header controls are compact.
+first with no header above them, one help bubble serves each row, and
+rotations show at sensible precision.
+
+Every value must fit its own box, with its unit: a scrollWidth check cannot
+see this, because the padding that clips the digit sits inside clientWidth
+(a "0" clipped to "(" overflowed by four pixels). The check measures each
+value's rendered text against its box's content width instead, and every
+vector input in the panel shares one font size - a long value shrinks its
+neighbours with it instead of sitting small beside them. Below a 340px
+control the axes stack, and the side panel fits an 1100px window.
 """
 import sys
 import tempfile
@@ -24,10 +32,6 @@ from plugins.ds1.plugin import DS1Session  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 MAP = "m10_00_00_00.msb"
-# A number input's spinner counts toward scrollWidth, so a fully visible
-# value can still read a few pixels over. Genuine clipping (float tails
-# in tiny boxes) overflowed by twenty pixels or more.
-SPINNER_SLOP = 16
 
 
 @contextmanager
@@ -73,21 +77,68 @@ def selection_page(width, height):
 
 def vector_inputs(page):
     return page.locator("[data-maps-side] .lex-multi-number input").evaluate_all(
-        "nodes=>nodes.map(n=>({key:n.getAttribute('data-field-key'),value:n.value,"
-        "w:n.clientWidth,sw:n.scrollWidth}))")
+        """nodes => {
+          const pen = document.createElement('canvas').getContext('2d');
+          return nodes.map(n => {
+            const style = getComputedStyle(n);
+            pen.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            const box = n.getBoundingClientRect();
+            const padL = parseFloat(style.paddingLeft) || 0;
+            const padR = parseFloat(style.paddingRight) || 0;
+            const ink = pen.measureText(n.value).width;
+            const unit = n.closest('.lex-unit-field')?.querySelector(':scope > .lex-unit');
+            const mark = unit ? unit.getBoundingClientRect() : null;
+            return {key: n.getAttribute('data-field-key'), value: n.value,
+              fontSize: style.fontSize, text: ink,
+              content: n.clientWidth - padL - padR,
+              textEnd: box.left + (parseFloat(style.borderLeftWidth) || 0) + padL + ink,
+              unitLeft: mark ? mark.left : null, unitRight: mark ? mark.right : null,
+              inputRight: box.right};
+          });
+        }""")
+
+
+def assert_vectors_fit(shown):
+    assert len(shown) == 9, shown
+    for box in shown:
+        assert box["text"] <= box["content"] + 1, box
+        if box["unitLeft"] is not None:
+            assert box["unitLeft"] >= box["textEnd"] - 1, box
+            assert box["unitRight"] <= box["inputRight"] + 1, box
+    assert len({box["fontSize"] for box in shown}) == 1, shown
+
+
+def row_tracks(page):
+    return page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
+        "nodes=>nodes.map(n=>getComputedStyle(n).gridTemplateColumns.trim().split(/\\s+/).length)")
+
+
+def side_geometry(page):
+    return page.locator("[data-maps-side]").evaluate(
+        """side => {
+          const box = side.getBoundingClientRect();
+          const buttons = [...side.querySelectorAll('.lex-detail-panel-actions .lex-header-icon')]
+            .map(button => button.getBoundingClientRect().right);
+          return {left: box.left, right: box.right, win: window.innerWidth,
+            scroll: side.scrollWidth, client: side.clientWidth, buttons};
+        }""")
 
 
 def test_selection_vectors_show_full_value():
     with selection_page(1600, 900) as page:
-        shown = vector_inputs(page)
-        assert len(shown) == 9, shown
-        for box in shown:
-            assert box["sw"] <= box["w"] + SPINNER_SLOP, box
+        assert_vectors_fit(vector_inputs(page))
+        assert row_tracks(page) == [3, 3, 3]
         assert page.locator("[data-maps-side] [data-field-key='rotY']").input_value() == "180"
         page.set_viewport_size({"width": 1100, "height": 800})
         page.wait_for_timeout(500)
-        for box in vector_inputs(page):
-            assert box["sw"] <= box["w"] + SPINNER_SLOP, box
+        assert_vectors_fit(vector_inputs(page))
+        assert row_tracks(page) == [1, 1, 1]
+        geo = side_geometry(page)
+        assert geo["right"] <= geo["win"], geo
+        assert geo["scroll"] <= geo["client"] + 1, geo
+        for right in geo["buttons"]:
+            if right > 0:
+                assert right <= geo["win"], geo
 
 
 def test_selection_vectors_come_first_without_headers():

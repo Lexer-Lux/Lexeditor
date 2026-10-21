@@ -6341,12 +6341,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
 /* A coordinate triple stays one row while its numbers fit: X, Y and Z are
    read as one value. Past that the axes stack, one per row: three readable
-   rows beat one row of clipped boxes. */
+   rows beat one row of clipped boxes. Three across needs room for grown
+   digits plus unit, stepper and reference padding in every box - about
+   340px of control - so the triple stacks before it can clip. */
 .lex-detail-parts-nowrap { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
 .lex-detail-field:has(> .lex-detail-field-control > .lex-detail-parts-nowrap) > .lex-detail-field-control {
   container:lex-vector-row / inline-size;
 }
-@container lex-vector-row (max-width:17em) {
+@container lex-vector-row (max-width:340px) {
   .lex-detail-parts-nowrap { grid-template-columns:minmax(0,1fr); }
 }
 /* The lane keeps its name: with three parts across, the box minimum

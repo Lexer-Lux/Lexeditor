@@ -118,10 +118,12 @@ def main():
                     assert vectors == ["Position", "Rotation", "Scale"], vectors
                     rows = page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
                         "nodes=>nodes.map(n=>[...n.querySelectorAll('input')].map("
-                        "i=>{const r=i.getBoundingClientRect();return r.top+r.height/2}))")
-                    for tops in rows:
-                        assert len(tops) == 3, tops
-                        assert max(tops) - min(tops) < 4, tops
+                        "i=>{const r=i.getBoundingClientRect();"
+                        "return [r.left+r.width/2,r.top+r.height/2]}))")
+                    for axes in rows:
+                        assert len(axes) == 3, axes
+                        assert max(x for x, _ in axes) - min(x for x, _ in axes) < 4, axes
+                        assert max(y for _, y in axes) - min(y for _, y in axes) > 20, axes
                     units = page.locator("[data-maps-side] .lex-unit").evaluate_all(
                         "nodes=>nodes.map(n=>n.textContent)")
                     assert units == ["m", "m", "m", "\u00b0", "\u00b0", "\u00b0", "\u00d7", "\u00d7", "\u00d7"], units
