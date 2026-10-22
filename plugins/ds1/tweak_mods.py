@@ -3,7 +3,8 @@
 A DS1 tweak mod (see core/script_mods.py) builds `native/<id>.json`, a patch
 description that exe_patches.py combines with every other enabled tweak's,
 and optionally `layout/<id>.json`, text nodes menu_layout.py adds to the
-vanilla menu layout.
+vanilla menu layout, and `esd/<id>.json`, commands menu_scripts.py inserts
+into the ingame and common menu scripts.
 
 DarkSoulsRemastered.exe is never written. Applying installs Lexeditor's
 loader (dinput8.dll) and lexeditor-ds1-patch.bin beside it, and the loader
@@ -14,7 +15,8 @@ never modified"). An executable patched by an earlier Lexeditor is put back
 once, by the next Apply or Restore.
 
 The menu layout is a data file and is still replaced, only when a tweak asks
-for nodes or an earlier Apply changed it. It keeps one original copy and an
+for nodes or an earlier Apply changed it. The ingame and common menu scripts
+follow the same rule for command insertions. It keeps one original copy and an
 ownership journal beside it; the journal records replacement intent before
 the file is written, so an interrupted Apply or Restore can be retried
 without trusting unknown bytes. Outside modifications are refused, never
@@ -35,9 +37,9 @@ from core import mod_requires, script_mods
 from core.plugin_files import atomic_write
 from core.process_probe import live_processes
 
-from . import exe_patches, menu_layout
+from . import exe_patches, menu_layout, menu_scripts
 
-ALLOWED_ROOTS = ("native", "layout")
+ALLOWED_ROOTS = ("native", "layout", "esd")
 BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
@@ -136,6 +138,12 @@ EXECUTABLE = Managed(exe_patches.EXECUTABLE, "executable", 128 * 1024 * 1024, la
 RUNTIME_FILE = Managed("dinput8.dll", "loader", 64 * 1024 * 1024, lambda data: False)
 LAYOUT = Managed(menu_layout.RELATIVE.as_posix(), "menu layout", 16 * 1024 * 1024,
                  lambda data: menu_layout.is_vanilla(data))
+ESD_INGAME = Managed(menu_scripts.RELATIVE["ingame"].as_posix(), "ingame menu scripts",
+                     16 * 1024 * 1024, lambda data: menu_scripts.is_vanilla(data, "ingame"))
+ESD_COMMON = Managed(menu_scripts.RELATIVE["common"].as_posix(), "common menu scripts",
+                     16 * 1024 * 1024, lambda data: menu_scripts.is_vanilla(data, "common"))
+ESD = (ESD_INGAME, ESD_COMMON)
+ESD_ARCHIVE = {ESD_INGAME: "ingame", ESD_COMMON: "common"}
 assert EXECUTABLE.backup(Path()).name == BACKUP_FILE and EXECUTABLE.manifest(Path()).name == MANIFEST_FILE
 
 
@@ -244,7 +252,7 @@ class BuildContext:
 def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
     """Build every enabled tweak mod and read back its executable patches.
 
-    The same build writes any layout/<id>.json; layout_specs reads those.
+    The same build writes any layout/<id>.json or esd/<id>.json; layout_specs and esd_specs read those.
     """
     try:
         mod_requires.check_enabled(root or mods_root())
@@ -259,6 +267,11 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
 def layout_specs(root: Path | None = None) -> list[dict]:
     """The menu-layout nodes the last build_specs produced."""
     return _built([row for row in tweak_rows(root) if row["enabled"]], "layout", menu_layout.validate)
+
+
+def esd_specs(root: Path | None = None) -> list[dict]:
+    """The menu-script commands the last build_specs produced."""
+    return _built([row for row in tweak_rows(root) if row["enabled"]], "esd", menu_scripts.validate)
 
 
 def _built(rows: list[dict], folder: str, check) -> list[dict]:
@@ -598,11 +611,16 @@ def _layout_in_use(game_root: Path) -> bool:
     return checked(LAYOUT.manifest(game_root)).is_file() or checked(LAYOUT.backup(game_root)).exists()
 
 
+def _esd_in_use(game_root: Path, managed: Managed) -> bool:
+    """A menu script archive is managed once a tweak changed it, until restored."""
+    return checked(managed.manifest(game_root)).is_file() or checked(managed.backup(game_root)).exists()
+
+
 def _changes(specs: list[dict]) -> list[str]:
     """Only mods that change something are recorded as applied."""
     return [spec["owner"] for spec in specs
             if spec.get("islands") or spec.get("hooks") or spec.get("sectionVirtualSize")
-            or spec.get("nodes") or spec.get("moves")]
+            or spec.get("nodes") or spec.get("moves") or spec.get("changes")]
 
 
 # --- The in-memory loader ------------------------------------------------------
@@ -807,6 +825,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     built = {row["id"]: build_fingerprint(Path(row["path"]))
              for row in tweak_rows(root) if row["enabled"]}
     layout = layout_specs(root)
+    scripts = esd_specs(root)
     specs = native + ([exe_patches.validate(chosen["spec"], "Project native rules")] if chosen else [])
     try:
         patch = exe_patches.runtime_patch(original, specs)
@@ -827,9 +846,23 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
+    for managed in ESD:
+        targeted = [spec for spec in scripts
+                    if any(change["archive"] == ESD_ARCHIVE[managed] for change in spec["changes"])]
+        if targeted or _esd_in_use(game_root, managed):
+            esd_current, esd_manifest = _installed(game_root, managed, "restore it before applying tweaks")
+            esd_original = _original(game_root, esd_current, esd_manifest, managed)
+            try:
+                esd_after = menu_scripts.compose(esd_original, targeted, ESD_ARCHIVE[managed])
+            except ValueError as error:
+                raise TweakError(str(error)) from error
+            files.append({"managed": managed, "before": esd_current, "after": esd_after,
+                          "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
+                          "previous": _current_manifest(esd_current, esd_manifest, managed)})
     if patch is None and not debug_mode(root) and any(
-            item.get("managed") is LAYOUT and not LAYOUT.vanilla(item["after"]) for item in files):
-        # No native patches, but the menu layout stays managed: keep an empty
+            item.get("managed") in (LAYOUT, *ESD) and not item["managed"].vanilla(item["after"])
+            for item in files):
+        # No native patches, but a menu file stays managed: keep an empty
         # patch and its record, so later changes still ask for a rebuild.
         patch = b""
     return {"files": files, "executableSha256": _sha(current),
@@ -898,7 +931,8 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
     game_root = checked(Path(game_root))
     with _exclusive(game_root):
         _clear_moved_aside(game_root)
-        managed_files = [EXECUTABLE] + ([LAYOUT] if _layout_in_use(game_root) else [])
+        managed_files = ([EXECUTABLE] + ([LAYOUT] if _layout_in_use(game_root) else [])
+                         + [managed for managed in ESD if _esd_in_use(game_root, managed)])
         # Every file is checked before any of them is written.
         targets = [(managed, *_installed(game_root, managed, "it was left alone")) for managed in managed_files]
         originals = [(managed, current, manifest, _original(game_root, current, manifest, managed))
@@ -943,6 +977,9 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         files = [executable]
         if _layout_in_use(game_root):
             files.append(_file_status(game_root, LAYOUT))
+        for managed in ESD:
+            if _esd_in_use(game_root, managed):
+                files.append(_file_status(game_root, managed))
         runtime = _runtime_status(game_root)
         # An executable still patched by an earlier Lexeditor is put back by
         # the next Apply or Restore.
