@@ -319,6 +319,21 @@ class MoveTests(unittest.TestCase):
         with self.assertRaisesRegex(menu_layout.LayoutError, "not in the original layout"):
             menu_layout.compose(original, [added, stray])
 
+    def test_optional_moves_follow_other_tweaks_nodes_or_skip(self):
+        original = dcx(drb())
+        added = menu_layout.validate({"version": 1, "nodes": STAMINA[:1]}, "Adder")
+        mover = menu_layout.validate({"version": 1, "moves": [
+            {"dialog": "data_simple_arms", "name": "text_lexeditor_stamina", "rect": [5, 6, 70, 34],
+             "optional": True}]}, "Mover")
+        self.assertEqual(mover["moves"][0]["optional"], True)
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [added, mover])))
+        self.assertEqual(layout.text("data_simple_arms", "text_lexeditor_stamina")["rect"], [5, 6, 70, 34])
+        # Without the adder the optional move is skipped, and nothing changes.
+        self.assertEqual(menu_layout.compose(original, [mover]), original)
+        for bad in ({**MOVES[0], "optional": False}, {**MOVES[0], "optional": 1}):
+            with self.subTest(move=bad), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "moves": [bad]}, "Bad")
+
 
 CLONES = {
     "data_simple_arms": [

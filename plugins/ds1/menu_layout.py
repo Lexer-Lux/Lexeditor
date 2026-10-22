@@ -493,8 +493,10 @@ def validate(spec: object, owner: str) -> dict:
     clean_moves = []
     for move in moves:
         keys = set(move) if isinstance(move, dict) else set()
-        if keys != {"dialog", "name", "rect"}:
-            raise LayoutError(f"{owner}: a layout move names dialog, name and rect")
+        if keys not in ({"dialog", "name", "rect"}, {"dialog", "name", "rect", "optional"}):
+            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true)")
+        if "optional" in move and move["optional"] is not True:
+            raise LayoutError(f"{owner}: a layout move's optional is true or absent")
         if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout move names must be text")
         rect = move["rect"]
@@ -502,7 +504,10 @@ def validate(spec: object, owner: str) -> dict:
                 or not all(-32768 <= value <= 32767 for value in rect)
                 or not rect[0] < rect[2] or not rect[1] < rect[3]):
             raise LayoutError(f"{owner}: a layout move rect is four whole numbers, left < right, top < bottom")
-        clean_moves.append({"dialog": move["dialog"], "name": move["name"], "rect": list(rect)})
+        entry = {"dialog": move["dialog"], "name": move["name"], "rect": list(rect)}
+        if move.get("optional"):
+            entry["optional"] = True
+        clean_moves.append(entry)
     return {"owner": owner, "nodes": clean, "moves": clean_moves}
 
 
@@ -536,7 +541,13 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
     moved = {}
     for owner, move in moves:
         key = (move["dialog"], move["name"])
-        if key not in placed:
+        if move.get("optional"):
+            # An optional move may re-place a node another tweak added (a
+            # panel rework moving a stats mod's rows) and is skipped when
+            # neither the original layout nor any tweak has that node.
+            if key not in placed and key not in seen:
+                continue
+        elif key not in placed:
             raise LayoutError(f"{owner} moves {move['dialog']}/{move['name']}, which is not in the original layout")
         if key in moved:
             raise LayoutError(f"{owner} and {moved[key]} both move {move['dialog']}/{move['name']}")
