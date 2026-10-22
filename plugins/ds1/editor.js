@@ -1,12 +1,12 @@
 "use strict";
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,logView,pagedListDetail,columnList,subtabBar,
-  actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
+  actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sorts:{},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},animLeftTab:"chars",nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,animListError:null,animEventError:null,
-  assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"},{id:"files",label:"Files"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
+  assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
@@ -97,7 +97,7 @@ const shell=LexeditorUI.mountShell({
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
     {id:"models",label:"Models",help:"What you see and bump into: character, object and map geometry. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
     {id:"textures",label:"Textures",help:"The images on the models. Tinted names replace an installed file; a pen nib marks files only the mod carries. A preview shows the file the game would load. Add and Remove save at once. Vanilla is read-only."},
-    {id:"sound",label:"Sound",help:"Every sound effect and music track, listed one by one. The streams live inside bank files. Files holds those banks, and Add and Remove replace them. Tinted names replace an installed file. A pen nib marks files only the mod carries. Vanilla is read-only."},
+    {id:"sound",label:"Sound",help:"Every sound effect and music track, listed one by one. The Bank row names the file that holds the stream. A stream's actions replace its bank or remove the mod's copy. Vanilla is read-only."},
     {id:"misc",label:"Misc.",help:"Load ranges, base stamina recovery and effect overrides. Save and Apply to use your rules."},
     {id:"tweaks",label:"Tweaks",help:"Each tweak is a mod in the library. Switch them in the Mods tab and change their settings here. Changed tweaks rebuild when you save. Restore original removes them from the game."}],
   activeTab:()=>state.tab,navigate:tab=>navigate(tab),
@@ -270,15 +270,6 @@ async function loadDetail(){
     const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
     if(state.selected!==key(row))return;
     state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;
-    if(state.tab==="sound"&&/\.fsb$/i.test(row.id)){
-      if(state.assetStreamFile!==row.id){state.assetStreamFile=row.id;state.assetStream=null;state.assetPage=0;}
-      try{
-        const sounds=await api(`/api/sound/bank?file=${encodeURIComponent(row.id)}`);
-        if(state.selected!==key(row))return;
-        state.assetSounds=sounds;
-        if(!state.assetStream&&sounds.streams.length)state.assetStream=sounds.streams[0].name;
-      }catch(error){state.assetSounds={file:row.id,streams:[],error:String(error?.message||error)};}
-    }
     return;
   }
   if(row.table==="SoundStream"){
@@ -1473,30 +1464,6 @@ function bytesToBase64(buffer){
     text+=String.fromCharCode.apply(null,bytes.subarray(index,index+8192));
   return btoa(text);
 }
-function assetSoundPanel(row,info,body){
-  const help="Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy.";
-  const sounds=state.assetSounds;
-  const note=text=>detailSection({title:"PREVIEW",body:[soundPreview({note:text,
-    help:infoHelp("Audio plays in the game. It has no picture to show.")})]});
-  if(!/\.fsb$/i.test(row.id)){body.push(note("No preview"));return{help,audio:null};}
-  if(!sounds||state.assetStreamFile!==row.id){body.push(LexeditorUI.loadingPanel({label:"Loading sounds"}));return{help,audio:null};}
-  if(sounds.error||!sounds.streams.length){body.push(note(sounds.error?`This bank could not be read (${sounds.error}).`:"This bank holds no sounds."));return{help,audio:null};}
-  const file=row.id,selected=state.assetStream||sounds.streams[0].name;
-  const url=name=>`/api/sound/stream?file=${encodeURIComponent(file)}&stream=${encodeURIComponent(name)}`;
-  const size=state.pageSize,pages=Math.max(1,Math.ceil(sounds.streams.length/size));
-  const page=Math.min(state.assetPage||0,pages-1);state.assetPage=page;
-  const shown=sounds.streams.slice(page*size,(page+1)*size);
-  body.push(detailSection({title:"SOUNDS",body:[columnList({rows:shown,key:stream=>stream.name,
-    selected,select:name=>{state.assetStream=name;render();},
-    columns:[audioColumn({src:stream=>url(stream.name),name:stream=>stream.name}),
-      {key:"name",label:"Sound",grow:1,align:"start"},
-      {key:"duration",label:"Length",render:stream=>`${stream.duration.toFixed(2)} s`},
-      {key:"size",label:"Size",render:stream=>formatAssetSize(stream.size)}]}),
-    LexeditorUI.pager({inline:true,stacked:true,pages,page,total:sounds.streams.length,pageSize:size,
-      change:value=>{state.assetPage=value;render();}})],
-    help:infoHelp("Every stream the bank holds. Play one from its row, or click the row and play it from the heading.")}));
-  return{help,audio:{src:url(selected),label:selected}};
-}
 const formatSoundLength=seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,"0")}`;
 function renderSoundDetail(row){
   const bank=row.bank||"",stream=row.name||"";
@@ -1505,12 +1472,36 @@ function renderSoundDetail(row){
       detailField({label:"BANK",property:"bank",control:readonlyField(bank)}),
       detailField({label:"LENGTH",property:"length",control:readonlyField(formatSoundLength(row.duration||0))}),
       detailField({label:"SIZE",property:"size",control:readonlyField(formatAssetSize(row.size||0))})]}),
-    detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(
-      el("button",{type:"button",onclick:()=>navigate("sound","files",`Asset:${bank}`)},"Show in Files"))})]})];
+    detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...soundBankActions(row))})]})];
   return detailPanel({title:row.name,meta:formatSoundLength(row.duration||0),
-    help:"Streams live inside bank files. Show in Files opens this stream's bank, and replacing the bank replaces its sounds.",
+    help:"The bank file holds this stream. Replacing the bank replaces every stream inside it.",
     audio:{src:`/api/sound/stream?file=${encodeURIComponent(bank)}&stream=${encodeURIComponent(stream)}`,label:stream},
     paginate:{unpaged:true},body});
+}
+function soundBankActions(row){
+  const bank=row.bank||"";
+  const locked=state.readOnly||state.assetBusy;
+  const replace=el("button",{type:"button",disabled:locked,
+    title:state.readOnly?"This is the game's own data, shown read-only. Create a mod to replace sounds.":state.assetBusy?"An upload is already running.":"Replace this stream's bank file",
+    onclick:()=>replaceSoundBank(bank)},"Replace bank\u2026");
+  if(!row.overridden)return[replace];
+  const remove=el("button",{type:"button",disabled:locked,
+    title:state.readOnly?"This is the game's own data, shown read-only.":state.assetBusy?"An upload is already running.":"Drop the mod's copy of this bank",
+    onclick:()=>removeSoundBankOverride(bank)},"Remove override");
+  return[replace,remove];
+}
+let soundBankTarget=null;
+function replaceSoundBank(bank){
+  if(state.assetBusy||state.readOnly||!bank)return;
+  soundBankTarget=bank;assetFilePicker().click();
+}
+async function removeSoundBankOverride(bank){
+  if(state.assetBusy||!bank)return;
+  if(!await confirmAction({title:"Remove this override?",message:"The mod stops carrying this bank, and the installed game bank plays again.",confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
+  state.assetBusy=true;render();
+  try{await api("/api/assets/remove",{relative:bank});await loadItems();}
+  catch(error){notify(error);}
+  finally{state.assetBusy=false;render();}
 }
 function renderAssetDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
@@ -1531,7 +1522,6 @@ function renderAssetDetail(){
   let icon=null,preview=null,help="",audio=null;
   if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
   else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
-  else if(state.tab==="sound")({help,audio}=assetSoundPanel(row,info,body));
   else{
     help="Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy.";
     body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
@@ -1543,7 +1533,7 @@ function renderAssetDetail(){
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
   return detailPanel({title:row.name,actions:[assetUploadButton()],meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body});
 }
-async function uploadAsset(target,file){
+async function uploadAsset(target,file,refresh){
   if(state.assetBusy)return;
   if(!file.size){notify(new Error("That file is empty."));return;}
   if(file.size>512*1024*1024){notify(new Error("That file is too large to carry as an override."));return;}
@@ -1560,6 +1550,7 @@ async function uploadAsset(target,file){
       state.assetUpload={received:offset,total:file.size};render();
     }
     state.assetBusy=false;state.assetUpload=null;
+    if(refresh){await refresh();return;}
     if(files){state.assetFiles=files;state.rows=assetRows(files);}
     state.selected=`Asset:${target}`;
     await loadDetail();render();
@@ -1724,7 +1715,8 @@ function assetFilePicker(){
   if(!assetPicker){
     assetPicker=el("input",{type:"file",id:"ds1-asset-picker",style:"display:none","aria-hidden":"true",tabindex:"-1"});
     assetPicker.onchange=event=>{const file=event.target.files[0];assetPicker.value="";
-      if(!file)return;
+      if(!file){soundBankTarget=null;return;}
+      if(soundBankTarget){const bank=soundBankTarget;soundBankTarget=null;void uploadAsset(bank,file,async()=>{await loadItems();render();});return;}
       const target=state.rows.find(row=>key(row)===state.selected);
       if(target)void uploadAsset(target.id,file);};
     document.body.append(assetPicker);
@@ -1733,6 +1725,7 @@ function assetFilePicker(){
 }
 function assetAddUpload(){
   if(state.assetBusy||state.readOnly)return;
+  soundBankTarget=null;
   const target=state.rows.find(row=>key(row)===state.selected);
   if(!target){LexeditorUI.showToast("Select a file in the list to add it to the mod.");return;}
   assetFilePicker().click();
@@ -2444,7 +2437,7 @@ function renderItems(){
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="scripts"?"states":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="scripts"?"states":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="sound"?"sounds":ASSET_TABS.has(state.tab)?"files":"items";
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="scripts"?"Scripts":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),

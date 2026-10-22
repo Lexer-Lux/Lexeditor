@@ -7974,6 +7974,12 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
 
  border: 1px solid var(--lex-detail-icon-border, var(--lex-border));
 }
+/* A record that is a sound plays from its heading: the circle button
+   alone, with no picture frame around it. */
+.lex-detail-panel-icon-audio {
+  background: none;
+  border: none;
+}
 
 /* Paintable parts of a list, a field and the add button. Defaults are what they
    already were; a game sets the token on its own container. */

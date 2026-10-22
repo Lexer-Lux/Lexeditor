@@ -177,26 +177,26 @@ def main():
                     page.locator('[data-tab="models"]').click()
                     page.wait_for_function('state.tab==="models" && state.sub==="files"')
                     assert page.locator("[data-subtab]").count() == 0
-                    # Sound merges effects and music: streams first, files behind Files.
+                    # Sound merges effects and music into flat stream lists.
                     page.locator('[data-tab="sound"]').click()
-                    page.wait_for_function(
-                        'state.tab==="sound" && state.sub==="files"'
-                        " && state.rows.length===2 && !state.error")
-                    subs = page.locator("[data-subtab]").evaluate_all(
-                        "nodes=>nodes.map(n=>n.dataset.subtab)")
-                    assert subs == ["sfx", "music", "files"], subs
-                    page.locator('[data-subtab="sfx"]').click()
                     page.wait_for_function(
                         'state.tab==="sound" && state.sub==="sfx"'
                         " && state.rows.length===0 && !state.error")
-                    page.locator('[data-subtab="files"]').click()
+                    page.locator('[data-subtab="music"]').wait_for()
+                    subs = page.locator("[data-subtab]").evaluate_all(
+                        "nodes=>nodes.map(n=>n.dataset.subtab)")
+                    assert subs == ["sfx", "music"], subs
+                    page.locator('[data-subtab="music"]').click()
                     page.wait_for_function(
-                        'state.tab==="sound" && state.sub==="files"'
-                        " && state.rows.length===2 && !state.error")
+                        'state.tab==="sound" && state.sub==="music"'
+                        " && state.rows.length===0 && !state.error")
                     assert page.locator(".lex-list-row", has_text="intro.wmv").count() == 0
-                    # Files join the mod through the list's add button.
+                    # Files join the mod through the detail header's add button.
+                    page.locator('[data-tab="models"]').click()
+                    page.wait_for_function('state.tab==="models" && state.sub==="files"')
+                    page.locator(".lex-detail-panel-heading").wait_for()
                     assert page.locator(
-                        '#main .lex-table-add[aria-label="Add file to mod"]').count() == 1
+                        '.lex-detail-panel-actions .lex-new-button[aria-label="Add file to mod"]').count() == 1
                     # A character model: meshes and bones, never objects.
                     page.locator('[data-tab="models"]').click()
                     page.wait_for_function('state.tab==="models" && state.rows.length===4')
@@ -332,28 +332,23 @@ def main():
                         'state.row?.id==="map/m10/m10.tpfbhd"'
                         " && state.assetDetail?.reason==='split-archive' && !state.error")
                     assert page.locator(".lex-detail-field-label-text", has_text="ARCHIVE").count() == 1
-                    note = page.locator(".lex-detail-section", has_text="PREVIEW").first.locator("input").input_value()
+                    note = page.locator(".lex-detail-field", has_text="ARCHIVE").first.locator("input").input_value()
                     assert note == "Split archive", note
+                    assert page.locator(".lex-detail-section", has_text="PREVIEW").count() == 0
                     assert page.locator(".lex-model-preview-trigger").count() == 0
                     kinds = page.evaluate("state.rows.map(r=>r.display?.kind)")
                     assert kinds.count("Split archive") == 2 and kinds.count("Textures") == 2, kinds
                     assert page.locator("#main .lex-list-row", has_text="Split archive").count() == 2
-                    # Sound files have no picture and no source row.
+                    # Sound streams name their banks; there is no Files list.
                     page.locator('[data-tab="sound"]').click()
-                    page.locator('[data-subtab="files"]').click()
+                    page.locator('[data-subtab="sfx"]').click()
                     page.wait_for_function(
-                        'state.tab==="sound" && state.sub==="files"'
-                        " && state.rows.length===2 && !state.error")
-                    for wanted in (SFX, MUSIC):
-                        page.locator(".lex-list-row", has_text=wanted).click()
-                        page.wait_for_function(
-                            f'state.row?.id==="{wanted}" && state.assetDetail?.source==="game"'
-                            " && state.assetDetail.textures.length===0 && !state.error")
-                        assert page.locator("#main img").count() == 0
-                        assert page.locator(
-                            ".lex-detail-field-label-text", has_text="SOURCE").count() == 0
-                        assert page.locator('[data-asset-action="replace"]').count() == 0
-                    page.locator(".lex-detail-panel-meta", has_text="16 B").wait_for()
+                        'state.tab==="sound" && state.sub==="sfx"'
+                        " && state.rows.length===0 && !state.error")
+                    page.locator('[data-subtab="music"]').wait_for()
+                    subs = page.locator("[data-subtab]").evaluate_all(
+                        "nodes=>nodes.map(n=>n.dataset.subtab)")
+                    assert subs == ["sfx", "music"], subs
                     # Adding a file at a listed path replaces it through the loader.
                     page.locator('[data-tab="textures"]').click()
                     page.wait_for_function('state.tab==="textures" && state.rows.length===4')

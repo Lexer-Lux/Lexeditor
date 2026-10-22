@@ -21,7 +21,7 @@ ASSET_TARGETS = {'chr': ('models', 'files'),
                  'obj': ('models', 'files'),
                  'parts': ('models', 'files'),
                  'remo': ('models', 'files'),
-                 'sound': ('sound', 'files'), 'script': ('scripts', 'talk')}
+                 'sound': ('sound', 'sfx'), 'script': ('scripts', 'talk')}
 # Folders whose files no tab lists: movies and the like have no
 # browser, but Apply still installs files a mod carries there.
 UNTARGETED_ASSETS = {'event': 'event scripts', 'movww': 'movies',

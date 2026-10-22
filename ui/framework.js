@@ -1993,7 +1993,9 @@
     const heading = options.heading === false ? null : element("div", {
       class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),
     },
-      options.icon ? element("div", {class: "lex-detail-panel-icon",
+      options.icon ? element("div", {class: sound
+        ? "lex-detail-panel-icon lex-detail-panel-icon-audio"
+        : "lex-detail-panel-icon",
         // The record's picture can be pinned as a table column like any
         // property: its pin sits on the thumbnail's corner, and a right-click
         // on the thumbnail places or removes it.

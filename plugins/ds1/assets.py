@@ -244,7 +244,8 @@ def list_streams(game_root, project=None):
     """Every FSB bank's streams, split by kind.
 
     {"sound": [...], "music": [...], "unreadable": [...]}; each stream
-    carries its bank path, name, duration in seconds and payload size.
+    carries its bank path, name, duration in seconds, payload size,
+    and whether the mod overrides its bank.
     The table reads headers only, so the whole game scans in about a
     second; the result is cached per game root and mod project. The
     mod's bank wins over the installed one. Banks that fail to parse
@@ -262,10 +263,12 @@ def list_streams(game_root, project=None):
         if not relative.lower().endswith(".fsb"):
             continue
         path = None
+        overridden = False
         if project is not None:
             own = Path(project) / relative
             if own.is_file():
                 path = own
+                overridden = True
         if path is None:
             if game_root is None:
                 continue
@@ -278,7 +281,8 @@ def list_streams(game_root, project=None):
         for stream in streams:
             found[entry["kind"]].append({"bank": relative, "name": stream["name"],
                                         "duration": round(stream["duration"], 2),
-                                        "size": stream["size"]})
+                                        "size": stream["size"],
+                                        "overridden": overridden})
     _SOUNDS_CACHE[key] = found
     return found
 

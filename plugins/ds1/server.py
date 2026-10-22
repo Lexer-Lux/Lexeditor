@@ -555,7 +555,8 @@ class Handler(PluginRequestHandler):
                     streams = assets.list_streams(STORE.game_root, STORE.project)
                     rows = [{"table": "SoundStream", "id": f"{entry['bank']}::{entry['name']}",
                              "name": entry["name"], "bank": entry["bank"],
-                             "duration": entry["duration"], "size": entry["size"]}
+                             "duration": entry["duration"], "size": entry["size"],
+                             "overridden": entry["overridden"]}
                             for entry in (streams["music"] if kind == "music" else streams["sound"])]
                     self.send_json({"rows": rows, "unreadable": streams["unreadable"]})
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
