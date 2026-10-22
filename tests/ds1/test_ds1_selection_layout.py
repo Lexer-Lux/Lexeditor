@@ -1,4 +1,4 @@
-"""Maps selection panel layout: coordinates first, values fully shown.
+"""Maps selection details layout: coordinates first, values fully shown.
 
 The selection panel squeezed its record title (sixty-pixel header buttons),
 listed Position/Rotation/Scale under separate headers below the Placement
@@ -13,8 +13,9 @@ see this, because the padding that clips the digit sits inside clientWidth
 (a "0" clipped to "(" overflowed by four pixels). The check measures each
 value's rendered text against its box's content width instead, and every
 vector input in the panel shares one font size - a long value shrinks its
-neighbours with it instead of sitting small beside them. Below a 340px
-control the axes stack, and the side panel fits an 1100px window.
+neighbours with it instead of sitting small beside them. The axes stay
+one row at any width (nowrap means nowrap); the details floor keeps the
+boxes wide enough that values fit, and the panel fits an 1100px window.
 """
 import sys
 import tempfile
@@ -66,7 +67,6 @@ def selection_page(width, height):
                     page.wait_for_function(
                         "state.tab==='maps' && state.mapView && state.rows.length>0",
                         timeout=60000)
-                    page.locator('[data-tabstrip-id="selection"]').click()
                     page.wait_for_timeout(600)
                     yield page
                 finally:
@@ -76,7 +76,7 @@ def selection_page(width, height):
 
 
 def vector_inputs(page):
-    return page.locator("[data-maps-side] .lex-multi-number input").evaluate_all(
+    return page.locator("[data-maps-detail] .lex-multi-number input").evaluate_all(
         """nodes => {
           const pen = document.createElement('canvas').getContext('2d');
           return nodes.map(n => {
@@ -109,12 +109,12 @@ def assert_vectors_fit(shown):
 
 
 def row_tracks(page):
-    return page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
+    return page.locator("[data-maps-detail] .lex-multi-number").evaluate_all(
         "nodes=>nodes.map(n=>getComputedStyle(n).gridTemplateColumns.trim().split(/\\s+/).length)")
 
 
 def side_geometry(page):
-    return page.locator("[data-maps-side]").evaluate(
+    return page.locator("[data-maps-detail-panel]").evaluate(
         """side => {
           const box = side.getBoundingClientRect();
           const buttons = [...side.querySelectorAll('.lex-detail-panel-actions .lex-header-icon')]
@@ -128,11 +128,11 @@ def test_selection_vectors_show_full_value():
     with selection_page(1600, 900) as page:
         assert_vectors_fit(vector_inputs(page))
         assert row_tracks(page) == [3, 3, 3]
-        assert page.locator("[data-maps-side] [data-field-key='rotY']").input_value() == "180"
+        assert page.locator("[data-maps-detail] [data-field-key='rotY']").input_value() == "180"
         page.set_viewport_size({"width": 1100, "height": 800})
         page.wait_for_timeout(500)
         assert_vectors_fit(vector_inputs(page))
-        assert row_tracks(page) == [1, 1, 1]
+        assert row_tracks(page) == [3, 3, 3]
         geo = side_geometry(page)
         assert geo["right"] <= geo["win"], geo
         assert geo["scroll"] <= geo["client"] + 1, geo
@@ -144,19 +144,19 @@ def test_selection_vectors_show_full_value():
 def test_selection_vectors_come_first_without_headers():
     with selection_page(1600, 900) as page:
         sections = page.locator(
-            "[data-maps-side] .lex-detail-section-title-text").evaluate_all(
+            "[data-maps-detail] .lex-detail-section-title-text").evaluate_all(
             "nodes=>nodes.map(n=>n.textContent)")
         assert sections == ["Placement"], sections
-        order = page.locator("[data-maps-side] .lex-detail-panel-body").evaluate(
+        order = page.locator("[data-maps-detail] .lex-detail-panel-body").evaluate(
             """n => [...n.querySelectorAll('.lex-detail-field-label-text,'
               + ' .lex-detail-section-title-text')].map(e => e.textContent.trim())""")
         assert order[:4] == ["Position", "Rotation", "Scale", "Placement"], order
         assert page.locator(
-            "[data-maps-side] .lex-multi-number .lex-info-help").count() == 0
+            "[data-maps-detail] .lex-multi-number .lex-info-help").count() == 0
         assert page.locator(
-            "[data-maps-side] .lex-detail-field:has(.lex-multi-number) > "
+            "[data-maps-detail] .lex-detail-field:has(.lex-multi-number) > "
             ".lex-detail-field-label .lex-info-help").count() == 3
-        header = page.locator("[data-maps-side] .lex-detail-panel-heading").evaluate(
+        header = page.locator("[data-maps-detail] .lex-detail-panel-heading").evaluate(
             """n => {
               const buttons = [...n.querySelectorAll('.lex-detail-panel-actions'
                 + ' .lex-header-icon:not(.lex-detail-add-header)')].map(b => {

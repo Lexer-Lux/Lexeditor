@@ -97,6 +97,17 @@ def test_remove_empties_an_anim_and_add_brings_events_back():
     assert TaeDocument(fresh.export()).list_events(0)[0]["type"] == 128
 
 
+def test_remove_saved_added_event_leaves_a_tombstone():
+    doc = TaeDocument(build_tae())
+    index = doc.add_event(0, 66, 0.0, 1.0)
+    reopened = TaeDocument(doc.export())
+    assert reopened.dirty_count == 0
+    reopened.remove_event(0, index)
+    assert reopened.dirty_count == 1
+    assert [(gone["event"], gone["label"]) for gone in reopened.removed] == [(4, "Add effect")]
+    assert [event["type"] for event in TaeDocument(reopened.export()).list_events(0)] == [1, 66, 999, 16]
+
+
 def test_add_then_remove_cancels_without_a_tombstone():
     doc = TaeDocument(build_tae())
     index = doc.add_event(0, 66, 0.0, 1.0)
@@ -142,6 +153,21 @@ def test_store_vanilla_overlay_follows_removed_events(tmp_path):
     row = store.read(BINDER, f"ev:{TAE}|0|1")
     assert row["type"] == 999
     assert next(item["vanilla"] for item in row["fields"] if item["key"] == "start") == 1.5
+
+
+def test_store_remove_saved_added_event_saves(tmp_path):
+    game, mod, store = setup(tmp_path)
+    row = store.add_event(BINDER, TAE, 0, 128, 0.0, 1.0)
+    store.save()
+    assert store.dirty_count == 0
+    rested = TaeStore(game, mod, False, None)
+    assert len(rested.list_events(BINDER, TAE, 0)) == 5
+    rested.remove_event(BINDER, row["id"])
+    assert rested.dirty_count == 1
+    assert any("removed" in change["label"] for change in rested.pending_changes())
+    rested.save()
+    reopened = TaeStore(game, mod, False, None)
+    assert [event["values"]["type"] for event in reopened.list_events(BINDER, TAE, 0)] == [1, 66, 999, 16]
 
 
 def test_store_add_then_remove_writes_nothing(tmp_path):

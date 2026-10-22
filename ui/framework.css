@@ -404,6 +404,18 @@ body.lex-save-busy .lex-save-icon.saving {
 
  color:#fff; background:#a51e1e; font:700 26px/1 Arial,sans-serif;
 }
+.lex-searcher-bar:has(> .lex-searcher-clear) { grid-template-columns:38px minmax(0,1fr) auto 38px; }
+.lex-searcher-clear {
+  height:34px;
+  padding:0 12px;
+  border:1px solid var(--lex-border);
+  border-radius:4px;
+  color:var(--lex-text);
+  background:var(--lex-panel-2);
+  font:inherit;
+  white-space:nowrap;
+  cursor:pointer;
+}
 .lex-searcher-prompt { overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
 .lex-search-candidate { position:relative; isolation:isolate; cursor:pointer; }
 .lex-search-candidate > * { position:relative; z-index:2; }
@@ -970,6 +982,16 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel-icon > .lex-column-pin { position:absolute; top:-4px; right:-4px; z-index:4; }
 .lex-detail-panel-icon:not(:hover) > .lex-column-pin:not(.pinned) { opacity:0; }
 .lex-detail-panel-heading.lex-audio-heading { position:relative; border-bottom-color:transparent; }
+/* Tag buttons under a text box: small chips in collapsing family
+   groups, wrapping to the box width. */
+.lex-tag-bar { display:flex; flex-direction:column; gap:4px; margin-top:4px; }
+.lex-tag-group { border:1px solid var(--lex-border); border-radius:6px; }
+.lex-tag-group-name { cursor:pointer; padding:2px 8px; font-size:0.85em; opacity:0.85; }
+.lex-tag-buttons { display:flex; flex-wrap:wrap; gap:4px; padding:4px 8px 6px; }
+.lex-tag-button { font-size:0.85em; padding:1px 8px; border:1px solid var(--lex-border);
+  border-radius:10px; background:var(--lex-panel); color:inherit; cursor:pointer; }
+.lex-tag-button:is(:hover,:focus-visible) { filter:brightness(1.2); }
+
 .lex-audio-play {
   display:grid; place-items:center; width:100%; height:100%; min-width:36px; min-height:36px; aspect-ratio:1;
   padding:18%; border:1px solid var(--lex-border); border-radius:50%;
@@ -2299,7 +2321,7 @@ body[data-lex-github-open="true"] > :is(#main,#toolbar,footer) {
 }
 
 .lex-panel-layout.lex-panel-layout-static {
-  gap: var(--lex-panel-layout-gap, var(--lex-panel-gap, 14px));
+  gap: 0;
 }
 .lex-panel-layout.lex-panel-layout-overflow { overflow:auto; }
 main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
@@ -2439,7 +2461,7 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   min-width: 0;
   min-height: 0;
   height: 100%;
-  cursor: row-resize;
+  cursor: default;
   justify-self: stretch;
 }
 /* The handle follows the edge it drags: on its side for a stacked layout. */
@@ -2455,10 +2477,6 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   translate: -50% 0;
 }
 
-body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
-  cursor: col-resize;
-  user-select: none;
-}
 
 .lex-list.lex-fitted-page {
   overflow-y: hidden;
@@ -3032,7 +3050,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   border-radius:var(--lex-radius);
   background:var(--lex-panel-2);
   box-shadow:none;
-  text-shadow:none;
+  text-shadow:inherit;
   font:inherit;
 }
 .lex-pager-right select {
@@ -3049,7 +3067,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   border-radius:var(--lex-radius);
   background:var(--lex-panel-2);
   box-shadow:none;
-  text-shadow:none;
+  text-shadow:inherit;
   font:inherit;
 
 }
@@ -3104,6 +3122,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 }
 
 .lex-page-row-override input {
+  text-shadow:inherit;
   box-sizing:border-box;
   width:calc(2ch + 14px);
   min-height:32px;
@@ -3118,7 +3137,6 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   font-size:24px;
   line-height:1.2;
   text-align:center;
-  text-shadow:none;
   appearance:textfield;
   transition:width 160ms ease;
 }
@@ -3374,6 +3392,15 @@ select optgroup {
 .lex-source-control-internal > .lex-unit-field > :is(input,select,textarea) {
   padding-right:calc(var(--lex-unit-reserve,2.4em) + var(--lex-internal-reference-width) + var(--lex-stepper-width, 0px) + .7em);
 }
+/* A compact box (followUnit) has no room for its reference rail or
+   stepper, so they hide and the value takes the box. Right-click
+   still restores vanilla. */
+.lex-source-control-internal.lex-compact-box > .lex-unit-field > :is(input,select,textarea) {
+  padding-right:var(--lex-unit-reserve);
+}
+.lex-source-control-internal.lex-compact-box > :is(.lex-stepper,.lex-reference-values,.lex-reference-placeholder) {
+  display:none;
+}
 .lex-source-control-internal > .lex-unit-field > .lex-unit {
   /* Resolve the reference rail in the same font size as its container.
      Shrink the painted unit only; a smaller em moved it into the reference. */
@@ -3512,6 +3539,7 @@ select optgroup {
 }
 
 .lex-pager .lex-page-position input.lex-page-number {
+  text-shadow:inherit;
   width: max(2ch, calc(var(--lex-page-digits, 1) * 1ch + 4px));
   min-width: 2ch;
   max-width: 8ch;
@@ -4716,15 +4744,6 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1e
   color:var(--lex-model-stage-fg, #e8e2d4);
   text-align:center;
 }
-.lex-model-stage-spin {
-  width:22px;
-  height:22px;
-  border:3px solid color-mix(in srgb, var(--lex-model-stage-spinner, currentColor) 33%, transparent);
-  border-top-color:var(--lex-model-stage-spinner, currentColor);
-  border-radius:50%;
-  animation:lex-plugin-loading-spin .7s linear infinite;
-}
-
 /* Corner buttons switching how a 3D view is drawn: Regular, Fullbright and
    Wireframe. Bottom-left everywhere: the model drawer's heading floats above
    the stage's top edge, and the map's own hover actions own the top-right
@@ -5283,6 +5302,11 @@ html[data-lex-project-readonly="true"] main .lex-detail-field .lex-value-handle,
 .lex-detail-field.lex-column-lit {
   background: color-mix(in srgb, var(--lex-highlight) 6%, transparent);
 }
+/* A lit tab reads like a drop target but stays solid: hovering points at
+   the tab, it does not invite a drop. */
+.lex-tabbed-panel-tabs .lex-subtab-button.lex-column-lit {
+  outline:2px solid var(--lex-highlight); outline-offset:-2px;
+}
 
 /* ---- Curve layout ---------------------------------------------------- */
 /* The plot matches the drawing's own 2:1 ratio, so `meet` has nothing to
@@ -5722,13 +5746,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   min-width:0;
   min-height: 44px;
   outline: 0;
-  cursor: col-resize;
+  cursor: default;
   touch-action: none;
   align-self:stretch;
 
  z-index:20;
 }
-.lex-panel-layout-divider > .lex-barrel-control { z-index:30; }
+.lex-panel-layout-divider { pointer-events:none; }
+.lex-panel-layout-divider > .lex-barrel-control { z-index:30; pointer-events:auto; }
 .lex-barrel-control button {
 
   position: relative;
@@ -6339,18 +6364,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part:last-child { flex:1 1 auto; }
 .lex-column-list-cell .lex-detail-parts-fixed-first > .lex-detail-part:first-child { flex:none; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
-/* A coordinate triple stays one row while its numbers fit: X, Y and Z are
-   read as one value. Past that the axes stack, one per row: three readable
-   rows beat one row of clipped boxes. Three across needs room for grown
-   digits plus unit, stepper and reference padding in every box - about
-   340px of control - so the triple stacks before it can clip. */
+/* A coordinate triple is one row, always: X, Y and Z read as one
+   value, and nowrap means nowrap. Narrow panels shrink the boxes
+   instead of stacking the axes. */
 .lex-detail-parts-nowrap { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
-.lex-detail-field:has(> .lex-detail-field-control > .lex-detail-parts-nowrap) > .lex-detail-field-control {
-  container:lex-vector-row / inline-size;
-}
-@container lex-vector-row (max-width:340px) {
-  .lex-detail-parts-nowrap { grid-template-columns:minmax(0,1fr); }
-}
 /* The lane keeps its name: with three parts across, the box minimum
    would otherwise squeeze single-letter names to nothing. */
 .lex-detail-parts-nowrap > .lex-detail-part { grid-template-columns:auto auto minmax(0,1fr); }
@@ -6580,34 +6597,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-copy-value > svg { display:block;width:100%;height:100%; }
 
 /* A symmetric resize symbol stays clear without a scrollbar track. */
-.lex-panel-layout-divider::before {
-
-  position: absolute;
-  content: "";
-  transition: color .12s ease;
-
-  top:50%;left:50%;width:16px;height:32px;
-  border:0;border-radius:0;
-  background:currentColor;
-  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 32'%3E%3Cpath d='M1 16 5 12v8ZM15 16 11 12v8Z'/%3E%3Crect x='7' y='6' width='2' height='20'/%3E%3C/svg%3E") center/16px 32px no-repeat;
-  color:var(--lex-muted);
-  transform:translate(-50%,-50%);
-
-}
-.lex-panel-layout-divider:hover::before,
-.lex-panel-layout-divider:focus-visible::before,
-.lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
-/* A stacked layout drags up and down, so its grip is the same arrows turned a
-   quarter: the earlier stacked rule reshaped the box to 24x10, which squashed
-   the upright artwork into a smear instead of turning it. */
-.lex-panel-layout-vertical > .lex-panel-layout-divider::before {
-
-  background-size: 6px 5px;
-
-  width:16px;height:32px;
-  transform:translate(-50%,-50%) rotate(90deg);
-
-}
 
 /* Shortcut badges are overlays. Hover never changes the label lane. */
 
@@ -7748,6 +7737,26 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
   position:sticky;
   top:0;
   z-index:1;
+}
+/* A mod's Files and Records tabs are one list each: the list owns the tab
+   below its header, with the pager pinned at its foot. */
+.lex-tabbed-panel-content:has(> .lex-mod-contents-tab) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:0;
+}
+.lex-mod-contents-tab {
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+.lex-mod-contents {
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
 }
 .lex-boolean-mark {
    font:800 1.08em/1 var(--lex-font), "Segoe UI Symbol", sans-serif;
@@ -8892,6 +8901,14 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-property-dragging { opacity: .45; }
 .lex-property-drop-before { box-shadow: inset 0 2px currentColor; }
 .lex-property-drop-after { box-shadow: inset 0 -2px currentColor; }
+/* While a property is dragged, an emptied section keeps a landing pad:
+   its content has no height otherwise, and the title now means beside
+   the section, so there would be no way back in. */
+.lex-detail-panel:has(.lex-property-dragging) .lex-detail-section-content:empty {
+  min-height: 28px;
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
 
 /* A disabled control swallows the pointer, so the shell's read-only guard
    never saw the attempt and Vanilla offered no Create a mod prompt. Let the

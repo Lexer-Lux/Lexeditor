@@ -101,13 +101,59 @@ for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic
     WEAPON_FIELDS[key] = (f'{kind} guard (%)', 'Defense',
         'The absorption to apply to damage of the specified type when guarding.')
 
+# Motion sets, not single animations: each choice names a weapon family's
+# whole moveset, while the Animations tab edits individual animations.
+WEAPON_FIELDS['wepmotionCategory'] = (
+    'Weapon Animation Set', 'Use behavior',
+    'The moveset this weapon uses: its attacks, guards and motions. '
+    'The Animations tab edits single animations per character.')
+WEAPON_FIELDS['guardmotionCategory'] = (
+    'Guard Animation Set', 'Use behavior',
+    'The moveset for blocking with this weapon. '
+    'The Animations tab edits single animations per character.')
+
+# Achievements, decoded from the shipped Remastered GameParam: every
+# upgradeable weapon carries its upgrade path here (16 standard, 17
+# crystal, 18 lightning, 19 raw, 20 magic, 21 enchanted, 22 divine,
+# 23 occult, 24 fire, 25 chaos), and each key item its pickup
+# achievement. Names match the game's own trophy list.
+TROPHY_SEQ_CHOICES = {'-1': 'None', '16': 'Strongest Weapon', '17': 'Crystal Weapon',
+                      '18': 'Lightning Weapon', '19': 'Raw Weapon', '20': 'Magic Weapon',
+                      '21': 'Enchanted Weapon', '22': 'Divine Weapon', '23': 'Occult Weapon',
+                      '24': 'Fire Weapon', '25': 'Chaos Weapon', '27': 'Estus Flask',
+                      '31': 'Rite of Kindling', '32': 'Art of Abysswalking', '34': 'Lordvessel'}
+TROPHY_SEQ_WEAPON_HELP = ('The game grants this achievement for this weapon '
+                          'at the final step of its upgrade path.')
+TROPHY_SEQ_ITEM_HELP = 'The game grants this achievement when the player picks up this item.'
+
+# Knight's Honor checklist slots: the 47 graded weapons in the shipped
+# params are exactly the 47 rare weapons the achievement needs (15
+# soul weapons, 32 unique). Armor stores 0 instead of -1 for no entry.
+_KNIGHT_SLOTS = (104, 212, 213, 220, 221, 230, 258, 259, 267, 268, 269, 271,
+                 281, 282, 291, 451, 503, 506, 507, 508, 608, 652, 655, 720,
+                 731, 805, 810, 913, 1003, 1004, 1101, 1102, 1103, 1305, 1360,
+                 1510, 1514, 1531, 1532, 1533, 1534, 1535, 1541, 1542, 1543,
+                 1544, 1545)
+TROPHY_SGRADE_CHOICES = {'-1': 'None', '0': 'None'}
+TROPHY_SGRADE_CHOICES.update({str(slot): f"Knight's Honor (#{slot})" for slot in _KNIGHT_SLOTS})
+TROPHY_SGRADE_WEAPON_HELP = ("The game counts this weapon toward Knight's Honor "
+                             'when the player picks it up.')
+
+# Collection achievements on goods: sorcery scrolls count toward
+# Wisdom of a Sage, pyromancies toward Bond of a Pyromancer, miracles
+# toward Prayer of a Maiden.
+COMP_TROPHY_CHOICES = {'-1': 'None', '4': 'Wisdom of a Sage',
+                       '5': 'Bond of a Pyromancer', '6': 'Prayer of a Maiden'}
+COMP_TROPHY_HELP = ('This item counts toward a collection achievement. '
+                    'Collecting every item for it grants the achievement.')
+
 
 # Label art per field: the damage, defense, status and stat icons the
 # game's own menus use (icons.py crops them from Menu04_2). Slash,
-# strike and thrust have no glyph of their own anywhere in the menu, HUD,
+# strike and thrust have no cell of their own anywhere in the menu, HUD,
 # font or icon sheets (they are text wherever the game shows them), so
-# they reuse the physical shield: every one of these fields scales
-# physical defense, which is what the shield means. Divine takes the
+# those fields keep the shared registry's glyphs, which name the damage
+# kind the value scales. Divine takes the
 # white ring and occult the black one (the sheet's bottom row); luck
 # stays unmapped, with no cure-item icon that would read as the item
 # instead of the status. HP and stamina take their bar frames (red and
@@ -120,13 +166,13 @@ for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('def_slash', 'def_blow', 'def_thrust'),
-         ('physicalDef', 'physicalDef', 'physicalDef')),
+         ('slash', 'strike', 'thrust')),
         ('NpcParam', ('resist_poison', 'resist_desease', 'resist_blood', 'resist_curse'),
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
-         ('physicalDef', 'physicalDef', 'physicalDef')),
+         ('slash', 'strike', 'thrust')),
         ('AtkParam_Npc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
          ('physical', 'magic', 'fire', 'lightning')),
         ('AtkParam_Pc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
@@ -136,7 +182,7 @@ for _table, _keys, _kinds in (
         ('EquipParamWeapon', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('EquipParamWeapon', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
-         ('physicalDef', 'physicalDef', 'physicalDef')),
+         ('slash', 'strike', 'thrust')),
         ('EquipParamWeapon', ('properStrength', 'properAgility', 'properMagic', 'properFaith'),
          ('str', 'dex', 'int', 'faith')),
         ('EquipParamWeapon', ('correctStrength', 'correctAgility', 'correctMagic', 'correctFaith'),
@@ -146,7 +192,7 @@ for _table, _keys, _kinds in (
         ('EquipParamProtector', ('defensePhysics', 'defenseMagic', 'defenseFire', 'defenseThunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('EquipParamProtector', ('defenseSlash', 'defenseBlow', 'defenseThrust'),
-         ('physicalDef', 'physicalDef', 'physicalDef')),
+         ('slash', 'strike', 'thrust')),
         ('EquipParamProtector', ('weight',), ('weight',)),
         ('EquipParamProtector', ('durability', 'durabilityMax'), ('durability', 'durability')),
         ('Magic', ('requirementIntellect', 'requirementFaith'), ('int', 'faith')),
@@ -158,6 +204,8 @@ for _table, _keys, _kinds in (
          ('physical', 'magic', 'fire', 'lightning')),
         ('SpEffectParam', ('neutralDamageCutRate', 'magicDamageCutRate', 'fireDamageCutRate', 'thunderDamageCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('SpEffectParam', ('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'),
+         ('slash', 'strike', 'thrust')),
         ('SpEffectParam', ('physicsDiffence', 'magicDiffence', 'fireDiffence', 'thunderDiffence'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('SpEffectParam', ('physicsDiffenceRate', 'magicDiffenceRate', 'fireDiffenceRate', 'thunderDiffenceRate'),
@@ -170,9 +218,29 @@ for _table, _keys, _kinds in (
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('hp', 'mp', 'stamina', 'staminaRecoverBaseVel'),
          ('hp', 'mp', 'stamina', 'stamina')),
+        ('Magic', ('stamina',), ('stamina',)),
+        ('BehaviorParam', ('stamina',), ('stamina',)),
+        ('BehaviorParam', ('mp',), ('mp',)),
+        ('BehaviorParam', ('heroPoint',), ('humanity',)),
         ('NpcParam', ('staminaGuardDef',), ('stability',)),
         ('EquipParamWeapon', ('staminaGuardDef',), ('stability',)),
         ('ReinforceParamWeapon', ('staminaGuardDefRate',), ('stability',)),
+        ('ReinforceParamWeapon', ('physicsAtkRate', 'magicAtkRate', 'fireAtkRate', 'thunderAtkRate'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('ReinforceParamWeapon', ('staminaAtkRate',), ('stamina',)),
+        ('ReinforceParamWeapon', ('saWeaponAtkRate', 'saDurabilityRate'), ('poise', 'poise')),
+        ('ReinforceParamWeapon', ('correctStrengthRate', 'correctAgilityRate', 'correctMagicRate', 'correctFaithRate'),
+         ('str', 'dex', 'int', 'faith')),
+        ('ReinforceParamWeapon', ('physicsGuardCutRate', 'magicGuardCutRate', 'fireGuardCutRate', 'thunderGuardCutRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('ReinforceParamWeapon', ('poisonGuardResistRate', 'diseaseGuardResistRate', 'bloodGuardResistRate', 'curseGuardResistRate'),
+         ('poison', 'toxic', 'bleed', 'curse')),
+        ('ReinforceParamProtector', ('physicsDefRate', 'magicDefRate', 'fireDefRate', 'thunderDefRate'),
+         ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
+        ('ReinforceParamProtector', ('slashDefRate', 'blowDefRate', 'thrustDefRate'),
+         ('slash', 'strike', 'thrust')),
+        ('ReinforceParamProtector', ('resistPoisonRate', 'resistDiseaseRate', 'resistBloodRate', 'resistCurseRate'),
+         ('poison', 'toxic', 'bleed', 'curse')),
         ('SpEffectParam', ('guardStaminaCutRate',), ('stability',)),
         ('AtkParam_Npc', ('guardStaminaCutRate',), ('stability',)),
         ('AtkParam_Pc', ('guardStaminaCutRate',), ('stability',)),
@@ -185,10 +253,25 @@ for _table, _keys, _kinds in (
          'superArmorBrakeKnockbackDist'), ('poise', 'poise', 'poise')),
         ('SpEffectParam', ('registBlood', 'registCurse', 'registBloodChangeRate', 'registCurseChangeRate',
          'bloodDamageRate'), ('bleed', 'curse', 'bleed', 'curse', 'bleed')),
+        ('SpEffectParam', ('registPoizonChangeRate', 'registIllnessChangeRate', 'registIllness',
+         'poizonAttackPower'), ('poison', 'toxic', 'toxic', 'poison')),
         ('SpEffectParam', ('disablePoison', 'disableDisease', 'disableBlood', 'disableCurse'),
          ('poison', 'toxic', 'bleed', 'curse')),
         ('SpEffectParam', ('soulRate', 'soul', 'haveSoulRate', 'soulStealRate', 'clearSoul'),
          ('souls', 'souls', 'souls', 'souls', 'souls')),
+        ('EquipParamWeapon', ('sellValue',), ('souls',)),
+        ('EquipParamProtector', ('sellValue',), ('souls',)),
+        ('EquipParamAccessory', ('sellValue',), ('souls',)),
+        ('EquipParamGoods', ('sellValue',), ('souls',)),
+        ('EquipParamWeapon', ('fixPrice', 'basicPrice'), ('souls', 'souls')),
+        ('EquipParamProtector', ('fixPrice', 'basicPrice'), ('souls', 'souls')),
+        ('EquipParamAccessory', ('basicPrice',), ('souls',)),
+        ('EquipParamGoods', ('basicPrice',), ('souls',)),
+        ('EquipParamAccessory', ('weight',), ('weight',)),
+        ('EquipParamGoods', ('weight',), ('weight',)),
+        ('Bullet', ('damageDamp', 'spelDamageDamp', 'fireDamageDamp', 'thunderDamageDamp', 'staminaDamp'),
+         ('physical', 'magic', 'fire', 'lightning', 'stamina')),
+        ('ShopLineupParam', ('value',), ('souls',)),
         ('SpEffectParam', ('changeSuperArmorPoint',), ('poise',)),
         ('Magic', ('slotLength',), ('slot',)),
         ('EquipParamWeapon', ('antSaintDamageRate', 'antWeakA_DamageRate'),
@@ -202,8 +285,8 @@ for _table, _keys, _kinds in (
 del _table, _keys, _kinds, _key, _kind
 ABSORPTION_ICONS = {'neutralDamageCutRate': 'physicalDef', 'magicDamageCutRate': 'magicDef',
                     'fireDamageCutRate': 'fireDef', 'thunderDamageCutRate': 'lightningDef',
-                    'slashDamageCutRate': 'physicalDef', 'blowDamageCutRate': 'physicalDef',
-                    'thrustDamageCutRate': 'physicalDef'}
+                    'slashDamageCutRate': 'slash', 'blowDamageCutRate': 'strike',
+                    'thrustDamageCutRate': 'thrust'}
 
 
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
@@ -235,12 +318,6 @@ UPGRADE_MULTIPLIERS = {'neutralDamageCutRate': 'physicsDefRate', 'slashDamageCut
                        'blowDamageCutRate': 'blowDefRate', 'thrustDamageCutRate': 'thrustDefRate',
                        'magicDamageCutRate': 'magicDefRate', 'fireDamageCutRate': 'fireDefRate',
                        'thunderDamageCutRate': 'thunderDefRate'}
-# Slider spans shared by fields with one meaning. Seven defense rates with
-# seven data spans put one value in seven places; one span per group keeps
-# the same value in the same place on every slider.
-SHARED_SPAN_GROUPS = (frozenset(UPGRADE_MULTIPLIERS.values()),
-                      frozenset({'resistPoisonRate', 'resistDiseaseRate',
-                                 'resistBloodRate', 'resistCurseRate'}))
 MAX_UPGRADE_LEVEL = 15
 ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),
                   ('player-attacks', 'Player attacks', 'AtkParam_Pc'),
@@ -505,6 +582,18 @@ def _enum(name):
             for row in raw['Options']}
 
 
+def _unit_suffix(label):
+    """Move a bare vendor percent into the trailing-(%) unit form.
+
+    Smithbox names carry the % bare ('Critical Hit %') or mid-label
+    ('Guard Absorption %: Physical'), which never engages the client's
+    trailing-(%) unit control. Restating both as 'Name (%)' lights the
+    component and reads the way the already-converted names do.
+    """
+    label = re.sub(r'^(.+) %: (.+)$', r'\1: \2 (%)', label)
+    return re.sub(r' %$', ' (%)', label)
+
+
 @lru_cache(maxsize=None)
 def schema(table):
     if table not in TABLES:
@@ -564,6 +653,13 @@ def schema(table):
             description = ORIGIN_HELP
         if table == 'EquipParamWeapon' and key.startswith('originEquipWep'):
             description = ORIGIN_HELP
+        if key == 'trophySeqId':
+            description = (TROPHY_SEQ_WEAPON_HELP if table == 'EquipParamWeapon'
+                           else TROPHY_SEQ_ITEM_HELP)
+        if table == 'EquipParamWeapon' and key == 'trophySGradeId':
+            description = TROPHY_SGRADE_WEAPON_HELP
+        if key == 'compTrophySedId':
+            description = COMP_TROPHY_HELP
         slot = key[-2:] if table == MATERIAL_TABLE else ''
         if slot in ('01', '02', '03', '04', '05'):
             group = f'Material {int(slot)}'
@@ -587,6 +683,12 @@ def schema(table):
             choices = {**choices, '0': 'Standard'}
         if table == CHARA_TABLE and key == 'vowType':
             choices = {code: name for code, name in choices.items() if int(code) <= 9}
+        if key == 'trophySeqId':
+            choices = TROPHY_SEQ_CHOICES
+        elif key == 'trophySGradeId':
+            choices = TROPHY_SGRADE_CHOICES
+        elif key == 'compTrophySedId':
+            choices = COMP_TROPHY_CHOICES
         padding = dtype == 'dummy8' or 'Padding' in attrs or key.lower().startswith('pad')
         # Goods and Magic carry sixteen one-bit covenant slots. Their own
         # annotations named them differently (Goods by number only, Magic by
@@ -624,6 +726,7 @@ def schema(table):
             protected = True
         if table in ('AtkParam_Npc', 'AtkParam_Pc') and key not in ATTACK_FIELDS:
             protected = True
+        label = _unit_suffix(label)
         field = FieldSpec(key, dtype, field_offset, count, bit_used if bits else None, bits,
                           label, description, group,
                           'IsBool' in attrs or bits == 1 or (table == 'NpcParam' and key in WEAKNESSES),
@@ -1042,8 +1145,9 @@ class ItemDocument:
         """Parts-binder and icon-atlas links for one row's file-backed IDs.
 
         A Model ID names a member of a parts binder and an Icon ID names
-        a cell of a menu icon sheet: hover targets, never pickers, since
-        a picked file could never write back into a numeric ID. Model
+        a cell of a menu icon sheet. Models carry their thing-finder
+        type, so the Models tab offers their binders to hold and choose;
+        the binder's number is what writes back into the Model ID. Model
         paths need no game files; icon sheets do, so icons stay unlinked
         offline. Consumables name no model file, so their Model ID stays
         a dead number. Never raises: a row must load even when game
@@ -1073,9 +1177,11 @@ class ItemDocument:
                 stems = None
             if stems:
                 relative = f"parts/{stems[0][0]}.partsbnd.dcx"
+                piece = 'WP_A' if table == 'EquipParamWeapon' else _viewport.PART_PREFIXES[info['category']]
                 found.append({'kind': 'asset', 'table': 'Asset', 'id': relative, 'tab': 'models',
                               'field': 'equipModelId', 'resolved': True,
-                              'name': f'{stems[0][0]}.partsbnd.dcx'})
+                              'name': f'{stems[0][0]}.partsbnd.dcx',
+                              'pick': _viewport.model_pick_type(table, piece)})
         return found
 
     def row_name(self, table, row_id):
@@ -1331,49 +1437,6 @@ class ItemDocument:
         _row, start, data = self._row(table, row_id)
         return bytes(self.original_plain[start:start + len(data)])
 
-    def _value_spans(self, table):
-        """Each number's span across the game's own rows of a table, for the
-        slider. A field bounded only by its type put every record's fill at
-        the same spot. Read once per table."""
-        cache = self.__dict__.setdefault('_spans_cache', {})
-        if table in cache:
-            return cache[table]
-        source = self.vanilla_document if self.vanilla_document is not None else self
-        plain = source.plain if source is not self else self.original_plain
-        # Our own rows are read from the file as opened, so a row added or
-        # removed since (which moves every offset) cannot misplace them.
-        shipped = members(plain) if source is self else source.members
-        offset, size = shipped[table + '.param'].offset, TABLES[table][0]
-        rows = ParamView(bytes(plain[offset:offset + shipped[table + '.param'].size])).rows if source is self else source.params[table].rows
-        fields = [item['spec'] for item in self.schemas[table]['fields']
-                  if not item['spec'].padding and item['spec'].array_length == 1 and not item['spec'].is_bool]
-        found = {}
-        for row in rows:
-            data = bytes(plain[offset + row.data_offset:offset + row.data_offset + size])
-            for field in fields:
-                value = read_field(data, field, '<')
-                if isinstance(value, float) and not math.isfinite(value):
-                    continue
-                low, high = found.get(field.key, (value, value))
-                found[field.key] = (min(low, value), max(high, value))
-        spans = {}
-        for key, (low, high) in found.items():
-            # From zero (or the lowest value, when the game goes below zero)
-            # to a quarter past the highest, so the largest vanilla value is
-            # not already the end of the slider.
-            low = min(low, 0)
-            high = high + (high - low) * 0.25 if high > low else low + max(1, abs(low))
-            spans[key] = (low, high)
-        for group in SHARED_SPAN_GROUPS:
-            present = [spans[key] for key in group if key in spans]
-            if len(present) > 1:
-                shared = (min(low for low, _ in present), max(high for _, high in present))
-                for key in group:
-                    if key in spans:
-                        spans[key] = shared
-        cache[table] = spans
-        return spans
-
     def read_row(self, table, row_id, only=None, game_root=None):
         if table == 'MenuText':
             return self._read_menu_label(row_id, only)
@@ -1384,7 +1447,6 @@ class ItemDocument:
         row, _, data = self._row(table, row_id)
         vanilla = self._vanilla_row(table, row_id)
         fields = []
-        spans = self._value_spans(table)
         links = {}
         for candidate in self.schemas[table]['fields']:
             if not candidate['spec'].reference:
@@ -1427,9 +1489,7 @@ class ItemDocument:
                            'type': 'bool' if field.is_bool else 'enum' if options else 'number',
                            'minimum': None if unbounded else item['min'], 'maximum': None if unbounded else item['max'],
                            'enum': options, 'protectedReason': item.get('protectedReason', ''),
-                           'editable': item['editable'] and finite, 'vanilla': original, 'icon': item.get('icon'),
-                           'sliderMin': spans.get(field.key, (None, None))[0],
-                           'sliderMax': spans.get(field.key, (None, None))[1]})
+                           'editable': item['editable'] and finite, 'vanilla': original, 'icon': item.get('icon')})
             if (field.key == 'materialSetId' and table in ('EquipParamWeapon', 'EquipParamProtector')
                     and fields[-1]['vanilla'] is not None):
                 try:
@@ -1501,11 +1561,16 @@ class ItemDocument:
             kind, target = links[field['key']]
             choices = self.link_choices(kind, target)
             current = field['value']
-            if choices.get(str(current)) == 'None':
-                continue
+            # A link pointing at None is still a link: the entry is
+            # emitted unresolved so the field keeps its face and finder
+            # instead of falling back to a full-table select, and the
+            # finder offers None back (Lexer: unset drop tables showed
+            # a dropdown of every lot in the game).
+            is_none = choices.get(str(current)) == 'None'
             noun = self.link_noun(kind, target)
             entry = {'kind': kind, 'table': target, 'id': current,
-                       'field': field['key'], 'resolved': str(current) in choices,
+                       'field': field['key'],
+                       'resolved': str(current) in choices and not is_none,
                        'name': choices.get(str(current), f'Missing {noun} {current}')}
             if (field['key'] == 'materialSetId' and table in ('EquipParamWeapon', 'EquipParamProtector')
                     and entry['resolved']):

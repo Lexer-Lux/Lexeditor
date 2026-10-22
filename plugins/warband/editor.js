@@ -369,8 +369,8 @@
   // The drawer's own stage. The icon in the heading stays a still thumbnail;
   // this is the turnable model behind it.
   function warbandPreviewStage(item){
-    const stage=LexeditorUI.modelStage({className:"warband-preview-stage",busy:Boolean(item.inventoryMesh),message:"This item has no inventory mesh."}),message=stage.lexMessage;
-    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandModel(item,stage,message));
+    const stage=LexeditorUI.modelStage({className:"warband-preview-stage",message:"This item has no inventory mesh."}),message=stage.lexMessage;
+    if(item.inventoryMesh){message.replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${item.name} model`}));requestAnimationFrame(()=>loadWarbandModel(item,stage,message));}
     return stage;
   }
   async function loadWarbandModel(item,stage,message){

@@ -6,6 +6,7 @@ every property one, and its table shows pinned properties as columns from the
 row's values (row.values / row.display).
 """
 from test_shared_ui_feedback import framework, page
+from test_vanilla_metadata_edit import mount_vanilla_shell
 
 PAGE = """(ownPins) => {
   const U = LexeditorUI;
@@ -57,3 +58,64 @@ def test_a_plugin_that_wires_its_own_pins_keeps_them(page):
     page.wait_for_timeout(200)
     # Its own pins are its business; the paged list adds none, so none is dead.
     assert page.locator('[data-lex-auto-pin]').count() == 0
+
+# Pin headers read as the developer last named the property: a rename
+# used to stick in the detail panel while the pinned column kept the old
+# snapshot, because icon pins render through a label factory that skipped
+# the live-label machinery entirely.
+
+def mount_dev(page):
+    framework(page)
+    mount_vanilla_shell(page)
+    page.evaluate(PAGE, False)
+    page.wait_for_timeout(200)
+
+def rename_field(page, old, new):
+    page.locator(".lex-detail-field-label-text", has_text=old).dblclick()
+    box = page.locator(".lex-label-rename")
+    box.fill(new)
+    box.press("Enter")
+    page.wait_for_timeout(300)
+
+def pin_power(page):
+    page.locator('[data-lex-pin-column="power"]').click(force=True)
+    page.wait_for_timeout(200)
+
+def test_pin_header_follows_a_later_rename(page):
+    mount_dev(page)
+    pin_power(page)
+    assert "Power" in headers(page)
+    rename_field(page, "Power", "Might")
+    assert "Might" in headers(page), headers(page)
+    assert "Power" not in headers(page)
+    page.evaluate(PAGE.replace("localStorage.clear();", ""), False)
+    page.wait_for_timeout(200)
+    assert "Might" in headers(page), headers(page)
+
+def test_icon_pin_header_follows_a_later_rename(page):
+    mount_dev(page)
+    field = page.locator(".lex-detail-field", has_text="Power")
+    field.evaluate("node => node.dataset.lexIcon = 'stamina'")
+    pin_power(page)
+    rename_field(page, "Power", "Might")
+    assert "Might" in headers(page), headers(page)
+
+def test_pin_taken_after_a_rename_follows_the_next_one(page):
+    mount_dev(page)
+    rename_field(page, "Power", "Might")
+    pin_power(page)
+    assert "Might" in headers(page), headers(page)
+    rename_field(page, "Might", "Vigor")
+    assert "Vigor" in headers(page), headers(page)
+
+def test_pin_without_stored_names_follows_its_described_label(page):
+    framework(page)
+    mount_vanilla_shell(page)
+    page.evaluate(PAGE.replace(
+        "master: ({rows: listed, selected, select}) => U.columnList({",
+        "describe: key => (key === 'power' ? {label: 'Power'} : null), " +
+        "master: ({rows: listed, selected, select}) => U.columnList({"), False)
+    page.wait_for_timeout(200)
+    pin_power(page)
+    rename_field(page, "Power", "Might")
+    assert "Might" in headers(page), headers(page)

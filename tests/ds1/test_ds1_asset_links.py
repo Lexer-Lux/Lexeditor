@@ -2,8 +2,10 @@
 
 An equipment row's Model ID names a member of a parts binder and its Icon
 ID names a cell of a menu icon sheet. Neither names a Models/Textures row
-directly, so the links open the containing file (hover only: a picked file
-could never write back into a numeric ID). Consumables name no model file,
+directly, so the links open the containing file. Models are also held
+and chosen in the Models tab (the binder's number writes back into the
+Model ID); icons are chosen from a gallery of the menu catalog.
+Consumables name no model file,
 so their Model ID stays a dead number.
 """
 import re
@@ -118,3 +120,47 @@ def test_asset_faces_show_beside_their_numbers():
     assert 'class:"ds1-asset-field"' in EDITOR
     assert '&key=${encodeURIComponent(field.key)}&v=${field.value}`' in EDITOR
     assert 'targetLabel:`${entry.name} in Models`' in EDITOR
+
+
+def test_model_entries_carry_their_picker_type():
+    document = ItemDocument(make_archive())
+    put(document, 'EquipParamWeapon', 100, 'equipModelId', 100)
+    (entry,) = asset_links(document, 'EquipParamWeapon', 100)
+    assert entry['pick'] == 'ds1-model-EquipParamWeapon-WP_A'
+    document = ItemDocument(make_archive())
+    put(document, 'EquipParamProtector', 100, 'equipModelId', 100)
+    put(document, 'EquipParamProtector', 100, 'equipModelCategory', 2)
+    put(document, 'EquipParamProtector', 100, 'equipModelGender', 3)
+    (entry,) = asset_links(document, 'EquipParamProtector', 100)
+    assert entry['pick'] == 'ds1-model-EquipParamProtector-BD'
+
+
+def test_model_pick_types_match_their_binders():
+    from plugins.ds1 import viewport
+    weapon = viewport.model_pick_type('EquipParamWeapon', 'WP_A')
+    assert viewport.stem_model_pick('parts/WP_A_0100.partsbnd.dcx') == {'type': weapon, 'value': 100}
+    armor = viewport.model_pick_type('EquipParamProtector', 'BD')
+    assert viewport.stem_model_pick('parts/BD_M_0100.partsbnd.dcx') == {'type': armor, 'value': 100}
+    assert viewport.stem_model_pick('parts/BD_F_0100.partsbnd.dcx') == {'type': armor, 'value': 100}
+    assert viewport.stem_model_pick('parts/BD_X_0100.partsbnd.dcx') is None
+    assert viewport.stem_model_pick('chr/c0000.chrbnd.dcx') is None
+
+
+def test_model_picker_uses_the_shared_finder():
+    assert 'function modelPicker(row,field,face,entry){' in EDITOR
+    assert 'thingFinderButton({class:"ds1-find-asset"' in EDITOR
+    assert 'type:entry.pick' in EDITOR
+    assert 'await navigate("models","files")' in EDITOR
+    assert 'if(row.modelPick)LexeditorUI.decorateSearchCandidate' in EDITOR
+
+
+def test_icon_gallery_lists_the_menu_catalog():
+    assert 'function openIconGallery(row,field,face){' in EDITOR
+    assert '/api/icon-catalog' in EDITOR
+    assert '/api/icon-art?icon=' in EDITOR
+    assert 'ds1-icon-choice' in EDITOR
+
+
+def test_asset_ids_draw_no_slider():
+    assert '...(assetId?{}:{min:field.minimum,max:field.maximum})' in EDITOR
+    assert '...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})' in EDITOR

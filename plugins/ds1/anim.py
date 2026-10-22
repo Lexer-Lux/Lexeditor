@@ -365,8 +365,9 @@ def anim_events(tae_store, chr_id, binder, member):
         rows = tae_store.list_events(f'{chr_id}.anibnd.dcx', name, index)
     except (TaeError, ValueError, OSError):
         return []
-    return [{'start': row['values']['start'], 'end': row['values']['end'],
-             'type': row['values']['type'], 'label': row['values']['label']} for row in rows]
+    return [{'id': row['id'], 'start': row['values']['start'],
+             'end': row['values']['end'], 'type': row['values']['type'],
+             'label': row['values']['label']} for row in rows]
 
 
 def anim_frames(game_root, project, chr_id, binder, member, tae_store=None):

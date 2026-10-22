@@ -67,10 +67,12 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     assert page.locator('button[data-tab="world"]').count() == 0
                     page.locator('button[data-tab="maps"]').click()
-                    page.wait_for_function('state.tab==="maps" && state.rows.length>0 && state.dirRows.length>0 && !state.error')
+                    page.wait_for_function('state.tab==="maps" && state.rows.length>0 && !state.error')
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_selector('[data-maps-dir] [data-subtab="treasure"]')
                     assert page.locator('[data-maps-dir] [data-subtab]').evaluate_all(
-                        'nodes=>nodes.map(n=>n.dataset.subtab)') == ['drops', 'enemies', 'npcs', 'treasure']
+                        'nodes=>nodes.map(n=>n.dataset.subtab)') == ['all', 'drops', 'enemies', 'npcs', 'treasure']
                     # The NPC/enemy split follows the live npcType, not names.
                     page.locator('[data-maps-dir] [data-subtab="npcs"]').click()
                     page.wait_for_function('state.dirTab==="npcs"')
@@ -93,11 +95,11 @@ def main():
                         page.wait_for_timeout(200)
                         assert page.evaluate('state.dirRows.length') > 0
                         page.locator('[data-maps-dir] .lex-list-row').first.click()
-                        page.wait_for_function('(table)=>state.mapTab==="selection" && state.row && state.row.table===table',
+                        page.wait_for_function('(table)=>state.row && state.row.table===table',
                                                arg=table)
                         keys = page.evaluate('state.row.fields.map(f=>f.key)')
                         assert keys, keys
-                        control = reveal(page, page.locator('[data-maps-side] input[data-field-key][type="number"][min]').first)
+                        control = reveal(page, page.locator('[data-maps-detail] input[data-field-key][type="number"][min]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))
                         low, high = float(control.get_attribute('min')), float(control.get_attribute('max'))

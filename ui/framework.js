@@ -183,6 +183,18 @@
     if(event.target.matches?.('textarea,input,[contenteditable="true"]'))event.target.spellcheck=false;
   });
 
+  // One matcher for every glow path: a pinned column's pin: prefix is
+  // stripped before comparing, so pin:sellValue lights the sellValue
+  // field, its cells, and (off-tab) its tab.
+  const stripPinPrefix = key => String(key ?? "").replace(/^pin:/, "");
+  const glowSelector = key => {
+    const raw = String(key ?? "");
+    const base = stripPinPrefix(raw);
+    const columns = raw === base
+      ? [`[data-column-key="${CSS.escape(raw)}"]`]
+      : [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="${CSS.escape(base)}"]`];
+    return [...columns, `[data-lex-property="${CSS.escape(base)}"]`].join(",");
+  };
   const element = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
     // A textarea or a select has no value attribute: setting one left every
@@ -578,11 +590,16 @@
     const buttons = new Map();
     for (const tab of options.tabs || []) {
       const on = tab.id === options.active;
+      // A disabled tab stays focusable (a truly disabled button eats
+      // its tooltip): aria-disabled grays it, the click is a no-op,
+      // and the reason rides on the title.
+      const off = !!tab.disabled;
       const button = element("button", {type: "button",
         class: ["lex-subtab-button", "lex-tabstrip-button", on ? "active" : ""].filter(Boolean).join(" "),
         role: "tab", "aria-selected": String(on), tabindex: on ? "0" : "-1",
         "data-tabstrip-id": tab.id,
-        onclick: () => options.change?.(tab.id),
+        ...(off ? {"aria-disabled": "true", title: tab.disabledReason || "Unavailable"} : {}),
+        onclick: () => { if (!off) options.change?.(tab.id); },
       }, element("span", {class: "lex-tab-label lex-tabstrip-label"}, tab.label ?? tab.id));
       if (typeof options.onRename === "function") {
         button.addEventListener("dblclick", event => {
@@ -700,6 +717,7 @@
       activeHelpPopup.commitEdit();
       return;
     }
+    liveHoverPopups.delete(activeHelpPopup.lexHoverEntry);
     activeHelpPopup.cleanup?.();
     activeHelpPopup.remove();
     activeHelpPopup = null;
@@ -889,7 +907,7 @@
             else if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
-            labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
+            pushLabelUndo({key: helpKey(shipped), tabId: activePageTab(), before,
               after: next, shipped, node: null});
             labelRedo.length = 0;
             const saved = await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
@@ -969,6 +987,8 @@
         window.removeEventListener("scroll", onScroll, true);
       };
       activeHelpPopup = popup;
+      popup.lexHoverEntry = {anchor: marker, close: closeHelpPopup};
+      liveHoverPopups.add(popup.lexHoverEntry);
       position();
     };
     marker.addEventListener("pointerenter", open);
@@ -1079,6 +1099,10 @@
   };
 
   const unitField = (control, unit, attrs = {}) => {
+    // Frames are the \u{1D453} symbol everywhere, never the word: one glyph
+    // that reads at any panel width, like every other unit.
+    if (String(unit || "").toLowerCase() === "frames" || String(unit || "").toLowerCase() === "frame")
+      unit = "\u{1D453}";
     const scalar = control instanceof Element
       ? (control.matches("input,select,textarea,output,.lex-readonly-field") ? control
         : control.querySelector("input,select,textarea,output,.lex-readonly-field")) : null;
@@ -1136,6 +1160,10 @@
       const left = Math.min(border + start + measured + gap, limit);
       const next = `${Math.round(left)}px`;
       if (unitNode.style.left !== next) unitNode.style.left = next;
+      // A box too narrow to read a reference beside its value keeps the
+      // value: the rail and stepper hide until the box has room again.
+      const host = field.closest?.(".lex-source-control-internal");
+      if (host && field.clientWidth > 0) host.classList.toggle("lex-compact-box", field.clientWidth < 120);
     };
     control.addEventListener("input", place);
     control.addEventListener("change", place);
@@ -1670,9 +1698,12 @@
           tab.label = label;
           persistShared();
           strip.setLabel(id, label);
-        },
-        holdToSave: true});
+        }});
+      // Hold-right fills a tab with a new section, or removes it when it
+      // holds nothing (bindTabHold below). Saving the view stays on page
+      // and subtab bars, so this strip keeps no holdToSave.
       for (const button of strip.querySelectorAll(".lex-tabstrip-button")) {
+        bindTabHold(button);
         button.addEventListener("dragover", event => {
           if (!dev() || ![...event.dataTransfer.types].includes("text/lex-detail-node")) return;
           event.preventDefault();
@@ -1748,6 +1779,72 @@
       persistShared();
       render();
     };
+    // An empty tab goes the way of an empty section: hold-right removes
+    // it, and only it - assignments clean up so no later render can deal
+    // a detached node back. Like adding a tab, this ships without undo:
+    // nothing is lost but the tab itself.
+    const removeTab = id => {
+      layout.tabs = layout.tabs.filter(tab => tab.id !== id);
+      for (const map of [layout.shells, layout.fields])
+        for (const key of Object.keys(map)) if (map[key] === id) delete map[key];
+      if (!tabIds().includes(layout.active)) layout.active = firstTab() ?? null;
+      persistShared();
+      render();
+      enableDrag();
+    };
+    // Hold-right on a tab fills it with a new section; on a tab holding
+    // nothing, it removes the tab instead. A tab whose sections drifted
+    // elsewhere keeps its assignments, so the hold says where to drag
+    // them instead of orphaning them onto the first tab.
+    const fillOrRemoveTab = (id, button) => {
+      const pane = [...box.children].find(node => node.dataset?.tabstripPane === id);
+      const label = button.querySelector(".lex-tabstrip-label")?.textContent?.trim() || "This tab";
+      if (pane && pane.childElementCount > 0) {
+        const panel = box.closest(".lex-detail-panel") || box;
+        const fieldInside = panel.querySelector(".lex-detail-field[data-lex-layout-field]");
+        const state = preparePropertyLayout(fieldInside ? propertyRoot(fieldInside) : panel);
+        const before = capturePropertyLayout(state);
+        const taken = new Set((state.custom || []).map(spec => spec.id));
+        let sectionId = `custom-${Date.now().toString(36)}`;
+        if (taken.has(sectionId)) {
+          let serial = 2;
+          while (taken.has(`${sectionId}-${serial}`)) serial++;
+          sectionId = `${sectionId}-${serial}`;
+        }
+        placeCustomSections(state, [...(state.custom || []), {id: sectionId, title: "New section", after: ""}]);
+        const node = panel.querySelector(`[data-lex-layout-section="${sectionId}"]`);
+        if (node) adoptShell(registerShell(node), id);
+        const after = capturePropertyLayout(state);
+        const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+        pushLabelUndo({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+        void apply(after);
+        showToast(`Added a section to ${label}. Double-click its heading to name it, and drag properties into it. `
+          + "To remove this tab, drag its sections onto other tabs, then hold right on it.");
+        return;
+      }
+      const assigned = [...Object.values(layout.shells), ...Object.values(layout.fields)].includes(id);
+      if (assigned) {
+        showToast("That tab still holds sections whose properties moved elsewhere. "
+          + "Drag its sections onto another tab, then hold right again.");
+        return;
+      }
+      removeTab(id);
+      showToast("Removed the empty tab.");
+    };
+    const bindTabHold = button => {
+      button.addEventListener("pointerdown", event => {
+        if (event.button !== 2 || !dev()) return;
+        clearTimeout(hideTimer);
+        hideHeld = false;
+        button.classList.add("lex-property-holding");
+        hideTimer = setTimeout(() => {
+          button.classList.remove("lex-property-holding");
+          hideHeld = true;
+          fillOrRemoveTab(button.dataset.tabstripId, button);
+        }, 700);
+      });
+      button.addEventListener("contextmenu", event => event.preventDefault());
+    };
     const activeTab = () => validTab(layout.active);
     // A section created after the first render joins the keys under the
     // same rules, so it keeps this key on every rebuild and deals into
@@ -1820,8 +1917,8 @@
     placeCustomSections(state, [...(state.custom || []), spec]);
     adoptCustomIntoActivePane(panel, spec.id);
     const after = capturePropertyLayout(state);
-    const apply = layout => storePropertyLayout(state, layout);
-    labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+    const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+    pushLabelUndo({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
     void apply(after);
     showToast("Added a section. Double-click its heading to name it, and drag properties into it. "
       + "To remove a section, drag its properties out, then hold right on its heading.");
@@ -2019,7 +2116,6 @@
   };
   const tabbedPanel = (options = {}) => {
     const suppliedTabs = options.tabs || [];
-    const title = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
     // A misc tab is written with its full stop and comes last, after
     // every named area, with a tweaks tab after it when a panel has one.
     const tabRank = tab => {
@@ -2027,7 +2123,7 @@
       return id === "tweaks" ? 2 : id === "misc" ? 1 : 0;
     };
     const tabTitle = tab => {
-      const name = title(tab);
+      const name = shownSubtabName(tab);
       return String(tab.id).toLocaleLowerCase() === "misc" && name === "Misc"
         ? "Misc." : name;
     };
@@ -2059,6 +2155,15 @@
       const accept = new Set(options.fieldTabs.accept || []);
       for (const button of bar.querySelectorAll(":scope > .lex-subtab-button"))
         if (accept.has(button.dataset.subtab)) button.dataset.lexAcceptFields = "true";
+    }
+    // A header hover glows the tab holding its property when the field
+    // itself is off-screen; the caller names each tab's members.
+    if (options.fieldTabs?.members) {
+      const known = new Map();
+      for (const [tabId, keys] of Object.entries(options.fieldTabs.members))
+        for (const key of [keys || []].flat())
+          if (!known.has(String(key))) known.set(String(key), tabId);
+      bar.lexTabMembers = known;
     }
     return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
@@ -2181,11 +2286,17 @@
       const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list, .lex-instruction-controls")
         ? Number.parseFloat(style.fontSize) || 16
         : Math.max(minimum,Math.min(28,control.clientHeight*.78));
+      // A parked unit sits left of the reserved lane, inside the text's
+      // own room: the value must end before the unit starts, so the unit's
+      // width counts against the text like padding. Short values never bind
+      // on it (the unit follows them instead), so only long values shrink.
+      const parkedUnit = control.closest?.(".lex-unit-field")?.querySelector?.(":scope > .lex-unit");
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
         (Number.parseFloat(style.paddingRight) || 0) +
         (Number.parseFloat(style.borderLeftWidth) || 0) +
         (Number.parseFloat(style.borderRightWidth) || 0) +
-        (control instanceof HTMLSelectElement ? 22 : 2);
+        (control instanceof HTMLSelectElement ? 22 : 2) +
+        (parkedUnit ? parkedUnit.offsetWidth || 0 : 0);
       const available = Math.max(1, control.clientWidth - horizontal);
       const value = control instanceof HTMLSelectElement
         ? control.selectedOptions[0]?.textContent || ""
@@ -2696,6 +2807,46 @@
   const textArea = (options = {}) => element("textarea", {rows:4, ...options,
     class:["lex-text-area", options.class || ""].filter(Boolean).join(" ")});
 
+  // Buttons that insert canned snippets (a game's text <?tags?> and the
+  // like) at the caret of a text box the caller owns. Groups keep a long
+  // list short: [{label, tags}] with each tag {label, insert, title,
+  // caretBack?}. The title tells what the tag does; caretBack parks the
+  // caret that many characters back inside the insert (for an id the
+  // reader must fill in). The box keeps its own input and change
+  // handlers: both fire, so the edit commits like a typed one.
+  const tagBar = ({groups = [], target, help = null} = {}) => {
+    // A function target re-resolves per click against the live panel: a
+    // commit rebuilds the detail, and an element held from the last render
+    // would take the insert with it into the detached tree.
+    const box = () => (typeof target === "function" ? target(bar) : target);
+    const insert = tag => {
+      const node = box();
+      if (!node) return;
+      const start = node.selectionStart ?? node.value.length;
+      const end = node.selectionEnd ?? node.value.length;
+      const snippet = String(tag.insert ?? "");
+      node.value = node.value.slice(0, start) + snippet + node.value.slice(end);
+      const caret = start + snippet.length - (Number(tag.caretBack) || 0);
+      // Focusing selects the whole box a frame later; that would swallow
+      // the caret this insert just placed, so the next tag click would
+      // replace all the text. Borrowing the focus-restore flag skips it.
+      node.lexRestoringFocus = true;
+      node.focus();
+      node.setSelectionRange(caret, caret);
+      requestAnimationFrame(() => requestAnimationFrame(() => { delete node.lexRestoringFocus; }));
+      node.dispatchEvent(new Event("input", {bubbles: true}));
+      node.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+    const folds = groups.map((group, index) => element("details",
+      {class: "lex-tag-group", ...(index === 0 ? {open: true} : {})},
+      element("summary", {class: "lex-tag-group-name"}, group.label),
+      element("div", {class: "lex-tag-buttons"}, ...(group.tags || []).map(tag =>
+        element("button", {type: "button", class: "lex-tag-button", title: tag.title || tag.insert,
+          onclick: () => insert(tag)}, tag.label)))));
+    const bar = element("div", {class: "lex-tag-bar"}, help, ...folds);
+    return bar;
+  };
+
   const stack = (...children) => {
     const options=children[0] && typeof children[0]==="object" && !(children[0] instanceof Node)
       ? children.shift() : {};
@@ -2727,11 +2878,11 @@
   }));
 
   // A turnable model: a renderer draws its canvas into the stage, and the
-  // message says what is happening until it has. `busy` shows a spinner in
-  // place of words. The message node is stage.lexMessage.
+  // message says what is happening until it has. A loading stage holds the
+  // shared loading panel, like every other loading surface. The message
+  // node is stage.lexMessage.
   const modelStage = (options = {}) => {
-    const message = element("div", {class: "lex-model-stage-message"},
-      options.busy ? element("div", {class: "lex-model-stage-spin", "aria-hidden": "true"}) : (options.message ?? ""));
+    const message = element("div", {class: "lex-model-stage-message"}, options.message ?? "");
     const stage = element("div", {class: ["lex-model-stage", options.className || ""].filter(Boolean).join(" ")}, message);
     stage.lexMessage = message;
     if (options.modes !== false) modelViewModes(stage);
@@ -3240,7 +3391,16 @@
       const targetX = target.right + (outside ? inset : -inset - overhangX);
       const targetY = target.top + (outside ? -inset : inset + dropY);
       const scale = owner.width / control.offsetWidth || 1;
-      pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
+      // The mark belongs at the box's corner and inside the row. Past the
+      // row it reads as clipped, and its pixels count as overflow: a few
+      // of them vetoed the pager's split and left a scrollbar beside it.
+      // A part's pin stays in its own box; a field's may use the row.
+      const row = control.matches(".lex-detail-part-control") ? null
+        : control.closest(".lex-detail-field");
+      const edge = row ? Math.min(owner.right, row.getBoundingClientRect().right) : owner.right;
+      const left = Math.max(2 - tipX, Math.min((targetX - owner.left - tipX) / scale,
+        (edge - owner.left - icon.width) / scale - 1));
+      pin.style.setProperty("left", `${left}px`, "important");
       pin.style.setProperty("top", `${(targetY - owner.top - tipY) / scale}px`, "important");
       pin.style.setProperty("right", "auto", "important");
     };
@@ -3333,9 +3493,32 @@
     wil: ['#5aa9e0', '<path d="M3 3.5h10v2H3zM3 7h10v2H3zM3 10.5h10v2H3z"/>'],
     end: ['#a3c14a', '<path d="M9 1.5 L4.5 9 H7.5 L7 14.5 L11.5 7 H8.5 Z"/>'],
     luc: ['#c9c9c9', '<circle cx="8" cy="8" r="5" fill="none" stroke-width="2.5"/>'],
+    physicalDef: ['#cfcfcf', '<path d="M8 1l5 2v4.5c0 3.4-2.4 5.4-5 6.8-2.6-1.4-5-3.4-5-6.8V3z"/>'],
+    magicDef: ['#5aa9ff', '<path d="M8 1l5 2v4.5c0 3.4-2.4 5.4-5 6.8-2.6-1.4-5-3.4-5-6.8V3z"/>'],
+    fireDef: ['#ff7a3c', '<path d="M8 1l5 2v4.5c0 3.4-2.4 5.4-5 6.8-2.6-1.4-5-3.4-5-6.8V3z"/>'],
+    lightningDef: ['#ffd94d', '<path d="M8 1l5 2v4.5c0 3.4-2.4 5.4-5 6.8-2.6-1.4-5-3.4-5-6.8V3z"/>'],
+    faith: ['#e08aa0', '<path d="M8 1l5 7-5 7-5-7z"/>'],
+    weight: ['#9aa3ad', '<path d="M8 1a3 3 0 0 1 3 3v1H5V4a3 3 0 0 1 3-3z"/><circle cx="8" cy="10.5" r="4"/>'],
+    durability: ['#c9c9c9', '<rect x="2.5" y="2" width="11" height="4" rx="1"/><rect x="7" y="6" width="2" height="8"/>'],
+    hp: ['#e05a5a', '<rect x="2" y="6" width="12" height="4.5" rx="2"/>'],
+    mp: ['#5aa9ff', '<rect x="2" y="6" width="12" height="4.5" rx="2"/>'],
+    stamina: ['#7fd08a', '<rect x="2" y="6" width="12" height="4.5" rx="2"/>'],
+    humanity: ['#f0f0f0', '<circle cx="8" cy="8" r="3.5"/>'],
+    stability: ['#8fa3b8', '<path d="M8 1l5 2v4.5c0 3.4-2.4 5.4-5 6.8-2.6-1.4-5-3.4-5-6.8V3z" fill="none" stroke-width="1.8"/><path d="M5.5 8l2 2 3.5-4" fill="none" stroke-width="1.8"/>'],
+    souls: ['#ffe9a8', '<path d="M8 2.5l1.1 4.4 4.4 1.1-4.4 1.1L8 13.5l-1.1-4.4-4.4-1.1 4.4-1.1z"/>'],
+    poise: ['#c9a86a', '<rect x="2" y="5" width="12" height="2.2" rx="1"/><rect x="2" y="9" width="12" height="2.2" rx="1"/>'],
+    slot: ['#e8c67a', '<rect x="3" y="3" width="10" height="10" rx="2" fill="none" stroke-width="2"/>'],
+    att: ['#8a9ae0', '<rect x="4" y="2" width="8" height="12" rx="1.5" fill="none" stroke-width="1.6"/><path d="M6 5.5h4v1.4H6zM6 8h4v1.4H6zM6 10.5h4v1.4H6z"/>'],
+    res: ['#8a9a5b', '<path d="M8 2l4.5 2.6v5.2L8 12.4l-4.5-2.6V4.6z" fill="none" stroke-width="1.8"/>'],
+    soulLv: ['#ffe9a8', '<path d="M3.5 10.5L8 6l4.5 4.5" fill="none" stroke-width="2.2"/>'],
+    critical: ['#e05a5a', '<path d="M2 14L11 2h2L4 14z"/><path d="M14 14L5 2H3l9 12z"/>'],
+    gems: ['#6ad0ff', '<path d="M8 1.5L14 6l-6 8.5L2 6z" fill="none" stroke-width="1.6"/><path d="M2 6h12M8 1.5L5.8 6 8 14.5 10.2 6 8 1.5" fill="none" stroke-width="1"/>'],
   };
   const typeGlyph = kind => {
-    const found = TYPE_GLYPHS[String(kind || '').toLocaleLowerCase()];
+    // Keys match the names plugins send, camelCase included; the
+    // lowercase probe keeps older all-lowercase kinds resolving.
+    const name = String(kind || '');
+    const found = TYPE_GLYPHS[name] || TYPE_GLYPHS[name.toLocaleLowerCase()];
     if (!found) return null;
     const [color, shapes] = found;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -3518,6 +3701,8 @@
     if (typeof ResizeObserver === "function") new ResizeObserver(fitTypeRail).observe(node);
     node.addEventListener("focusin", fitTypeRail);
     node.addEventListener("focusout", fitTypeRail);
+    node.addEventListener("mouseenter", fitTypeRail);
+    node.addEventListener("mouseleave", fitTypeRail);
     requestAnimationFrame(fitTypeRail);
 
     // Rejecting a value has to be visible, so the rail flashes and shakes and
@@ -3557,16 +3742,10 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
-    // The slider's span can be narrower than what the field accepts: a value
-    // bounded only by its type (a whole 32-bit range) put every record's fill
-    // at the same spot (Lexer: "all the sliders ... exact same initial
-    // position"). `sliderMin`/`sliderMax` give the span the data really uses;
-    // typing still accepts the whole range, and the fill pins at its ends.
-    const shownLow = Number.isFinite(Number(options.sliderMin ?? NaN)) && Number.isFinite(lowBound)
-      ? Math.max(lowBound, Number(options.sliderMin)) : lowBound;
-    const shownHigh = Number.isFinite(Number(options.sliderMax ?? NaN)) && Number.isFinite(highBound)
-      ? Math.min(highBound, Number(options.sliderMax)) : highBound;
-    const [sliderLow, sliderHigh] = shownHigh > shownLow ? [shownLow, shownHigh] : [lowBound, highBound];
+    // The slider always spans the whole accepted range. A second, narrower
+    // span computed from the data read as a second range (Lexer), so the
+    // handle moves in exactly what the field accepts.
+    const [sliderLow, sliderHigh] = [lowBound, highBound];
     // Native arrows move by 1 when step is "any": without this, float
     // fields changed through whole numbers from the keyboard too.
     if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
@@ -3600,10 +3779,33 @@
         if (!Number.isFinite(value)) return 0;
         return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
       };
-      const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
+      const paint = () => {
+        fill.style.setProperty("--lex-value-ratio", String(ratio()));
+        // A face, stepper or lock beside the input makes the host taller
+        // or wider than the box, and the fill then paints outside the
+        // box. Measure the box and pin the fill to it - but only when
+        // they differ, so normal fields keep their pure-CSS geometry
+        // (the reference rail's inset included).
+        const host = fill.parentElement;
+        const target = input.getBoundingClientRect();
+        const owner = host?.getBoundingClientRect();
+        if (!host || !target.width || !target.height || !owner.width || !owner.height) return;
+        if (Math.abs(owner.width - target.width) < 2 && Math.abs(owner.height - target.height) < 2 &&
+            Math.abs(owner.left - target.left) < 2 && Math.abs(owner.top - target.top) < 2) {
+          fill.style.left = fill.style.top = fill.style.width = fill.style.height = "";
+          return;
+        }
+        const scale = owner.width / host.offsetWidth || 1;
+        fill.style.left = `${(target.left - owner.left) / scale + 1}px`;
+        fill.style.top = `${(target.top - owner.top) / scale + 1}px`;
+        fill.style.width = `${target.width / scale - 2}px`;
+        fill.style.height = `${target.height / scale - 2}px`;
+      };
       input.__lexValueSliderPaint = paint;
       input.addEventListener("input", paint);
       input.addEventListener("change", paint);
+      if (typeof ResizeObserver === "function") new ResizeObserver(paint).observe(node);
+      requestAnimationFrame(paint);
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
         ? control : input);
       const setFromPointer = event => {
@@ -4045,6 +4247,10 @@
       });
     });
   };
+  // The last subtab click, for telling a double-click from two singles.
+  // It lives outside the bar because a switch rebuilds the bar: the second
+  // click lands on a new element, so the bar itself cannot remember it.
+  let lastSubtabClick = null;
   const subtabBar = (options = {}) => {
     const bar = subtabBarSorted(options);
     bar.querySelectorAll(".lex-subtab-button").forEach(button => {
@@ -4058,7 +4264,7 @@
   const subtabBarSorted = (options = {}) => {
     if (options.images || options.order === "given") return subtabBarElement(options);
     const rank = tab => ({tweaks: 2, misc: 1})[String(tab.id).toLocaleLowerCase()] || 0;
-    const name = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
+    const name = tab => shownSubtabName(tab);
     const tabs = [...(options.tabs || [])].sort((a, b) => rank(a) - rank(b)
       || name(a).localeCompare(name(b), undefined, {numeric: true, sensitivity: "base"}));
     return subtabBarElement({...options, tabs});
@@ -4114,7 +4320,11 @@
       return element("button", {
       type: "button",
       ...(tab.attrs || {}),
-      disabled:!!tab.disabled,
+      // A tab with a reason stays focusable (a truly disabled button
+      // eats its tooltip): aria-disabled grays it with the not-allowed
+      // cursor and the reason rides on the title. Otherwise native.
+      disabled:!!tab.disabled && !tab.disabledReason,
+      ...(!!tab.disabled && tab.disabledReason ? {"aria-disabled": "true", title: tab.disabledReason} : {}),
       class: ["lex-subtab-button", tab.id === options.active ? "active" : ""].filter(Boolean).join(" "),
       "data-subtab": String(tab.id),
       role: "tab",
@@ -4122,9 +4332,26 @@
       tabindex: tab.id === options.active ? "0" : "-1",
       // Clicking the active subtab changes nothing: re-running change
       // would rebuild the strip (wiping the rename box a double-click
-      // just opened) for no visible effect.
+      // just opened) for no visible effect. A double-click on an INACTIVE
+      // subtab is a rename, caught here rather than in the label's own
+      // dblclick listener: the first click rebuilds the strip, so that
+      // listener would never see both clicks on one node.
       onclick: event => {
-        if (event.currentTarget.classList.contains("active")) return;
+        const button = event.currentTarget;
+        if (tab.disabled) return;
+        const bar = button.closest(".lex-subtab-bar");
+        const stamp = `${activePageTab()}|${bar?.getAttribute("aria-label") || ""}|${tab.id}`;
+        const now = Date.now();
+        const secondClick = sharedSettingsSnapshot?.developerMode && lastSubtabClick
+          && lastSubtabClick.stamp === stamp && now - lastSubtabClick.at < 500
+          && !button.querySelector(".lex-label-rename");
+        lastSubtabClick = {stamp, at: now};
+        if (secondClick) {
+          const label = button.querySelector(".lex-tab-label-text");
+          if (label) renameInPlace(subtabKey(), activePageTab(), tab.label, label);
+          return;
+        }
+        if (button.classList.contains("active")) return;
         options.change?.(tab.id);
       },
     }, element("span", {class: "lex-tab-label"}, labelText),
@@ -5117,8 +5344,9 @@
         last.after = after;
         last.afterSignature = afterSignature;
         last.time = now;
+        last.at = nextHistoryTick();
       } else {
-        this.undoStack.push({...pending, after, afterSignature, time: now});
+        this.undoStack.push({...pending, after, afterSignature, time: now, at: nextHistoryTick()});
         if (this.undoStack.length > this.limit) this.undoStack.shift();
       }
       this.redoStack = [];
@@ -5169,15 +5397,8 @@
       for (const eventName of ["input", "change", "click"]) {
         root.addEventListener(eventName, begin, true);
       }
-      root.addEventListener("keydown", event => {
-        if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-        const key = event.key.toLowerCase();
-        if (key !== "z" && key !== "y") return;
-        event.preventDefault();
-        const active = document.activeElement;
-        if (active?.matches?.("input,textarea,select")) active.blur();
-        setTimeout(() => key === "y" || event.shiftKey ? this.redo() : this.undo(), 0);
-      }, true);
+      // No key binding here: the shell's shortcut dispatcher is the only
+      // Ctrl+Z handler, and a second one undid twice per press.
     }
   }
 
@@ -5538,6 +5759,9 @@
     // that genuinely wants a fixed count passes pageSize.
     const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
     let cardHeights = new WeakMap();
+    // Section->column pins from the stored arrangement; the deal honors
+    // them instead of re-flowing by height. Null until one is stored.
+    let laneMap = null;
     const columnCount = length => {
       // The reader's own count, from the COLUMNS control on the divider.
       const chosen=Number(content.closest('[data-lex-detail-columns]')?.dataset.lexDetailColumns)||0;
@@ -5756,7 +5980,11 @@
         const box=card.getBoundingClientRect();
         const scale=box.width/Math.max(1,card.offsetWidth);
         cardHeights.set(card,Math.ceil(box.height/scale)+1);
-        if(options.strictColumns){
+        // A page never scrolls: a section too tall for it is split where it
+        // stands, in strict and inline flows alike. Only strict flows throw
+        // when a card cannot be made to fit; an inline flow leaves that one
+        // card scrolling so every property stays reachable.
+        if(options.strictColumns||options.inline){
           // Say which way it does not fit: a section too tall for the page
           // is split by its game; one too wide has a control that will not
           // shrink.
@@ -5771,7 +5999,7 @@
           }
           // A failed fit must still leave every setting reachable: the page
           // falls back to one scrolling column behind the thrown guard.
-          if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
+          if(why&&options.strictColumns){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
         }
       }
     // An unpaged flow deals every card into columns on one scrolling
@@ -5795,6 +6023,20 @@
 
     // Measure at the final width, then fill ordered columns from top to bottom.
     const deal = onPage => {
+      // Stranded cards rejoin instead of dying: anything the grid still
+      // holds directly (a custom section placed between deals, a tab shell
+      // re-attached elsewhere) enters this dealing, or the replaceChildren
+      // below would silently destroy it with its fields inside. The grid
+      // is pager-owned, so anything grid-direct is a card-in-waiting; a
+      // stray decoration landing in a column is a loud failure, while a
+      // destroyed section is silent data loss.
+      for (const orphan of [...content.children])
+        if (orphan instanceof Element && !orphan.classList.contains("lex-tweak-column") &&
+            !orphan.classList.contains("lex-tweak-off-page") && !cards.includes(orphan) &&
+            orphan.isConnected) {
+          cards.push(orphan);
+          onPage.push(orphan);
+        }
       const count=columnCount(onPage.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const columns=Array.from({length:count},()=>element("div",{class:"lex-tweak-column"})),loads=Array(count).fill(0);
       let orderedLane=0;
@@ -5824,6 +6066,15 @@
         else if(measured!==undefined){
           if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
           lane=orderedLane;
+        }
+        // A stored arrangement pins sections to columns: the deal honors
+        // the pins instead of re-flowing by height, so adding a column
+        // leaves every section where it was and a drop lands where its
+        // preview line showed. Pins past the count join the last lane, as
+        // do cards the stored arrangement never saw.
+        if(options.unpaged&&laneMap?.size){
+          const pinned=laneMap.get(card.dataset.lexLayoutSection||"properties");
+          lane=pinned===undefined?count-1:Math.min(Math.max(0,pinned),count-1);
         }
         columns[lane].append(card);loads[lane]+=(loads[lane]?gap:0)+(measured||0);
       });
@@ -5913,6 +6164,10 @@
     // list has not seen (a section the developer added) goes after the card
     // before it in the order.
     root.lexCards = () => [...cards];
+    root.lexUnpaged = options.unpaged === true;
+    // Setting pins never re-deals by itself: callers refit through
+    // their own path (a drop refits once, through orderSections).
+    root.lexSetLanes = map => { laneMap = map instanceof Map ? map : asLaneMap(map); };
     // Cards the layout moved out of the columns leave the dealing: dealt
     // again, the pager would otherwise pull a property back out of the
     // custom section it was dropped into.
@@ -5932,8 +6187,15 @@
       known.forEach((card, index) => { cards[slots[index]] = card; });
       wanted.forEach((card, index) => {
         if (cards.includes(card) || !card.isConnected) return;
+        // A card new to the deal slots where the live order puts it:
+        // after the nearest known card before it, else before the
+        // nearest known card after it. Appending unconditionally put a
+        // property dragged above every section below them on refit.
         const previous = wanted.slice(0, index).reverse().find(other => cards.includes(other));
-        cards.splice(previous ? cards.indexOf(previous) + 1 : cards.length, 0, card);
+        const next = previous ? null : wanted.slice(index + 1).find(other => cards.includes(other));
+        if (previous) cards.splice(cards.indexOf(previous) + 1, 0, card);
+        else if (next) cards.splice(cards.indexOf(next), 0, card);
+        else cards.push(card);
       });
       if (cards.length === was.length && cards.every((card, index) => card === was[index])) return;
       // A quiet re-sequence only retires the shipped order: the live DOM
@@ -5960,7 +6222,7 @@
         }
         const wanted = [];
         for (const key of Object.keys(stored).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}))) {
-          if (key === "sections" || key === "removed" || key === "order") continue;
+          if (key === "sections" || key === "removed" || key === "order" || key === "lanes") continue;
           const list = stored[key];
           if (!Array.isArray(list)) continue;
           for (const id of list) {
@@ -5970,6 +6232,7 @@
           }
         }
         if (wanted.length) root.lexOrderCards(wanted, true);
+        if (stored.lanes && typeof stored.lanes === "object") laneMap = asLaneMap(stored.lanes);
       }
     } catch (_error) {}
     render();
@@ -6523,7 +6786,7 @@
         title: `${cue.label} (${at.toFixed(2)}s)`,
         style: `left:${Math.min(at / duration, 1) * 100}%`,
         "aria-label": `${cue.label} (${at.toFixed(2)}s)`,
-        onclick: () => { state.time = at % duration; }});
+        onclick: () => { state.time = at % duration; options.onEvent?.(cue); }});
       markers.append(tick);
     }
     const transport = element("div", {class: "lex-anim-transport",
@@ -6536,7 +6799,7 @@
     const sync = () => {
       const shown = (((state.time / frameDur) % count) + count) % count;
       if (document.activeElement !== slider) slider.value = String(shown);
-      readout.textContent = `${shown.toFixed(1)} / ${count - 1} frames \u00B7 ${state.time.toFixed(2)}s`;
+      readout.textContent = `${shown.toFixed(1)} / ${count - 1} \u{1D453} \u00B7 ${state.time.toFixed(2)}s`;
       return shown;
     };
     const goToFrame = frame => {
@@ -6705,6 +6968,7 @@
     {id: "move-property", keys: ["Drag", "property row"], label: "Move the property, within or between sections"},
     {id: "hide-property", keys: ["Hold right", "property"], label: "Hide it for readers without Show hidden properties; again to show it"},
     {id: "add-section", keys: ["Hold right", "section heading"], label: "Add a new section below it; on an empty section, remove it"},
+    {id: "fill-tab", keys: ["Hold right", "panel tab"], label: "Add a section to it; on an empty tab, remove it"},
     {id: "save-view", keys: ["Hold right", "page tab or subtab"], label: "Save the page's view as the shipped default"},
     {id: "undo-layout", keys: ["Ctrl", "Z"], label: "Undo any of these"},
   ];
@@ -6863,13 +7127,30 @@
     } else result.push({label:path || "Value",before,after});
     return result;
   };
+  // A popup whose anchor left the document is stranded: removing an element
+  // fires no mouseleave, so tab switches, record selects and re-renders all
+  // orphaned their cards until Escape. Open popups register here; one
+  // observer closes any whose anchor is removed, at any depth. It costs
+  // nothing while no popup is open.
+  const liveHoverPopups = new Set();
+  new MutationObserver(records => {
+    if (!liveHoverPopups.size) return;
+    for (const record of records) {
+      for (const node of record.removedNodes) {
+        if (!(node instanceof Element)) continue;
+        for (const entry of [...liveHoverPopups]) {
+          if (entry.anchor === node || node.contains(entry.anchor)) entry.close();
+        }
+      }
+    }
+  }).observe(document.documentElement, {childList: true, subtree: true});
   // One hover card for anything that previews what it points at: the save
   // button's pending changes, or a linked record. `build` returns the card's
   // contents, or a promise of them; a card whose anchor was left before the
   // contents arrived is never shown.
   const hoverPreview = (anchor, build, className = "") => {
-    let popup, timer, request = 0;
-    const close=()=>{clearTimeout(timer);request++;popup?.remove();popup=null;anchor.removeAttribute('aria-describedby')};
+    let popup, timer, request = 0, entry = null;
+    const close=()=>{clearTimeout(timer);request++;popup?.remove();popup=null;anchor.removeAttribute('aria-describedby');if(entry)liveHoverPopups.delete(entry);};
     const leave=()=>{timer=setTimeout(close,180)};
     const show=async()=>{
       clearTimeout(timer);if(popup||anchor.disabled)return;
@@ -6879,6 +7160,7 @@
       if(token!==request||popup||!anchor.isConnected||!contents)return;
       popup=element('div',{class:['lex-help-popover',className].filter(Boolean).join(' '),role:'tooltip',id:`hover-preview-${Math.random().toString(36).slice(2)}`},contents);
       document.body.append(popup);anchor.setAttribute('aria-describedby',popup.id);
+      entry={anchor,close};liveHoverPopups.add(entry);
       const r=anchor.getBoundingClientRect(),box=popup.getBoundingClientRect();
       popup.style.left=`${Math.max(8,Math.min(r.left+r.width/2-box.width/2,innerWidth-box.width-8))}px`;
       const below=innerHeight-r.bottom-16,above=r.top-16;
@@ -7961,7 +8243,6 @@ ${contents.path}`});
     const commentsPanel = element("section", {class: "lex-detail lex-github-comments-panel"},
       element("div", {class: "lex-github-empty"}, "Select an issue."));
     const layout = panelLayout([issueList, editor, commentsPanel], "lex-github-layout", {
-      layoutKey: `github-${options.plugin.id}`,
       defaultSizes: [28, 38, 34], minSizes: [260, 320, 300],
     });
     const root = element("section", {
@@ -8380,6 +8661,14 @@ ${contents.path}`});
       return stored;
     } catch (_error) { return fallback; }
   };
+  // The name a subtab shows under: the developer's rename when there is
+  // one, else the shipped label. Panel tabs share this namespace (the bar
+  // builds them the same way). Build-time sorts use the shown name, so a
+  // renamed tab keeps its alphabetical seat on every render, not just in
+  // the re-sort that follows the rename.
+  const shownSubtabName = tab => savedLabel(
+    `${shellPluginId()}-${activePageTab()}.sub.${tab.id}.label`,
+    String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id));
   // The help text a developer rewords. A bubble has no name of its own and its
   // text is far too long for a key, so the key is a short digest of the shipped
   // text. A string rewritten in a plugin's code simply stops matching, and the
@@ -8400,11 +8689,41 @@ ${contents.path}`});
   const labelUndo = [];
   const labelRedo = [];
   let labelHistoryChanged = () => {};
+  // One undo order across kinds: every entry on either stack carries a tick
+  // from this shared clock, and the newest change wins, whether it renamed
+  // a tab or edited a value. (Lexer: a pile of layout undos used to swallow
+  // the button, so value edits never came back.)
+  let historyTick = 0;
+  const nextHistoryTick = () => ++historyTick;
+  const pushLabelUndo = entry => {
+    if (entry && !Number.isFinite(entry.at)) entry.at = nextHistoryTick();
+    labelUndo.push(entry);
+  };
+  const stackTopAt = entry => entry && Number.isFinite(entry.at) ? entry.at : -1;
+  const pluginStackTop = (history, redo) => {
+    if (!history) return undefined;
+    const stack = redo ? history.redoStack : history.undoStack;
+    return Array.isArray(stack) ? stack[stack.length - 1] : undefined;
+  };
+  const undoNewest = async pluginHistory => {
+    const mine = labelUndo[labelUndo.length - 1];
+    const theirs = pluginStackTop(pluginHistory, false);
+    if (theirs !== undefined && (mine === undefined || stackTopAt(theirs) > stackTopAt(mine)))
+      return pluginHistory.undo();
+    return undoLabel();
+  };
+  const redoNewest = async pluginHistory => {
+    const mine = labelRedo[labelRedo.length - 1];
+    const theirs = pluginStackTop(pluginHistory, true);
+    if (theirs !== undefined && (mine === undefined || stackTopAt(theirs) > stackTopAt(mine)))
+      return pluginHistory.redo();
+    return redoLabel();
+  };
   // A table's column header shows the same property as the field, so a rename
   // reaches the headers already drawn too (Lexer: "i renamed a property but its
   // name in the table column header remained the same?").
   const relabelHeaders = (key, text) => {
-    for (const label of document.querySelectorAll(".header-label[data-lex-label-key]")) {
+    for (const label of document.querySelectorAll(".header-label[data-lex-label-key], .lex-pinned-header-label[data-lex-label-key]")) {
       if (label.dataset.lexLabelKey !== key) continue;
       const name = label.lastChild;
       if (name?.nodeType === Node.TEXT_NODE) name.data = text;
@@ -8450,7 +8769,7 @@ ${contents.path}`});
     if (!entry) return false;
     if (entry.apply) {
       await entry.apply(entry.after);
-      labelUndo.push(entry);
+      pushLabelUndo(entry);
       labelHistoryChanged();
       return true;
     }
@@ -8458,7 +8777,7 @@ ${contents.path}`});
     relabelHeaders(entry.key, entry.after);
     resortSubtabOf(entry.node);
     await storeLabel(entry.key, entry.tabId, entry.after, entry.shipped);
-    labelUndo.push(entry);
+    pushLabelUndo(entry);
     labelHistoryChanged();
     return true;
   };
@@ -8523,30 +8842,40 @@ ${contents.path}`});
   };
   // Scan only: no restore. Detail tabs probe a mid-render box with this
   // to learn its stored custom sections; the probe shares the exact key.
+  // Any parent of properties is a group: a section's content, a dealt
+  // column, or the panel body itself for properties dragged out of every
+  // section. Shared with the drop handler, which groups a parent that
+  // holds no property yet.
+  const addPropertyGroup = (groups, node) => {
+    if (groups.has(node)) return groups.get(node);
+    const section = node.closest(".lex-detail-section");
+    const name = section?.dataset.lexLayoutSection || "properties";
+    const index = [...groups.values()].filter(group => group.name === name).length;
+    const group = {id: `${name}:${index}`, name, node, anchors: [], custom: section?.dataset.lexCustomSection === "true"};
+    groups.set(node, group);
+    return group;
+  };
   const buildPropertyState = (root, fields) => {
     const groups = new Map(), fieldMap = new Map(), identities = new Map();
-    const addGroup = node => {
-      if (groups.has(node)) return groups.get(node);
-      const section = node.closest(".lex-detail-section");
-      const name = section?.dataset.lexLayoutSection || "properties";
-      const index = [...groups.values()].filter(group => group.name === name).length;
-      const group = {id: `${name}:${index}`, name, node, custom: section?.dataset.lexCustomSection === "true"};
-      groups.set(node, group);
-      return group;
-    };
     const boxed = isDetachedBody(root);
     for (const section of root.querySelectorAll(".lex-detail-section-content")) {
       if (section.closest(".lex-detail-field")) continue;
       const home = section.closest(".lex-detail-panel") || section.closest(".lex-detail-section");
-      if (home === root || (boxed && !section.closest(".lex-detail-panel"))) addGroup(section);
+      if (home === root || (boxed && !section.closest(".lex-detail-panel"))) addPropertyGroup(groups, section);
     }
     for (const field of fields) {
-      const group = addGroup(field.parentElement);
+      const group = addPropertyGroup(groups, field.parentElement);
       const base = `${group.id}/${field.dataset.lexLayoutField}`;
       const index = identities.get(base) || 0;
       identities.set(base, index + 1);
       fieldMap.set(field, `${base}:${index}`);
     }
+    // The panel body itself is a group too, made last after the
+    // sections: properties live loose in it when the developer drags
+    // them out of every section, and it must exist before a stored
+    // loose arrangement applies.
+    const looseHome = root.querySelector?.(".lex-detail-panel-body .lex-tweak-card-grid, .lex-detail-panel-body");
+    if (looseHome) addPropertyGroup(groups, looseHome);
     for (const group of groups.values()) {
       group.anchors = [...group.node.children].filter(node => fieldMap.has(node)).map(field => {
         let next = field.nextSibling;
@@ -8629,7 +8958,7 @@ ${contents.path}`});
     const activeTab = () => document.querySelector(
       `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"] .lex-subtab-button.active`)?.dataset.subtab;
     writeFieldTabOverrides(shape, afterMap);
-    labelUndo.push({before: beforeMap, after: afterMap, apply: layout => {
+    pushLabelUndo({before: beforeMap, after: afterMap, apply: layout => {
       writeFieldTabOverrides(shape, layout);
       const showId = layout === afterMap ? targetTab : sourceTab;
       // Clicking the active tab rebuilds nothing, so bounce through the
@@ -8737,11 +9066,10 @@ ${contents.path}`});
     }
     const pager = movable.map(section => section.closest(".lex-tweaks-paged")).find(node => node?.lexOrderCards);
     if (pager) {
-      // A custom section living in tab content outside the dealt grid keeps
-      // its place there: carding it would narrow it into a column. Sections
-      // without a tabbed ancestor still join the grid the way they always did.
-      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager &&
-        (section.closest(".lex-tweak-card-grid") || !section.closest(".lex-tabbed-panel-content"))));
+      // Every section in the pager joins the deal, customs in tab content
+      // included: a new header belongs in one column like every shipped
+      // one, not full-width below the columns.
+      pager.lexOrderCards(movable.filter(section => section.closest(".lex-tweaks-paged") === pager));
       return;
     }
     if (movable.length < 2) return;
@@ -8752,25 +9080,75 @@ ${contents.path}`});
     });
     movable.forEach((section, index) => slots[index].replaceWith(section));
   };
+  const asLaneMap = lanes => new Map(Object.entries(lanes && typeof lanes === "object" ? lanes : {})
+    .filter(([, lane]) => Number.isInteger(lane) && lane >= 0)
+    .map(([name, lane]) => [String(name), lane]));
+  const liveSectionLanes = state => {
+    const live = new Map();
+    for (const group of state.groups.values()) {
+      const section = layoutSectionOf(group);
+      const pager = section?.closest(".lex-tweaks-paged");
+      if (!pager || pager.lexUnpaged !== true) continue;
+      const columns = [...pager.querySelectorAll(".lex-tweak-column")]
+        .filter(column => column.closest(".lex-tweaks-paged") === pager);
+      if (columns.length < 2) continue;
+      const lane = columns.indexOf(section.closest(".lex-tweak-column"));
+      if (lane >= 0) live.set(group.name, lane);
+    }
+    return live;
+  };
+  // A property loose in the panel body (or a dealt column) records the
+  // section after it, so a fresh render puts it back beside that
+  // section instead of appending it after every section. Columns
+  // rebuild on every refit, so the section - a stable node - is the
+  // anchor, not the column. Trailing properties record nothing: the
+  // normal passes append them.
+  const looseAnchors = state => {
+    const anchors = {};
+    const contentOf = new Map([...state.groups.values()].map(group => [group.node, group]));
+    for (const group of state.groups.values()) {
+      if (layoutSectionOf(group)) continue;
+      const kids = [...group.node.children];
+      kids.forEach((field, at) => {
+        if (!state.fields.has(field)) return;
+        const following = kids.slice(at + 1).find(node => node.classList?.contains("lex-detail-section"));
+        if (!following) return;
+        const content = following.querySelector(":scope > .lex-detail-section-content");
+        const anchor = content && contentOf.get(content);
+        if (anchor) anchors[state.fields.get(field)] = anchor.id;
+      });
+    }
+    return anchors;
+  };
   const capturePropertyLayout = state => ({
     ...Object.fromEntries([...state.groups.values()].map(group =>
       [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))])),
     hidden: [...state.fields].filter(([field]) => field.classList.contains("lex-property-hidden")).map(([, id]) => id),
     sections: (state.custom || []).map(spec => ({...spec})),
     removed: [...(state.removed || [])],
-    order: sectionOrder(state)});
+    order: sectionOrder(state),
+    lanes: {...readStoredLayout(state)?.lanes, ...Object.fromEntries(liveSectionLanes(state))},
+    loose: looseAnchors(state)});
   // A page's own section the developer removed. It is hidden only while it
   // holds no properties, so a property moved back into it (or one the page
   // gains later) is never lost behind a removed heading.
+  // Returns whether any section flipped: callers refit the pager then, so
+  // an unhidden section is dealt back into view instead of stranded.
   const hideRemovedSections = state => {
     const removed = new Set(state.removed || []);
+    let flipped = false;
     for (const group of state.groups.values()) {
       if (group.custom) continue;
       const section = group.node.closest(".lex-detail-section");
       if (!section) continue;
-      const empty = ![...group.node.children].some(node => state.fields.has(node));
-      section.hidden = removed.has(group.id) && empty;
+      // Empty means nothing rendered, the same rule as the hold-right
+      // gesture: a removed section holding a graph shows again instead
+      // of staying hidden behind a stale removed entry.
+      const empty = group.node.childElementCount === 0;
+      const hide = removed.has(group.id) && empty;
+      if (section.hidden !== hide) { section.hidden = hide; flipped = true; }
     }
+    return flipped;
   };
   // A section the developer added: a heading and an empty body that
   // properties are dragged into. It belongs to the layout, after the section
@@ -8790,7 +9168,7 @@ ${contents.path}`});
         target.title = typed;
         const after = capturePropertyLayout(live);
         const apply = layout => storePropertyLayout(live, layout);
-        labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+        pushLabelUndo({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
         void apply(after);
       }});
     });
@@ -8891,7 +9269,7 @@ ${contents.path}`});
       }
       return null;
     };
-    const layoutKeys = new Set(["hidden", "sections", "removed", "order"]);
+    const layoutKeys = new Set(["hidden", "sections", "removed", "order", "lanes", "loose"]);
     // Bare fields dealt into columns name their group after the column, so
     // the group count IS the column count: a layout stored with one column
     // cannot apply by group id to a two-column dealing. That pulled every
@@ -8935,6 +9313,31 @@ ${contents.path}`});
       }
       if (migrated) layout = migrated;
     }
+    // Loose properties rejoin their anchor section first, in stored
+    // order: the section is a stable node, while the column they were
+    // dropped in rebuilds on every refit. The normal passes skip them
+    // once placed.
+    const loose = layout.loose && typeof layout.loose === "object" ? layout.loose : null;
+    if (loose) {
+      const sectionById = new Map([...state.groups.values()].map(group => [group.id, layoutSectionOf(group)]));
+      for (const ids of Object.values(layout)) {
+        if (!Array.isArray(ids)) continue;
+        for (const id of ids) {
+          if (typeof id !== "string") continue;
+          const anchor = sectionById.get(loose[id] ?? loose[propertyOf(id)]);
+          if (!anchor?.parentElement) continue;
+          const field = resolveField(id);
+          if (!field || used.has(field) || field.contains(anchor)) continue;
+          used.add(field);
+          // The anchor's parent is a group the fresh page never built (the
+          // drop registered it, the template has no such node): without it
+          // the restored field is no group's child, and the next capture
+          // stores it nowhere - the undo of a drop back inside then lost it.
+          addPropertyGroup(state.groups, anchor.parentElement);
+          anchor.parentElement.insertBefore(field, anchor);
+        }
+      }
+    }
     for (const group of state.groups.values()) {
       const ids = layout[group.id];
       if (!Array.isArray(ids)) continue;
@@ -8976,14 +9379,19 @@ ${contents.path}`});
     const pageOrder = readSectionOrder(state.plugin, state.tab);
     // The page's order is the latest one set on any record of the page (every
     // save, undo included, writes it), so it wins over an older layout's.
-    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
-    hideRemovedSections(state);
     const pagers = new Set();
     for (const group of state.groups.values()) {
       const pager = group.node.closest?.(".lex-tweaks-paged");
       if (pager) pagers.add(pager);
     }
+    // Pins land before the ordering refit, or the refit deals stale lanes.
+    if (layout.lanes && typeof layout.lanes === "object")
+      for (const pager of pagers) pager.lexSetLanes?.(layout.lanes);
+    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
     pagers.forEach(syncPagerCards);
+    // A hidden flip changes the dealt set, so the pager refits: without
+    // this an undo that unhides a section left it stranded outside the deal.
+    if (hideRemovedSections(state)) pagers.forEach(pager => pager.lexFitPage?.());
     // A card the layout moved out of its pager's columns (a property now
     // living in a custom section) leaves that pager's dealing, or the next
     // refit pulls it back out. Cards merely unlisted by the stored layout
@@ -9039,8 +9447,8 @@ ${contents.path}`});
       const before = capturePropertyLayout(state);
       field.classList.toggle("lex-property-hidden");
       const after = capturePropertyLayout(state);
-      const apply = layout => storePropertyLayout(state, layout);
-      labelUndo.push({before, after, apply});
+      const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+      pushLabelUndo({before, after, apply});
       labelRedo.length = 0;
       labelHistoryChanged();
       void apply(after);
@@ -9068,10 +9476,14 @@ ${contents.path}`});
       const before = capturePropertyLayout(state);
       const group = [...state.groups.values()].find(entry => entry.node.closest(".lex-detail-section") === section);
       const holdsFields = group && [...group.node.children].some(node => state.fields.has(node));
+      // Empty means nothing rendered at all: a section holding a graph, a
+      // table or a note is not empty just because it holds no properties.
+      // Removing one of those destroyed its content beyond undo.
+      const holdsContent = group && group.node.childElementCount > 0;
       // An empty section, the page's own or an added one, is removed; one
-      // that still holds properties gets a new section added below it.
+      // that still holds anything gets a new section added below it.
       let specs = [...(state.custom || [])];
-      const removing = group && !holdsFields;
+      const removing = group && !holdsContent;
       let added = null;
       if (removing && group.custom) {
         specs = specs.filter(spec => `${spec.id}:0` !== group.id);
@@ -9083,10 +9495,12 @@ ${contents.path}`});
       if (added) adoptCustomIntoActivePane(root, added.id, section);
       hideRemovedSections(state);
       const after = capturePropertyLayout(state);
-      const apply = layout => storePropertyLayout(state, layout);
-      labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+      const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+      pushLabelUndo({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
       void apply(after);
+      const holdsNonField = group && [...group.node.children].some(child => !state.fields.has(child));
       showToast(removing ? "Removed the empty section. Undo brings it back."
+        : holdsNonField ? "That section holds something that is not a property, so it stays. Added a section below it instead."
         : "Added a section. Double-click its heading to name it, and drag properties into it. "
           + "To remove a section, drag its properties out, then hold right on its heading.");
     }, 700);
@@ -9186,6 +9600,36 @@ ${contents.path}`});
     event.dataTransfer.dropEffect = "move";
     target.classList.add(after ? "lex-property-drop-after" : "lex-property-drop-before");
   });
+  const pinDropLanes = (state, moving, target) => {
+    const pager = target.closest(".lex-tweaks-paged");
+    if (!pager || pager.lexUnpaged !== true || typeof pager.lexSetLanes !== "function") return;
+    const columns = [...pager.querySelectorAll(".lex-tweak-column")]
+      .filter(column => column.closest(".lex-tweaks-paged") === pager);
+    if (columns.length < 2) return;
+    const laneOf = node => columns.indexOf(node.closest(".lex-tweak-column"));
+    const targetLane = laneOf(target);
+    if (targetLane < 0) return;
+    const map = new Map();
+    for (const group of state.groups.values()) {
+      const node = layoutSectionOf(group);
+      if (!node || node.closest(".lex-tweaks-paged") !== pager) continue;
+      const lane = node === moving ? targetLane : laneOf(node);
+      if (lane >= 0) map.set(group.name, lane);
+    }
+    if (map.size) { pager.lexSetLanes(map); return true; }
+    return false;
+  };
+  // Undoing a layout change restores the stored arrangement to the live
+  // panel, not just to storage: the state is rebuilt (a refit may have
+  // replaced the columns since) and the stored layout applies onto it.
+  // When the panel rebuilt since, the live root with the same key takes it.
+  const reapplyStoredLayout = state => {
+    const live = state.root.isConnected ? state.root
+      : [...propertyLayouts.keys()].find(root => root.isConnected && propertyLayouts.get(root)?.key === state.key);
+    if (!live) return;
+    propertyLayouts.delete(live);
+    preparePropertyLayout(live);
+  };
   document.addEventListener("drop", event => {
     if (!sectionDrag || !propertyDrop?.target || !sharedSettingsSnapshot?.developerMode) return;
     event.preventDefault();
@@ -9194,12 +9638,17 @@ ${contents.path}`});
     const moving = idOf(section), target = idOf(propertyDrop.target);
     const order = sectionOrder(state).filter(id => id !== moving);
     order.splice(order.indexOf(target) + (propertyDrop.after ? 1 : 0), 0, moving);
+    const dropTarget = propertyDrop.target;
+    const pinned = pinDropLanes(state, section, dropTarget);
     clearPropertyDrop();
     orderSections(state, order);
+    // A lane-only drop re-sequences nothing, so the ordering above deals
+    // nothing: refit for the new pins explicitly.
+    if (pinned) for (const pager of state.root.querySelectorAll(".lex-tweaks-paged")) pager.lexFitPage?.();
     const after = capturePropertyLayout(state);
     if (JSON.stringify(before) === JSON.stringify(after)) return;
-    const apply = layout => storePropertyLayout(state, layout);
-    labelUndo.push({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
+    const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+    pushLabelUndo({before, after, apply}); labelRedo.length = 0; labelHistoryChanged();
     void apply(after);
   });
   document.addEventListener("dragend", () => {
@@ -9247,18 +9696,27 @@ ${contents.path}`});
       propertyDrop = {node: target.parentElement, before: after ? target.nextSibling : target, marker: target, after};
     } else {
       const section = event.target.closest?.(".lex-detail-section");
-      const sectionNode = section?.querySelector(":scope > .lex-detail-section-content");
-      if (state.groups.has(sectionNode)) {
-        propertyDrop = {node: sectionNode, before: null, marker: section, after: true};
+      const title = event.target.closest?.(".lex-detail-section-title");
+      // A title drop lands beside the section instead of inside it,
+      // above or below by pointer half. That is how a property leaves
+      // every section for the bare panel.
+      if (title && section && section.parentElement && !title.closest(".lex-detail-field")) {
+        const after = event.clientY >= section.getBoundingClientRect().top + section.offsetHeight / 2;
+        propertyDrop = {node: section.parentElement, before: after ? section.nextSibling : section, marker: section, after};
       } else {
-        // An emptied column holds no property to land before or after, so
-        // the column itself is the target. Non-empty columns still take
-        // drops on their properties, never here, so aiming between two
-        // rows keeps landing between them.
-        const column = event.target.closest?.(".lex-tweak-column");
-        const empty = column && state.groups.has(column) &&
-          ![...column.children].some(child => state.fields.has(child));
-        if (empty) propertyDrop = {node: column, before: null, marker: column, after: true};
+        const sectionNode = section?.querySelector(":scope > .lex-detail-section-content");
+        if (state.groups.has(sectionNode)) {
+          propertyDrop = {node: sectionNode, before: null, marker: section, after: true};
+        } else {
+          // An emptied column holds no property to land before or after, so
+          // the column itself is the target. Non-empty columns still take
+          // drops on their properties, never here, so aiming between two
+          // rows keeps landing between them.
+          const column = event.target.closest?.(".lex-tweak-column");
+          const empty = column && state.groups.has(column) &&
+            ![...column.children].some(child => state.fields.has(child));
+          if (empty) propertyDrop = {node: column, before: null, marker: column, after: true};
+        }
       }
     }
     if (!propertyDrop) return;
@@ -9275,13 +9733,14 @@ ${contents.path}`});
       return;
     }
     const {state, field, before} = propertyDrag;
+    addPropertyGroup(state.groups, propertyDrop.node);
     propertyDrop.node.insertBefore(field, propertyDrop.before);
     syncPagerCards(field.closest(".lex-tweaks-paged"));
     const after = capturePropertyLayout(state);
     clearPropertyDrop();
     if (JSON.stringify(before) === JSON.stringify(after)) return;
-    const apply = layout => storePropertyLayout(state, layout);
-    labelUndo.push({before, after, apply});
+    const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
+    pushLabelUndo({before, after, apply});
     labelRedo.length = 0;
     labelHistoryChanged();
     void apply(after);
@@ -9405,7 +9864,7 @@ ${contents.path}`});
           resortSubtabOf(text);
           // Remember it, so the shell's undo can take the name back: the
           // plugin's record history has no idea this happened.
-          labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
+          pushLabelUndo({key, tabId, before, after: label, shipped: fallback, node: text});
           labelRedo.length = 0;
           const saved = await storeLabel(key, tabId, label, fallback);
           labelHistoryChanged();
@@ -9454,6 +9913,12 @@ ${contents.path}`});
         // and the old tab is never shown as the new one. A plugin that
         // renders synchronously replaces this before paint; no flash.
         document.querySelector("#main")?.replaceChildren(loadingPanel({label: `Loading ${tab}`}));
+        // The tab marks itself before the plugin renders: every label and
+        // layout key is read from the marked tab, so marking after the
+        // render would build the new page under the old tab's keys and drop
+        // every rename on the floor.
+        for (const button of tabButtons.values())
+          button.classList.toggle("active", button.dataset.tab === tab);
 
         return pluginNavigate(tab);
       }};
@@ -9526,7 +9991,8 @@ ${contents.path}`});
     // alphabetically sorted anymore. wtf?"): a reader finds a page by name,
     // and every game's bar then reads the same way. A page whose order carries
     // meaning still states `order`.
-    const tabName = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
+    const tabName = tab => savedLabel(`${options.plugin.id}-${tab.id}.label`,
+      String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id));
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -9883,10 +10349,11 @@ ${contents.path}`});
     const history = !options.history ? null
       : ownHistory ? options.history : new EditHistory({...options.history, changed: refresh});
     if (history && !ownHistory) history.observe(document);
-  // A name the developer changed is undone first, then the record history:
-  // the two are different kinds of change and the newest one wins.
-  undo.onclick = async () => { if (!(await undoLabel())) history?.undo(); };
-  redo.onclick = async () => { if (!(await redoLabel())) history?.redo(); };
+  // A name the developer changed and a record the plugin changed undo
+  // newest first, through one shared order instead of draining either
+  // stack first.
+  undo.onclick = () => undoNewest(history);
+  redo.onclick = () => redoNewest(history);
     let saveBusy = false;
     const renderSaveContents = () => {
       const count = element("span", {class: "lex-save-count", hidden: true, "aria-hidden": "true"});
@@ -10083,9 +10550,14 @@ ${contents.path}`});
         flashShortcut(action);
         return;
       }
-      const editing = event.target instanceof HTMLElement &&
-        event.target.matches("input:not([type='checkbox']),textarea,select,[contenteditable='true']");
-      if (editing && (action === "undo" || action === "redo")) return;
+      if (action === "undo" || action === "redo") {
+        // Free text keeps native typing undo, and an open dialog keeps
+        // every key; anything else undoes the app, blurring first so a
+        // focused managed field commits what it holds.
+        if (document.querySelector(".lex-dialog-backdrop,dialog[open]")) return;
+        if (event.target.closest?.("textarea,input[type=text]:not([data-field-key]),input[type=search]")) return;
+        document.activeElement?.blur?.();
+      }
       const run = {
         undo: () => undo.click(),
         redo: () => redo.click(),
@@ -10356,6 +10828,20 @@ ${contents.path}`});
     cellClass: row => [typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || "",
       owner.renamable(row) ? "" : "lex-cell-fixed"].filter(Boolean).join(" "),
   } : column;
+  // The shipped label a pin was taken from: a pin taken after a rename
+  // holds the renamed text, so match a stored rename by value first.
+  const pinShipped = label => {
+    const text = String(label ?? "");
+    try {
+      const prefix = `${shellPluginId()}-${activePageTab()}.field.`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix) && key.endsWith(".label") && localStorage.getItem(key) === text)
+          return key.slice(prefix.length, -".label".length);
+      }
+    } catch (_error) {}
+    return text;
+  };
   const autoPinStores = new Map();
   const autoPins = viewKey => {
     if (!autoPinStores.has(viewKey)) {
@@ -10363,7 +10849,8 @@ ${contents.path}`});
       let pinned = [];
       try { pinned = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_error) {}
       autoPinStores.set(viewKey, {key, pinned: (Array.isArray(pinned) ? pinned : [])
-        .filter(entry => entry && typeof entry.key === "string")});
+        .filter(entry => entry && typeof entry.key === "string")
+        .map(entry => ({...entry, shipped: entry.shipped || pinShipped(entry.label)}))});
     }
     return autoPinStores.get(viewKey);
   };
@@ -10387,8 +10874,13 @@ ${contents.path}`});
   const pinnedColumns = owner => owner.store.pinned.map(entry => {
     const described = typeof owner.describe === "function" ? owner.describe(entry.key) : null;
     const editable = !!described?.editable && typeof owner.commitCell === "function";
+    // A pin header reads as the developer last named it, here as in
+    // the record's field: the rename store keys by shipped label.
+    const shipped = described?.label || entry.shipped || entry.label || entry.key;
+    const labelKey = fieldLabelKey(shipped);
+    const shown = () => savedLabel(labelKey, shipped);
     return {
-      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label"}, typeGlyph(entry.icon), entry.label) : entry.label, sortable: true, pinnedProperty: entry.key,
+      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey}, typeGlyph(entry.icon), shown()) : shipped, sortable: true, pinnedProperty: entry.key,
       sortValue: row => pinnedValue(row, entry.key) ?? "",
       numeric: described?.numeric === true,
       min: described?.minimum, max: described?.maximum, step: described?.step,
@@ -10571,11 +11063,7 @@ ${contents.path}`});
   const setColumnLit = (key, lit) => {
     if (!key) return;
     if (lit) litColumns.add(key); else litColumns.delete(key);
-    const escaped = CSS.escape(String(key));
-    for (const node of document.querySelectorAll(`[data-column-key="${escaped}"]`)) {
-      node.classList.toggle("lex-column-lit", lit);
-    }
-    for (const node of document.querySelectorAll(`[data-lex-property="${escaped}"]`)) {
+    for (const node of document.querySelectorAll(glowSelector(key))) {
       node.classList.toggle("lex-column-lit", lit);
     }
   };
@@ -10615,7 +11103,7 @@ ${contents.path}`});
     for (; node && node !== document.body; node = node.parentElement) {
       const bar = node.matches?.('.lex-subtab-bar') ? node : node.querySelector?.(':scope > .lex-subtab-bar:not([hidden])');
       if (!bar) continue;
-      const tabs = [...bar.querySelectorAll(':scope > [role="tab"]:not([disabled])')];
+      const tabs = [...bar.querySelectorAll(':scope > [role="tab"]:not([disabled]):not([aria-disabled="true"])')];
       if (tabs.length < 2) continue;
       const index = Math.max(0,tabs.findIndex(tab=>tab.getAttribute('aria-selected')==='true'));
       const label = bar.getAttribute("aria-label");
@@ -10834,7 +11322,8 @@ ${contents.path}`});
     const pinOwner = options.columnPreferences ? null : pagedPinOwner;
     const renameOwner = pagedRenameOwner;
     const ownColumns = (pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
-      .filter(column => !(options.columns || []).some(own => own.key === column.pinnedProperty))] : options.columns || [])
+      .filter(column => !(options.columns || []).some(own =>
+        String(own.key ?? "").toLowerCase() === String(column.pinnedProperty ?? "").toLowerCase()))] : options.columns || [])
       .map(column => renameColumn(column, renameOwner));
     const columns = preferredColumns
       ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
@@ -11260,52 +11749,6 @@ ${contents.path}`});
     };
     const defaults = sizesWithMinimums(options.defaultSizes);
     let sizes = [...defaults];
-    let storageKey = options.storageKey ||
-      (options.layoutKey ? `lexeditor:panel-layout:${options.layoutKey}` : "");
-    // Divider positions ship with their tab: a key without the tab token
-    // gains it when the divider moves (a drag means its tab is up, so
-    // the live token is trustworthy; at build time the nav may lag the
-    // content). Keys that already name their tab pass through.
-    const tokenizedKey = key => {
-      const plugin = shellPluginId(), tab = activePageTab();
-      if (!key || !plugin || !tab || key.includes(`${plugin}-${tab}`)) return key;
-      return key.replace("lexeditor:", `lexeditor:${plugin}-${tab}:`);
-    };
-    if (storageKey) {
-      try {
-        const readSizes = key => {
-          const stored = localStorage.getItem(key);
-          const parsed = JSON.parse(stored || "null");
-          if (Array.isArray(parsed) && parsed.length === nodes.length) return sizesWithMinimums(parsed);
-          if (nodes.length === 2 && Number.isFinite(Number.parseFloat(stored))) {
-            const first = Number.parseFloat(stored);
-            return sizesWithMinimums([first, 100 - first]);
-          }
-          return null;
-        };
-        const liveKey = tokenizedKey(storageKey);
-        // A migrated key answers under any nav state: the exact key,
-        // the live token guess, then whatever tokenized variant exists.
-        const scanKey = () => {
-          const rest = storageKey.replace(/^lexeditor:/, "");
-          if (!rest || rest === storageKey) return null;
-          let fallback = null;
-          for (let index = 0; index < localStorage.length; index++) {
-            const candidate = localStorage.key(index);
-            if (!candidate || candidate === storageKey || !candidate.endsWith(`:${rest}`)) continue;
-            if (candidate === liveKey) return candidate;
-            fallback ??= candidate;
-          }
-          return fallback;
-        };
-        const scanned = liveKey !== storageKey ? scanKey() : null;
-        sizes = readSizes(storageKey) || (liveKey !== storageKey ? readSizes(liveKey) : null) ||
-          (scanned ? readSizes(scanned) : null) || [...defaults];
-      } catch (_error) {
-        // Storage can be unavailable in a locked-down WebView. Resizing still
-        // works for the current layout instance.
-      }
-    }
     const template = (current, dividers = true) => current.flatMap((value, index) =>
       index < current.length - 1 && dividers
         ? [`minmax(${minSizes[index]}px, ${value}fr)`, "var(--lex-panel-gap, 14px)"]
@@ -11352,7 +11795,6 @@ ${contents.path}`});
       const divider = root.querySelector(':scope > .lex-panel-layout-divider');
       const dividerSize = vertical ? divider?.offsetHeight : divider?.offsetWidth;
       if (dividerSize) measuredGap = dividerSize;
-      else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(vertical ? css.rowGap : css.columnGap) || 0;
       const available = extent - (parseFloat(vertical ? css.paddingTop : css.paddingLeft) || 0)
         - (parseFloat(vertical ? css.paddingBottom : css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
       if(!vertical&&root.isConnected){
@@ -11392,186 +11834,29 @@ ${contents.path}`});
       return minSizes.map((value,index)=>value+spare*(total?weights[index]/total:1/nodes.length));
     };
 
-    if (nodes.length < 2 || options.resizable === false) {
-      root.style.setProperty("--lex-panel-layout-template", template(sizes, false));
-      root.style.setProperty("--lex-panel-layout-gap", Number(options.gap) > 0
-        ? `${Number(options.gap)}px` : "var(--lex-panel-gap, 14px)");
-      root.classList.add("lex-panel-layout-static");
-      root.append(...nodes);
-      if (nodes.length) {
-        const refresh = () => {
-          const fitted = fitResponsiveSizes(updateResponsive());
-          if (fitted) {
-            sizes = sizesWithMinimums(fitted);
-          }
-          root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
-        };
-        const observer = new ResizeObserver(refresh);
-        observer.observe(root);
-        root.__lexPanelLayoutObserver = observer;
-        requestAnimationFrame(() => {
-          refresh();
-          document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refresh();});
-        });
-      }
-      return root;
-    }
-
-    root.classList.add("lex-panel-layout-resizable");
-    const dividers = Array.from({length: nodes.length - 1}, (_, index) => {
-      const divider = element("div", {
-        class: "lex-panel-layout-divider",
-        role: "separator",
-        tabindex: "0",
-        "aria-label": options.dividerLabels?.[index] ||
-          `Resize panel ${index + 1} and panel ${index + 2}`,
-        "aria-orientation": vertical ? "horizontal" : "vertical",
-        title: "Drag to resize panels. Right-click to reset.",
-      });
-      if (options.dividerClass) divider.classList.add(options.dividerClass);
-      divider.dataset.dividerIndex = String(index);
-      const accessory = options.dividerAccessories?.[index];
-      [accessory].flat().filter(Boolean).forEach(node => divider.append(node));
-      return divider;
+    // Divider positions are never dragged or saved: every layout takes its
+    // configured shares clamped to measured minimums, refit as room changes.
+    // The strips between panes only anchor divider accessories (the shared
+    // Barrels and Columns buttons). They take no input.
+    root.classList.add("lex-panel-layout-static");
+    root.style.setProperty("--lex-panel-layout-template", template(sizes));
+    const accessories = options.dividerAccessories || [];
+    const strips = Array.from({length: Math.max(0, nodes.length - 1)}, (_, index) => {
+      const strip = element("div", {class: "lex-panel-layout-divider"});
+      if (options.dividerClass) strip.classList.add(options.dividerClass);
+      [accessories[index]].flat().filter(Boolean).forEach(node => strip.append(node));
+      return strip;
     });
-    const updateDividerState = () => dividers.forEach((divider, index) => {
-      const pair = sizes[index] + sizes[index + 1] || 1;
-      const value = sizes[index] / pair * 100;
-      divider.setAttribute("aria-valuemin", "0");
-      divider.setAttribute("aria-valuemax", "100");
-      divider.setAttribute("aria-valuenow", String(Math.round(value)));
-      divider.setAttribute("aria-valuetext",
-        `Panel ${index + 1} ${Math.round(sizes[index])} percent; panel ${index + 2} ${Math.round(sizes[index + 1])} percent`);
-    });
-    const setSizes = (requested, persist = false) => {
-      sizes = sizesWithMinimums(requested);
-      // A drag moves the divider every frame; the table and label minima are
-      // remeasured once when it lands instead. Measuring them per frame forced
-      // a synchronous layout of every pane and made the divider lag behind.
-      // The drag-start minima still clamp the move itself, through resizePair.
-      if (!document.body.classList.contains("lex-panel-layout-dragging")) {
-        const fitted = fitResponsiveSizes(updateResponsive());
-        if (fitted) sizes = sizesWithMinimums(fitted);
-      }
-      root.style.setProperty("--lex-panel-layout-template", template(sizes));
-      updateDividerState();
-      const detail = {sizes: [...sizes], split: sizes[0]};
-      root.dispatchEvent(new CustomEvent("lex-panel-layout-resize", {detail}));
-      if (options.eventName) root.dispatchEvent(new CustomEvent(options.eventName, {detail}));
-      if (persist && storageKey) {
-        try {
-          const writeKey = tokenizedKey(storageKey);
-          localStorage.setItem(writeKey, nodes.length === 2 ? String(sizes[0]) : JSON.stringify(sizes));
-          if (writeKey !== storageKey) localStorage.removeItem(storageKey);
-          storageKey = writeKey;
-        } catch (_error) {}
-      }
-    };
-    // The configured floor is the same before and after a drag. Text fitting
-    // must not turn a temporary wider view into a new, irreversible minimum.
-    const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
-      if (belowMinimum) return false;
-      const widths = initialWidths ? [...initialWidths]
-        : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
-      if (!root.isConnected || widths.some(value => value <= 0)) return false;
-      const total = widths.reduce((sum,value)=>sum+value,0);
-      const minimums = minSizes.map((value,i)=>Math.max(value,total*minimumFractions[i]));
-      if(edge==="home")delta=-total;
-      if(edge==="end")delta=total;
-      // When the adjacent pane reaches its minimum, use spare room in the
-      // next pane too. A narrow centre list must not trap the left divider.
-      const donors=delta>0
-        ? widths.map((_,i)=>i).filter(i=>i>index)
-        : widths.map((_,i)=>i).filter(i=>i<=index).reverse();
-      let remaining=Math.abs(delta),applied=0;
-      for(const donor of donors){
-        const taken=Math.min(remaining,Math.max(0,widths[donor]-minimums[donor]));
-        widths[donor]-=taken;remaining-=taken;applied+=taken;
-        if(remaining<.25)break;
-      }
-      // A drag is measured from its starting widths. Returning to the start
-      // must restore those widths, even though this move transfers nothing.
-      if(applied<.25){if(initialWidths)setSizes(widths,persist);return false;}
-      widths[delta>0?index:index+1]+=applied;
-      setSizes(widths, persist);
-      return true;
-    };
-    let dragFrame = 0, pendingDrag = null, dragStart = null;
-    const flushDrag = () => {
-      dragFrame = 0;
-      const pending = pendingDrag; pendingDrag = null;
-      if (!pending || !root.isConnected) return;
-      if (!dragStart) return;
-      resizePair(pending.index, pending.x - dragStart.x, false, "", dragStart.widths);
-    };
-    const finishDrag = (divider, event) => {
-      if (!divider.classList.contains("dragging")) return;
-      if (dragFrame) cancelAnimationFrame(dragFrame);
-      flushDrag();
-      dragStart = null;
-      divider.classList.remove("dragging");
-      document.body.classList.remove("lex-panel-layout-dragging");
-      try {
-        if (divider.hasPointerCapture?.(event.pointerId)) divider.releasePointerCapture(event.pointerId);
-      } catch (_error) {}
-      setSizes(sizes, true);
-      document.dispatchEvent(new Event("lex-panel-drag-ended"));
-    };
-    dividers.forEach((divider, index) => {
-      divider.addEventListener("pointerdown", event => {
-        if (event.button !== 0) return;
-        // Divider accessories are controls, not resize handles. Capturing their
-        // pointer made the shared Barrels buttons appear live but do nothing.
-        if (event.target.closest?.("button,input,select,textarea,[role=button]")) return;
-        event.preventDefault();
-        dragStart = {x: vertical ? event.clientY : event.clientX,
-          widths: nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width)};
-        divider.classList.add("dragging");
-        document.body.classList.add("lex-panel-layout-dragging");
-        try { divider.setPointerCapture?.(event.pointerId); } catch (_error) {}
-      });
-      divider.addEventListener("pointermove", event => {
-        if (!divider.classList.contains("dragging")) return;
-        pendingDrag = {divider, index, x: vertical ? event.clientY : event.clientX};
-        if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
-      });
-      divider.addEventListener("pointerup", event => finishDrag(divider, event));
-      divider.addEventListener("pointercancel", event => finishDrag(divider, event));
-      divider.addEventListener("lostpointercapture", event => finishDrag(divider, event));
-      divider.addEventListener("keydown", event => {
-        const dimension = vertical ? "height" : "width";
-        const pairWidth = nodes[index].getBoundingClientRect()[dimension] +
-          nodes[index + 1].getBoundingClientRect()[dimension];
-        const step = pairWidth * (event.shiftKey ? .05 : .02);
-        if (event.key === (vertical ? "ArrowUp" : "ArrowLeft")) resizePair(index, -step, true);
-        else if (event.key === (vertical ? "ArrowDown" : "ArrowRight")) resizePair(index, step, true);
-        else if (event.key === "Home") resizePair(index, 0, true, "home");
-        else if (event.key === "End") resizePair(index, 0, true, "end");
-        else return;
-        event.preventDefault();
-      });
-      const reset = event => {
-        if (event.target.closest?.("button,input,select,textarea,[role=button]")) return;
-        event.preventDefault();
-        setSizes(defaults, true);
-      };
-      // Right-click resets a split; double-click does not. A divider is
-      // dragged, and a drag that starts with two quick presses would otherwise
-      // throw the layout away instead of moving it. Two separate contracts
-      // record this decision.
-      divider.addEventListener("contextmenu", reset);
-    });
-
     nodes.forEach((node, index) => {
       root.append(node);
-      if (index < dividers.length) root.append(dividers[index]);
+      if (index < strips.length) root.append(strips[index]);
     });
-    setSizes(sizes);
     const refreshResponsive = () => {
       const fitted = fitResponsiveSizes(updateResponsive());
-      if (fitted) setSizes(fitted);
-      else root.style.setProperty('--lex-panel-layout-template',template(sizes));
+      if (fitted) sizes = sizesWithMinimums(fitted);
+      root.style.setProperty('--lex-panel-layout-template', template(sizes));
     };
+    refreshResponsive();
     if (typeof ResizeObserver !== "undefined") {
       let pending = 0;
       const observer = new ResizeObserver(() => {
@@ -11579,10 +11864,6 @@ ${contents.path}`});
         pending = requestAnimationFrame(() => {
           pending = 0;
           refreshResponsive();
-          if (nodes.length === 2 && !dividers[0]?.classList.contains("dragging")) {
-            resizePair(0, 0);
-          }
-          updateDividerState();
         });
       });
       observer.observe(root);
@@ -11590,13 +11871,12 @@ ${contents.path}`});
     }
     requestAnimationFrame(() => {
       refreshResponsive();
-      if (root.isConnected && nodes.length === 2) resizePair(0, 0);
       document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refreshResponsive();});
     });
     return root;
   };
 
-  // Compatibility wrapper for older callers. Resizing belongs to panelLayout.
+  // Compatibility wrapper for older callers. Sizes always come from panelLayout.
   const listDetail = (listNode, detail, className = "", splitOptions = {}) => {
     if (className && typeof className === "object") {
       splitOptions = className;
@@ -11611,15 +11891,10 @@ ${contents.path}`});
         minSizes: [Math.max(160, Number(options.minLeft) || 280),
           Math.max(240, Number(options.minRight) || 360)],
         minimumFractions: [minimumSplit / 100, 0],
-        storageKey: options.splitKey ? `lexeditor:list-detail:${options.splitKey}` : "",
-        resizable: options.resizable,
         dividerClass: "lex-list-detail-divider",
-        dividerLabels: ["Resize list and detail panels"],
         dividerAccessories: options.dividerAccessories,
         paneClass: options.paneClass,
-        eventName: "lex-list-detail-resize",
       });
-    if (options.resizable !== false) root.classList.add("lex-list-detail-resizable");
     root.__lexListDetailObserver = root.__lexPanelLayoutObserver;
     return root;
   };
@@ -11862,14 +12137,17 @@ ${contents.path}`});
     const prompt=element("strong",{class:"lex-searcher-prompt"},options.prompt||"Select a record");
     const cancel=element("button",{type:"button",class:"lex-searcher-cancel",title:options.closeLabel||"Cancel selection",
       "aria-label":options.closeLabel||"Cancel selection"},"×");
-    const bar=element("div",{class:"lex-searcher-bar",role:"status","aria-live":"polite"},context,prompt,cancel);
-    return {context,prompt,cancel,bar};
+    const clear=options.clearValue === undefined ? null : element("button",{type:"button",class:"lex-searcher-clear",
+      title:options.clearTitle||`Clear the selection (${options.clearLabel||"None"})`,
+      "aria-label":options.clearLabel||"None"},options.clearLabel||"None");
+    const bar=element("div",{class:"lex-searcher-bar",role:"status","aria-live":"polite"},context,prompt,clear,cancel);
+    return {context,prompt,cancel,clear,bar};
   };
   const beginSearcher = options => {
     finishSearcher(false);
     const header = document.querySelector(".lex-shell-header");
     if (!header?.querySelector(".lex-nav-frame")) throw new Error("The shared Searcher needs the Lexeditor shell");
-    const {context,prompt,cancel,bar}=selectionBar(options);
+    const {context,prompt,cancel,clear,bar}=selectionBar(options);
     const searcher = {
       type: String(options.type || "record"), accept: options.accept, origin: options.origin,
       target: options.target, bar, header, atTarget: true,
@@ -11945,6 +12223,12 @@ ${contents.path}`});
       }
     };
     cancel.onclick = () => finishSearcher(true);
+    if (clear) clear.onclick = () => {
+      const accept = searcher.accept;
+      finishSearcher(false);
+      accept?.(options.clearValue, options.clearLabel || "None");
+      searcher.origin?.();
+    };
     header.classList.add("lex-searcher-active");
     header.append(bar);
     searcher.target?.();
@@ -12006,7 +12290,9 @@ ${contents.path}`});
     disabled: options.disabled === true,
     onclick: event => { event.preventDefault(); event.stopPropagation();
       beginSearcher({type: options.type, prompt: options.prompt, target: options.target,
-        origin: options.origin, accept: options.accept, holdMs: options.holdMs}); },
+        origin: options.origin, accept: options.accept, holdMs: options.holdMs,
+        clearValue: options.clearValue, clearLabel: options.clearLabel,
+        clearTitle: options.clearTitle}); },
   }, options.content || selectionIcon());
   const thingFinderField = (content, options = {}) => choiceField(content, thingFinderButton(options), options);
 
@@ -12338,7 +12624,7 @@ ${contents.path}`});
   };
   // How many columns a page's details use: 1-6, or none saved for "fit".
   const detailColumnsKey = options => `columns:${String(
-    options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
+    options.columnsKey || options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
   const readDetailColumns = key => {
     const managed = sharedSettingsSnapshot?.viewPreferences?.[key];
     let value = managed;
@@ -12642,7 +12928,7 @@ ${contents.path}`});
       change("pins",{});
     },toggle:(key,label,icon)=>{
       const store=pinOwner.store;
-      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label,icon:icon||""}];
+      store.pinned=store.pinned.some(entry=>entry.key===key)?store.pinned.filter(entry=>entry.key!==key):[...store.pinned,{key,label,icon:icon||"",shipped:pinShipped(label)}];
       try{localStorage.setItem(store.key,JSON.stringify(store.pinned));}catch(_error){}
       change("pins",{});
     }};
@@ -12836,7 +13122,9 @@ ${contents.path}`});
     // columns the selected record's details flow into. Right-click: fit again.
     // Each panel tab keeps its own column count: the key extends with the
     // active tabs in the detail, outer to inner, so one item section and the
-    // next (or the GF's HP tab and its XP tab) can differ. Counts persist
+    // next (or the GF's HP tab and its XP tab) can differ. Callers that show
+    // the same fields under several subtabs pass columnsKey to share one count
+    // across them, the way the property layout already does. Counts persist
     // through the same saved preferences as before, one entry per tab.
     const columnsBaseKey = detailColumnsKey(options);
     const columnsKeyNow = () => {
@@ -12848,8 +13136,13 @@ ${contents.path}`});
     let columnsKey = columnsKeyNow();
     let chosenColumns = readDetailColumns(columnsKey);
     const shownColumns = () => {
+      // Every visible column counts, empty ones included: they still take
+      // their share of the row (the blank right side), and the deal still
+      // honors them. Counting only non-empty columns read "1" on a fitted
+      // three-column deal whose stored layout stacks everything left, while
+      // drops landed in the "missing" columns and minus sat disabled.
       const columns = [...(detailNode?.querySelectorAll?.(".lex-tweaks-paged .lex-tweak-column") || [])]
-        .filter(column => column.offsetParent && column.childElementCount);
+        .filter(column => column.offsetParent);
       return chosenColumns || Math.max(1, columns.length);
     };
     const columnTally = element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(chosenColumns || ""));
@@ -12895,23 +13188,17 @@ ${contents.path}`});
     const barrelPanelMinimum = Math.max(160, Number(options.minLeft) || 280) * barrels +
       7 * (barrels - 1);
     const root = leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
-      `lex-list-detail lex-master-detail lex-list-detail-resizable lex-leading-list-detail ${options.className || ""}`, {
+      `lex-list-detail lex-master-detail lex-leading-list-detail ${options.className || ""}`, {
         defaultSizes: options.panelSizes || [options.defaultLeadingWidth || 25, 30, 45],
         minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
-        storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
         dividerClass: "lex-list-detail-divider",
         dividerAccessories: [null, [barrelControl, columnControl]],
-        dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
-        eventName: "lex-list-detail-resize",
       }) : trailingNode ? panelLayout([masterNode, detailNode, trailingNode],
       `lex-list-detail lex-master-detail ${options.className || ""}`, {
         defaultSizes:options.panelSizes || [30,30,40],
         minSizes:[barrelPanelMinimum, Math.max(240, Number(options.minRight) || 300), Math.max(240, Number(options.minTrailing) || 360)],
-        storageKey:options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",
         dividerClass:"lex-list-detail-divider",
         dividerAccessories:[[barrelControl, columnControl],null],
-        dividerLabels:["Resize list and detail panels","Resize detail and related records"],
-        eventName:"lex-list-detail-resize",
       }) : listDetail(masterNode, detailNode, options.className || "", {
       splitKey: options.splitKey,
       defaultSplit: options.defaultSplit,
@@ -12960,60 +13247,65 @@ ${contents.path}`});
         change: value => modOnly.change?.(value),
       }));
     }
-    // Every table has one add button, round, in its own bottom-right corner
-    // and faint until pointed at. Where a record cannot be added it stays
-    // there, marked unavailable, and says why when pointed at or pressed:
-    // "every game, every list should have it... if disabled, it says why".
-    // A plugin that builds its own add button and hands it over with the
-    // pager's filters gets that button moved here, not a second one.
-    const suppliedAdd = bottomTools.find(control => control?.matches?.(".lex-new-button"));
-    if (suppliedAdd) bottomTools.splice(bottomTools.indexOf(suppliedAdd), 1);
-    const readonlySource = document.documentElement.dataset.lexProjectReadonly === "true";
-    // A slot table cannot grow, but one that knows its empty slots fills the
-    // next one: Add hands the plugin that slot (Lexer: "i distinctly remember
-    // you saying that there were empty slots for things").
-    const claimsEmpty = slotBased && Boolean(emptyRow) && typeof options.add === "function"
-      && options.addDisabled !== true;
-    const pluginAdd = suppliedAdd ? !suppliedAdd.disabled
-      : claimsEmpty ? emptyCount > 0
-      : !slotBased && typeof options.add === "function" && options.addDisabled !== true;
-    const canAdd = pluginAdd && !readonlySource;
-    const addWhy = canAdd ? "" : readonlySource
-      ? "This is the game's own data, shown read-only. Create a mod to add records to it."
-      : options.addDisabledReason || (suppliedAdd || options.addDisabled === true
-        ? "Adding is unavailable right now."
-        : claimsEmpty
-          ? `Every slot in this table is in use, so there is no room to add ${options.noun || "records"}.`
-        : slotBased
-          ? `This table is a fixed set of slots in the game's data, so there is no room to add ${options.noun || "records"}.`
-          : `Adding ${options.noun || "records"} to this table is not supported yet.`);
-    const tableAdd = suppliedAdd || newButton({title: options.addTitle || `Add ${options.noun || "record"}`,
-      onclick: event => {
-        event.stopPropagation();
-        if (!canAdd) return;
-        if (!claimsEmpty) { options.add(); return; }
-        // The slot being filled must be on screen, so Hide empty lets go.
-        if (hideEmpty) saveHideEmpty(hideEmptyKey, false);
-        options.add(allRows.find(record => emptyRow(record)));
-      }});
-    tableAdd.disabled = false;
-    tableAdd.classList.add("lex-table-add");
-    tableAdd.classList.toggle("unavailable", !canAdd);
-    if (canAdd) tableAdd.removeAttribute("aria-disabled");
-    else {
-      tableAdd.setAttribute("aria-disabled", "true");
-      tableAdd.title = addWhy;
-      tableAdd.setAttribute("aria-label", addWhy);
+    // Creation lives in the detail header: a list whose plugin owns
+    // creation there passes tableAdd:false and shows no button here.
+    // Lists still migrating keep the old bottom-right button meanwhile.
+    if (options.tableAdd !== false) {
+      // Every table has one add button, round, in its own bottom-right corner
+      // and faint until pointed at. Where a record cannot be added it stays
+      // there, marked unavailable, and says why when pointed at or pressed:
+      // "every game, every list should have it... if disabled, it says why".
+      // A plugin that builds its own add button and hands it over with the
+      // pager's filters gets that button moved here, not a second one.
+      const suppliedAdd = bottomTools.find(control => control?.matches?.(".lex-new-button"));
+      if (suppliedAdd) bottomTools.splice(bottomTools.indexOf(suppliedAdd), 1);
+      const readonlySource = document.documentElement.dataset.lexProjectReadonly === "true";
+      // A slot table cannot grow, but one that knows its empty slots fills the
+      // next one: Add hands the plugin that slot (Lexer: "i distinctly remember
+      // you saying that there were empty slots for things").
+      const claimsEmpty = slotBased && Boolean(emptyRow) && typeof options.add === "function"
+        && options.addDisabled !== true;
+      const pluginAdd = suppliedAdd ? !suppliedAdd.disabled
+        : claimsEmpty ? emptyCount > 0
+        : !slotBased && typeof options.add === "function" && options.addDisabled !== true;
+      const canAdd = pluginAdd && !readonlySource;
+      const addWhy = canAdd ? "" : readonlySource
+        ? "This is the game's own data, shown read-only. Create a mod to add records to it."
+        : options.addDisabledReason || (suppliedAdd || options.addDisabled === true
+          ? "Adding is unavailable right now."
+          : claimsEmpty
+            ? `Every slot in this table is in use, so there is no room to add ${options.noun || "records"}.`
+          : slotBased
+            ? `This table is a fixed set of slots in the game's data, so there is no room to add ${options.noun || "records"}.`
+            : `Adding ${options.noun || "records"} to this table is not supported yet.`);
+      const tableAdd = suppliedAdd || newButton({title: options.addTitle || `Add ${options.noun || "record"}`,
+        onclick: event => {
+          event.stopPropagation();
+          if (!canAdd) return;
+          if (!claimsEmpty) { options.add(); return; }
+          // The slot being filled must be on screen, so Hide empty lets go.
+          if (hideEmpty) saveHideEmpty(hideEmptyKey, false);
+          options.add(allRows.find(record => emptyRow(record)));
+        }});
+      tableAdd.disabled = false;
+      tableAdd.classList.add("lex-table-add");
+      tableAdd.classList.toggle("unavailable", !canAdd);
+      if (canAdd) tableAdd.removeAttribute("aria-disabled");
+      else {
+        tableAdd.setAttribute("aria-disabled", "true");
+        tableAdd.title = addWhy;
+        tableAdd.setAttribute("aria-label", addWhy);
+      }
+      // Capturing on the button itself runs before the handler it was built
+      // with, so an unavailable button explains itself instead of acting.
+      tableAdd.addEventListener("click", event => {
+        if (canAdd) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        showToast(addWhy);
+      }, {capture: true});
+      hoverActions(masterNode, {label: "Table actions", align: "bottom-right", actions: [{node: tableAdd}]});
     }
-    // Capturing on the button itself runs before the handler it was built
-    // with, so an unavailable button explains itself instead of acting.
-    tableAdd.addEventListener("click", event => {
-      if (canAdd) return;
-      event.stopImmediatePropagation();
-      event.preventDefault();
-      showToast(addWhy);
-    }, {capture: true});
-    hoverActions(masterNode, {label: "Table actions", align: "bottom-right", actions: [{node: tableAdd}]});
     if (emptyRow) {
       const toggle = element("input", {
         type: "checkbox", checked: hideEmpty, "aria-label": "Hide empty slots",
@@ -14493,6 +14785,7 @@ ${contents.path}`});
     let modDetailTab = "details", contentsMod = null, contentsResult = null, contentsFailed = false;
     const contentsWraps = {files: null, records: null};
     const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
+    const contentsFitted = {records: 10, files: 10};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
@@ -14612,7 +14905,8 @@ ${contents.path}`});
       const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
         : `Remove ${row.name} from the library`;
       const openTitle = `Open ${row.name}'s folder`;
-      const actions = [toggle, // The switch opens the header row, ahead of the icon buttons.
+      // The switch closes the header row, always the rightmost record control.
+      const actions = [
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
@@ -14620,7 +14914,8 @@ ${contents.path}`});
         element("button", {type: "button", class: "lex-header-icon", title: openTitle,
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
-            .catch(error => failure("Could not open the folder", error))}, folderIcon())];
+            .catch(error => failure("Could not open the folder", error))}, folderIcon()),
+        toggle];
 
       const sections = [];
       const settingsPanels = [];
@@ -14682,7 +14977,7 @@ ${contents.path}`});
       const modContentsTable = (tab, rows, columns, searchLabel, emptyNote, notes, rowClass, rowTitle) => {
         const needle = String(contentsQuery[tab] || "").toLowerCase();
         const filtered = needle ? rows.filter(row => JSON.stringify(row).toLowerCase().includes(needle)) : rows;
-        const size = 10;
+        const size = Math.max(1, contentsFitted[tab] || 10);
         const pages = Math.max(1, Math.ceil(filtered.length / size));
         contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab] || 0, pages - 1));
         const slice = filtered.slice(contentsPage[tab] * size, (contentsPage[tab] + 1) * size);
@@ -14694,9 +14989,26 @@ ${contents.path}`});
         if (!rows.length) return element("div", {class: "lex-mod-contents"}, detailNote(emptyNote), ...foot);
         if (!filtered.length) return element("div", {class: "lex-mod-contents"},
           detailNote(`No ${tab === "records" ? "changes" : "files"} match this search.`), pagerNode, ...foot);
-        return element("div", {class: "lex-mod-contents"},
-          columnList({rows: slice, key: (row, index) => index, columns, rowClass, rowTitle}),
-          pagerNode, ...foot);
+        // The list owns the tab below its header: it fills the space,
+        // takes as many rows as fit, and the wheel turns its pages.
+        const list = columnList({rows: slice, key: (row, index) => index,
+          columns, rowClass, rowTitle, class: "lex-list-fill"});
+        const box = element("div", {class: "lex-mod-contents"},
+          list, pagerNode, ...foot);
+        fitListPage({list, pageSize: size, change: next => {
+          if (next === contentsFitted[tab]) return;
+          contentsFitted[tab] = next;
+          contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab],
+            Math.max(1, Math.ceil(filtered.length / next)) - 1));
+          draw();
+        }});
+        wheelPages(box, direction => {
+          const target = contentsPage[tab] + direction;
+          if (target < 0 || target >= pages) return;
+          contentsPage[tab] = target;
+          draw();
+        });
+        return box;
       };
       const modRecordsTable = result => {
         const changes = result.changes || [];
@@ -14733,9 +15045,21 @@ ${contents.path}`});
         if (!contentsResult) return loadingStatus("Reading mod contents");
         return tab === "files" ? modFilesTable(contentsResult) : modRecordsTable(contentsResult);
       };
+      const recordsEmptyNow = () => !!contentsResult && !contentsFailed
+        && !(contentsResult.changes || []).length && !contentsResult.note;
       const paintWraps = () => {
         if (contentsWraps.files) contentsWraps.files.replaceChildren(contentsNode("files"));
         if (contentsWraps.records) contentsWraps.records.replaceChildren(contentsNode("records"));
+        // The strip was built before the contents arrived, and only
+        // the showing tab is mounted, so an emptiness change redraws
+        // from cache: the Records tab grays with its reason there,
+        // and a showing Records tab falls back to Details.
+        const empty = recordsEmptyNow();
+        const button = main?.querySelector(
+          '.lex-tabbed-panel-tabs [data-subtab="records"]');
+        const grayed = button?.getAttribute("aria-disabled") === "true"
+          || button?.disabled === true;
+        if (button && empty !== grayed) draw();
       };
       const filesWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("files"));
       const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
@@ -14749,6 +15073,11 @@ ${contents.path}`});
       // Panel tabs, not sections with a tab strip inside: Details, Files and
       // Records work the way every other detail panel's tabs do. Each table
       // carries its own inline pager, so no panel paging.
+      // A mod with no record changes offers no Records tab: the tab
+      // grays out with its reason instead of opening an empty table.
+      // A loader note still counts as content, so it stays enabled.
+      const recordsEmpty = recordsEmptyNow();
+      if (modDetailTab === "records" && recordsEmpty) modDetailTab = "details";
       return detailPanel({title: row.name, actions, body: [...notes, tabbedPanel({
         label: "Mod details",
         active: modDetailTab,
@@ -14758,6 +15087,8 @@ ${contents.path}`});
           {id: "files", label: "Files",
             help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
           {id: "records", label: "Records",
+            ...(recordsEmpty ? {disabled: true,
+              disabledReason: "This mod changes no rows or text entries."} : {}),
             help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
         ],
         change: id => { modDetailTab = id; draw(); },
@@ -15016,7 +15347,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
@@ -15248,6 +15579,28 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closeHeaderZoom(); });
   window.addEventListener('scroll', closeHeaderZoom, true);
 
+  // Local mirror of the glow matcher: this block keeps its own scope.
+  const stripPinPrefix = key => String(key ?? "").replace(/^pin:/, "");
+  const glowSelector = key => {
+    const raw = String(key ?? "");
+    const base = stripPinPrefix(raw);
+    const columns = raw === base
+      ? [`[data-column-key="${CSS.escape(raw)}"]`]
+      : [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="${CSS.escape(base)}"]`];
+    return [...columns, `[data-lex-property="${CSS.escape(base)}"]`].join(",");
+  };
+  // A header whose property sits on another panel tab glows that tab's
+  // button instead of its hidden field. Only bars that name their
+  // members answer; only the hovered table's own panel is asked.
+  const litHolderTabs = (key, scope, lit) => {
+    if (!key || !scope?.querySelectorAll) return;
+    for (const bar of scope.querySelectorAll(".lex-tabbed-panel-tabs")) {
+      const tabId = bar.lexTabMembers?.get?.(stripPinPrefix(key));
+      if (!tabId) continue;
+      bar.querySelector(`:scope > .lex-subtab-button[data-subtab="${CSS.escape(String(tabId))}"]`)
+        ?.classList.toggle("lex-column-lit", lit);
+    }
+  };
   const hoverKey = node => node?.dataset?.lexProperty || node?.dataset?.columnKey || '';
   document.addEventListener('pointerover', event => {
     const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
@@ -15262,9 +15615,11 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (!fromHeader) return;
     const key = hoverKey(node);
     if (!key) return;
-    const escaped = CSS.escape(String(key));
-    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
-      .forEach(peer => peer.classList.add('lex-column-lit'));
+    const peers = document.querySelectorAll(glowSelector(key));
+    peers.forEach(peer => peer.classList.add('lex-column-lit'));
+    const fieldShown = [...peers].some(peer =>
+      peer.hasAttribute('data-lex-property') && peer.getClientRects().length > 0);
+    if (!fieldShown) litHolderTabs(key, node.closest?.('.lex-paged-list-detail') || document, true);
   });
   document.addEventListener('pointerout', event => {
     const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
@@ -15272,9 +15627,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     node.classList.remove('lex-self-hover');
     const key = hoverKey(node);
     if (!key) return;
-    const escaped = CSS.escape(String(key));
-    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
+    document.querySelectorAll(glowSelector(key))
       .forEach(peer => peer.classList.remove('lex-column-lit'));
+    litHolderTabs(key, node.closest?.('.lex-paged-list-detail') || document, false);
   });
 
   document.addEventListener('click', event => {
@@ -16068,15 +16423,22 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const value = Number(input.value);
     return Number.isFinite(value) && Math.abs(value) >= GROUPING_FLOOR;
   };
-  const groupNumberBoxes = root => {
+  const fitNewControls = root => {
     const scope = root instanceof Element || root instanceof Document ? root : document;
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    // A dropdown cannot wrap its face: a long choice in a narrow box clipped
+    // to an ellipsis. The fitter scales the face down instead, like numbers.
+    const selects = [...scope.querySelectorAll("select")];
+    if (scope instanceof Element && scope.matches?.("select")) selects.push(scope);
     // A locked value is sized like an editable one, but only a value: fitted
     // to one line, a sentence shrank to a few pixels high.
     for (const box of scope.querySelectorAll(".lex-detail-field-control .lex-readonly-field")) {
       const text = String(box.value ?? box.textContent ?? "").trim();
       if (!box.__lexAutoFitUpdate && text.length <= 24) window.LexeditorUI.autoFitControlText(box,{minimum:8});
+    }
+    for (const select of selects) {
+      if (!select.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(select,{minimum:8});
     }
     for (const input of inputs) {
       if (!input.__lexAutoFitUpdate) window.LexeditorUI.autoFitControlText(input,{minimum:8});
@@ -16144,7 +16506,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
 
   let pending = false;
   const schedule = root => {
-    groupNumberBoxes(root && root !== document ? root : document);
+    fitNewControls(root && root !== document ? root : document);
     if (root && root !== document) { requestAnimationFrame(() => alignFieldMetadata(root)); return; }
     if (pending) return;
     pending = true;

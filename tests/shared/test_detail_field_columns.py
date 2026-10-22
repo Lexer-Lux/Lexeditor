@@ -103,3 +103,90 @@ def test_developer_can_drop_a_property_into_an_empty_column(page):
     page.evaluate("() => window.__rebuildFields()")
     page.wait_for_timeout(400)
     assert page.evaluate(COLUMNS)[1] == ['physical']
+
+def tally(page):
+    page.locator(".lex-list-detail-divider").first.hover()
+    return page.locator(
+        ".lex-list-detail-divider .lex-detail-column-control .lex-barrel-count").text_content()
+
+
+def test_tally_counts_empty_fitted_columns(page):
+    # A fitted deal whose stored layout stacks everything left keeps its
+    # empty columns taking their share of the row. The tally used to count
+    # non-empty columns, so it read "1" on a three-column deal: minus sat
+    # disabled while drops landed in the "missing" columns. It reads the
+    # effective deal instead.
+    build(page)
+    set_columns(page, 3)
+    assert tally(page) == "3"
+    while True:
+        columns = page.evaluate(COLUMNS)
+        if len(columns) < 3 or (not columns[1] and not columns[2]):
+            break
+        donor = 1 if columns[1] else 2
+        name = page.locator(
+            f'[data-lex-layout-field="{columns[donor][0]}"] .lex-detail-field-label-text').text_content()
+        first = page.locator('main .lex-tweak-column').first.locator('.lex-detail-field').first
+        drag(page, name, first)
+    assert page.evaluate(COLUMNS)[1:] == [[], []]
+    # Right-click fits to width again: the deal keeps three columns (the
+    # stored three-group layout applies as stored), and the tally says so.
+    page.locator(".lex-list-detail-divider").first.hover()
+    page.locator(".lex-list-detail-divider .lex-detail-column-control").click(button="right")
+    page.wait_for_timeout(400)
+    columns = page.evaluate(COLUMNS)
+    assert len(columns) == 3, columns
+    assert columns[1:] == [[], []], columns
+    assert tally(page) == "3"
+    assert page.locator(
+        ".lex-list-detail-divider .lex-detail-column-control .lex-barrel-decrease").is_enabled()
+
+SCOPED_BUILD = """([barrel, columnsKey]) => {
+  const U = LexeditorUI;
+  try { localStorage.clear(); } catch (_error) {}
+  const rows = Array.from({length: 6}, (_, id) => ({id, name: 'Ammo ' + id}));
+  const fields = () => ['Damage', 'Weight', 'Price'].map(name => U.detailField({
+    label: name, property: name.toLowerCase(),
+    control: U.el('input', {type: 'number', value: 0, min: 0, max: 100})}));
+  const main = document.querySelector('main');
+  main.style.cssText = 'display:block;height:760px';
+  window.__scopedBuild = barrelNow => main.replaceChildren(U.pagedListDetail({rows,
+    key: row => row.id, selected: 0, noun: 'ammo', splitKey: 'scope-check', slots: false,
+    pageSize: 6, defaultSplit: 22, barrelKey: barrelNow, columnsKey,
+    master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
+      select: v.select, columns: [{key: 'name', label: 'Name'}]}),
+    detail: row => U.detailPanel({title: row.name, body: fields()})}));
+  window.__scopedBuild(barrel);
+}"""
+
+
+def build_scoped(page, barrel, columns_key):
+    page.set_viewport_size({"width": 1700, "height": 800})
+    framework(page)
+    mount_shell(page, True)
+    page.evaluate(SCOPED_BUILD, [barrel, columns_key])
+    page.wait_for_timeout(400)
+
+
+def test_columns_key_shares_count_across_subtab_barrels(page):
+    # DS1 renders every record tab through one paged list whose barrel key
+    # carries the subtab, so a count change in Ammo never reached
+    # Consumables while dragged properties did. A shared columnsKey keeps
+    # one count per tab across its subtabs.
+    build_scoped(page, 'ds1-items-ammo', 'ds1-items')
+    assert tally(page) == "1"
+    set_columns(page, 3)
+    page.evaluate("() => window.__scopedBuild('ds1-items-consumables')")
+    page.wait_for_timeout(400)
+    assert tally(page) == "3"
+
+
+def test_barrel_scoped_counts_stay_independent(page):
+    # Without a columnsKey the count stays per barrel key, so unrelated
+    # lists keep their own counts as before.
+    build_scoped(page, 'scope-list-a', None)
+    set_columns(page, 3)
+    page.evaluate("() => window.__scopedBuild('scope-list-b')")
+    page.wait_for_timeout(400)
+    assert tally(page) == "1"
+

@@ -483,6 +483,11 @@ def list_textures(file_bytes, filename):
         return found
     payload = plain if plain is not None else bytes(file_bytes)
     lowered = filename.lower()
+    if plain is not None and lowered.endswith(".dcx"):
+        # The bytes already came out of the wrapper; read the inner type.
+        # Without this the menu icon sheets (menu_1.tpf.dcx and kin) list
+        # no textures and their records show no thumbnail or preview.
+        lowered = lowered[:-len(".dcx")]
     if lowered.endswith(".tpf"):
         for texture in parse_tpf(payload):
             info = dds_info(payload[texture["offset"]:texture["offset"] + texture["size"]])
@@ -515,6 +520,11 @@ def texture_png(file_bytes, filename, member="", index=0):
         return render_png(tpf[match["offset"]:match["offset"] + match["size"]])
     payload = plain if plain is not None else bytes(file_bytes)
     lowered = filename.lower()
+    if plain is not None and lowered.endswith(".dcx"):
+        # The bytes already came out of the wrapper; read the inner type.
+        # Without this the menu icon sheets (menu_1.tpf.dcx and kin) list
+        # no textures and their records show no thumbnail or preview.
+        lowered = lowered[:-len(".dcx")]
     if lowered.endswith(".tpf"):
         textures = parse_tpf(payload)
     elif lowered.endswith(".tpfbhd") or lowered.endswith(".tpfbdt"):

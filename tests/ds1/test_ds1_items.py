@@ -289,18 +289,18 @@ def test_armor_absorption_accepts_full_immunity():
     assert shown['value'] == 100 and shown['maximum'] == 100.0
 
 
-def test_armor_and_shield_guard_fields_carry_no_icons():
-    # The hand-drawn glyphs were never game art, so fields ship without
-    # icons until the menu icon atlas is extracted: game art only.
+def test_armor_and_shield_guard_fields_carry_icons():
+    # Guard fields carry the menus' own small icons: swords and shields
+    # for damage types, tolerance icons for status.
     document = ItemDocument(make_archive())
     armor = {field['key']: field.get('icon', '')
              for field in document.read_row('EquipParamProtector', 100)['fields']}
-    assert armor['defenseThunder'] == ''
-    assert armor['resistBlood'] == ''
+    assert armor['defenseThunder'] == 'lightningDef'
+    assert armor['resistBlood'] == 'bleed'
     guard = {field['key']: field.get('icon', '')
              for field in document.read_row('EquipParamWeapon', 100)['fields']}
-    assert guard['thunGuardCutRate'] == ''
-    assert guard['curseGuardResist'] == ''
+    assert guard['thunGuardCutRate'] == 'lightningDef'
+    assert guard['curseGuardResist'] == 'curse'
 
 
 def test_weapon_guard_labels_carry_percent_unit():
@@ -315,24 +315,24 @@ def test_weapon_guard_labels_carry_percent_unit():
     assert NPC_FIELDS['poisonGuardResist'][0] == 'Poison guard (%)'
 
 
-def test_scaling_and_requirement_fields_carry_no_icons():
-    # The hand-drawn glyphs were never game art, so fields ship without
-    # icons until the menu icon atlas is extracted: game art only.
+def test_scaling_and_requirement_fields_carry_icons():
+    # Scaling and requirement fields carry the level-up screen's stat
+    # glyphs.
     document = ItemDocument(make_archive())
     weapon = {field['key']: field.get('icon', '')
               for field in document.read_row('EquipParamWeapon', 100)['fields']}
-    assert weapon['correctStrength'] == ''
-    assert weapon['correctAgility'] == ''
-    assert weapon['correctMagic'] == ''
-    assert weapon['correctFaith'] == ''
-    assert weapon['properStrength'] == ''
-    assert weapon['properAgility'] == ''
-    assert weapon['properMagic'] == ''
-    assert weapon['properFaith'] == ''
+    assert weapon['correctStrength'] == 'str'
+    assert weapon['correctAgility'] == 'dex'
+    assert weapon['correctMagic'] == 'int'
+    assert weapon['correctFaith'] == 'faith'
+    assert weapon['properStrength'] == 'str'
+    assert weapon['properAgility'] == 'dex'
+    assert weapon['properMagic'] == 'int'
+    assert weapon['properFaith'] == 'faith'
     magic = {field['key']: field.get('icon', '')
              for field in document.read_row('Magic', 100)['fields']}
-    assert magic['requirementIntellect'] == ''
-    assert magic['requirementFaith'] == ''
+    assert magic['requirementIntellect'] == 'int'
+    assert magic['requirementFaith'] == 'faith'
 
 
 def test_armor_list_rows_carry_absorption_shares_for_pinned_columns(monkeypatch):
@@ -485,6 +485,8 @@ def test_unit_labels_carry_their_control_suffix():
         ('ReinforceParamProtector', 'resistDiseaseRate'): '(x)',
         ('ReinforceParamProtector', 'resistBloodRate'): '(x)',
         ('ReinforceParamProtector', 'resistCurseRate'): '(x)',
+        ('SpEffectParam', 'bowDistRate'): '(%)',
+        ('SpEffectParam', 'soulStealRate'): '(%)',
         ('CalcCorrectGraph', 'stageMaxGrowVal0'): '(%)',
         ('CalcCorrectGraph', 'stageMaxGrowVal1'): '(%)',
         ('CalcCorrectGraph', 'stageMaxGrowVal2'): '(%)',
@@ -509,9 +511,12 @@ def test_unit_labels_carry_their_control_suffix():
         ('EquipParamWeapon', 'slashGuardCutRate'): '(%)',
         ('EquipParamWeapon', 'blowGuardCutRate'): '(%)',
         ('EquipParamWeapon', 'thrustGuardCutRate'): '(%)',
+        ('EquipParamWeapon', 'throwAtkRate'): '(%)',
+        ('EquipParamWeapon', 'bowDistRate'): '(%)',
         ('EquipParamProtector', 'weight'): '(kg)',
         ('EquipParamProtector', 'partsDamageRate'): '(x)',
         ('EquipParamProtector', 'flickDamageCutRate'): '(%)',
+        ('EquipParamProtector', 'knockbackBounceRate'): '(%)',
         ('EquipParamGoods', 'weight'): '(kg)',
         ('EquipParamAccessory', 'weight'): '(kg)',
         ('NpcParam', 'hitHeight'): '(metres)',
@@ -522,7 +527,7 @@ def test_unit_labels_carry_their_control_suffix():
         for slot in range(4):
             expected[(table, f'hit{slot}_Radius')] = '(metres)'
         expected[(table, 'hitStopTime')] = '(seconds)'
-    assert len(expected) == 133, len(expected)
+    assert len(expected) == 138, len(expected)
     for (table, key), suffix in sorted(expected.items()):
         label = next(item['spec'].label for item in schema(table)['fields']
                      if item['spec'].key == key)
@@ -531,12 +536,7 @@ def test_unit_labels_carry_their_control_suffix():
     # Unconfirmed quantities stay bare: no suffix may match them.
     bare = [
         ('EquipParamWeapon', 'correctStrength'),
-        ('EquipParamWeapon', 'throwAtkRate'),
-        ('EquipParamWeapon', 'bowDistRate'),
-        ('SpEffectParam', 'bowDistRate'),
-        ('SpEffectParam', 'soulStealRate'),
         ('EquipParamProtector', 'knockBack'),
-        ('EquipParamProtector', 'knockbackBounceRate'),
         ('EquipParamProtector', 'faceScaleM_ScaleX'),
         ('NpcThinkParam', 'targetSys_DmgEffectRate'),
         ('ObjActParam', 'validDist'),

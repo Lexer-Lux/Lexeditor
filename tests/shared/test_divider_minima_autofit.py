@@ -1,27 +1,28 @@
-"""A divider drag freezes pane minima until release, so the drag stays smooth."""
+"""Pane minimums follow their tables with no drag needed.
+
+A pane holding a table is at least as wide as the table's own columns
+at their minimum. Widening the content and refitting (here, a resize)
+raises the floor; the split rebalances around it.
+"""
 import re
 
 from test_shared_ui_feedback import page, framework
 
-ROOT = ".lex-panel-layout[data-defer-minima]"
+ROOT = ".lex-panel-layout[data-autofit-minima]"
 
 
 def floors(template):
     return [int(value) for value in re.findall(r"minmax\((\d+)px", template)]
 
 
-def first_fraction(template):
-    return float(re.findall(r"([\d.]+)fr", template)[0])
-
-
-def test_divider_drag_freezes_minima_until_release(page):
+def test_pane_minimums_follow_their_tables(page):
     framework(page)
     page.evaluate('''() => {
       const U = LexeditorUI;
       const list = U.columnList({rows: [{id: 1, name: 'Short'}], key: row => row.id, selected: 1,
         columns: [{key: 'name', label: 'Name'}]});
       const view = U.listDetail(U.el('div', {}, list), U.detailPanel({title: 'Detail'}));
-      view.setAttribute('data-defer-minima', '1');
+      view.setAttribute('data-autofit-minima', '1');
       view.style.height = '600px';
       document.querySelector('main').append(view);
     }''')
@@ -30,13 +31,6 @@ def test_divider_drag_freezes_minima_until_release(page):
             ".getPropertyValue('--lex-panel-layout-template')")
     before = page.evaluate(read)
     assert floors(before), before
-    divider = page.locator(f'{ROOT} .lex-panel-layout-divider').first.bounding_box()
-    x, y = divider['x'] + divider['width'] / 2, divider['y'] + 100
-    page.mouse.move(x, y)
-    page.mouse.down()
-    page.mouse.move(x + 120, y, steps=5)
-    page.wait_for_timeout(300)
-    # Side-by-side lists widen the pane floor: the floors must not follow mid-drag.
     page.evaluate(f'''() => {{
       const pane = document.querySelector('{ROOT} > .lex-panel-layout-pane');
       const grid = document.createElement('div');
@@ -45,12 +39,9 @@ def test_divider_drag_freezes_minima_until_release(page):
       for (let i = 0; i < 6; i++) grid.append(sample.cloneNode(true));
       pane.append(grid);
     }}''')
-    page.mouse.move(x + 140, y, steps=2)
-    page.wait_for_timeout(300)
-    during = page.evaluate(read)
-    assert floors(during) == floors(before), (before, during)
-    assert first_fraction(during) > first_fraction(before), 'the divider still follows the pointer'
-    page.mouse.up()
-    page.wait_for_timeout(300)
+    box = page.viewport_size
+    page.set_viewport_size({'width': box['width'] - 60, 'height': box['height']})
+    page.wait_for_timeout(400)
     after = page.evaluate(read)
     assert floors(after)[0] > floors(before)[0], (before, after)
+    page.set_viewport_size(box)

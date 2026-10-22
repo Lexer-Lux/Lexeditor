@@ -91,12 +91,14 @@ def main():
                     page.wait_for_timeout(500)
                     assert page.locator('.ds1-anim .lex-collapsible-handle').count() == 0
                     widths = page.evaluate(
-                        """() => [document.querySelector('[data-anim-chars-panel]')
+                        """() => [document.querySelector('[data-anim-left-panel]')
                             .getBoundingClientRect().width,
-                          document.querySelector('[data-anim-list-panel]')
+                          document.querySelector('[data-anim-detail-panel]')
                             .getBoundingClientRect().width]""")
-                    assert [round(width) for width in widths] == [300, 360], widths
+                    assert [round(width) for width in widths] == [360, 360], widths
                     for pane in ('[data-anim-chars]', '[data-anim-list]'):
+                        if pane == '[data-anim-list]':
+                            page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                         assert page.locator(f'{pane} .lex-pager').count() == 1, pane
                         assert page.locator(f'{pane} .lex-pager.lex-pager-inline').count() == 1, pane
                         box = page.evaluate(
@@ -121,10 +123,13 @@ def main():
                             }""", pane)
                         assert gap < 6, (pane, gap)
                     assert page.locator('.ds1-anim .lex-pager:not(.lex-pager-inline)').count() == 0
+                    page.locator('[data-anim-left] [data-tabstrip-id="chars"]').click()
                     assert page.locator('[data-anim-chars] .lex-compact-pager').count() == 1
-                    assert page.locator('[data-anim-list] .lex-compact-pager').count() == 1
                     assert page.locator('[data-anim-chars] .lex-page-summary').count() == 0
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
+                    assert page.locator('[data-anim-list] .lex-compact-pager').count() == 1
                     assert page.locator('[data-anim-list] .lex-page-summary').count() == 0
+                    page.locator('[data-anim-left] [data-tabstrip-id="chars"]').click()
                     first_chars = page.locator('[data-anim-chars] .lex-list-row').first.inner_text()
                     page.locator("[data-anim-chars] .lex-pager button[aria-label='Next page']").click()
                     page.wait_for_function('state.animCharPage === 1')
@@ -138,6 +143,7 @@ def main():
                     page.wait_for_timeout(250)
                     page.mouse.wheel(0, -120)
                     page.wait_for_function('state.animCharPage === 0')
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     first_motions = page.locator('[data-anim-list] .lex-list-row').first.inner_text()
                     page.locator("[data-anim-list] .lex-pager button[aria-label='Next page']").click()
                     page.wait_for_function('state.animPage === 1')
@@ -152,6 +158,7 @@ def main():
                     page.mouse.wheel(0, -120)
                     page.wait_for_function('state.animPage === 0')
                     # Textures: the plain quad renders in its diffuse red.
+                    page.locator('[data-anim-left] [data-tabstrip-id="chars"]').click()
                     page.locator('[data-anim-chars] .lex-list-row', has_text='c1201').click()
                     page.wait_for_function(
                         '!document.querySelector("[data-anim-host]").hasAttribute("data-ready")',
@@ -194,6 +201,8 @@ def main():
                                               " button[aria-label='Last page']"),
                                        ('[data-anim-list]', "[data-anim-list] .lex-pager"
                                              " button[aria-label='Last page']")):
+                        tab = 'chars' if pane == '[data-anim-chars]' else 'anims'
+                        page.locator(f'[data-anim-left] [data-tabstrip-id="{tab}"]').click()
                         page.locator(last).click()
                         page.wait_for_timeout(400)
                         gap = page.evaluate(

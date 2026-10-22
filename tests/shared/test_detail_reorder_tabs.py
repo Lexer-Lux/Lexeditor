@@ -3,7 +3,7 @@
 A developer drags Blocking fields into place, opens another panel
 tab, and comes back: the order must hold. Panel tabs rebuild their
 content on every switch, so the stored property layout has to
-re-apply to the rebuilt tab. A refit (resize, zoom, divider drag)
+re-apply to the rebuilt tab. A refit (resize, zoom, layout refit)
 must also keep the live arrangement: the pager deals cards in its
 own list order, so field moves re-sequence that list the way
 section moves already do. Bare fields, like the monster detail tabs.

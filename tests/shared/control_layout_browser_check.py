@@ -112,18 +112,24 @@ def main():
                 for item in page.locator('.lex-multi-number-item').all():
                     if not item.is_visible():continue
                     assert item.evaluate("e=>e.tagName")!='LABEL',                        'a multi-number item is a label and will adopt its copy button'
-                # The fill behind a value is the height of that value's box,
-                # never the height of the property row around it.
+                # The fill behind a value never leaves that value's box:
+                # neither taller (a face or stepper beside the input made
+                # the host taller) nor wider (narrow columns). It insets
+                # one pixel per side, so containment holds with room.
                 for field in page.locator('.lex-has-value-fill').all():
                     if not field.is_visible():continue
                     fill=field.evaluate('''e=>{
                       const f=e.querySelector('.lex-value-fill');
                       const box=e.querySelector('input,select,textarea');
                       if(!f||!box)return null;
-                      return [Math.round(f.getBoundingClientRect().height),
-                              Math.round(box.getBoundingClientRect().height)];}''')
+                      const fr=f.getBoundingClientRect(),br=box.getBoundingClientRect();
+                      return {fh:Math.round(fr.height),bh:Math.round(br.height),
+                              fw:Math.round(fr.width),bw:Math.round(br.width),
+                              left:Math.round(fr.left-br.left),top:Math.round(fr.top-br.top)};}''')
                     if fill is not None:
-                        assert fill[0]<=fill[1]+3,fill
+                        assert fill['fh']<=fill['bh'],fill
+                        assert fill['fw']<=fill['bw'],fill
+                        assert fill['left']>=0 and fill['top']>=0,fill
                 # A boolean row lines up with the properties around it: its
                 # label lane ends on its column's shared edge, its checkbox on the shared
                 # value edge, the leader arrow points at the middle of the box

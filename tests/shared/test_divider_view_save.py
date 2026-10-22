@@ -1,10 +1,10 @@
-"""Divider positions ship with their tab's default view.
+"""Divider positions are automatic: nothing drags and nothing is saved.
 
-Dragging a list-detail divider stores under a key carrying the tab
-token, so holding the tab ships the split with every other view
-setting; keys that already name their tab keep working untouched,
-and pre-token keys migrate on first read. Holding a tab with no view
-settings at all says so instead of failing.
+A list-detail split always comes from its configured shares clamped to
+measured minimums. Dragging and right-click change nothing; no divider
+key is ever stored (stale keys from older versions are ignored, never
+migrated). Holding a tab still ships the remaining view settings, and
+says so when there are none.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401  (fixture)
 from test_tab_rename import mount_shell
@@ -26,12 +26,19 @@ BUILD = """() => {
 KEYS = """() => Array.from({length: localStorage.length},
   (_, index) => localStorage.key(index))"""
 
+TEMPLATE = """() => document.querySelector('.lex-panel-layout').style
+  .getPropertyValue('--lex-panel-layout-template')"""
+
 
 def mount(page):
     framework(page)
     mount_shell(page, developer=True)
     page.evaluate(BUILD)
     page.wait_for_timeout(300)
+
+
+def master_width(page):
+    return page.locator('.lex-panel-layout-pane').first.bounding_box()['width']
 
 
 def drag_divider(page, delta=200):
@@ -55,47 +62,57 @@ def hold_tab(page):
     page.wait_for_timeout(200)
 
 
-def test_divider_drag_stores_under_a_tokenized_key(page):
+def test_split_follows_configured_shares(page):
     mount(page)
+    assert 280 <= master_width(page) <= 315, master_width(page)
+
+
+def test_divider_is_not_draggable(page):
+    mount(page)
+    strip = page.locator('.lex-list-detail-divider')
+    assert strip.get_attribute('role') is None
+    assert strip.get_attribute('tabindex') is None
+    assert strip.evaluate('node => getComputedStyle(node).cursor') == 'default'
+    before = (page.evaluate(TEMPLATE), master_width(page))
     drag_divider(page)
-    keys = page.evaluate(KEYS)
-    assert 'lexeditor:fixture-items:list-detail:plain' in keys, keys
-    assert 'lexeditor:list-detail:plain' not in keys, keys
-    value = page.evaluate(
-        "localStorage.getItem('lexeditor:fixture-items:list-detail:plain')")
-    assert 40 <= float(value) <= 60, value
+    assert page.evaluate(
+        'document.body.classList.contains("lex-panel-layout-dragging")') is False
+    assert (page.evaluate(TEMPLATE), master_width(page)) == before
+    assert [key for key in page.evaluate(KEYS) if 'list-detail' in key] == []
 
 
-def test_pre_token_key_migrates_on_read(page):
+def test_divider_ignores_right_click(page):
+    mount(page)
+    before = (page.evaluate(TEMPLATE), master_width(page))
+    box = page.locator('.lex-list-detail-divider').bounding_box()
+    page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2,
+                     button='right')
+    page.wait_for_timeout(150)
+    assert (page.evaluate(TEMPLATE), master_width(page)) == before
+    assert [key for key in page.evaluate(KEYS) if 'list-detail' in key] == []
+
+
+def test_stale_divider_keys_are_ignored(page):
     framework(page)
     mount_shell(page, developer=True)
     page.evaluate("localStorage.setItem('lexeditor:list-detail:plain', '55')")
     page.evaluate(BUILD)
     page.wait_for_timeout(300)
-    master = page.locator('.lex-panel-layout-pane').first.bounding_box()
-    assert 520 <= master['width'] <= 580, master
-    drag_divider(page, delta=-100)
+    assert 280 <= master_width(page) <= 315, master_width(page)
     keys = page.evaluate(KEYS)
-    assert 'lexeditor:fixture-items:list-detail:plain' in keys, keys
+    assert 'lexeditor:list-detail:plain' in keys, keys
+    assert [key for key in keys if 'fixture-items:list-detail' in key] == []
 
 
-def test_key_with_a_token_is_left_alone(page):
+def test_holding_the_tab_ships_remaining_settings(page):
     mount(page)
-    page.evaluate("drawSplit('fixture-items-sub')")
-    page.wait_for_timeout(200)
-    drag_divider(page)
-    keys = [key for key in page.evaluate(KEYS) if 'list-detail' in key]
-    assert keys == ['lexeditor:list-detail:fixture-items-sub'], keys
-
-
-def test_holding_the_tab_ships_the_divider(page):
-    mount(page)
-    drag_divider(page)
+    page.evaluate("localStorage.setItem('lexeditor:fixture-items:barrels:test', '2')")
     hold_tab(page)
     calls = page.evaluate('window.savedCalls')
     assert len(calls) == 1, calls
     _plugin, _tab, preferences = calls[0]
-    assert 'lexeditor:fixture-items:list-detail:plain' in preferences, preferences
+    assert 'lexeditor:fixture-items:barrels:test' in preferences, preferences
+    assert not [key for key in preferences if 'list-detail' in key], preferences
 
 
 def test_holding_a_tab_with_no_settings_says_so(page):

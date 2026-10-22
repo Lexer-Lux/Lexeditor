@@ -76,12 +76,14 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_selector('[data-maps-dir] .lex-column-list.lex-list-fill',
                                            timeout=30000)
                     assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
                     assert page.locator('.lex-collapsible-handle').count() == 0
                     width = page.evaluate(
-                        "() => document.querySelector('[data-maps-directory-panel]')"
+                        "() => document.querySelector('[data-maps-side]')"
                         ".getBoundingClientRect().width")
                     assert round(width) == 360, width
                     counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
@@ -104,27 +106,26 @@ def main():
                     else:
                         page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.table===e.map",
                                                arg={"key": ":" + key.split(":")[1], "map": map_name})
-                    page.locator('[data-tabstrip-id="selection"]').click()
                     title = page.locator(".lex-detail-panel-title").inner_text()
                     if not root:
                         assert title.strip() == "Rat", title
                     else:
                         assert map_name not in title and title.strip(), title
-                    goto = page.locator('[data-maps-side] [data-row-action="goto"]')
+                    goto = page.locator('[data-maps-detail] [data-row-action="goto"]')
                     assert goto.count() == 1
                     assert "lex-header-icon" in (goto.first.get_attribute("class") or "")
-                    assert page.locator("[data-maps-side] .lex-multi-number").count() == 3
-                    vectors = page.locator("[data-maps-side] .lex-detail-field:has(.lex-multi-number) .lex-detail-field-label-text").evaluate_all("nodes=>nodes.map(n=>n.textContent)")
+                    assert page.locator("[data-maps-detail] .lex-multi-number").count() == 3
+                    vectors = page.locator("[data-maps-detail] .lex-detail-field:has(.lex-multi-number) .lex-detail-field-label-text").evaluate_all("nodes=>nodes.map(n=>n.textContent)")
                     assert vectors == ["Position", "Rotation", "Scale"], vectors
-                    rows = page.locator("[data-maps-side] .lex-multi-number").evaluate_all(
+                    rows = page.locator("[data-maps-detail] .lex-multi-number").evaluate_all(
                         "nodes=>nodes.map(n=>[...n.querySelectorAll('input')].map("
                         "i=>{const r=i.getBoundingClientRect();"
                         "return [r.left+r.width/2,r.top+r.height/2]}))")
                     for axes in rows:
                         assert len(axes) == 3, axes
-                        assert max(x for x, _ in axes) - min(x for x, _ in axes) < 4, axes
-                        assert max(y for _, y in axes) - min(y for _, y in axes) > 20, axes
-                    units = page.locator("[data-maps-side] .lex-unit").evaluate_all(
+                        assert max(y for _, y in axes) - min(y for _, y in axes) < 4, axes
+                        assert max(x for x, _ in axes) - min(x for x, _ in axes) > 20, axes
+                    units = page.locator("[data-maps-detail] .lex-unit").evaluate_all(
                         "nodes=>nodes.map(n=>n.textContent)")
                     assert units == ["m", "m", "m", "\u00b0", "\u00b0", "\u00b0", "\u00d7", "\u00d7", "\u00d7"], units
                     assert page.get_by_text(f"model {enemy['model']}", exact=False).count() >= 1
@@ -156,8 +157,7 @@ def main():
                         else:
                             page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.table===c.map",
                                                    arg={"partId": chest["partId"], "map": map_name})
-                        page.locator('[data-tabstrip-id="selection"]').click()
-                        assert page.locator('[data-field-key="npcId"]:visible').count() == 0
+                            assert page.locator('[data-field-key="npcId"]:visible').count() == 0
                         field = page.locator('[data-field-key="posX"]:visible')
                         field.fill(str(chest_pos))
                         field.press("Tab")
@@ -168,7 +168,7 @@ def main():
                         page.screenshot(path=str(output / "maps-detail.png"))
                     page.set_viewport_size({"width": 1000, "height": 700})
                     page.wait_for_timeout(400)
-                    shown = page.locator("[data-maps-side] .lex-multi-number input").evaluate_all(
+                    shown = page.locator("[data-maps-detail] .lex-multi-number input").evaluate_all(
                         "nodes=>nodes.map(n=>({w:n.clientWidth,sw:n.scrollWidth,value:n.value}))")
                     assert shown, "no coordinate inputs rendered"
                     for box in shown:
@@ -211,7 +211,6 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function("state.tab==='maps' && state.rows.length>0 && !!state.row")
-                    page.locator('[data-tabstrip-id="selection"]').click()
                     control = page.locator('[data-field-key="posX"]:visible')
                     assert control.is_disabled()
                     control.click(force=True)

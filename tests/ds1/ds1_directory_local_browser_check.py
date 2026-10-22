@@ -32,6 +32,13 @@ def open_maps(page, session):
     page.locator('button[data-tab="maps"]').click()
     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error',
                           timeout=60000)
+    page.locator('[data-tabstrip-id="placements"]').click()
+    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
+    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+    # The All list's rows would satisfy a row count; the Local toggle
+    # only exists once the Drops list itself renders.
+    page.wait_for_selector("[data-maps-dir] [data-dir-local]", timeout=30000)
 
 
 def main():
@@ -71,8 +78,12 @@ def main():
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===2",
                         timeout=30000)
+                    page.locator('[data-tabstrip-id="maps"]').click()
+                    page.wait_for_function('state.mapTab==="maps"', timeout=30000)
                     page.locator("[data-maps-side] .lex-list-row", has_text=MAP_B).click()
                     page.wait_for_function(f'state.mapId==="{MAP_B}"', timeout=30000)
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===1",
                         timeout=30000)
@@ -83,8 +94,12 @@ def main():
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===0",
                         timeout=30000)
+                    page.locator('[data-tabstrip-id="maps"]').click()
+                    page.wait_for_function('state.mapTab==="maps"', timeout=30000)
                     page.locator("[data-maps-side] .lex-list-row", has_text=MAP_A).click()
                     page.wait_for_function(f'state.mapId==="{MAP_A}"', timeout=30000)
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===1",
                         timeout=30000)

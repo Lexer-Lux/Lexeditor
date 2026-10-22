@@ -63,7 +63,6 @@ def test_map_undo_is_surgical():
                     page.get_by_role('searchbox', name='Search placements').fill('Rat')
                     page.wait_for_function(
                         'state.selected.endsWith(":0") && state.row?.name==="Rat"')
-                    page.locator('[data-tabstrip-id="selection"]').click()
                     field = page.locator('[data-field-key="posX"]:visible')
                     before = field.input_value()
                     field.fill('41.5')
@@ -79,7 +78,7 @@ def test_map_undo_is_surgical():
                     page.wait_for_function(
                         'fieldHistory.undoStack.length === 0 && fieldHistory.redoStack.length === 1')
                     page.wait_for_function(
-                        '(x) => document.querySelector("[data-maps-side] [data-field-key=\'posX\']").value === x',
+                        '(x) => document.querySelector("[data-maps-detail] [data-field-key=\'posX\']").value === x',
                         arg=before)
                     assert page.evaluate('viewportMount') == mount
                     assert page.evaluate(
@@ -94,7 +93,7 @@ def test_map_undo_is_surgical():
                     page.wait_for_function(
                         'fieldHistory.undoStack.length === 1 && fieldHistory.redoStack.length === 0')
                     page.wait_for_function(
-                        'document.querySelector("[data-maps-side] [data-field-key=\'posX\']").value === "41.5"')
+                        'document.querySelector("[data-maps-detail] [data-field-key=\'posX\']").value === "41.5"')
                     assert page.evaluate('viewportMount') == mount
                     assert heavy_fetches(requests) == [], heavy_fetches(requests)
                     # An enemy swap undo restores the name and counts; the

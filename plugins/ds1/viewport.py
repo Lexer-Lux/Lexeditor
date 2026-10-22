@@ -992,6 +992,44 @@ def part_candidates(table, category, gender, model_id):
     return ([(f'{prefix}_{variant}_{model_id:04d}', None)], None)
 
 
+def model_pick_type(table, piece):
+    """The thing-finder type for a row's Model ID: one type per table and
+    wearable piece, so a weapon pick only ever offers weapon binders and
+    an armor pick only its own piece (both fits share the piece type, so
+    either binder offers the same ID)."""
+    return f'ds1-model-{table}-{piece}'
+
+
+def _stem_pick_pattern():
+    pieces = '|'.join(sorted(set(PART_PREFIXES.values())))
+    variants = ''.join(sorted(set(PART_VARIANTS.values())))
+    return re.compile(rf'^parts/((?:WP_A)|(?:{pieces})_[{variants}])_(\d+)\.partsbnd(?:\.dcx)?$')
+
+
+_STEM_PICK = None
+
+
+def stem_model_pick(relative):
+    """A parts file's thing-finder candidacy: {'type', 'value'}, else None.
+
+    The type mirrors model_pick_type, so rows and fields agree without
+    either side knowing the other's grammar; the value is the binder's
+    number, which is what writes back into the Model ID.
+    """
+    global _STEM_PICK
+    if _STEM_PICK is None:
+        _STEM_PICK = _stem_pick_pattern()
+    match = _STEM_PICK.match(relative.replace('\\', '/'))
+    if not match:
+        return None
+    piece = match.group(1)
+    if piece == 'WP_A':
+        table = 'EquipParamWeapon'
+    else:
+        table, piece = 'EquipParamProtector', piece.split('_')[0]
+    return {'type': model_pick_type(table, piece), 'value': int(match.group(2))}
+
+
 def _part_member(binder, stem):
     """The binder member holding the model: the stem's own mesh, else
     the first mesh in the binder.
@@ -1164,4 +1202,9 @@ def map_view(mapstore, map_name):
                       'kind': part['kind'], 'model': part['model'],
                       'pos': list(part['pos']), 'rot': list(part['rot']),
                       'scale': list(part['scale'])})
-    return {'map': map_name, 'models': models, 'parts': parts}
+    lights = []
+    for light in doc.lights():
+        lights.append({'key': light['key'], 'name': light['name'],
+                       'pos': list(light['pos']), 'preset': light['preset'],
+                       'sharers': [entry['name'] for entry in light['sharers']]})
+    return {'map': map_name, 'models': models, 'parts': parts, 'lights': lights}

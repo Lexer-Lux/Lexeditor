@@ -117,7 +117,12 @@ def test_effect_options_validate_and_reflect_actual_consumers():
     users=doc.read_row(TABLE,6890)["effectUsage"]
     assert {(u["table"],u["id"]) for u in users} == {("EquipParamWeapon",100),("EquipParamAccessory",100)}
     alone = doc.read_row("EquipParamAccessory",101)["recordLinks"]
-    assert [(link["kind"], link["table"], link["resolved"]) for link in alone] == [("bullet", "Bullet", False)]
+    # An unset reference still emits its entry, so the field keeps its
+    # face and finder instead of a full-table dropdown.
+    assert [(link["kind"], link["table"], link["resolved"]) for link in alone] == [
+        ("bullet", "Bullet", False), ("drop", "ItemLotParam", False),
+        ("drop", "ItemLotParam", False), ("drop", "ItemLotParam", False)]
+    assert [link["id"] for link in alone if link["kind"] == "drop"] == [0, 0, 0]
     doc.edit("EquipParamWeapon",100,"residentSpEffectId",99001)
     assert next(link["id"] for link in doc.read_row("EquipParamWeapon",100)["recordLinks"]
                 if link["field"] == "residentSpEffectId") == 99001
@@ -262,12 +267,19 @@ def test_damage_and_defense_fields_carry_the_games_icons():
     for keys in (cuts, flats, rates):
         for key, kind in zip(keys, defs):
             assert items[key]['icon'] == kind, key
-    # The game draws no glyph for these: slash/strike/thrust, status, humanity.
-    for key in ('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate',
-                'poizonAttackPower', 'registIllness', 'registBlood', 'registCurse',
-                'registPoizonChangeRate', 'registIllnessChangeRate', 'registBloodChangeRate',
-                'registCurseChangeRate', 'heroPointDamage'):
-        assert items[key]['icon'] is None, key
+    # Slash, strike and thrust keep the shared glyphs: the game draws
+    # them as text, so there is no menu cell to crop.
+    for key, kind in zip(('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'),
+                        ('slash', 'strike', 'thrust')):
+        assert items[key]['icon'] == kind, key
+    for key, kind in (('poizonAttackPower', 'poison'), ('registIllness', 'toxic'),
+                        ('registBlood', 'bleed'), ('registCurse', 'curse'),
+                        ('registPoizonChangeRate', 'poison'),
+                        ('registIllnessChangeRate', 'toxic'),
+                        ('registBloodChangeRate', 'bleed'),
+                        ('registCurseChangeRate', 'curse')):
+        assert items[key]['icon'] == kind, key
+    assert items['heroPointDamage']['icon'] is None
 
 
 def test_shown_labels_stay_unique_once_units_move_to_the_control():

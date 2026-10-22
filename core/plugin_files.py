@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from typing import Callable
@@ -25,13 +26,39 @@ def atomic_write(path: Path, data: bytes) -> None:
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        # A file extracted read-only (mod zips arrive that way) refuses
+        # the replace on every attempt: no retry window helps. The caller
+        # asked to overwrite the content, so the file must be writable.
+        try:
+            if not os.access(path, os.W_OK):
+                os.chmod(path, 0o666)
+        except OSError:
+            pass
     handle, name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(handle, "wb") as stream:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(name, path)
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                os.replace(name, path)
+                break
+            except PermissionError as error:
+                # Windows lets antivirus, search indexing and cloud sync hold
+                # a file briefly after it changes; the replace then fails
+                # with access denied even though nothing is wrong. Wait it
+                # out briefly, then say what to close instead of the bare
+                # system error.
+                if time.monotonic() >= deadline:
+                    where = path.name if path.parent == Path(".") else path.parent.name + "/" + path.name
+                    raise PermissionError(
+                        f"Could not write {where}: access is denied. Close any program "
+                        "holding the file (the game, an editor, a sync tool) and check "
+                        "the file is not read-only.") from error
+                time.sleep(0.1)
     finally:
         Path(name).unlink(missing_ok=True)
 

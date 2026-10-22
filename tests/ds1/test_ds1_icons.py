@@ -136,10 +136,11 @@ def test_field_icons_follow_damage_defense_and_stats():
     found = formats._FIELD_ICONS
     assert found[('NpcParam', 'def_phys')] == 'physicalDef'
     assert found[('NpcParam', 'physGuardCutRate')] == 'physicalDef'
-    assert found[('NpcParam', 'def_slash')] == 'physicalDef'
-    assert found[('NpcParam', 'blowGuardCutRate')] == 'physicalDef'
-    assert found[('EquipParamWeapon', 'slashGuardCutRate')] == 'physicalDef'
-    assert found[('EquipParamProtector', 'defenseThrust')] == 'physicalDef'
+    assert found[('NpcParam', 'def_slash')] == 'slash'
+    assert found[('NpcParam', 'blowGuardCutRate')] == 'strike'
+    assert found[('NpcParam', 'thrustGuardCutRate')] == 'thrust'
+    assert found[('EquipParamWeapon', 'slashGuardCutRate')] == 'slash'
+    assert found[('EquipParamProtector', 'defenseThrust')] == 'thrust'
     assert found[('AtkParam_Npc', 'atkThun')] == 'lightning'
     assert found[('EquipParamWeapon', 'attackBasePhysics')] == 'physical'
     assert found[('EquipParamWeapon', 'thunGuardCutRate')] == 'lightningDef'
@@ -164,12 +165,50 @@ def test_field_icons_follow_damage_defense_and_stats():
         assert found[(table, key)] == 'stability', (table, key)
     assert icons.LABELS['stability'] == (169, 87, 211, 129)
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
-    assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
+    assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'slash'
+    assert formats.ABSORPTION_ICONS['blowDamageCutRate'] == 'strike'
+    assert formats.ABSORPTION_ICONS['thrustDamageCutRate'] == 'thrust'
     assert found[('NpcParam', 'mp')] == 'mp'
     assert found[('CharaInitParam', 'baseMp')] == 'mp'
     assert found[('CharaInitParam', 'baseWil')] == 'att'
     assert found[('CharaInitParam', 'baseDurability')] == 'res'
     assert found[('CharaInitParam', 'soulLv')] == 'soulLv'
+    assert found[('ReinforceParamWeapon', 'physicsAtkRate')] == 'physical'
+    assert found[('ReinforceParamWeapon', 'thunderAtkRate')] == 'lightning'
+    assert found[('ReinforceParamWeapon', 'staminaAtkRate')] == 'stamina'
+    assert found[('ReinforceParamWeapon', 'saWeaponAtkRate')] == 'poise'
+    assert found[('ReinforceParamWeapon', 'correctStrengthRate')] == 'str'
+    assert found[('ReinforceParamWeapon', 'correctFaithRate')] == 'faith'
+    assert found[('ReinforceParamWeapon', 'physicsGuardCutRate')] == 'physicalDef'
+    assert found[('ReinforceParamWeapon', 'poisonGuardResistRate')] == 'poison'
+    assert found[('ReinforceParamWeapon', 'curseGuardResistRate')] == 'curse'
+    assert found[('ReinforceParamProtector', 'thunderDefRate')] == 'lightningDef'
+    assert found[('ReinforceParamProtector', 'slashDefRate')] == 'slash'
+    assert found[('ReinforceParamProtector', 'blowDefRate')] == 'strike'
+    assert found[('ReinforceParamProtector', 'resistCurseRate')] == 'curse'
+    assert found[('EquipParamWeapon', 'basicPrice')] == 'souls'
+    assert found[('EquipParamWeapon', 'fixPrice')] == 'souls'
+    assert found[('EquipParamProtector', 'sellValue')] == 'souls'
+    assert found[('EquipParamAccessory', 'weight')] == 'weight'
+    assert found[('EquipParamGoods', 'basicPrice')] == 'souls'
+    assert found[('Bullet', 'fireDamageDamp')] == 'fire'
+    assert found[('Bullet', 'staminaDamp')] == 'stamina'
+    assert found[('ShopLineupParam', 'value')] == 'souls'
+
+
+def test_every_param_table_is_mapped_or_documented_bare():
+    """No table silently drops its property icons.
+
+    A table whose fields carry no icon entry renders every property
+    bare. New tables fail here until they are mapped above or join
+    the bare list with a reason.
+    """
+    # Curve data, ID rosters, chances and odds: nothing in these
+    # tables names damage, defense, status, stats or souls.
+    bare = {'CalcCorrectGraph', 'EquipMtrlSetParam', 'ItemLotParam',
+            'NpcThinkParam', 'ObjActParam'}
+    mapped = {table for table, _key in formats._FIELD_ICONS}
+    assert set(formats.TABLES) - mapped == bare
 
 
 def test_mp_label_tints_the_stamina_frame_blue(tmp_path):
@@ -224,3 +263,16 @@ def test_label_png_serves_divine_and_occult(tmp_path):
         with Image.open(io.BytesIO(icons.label_png(str(tmp_path), kind))) as image:
             image.load()
             assert image.size == (84, 78)
+
+
+def test_icon_catalog_merges_layout_and_sheet_grids(tmp_path):
+    menu = tmp_path / 'menu'
+    menu.mkdir()
+    (menu / 'menu.drb').write_bytes(catalog_drb())
+    found = icons.icon_catalog(str(tmp_path))
+    assert found == sorted(found)
+    assert 7000 in found  # layout-mapped, outside every sheet range
+    assert 198 in found  # Icon01 grid continuation, unmapped DLC
+    assert 1314 in found  # Icon12 grid continuation, unmapped DLC
+    assert set(range(0, 132)) <= set(found)  # the Icon00 range, all choosable
+    assert 999999 not in found

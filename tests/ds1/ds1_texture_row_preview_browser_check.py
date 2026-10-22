@@ -21,10 +21,11 @@ from playwright.sync_api import sync_playwright
 
 TPF = 'chr/c0000/c0000.tpf'
 DDS = 'chr/c0000/face.dds'
+BLANK = 'chr/c0000/blank.dds'
 BHD = 'map/m10/m10.tpfbhd'
 
 
-def make_dds(width=32, height=32):
+def make_dds(width=32, height=32, solid=None):
     head = bytearray(128)
     head[0:4] = b"DDS "
     struct.pack_into("<I", head, 4, 124)
@@ -40,7 +41,8 @@ def make_dds(width=32, height=32):
     pixels = bytearray()
     for row in range(height):
         for column in range(width):
-            pixels += bytes((255 if (row + column) % 2 else 0, 0 if (row + column) % 2 else 255, 128, 255))
+            pixels += bytes(solid) if solid else bytes((255 if (row + column) % 2 else 0,
+                                                             0 if (row + column) % 2 else 255, 128, 255))
     return bytes(head) + bytes(pixels)
 
 
@@ -64,6 +66,7 @@ def main():
         (game / 'chr' / 'c0000').mkdir(parents=True)
         (game / TPF).write_bytes(make_tpf('body'))
         (game / DDS).write_bytes(make_dds())
+        (game / BLANK).write_bytes(make_dds(16, 16, solid=(255, 255, 255, 255)))
         (game / 'map' / 'm10').mkdir(parents=True)
         (game / 'map' / 'm10' / 'm10.tpfbhd').write_bytes(make_bhf([('/tex0', 0, 8)]))
         (game / 'map' / 'm10' / 'm10.tpfbdt').write_bytes(b'12345678')
@@ -100,6 +103,16 @@ def main():
                     assert archive.locator('img.lex-ds1-shop-icon').count() == 0, \
                         'split archives have no per-texture preview'
                     assert 'Split archive' in archive.inner_text()
+                    page.evaluate(f'navigate("textures", "files", "Asset:{BLANK}")')
+                    page.wait_for_selector('.ds1-texture-tile img')
+                    tile = page.locator('.ds1-texture-tile')
+                    page.wait_for_function(
+                        "document.querySelector('.ds1-texture-tile').classList.contains"
+                        "('ds1-texture-blank')")
+                    assert tile.count() == 1, tile.count()
+                    assert 'blank' in tile.locator('.ds1-texture-name').inner_text()
+                    box = tile.locator('img').bounding_box()
+                    assert box['width'] < 64, box
                     assert not errors, f'page errors: {errors[:3]}'
                 finally:
                     browser.close()

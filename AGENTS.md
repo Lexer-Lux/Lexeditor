@@ -11,6 +11,7 @@ work, even if your tool does not load skills on its own.
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
 | ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-modding/SKILL.md` |
+| build or change an editor screen, panel, preview, header or shared control | `.agents/skills/ux-design/SKILL.md` |
 
 ## Editor UI
 

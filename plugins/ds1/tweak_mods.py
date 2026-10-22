@@ -750,8 +750,11 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
         try:
             digest = build_fingerprint(Path(row["path"]))
         except (ValueError, OSError):
-            digest = None
-        if digest is None or built.get(row["id"]) != digest:
+            # tweak_rows just read this mod fine; a lock landing between
+            # that and this read is transient interference, not a change.
+            # Calling it stale flashed the changed alert on and off.
+            continue
+        if built.get(row["id"]) != digest:
             stale.append(row["id"])
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}

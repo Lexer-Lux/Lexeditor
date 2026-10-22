@@ -61,36 +61,36 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="animations"]').click()
-                    page.wait_for_function("state.tab==='animations' && state.animScope.level==='chars' && state.rows.length===1 && String(state.rows[0].id).startsWith('char:')")
-                    assert page.evaluate("state.rows[0].name") == "c1200"
+                    page.wait_for_function("state.tab==='animations' && state.animChars.length===1")
+                    assert page.evaluate("state.animChars[0].name") == "c1200"
                     assert page.evaluate("state.animTabs[0].id") == "animations"
                     if output:
                         page.wait_for_timeout(250)
                         page.screenshot(path=str(output / "animations-chars.png"))
-                    page.locator(".lex-list-row", has_text="c1200").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-chars] .lex-list-row", has_text="c1200").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     page.wait_for_function("state.animScope.level==='anims' && state.rows.length===2")
                     assert page.evaluate("state.rows.map(r=>r.name)") == ["a87_3300.HKX", "animation 3301"]
                     if output:
                         page.screenshot(path=str(output / "animations-anims.png"))
-                    page.locator(".lex-list-row", has_text="a87_3300.HKX").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===4")
                     assert page.evaluate("state.rows.map(r=>r.values.label)") == [
                         "Attack", "Add effect", "Unknown event 999", "Unknown event 16"]
-                    assert page.locator('[data-anim-crumb="chars"]').count() == 1
-                    assert page.locator('[data-anim-crumb="anims"]').count() == 1
+                    assert page.locator('[data-anim-left] [data-tabstrip-id="events"].active').count() == 1
                     if output:
                         page.screenshot(path=str(output / "animations-events.png"))
-                    page.locator('[data-anim-crumb="chars"]').click()
-                    page.wait_for_function("state.animScope.level==='chars' && state.rows.length===1 && String(state.rows[0].id).startsWith('char:')")
-                    page.locator(".lex-list-row", has_text="c1200").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="chars"]').click()
+                    page.wait_for_function("state.animLeftTab==='chars'")
+                    page.locator("[data-anim-chars] .lex-list-row", has_text="c1200").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     page.wait_for_function("state.animScope.level==='anims' && state.rows.length===2")
-                    page.locator(".lex-list-row", has_text="a87_3300.HKX").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===4")
                     page.get_by_role("searchbox", name="Search events").fill("Attack")
+                    page.locator("[data-anim-list] .lex-list-row", has_text="Attack").click()
                     page.wait_for_function("state.row?.label==='Attack'")
                     assert "Attack at" in page.locator(".lex-detail-panel-title").inner_text()
                     assert page.get_by_text(BINDER, exact=False).count() >= 1
@@ -113,9 +113,9 @@ def main():
                     box.click()
                     box.press("ControlOrMeta+A")
                     box.press("Backspace")
-                    page.wait_for_function("state.query===''")
+                    page.wait_for_function("state.animQuery===''")
                     box.fill("Add effect")
-                    page.locator(".lex-list-row", has_text="Add effect").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="Add effect").click()
                     page.wait_for_function("state.row?.label==='Add effect'")
                     effect = page.locator('[data-field-key="effect"]:visible')
                     assert effect.evaluate("n=>n.tagName") == "SELECT"
@@ -144,11 +144,11 @@ def main():
                     assert next(item["value"] for item in second["fields"] if item["key"] == "start") == new_start
                     assert next(item["value"] for item in second["fields"] if item["key"] == "effect") == 6890
                     page.locator('[data-tab="animations"]').click()
-                    page.locator(".lex-list-row", has_text="c1200").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-chars] .lex-list-row", has_text="c1200").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     page.wait_for_function("state.animScope.level==='anims' && state.rows.length===2")
-                    page.locator(".lex-list-row", has_text="a87_3300.HKX").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===4 && state.row")
                     page.locator('[data-tae-action="add"]').click()
                     page.wait_for_selector('[data-tae-input="type"]')
@@ -174,13 +174,13 @@ def main():
                     grown = TaeDocument(bytes(grown_plain[grown_entry.offset:grown_entry.offset + grown_entry.size]))
                     assert [event["type"] for event in grown.list_events(0)] == [1, 66, 999, 16, 66]
                     page.locator('[data-tab="animations"]').click()
-                    page.locator(".lex-list-row", has_text="c1200").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-chars] .lex-list-row", has_text="c1200").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     page.wait_for_function("state.animScope.level==='anims' && state.rows.length===2")
-                    page.locator(".lex-list-row", has_text="a87_3300.HKX").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===5")
-                    page.locator(".lex-list-row", has_text="0.10s").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="0.10s").click()
                     page.wait_for_function("state.row?.type===66 && state.row.fields.find(f=>f.key==='start').value<0.11")
                     page.locator('[data-tae-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove event").click()
@@ -225,11 +225,11 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="animations"]').click()
                     page.wait_for_function("state.tab==='animations' && state.rows.length>0")
-                    page.locator(".lex-list-row", has_text="c1200").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-chars] .lex-list-row", has_text="c1200").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     page.wait_for_function("state.animScope.level==='anims' && state.rows.length===2")
-                    page.locator(".lex-list-row", has_text="a87_3300.HKX").click()
-                    page.locator("[data-anim-open]").click()
+                    page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.row?.label==='Attack'")
                     control = page.locator('[data-field-key="start"]:visible')
                     assert control.is_disabled()

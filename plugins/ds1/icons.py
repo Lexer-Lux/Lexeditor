@@ -24,6 +24,7 @@ from __future__ import annotations
 import io
 import re
 import struct
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -219,17 +220,71 @@ def icon_rect(icon_id, table):
     return None
 
 
+_SHEET_IMAGES = {}
+_SHEET_LOCKS = {}
+_SHEET_GUARD = threading.Lock()
+_SHEET_IMAGES_MAX = 4
+
+
+def _sheet_image(menu_dir, sheet):
+    """One menu sheet decoded: shared by every icon on it.
+
+    The gallery asks for hundreds of cells at once; decoding the sheet
+    once and cropping each icon from it beats decoding per icon, and a
+    per-sheet lock flies the first herd single instead of decoding the
+    same sheet on every lane. Four sheets stay decoded (64MB worst
+    case); older ones decode again. Menu files do not change while
+    the game is open.
+    """
+    from PIL import Image  # noqa: PLC0415 (Pillow ships with the app's previews)
+    key = (str(menu_dir), sheet)
+    with _SHEET_GUARD:
+        found = _SHEET_IMAGES.get(key)
+        if found is not None:
+            return found
+        lock = _SHEET_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        with _SHEET_GUARD:
+            found = _SHEET_IMAGES.get(key)
+            if found is not None:
+                return found
+        with Image.open(io.BytesIO(bytes(sheet_bytes(menu_dir, sheet)))) as image:
+            image.load()
+            decoded = image.copy()
+        with _SHEET_GUARD:
+            while len(_SHEET_IMAGES) >= _SHEET_IMAGES_MAX:
+                _SHEET_IMAGES.pop(next(iter(_SHEET_IMAGES)))
+            _SHEET_IMAGES[key] = decoded
+        return decoded
+
+
+def _crop_image(image, rect):
+    """A layout-pixel rectangle of a decoded sheet as PNG bytes."""
+    left, top, right, bottom = (value * SCALE for value in rect)
+    if right > image.width or bottom > image.height:
+        raise IconError('That icon rectangle falls outside its texture')
+    out = io.BytesIO()
+    tile = image.crop((left, top, right, bottom))
+    tile.load()
+    tile.save(out, format='PNG')
+    return out.getvalue()
+
+
 def crop_png(dds, rect):
     """A layout-pixel rectangle of a DDS texture as PNG bytes."""
     from PIL import Image  # noqa: PLC0415 (Pillow ships with the app's previews)
-    left, top, right, bottom = (value * SCALE for value in rect)
     with Image.open(io.BytesIO(bytes(dds))) as image:
         image.load()
-        if right > image.width or bottom > image.height:
-            raise IconError('That icon rectangle falls outside its texture')
-        out = io.BytesIO()
-        image.crop((left, top, right, bottom)).save(out, format='PNG')
-        return out.getvalue()
+        return _crop_image(image, rect)
+
+
+def icon_catalog(game_root):
+    """Every choosable icon ID: the layout's mapped icons plus each
+    sheet range's grid continuation, which holds the unmapped DLC icons."""
+    found = set(load_icon_table(game_root))
+    for _sheet, first, last in SHEET_RANGES:
+        found.update(range(first, last))
+    return sorted(found)
 
 
 @lru_cache(maxsize=1024)
@@ -241,7 +296,7 @@ def icon_png(game_root, icon_id):
         raise IconError(f'Icon {icon_id} has no picture in the menu files')
     sheet, *rect = found
     menu = Path(game_root) / 'menu'
-    return crop_png(sheet_bytes(menu, sheet), rect)
+    return _crop_image(_sheet_image(menu, sheet), rect)
 
 
 def _mp_bar(png):

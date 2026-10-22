@@ -23,7 +23,7 @@ window.Ds1Anim = (() => {
   // Read-only skeletal playback: the model's bind pose comes from its
   // bones, each frame poses them from the sampled motion, and the
   // timeline scrubs frames with the motion's TAE event cues as markers.
-  async function mount(host, chrId, motion, timeline, status) {
+  async function mount(host, chrId, motion, timeline, status, onEvent) {
     stop(host);
     timeline.replaceChildren();
     const mine = ++session;
@@ -251,7 +251,8 @@ window.Ds1Anim = (() => {
     host._animViewer = LexeditorUI.animationViewer({
       host, timeline, status,
       frames: {count, duration: frames.duration, frameDuration: frameDur,
-        events: (frames.events || []).map(event => ({start: event.start, label: event.label}))},
+        events: (frames.events || []).map(event => ({start: event.start, label: event.label, id: event.id}))},
+      onEvent,
       follow: {label: "Root motion"},
       render: (shown, playback) => {
         pose(shown, playback.follow);

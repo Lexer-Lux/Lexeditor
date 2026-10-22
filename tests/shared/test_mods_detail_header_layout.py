@@ -1,10 +1,11 @@
-"""The Mods detail header: the switch first, icons after the name.
+"""The Mods detail header: icons after the name, the switch last.
 
-The enable switch opens the row on the left; the copy, delete and open
-buttons sit after it. Every control in the row is a compact fixed
-square: the record name owns the heading's width, and a roomy header no
-longer grows roomy controls. The sizing lives on the shared
-detail-header component, not on a Mods-only rule.
+The copy, delete and open buttons sit after the name; the enable
+switch closes the row on the right, always the rightmost record
+control. Every control in the row is a compact fixed square: the
+record name owns the heading's width, and a roomy header no longer
+grows roomy controls. The sizing lives on the shared detail-header
+component, not on a Mods-only rule.
 """
 from test_mods_tab import mount
 from test_shared_ui_feedback import page  # noqa: F401  (fixture)
@@ -18,7 +19,8 @@ def geometry(page):
       return {
         head: rect(document.querySelector('.lex-mods-page .lex-detail-panel-heading')),
         actions: rect(actions),
-        firstIsSwitch: actions.firstElementChild?.matches('input[type="checkbox"]') ?? false,
+        lastIsSwitch: [...actions.children].filter(el => !el.classList.contains('lex-detail-add-header'))
+          .at(-1)?.matches('input[type="checkbox"]') ?? false,
         icons: [...actions.querySelectorAll(':scope > .lex-header-icon:not(.lex-detail-add-header)')].map(rect),
         box: rect(actions.querySelector(':scope > input[type="checkbox"]')),
         svg: actions.querySelector('.lex-header-icon > svg').getBoundingClientRect().width,
@@ -26,7 +28,7 @@ def geometry(page):
     }""")
 
 
-def test_switch_is_first_and_controls_are_compact(page):
+def test_switch_is_last_and_controls_are_compact(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("checkbox", name="Mine enabled").wait_for()
@@ -34,10 +36,10 @@ def test_switch_is_first_and_controls_are_compact(page):
     geo = geometry(page)
     box, head, icons = geo["box"], geo["head"], geo["icons"]
     assert len(icons) == 3, geo
-    # The switch opens the row: first in the DOM, left of every icon.
-    assert geo["firstIsSwitch"], geo
+    # The switch closes the row: last in the DOM, right of every icon.
+    assert geo["lastIsSwitch"], geo
     for icon in icons:
-        assert box["x"] + box["width"] <= icon["x"] + 1, geo
+        assert icon["x"] + icon["width"] <= box["x"] + 1, geo
         assert icon["x"] + icon["width"] <= head["x"] + head["width"] + 1, geo
     # Compact fixed squares, icons and switch alike, inside the heading.
     for icon in icons:

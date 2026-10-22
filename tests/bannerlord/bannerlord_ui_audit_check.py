@@ -244,23 +244,17 @@ def settle_screen(page, label):
 def exercise_resizer(page, label):
     divider = page.locator(".lex-panel-layout-divider").first
     if not divider.count():
-        raise AssertionError((label, "expected shared resizable panel divider"))
-    before = divider.get_attribute("aria-valuenow")
-    divider.focus()
-    divider.press("ArrowRight")
-    page.wait_for_function(
-        """before=>{const d=document.querySelector('.lex-panel-layout-divider');
-          return !!d && d.getAttribute('aria-valuenow')!==before}""",
-        arg=before,
-    )
-    moved = page.locator(".lex-panel-layout-divider").first.get_attribute("aria-valuenow")
-    assert moved != before, (label, "keyboard resize did not move divider")
-    page.locator(".lex-panel-layout-divider").first.click(button="right")
-    page.wait_for_function(
-        """before=>{const d=document.querySelector('.lex-panel-layout-divider');
-          return !!d && d.getAttribute('aria-valuenow')===before}""",
-        arg=before,
-    )
+        raise AssertionError((label, "expected shared panel strip"))
+    assert divider.get_attribute("role") is None, label
+    assert divider.get_attribute("tabindex") is None, label
+    before = divider.bounding_box()
+    page.keyboard.press("ArrowRight")
+    box = divider.bounding_box()
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2,
+                     button="right")
+    page.wait_for_timeout(150)
+    after = divider.bounding_box()
+    assert abs(after["x"] - before["x"]) < 2, (label, before, after)
 
 
 def exercise_table(page, label):

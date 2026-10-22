@@ -4,7 +4,8 @@
 // and editor.js commits the move. Collision and navigation geometry is baked
 // in world space in the Havok packfiles, which this version does not decode,
 // so those parts are counted, never drawn. Mounted by editor.js, which owns
-// the page and the edit bar.
+// the page and the edit bar. Map lights draw as small marker
+// octahedra; see the lights loop below.
 window.Ds1Viewport = (() => {
   let session = 0;
   const DEG = Math.PI / 180;
@@ -217,6 +218,22 @@ window.Ds1Viewport = (() => {
     const root = new THREE.Group();
     scene.add(root);
     const groups = new Map();
+    // Map lights are unlit markers, not scene lighting: a hundred
+    // real point lights would stall the renderer, so each light is
+    // one small warm octahedron at its point. Clicking selects it
+    // and the gizmo drags it like any placement; the shared point
+    // note on its position fields says what moves along.
+    const lightGeo = new THREE.OctahedronGeometry(0.5);
+    const lightMat = new THREE.MeshBasicMaterial({color: 0xffc46b});
+    for (const light of view.lights || []) {
+      const group = new THREE.Group();
+      group.position.set(light.pos[0], light.pos[1], light.pos[2]);
+      group.userData.part = {key: light.key, name: light.name, kind: "Light",
+        model: "", movable: true};
+      group.add(new THREE.Mesh(lightGeo, lightMat));
+      root.add(group);
+      groups.set(light.key, group);
+    }
     const skyMeshes = [];
     const box = new THREE.Box3();
     let mapDiag = 0, skyDiag = 0;
@@ -430,6 +447,8 @@ window.Ds1Viewport = (() => {
       effect.dispose();
       for (const item of disposable) item.dispose();
       highlight.dispose();
+      lightGeo.dispose();
+      lightMat.dispose();
     };
     const loop = () => {
       if (!live || mine !== session || !host.isConnected) { stop(host); return; }

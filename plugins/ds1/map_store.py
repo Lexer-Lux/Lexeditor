@@ -471,9 +471,35 @@ class MapStore:
                 rows.append(self._placement_row(map_name, placement, names, types, displays))
         return rows
 
+    def _light_row(self, map_name, light):
+        values = {"map": map_name, "part": light["part"], "kind": "Light",
+                  "posX": light["pos"][0], "posY": light["pos"][1], "posZ": light["pos"][2],
+                  "preset": light["preset"], "point": light["point"],
+                  "who": light["name"],
+                  "mapNames": [self.display_name(map_name)]}
+        modified = self.get(map_name).light_modified(("light", light["seq"]))
+        return {"id": light["key"], "table": map_name,
+                "name": light["name"],
+                "range": light["name"], "values": values, "display": {},
+                "modified": modified}
+
+    def light_rows(self):
+        rows = []
+        for map_name in self.maps():
+            for light in self.get(map_name).lights():
+                rows.append(self._light_row(map_name, light))
+        return rows
+
     def row_values(self, map_name, key):
         """One placement's list values, display names and title, fresh after
         an edit, so undo can patch the lists without re-reading the map."""
+        if str(key).startswith("light:"):
+            light = next((entry for entry in self.get(map_name).lights()
+                          if entry["key"] == key), None)
+            if light is None:
+                raise MsbError("Unknown light")
+            row = self._light_row(map_name, light)
+            return row["values"], row["display"], row["name"]
         _ids, names, types = self._npc()
         part_key = parse_key(key)
         placement = next((entry for entry in self.get(map_name).placements()
@@ -500,6 +526,8 @@ class MapStore:
         return 'enemies', 'monsters'
 
     def read(self, map_name, key):
+        if str(key).startswith("light:"):
+            return self.read_light(map_name, key)
         _ids, names, types = self._npc()
         part_key = parse_key(key)
         row = self.get(map_name).read_placement(part_key)
@@ -527,7 +555,34 @@ class MapStore:
                                        'tab': tab, 'sub': sub})
         return row
 
+    def read_light(self, map_name, key):
+        seq = int(str(key).split(":")[1])
+        row = self.get(map_name).read_light(("light", seq))
+        try:
+            originals = {item["key"]: item["value"]
+                         for item in self._vanilla_doc(map_name).read_light(("light", seq))["fields"]}
+        except MsbError:
+            originals = {}
+        row.update(id=key, table=map_name, map=map_name)
+        row["shortName"] = row["name"]
+        for item in row["fields"]:
+            if item["key"] in originals:
+                item["vanilla"] = originals[item["key"]]
+        row["recordLinks"] = []
+        return row
+
+    def row_modified(self, map_name, key):
+        """Whether this session changed the placement or light."""
+        if str(key).startswith("light:"):
+            return self.get(map_name).light_modified(("light", int(str(key).split(":")[1])))
+        return self.get(map_name).placement_modified(parse_key(key))
+
     def edit(self, map_name, key, field, value):
+        self.writable()
+        if str(key).startswith("light:"):
+            seq = int(str(key).split(":")[1])
+            self.get(map_name).edit_light(("light", seq), field, value)
+            return self.read(map_name, key)
         self.writable()
         ids, _names, _types = self._npc()
         self.get(map_name).edit(parse_key(key), field, value, ids if field == "npcId" else None)
@@ -560,7 +615,15 @@ class MapStore:
         changes = []
         for map_name, document in self.docs.items():
             known = {(part["type"], part["id"]): part["name"] for part in document.parts}
-            for (ptype, pid), field in sorted(document.dirty):
+            for (ptype, pid), field in sorted(document.dirty, key=str):
+                if ptype == "light":
+                    row = document.read_light((ptype, pid))
+                    light_label = next(
+                        light["name"] for light in document.lights() if light["seq"] == pid)
+                    item = next(entry for entry in row["fields"] if entry["key"] == field)
+                    changes.append({"label": f"{map_name} {light_label}, {item['label']}",
+                                    "before": item["vanilla"], "after": item["value"]})
+                    continue
                 row = document.read_placement((ptype, pid))
                 item = next(entry for entry in row["fields"] if entry["key"] == field)
                 before, after = item["vanilla"], item["value"]

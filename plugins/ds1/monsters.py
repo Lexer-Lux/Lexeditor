@@ -158,17 +158,19 @@ NPC_STATS = {
     'disableRespawn': ('No bonfire reset', 'Basics',
         'When set, this enemy keeps its position and behavior when the player rests at a bonfire.'),
     'teamType': ('Team', 'Basics', 'Which side this enemy fights for.'),
-    'weakPartsDamageRate': ('Damage taken: weak point (x)', 'Defense',
+    'weakPartsDamageRate': ('Damage taken: weak point (x)', 'Body',
         'Multiplier on damage the weak point takes. 1 is unchanged.'),
     'staminaGuardDef': ('Stamina guard (%)', 'Blocking',
         'Stamina damage blocked while guarding, as a percentage off the hit.'),
-    'hitHeight': ('Body height (metres)', 'Defense',
+    'hitHeight': ('Body height (metres)', 'Body',
         'Height of the body used for hits. Ignored for ragdoll bodies.'),
-    'hitRadius': ('Body radius (metres)', 'Defense',
+    'hitRadius': ('Body radius (metres)', 'Body',
         'Radius of the body used for hits. Ignored for ragdoll bodies.'),
-    'hitYOffset': ('Body offset (metres)', 'Defense',
+    'hitYOffset': ('Body offset (metres)', 'Body',
         'Vertical shift of the body used for hits. Positive values float the enemy.'),
-    'getSoul': ('Souls', 'Value & rewards', 'Souls dropped on death.'),
+    'getSoul': ('Souls', 'Value & rewards',
+                'Souls dropped on death. Most bosses ignore this field; '
+                'their souls probably come from the encounter\'s event script instead.'),
     'humanityLotId': ('Humanity drop table', 'Value & rewards',
         'Humanity lot dropped on death, as a lot ID from the Drops list. -1 drops nothing.'),
     'dropType': ('Drop style', 'Value & rewards',
@@ -180,7 +182,7 @@ NPC_STATS = {
 }
 for index in range(1, 9):
     NPC_STATS[f'partsDamageRate{index}'] = (
-        f'Damage taken: Part {index} (x)', 'Defense',
+        f'Damage taken: Part {index} (x)', 'Body',
         f'Multiplier on damage body part {index} takes. 1 is unchanged.')
 for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
                   ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:

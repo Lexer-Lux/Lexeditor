@@ -92,6 +92,9 @@ def test_maps_side_panels_fit_and_page_inside():
                     for height in (900, 600):
                         if height != 900:
                             page.set_viewport_size({'width': 1440, 'height': height})
+                        page.locator('[data-tabstrip-id="placements"]').click()
+                        page.wait_for_function('state.mapTab==="placements"',
+                                               timeout=30000)
                         subtabs = (('drops', 'Drops'), ('treasure', 'Treasure'),
                                    ('npcs', 'NPCs'), ('enemies', 'Enemies'))
                         for subtab, label in subtabs:
@@ -125,6 +128,8 @@ def test_maps_side_panels_fit_and_page_inside():
                     page.set_viewport_size({'width': 1440, 'height': 900})
                     page.locator('[data-tabstrip-id="placements"]').click()
                     page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+                    page.locator('[data-maps-dir] .lex-subtab-button', has_text='All').click()
+                    page.wait_for_function('state.dirTab==="all"', timeout=30000)
                     panel_settled(page, '[data-maps-side]', '.lex-column-list')
                     keys = ("[data-maps-side] .lex-list-row:not(.lex-filler-row)",)
                     first = page.locator(keys[0]).evaluate_all(

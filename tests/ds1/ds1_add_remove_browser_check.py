@@ -83,8 +83,6 @@ def main():
                     assert first.inner_text().split() == ["Rat"]
                     first.click()
                     page.wait_for_function('state.row?.id==="2:0" && !state.error')
-                    page.locator('[data-tabstrip-id="selection"]').click()
-                    page.wait_for_function('state.mapTab==="selection"')
                     page.locator('[data-row-action="duplicate"]').click()
                     page.wait_for_function(
                         'state.selected==="m10_00_00_00.msb:2:1" && state.row?.id==="2:1" && !state.rowBusy && !state.error')
@@ -105,8 +103,6 @@ def main():
                     assert dupe.inner_text().split() == ["Rat"]
                     dupe.click()
                     page.wait_for_function('state.row?.id==="2:1" && !state.error')
-                    page.locator('[data-tabstrip-id="selection"]').click()
-                    page.wait_for_function('state.mapTab==="selection"')
                     page.locator('[data-row-action="remove"]').click()
                     page.locator(".lex-dialog").get_by_role("button", name="Remove").click()
                     page.wait_for_function(

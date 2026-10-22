@@ -196,6 +196,23 @@ def main():
                     trigger.click()
                     page.wait_for_function('window.__lexPreview === undefined')
                     assert page.locator('canvas[data-preview]').count() == 0
+                    # Model ID face: the binder name carries the model's
+                    # picture inline, like the icon face carries its own.
+                    page.locator('.lex-tabbed-panel [data-subtab="appearance"]').click()
+                    page.wait_for_function('state.itemTab === "appearance"')
+                    field = page.locator('.lex-detail-field', has=page.locator(
+                        '.lex-detail-field-label-text', has_text='Model ID'))
+                    face = field.locator('.lex-detail-field-control .lex-hoverable')
+                    face.wait_for()
+                    thumb = face.locator('img.lex-hoverable-icon')
+                    thumb.wait_for(timeout=30000)
+                    page.wait_for_function(
+                        "document.querySelector('.lex-detail-field .lex-hoverable"
+                        " img.lex-hoverable-icon')?.dataset.modelReady === 'true'",
+                        timeout=30000)
+                    src = thumb.get_attribute('src') or ''
+                    assert src.startswith('data:image/png'), src[:40]
+                    assert len(src) > 1000, len(src)
                     # Armor drawer: dual-gender rows offer male and female.
                     navigate(page, '[data-subtab="armor"]', "EquipParamProtector", 100)
                     page.wait_for_function('state.sub === "armor" && state.row && !state.error')
@@ -288,8 +305,12 @@ def main():
                         "fetch('/api/label?name=physical').then(r => r.status)") == 200
                     assert page.evaluate(
                         "fetch('/api/label?name=poison').then(r => r.status)") == 200
+                    # Divine takes the sheet's white ring (icons.py), so it
+                    # serves like any mapped label; luck stays the unmapped one.
                     assert page.evaluate(
-                        "fetch('/api/label?name=divine').then(r => r.status)") == 400
+                        "fetch('/api/label?name=divine').then(r => r.status)") == 200
+                    assert page.evaluate(
+                        "fetch('/api/label?name=luck').then(r => r.status)") == 400
                     # Enemy drawer: the placed character model renders plain.
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')

@@ -723,8 +723,40 @@ def test_mods_detail_contents_empty_states(page):
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine").click()
     page.wait_for_function("window.calls.filter(c => c[0] === 'mod_contents').length >= 3")
+    # Truly empty: the Records tab grays out with its reason and the
+    # panel falls back to Details. Clicking it changes nothing.
+    records = detail.locator(STRIP, has_text="Records")
+    page.wait_for_function("document.querySelector('[data-subtab=records]')"
+                           ".getAttribute(\"aria-disabled\") === \"true\"")
+    assert records.get_attribute("aria-disabled") == "true"
+    reason = records.evaluate("node => node.dataset.lexTitle || node.getAttribute('title')")
+    assert reason == "This mod changes no rows or text entries.", reason
+    assert records.evaluate("node => getComputedStyle(node).cursor") == "not-allowed"
+    assert records.locator(".lex-tab-label").evaluate(
+        "node => getComputedStyle(node).opacity") == "0.4"
+    records.evaluate("node => node.click()")
+    selected = detail.locator(STRIP + '[aria-selected="true"]').get_attribute("data-subtab")
+    assert selected == "files", selected
+    assert "No record changes compared to vanilla." not in detail.inner_text()
+    # Fallback: Records showing when emptiness arrives lands on Details.
+    page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
+                  " changesTruncated: false, canDescribe: false, note: 'Locate the game.'}")
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine").click()
+    page.wait_for_function("window.calls.filter(c => c[0] === 'mod_contents').length >= 5")
+    page.wait_for_function("document.querySelector('[data-subtab=records]')"
+                           ".getAttribute(\"aria-disabled\") === null")
     detail.locator(STRIP, has_text="Records").click()
-    assert "No record changes compared to vanilla." in detail.locator(".lex-mod-contents").inner_text()
+    assert "Locate the game." in detail.locator(".lex-mod-contents").inner_text()
+    page.evaluate("window.__modContents = {changes: [], files: [], truncated: false,"
+                  " changesTruncated: false, canDescribe: true, note: ''}")
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine").click()
+    page.wait_for_function("window.calls.filter(c => c[0] === 'mod_contents').length >= 7")
+    page.wait_for_function("document.querySelector('[data-subtab=records]')"
+                           ".getAttribute(\"aria-disabled\") === \"true\"")
+    selected = detail.locator(STRIP + '[aria-selected="true"]').get_attribute("data-subtab")
+    assert selected == "details", selected
 
 
 def test_mods_detail_contents_truncation(page):
@@ -756,3 +788,55 @@ def test_mods_detail_contents_search_filters_each_table(page):
     page.wait_for_timeout(300)
     assert detail.locator(".lex-mod-contents .lex-column-list-row").count() == 1
 
+
+
+def test_mods_files_fill_the_tab_and_turn_with_the_wheel(page):
+    mount(page)
+    page.evaluate(
+        "window.__modContents = {changes: [], note: '', truncated: false,"
+        " changesTruncated: false, canDescribe: true,"
+        " files: Array.from({length: 40}, (_, i) => ({relative: 'file-' + i + '.bin',"
+        " size: i, sizeLabel: i + ' B', loaded: i % 2 === 0}))}")
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Files").click()
+    rows = detail.locator(".lex-mod-contents .lex-column-list-row")
+    rows.first.wait_for()
+    page.wait_for_timeout(400)
+    first_count = rows.count()
+    assert first_count > 1
+    # The list owns the tab: its foot meets the pager, the pager meets
+    # the tab foot, and no scrollbar shares the pager.
+    geometry = detail.locator(".lex-mod-contents").evaluate(
+        """node => {
+          const list = node.querySelector('.lex-column-list');
+          const pager = node.querySelector('.lex-pager');
+          const tab = node.closest('.lex-tabbed-panel-content');
+          return {
+            rows: list.querySelectorAll('.lex-column-list-row').length,
+            listToPager: pager.getBoundingClientRect().top
+              - list.getBoundingClientRect().bottom,
+            pagerToTab: tab.getBoundingClientRect().bottom
+              - pager.getBoundingClientRect().bottom,
+            scrollable: list.scrollHeight > list.clientHeight + 1,
+          };
+        }""")
+    assert geometry["rows"] == first_count, geometry
+    assert geometry["listToPager"] <= 2, geometry
+    assert geometry["pagerToTab"] <= 2, geometry
+    assert geometry["scrollable"] is False, geometry
+    # A taller window fits more rows: the page size follows the tab.
+    page.set_viewport_size({"width": 1200, "height": 1100})
+    page.wait_for_function(
+        f"document.querySelectorAll('.lex-mod-contents .lex-column-list-row').length > {first_count}")
+    # The wheel turns pages; past either end it does nothing.
+    before = rows.first.inner_text()
+    detail.locator(".lex-mod-contents .lex-column-list").hover()
+    page.mouse.wheel(0, 240)
+    page.wait_for_function(
+        "document.querySelector('.lex-mod-contents .lex-column-list-row')"
+        f".innerText !== {before!r}")
+    page.wait_for_timeout(250)
+    page.mouse.wheel(0, -240)
+    page.wait_for_function(
+        "document.querySelector('.lex-mod-contents .lex-column-list-row')"
+        f".innerText === {before!r}")

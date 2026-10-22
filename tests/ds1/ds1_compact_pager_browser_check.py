@@ -23,6 +23,20 @@ MAP_A = "m10_00_00_00.msb"
 MAP_B = "m10_01_00_00.msb"
 
 
+# Geometry waits for the pane to stop replacing itself: measuring
+# mid-refit catches the list with no box at all.
+CALM = """() => {
+    window.__dirCalm = 0;
+    const side = document.querySelector('[data-maps-side]');
+    if (side._calmWatch)
+        return;
+    side._calmWatch = true;
+    new MutationObserver(() => { window.__dirCalm = 0; })
+        .observe(side, {childList: true});
+    setInterval(() => { window.__dirCalm++; }, 100);
+}"""
+
+
 def main():
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     if output:
@@ -53,9 +67,19 @@ def main():
                     page.locator('button[data-tab="maps"]').click()
                     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error',
                                            timeout=60000)
+                    page.evaluate("window.__dirCalmWait = " + CALM)
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
+                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    # The All list's rows would satisfy a row count; the Local
+                    # toggle only exists once the Drops list itself renders.
+                    page.wait_for_selector("[data-maps-dir] [data-dir-local]", timeout=30000)
                     page.wait_for_selector("[data-maps-dir] .lex-compact-pager", timeout=30000)
                     searchbox = page.get_by_role("searchbox", name="Search the world")
                     searchbox.wait_for(timeout=30000)
+                    page.evaluate("__dirCalmWait()")
+                    page.wait_for_function("window.__dirCalm>=3", timeout=30000)
                     assert page.locator("[data-maps-dir] .lex-compact-pager-search").count() == 0
                     bar = page.locator("[data-maps-dir] .lex-compact-pager")
                     assert bar.count() == 1
@@ -104,6 +128,8 @@ def main():
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===2",
                         timeout=30000)
+                    page.evaluate("__dirCalmWait()")
+                    page.wait_for_function("window.__dirCalm>=3", timeout=30000)
                     page.get_by_role("searchbox", name="Search the world").fill("101")
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===1",

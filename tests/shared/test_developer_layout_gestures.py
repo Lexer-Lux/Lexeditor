@@ -9,6 +9,7 @@ things I can do in dev mode".
 """
 from test_shared_ui_feedback import framework, page
 from test_vanilla_metadata_edit import mount_vanilla_shell
+from test_tab_rename import mount_shell
 
 PANEL = """() => {
   const U = LexeditorUI;
@@ -141,7 +142,7 @@ def test_right_clicking_the_shortcuts_button_lists_the_developer_gestures(page):
     panel = page.get_by_role("dialog", name="Developer Mode gestures")
     panel.wait_for()
     for gesture in ("Rename the property", "Edit the help bubble's text", "Move the property",
-                    "Hide it for readers", "Add a new section below it"):
+                    "Hide it for readers", "Add a new section below it", "Add a section to it"):
         assert panel.get_by_text(gesture).count() >= 1, gesture
 
 
@@ -196,20 +197,22 @@ def mount_table(page):
     page.wait_for_timeout(300)
 
 
-def test_holding_right_on_a_table_only_heading_removes_it(page):
-    # A section with no property rows (a table, a graph, a note) held
-    # nothing, so the hold did nothing. It removes like any other empty
-    # section, and undo brings it back.
+def test_holding_right_on_a_table_only_heading_keeps_it(page):
+    # A section holding a table is not empty: removing it destroyed its
+    # content beyond undo, so the hold keeps it and adds a section below
+    # instead, and undo takes the added one away.
     mount_table(page)
     section = page.locator(".lex-detail-section", has=page.locator(
         ".lex-detail-section-title", has_text="Referenced"))
     hold_right(page, section.locator(".lex-detail-section-title"))
-    assert section.is_hidden()
-    assert layout_saves(page), "the removal is shared through the default view"
+    assert section.is_visible()
+    assert layout_saves(page), "the added section is shared through the default view"
+    assert page.locator("[data-lex-custom-section]").count() == 1
     page.locator("body").click(position={"x": 2, "y": 2})
     page.keyboard.press("Control+z")
     page.wait_for_timeout(300)
     assert section.is_visible()
+    assert page.locator("[data-lex-custom-section]").count() == 0
 
 
 def test_a_table_only_heading_drags_its_section(page):
@@ -220,3 +223,130 @@ def test_a_table_only_heading_drags_its_section(page):
         page.locator(".lex-detail-section-title", has_text="Referenced"), target_position={"x": 10, "y": 2})
     page.wait_for_timeout(200)
     assert titles() == ["Notes", "Referenced"]
+
+
+GRAPH_PANEL = """() => {
+  const U = LexeditorUI;
+  window.drawGraphPanel = () => document.querySelector('main').replaceChildren(
+    U.detailPanel({title: 'Record', paginate: {unpaged: true}, body: [
+      U.detailSection({title: 'Combat', body: [
+        U.detailField({label: 'Power', property: 'power',
+          control: U.el('input', {value: '7'})})]}),
+      U.detailSection({title: 'Graph', body: [U.el('div', {class: 'mock-graph'}, 'graph')]}),
+      U.detailSection({title: 'Empty', body: []}),
+    ]}));
+  drawGraphPanel();
+}"""
+
+
+def mount_graph(page):
+    page.set_viewport_size({"width": 1400, "height": 800})
+    framework(page)
+    mount_shell(page, True)
+    page.evaluate(GRAPH_PANEL)
+    page.wait_for_timeout(400)
+
+
+def test_holding_right_on_a_section_holding_a_graph_keeps_it(page):
+    # The graph is not a property row, but the section is not empty:
+    # holding right must not remove it. It gets a section below it.
+    mount_graph(page)
+    hold_right(page, page.locator(".lex-detail-section-title", has_text="Graph"))
+    assert page.locator(".lex-detail-section-title", has_text="Graph").is_visible()
+    assert page.locator("[data-lex-custom-section]").count() == 1
+
+
+def test_removed_empty_section_undo_restores_it_visibly(page):
+    # A shipped empty section removes through the hidden flag; after a
+    # refit strands it outside the deal, undo must seat it visibly again.
+    mount_graph(page)
+    hold_right(page, page.locator(".lex-detail-section-title", has_text="Empty"))
+    empty = page.locator(".lex-detail-section-title", has_text="Empty")
+    assert empty.is_hidden()
+    page.evaluate("drawGraphPanel()")
+    page.wait_for_timeout(400)
+    assert empty.is_hidden()
+    page.evaluate("document.querySelector('.lex-tweaks-paged').lexFitPage()")
+    page.wait_for_timeout(200)
+    page.evaluate("document.activeElement?.blur()")
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    assert empty.is_visible()
+
+
+def add_detail_tab(page, name):
+    page.locator(".lex-detail-panel-title").click(button="right")
+    page.get_by_role("heading", name="New detail tab").wait_for()
+    page.get_by_label("Tab name").fill(name)
+    page.get_by_role("button", name="Create").click()
+    page.get_by_role("tab", name=name).wait_for()
+
+
+def adopt_shell(page, section_title, tab_id):
+    page.evaluate("""([title, tabId]) => {
+      const panel = document.querySelector('.lex-detail-panel');
+      const section = [...panel.querySelectorAll('.lex-detail-section')].find(
+        node => node.querySelector('.lex-detail-section-title-text')?.textContent === title);
+      const ctx = panel._DetailTabs;
+      ctx.adoptShell(ctx.registerShell(section), tabId);
+    }""", [section_title, tab_id])
+    page.wait_for_timeout(200)
+
+
+def detail_tab_saves(page):
+    return [args[2] for args in page.evaluate("window.savedCalls")
+            if any(".detailtabs." in key for key in args[2])]
+
+
+def mount_tabs(page):
+    mount(page)
+    add_detail_tab(page, "Alpha")
+    add_detail_tab(page, "Beta")
+
+
+def test_holding_right_on_a_panel_tab_fills_it_with_a_section(page):
+    mount_tabs(page)
+    adopt_shell(page, "Combat", "alpha")
+    hold_right(page, page.get_by_role("tab", name="Alpha"))
+    pane = page.locator('[data-tabstrip-pane="alpha"]')
+    assert pane.locator("[data-lex-custom-section]").count() == 1
+    assert pane.locator(".lex-detail-section-title-text",
+                        has_text="New section").count() == 1
+    page.locator("body").click(position={"x": 2, "y": 2})
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(300)
+    assert pane.locator("[data-lex-custom-section]").count() == 0
+
+
+def test_holding_right_on_an_empty_panel_tab_removes_it(page):
+    mount_tabs(page)
+    adopt_shell(page, "Combat", "beta")
+    adopt_shell(page, "Drops", "beta")
+    hold_right(page, page.get_by_role("tab", name="Alpha"))
+    assert page.get_by_role("tab", name="Alpha").count() == 0
+    assert page.get_by_role("tab", name="Beta").count() == 1
+    assert page.locator('[data-tabstrip-pane="beta"] .lex-detail-section').count() == 2
+    assert detail_tab_saves(page), "the removed tab is shared through the default view"
+
+
+def test_holding_right_on_a_tab_with_drifted_sections_keeps_it(page):
+    mount_tabs(page)
+    adopt_shell(page, "Combat", "alpha")
+    adopt_shell(page, "Drops", "beta")
+    for label in ("Power", "Speed"):
+        page.evaluate("""([label, tabId]) => {
+          const field = [...document.querySelectorAll('.lex-detail-field')].find(
+            node => node.textContent.includes(label));
+          const button = [...document.querySelectorAll('.lex-tabstrip-button')].find(
+            node => node.dataset.tabstripId === tabId);
+          const transfer = new DataTransfer();
+          transfer.setData("text/lex-detail-node",
+            JSON.stringify({key: field._detailDragKey, shell: false}));
+          button.dispatchEvent(new DragEvent("drop", {dataTransfer: transfer, bubbles: true}));
+        }""", [label, "beta"])
+    page.wait_for_timeout(200)
+    assert page.locator('[data-tabstrip-pane="alpha"]').evaluate(
+        "node => node.childElementCount") == 0
+    hold_right(page, page.get_by_role("tab", name="Alpha"))
+    assert page.get_by_role("tab", name="Alpha").count() == 1
+    assert page.locator("[data-lex-custom-section]").count() == 0

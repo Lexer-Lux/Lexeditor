@@ -58,14 +58,14 @@ def main():
                     assert page.locator('[data-subtab]').count() == 0
                     chars = page.locator('[data-anim-chars] .lex-list-row').evaluate_all(ROWS)
                     assert chars == ['c1200'], chars
+                    assert page.locator('[data-anim-chars] .lex-column-list.lex-list-fill').count() == 1
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     motions = page.locator('[data-anim-list] .lex-list-row').evaluate_all(ROWS)
                     assert motions == ['a87_3300.hkx', 'animation 3301'], motions
-                    assert page.locator('[data-anim-chars] .lex-column-list.lex-list-fill').count() == 1
                     assert page.locator('[data-anim-list] .lex-column-list.lex-list-fill').count() == 1
-                    # The motion loads under the standard throbber.
-                    page.wait_for_selector('[data-anim-host] .lex-panel-loading', timeout=30000)
+                    # The mount may finish before the tab navigation lands:
+                    # readiness, not the transient throbber, is the signal.
                     page.wait_for_selector('[data-anim-host][data-ready="true"]', timeout=30000)
-                    page.wait_for_selector('[data-anim-host] .lex-panel-loading', state='detached')
                     # Loaded: the status line under the viewer stays empty.
                     status = page.locator('[data-anim-status]').inner_text()
                     assert status.strip() == '', status
@@ -83,6 +83,13 @@ def main():
                     # covers its twin; the seek still fires.
                     page.locator('.lex-anim-marker').first.click(force=True)
                     time.sleep(0.3)
+                    # The marker also selects its event: the left panel
+                    # jumps to the Events tab with all four cues listed.
+                    page.wait_for_function('state.animLeftTab === "events" && state.animScope.level === "events"')
+                    events = page.locator('[data-anim-list] .lex-list-row').evaluate_all(ROWS)
+                    assert len(events) == 4, events
+                    assert ':ev:' in page.evaluate('state.selected')
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
                     # Pausing freezes the readout; scrubbing seeks it.
                     page.locator('[data-anim-timeline] button[aria-label="Play or pause"]').click()
                     frozen = page.locator('[data-anim-readout]').inner_text()

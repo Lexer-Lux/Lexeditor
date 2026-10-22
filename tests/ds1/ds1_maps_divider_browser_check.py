@@ -1,9 +1,9 @@
-"""Maps right panel hangs on a remembered divider, canvas follows.
+"""Maps details panel split is automatic, canvas follows.
 
-The viewport and the Maps/Placements/Selection side share one
-panelLayout divider: dragging it resizes both panes, the split
-persists to localStorage, and the WebGL canvas tracks its host
-without a window resize. Synthetic fixtures only; read-only.
+The viewport and the Selection details share one panelLayout
+strip: it is not draggable, the split is never stored, and the
+WebGL canvas tracks its host across window resizes. Synthetic
+fixtures only; read-only.
 """
 import sys
 import tempfile
@@ -18,7 +18,13 @@ from plugins.ds1.store import RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
 
-STORAGE_KEY = "lexeditor:panel-layout:ds1-maps-view-side"
+
+def canvas_geometry(page):
+    return page.evaluate(
+        """() => { const host = document.querySelector(
+            '[data-viewport-host]');
+            const view = host.querySelector('canvas');
+            return {backing: view.width, css: host.clientWidth}; }""")
 
 
 def main():
@@ -51,7 +57,9 @@ def main():
                     divider = page.locator(".lex-panel-layout-divider")
                     assert divider.count() == 1
                     assert divider.first.is_visible()
-                    side = page.locator("[data-maps-side]")
+                    assert divider.first.get_attribute("role") is None
+                    assert divider.first.get_attribute("tabindex") is None
+                    side = page.locator("[data-maps-detail-panel]")
                     before = side.bounding_box()["width"]
                     box = divider.first.bounding_box()
                     assert box["width"] >= 8, box
@@ -63,14 +71,12 @@ def main():
                     page.mouse.up()
                     page.wait_for_timeout(400)
                     after = side.bounding_box()["width"]
-                    assert abs((after - before) - 120) < 15, (before, after)
-                    stored = page.evaluate(f"localStorage.getItem({STORAGE_KEY!r})")
-                    assert stored is not None, "split was not remembered"
-                    canvas = page.evaluate(
-                        """() => { const host = document.querySelector(
-                            '[data-viewport-host]');
-                            const view = host.querySelector('canvas');
-                            return {backing: view.width, css: host.clientWidth}; }""")
+                    assert abs(after - before) < 2, (before, after)
+                    keys = page.evaluate("Object.keys(localStorage)")
+                    assert [key for key in keys if "panel-layout" in key] == [], keys
+                    page.set_viewport_size({"width": 1100, "height": 900})
+                    page.wait_for_timeout(500)
+                    canvas = canvas_geometry(page)
                     assert abs(canvas["backing"] - canvas["css"]) <= 2, canvas
                     assert not errors, errors
                 finally:

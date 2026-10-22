@@ -215,6 +215,10 @@ class Handler(PluginRequestHandler):
                                       if STORE.project is not None else [],
                                       'hasProject': STORE.project is not None,
                                       'readOnly': STORE.read_only}
+                        for found in result.get('files', []):
+                            pick = viewport.stem_model_pick(found.get('relative', ''))
+                            if pick is not None:
+                                found['modelPick'] = pick
                     elif path == '/api/state':
                         result = STORE.state()
                         result['animTabs'] = [{'id': 'animations', 'label': 'Animations',
@@ -304,6 +308,7 @@ class Handler(PluginRequestHandler):
                             for entry in document.attack_references().list(npc)['rows']:
                                 attack = entry['id']
                                 attacks.append({'id': attack, 'name': entry['name'],
+                                                'route': entry['route'],
                                                 'source': document.value('AtkParam_Npc', attack, 'hitSourceType'),
                                                 'slots': hitbox_slots(document, attack)})
                             result = {'npc': npc, 'name': name,
@@ -390,6 +395,8 @@ class Handler(PluginRequestHandler):
                         tab = query.get('tab', [''])[0]
                         if tab == 'placements':
                             result = {'rows': MAPSTORE.list_rows()}
+                        elif tab == 'lights':
+                            result = {'rows': MAPSTORE.light_rows()}
                         elif tab == 'viewport':
                             counts = MAPSTORE.map_counts()
                             rows = []
@@ -449,6 +456,31 @@ class Handler(PluginRequestHandler):
                     result['tweaksNeedRebuild'] = _tweaks_flag()
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/icon-catalog':
+            try:
+                if STORE.game_root is None:
+                    raise ValueError('Select the installed game before choosing its icons')
+                with LOCK:
+                    _warm_icon_table()
+                    found = icons.icon_catalog(STORE.game_root)
+                self.send_json({'icons': found})
+            except (icons.IconError, RuntimeError, ValueError, OSError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/icon-art':
+            try:
+                if STORE.game_root is None:
+                    raise ValueError('Select the installed game before showing its icons')
+                try:
+                    icon_id = int(query.get('icon', [''])[0])
+                except ValueError:
+                    raise ValueError('An icon picture needs a numeric icon') from None
+                png = icons.icon_png(STORE.game_root, icon_id)
+                self.send_bytes(png, 'image/png', cache=IMMUTABLE)
+            except (FormatError, icons.IconError, RuntimeError, ValueError, OSError,
+                    KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
         if path in ('/api/icon', '/api/label'):
@@ -615,8 +647,8 @@ class Handler(PluginRequestHandler):
                         values, display, name = MAPSTORE.row_values(
                             payload.get('table'), payload.get('id'))
                         extra = {'values': values, 'display': display, 'name': name,
-                                 'modified': MAPSTORE.get(payload.get('table')).placement_modified(
-                                     parse_key(payload.get('id')))}
+                                 'modified': MAPSTORE.row_modified(payload.get('table'),
+                                                                  payload.get('id'))}
                     elif str(payload.get('table', '')).endswith('.anibnd.dcx'):
                         row = TAESTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                     else:

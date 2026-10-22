@@ -33,6 +33,18 @@ TYPE_LABELS = {2: 'Enemy', 10: 'Dummy enemy', 4: 'Player', 1: 'Object', 9: 'Obje
 # object carries collision and animation fields (0x18), player is four
 # zero ints (0x10). Verified by reading every installed map file.
 TYPE_DATA_SIZES = {2: 0x40, 10: 0x40, 1: 0x18, 9: 0x18, 4: 0x10}
+EVENT_HEADER = 28
+POINT_HEADER = 60
+LIGHT_EVENT = 0
+# Event kinds from their names across all 35 maps: torches and point
+# lights (0), boss music and insects (1), light walls (2), wind (3),
+# treasure (4), generators (5), blood writing (6), chest triggers (7),
+# respawn points (8), map offsets (9), navmesh banks (10). Kinds 11
+# and 12 have no plain reading yet, so they keep their number.
+EVENT_TYPE_LABELS = {0: 'Light', 1: 'Sound', 2: 'SFX', 3: 'Wind',
+                     4: 'Treasure', 5: 'Generator', 6: 'Message',
+                     7: 'ObjAct', 8: 'Spawn point', 9: 'Map offset',
+                     10: 'Navmesh'}
 MAX_FILE = 8 * 1024 * 1024
 
 
@@ -58,6 +70,15 @@ FLOAT_FIELDS = {key: offset for key, offset in
                 (('posX', 0x14), ('posY', 0x18), ('posZ', 0x1c),
                  ('rotX', 0x20), ('rotY', 0x24), ('rotZ', 0x28),
                  ('scaleX', 0x2c), ('scaleY', 0x30), ('scaleZ', 0x34))}
+LIGHT_POINT_OFFSETS = {'posX': 0x10, 'posY': 0x14, 'posZ': 0x18}
+LIGHT_FIELDS = {
+    'posX': ('Position X', 'Position', 'Position along each axis, in metres.'),
+    'posY': ('Position Y', 'Position', 'Position along each axis, in metres.'),
+    'posZ': ('Position Z', 'Position', 'Position along each axis, in metres.'),
+    'preset': ('Light look', 'Light',
+               "Which of the game's built-in light looks this light wears. "
+               'Lights that look alike share a number; torches change it by area.'),
+}
 
 
 def _cstr(data, offset, what):
@@ -166,6 +187,43 @@ def _part(data, off):
     return part
 
 
+def _point(data, off):
+    if not 0 <= off <= len(data) - POINT_HEADER:
+        raise MsbError('A map point entry is out of bounds')
+    words = struct.unpack_from('<15i', data, off)
+    if words[0] != POINT_HEADER:
+        raise MsbError('A map point entry has an unexpected shape')
+    if words[1] != 0 or words[2] < 0:
+        raise MsbError('A map point entry has an unsupported kind')
+    pos = struct.unpack_from('<3f', data, off + 0x10)
+    name, ns, ne = _cstr(data, off + POINT_HEADER, 'A map point name')
+    return {'index': words[2], 'type': words[1], 'name': name,
+            'pos': pos, 'base': off, 'spans': [(ns, ne)]}
+
+
+def _event(data, off, nparts, npoints):
+    if not 0 <= off <= len(data) - EVENT_HEADER:
+        raise MsbError('A map event entry is out of bounds')
+    name_off, part, etype, seq, ahead, bhead, zero = struct.unpack_from('<7i', data, off)
+    if name_off != EVENT_HEADER or zero != 0 or bhead - ahead != 16:
+        raise MsbError('A map event entry has an unexpected shape')
+    name, ns, ne = _cstr(data, off + EVENT_HEADER, 'A map event name')
+    if not off + ahead + 16 <= len(data) or not off + bhead + 4 <= len(data):
+        raise MsbError('A map event entry is out of bounds')
+    area, point, flag, last = struct.unpack_from('<4i', data, off + ahead)
+    event = {'part': part, 'type': etype, 'seq': seq, 'name': name,
+             'base': off, 'ahead': off + ahead, 'bhead': off + bhead,
+             'area': area, 'point': point, 'flag': flag,
+             'spans': [(off, off + EVENT_HEADER), (ns, ne)]}
+    if etype == LIGHT_EVENT:
+        if not 0 <= part < nparts or not 0 <= area < nparts:
+            raise MsbError('A light points outside the part list')
+        if not 0 <= point < npoints or last != 0:
+            raise MsbError('A light points outside the point list')
+        event['preset'] = struct.unpack_from('<i', data, off + bhead)[0]
+    return event
+
+
 class MsbDocument:
     """One map file's placements. Edits rewrite fixed-size fields in place;
     everything else, including names and unknown tables, is preserved."""
@@ -209,6 +267,23 @@ class MsbDocument:
             self.parts.append(part)
             self._by_id[key] = part
             self._strings.extend(part['spans'][1:3])
+        self.points = []
+        for off in params[2]['offsets']:
+            point = _point(self.plain, off)
+            self.points.append(point)
+            self._strings.extend(point['spans'])
+        self.events = []
+        seen_events = set()
+        for off in params[1]['offsets']:
+            event = _event(self.plain, off, len(self.parts), len(self.points))
+            key = (event['type'], event['seq'])
+            if key in seen_events:
+                raise MsbError('Map event identities are not unique')
+            seen_events.add(key)
+            self.events.append(event)
+            self._strings.extend(event['spans'])
+        self._lights = {(0, event['seq']): event for event in self.events
+                        if event['type'] == LIGHT_EVENT}
 
     def placements(self):
         """Enemy, object and player-start parts in file order."""
@@ -247,6 +322,33 @@ class MsbDocument:
                            'scale': tuple(part['scale'])})
         return result
 
+    def lights(self):
+        """Every light event with its point position. A light is a
+        type-0 event: its name, two part links, a shared point that
+        carries the position in metres, and one preset word that
+        picks the game's built-in look. Effects often share the
+        point (a torch flame stands where its light shines)."""
+        users = {}
+        for event in self.events:
+            users.setdefault(event['point'], []).append(event)
+        result = []
+        for (etype, seq), event in sorted(self._lights.items()):
+            point = self.points[event['point']]
+            sharers = [{'type': other['type'],
+                        'kind': EVENT_TYPE_LABELS.get(other['type'],
+                                                      f"Event {other['type']}"),
+                        'name': other['name']}
+                       for other in users.get(event['point'], [])
+                       if other is not event]
+            result.append({'key': f'light:{seq}', 'type': etype, 'seq': seq,
+                           'name': event['name'], 'pos': tuple(point['pos']),
+                           'point': event['point'], 'preset': event['preset'],
+                           'flag': event['flag'],
+                           'part': self.parts[event['part']]['name'],
+                           'areaPart': self.parts[event['area']]['name'],
+                           'sharers': sharers})
+        return result
+
     @property
     def dirty_count(self):
         return len(self.dirty) + len(self.removed)
@@ -256,6 +358,11 @@ class MsbDocument:
         key = tuple(part_key)
         if key in self.added:
             return True
+        return any(entry[0] == key for entry in self.dirty)
+
+    def light_modified(self, light_key):
+        """Whether this session changed the light."""
+        key = tuple(light_key)
         return any(entry[0] == key for entry in self.dirty)
 
     def merge_units(self):
@@ -364,18 +471,102 @@ class MsbDocument:
                            'dtype': 'f32', 'value': round(self._readback(part, key), 3), 'type': 'number',
                            'minimum': None, 'maximum': None,
                            'enum': {}, 'editable': True,
-                           'vanilla': None if raw_vanilla is None else round(raw_vanilla, 3),
-                           'sliderMin': None, 'sliderMax': None})
+                           'vanilla': None if raw_vanilla is None else round(raw_vanilla, 3)})
         if part['type'] in ENEMY_TYPES:
             label, group, description = PLACEMENT_FIELDS['npcId']
             fields.append({'key': 'npcId', 'label': label, 'description': description, 'group': group,
                            'dtype': 's32', 'value': part['npc'], 'type': 'number',
                            'minimum': None, 'maximum': None,
-                           'enum': {}, 'editable': True, 'vanilla': self._original_value(part, 'npcId'),
-                           'sliderMin': None, 'sliderMax': None})
+                           'enum': {}, 'editable': True, 'vanilla': self._original_value(part, 'npcId')})
         return {'partId': part['id'], 'type': part['type'], 'kind': TYPE_LABELS[part['type']],
                 'name': part['name'], 'model': self.models[part['model']]['name'],
                 'think': part['think'], 'fields': fields}
+
+    def _light(self, light_key):
+        key = tuple(light_key) if isinstance(light_key, list) else light_key
+        event = self._lights.get((0, key[1]) if isinstance(key, tuple) else None)
+        if event is None:
+            raise MsbError('Select a light on the map')
+        return event
+
+    def _light_readback(self, event, field):
+        if field in LIGHT_POINT_OFFSETS:
+            point = self.points[event['point']]
+            return struct.unpack_from(
+                '<f', self.plain, point['base'] + LIGHT_POINT_OFFSETS[field])[0]
+        return struct.unpack_from('<i', self.plain, event['bhead'])[0]
+
+    def _light_original(self, event, field):
+        if field in LIGHT_POINT_OFFSETS:
+            point = self.points[event['point']]
+            return struct.unpack_from(
+                '<f', self.original, point['base'] + LIGHT_POINT_OFFSETS[field])[0]
+        return struct.unpack_from('<i', self.original, event['bhead'])[0]
+
+    def read_light(self, light_key):
+        event = self._light(light_key)
+        point = self.points[event['point']]
+        sharers = [other['name'] for other in self.events
+                   if other is not event and other['point'] == event['point']]
+        shared = (' ' + ', '.join(sharers) + ' share this spot, so they move too.'
+                  if sharers else '')
+        fields = []
+        for key in ('posX', 'posY', 'posZ'):
+            label, group, description = LIGHT_FIELDS[key]
+            raw_vanilla = self._light_original(event, key)
+            fields.append({'key': key, 'label': label, 'description': description + shared,
+                           'group': group, 'dtype': 'f32',
+                           'value': round(self._light_readback(event, key), 3), 'type': 'number',
+                           'minimum': None, 'maximum': None,
+                           'enum': {}, 'editable': True,
+                           'vanilla': round(raw_vanilla, 3)})
+        label, group, description = LIGHT_FIELDS['preset']
+        fields.append({'key': 'preset', 'label': label, 'description': description,
+                       'group': group, 'dtype': 's32',
+                       'value': self._light_readback(event, 'preset'), 'type': 'number',
+                       'minimum': None, 'maximum': None,
+                       'enum': {}, 'editable': True,
+                       'vanilla': self._light_original(event, 'preset')})
+        return {'key': f"light:{event['seq']}", 'kind': 'Light',
+                'preset': event['preset'],
+                'name': event['name'], 'point': point['name'],
+                'part': self.parts[event['part']]['name'],
+                'areaPart': self.parts[event['area']]['name'],
+                'fields': fields}
+
+    def edit_light(self, light_key, field, value):
+        """Change one light field. light_key is the ('light', seq)
+        identity from lights(). The position writes the shared point,
+        so effects standing on it move along."""
+        event = self._light(light_key)
+        if field in LIGHT_POINT_OFFSETS:
+            if type(value) not in (int, float) or isinstance(value, bool):
+                raise MsbError('Enter a finite number')
+            if not math.isfinite(value):
+                raise MsbError('Enter a finite number')
+            point = self.points[event['point']]
+            start = point['base'] + LIGHT_POINT_OFFSETS[field]
+            saved = struct.unpack_from('<f', self.original, start)[0]
+            if math.isfinite(saved) and float(f'{float(value):.7g}') == float(f'{saved:.7g}'):
+                value = saved
+            self._write(start, 4, struct.pack('<f', value))
+            pos = list(point['pos'])
+            pos[['posX', 'posY', 'posZ'].index(field)] = struct.unpack_from('<f', self.plain, start)[0]
+            point['pos'] = tuple(pos)
+        elif field == 'preset':
+            if type(value) is not int or isinstance(value, bool) or not -(2 ** 31) <= value < 2 ** 31:
+                raise MsbError('Enter a whole number')
+            self._write(event['bhead'], 4, struct.pack('<i', value))
+            event['preset'] = value
+        else:
+            raise MsbError('This light field is protected')
+        key = (('light', event['seq']), field)
+        if (self.plain == self.original
+                or self._light_readback(event, field) == self._light_original(event, field)):
+            self.dirty.discard(key)
+        else:
+            self.dirty.add(key)
+        return self.read_light(('light', event['seq']))
 
     def _entity_ids(self):
         ids = []

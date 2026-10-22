@@ -2,17 +2,18 @@
 const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,logView,pagedListDetail,columnList,subtabBar,
   actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
-  readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
+  readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sorts:{},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
-  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
-  animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
+  effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},animLeftTab:"chars",nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
+  animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,animListError:null,animEventError:null,
   assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"},{id:"files",label:"Files"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
-  dirTab:"drops",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
+  dirTab:"all",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
   dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
+const lastSubByTab={};
 const attackPreviews=new Map();
 const key=row=>`${row.table}:${row.id}`;
 // File tabs share one browser: each tab id is the file kind it lists.
@@ -23,7 +24,7 @@ const assetRows=files=>(files||[]).filter(file=>state.tab==="sound"?file.kind===
     return {table:"Asset",id:file.relative,name:file.relative,
       values:{size:file.size,...(kind?{kind}:{})},
       ...(kind?{display:{kind:kind==="archive"?"Split archive":"Textures"}}:{}),
-      created:file.status==="new",modified:file.status==="modified"};});
+      created:file.status==="new",modified:file.status==="modified",...(file.modelPick?{modelPick:file.modelPick}:{})};});
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
@@ -37,6 +38,7 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
   get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
   record(entry){
     if(this.applying||(!entry.edits&&entry.before===entry.after))return;
+    entry.at=LexeditorUI.nextHistoryTick();
     this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
     this.redoStack=[];shell.refresh();
   },
@@ -69,20 +71,16 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       // render would do) for one undone drag is what made undo feel
       // like a reload.
       if(state.tab==="maps"&&state.mapView)await refreshMapsAfterUndo(entry);
+      // Hitbox edits from the enemy viewer repaint the viewer: a render
+      // would close the drawer mid-inspection. Anything else renders.
+      else if((entry.edits||[entry]).every(edit=>edit.table==="AtkParam_Npc")&&await refreshChrDrawer()){}
       else render();
     }catch(error){notify(error);}
     finally{this.applying=false;shell.refresh();}
   },
   clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
-document.addEventListener("keydown",event=>{
-  if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
-  const pressed=event.key.toLowerCase();
-  if(pressed!=="z"&&pressed!=="y")return;
-  if(pressed==="z"&&!(event.target instanceof HTMLElement&&event.target.matches("input:not([type='checkbox']),textarea,select,[contenteditable='true']")))return;  if(event.target.closest?.("textarea,input[type=text]:not([data-field-key])"))return;
-  event.preventDefault();
-  document.activeElement?.blur?.();
-  setTimeout(()=>pressed==="y"||event.shiftKey?fieldHistory.redo():fieldHistory.undo(),0);
-},true);
+// Ctrl+Z lives in the shell's shortcut dispatcher, which undoes fieldHistory:
+// a plugin binding of its own undid twice per press.
 const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered",themeName:"ds1",theme:{accent:"#a4824c","accent-text":"#141210"}},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
@@ -120,6 +118,12 @@ async function refreshState(){
   state.readOnly=result.readOnly;state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
   if(result.theme&&result.theme.sounds)LexeditorUI.configureThemeSounds(result.theme.sounds.rows||[]);
 }
+// Each tab keeps its own list order: one global sort meant a column
+// click in Items re-sorted Drops too, so entering Drops showed some
+// other tab's order instead of the alphabetical default. Entering a
+// tab restores its own order, alphabetical until the reader picks one.
+const sortScope=()=>`${state.tab}-${state.sub}`;
+const tabSort=()=>state.sorts[sortScope()]||{key:"name",dir:1};
 function sortedRows(){
   const query=state.query.toLowerCase();
   // The search reads the whole row: names, ids, ranges and every
@@ -142,11 +146,19 @@ function sortedRows(){
   // which a name sort would scramble (state 10 sorts before state 3).
   if(state.tab==="scripts"||state.tab==="misc"||(state.tab==="stats"&&state.sub==="levelup")||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
   // The game's own order (by record) breaks ties.
-  return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
+  return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,tabSort())||a.id-b.id);
 }
 async function loadAnims(request){
   if(state.animScope.level==="events"){await loadAnimEvents(request);return;}
   await loadAnimChars(request);
+  if(state.animLeftTab==="events"){
+    const row=(state.rows||[]).find(entry=>key(entry)===state.selected);
+    if(row&&row.motion&&row.motion.tae){
+      animScopeFor(row);
+      state.animQuery="";state.animPage=0;state.selected=null;state.row=null;state.taeForm=null;
+      await loadAnimEvents(request);
+    }else state.animLeftTab="anims";
+  }
 }
 async function loadAnimChars(request){
   const result=await api("/api/table?tab=playback");
@@ -160,8 +172,15 @@ async function loadAnimView(request){
   const row=state.animChars.find(row=>key(row)===state.animCharId);
   state.animView=null;
   if(!row){state.rows=[];state.selected=null;state.row=null;return;}
-  const detail=await api(`/api/anim/list?chr=${encodeURIComponent(row.id)}`);
+  let detail;
+  try{
+    detail=await api(`/api/anim/list?chr=${encodeURIComponent(row.id)}`);
+  }catch(error){
+    if(request!==recordsRequest||state.animCharId!==key(row))return;
+    state.animListError=error.message||String(error);state.rows=[];state.selected=null;state.row=null;return;
+  }
   if(request!==recordsRequest||state.animCharId!==key(row))return;
+  state.animListError=null;
   state.animView=detail;
   state.animScope={level:"anims",binder:`${row.id}.anibnd.dcx`,charName:row.name};
   state.rows=animMotionRows(detail);
@@ -182,8 +201,15 @@ function animMotionRows(view){
 }
 async function loadAnimEvents(request){
   const scope=state.animScope;
-  const result=await api(`/api/table?tab=animations&scope=events&binder=${encodeURIComponent(scope.binder||"")}&tae=${encodeURIComponent(scope.tae||"")}&anim=${scope.anim??""}`);
+  let result;
+  try{
+    result=await api(`/api/table?tab=animations&scope=events&binder=${encodeURIComponent(scope.binder||"")}&tae=${encodeURIComponent(scope.tae||"")}&anim=${scope.anim??""}`);
+  }catch(error){
+    if(request!==recordsRequest||state.tab!=="animations")return;
+    state.animEventError=error.message||String(error);state.rows=[];state.selected=null;state.row=null;return;
+  }
   if(request!==recordsRequest||state.tab!=="animations")return;
+  state.animEventError=null;
   state.rows=result.rows;
   state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
   if(!state.rows.some(row=>key(row)===state.selected))state.selected=state.rows[0]?key(state.rows[0]):null;
@@ -233,6 +259,10 @@ async function loadDetail(){
   if(!row&&state.tab==="maps"){
     row=state.dirRows.find(row=>key(row)===state.selected);
     if(row)sub=state.dirTab;
+  }
+  if(!row&&state.tab==="maps"&&state.mapView){
+    const light=(state.mapView.lights||[]).find(entry=>`${state.mapView.map}:${entry.key}`===state.selected);
+    if(light)row={id:light.key,table:state.mapView.map,name:light.name};
   }
   if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;state.assetDetail=null;return;}
   if(row.table==="Asset"){
@@ -299,6 +329,10 @@ async function navigate(tab,sub=state.sub,selected=null){
 
   const token=++navigation;await edits;
   const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;state.taeForm=null;
+  // A bare tab switch (shell tab strip, history Back) returns to the tab's
+  // own last subtab. Without this the previous tab's sub rode along as the
+  // default, failed validation, and fell back to consumables.
+  if(changedTab&&arguments.length<2&&lastSubByTab[tab])sub=lastSubByTab[tab];
   if(tab==="enemies"&&!state.enemyTabs.some(entry=>entry.id===sub))sub="monsters";
   else if(tab==="ai"&&!state.aiTabs.some(entry=>entry.id===sub))sub="ai";
   else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
@@ -317,13 +351,14 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="scripts"&&!state.scriptTabs.some(entry=>entry.id===sub))sub="ingame";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
+  lastSubByTab[tab]=state.sub;
   try{
     if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","text","scripts"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
-    if(tab==="maps"&&selected)state.mapTab="placements";
+    if(tab==="maps"&&selected){state.mapTab="placements";if(String(selected).includes(".msb:"))state.dirTab="all";}
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
     state.error="";render();
     if(selected)revealSelection();
@@ -588,28 +623,40 @@ function commit(row,field,value,control,beforeOverride){
           // gizmo did, so typed edits left the mesh standing behind.
           const fresh=updates[updates.length-1].result.values||{};
           if(row.table===state.mapView.map){
-            const part=state.mapView.parts.find(entry=>entry.key===row.id);
-            const pos=[fresh.posX,fresh.posY,fresh.posZ],rot=[fresh.rotX,fresh.rotY,fresh.rotZ],scale=[fresh.scaleX,fresh.scaleY,fresh.scaleZ];
-            if(part){part.pos=pos;part.rot=rot;part.scale=scale;}
+            const lightRow=String(row.id).startsWith("light:");
+            const part=state.mapView.parts.find(entry=>entry.key===row.id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===row.id):null);
+            const pos=[fresh.posX,fresh.posY,fresh.posZ];
+            if(part)part.pos=pos;
             viewportCtl?.moveTo?.(row.id,pos);
-            viewportCtl?.turnTo?.(row.id,rot);
-            viewportCtl?.scaleTo?.(row.id,scale);
+            if(!lightRow){
+              const rot=[fresh.rotX,fresh.rotY,fresh.rotZ],scale=[fresh.scaleX,fresh.scaleY,fresh.scaleZ];
+              if(part){part.rot=rot;part.scale=scale;}
+              viewportCtl?.turnTo?.(row.id,rot);
+              viewportCtl?.scaleTo?.(row.id,scale);
+            }
           }
+        }
+        if(row.table.endsWith(".msb")&&String(row.id).startsWith("light:")&&state.tab==="maps"&&state.mapView&&row.table===state.mapView.map){
+          // The lights list reads the view, not the record lists, so
+          // a typed edit refreshes the cached light itself.
+          const entry=(state.mapView.lights||[]).find(item=>item.key===row.id);
+          const fresh=updates[updates.length-1].result.values||{};
+          if(entry){if(fresh.posX!==undefined)entry.pos=[fresh.posX,fresh.posY,fresh.posZ];if(fresh.preset!==undefined)entry.preset=fresh.preset;}
         }
         if(row.table.endsWith(".msb")&&field.key==="npcId"&&state.tab==="maps"){
           // An enemy swap can move a placement between the NPC and
           // enemy directory and change the map\u2019s own counts.
           state.mapList=(await api("/api/table?tab=viewport")).rows;
           await loadDirectory().catch(notify);
-          refreshMapSide();refreshDirectory();
+          refreshMapSide();refreshDirectory();refreshMapsDetail();
         }
         if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
-        else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();}
+        else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();refreshAnimDetail();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
         // An icon or model edit repaints its face (the picture or name beside the number).
         else if(field.key.startsWith("iconId")||field.key==="equipModelId")render();
         else if(field.key==="aiThinkId"||field.key==="behaviorVariationId"){await refreshMonsterPanels();render();}
-        else if(String(state.sort?.key||"").startsWith("pin:"))render();
+        else if(String(tabSort().key||"").startsWith("pin:"))render();
         else state.pagedView?.refreshValues?.();
       }
     }catch(error){
@@ -626,7 +673,7 @@ function describePinnedCell(propertyKey){
   const field=(state.row?.fields||[]).find(item=>item.key===propertyKey);
   if(!field||!field.editable||field.type==="longtext")return null;
   const entries=field.type==="enum"?Object.entries(field.enum||{}):null;
-  return {editable:true,type:field.type,numeric:field.type==="number",
+  return {editable:true,type:field.type,numeric:field.type==="number",label:field.label,
     minimum:field.minimum,maximum:field.maximum,
     step:field.step??(/^(f|angle)/.test(field.dtype||"")?"any":1),
     choices:entries&&entries.length?entries:field.type==="bool"?[[1,"Yes"],[0,"No"]]:null};
@@ -719,22 +766,88 @@ function referenceFace(row,field){
 }
 function referencePicker(row,field,face,knownLink){
   const link=knownLink||(row.recordLinks||[]).find(entry=>entry.field===field.key);
+  const clearEntry=Object.entries(field.enum||{}).find(([,label])=>label==="None");
   const source={};
   const value=()=>{const live=state.row&&key(state.row)===key(row)?state.row:row;
     return live.fields?.find(item=>item.key===field.key)?.value??field.value;};
   return LexeditorUI.thingFinderButton({class:"ds1-find-reference",label:`Change ${field.label}`,
     disabled:state.readOnly||field.disabled||!link,type:`ds1-${link?.table||"record"}`,
+    clearValue:clearEntry?.[0],clearLabel:clearEntry?.[1],
     prompt:link?`Choose the ${linkNoun(link)} for ${row.name}.`:"Choose a record.",
     target:async()=>{Object.assign(source,{tab:state.tab,sub:state.sub,selected:state.selected,selection:state.selection});
       const [tab,sub]=await finderTarget(link,value());await navigate(tab,sub);},
     origin:()=>navigate(source.tab,source.sub,source.selected),
     accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),face);face.value=String(picked);}});
 }
+// A Model ID earns the shared thing finder: the Models tab's binders
+// of its piece become hold-to-choose candidates, and the binder's
+// number writes back into the ID.
+function modelPicker(row,field,face,entry){
+  const source={};
+  return LexeditorUI.thingFinderButton({class:"ds1-find-asset",label:`Choose model for ${row.name}`,
+    disabled:state.readOnly||field.disabled,type:entry.pick,
+    prompt:`Choose the model for ${row.name}. Hold a file to choose it.`,
+    target:async()=>{Object.assign(source,{tab:state.tab,sub:state.sub,selected:state.selected,selection:state.selection});
+      await navigate("models","files");},
+    origin:()=>navigate(source.tab,source.sub,source.selected),
+    accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),face);face.value=String(picked);}});
+}
+// Icon IDs choose from a gallery: every menu icon as its own picture,
+// since a sheet cell has no row to hold and choose. Escape leaves
+// through the Cancel button, like every hand-built dialog.
+function iconGalleryButton(row,field,face){
+  return el("button",{type:"button",class:"lex-thing-finder ds1-icon-gallery",title:`Choose icon for ${row.name}`,
+    "aria-label":`Choose icon for ${field.label}`,disabled:state.readOnly||field.disabled,
+    onclick:event=>{event.preventDefault();event.stopPropagation();void openIconGallery(row,field,face);}},
+    LexeditorUI.selectionIcon());
+}
+async function openIconGallery(row,field,face){
+  let ids;
+  try{ids=(await api("/api/icon-catalog")).icons||[];}
+  catch(error){notify(error);return;}
+  const live=state.row&&key(state.row)===key(row)?state.row.fields?.find(item=>item.key===field.key)?.value:field.value;
+  const backdrop=el("div",{class:"lex-dialog-backdrop"});
+  const close=()=>{loader?.disconnect();backdrop.remove();};
+  const grid=el("div",{class:"ds1-icon-gallery-grid",role:"listbox","aria-label":`Icons for ${field.label}`});
+  // Eight hundred cells each fetching its art at once buried the
+  // server lanes an edit needs, so pictures load as their cells near
+  // the view instead. The buttons keep their size meanwhile.
+  const loader="IntersectionObserver" in window?new IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting)continue;
+      const picture=entry.target;loader.unobserve(picture);
+      picture.src=picture.dataset.src;delete picture.dataset.src;
+    }
+  },{root:grid,rootMargin:"200px"}):null;
+  const watch=picture=>{if(loader)loader.observe(picture);else picture.src=picture.dataset.src;};
+  for(const id of ids){
+    const current=id===live;
+    const picture=el("img",{alt:"",draggable:"false","data-lex-no-image":"off","data-src":`/api/icon-art?icon=${id}`});
+    watch(picture);
+    grid.append(el("button",{type:"button",class:"ds1-icon-choice"+(current?" current":""),role:"option",
+      "aria-selected":current?"true":"false",title:`Icon ${id}`,onclick:()=>{
+        commit(row,field,id,face);face.value=String(id);close();}},
+      picture));
+  }
+  const dialog=el("section",{class:"lex-dialog ds1-icon-gallery",role:"dialog","aria-modal":"true","aria-label":`Choose icon for ${field.label}`},
+    el("h2",{},`Choose icon for ${field.label}`),grid,
+    el("div",{class:"lex-dialog-actions"},el("button",{type:"button",class:"lex-dialog-action",onclick:close},"Cancel")));
+  backdrop.append(dialog);
+  backdrop.addEventListener("click",event=>{if(event.target===backdrop)close();});
+  document.body.append(backdrop);
+  dialog.querySelector(".ds1-icon-choice.current")?.scrollIntoView({block:"nearest"});
+  dialog.querySelector(".lex-dialog-action")?.focus();
+}
+function assetChoiceButton(row,field,face,entry){
+  if(entry.tab==="models"&&entry.pick)return modelPicker(row,field,face,entry);
+  if(entry.tab==="textures")return iconGalleryButton(row,field,face);
+  return null;
+}
 // An asset face shows what an Icon or Model ID points to beside its
 // number: the menu picture itself, or the parts binder name. Hover
 // previews it (the icon larger, the model as the Models tab would);
-// clicking opens the containing file. The number stays editable, so
-// no finder joins the face: a picked file could never write back.
+// clicking opens the containing file. The number stays editable, and
+// a choice button beside the face picks a new one visually.
 function assetFace(row,field,entry){
   if(entry.tab!=="models"){
     if(!(typeof field.value==="number"&&field.value>0))return null;
@@ -747,9 +860,81 @@ function assetFace(row,field,entry){
     thumb.addEventListener("error",()=>{if(face.isConnected)face.remove();},{once:true});
     return face;
   }
-  return hoverable({content:entry.name,targetType:"ds1-asset",targetId:entry.id,
+  const face=hoverable({content:entry.name,targetType:"ds1-asset",targetId:entry.id,
     targetLabel:`${entry.name} in Models`,preview:()=>assetPreview(row,entry),activate:()=>openRecord(entry)});
+  // The icon face shows its picture; the model face shows only the
+  // binder name until the parts view says a mesh is installed, then
+  // the same snapshot the Models tab uses. No mesh, no picture.
+  if(window.Ds1Preview)api(`/api/parts/view?table=${encodeURIComponent(row.table)}&id=${row.id}`).then(view=>{
+    const models=((view&&view.models)||[]).filter(item=>item.available);
+    if(!models.length||!face.isConnected)return;
+    const thumb=window.Ds1Preview.thumbnail({url:`/api/parts/geometry?table=${encodeURIComponent(row.table)}&id=${row.id}&variant=${encodeURIComponent(models[0].variant||"")}`,label:`${row.name} model`});
+    thumb.classList.add("lex-hoverable-icon");
+    face.prepend(thumb);
+  }).catch(()=>{});
+  return face;
 }
+// The text tab's <?tags?>, curated from the 873 the installed FMGs use
+// (codex/ds1/text-tags.md): the names, numbers, buttons and lookups a mod
+// author actually inserts. Titles say what each puts in, in player terms.
+const DS1_TEXT_TAG_GROUPS=[
+ {label:"Names",tags:[
+  {label:"deadName",insert:"<?deadName?>",title:"The name of the phantom that died."},
+  {label:"joinName",insert:"<?joinName?>",title:"The name of the phantom that joined."},
+  {label:"hostName",insert:"<?hostName?>",title:"The name of the world owner."},
+  {label:"leaveName",insert:"<?leaveName?>",title:"The name of the phantom that left."},
+  {label:"itemName",insert:"<?itemName?>",title:"The name of the item this event is about."},
+  {label:"itemNum",insert:"<?itemNum?>",title:"How many of the item this event is about."},
+  {label:"pcName",insert:"<?pcName?>",title:"The player character's name."},
+  {label:"mapName",insert:"<?mapName?>",title:"The name of the current map."}]},
+ {label:"Values",tags:[
+  {label:"souls",insert:"<?souls?>",title:"The soul count the player holds now."},
+  {label:"demandSoul",insert:"<?demandSoul?>",title:"The price the shop asks, in souls."},
+  {label:"sellSouls",insert:"<?sellSouls?>",title:"The souls selling gives."},
+  {label:"getSoulNum",insert:"<?getSoulNum?>",title:"The souls just gained."},
+  {label:"evntAcquittalPrice",insert:"<?evntAcquittalPrice?>",title:"The absolution price, in souls."},
+  {label:"playTime",insert:"<?playTime?>",title:"How long this character has played."}]},
+ {label:"Buttons",tags:[
+  {label:"attackR",insert:"<?attackR?>",title:"The right-hand attack button glyph."},
+  {label:"attackL",insert:"<?attackL?>",title:"The left-hand attack button glyph."},
+  {label:"subAttackR",insert:"<?subAttackR?>",title:"The right strong-attack button glyph."},
+  {label:"subAttackL",insert:"<?subAttackL?>",title:"The left strong-attack button glyph."},
+  {label:"selectUD",insert:"<?selectUD?>",title:"The scroll up and down glyph."},
+  {label:"selectLR",insert:"<?selectLR?>",title:"The move left and right glyph."},
+  {label:"selectAll",insert:"<?selectAll?>",title:"The move in any direction glyph."},
+  {label:"conclusion",insert:"<?conclusion?>",title:"The confirm button glyph."},
+  {label:"cancel",insert:"<?cancel?>",title:"The back button glyph."},
+  {label:"spin",insert:"<?spin?>",title:"The rotate glyph."},
+  {label:"spinLR",insert:"<?spinLR?>",title:"The rotate left and right glyph."},
+  {label:"commando",insert:"<?commando?>",title:"The toggle-display button glyph."},
+  {label:"viewChange",insert:"<?viewChange?>",title:"The switch-view button glyph."},
+  {label:"changeArmR",insert:"<?changeArmR?>",title:"The switch right-hand gear glyph."},
+  {label:"changeArmL",insert:"<?changeArmL?>",title:"The switch left-hand gear glyph."},
+  {label:"changeMagic",insert:"<?changeMagic?>",title:"The switch spell glyph."},
+  {label:"cameraMove",insert:"<?cameraMove?>",title:"The move-camera glyph."},
+  {label:"playerMove",insert:"<?playerMove?>",title:"The move-character glyph."},
+  {label:"keyboardEnter",insert:"<?keyboardEnter?>",title:"The keyboard confirm glyph."},
+  {label:"keyboardEsc",insert:"<?keyboardEsc?>",title:"The keyboard back glyph."},
+  {label:"pageUp",insert:"<?pageUp?>",title:"The page-up glyph."},
+  {label:"pageDown",insert:"<?pageDown?>",title:"The page-down glyph."},
+  {label:"scrollUp",insert:"<?scrollUp?>",title:"The scroll-one-line-up glyph."},
+  {label:"scrollDown",insert:"<?scrollDown?>",title:"The scroll-one-line-down glyph."}]},
+ {label:"Lookups",tags:[
+  {label:"sysmsg@id",insert:"<?sysmsg@?>",
+   title:"Another system message, by its id. 1 is OK.",caretBack:2},
+  {label:"platmsg@id",insert:"<?platmsg@?>",
+   title:"The platform's own button for an action id.",caretBack:2},
+  {label:"gdsparam@id",insert:"<?gdsparam@?>",
+   title:"A value the running event supplies, by its id.",caretBack:2},
+  {label:"goodsNameId@id",insert:"<?goodsNameId@?>",
+   title:"An item's name, by its goods id.",caretBack:2}]},
+ {label:"Soapstone",tags:[
+  {label:"bmsg",insert:"<?bmsg?>",title:"The message word the player picked."},
+  {label:"upr",insert:"<?upr?>",title:"The word's upper position."},
+  {label:"low",insert:"<?low?>",title:"The word's lower position."}]},
+ {label:"Forge",tags:[
+  {label:"itemNameBeforeForge",insert:"<?itemNameBeforeForge?>",title:"The gear's name before reinforcing."},
+  {label:"itemNameAfterForge",insert:"<?itemNameAfterForge?>",title:"The gear's name after reinforcing."}]}];
 function plainControlFor(row,field){
   if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
   const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly||field.disabled};
@@ -759,18 +944,34 @@ function plainControlFor(row,field){
   // control that looks editable but shows a blocked cursor.
   if(field.type==="bool")return el("input",{...attrs,type:"checkbox",checked:!!field.value,
     onchange:event=>commit(row,field,event.target.checked?1:0,event.target)});
-  if(field.type==="text")return el("input",{...attrs,type:"text",value:field.value,
-    maxlength:field.maxLength||48,required:field.required??true,onchange:event=>{
-      const input=event.target;
-      if(field.required!==false&&!input.value.trim()||!input.checkValidity()){input.reportValidity();return;}
-      commit(row,field,input.value,input);
-    }});
-  if(field.type==="longtext")return LexeditorUI.textArea({...attrs,value:field.value,rows:6,
-    maxlength:field.maxLength||2000,"aria-multiline":"true",onchange:event=>{
-      const input=event.target;
-      if(!input.checkValidity()){input.reportValidity();return;}
-      commit(row,field,input.value,input);
-    }});
+  if(field.type==="text"){
+    const input=el("input",{...attrs,type:"text",value:field.value,
+      maxlength:field.maxLength||48,required:field.required??true,onchange:event=>{
+        const box=event.target;
+        if(field.required!==false&&!box.value.trim()||!box.checkValidity()){box.reportValidity();return;}
+        commit(row,field,box.value,box);
+      }});
+    if(row.table==="MenuText")
+      return el("div",{class:"lex-ds1-text-editor"},input,LexeditorUI.tagBar({
+        target:node=>node.parentElement?.querySelector("textarea,input"),
+        groups:DS1_TEXT_TAG_GROUPS,
+        help:infoHelp("Tag buttons insert the game's codes at the caret. Each button names what it puts in.")}));
+    return input;
+  }
+  if(field.type==="longtext"){
+    const area=LexeditorUI.textArea({...attrs,value:field.value,rows:6,
+      maxlength:field.maxLength||2000,"aria-multiline":"true",onchange:event=>{
+        const input=event.target;
+        if(!input.checkValidity()){input.reportValidity();return;}
+        commit(row,field,input.value,input);
+      }});
+    if(row.table==="MenuText"||/\.fmg$/.test(row.table||""))
+      return el("div",{class:"lex-ds1-text-editor"},area,LexeditorUI.tagBar({
+        target:node=>node.parentElement?.querySelector("textarea,input"),
+        groups:DS1_TEXT_TAG_GROUPS,
+        help:infoHelp("Tag buttons insert the game's codes at the caret. Each button names what it puts in.")}));
+    return area;
+  }
   if(field.type==="enum"){
     const link=(row.recordLinks||[]).find(entry=>entry.field===field.key);
     if(link&&link.kind!=="npc")return referenceFace(row,field);
@@ -782,13 +983,14 @@ function plainControlFor(row,field){
     control.value=String(live??field.value);
     return control;
   }
-  return el("input",{...attrs,type:"number",value:field.value,min:field.minimum,max:field.maximum,
+  const assetId=(row.recordLinks||[]).some(entry=>entry.kind==="asset"&&entry.field===field.key);
+  return el("input",{...attrs,type:"number",value:field.value,...(assetId?{}:{min:field.minimum,max:field.maximum}),
     step:field.step??(/^(f|angle)/.test(field.dtype)?"any":1),onchange:event=>{
       const input=event.target;if(!input.value.trim()||!input.checkValidity()){input.reportValidity();return;}
       commit(row,field,Number(input.value),input);
     }});
 }
-const GROUP_ORDER=["Description","Basics","Starting gear","Starting spells","Starting items","Body & gestures","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
+const GROUP_ORDER=["Description","Basics","Starting gear","Starting spells","Starting items","Body & gestures","Body","Defense","Absorption","Combat","Requirements & costs","Thresholds","Growth","Curve shape","Level-up cost","Effects & references","Upgrades",
   "Use behavior","Value & rewards","Appearance","Logic & goals","Battle distances","Return home","Senses","Call for help","Team tactics","Movement","Properties"];
 // Every property that decides what an item becomes as it is reinforced:
 // its upgrade path, materials, reinforcement cost and ascension options.
@@ -808,7 +1010,7 @@ function groupFor(field,table){
   if(/guard|defen|resist|damagecut/.test(name))return "Defense";
   if(/attack|damage|correct|reinforce|repa|durability/.test(name))return "Combat";
   if(/ref|speffect|behavior|bullet|replace|magicid/.test(name))return "Effects & references";
-  if(/require|proper|slot|consume|stamina|dexterity|humanity|hero/.test(name))return "Requirements & costs";
+  if(/require|proper|slot|consume|stamina|dexterity|humanity|hero|vowtype/.test(name))return "Requirements & costs";
   if(/motion|anim|spatk|hold/.test(name))return "Use behavior";
   return "Properties";
 }
@@ -834,8 +1036,8 @@ function fieldSections(row){
   // A field that is itself a record link opens that record from its own row;
   // only links with no editable field on the page are listed separately.
   // Asset links serve through the field label below: a face would replace the
-  // number input and a picked file could never write back into it, so neither
-  // joins them here or in the Linked records group.
+  // number input beside it, with its own choice button. A model pick
+  // writes the binder's number back; an icon pick comes from the gallery.
   const links=new Map((row.recordLinks||[]).filter(entry=>entry.kind!=="asset").map(entry=>[entry.field,entry]));
   const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
   const shownLinks=new Set();
@@ -924,7 +1126,9 @@ function fieldSections(row){
         {"aria-label":`${field.label} text`,"data-field-key":field.key,"data-lex-dialog":"",
           title:dialog.text||"",format:false}));
     const assetDisplay=fieldAssetLink?assetFace(row,field,fieldAssetLink):null;
-    if(assetDisplay)control=el("span",{class:"ds1-asset-field"},control,assetDisplay);
+    const assetInput=control.matches?.("input")?control:control.querySelector?.("input");
+    const assetChoice=fieldAssetLink&&field.editable&&assetInput?assetChoiceButton(row,field,assetInput,fieldAssetLink):null;
+    if(assetDisplay||assetChoice)control=el("span",{class:"ds1-asset-field"},control,...[assetDisplay,assetChoice].filter(Boolean));
     const shown=shownLabel(field);
     const textLink=row.table==="EquipParamProtector"?TEXT_LABEL_LINKS[field.key]:null;
     const assetLink=!textLink?(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key&&entry.resolved):null;
@@ -940,8 +1144,7 @@ function fieldSections(row){
     groups.get(group).push(detailField({label,property:field.key,control,icon:field.icon||null,
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
-      help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),min:field.minimum,max:field.maximum,
-      sliderMin:field.sliderMin,sliderMax:field.sliderMax}));
+      help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})}));
   }
   const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field)&&entry.kind!=="asset");
   if(unlisted.length){
@@ -1155,9 +1358,11 @@ function monsterDetail(groups){
   if(state.row.table==="NpcParam"&&state.npcShop&&state.npcShop.rows.length)tabs.push({id:"shop",label:"Shop",help:"Everything this merchant sells, in shop order. Price and stock edit here; the item name opens the rest of the line below it. -1 stock means unlimited."});
   tabs.push({id:"ai",label:"AI",help:"The think record driving this enemy: senses, distances and goals. Swap it with the finder; think records are edited in the AI tab."});
   tabs.push({id:"behaviors",label:"Behaviors",help:"The behavior set this enemy uses. Every behavior in the set is one move it can choose; each move calls one attack, projectile or effect."});
-  // No model, no Model tab: an NPC without a placed, loadable character
-  // model showed an empty black stage here.
-  if(state.chrView&&(state.chrView.chrs||[]).some(entry=>entry.available))tabs.push({id:"model",label:"Model",help:"Character model, attacks and hitboxes. Pick an attack to see its hitboxes."});
+  // The magnifier covers previewable models, so the Model tab is the
+  // fallback: armor-assembled and unplaced NPCs inspect attacks and
+  // hitboxes here, where no previewer opens.
+  const chrMeshed=(state.chrView?.chrs||[]).some(entry=>entry.available&&(entry.meshes||0)>0);
+  if(state.chrView&&!chrMeshed)tabs.push({id:"model",label:"Model",help:"Attacks and hitboxes with no model to show them on. Enemies with a preview open this viewer in the magnifier instead."});
   const active=tabs.some(tab=>tab.id===state.monsterTab)?state.monsterTab:tabs[0].id;
   const section=tabs.find(tab=>tab.id===active);
   const content=active==="attacks"?monsterAttacksSection()
@@ -1167,7 +1372,7 @@ function monsterDetail(groups){
     :active==="behaviors"?monsterBehaviorsSection()
     :active==="model"?monsterModelSection()
     :groups.get(section.label);
-  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
+  return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.monsterTab=id;render();},content});
 }
 // Ammo's Defense tab reads its guard block under three headers: the guard's
@@ -1205,7 +1410,7 @@ function itemDetail(groups){
   const body=groups.get(section.label);
   const content=section.label==="Defense"&&state.row&&catalogSub(state.row.table,state.row)==="ammo"
     ?ammoDefenseSections(body):body;
-  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
+  return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.itemTab=id;render();},content});
 }
 function effectDetail(groups){
@@ -1217,10 +1422,25 @@ function effectDetail(groups){
   const section=tabs.find(tab=>tab.id===active);
   const accept=tabs.map(tab=>tab.id);
   const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
-  return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept},
+  return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.effectTab=id;render();},content:groups.get(section.label)});
 }
+function lightDetail(row,groups){
+  // Coordinates first like placements; the Light section below names
+  // what shines there, then the look it wears.
+  const vectors=groups.get("Position")||[];
+  const identity=[
+    detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
+    detailField({label:"Point",control:readonlyField(row.point,{format:false}),
+      help:infoHelp("The shared spot this light shines from. Effects standing on it move along.")}),
+    detailField({label:"Part",control:readonlyField(row.part,{format:false}),
+      help:infoHelp("The object this light hangs from, usually its torch.")}),
+    detailField({label:"Area part",control:readonlyField(row.areaPart,{format:false}),
+      help:infoHelp("The map piece this light belongs to.")})];
+  return [...vectors,detailSection({title:"Light",body:[...identity,...(groups.get("Light")||[])]})];
+}
 function msbDetail(row,groups){
+  if(row.kind==="Light")return lightDetail(row,groups);
   // Coordinates first, with no header above them: the placement's own
   // position, rotation and scale are the instance, and the Placement
   // group below names what stands there.
@@ -1254,7 +1474,7 @@ function bytesToBase64(buffer){
   return btoa(text);
 }
 function assetSoundPanel(row,info,body){
-  const help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
+  const help="Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy.";
   const sounds=state.assetSounds;
   const note=text=>detailSection({title:"PREVIEW",body:[soundPreview({note:text,
     help:infoHelp("Audio plays in the game. It has no picture to show.")})]});
@@ -1282,9 +1502,9 @@ function renderSoundDetail(row){
   const bank=row.bank||"",stream=row.name||"";
   const body=[
     detailSection({title:"SOUND",body:[
-      detailField({label:"BANK",control:readonlyField(bank)}),
-      detailField({label:"LENGTH",control:readonlyField(formatSoundLength(row.duration||0))}),
-      detailField({label:"SIZE",control:readonlyField(formatAssetSize(row.size||0))})]}),
+      detailField({label:"BANK",property:"bank",control:readonlyField(bank)}),
+      detailField({label:"LENGTH",property:"length",control:readonlyField(formatSoundLength(row.duration||0))}),
+      detailField({label:"SIZE",property:"size",control:readonlyField(formatAssetSize(row.size||0))})]}),
     detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(
       el("button",{type:"button",onclick:()=>navigate("sound","files",`Asset:${bank}`)},"Show in Files"))})]})];
   return detailPanel({title:row.name,meta:formatSoundLength(row.duration||0),
@@ -1294,9 +1514,9 @@ function renderSoundDetail(row){
 }
 function renderAssetDetail(){
   const row=state.rows.find(row=>key(row)===state.selected);
-  if(!row)return detailPanel({title:"File",body:[LexeditorUI.detailNote("Select a file.")]});
+  if(!row)return detailPanel({title:"File",actions:[assetUploadButton()],body:[LexeditorUI.detailNote("Select a file.")]});
   if(!state.row||key(state.row)!==state.selected||!state.assetDetail)
-    return detailPanel({title:row.name,body:[LexeditorUI.loadingPanel({label:"Loading file"})]});
+    return detailPanel({title:row.name,actions:[assetUploadButton()],body:[LexeditorUI.loadingPanel({label:"Loading file"})]});
   const info=state.assetDetail;
   const fromMod=info.source==="mod";
   const busy=state.assetBusy;
@@ -1305,15 +1525,15 @@ function renderAssetDetail(){
   const previewUrl=texture=>`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(texture.member||"")}&index=${texture.index}`;
   const textureHelp=texture=>infoHelp(`${texture.width} by ${texture.height}, ${texture.format}. Preview of the ${fromMod?"mod":"installed game"} file, shrunk to fit.`);
   // Vanilla-vs-mod already shows in the list (tinted names, pen nibs), so
-  // the panel carries no SOURCE row; files join the mod through the
-  // list's add button, never a Replace action.
+  // the panel carries no SOURCE row; files join the mod through + in the
+  // detail header, never a Replace action.
   const body=[];
   let icon=null,preview=null,help="",audio=null;
   if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
   else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
   else if(state.tab==="sound")({help,audio}=assetSoundPanel(row,info,body));
   else{
-    help="Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy.";
+    help="Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy.";
     body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
       help:infoHelp("Files play in the game. They have no picture to show.")})]}));
   }
@@ -1321,7 +1541,7 @@ function renderAssetDetail(){
     fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
     progress?el("span",{role:"status"},progress):null].filter(Boolean);
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
-  return detailPanel({title:row.name,meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body});
+  return detailPanel({title:row.name,actions:[assetUploadButton()],meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body});
 }
 async function uploadAsset(target,file){
   if(state.assetBusy)return;
@@ -1378,12 +1598,39 @@ const ASSET_MODEL_INFO={
 // file's textures as squares in a wrapping row, each named under its
 // picture, instead of a vertical stack of label-plus-image rows.
 function assetPreviewStrip(textures,previewUrl,textureHelp){
+  // Tiles below 64 pixels upscale crisp, and a texture painted one
+  // flat color says so: c0000's only texture is blank white, and a
+  // bare white tile reads as broken. Same-origin art only, so the
+  // canvas stays readable; anything odd keeps its plain tile.
+  const markTiny=image=>{if(image.naturalWidth<64||image.naturalHeight<64)image.classList.add("ds1-texture-tiny");};
+  const markBlank=(image,tile,name)=>{
+    if(!image.naturalWidth)return;
+    try{
+      const sample=document.createElement("canvas");
+      sample.width=image.naturalWidth;sample.height=image.naturalHeight;
+      const ctx=sample.getContext("2d",{willReadFrequently:true});
+      if(!ctx)return;
+      ctx.drawImage(image,0,0);
+      const pixels=ctx.getImageData(0,0,sample.width,sample.height).data;
+      const step=Math.max(1,Math.floor(pixels.length/4/256))*4;
+      const first=pixels[0]*65536+pixels[1]*256+pixels[2];
+      for(let at=0;at<pixels.length;at+=step){
+        if(pixels[at]*65536+pixels[at+1]*256+pixels[at+2]!==first)return;
+      }
+      tile.classList.add("ds1-texture-blank");
+      name.textContent=`${name.textContent} \u00b7 blank`;
+    }catch(_error){/* leave the tile as is */}
+  };
   return el("div",{class:"ds1-texture-strip",role:"list"},
-    ...textures.map(texture=>el("figure",{class:"ds1-texture-tile",role:"listitem"},
-      el("img",{src:texture.png||previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy"}),
-      el("div",{class:"ds1-texture-caption"},
-        el("span",{class:"ds1-texture-name",title:texture.name},texture.name),
-        el("span",{class:"ds1-texture-help"},textureHelp(texture))))));
+    ...textures.map(texture=>{
+      const name=el("span",{class:"ds1-texture-name",title:texture.name},texture.name);
+      const tile=el("figure",{class:"ds1-texture-tile",role:"listitem"},
+        el("img",{src:texture.png||previewUrl(texture),alt:texture.name,class:"lex-asset-thumbnail",loading:"lazy",
+          onload:event=>{markTiny(event.target);markBlank(event.target,tile,name);}}),
+        el("div",{class:"ds1-texture-caption"},name,
+          el("span",{class:"ds1-texture-help"},textureHelp(texture))));
+      return tile;
+    }));
 }
 function assetModelPanel(row,info,body,previewUrl,textureHelp){
   const model=info.model;
@@ -1408,7 +1655,7 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
       openLabel:`View ${row.name} model`,closeLabel:`Close ${row.name} model`,
       content:()=>assetModelContent(row,info),
       onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}}:null,
-    help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. The magnifier opens the 3D model. Remove drops the mod's copy."};
+    help:"Add this file to the mod with + in the header. The game loads the mod's copy once applied. The magnifier opens the 3D model. Remove drops the mod's copy."};
 }
 function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
@@ -1422,11 +1669,13 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
           control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto"}),
           help:textureHelp(texture)}))),
         onClose:drawer=>drawer.replaceChildren()},
-      help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. The magnifier shows every texture full-size. Remove drops the mod's copy."};
+      help:"Add this file to the mod with + in the header. The game loads the mod's copy once applied. The magnifier shows every texture full-size. Remove drops the mod's copy."};
   }
-  if(info.reason==="split-archive")body.push(detailSection({title:"PREVIEW",body:[
-    detailField({label:"ARCHIVE",control:readonlyField("Split archive"),
-      help:infoHelp("Many textures packed into one whole-file archive. It replaces as a whole file and has no per-texture preview; single .tpf and .dds files do.")})]}));
+  // The archive kind is file metadata, not a preview: it sits loose in
+  // the panel instead of under PREVIEW, pinnable through the row's kind.
+  if(info.reason==="split-archive")body.push(
+    detailField({label:"ARCHIVE",property:"kind",control:readonlyField("Split archive"),
+      help:infoHelp("Many textures packed into one whole-file archive. It replaces as a whole file and has no per-texture preview; single .tpf and .dds files do.")}));
   else if(info.reason==="unreadable")body.push(detailSection({title:"PREVIEW",body:[
     detailField({label:"TEXTURES",control:readonlyField("No preview"),
       help:infoHelp("This file does not open as textures. It still replaces as a whole file.")})]}));
@@ -1434,7 +1683,7 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
     detailField({label:"TEXTURES",control:readonlyField("No preview"),
       help:infoHelp("Only TPF containers and DDS files preview.")})]}));
   return {icon:LexeditorUI.iconSlot({content:LexeditorUI.noThumbnail("ds1")}),preview:null,
-    help:"Add this file to the mod with + in the list. The game loads the mod's copy once applied. Remove drops the mod's copy."};
+    help:"Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy."};
 }
 function assetGeometryUrl(file,side,member){
   return `/api/assets/geometry?side=${side}&file=${encodeURIComponent(file)}&member=${encodeURIComponent(member||"")}`;
@@ -1488,6 +1737,11 @@ function assetAddUpload(){
   if(!target){LexeditorUI.showToast("Select a file in the list to add it to the mod.");return;}
   assetFilePicker().click();
 }
+function assetUploadButton(){
+  const locked=state.readOnly||state.assetBusy;
+  const title=state.readOnly?"This is the game's own data, shown read-only. Create a mod to add files to it.":state.assetBusy?"An upload is already running.":"Add file to mod";
+  return LexeditorUI.newButton({title,"aria-label":title,disabled:locked,onclick:()=>assetAddUpload()});
+}
 function targetIcon(){
   const namespace="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(namespace,"svg");
@@ -1516,7 +1770,6 @@ function goToCell(label,resolve){
 async function goToPlacement(map,placementKey){
   const row=state.rows.find(entry=>key(entry)===placementKey&&entry.table===map);
   if(!row){notify(new Error("That placement is not in the open maps."));return;}
-  state.mapTab="selection";
   if(map!==state.mapId){
     state.selected=placementKey;state.mapFocus=row.id;
     await chooseMap(map);
@@ -1538,6 +1791,7 @@ async function goToDrop(lotId){
 function mapsNoun(){
   const table=state.row?.table||"";
   if(table==="ItemLotParam")return "Drop";
+  if(table.endsWith(".msb")&&String(state.row?.id||"").startsWith("light:"))return "Light";
   if(table==="ShopLineupParam")return "Shop entry";
   if(table==="ObjActParam")return "Treasure";
   return "Placement";
@@ -1546,10 +1800,11 @@ function rowActionButtons(kind){
   const locked=state.readOnly||state.rowBusy;
   const playerStart=kind==="placement"&&state.row.kind==="Player";
   const nouns=kind==="placement"?["placement","map"]:["record","table"];
-  const goTo=kind==="placement"
+  const light=kind==="light";
+  const goTo=(kind==="placement"||light)
     ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
-      title:"Show this placement in the map viewport","aria-label":"Show this placement in the map viewport",
-      onclick:()=>goToPlacement(state.row.table,key(state.row))},targetIcon())]
+      title:`Show this ${kind} in the map viewport`,"aria-label":`Show this ${kind} in the map viewport`,
+      onclick:()=>light?goToLight(key(state.row)):goToPlacement(state.row.table,key(state.row))},targetIcon())]
     :kind==="record"&&state.tab==="maps"&&state.row.table==="ItemLotParam"
     ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
       title:"Show where this drops in the map viewport","aria-label":"Show where this drops in the map viewport",
@@ -1557,6 +1812,9 @@ function rowActionButtons(kind){
     :[];
   const duplicateTitle=state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`;
   const removeTitle=playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`;
+  // Lights cannot be copied or deleted: events have no free IDs and
+  // the file keeps no spare room, so the buttons stay off entirely.
+  if(light)return goTo;
   return [...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
       title:duplicateTitle,"aria-label":duplicateTitle,
       onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
@@ -1671,13 +1929,14 @@ function curveDetail(actions,groups){
   graph=curveEditor({title:row.name,overlayExtrema:true,variables,
     domain:{min:stages[0],max:stages[4]>stages[0]?stages[4]:stages[0]+1},
     range:{min:floor,max:ceil>floor?ceil:floor+1},
-    graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate});
+    graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate,
+    formula:LexeditorUI.mathFormula("V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S")});
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=evaluate;
   host.append(graph);
   return detailPanel({title:row.name,help:row.help,actions,paginate:{unpaged:true},
     body:[detailSection({title:"GRAPH",
-      help:infoHelp("The line passes exactly through every stage point; between stages it blends with the left stage's Curve shape value. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shaping, C1-C4 the level-up cost fields. Edit every value from the variables drawer over the graph."),
+      help:infoHelp("The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. On the line, T_lo and V_lo belong to the left stage, T_hi and V_hi to the right one. Edit every value from the variables drawer over the graph."),
       body:[host]})]});
 }
 function renderScriptDetail(){
@@ -1720,11 +1979,11 @@ function detail(){
   const title=state.row.name;
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const meta=state.tab==="maps"&&state.row&&msbRowEarly?`model ${state.row.model}`:state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
+  const meta=state.tab==="maps"&&state.row&&msbRowEarly?(state.row.kind==="Light"?`look ${state.row.preset}`:`model ${state.row.model}`):state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
-  const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons("placement"):paramRowEarly?rowActionButtons("record"):[];
+  const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons(state.row.kind==="Light"?"light":"placement"):paramRowEarly?rowActionButtons("record"):[];
   if(state.row.table==="NpcParam")return armDs1Preview(detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]}),state.row.table,state.row.id);
   if(state.tab==="stats"&&state.sub==="curves"&&paramRowEarly)return curveDetail(rowActionsEarly,groups);
   let help=state.row.help;
@@ -1752,6 +2011,9 @@ function detail(){
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }
 const ds1PreviewAvailability=new Map();
+// The open enemy viewer's refresh, when one is open: undo and redo
+// repaint it instead of re-rendering the page out from under it.
+let chrDrawerRefresh=null;
 // Label kinds with equipment-screen art (icons.py); anything else keeps the
 // shared fallback glyph.
 const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
@@ -1800,10 +2062,17 @@ LexeditorUI.registerNoThumbnail("ds1",label=>{
 async function ds1PreviewTarget(table,id){
   if(table==="NpcParam"){
     const view=await api(`/api/chr/view?npc=${id}&view=thumb`);
-    const chr=(view.chrs||[]).find(entry=>entry.available);
-    return chr?{kind:"chr",name:`${view.name} model`,
-      url:`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`}
-      :{reason:`${view.name} has no character model.`};
+    // Humans walk on the shared player rig, which carries bones but
+    // no meshes: their bodies are armor sets the game assembles, not
+    // one model file. Previewing the bare rig shows a glitched empty
+    // stage, so mesh-less links take the honest empty state instead:
+    // the placeholder, no magnifier, and the reason on the icon.
+    const chr=(view.chrs||[]).find(entry=>entry.available&&(entry.meshes||0)>0);
+    if(chr)return {kind:"chr",name:`${view.name} model`,npc:id,
+      url:`/api/chr/geometry?chr=${encodeURIComponent(chr.id)}`};
+    if((view.chrs||[]).some(entry=>entry.available))
+      return {reason:`${view.name} is assembled from armor, so there is no one model to preview.`};
+    return {reason:`${view.name} has no character model.`};
   }
   if(!["EquipParamWeapon","EquipParamProtector","EquipParamGoods","EquipParamAccessory"].includes(table))return null;
   const view=await api(`/api/parts/view?table=${encodeURIComponent(table)}&id=${id}`);
@@ -1858,6 +2127,7 @@ function ds1PreviewContent(target){
       if(stage.isConnected)message.replaceChildren(error.message||String(error));
     });
   };
+  if(target.kind==="chr")return chrDrawerContent(target);
   if(!target.variants){show(target.url);return stage;}
   let picked=target.variants[0];
   // Dual-gender armor fits exactly two bodies, so the switch is one
@@ -1881,6 +2151,90 @@ function ds1PreviewContent(target){
   stage.querySelector(":scope > .lex-model-view-modes")?.append(picker);
   show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
   return stage;
+}
+// The enemy viewer: the Model tab's contents merged into the magnifier
+// drawer - an attack list on the left, the stage, and the viewed
+// attack's hitbox fields under it. One viewer, not two: enemies with a
+// preview open it here, and the Model tab stays only where no preview
+// opens. Hitbox timing is not shown: parameter links do not prove an
+// animation uses the attack, so no timeline can say when a slot strikes.
+async function chrDrawerContent(target){
+  const view=await api(`/api/chr/view?npc=${target.npc}`);
+  const listHost=el("div",{class:"lex-chr-viewer-list"});
+  const stageHost=el("div",{class:"lex-chr-viewer-stage"});
+  const status=el("div",{class:"lex-viewport-status"});
+  const fieldsHost=el("div",{class:"lex-chr-viewer-fields"});
+  const wrap=el("div",{class:"lex-chr-viewer"},listHost,
+    el("div",{class:"lex-chr-viewer-main"},stageHost,status,fieldsHost));
+  let attackId=(view.attacks||[])[0]?.id??null;
+  const renderList=()=>{listHost.replaceChildren(chrAttackList(view.attacks||[],attackId,pick));};
+  // The drawer appends this content after the factory resolves, and the
+  // stage refuses a detached host, so the first mount waits a frame.
+  const renderStage=async ()=>{
+    await new Promise(request=>requestAnimationFrame(request));
+    if(!stageHost.isConnected)return;
+    return Ds1Viewport.mountChr(stageHost,view,attackId,status)
+      .catch(error=>{status.textContent=error.message||String(error);});
+  };
+  const renderFields=async ()=>{
+    if(attackId==null){fieldsHost.replaceChildren();return;}
+    fieldsHost.replaceChildren(LexeditorUI.loadingStatus("Reading hitboxes"));
+    try{
+      const result=await api(`/api/row?table=AtkParam_Npc&id=${attackId}&sub=attacks`);
+      if(!wrap.isConnected)return;
+      const attackRow={table:"AtkParam_Npc",id:attackId,name:result.row.name,fields:result.row.fields};
+      fieldsHost.replaceChildren(chrHitboxFields(attackRow,refreshSoon));
+    }catch(error){
+      if(wrap.isConnected)fieldsHost.replaceChildren(LexeditorUI.detailNote("Could not read the attack."));
+      notify(error);
+    }
+  };
+  const refresh=async ()=>{
+    if(!wrap.isConnected){chrDrawerRefresh=null;return false;}
+    const fresh=await api(`/api/chr/view?npc=${target.npc}`);
+    Object.assign(view,fresh);
+    if(!(view.attacks||[]).some(entry=>entry.id===attackId))attackId=(view.attacks||[])[0]?.id??null;
+    renderList();await renderStage();await renderFields();
+    return true;
+  };
+  const refreshSoon=()=>{edits.then(refresh).catch(()=>{});};
+  const pick=id=>{if(id===attackId)return;attackId=id;renderList();renderStage();renderFields();};
+  chrDrawerRefresh=refresh;
+  renderList();renderStage();renderFields();
+  return wrap;
+}
+async function refreshChrDrawer(){
+  if(typeof chrDrawerRefresh!=="function")return false;
+  try{return await chrDrawerRefresh();}
+  catch(error){notify(error);return true;}
+}
+function chrAttackList(attacks,selectedId,onPick){
+  return columnList({rows:attacks.map(entry=>({id:entry.id,name:entry.name,values:{route:entry.route}})),
+    key:row=>row.id,selected:selectedId,select:row=>{if(row.id!==selectedId)onPick(row.id);},
+    columns:[{key:"name",label:"Attack",grow:1},
+      {key:"route",label:"Route",render:row=>String(row.values.route||"")}]});
+}
+function chrHitboxFields(attackRow,afterEdit){
+  const defs=new Map((attackRow.fields||[]).map(field=>[field.key,field]));
+  const body=[];
+  for(let slot=0;slot<4;slot++){
+    for(const key of [`hit${slot}_Radius`,`hit${slot}_DmyPoly1`,`hit${slot}_DmyPoly2`]){
+      const def=defs.get(key);
+      if(!def)continue;
+      const input=el("input",{type:"number",value:String(def.value),"aria-label":def.label,
+        ...(state.readOnly?{disabled:true,title:"Open a mod project to edit hitboxes"}:{})});
+      input.addEventListener("change",()=>{
+        if(state.readOnly)return;
+        commit(attackRow,{key:def.key,label:def.label,editable:true},Number(input.value),input);
+        afterEdit();
+      });
+      body.push(detailField({label:def.label,control:input,
+        ...(def.description?{help:infoHelp(def.description)}:{})}));
+    }
+  }
+  body.push(actionRow(el("button",{type:"button",onclick:()=>openAttack(attackRow.id)},
+    `Edit ${attackRow.name||"attack"} in Attacks`)));
+  return detailSection({title:"Hitboxes",body});
 }
 function armDs1Preview(panel,table,id){
   if(!(panel instanceof Element))return panel;
@@ -1910,7 +2264,7 @@ function armDs1Preview(panel,table,id){
     LexeditorUI.attachModelPreview(panel,{plugin:"ds1",label:target.name,
       openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
       content:()=>ds1PreviewContent(target),
-      onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
+      onClose:drawer=>{chrDrawerRefresh=null;window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
   };
   // Detail panels mount after detail() returns, so a cached answer settles
   // on a microtask: settling synchronously would find a detached panel.
@@ -1933,12 +2287,12 @@ async function beginTaeForm(){
   const field=key=>state.row?.fields.find(item=>item.key===key)?.value;
   state.taeForm={binder:scope.binder,tae:scope.tae,anim:scope.anim,type:"66",
     start:String(field("start")??0),end:String(field("end")??1)};
-  refreshAnimList();
+  refreshAnimList();refreshAnimDetail();
 }
 function renderTaeForm(){
   const form=state.taeForm;
   const type=el("select",{"aria-label":"Event type","data-tae-input":"type",disabled:state.taeBusy,
-    onchange:event=>{form.type=event.target.value;refreshAnimList();}},
+    onchange:event=>{form.type=event.target.value;refreshAnimDetail();}},
     ...taeEventTypes.map(entry=>el("option",{value:String(entry.type)},entry.label)));
   type.value=form.type;
   const start=el("input",{type:"number","aria-label":"Start (s)","data-tae-input":"start",step:"any",value:form.start,disabled:state.taeBusy,
@@ -1954,7 +2308,7 @@ function renderTaeForm(){
           }
           submitTaeForm(form);
         }},"Create event"),
-      el("button",{type:"button",disabled:state.taeBusy,onclick:()=>{state.taeForm=null;refreshAnimList();}},"Cancel")],
+      el("button",{type:"button",disabled:state.taeBusy,onclick:()=>{state.taeForm=null;refreshAnimDetail();}},"Cancel")],
     body:[detailSection({title:"Event",body:[
       detailField({label:"Event type",control:type,
         help:infoHelp("Which documented event to add. Its values start at 0, so set them after. Only documented types can be added.")}),
@@ -1963,7 +2317,7 @@ function renderTaeForm(){
 }
 function submitTaeForm(form){
   if(state.taeBusy||state.readOnly||state.taeForm!==form)return;
-  state.taeBusy=true;state.pending++;refreshAnimList();
+  state.taeBusy=true;state.pending++;refreshAnimList();refreshAnimDetail();
   edits=edits.then(async()=>{
     try{
       const result=await api("/api/tae/add",{table:form.binder,tae:form.tae,anim:form.anim,
@@ -1976,7 +2330,7 @@ function submitTaeForm(form){
     }catch(error){
       state.taeForm=null;await refreshState();await loadItems();notify(error);
     }finally{
-      state.pending--;state.taeBusy=false;refreshAnimList();revealSelection();
+      state.pending--;state.taeBusy=false;refreshAnimList();refreshAnimDetail();revealSelection();shell.refresh();
     }
   }).catch(notify);
 }
@@ -1986,7 +2340,7 @@ async function removeTaeEvent(){
     message:"The event leaves the animation at once. Save keeps the removal in the mod project.",
     confirmLabel:"Remove event",cancelLabel:"Cancel"});
   if(!ok)return;
-  state.taeBusy=true;state.pending++;refreshAnimList();
+  state.taeBusy=true;state.pending++;refreshAnimList();refreshAnimDetail();
   try{
     const [table,id]=[state.row.table,state.row.id];
     const result=await api("/api/tae/remove",{table,id});
@@ -1994,7 +2348,7 @@ async function removeTaeEvent(){
     state.selected=null;state.row=null;state.animQuery="";
     await loadItems();
   }catch(error){await refreshState();await loadItems();notify(error);}
-  finally{state.taeBusy=false;state.pending--;refreshAnimList();revealSelection();}
+  finally{state.taeBusy=false;state.pending--;refreshAnimList();refreshAnimDetail();revealSelection();shell.refresh();}
 }
 function bandActions(){
   const disabled=state.readOnly||state.bandBusy||state.pending>0;
@@ -2094,15 +2448,13 @@ function renderItems(){
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="scripts"?"Scripts":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),
-    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
+    page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,columnsKey:"ds1-"+state.tab,
     search:{key:"ds1-records-search",value:state.query,label:"Search "+noun,change:value=>{state.query=value;state.page=0;render();}},
-    // Asset files join the mod through the list's add button: adding at a
-    // path the game has replaces it through the loader, so asset tabs
-    // need no Replace action of their own.
-    add:ASSET_TABS.has(state.tab)?(()=>assetAddUpload()):undefined,
-    addTitle:"Add file to mod",
-    addDisabled:ASSET_TABS.has(state.tab)&&(state.readOnly||state.assetBusy),
-    addDisabledReason:!ASSET_TABS.has(state.tab)?undefined:state.readOnly?"This is the game's own data, shown read-only. Create a mod to add files to it.":state.assetBusy?"An upload is already running.":undefined,
+    // Creation lives in the detail header: records duplicate there, and
+    // asset files join the mod through + in the file header - adding at
+    // a path the game has replaces it through the loader, so asset tabs
+    // need no Replace action of their own. The list keeps no add button.
+    tableAdd:false,
     sync:next=>{
       state.page=next.page;state.pageSize=next.pageSize;state.selection=next.selection||[];
       if(state.selected!==next.selected){state.selected=next.selected;void loadDetail().then(render).catch(notify);}
@@ -2111,9 +2463,11 @@ function renderItems(){
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,
-      decorateRow:(node,row)=>LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name}),
-      sortState:state.sort,
-      sort:column=>{if(misc||(state.tab==="stats"&&state.sub==="levelup"))return;state.sort={key:column,dir:state.sort.key===column?-state.sort.dir:1};render();},
+      decorateRow:(node,row)=>{LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});
+        if(row.modelPick)LexeditorUI.decorateSearchCandidate(node,{type:row.modelPick.type,value:row.modelPick.value,label:row.name});
+        return node;},
+      sortState:tabSort(),
+      sort:column=>{if(misc||(state.tab==="stats"&&state.sub==="levelup"))return;const before=tabSort();state.sorts[sortScope()]={key:column,dir:before.key===column?-before.dir:1};render();},
       // The record is fetched first, then the shared list swaps in its detail
       // pane once. It used to draw the pane with the old record, then render
       // the whole page twice more as two loads of the same row came back.
@@ -2152,7 +2506,7 @@ function renderItems(){
     // names: a menu label is named by its text; editing the text renames it.
     renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
-    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
+    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
@@ -2175,17 +2529,20 @@ function refreshViewportBar(){
   if(!buttons.length)return;
   const movable=!!(state.mapInfo&&state.mapInfo.movable);
   const playerStart=state.mapInfo?.kind==="Player";
+  const light=state.mapInfo?.kind==="Light";
   for(const button of buttons){
     const action=button.dataset.viewportAction;
     if(action==="duplicate"){
-      button.disabled=state.readOnly||state.mapBusy||!movable;
-      button.title=state.readOnly?"Open a mod project to add placements"
+      button.disabled=state.readOnly||state.mapBusy||!movable||light;
+      button.title=light?"Lights cannot be duplicated"
+        :state.readOnly?"Open a mod project to add placements"
         :!state.mapSelected?"Select a placement in the viewport first"
         :!movable?"Only enemy, object and player-start placements can be duplicated"
         :"Copy this placement under the next free ID";
     }else if(action==="remove"){
-      button.disabled=state.readOnly||state.mapBusy||!movable||playerStart;
-      button.title=playerStart?"The player start cannot be removed"
+      button.disabled=state.readOnly||state.mapBusy||!movable||playerStart||light;
+      button.title=light?"Lights cannot be removed"
+        :playerStart?"The player start cannot be removed"
         :state.readOnly?"Open a mod project to remove placements"
         :!state.mapSelected?"Select a placement in the viewport first"
         :!movable?"Only enemy, object and player-start placements can be removed"
@@ -2226,9 +2583,9 @@ function syncPlacementRow(map,partKey,names,afters){
   }
   const entry=state.rows.find(row=>row.table===map&&row.id===partKey);
   if(entry)for(let i=0;i<3;i++)entry.values[names[i]]=afters[i];
-  if(state.tab!=="maps"||state.mapTab!=="selection")return;
+  if(state.tab!=="maps")return;
   for(let i=0;i<3;i++){
-    const input=document.querySelector(`[data-maps-side] [data-field-key="${names[i]}"]`);
+    const input=document.querySelector(`[data-maps-detail] [data-field-key="${names[i]}"]`);
     if(input&&input.isConnected)input.value=String(afters[i]);
   }
 }
@@ -2243,18 +2600,25 @@ async function refreshMapsAfterUndo(entry){
       moved.set(edit.table+":"+edit.id,{map:edit.table,id:edit.id});
   }
   for(const {map,id} of moved.values()){
+    const lightRow=String(id).startsWith("light:");
     const row=state.rows.find(entry=>entry.table===map&&entry.id===id);
-    if(!row)continue;
-    const pos=[row.values.posX,row.values.posY,row.values.posZ];
-    const rot=[row.values.rotX,row.values.rotY,row.values.rotZ];
+    let pos=null,rot=null;
+    if(row){pos=[row.values.posX,row.values.posY,row.values.posZ];rot=[row.values.rotX,row.values.rotY,row.values.rotZ];}
+    else if(lightRow&&state.row&&state.row.table===map&&state.row.id===id){
+      // Lights ride no record list; the freshly undone detail row
+      // carries the position back instead.
+      const val=lookup=>state.row.fields.find(item=>item.key===lookup)?.value;
+      pos=[val("posX"),val("posY"),val("posZ")];
+    }
+    if(!pos)continue;
     if(state.mapView&&map===state.mapView.map){
-      const part=state.mapView.parts.find(entry=>entry.key===id);
-      if(part){part.pos=pos;part.rot=rot;}
+      const part=state.mapView.parts.find(entry=>entry.key===id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===id):null);
+      if(part){part.pos=pos;if(!lightRow)part.rot=rot;}
       viewportCtl?.moveTo?.(id,pos);
-      viewportCtl?.turnTo?.(id,rot);
+      if(!lightRow)viewportCtl?.turnTo?.(id,rot);
     }
     syncPlacementRow(map,id,["posX","posY","posZ"],pos);
-    syncPlacementRow(map,id,["rotX","rotY","rotZ"],rot);
+    if(!lightRow)syncPlacementRow(map,id,["rotX","rotY","rotZ"],rot);
   }
   if(namesChanged){
     // An enemy swap can move a placement between the NPC and enemy
@@ -2262,12 +2626,12 @@ async function refreshMapsAfterUndo(entry){
     state.mapList=(await api("/api/table?tab=viewport")).rows;
     await loadDirectory().catch(notify);
   }
-  refreshMapSide();refreshDirectory();
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function viewportMove(map,key,pos){
   if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
   const names=["posX","posY","posZ"];
-  const before=state.mapView.parts.find(part=>part.key===key)?.pos||[0,0,0];
+  const before=(state.mapView.parts.find(part=>part.key===key)||(state.mapView.lights||[]).find(part=>part.key===key))?.pos||[0,0,0];
   state.mapBusy=true;state.pending++;shell.refresh();refreshViewportBar();
   viewportCtl?.moveTo(key,pos);
   let settle=null;
@@ -2284,7 +2648,7 @@ function viewportMove(map,key,pos){
       }
       fieldHistory.record({edits:done});
       state.dirty=latest.dirtyCount;state.changes=latest.changes||state.changes;state.nativeRules=latest.nativeRules||state.nativeRules;
-      const part=state.mapView.parts.find(entry=>entry.key===key);
+      const part=state.mapView.parts.find(entry=>entry.key===key)||(state.mapView.lights||[]).find(entry=>entry.key===key);
       if(part)part.pos=[done[0].after,done[1].after,done[2].after];
       viewportCtl?.moveTo(key,part?part.pos:pos);
       syncPlacementRow(map,key,names,[done[0].after,done[1].after,done[2].after]);
@@ -2296,6 +2660,7 @@ function viewportMove(map,key,pos){
 }
 function viewportRotate(map,key,rot){
   if(state.readOnly||state.mapBusy||!state.mapView)return Promise.resolve(false);
+  if(String(key).startsWith("light:"))return Promise.resolve(false);
   const names=["rotX","rotY","rotZ"];
   const before=state.mapView.parts.find(part=>part.key===key)?.rot||[0,0,0];
   state.mapBusy=true;state.pending++;shell.refresh();refreshViewportBar();
@@ -2332,7 +2697,7 @@ async function reloadViewport(map,selectKey){
   await loadItems();
   clampMapSelection();
   await loadDetail().catch(notify);
-  refreshMapSide();refreshDirectory();
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
   const host=document.querySelector("[data-viewport-host]");
   if(host&&state.tab==="maps"){
     viewportCtl=null;
@@ -2422,12 +2787,24 @@ async function chooseMap(id){
 // 3D scene, so picking a placement only swaps the side panel's content.
 async function selectPlacement(placementKey,fromCanvas){
   const row=state.rows.find(row=>key(row)===placementKey);
-  if(!row)return;
-  if(placementKey===state.selected&&state.mapTab==="selection"&&state.row&&key(state.row)===placementKey)return;
-  state.selected=placementKey;state.mapSelected=row.id;state.mapTab="selection";
+  if(!row){
+    if(state.tab==="maps"&&/\.msb:light:/.test(placementKey))return selectLight(placementKey,fromCanvas);
+    return;
+  }
+  if(placementKey===state.selected&&state.row&&key(state.row)===placementKey)return;
+  state.selected=placementKey;state.mapSelected=row.id;
   if(!fromCanvas&&viewportCtl)viewportCtl.select(state.mapSelected);
   await loadDetail().catch(notify);
-  refreshMapSide();refreshDirectory();
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
+}
+// Lights ride the open map view, not the record lists: the key after
+// the first colon is the viewport id (light:N).
+async function selectLight(lightKey,fromCanvas){
+  if(lightKey===state.selected&&state.row&&key(state.row)===lightKey)return;
+  state.selected=lightKey;state.mapSelected=lightKey.slice(lightKey.indexOf(":")+1);
+  if(!fromCanvas&&viewportCtl)viewportCtl.select(state.mapSelected);
+  await loadDetail().catch(notify);
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function refreshMapSide(){
   if(state.tab!=="maps")return;
@@ -2437,13 +2814,14 @@ function refreshMapSide(){
   side.replaceChildren(mapsStrip(),mapsPane());
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
-const DIRECTORY_TABS=["drops","treasure","npcs","enemies"];
+const DIRECTORY_TABS=["all","drops","treasure","npcs","enemies"];
 const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType!==2;
 const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType===2;
 let dirTabRestored=false;
 async function loadDirectory(){
   if(!dirTabRestored){dirTabRestored=true;try{const saved=localStorage.getItem("lex-ds1-directory-tab");if(saved)state.dirTab=saved;}catch(_error){}}
-  if(!DIRECTORY_TABS.includes(state.dirTab))state.dirTab="drops";
+  if(!DIRECTORY_TABS.includes(state.dirTab))state.dirTab="all";
+  if(state.dirTab==="all"){state.dirRows=[];return;}
   if(state.dirTab==="npcs")state.dirRows=state.rows.filter(isDirectoryFriend);
   else if(state.dirTab==="enemies")state.dirRows=state.rows.filter(isDirectoryFoe);
   else state.dirRows=(await api("/api/table?tab="+encodeURIComponent(state.dirTab))).rows;
@@ -2451,7 +2829,8 @@ async function loadDirectory(){
   if(state.dirPage>pages-1)state.dirPage=pages-1;
 }
 function directoryTabs(){
-  return [...state.worldTabs.filter(entry=>DIRECTORY_PARAM_TABS.has(entry.id)),
+  return [{id:"all",label:"All",help:"Every placement on the open map: enemies, objects and player starts. Pick one to edit it."},
+    ...state.worldTabs.filter(entry=>DIRECTORY_PARAM_TABS.has(entry.id)),
     {id:"npcs",label:"NPCs",help:"Named characters who do not fight you: merchants, blacksmiths and quest givers. Pick one to see it in the map."},
     {id:"enemies",label:"Enemies",help:"Everything placed that fights you, bosses included. Pick one to see it in the map."}];
 }
@@ -2476,7 +2855,7 @@ function directoryMatches(){
     if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
     else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
   }
-  return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||(a.id>b.id?1:a.id<b.id?-1:0));
+  return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,tabSort())||(a.id>b.id?1:a.id<b.id?-1:0));
 }
 function directoryPane(){
   return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),...directoryList());
@@ -2484,7 +2863,7 @@ function directoryPane(){
 function refreshDirectory(){
   if(state.tab!=="maps")return;
   const pane=document.querySelector("[data-maps-dir]");
-  if(!pane){render();return;}
+  if(!pane)return;
   stopPaneFit(pane);
   pane.replaceChildren(directoryStrip(),...directoryList());
 }
@@ -2506,6 +2885,7 @@ function directoryLocalRow(){
   return node;
 }
 function directoryList(){
+  if(state.dirTab==="all")return [placementsPane()];
   const matches=directoryMatches();
   const size=paneSize("dir");
   const pages=Math.max(1,Math.ceil(matches.length/size));
@@ -2541,23 +2921,32 @@ function directoryList(){
     both];
 }
 async function selectDirectoryParam(row){
-  if(key(row)===state.selected&&state.mapTab==="selection")return;
-  state.selected=key(row);state.mapTab="selection";
+  if(key(row)===state.selected&&state.row&&key(state.row)===key(row))return;
+  state.selected=key(row);
   await loadDetail().catch(notify);
-  refreshMapSide();refreshDirectory();
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"selection",label:"Selection"}],
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"}],
     active:state.mapTab,label:"Map views",change:id=>{state.mapTab=id;refreshMapSide();}});
 }
 function mapsPane(){
-  if(state.mapTab==="placements")return placementsPane();
-  if(state.mapTab==="selection"){
-    const panel=detail();
-    panel.style.flex="1 1 auto";panel.style.minHeight="0";
-    return panel;
-  }
+  if(state.mapTab==="placements")return directoryPane();
+  if(state.mapTab==="lights")return lightsPane();
   return mapsListPane();
+}
+// The right panel always shows the current selection's details, like
+// the animations tab: no Selection tab needed.
+function mapsDetailBox(){
+  const panel=detail();
+  panel.style.flex="1 1 auto";panel.style.minHeight="0";
+  return el("div",{"data-maps-detail":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:auto;"},panel);
+}
+function refreshMapsDetail(){
+  if(state.tab!=="maps")return;
+  const pane=document.querySelector("[data-maps-detail]");
+  if(!pane){render();return;}
+  pane.replaceWith(mapsDetailBox());
 }
 function mapsListPane(){
   selectVisibleRecord=null;
@@ -2623,14 +3012,51 @@ function placementsPane(){
       change:value=>{state.query=value;state.page=0;
         // Filtering picks its first match, as the old list did, but
         // stays on this tab: the reader asked to search, not to leave.
+        // The pick routes through selection so the details follow it.
         const matches=sortedRows().filter(row=>row.table===state.mapId);
         if(matches.length&&!matches.some(row=>key(row)===state.selected)){
-          state.selected=key(matches[0]);state.mapSelected=matches[0].id;
-          if(viewportCtl)viewportCtl.select(state.mapSelected);
-          void loadDetail().catch(notify);
-        }
-        refreshMapSide();}}),
+          void selectPlacement(key(matches[0]),false);
+        }else refreshMapSide();}}),
     both);
+}
+// The open map's lights, straight from its view: no fetch, and the
+// list dies with the map, so a map switch cannot strand it.
+function lightsPane(){
+  const map=state.mapView&&state.mapView.map===state.mapId?state.mapView.map:null;
+  const pool=map?(state.mapView.lights||[]).map(entry=>({id:entry.key,table:map,name:entry.name,
+    values:{preset:entry.preset}})):[];
+  const needle=(state.lightQuery||"").trim().toLocaleLowerCase();
+  const here=pool.filter(row=>!needle||String(row.name||"").toLocaleLowerCase().includes(needle))
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),undefined,{numeric:true,sensitivity:"base"}));
+  const size=paneSize("lights");
+  const pages=Math.max(1,Math.ceil(here.length/size));
+  if(state.lightPage==null)state.lightPage=0;
+  if(state.lightPage>pages-1)state.lightPage=pages-1;
+  const shown=here.slice(state.lightPage*size,(state.lightPage+1)*size);
+  const select=(row,event)=>{
+    if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
+    selectLight(key(row),false);
+  };
+  const columns=[{key:"name",label:"Name",grow:1},
+    {key:"preset",label:"Look",numeric:true,sortValue:row=>row.values.preset,render:row=>String(row.values.preset)}];
+  columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToLight(key(row))));
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",columns});
+  const pager=LexeditorUI.compactPager({pages,page:state.lightPage||0,total:here.length,pageSize:size,
+    change:value=>{state.lightPage=value;refreshMapSide();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizePaneRows(list,size,false);
+  fitPaneList(list,"lights",size,both);
+  return LexeditorUI.stack(
+    LexeditorUI.bottomSearch({key:"maps-lights",value:state.lightQuery||"",label:"Search lights",
+      change:value=>{state.lightQuery=value;state.lightPage=0;refreshMapSide();}}),
+    both);
+}
+async function goToLight(lightKey){
+  await selectLight(lightKey,false);
+  const id=lightKey.slice(lightKey.indexOf(":")+1);
+  if(viewportCtl)viewportCtl.focus(id);
+  else state.mapFocus=id;
 }
 function animCharMatches(){
   const needle=state.animCharQuery.trim().toLocaleLowerCase();
@@ -2645,38 +3071,111 @@ function animListMatches(){
 }
 async function chooseAnimChar(row){
   if(!row||key(row)===state.animCharId)return;
-  state.animCharId=key(row);state.animCharPage=0;state.animQuery="";state.animPage=0;
+  // The characters pane keeps its own page: resetting it here pushed the
+  // reader back to page one on every pick. Only the animations pane
+  // (a new character's list) starts over.
+  state.animCharId=key(row);state.animQuery="";state.animPage=0;
   state.animScope={level:"anims"};state.taeForm=null;
   const request=++recordsRequest;
-  await loadAnimView(request).catch(notify);
-  refreshAnimChars();refreshAnimList();remountAnim();
+  await loadAnimView(request);
+  if(state.animLeftTab==="events"){
+    const motion=(state.rows||[]).find(entry=>key(entry)===state.selected);
+    if(motion&&motion.motion&&motion.motion.tae){
+      animScopeFor(motion);
+      state.selected=null;state.row=null;
+      await loadAnimEvents(request);
+    }else state.animLeftTab="anims";
+  }
+  refreshAnimLeft();refreshAnimDetail();remountAnim();
 }
 async function pickAnimMotion(row){
   if(!row||key(row)===state.selected)return;
   state.selected=key(row);
-  refreshAnimList();remountAnim();
+  refreshAnimList();refreshAnimDetail();remountAnim();
 }
 async function pickAnimEvent(row){
   if(!row||key(row)===state.selected)return;
   state.selected=key(row);
   await loadDetail().catch(notify);
-  refreshAnimList();
+  refreshAnimList();refreshAnimDetail();
+}
+function animScopeFor(row){
+  const motion=row.motion;
+  state.animScope={level:"events",binder:motion.binder,tae:motion.tae,anim:motion.taeIndex,
+    charName:state.animScope.charName,animName:row.name,motionFile:motion.file||null};
 }
 async function animDrillEvents(row){
   const motion=row.motion;
   if(!motion||!motion.tae)return;
-  state.animScope={level:"events",binder:motion.binder,tae:motion.tae,anim:motion.taeIndex,
-    charName:state.animScope.charName,animName:row.name,motionFile:motion.file||null};
+  animScopeFor(row);
   state.animQuery="";state.animPage=0;state.selected=null;state.row=null;state.taeForm=null;
   const request=++recordsRequest;
-  await loadAnimEvents(request).catch(notify);
+  await loadAnimEvents(request);
   refreshAnimList();
 }
+// The motion the viewer plays: the drilled one on the Events pane,
+// else the selected animations row.
+function currentAnimMotionRef(){
+  const scope=state.animScope;
+  if(scope.level==="events")return {file:scope.motionFile||null,tae:scope.tae||null,taeIndex:scope.anim??null};
+  const row=(state.rows||[]).find(entry=>key(entry)===state.selected);
+  return row&&row.table==="AnimMotion"?row.motion:null;
+}
+async function switchAnimLeft(id){
+  if(id===state.animLeftTab)return;
+  if(id==="events"){
+    if(state.animScope.level!=="events"){
+      const row=(state.rows||[]).find(entry=>key(entry)===state.selected);
+      if(!row||!row.motion||!row.motion.tae){refreshAnimLeft();return;}
+      await animDrillEvents(row);
+    }
+    state.animLeftTab="events";
+  }else if(id==="anims"){
+    if(state.animScope.level==="events")await animBackToAnims();
+    state.animLeftTab="anims";
+  }else state.animLeftTab="chars";
+  refreshAnimLeft();refreshAnimDetail();
+}
+// The per-row Events button jumps to the Events pane for that motion.
+async function animGotoEvents(row){
+  if(!row||!row.motion||!row.motion.tae)return;
+  const same=key(row)===state.selected&&state.animScope.level==="anims";
+  await animDrillEvents(row);
+  state.animLeftTab="events";
+  refreshAnimLeft();refreshAnimDetail();
+  if(!same)remountAnim();
+}
+// A timeline event marker seeks (the viewer does that) and selects
+// the event: the left panel shows its Events pane, the right panel
+// its details.
+async function animTimelineEvent(cue){
+  if(state.tab!=="animations"||!cue||!cue.id)return;
+  if(state.animScope.level!=="events"){
+    const row=(state.rows||[]).find(entry=>key(entry)===state.selected);
+    if(!row||!row.motion||!row.motion.tae)return;
+    await animDrillEvents(row);
+    state.animLeftTab="events";
+  }
+  const found=(state.rows||[]).find(entry=>entry.id===cue.id);
+  if(found&&key(found)!==state.selected){
+    state.selected=key(found);
+    await loadDetail().catch(notify);
+  }
+  if(found){
+    const size=paneSize("events");
+    const index=animListMatches().findIndex(entry=>key(entry)===state.selected);
+    if(index>=0)state.animPage=Math.floor(index/size);
+  }
+  refreshAnimLeft();refreshAnimDetail();
+}
 async function animBackToAnims(){
-  state.animScope={level:"anims",binder:state.animScope.binder,charName:state.animScope.charName};
+  const scope=state.animScope;
+  state.animScope={level:"anims",binder:scope.binder,charName:scope.charName};
   state.animQuery="";state.animPage=0;state.taeForm=null;
   state.rows=state.animView?animMotionRows(state.animView):[];
-  const playable=state.rows.find(row=>row.motion.file)||state.rows[0];
+  const same=state.rows.find(row=>row.motion&&(row.motion.file||null)===(scope.motionFile||null)&&
+    (row.motion.tae||null)===(scope.tae||null)&&String(row.motion.taeIndex??"")===String(scope.anim??""));
+  const playable=same||state.rows.find(row=>row.motion.file)||state.rows[0];
   state.selected=playable?key(playable):null;
   state.row=null;
   refreshAnimList();
@@ -2703,17 +3202,21 @@ function remountAnim(){
   const status=document.querySelector("[data-anim-status]");
   if(!host||!timeline||!status||!host.isConnected){render();return;}
   const token=++animMount;
-  Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status).catch(error=>{
+  Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status,animTimelineEvent).catch(error=>{
     if(token!==animMount)return;
     host.querySelector(":scope > .lex-panel-loading")?.remove();
-    failMount(status,"Could not load the animation.")(error);
+    // A missing skeleton or an unreadable motion is routine browsing, not
+    // an action failure: the reason stays in the viewport, no alert.
+    status.textContent="Could not load the animation.";
+    host.append(LexeditorUI.notice({tone:"warning",message:error.message||String(error)}));
+    console.error(error);
   });
 }
 // A panel pages only what fits it: the fitted size caps the global
 // row count, so a paginated list never grows its own scrollbar. One set
 // of sizing rules for every side panel: animations and maps alike.
 const PANE_FITS={char:"animCharFit",anims:"animFit",events:"animEventFit",
-  dir:"dirFit",maps:"mapListFit",placements:"mapFit"};
+  dir:"dirFit",maps:"mapListFit",placements:"mapFit",lights:"mapLightFit"};
 function paneSize(which){
   return Math.max(1,Math.min(state.pageSize,state[PANE_FITS[which]]||Infinity));
 }
@@ -2725,7 +3228,7 @@ function fitPaneList(list,which,size,available){
     change:value=>{
       if(state[PANE_FITS[which]]===value)return;
       state[PANE_FITS[which]]=value;
-      if(which==="dir"||which==="maps"||which==="placements"){
+      if(which==="dir"||which==="maps"||which==="placements"||which==="lights"){
         if(state.tab!=="maps")return;
         if(which==="dir")refreshDirectory();else refreshMapSide();
         return;
@@ -2773,10 +3276,11 @@ function animEventsCell(){
     const motion=row.motion;
     if(!motion||!motion.tae)return "";
     return el("button",{type:"button",class:"lex-goto-button","data-anim-events":key(row),
-      title:`Edit events of ${row.name}`,"aria-label":`Edit events of ${row.name}`,
-      onclick:event=>{event.stopPropagation();void animDrillEvents(row);}},targetIcon());}};
+      title:`Show events of ${row.name}`,"aria-label":`Show events of ${row.name}`,
+      onclick:event=>{event.stopPropagation();void animGotoEvents(row);}},targetIcon());}};
 }
 function animAnimsPane(){
+  if(state.animListError)return [LexeditorUI.notice({tone:"warning",message:state.animListError})];
   const here=animListMatches();
   const size=paneSize("anims");
   const pages=Math.max(1,Math.ceil(here.length/size));
@@ -2797,6 +3301,7 @@ function animAnimsPane(){
     both];
 }
 function animEventsPane(){
+  if(state.animEventError)return [LexeditorUI.notice({tone:"warning",message:state.animEventError})];
   const here=animListMatches();
   const size=paneSize("events");
   const pages=Math.max(1,Math.ceil(here.length/size));
@@ -2804,9 +3309,6 @@ function animEventsPane(){
   const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
   const select=row=>{if(key(row)!==state.selected)void pickAnimEvent(row);};
   selectVisibleRecord=select;
-  const scope=state.animScope;
-  const back=el("button",{type:"button","data-anim-back":"",
-    onclick:()=>animBackToAnims().catch(notify)},`‹ ${scope.animName||"Animations"}`);
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
     columns:[{key:"name",label:"Name",grow:1}]});
   const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
@@ -2815,29 +3317,101 @@ function animEventsPane(){
   both.style.flex="1 1 auto";both.style.minHeight="0";
   sizePaneRows(list,size);
   fitPaneList(list,"events",size,both);
-  return [back,
+  return [
     LexeditorUI.bottomSearch({key:"anims-events",value:state.animQuery,label:"Search events",
       change:value=>{state.animQuery=value;state.animPage=0;refreshAnimList();}}),
-    both,
-    detail()];
+    both];
 }
 function animListPane(){
   const level=state.animScope.level;
   return el("div",{"data-anim-list":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;"},...(level==="events"?animEventsPane():animAnimsPane()));
 }
+// The left panel's three lists: characters, the current character's
+// animations, and the current animation's events. Animations needs a
+// character, events needs a motion with an event file; a tab with
+// nothing to show is disabled with its reason on the tooltip.
+function animLeftTabs(){
+  const charActive=!!state.animCharId;
+  const motion=currentAnimMotionRef();
+  const eventsActive=state.animScope.level==="events"||!!(motion&&motion.tae);
+  const tabs=[
+    {id:"chars",label:"Characters"},
+    {id:"anims",label:"Animations",...(charActive?{}:{disabled:true,disabledReason:"Select a character first."})},
+    {id:"events",label:"Events",...(eventsActive?{}:{disabled:true,
+      disabledReason:charActive?"The current animation has no event file.":"Select a character first."})}];
+  return LexeditorUI.tabStrip({label:"Animation lists",tabs,active:state.animLeftTab,
+    change:id=>{switchAnimLeft(id).catch(notify);}});
+}
+function animLeftPane(){
+  const tab=state.animLeftTab;
+  return el("div",{"data-anim-left":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:8px;"},
+    animLeftTabs(),
+    tab==="anims"||tab==="events"?animListPane():animCharsPane());
+}
+function refreshAnimLeft(){
+  if(state.tab!=="animations")return;
+  const pane=document.querySelector("[data-anim-left]");
+  if(!pane){render();return;}
+  stopPaneFit(pane);
+  pane.replaceWith(animLeftPane());
+}
 function refreshAnimChars(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-chars]");
-  if(!pane)return;
+  if(!pane){refreshAnimLeft();return;}
   stopPaneFit(pane);
   pane.replaceWith(animCharsPane());
 }
 function refreshAnimList(){
   if(state.tab!=="animations")return;
   const pane=document.querySelector("[data-anim-list]");
-  if(!pane){render();return;}
+  if(!pane){refreshAnimLeft();return;}
   stopPaneFit(pane);
   pane.replaceWith(animListPane());
+}
+// The right panel shows the current selection: a character's file
+// and animation count, a motion's file and event link, or the
+// selected event's editable fields.
+function animCharDetail(){
+  const row=(state.animChars||[]).find(entry=>key(entry)===state.animCharId);
+  if(!row)return detailPanel({title:"Character",body:[LexeditorUI.detailNote("Select a character.")]});
+  const count=state.animView?animMotionRows(state.animView).length:null;
+  return detailPanel({title:row.name,body:[detailSection({title:"Character",body:[
+    detailField({label:"Character ID",control:readonlyField(row.id,{format:false})}),
+    detailField({label:"Binder",control:readonlyField(row.values?.binder||"",{format:false})}),
+    detailField({label:"Animations",control:readonlyField(count===null?"Loading…":count)})]})]});
+}
+function animMotionDetail(){
+  const row=(state.rows||[]).find(entry=>key(entry)===state.selected);
+  const motion=row&&row.table==="AnimMotion"?row.motion:null;
+  if(!motion)return detailPanel({title:"Animation",body:[LexeditorUI.detailNote("Select an animation.")]});
+  const fields=[
+    detailField({label:"File",control:readonlyField(motion.file||"(no playable motion)",{format:false})}),
+    detailField({label:"Binder",control:readonlyField(motion.binder||"",{format:false})})];
+  if(motion.tae)fields.push(detailField({label:"Event file",
+    control:readonlyField(`${motion.tae} · animation ${motion.taeIndex}`,{format:false})}));
+  if(motion.available===false&&motion.reason)fields.push(
+    detailField({label:"Status",control:readonlyField(motion.reason,{format:false})}));
+  return detailPanel({title:row.name,body:[detailSection({title:"Animation",body:fields})]});
+}
+function animDetailPane(){
+  const tab=state.animLeftTab;
+  if(tab==="events")return detail();
+  if(tab==="anims")return animMotionDetail();
+  return animCharDetail();
+}
+function animDetailBox(){
+  // Like the maps Selection pane: the panel flexes to fill the lane,
+  // giving its paged body a definite height to fit against.
+  const panel=animDetailPane();
+  panel.style.flex="1 1 auto";panel.style.minHeight="0";
+  return el("div",{"data-anim-detail":"",style:"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:auto;"},panel);
+}
+function refreshAnimDetail(){
+  if(state.tab!=="animations")return;
+  const pane=document.querySelector("[data-anim-detail]");
+  if(!pane){render();return;}
+  pane.replaceWith(animDetailBox());
 }
 function renderMaps(){
   if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
@@ -2871,22 +3445,20 @@ function renderMaps(){
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
     actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
   const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
-  const side=el("div",{"data-maps-side":"",style:"display:flex;flex-direction:column;min-width:0;min-height:0;"},mapsStrip(),mapsPane());
-  // Plain panel, not a collapsible one: the directory is the page, and
-  // collapsing it away only stranded readers. The collapsible
-  // component stays global for later use.
-  const directory=el("div",{"data-maps-directory-panel":"",class:"ds1-directory","aria-label":"Directory",
-    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},directoryPane());
-  // The viewport and the side share one remembered divider, like every
+  const lists=el("div",{"data-maps-side":"",class:"ds1-maps-left","aria-label":"Map lists",
+    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},mapsStrip(),mapsPane());
+  const selection=el("div",{"data-maps-detail-panel":"",class:"ds1-maps-detail","aria-label":"Selection details",
+    style:"min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},mapsDetailBox());
+  // The viewport and the details share one remembered divider, like every
   // list-and-detail split: the table sets the floor through minSizes.
-  // Floors that fit an 1100px window: past the 360px directory the split
-  // keeps about 710px, so the view and side floors plus their divider must
-  // stay under it. The side's vectors stack below a 340px control, so 320px
-  // still shows every value at full size instead of clipping three across.
-  const split=LexeditorUI.panelLayout([viewPane,side],"ds1-maps-view",
-    {layoutKey:"ds1-maps-view-side",defaultSizes:[60,40],minSizes:[280,320]});
+  // Floors that fit an 1100px window: past the 360px lists the split
+  // keeps about 710px, so the view and detail floors plus their divider must
+  // stay under it. The detail vectors never stack (one row, always), so the
+  // detail floor keeps the boxes wide enough that values fit at full size.
+  const split=LexeditorUI.panelLayout([viewPane,selection],"ds1-maps-view",
+    {layoutKey:"ds1-maps-view-side",defaultSizes:[60,40],minSizes:[280,360]});
   split.style.flex="1 1 auto";split.style.minWidth="0";
-  return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},directory,split);
+  return el("div",{style:"display:flex;gap:8px;align-items:stretch;"},lists,split);
 }
 function renderAnimPanels(){
   const chars=state.animChars||[];
@@ -2899,20 +3471,25 @@ function renderAnimPanels(){
   const token=++animMount;
   requestAnimationFrame(()=>{
     if(token!==animMount)return;
-    Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status).catch(error=>{
+    Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status,animTimelineEvent).catch(error=>{
       if(token!==animMount)return;
       host.querySelector(":scope > .lex-panel-loading")?.remove();
-      failMount(status,"Could not load the animation.")(error);
+      // Same as remountAnim: routine browsing failures stay in the
+      // viewport with their reason, no alert.
+      status.textContent="Could not load the animation.";
+      host.append(LexeditorUI.notice({tone:"warning",message:error.message||String(error)}));
+      console.error(error);
     });
   });
   // Plain panels, not collapsible ones: the lists are the page, and
   // collapsing them away only stranded readers. The collapsible
   // component stays global for callers that still want it.
-  const characters=el("div",{"data-anim-chars-panel":"",class:"ds1-anim-chars","aria-label":"Characters",
-    style:"flex:0 0 300px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},animCharsPane());
-  const animations=el("div",{"data-anim-list-panel":"",class:"ds1-anim-list","aria-label":"Animations",
-    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},animListPane());
-  return el("div",{class:"ds1-anim"},characters,viewPane,animations);
+  const lists=el("div",{"data-anim-left-panel":"",class:"ds1-anim-left","aria-label":"Animation lists",
+    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},animLeftPane());
+  const selection=el("div",{"data-anim-detail-panel":"",class:"ds1-anim-detail","aria-label":"Selection details",
+    style:"flex:0 0 360px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},
+    animDetailBox());
+  return el("div",{class:"ds1-anim"},lists,viewPane,selection);
 }
 function monsterModelSection(){
   const view=state.chrView;

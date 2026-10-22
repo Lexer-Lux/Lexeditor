@@ -311,3 +311,17 @@ def test_a_layout_only_tweak_keeps_its_record_and_rebuilds(game, library, tmp_pa
     assert tweak_mods.needs_rebuild(game, library)["stale"] == ["details"]
     tweak_mods.apply(game, library)
     assert tweak_mods.needs_rebuild(game, library)["needed"] is False
+def test_an_unreadable_mod_counts_as_unchanged_not_stale(game, library, monkeypatch):
+    # tweak_rows just read this mod fine; a lock landing between that and
+    # the fingerprint read is transient interference, not a change. Calling
+    # it stale flashed "changed since the last build" on and off.
+    tweak_mods.apply(game, library)
+    real_fingerprint = tweak_mods.build_fingerprint
+
+    def flaky(folder):
+        if Path(folder).name == "Alpha":
+            raise OSError("locked")
+        return real_fingerprint(folder)
+
+    monkeypatch.setattr(tweak_mods, "build_fingerprint", flaky)
+    assert tweak_mods.needs_rebuild(game, library)["stale"] == []

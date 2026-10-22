@@ -24,6 +24,13 @@ def test_drop_tables_say_which_slot_is_live():
         assert '-1' in description
 
 
+def test_boss_souls_help_names_the_event_script():
+    label, group, description = NPC_FIELDS['getSoul']
+    assert label == 'Souls'
+    assert group == 'Value & rewards'
+    assert 'event script' in description, description
+
+
 def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     doc = ItemDocument(make_archive())
     assert [row['id'] for row in doc.list_rows('monsters')] == [120000, 120100]

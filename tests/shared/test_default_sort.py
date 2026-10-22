@@ -74,7 +74,9 @@ def test_mods_tab_shows_priority_numbers():
 
 def test_ds1_sorts_by_name_and_exempts_time_order():
     source = ds1()
-    assert 'sort:{key:"name",dir:1}' in source
+    assert 'sorts:{}' in source
+    assert 'const tabSort=()=>state.sorts[sortScope()]||{key:"name",dir:1};' in source
+    assert 'state.sort=' not in source
     assert 'sort:{key:"id",dir:1}' not in source
     assert 'state.animScope.level==="events"))return filtered;' in source
     records = source[source.index('className:"ds1-records"'):source.index('className:"ds1-records"') + 300]

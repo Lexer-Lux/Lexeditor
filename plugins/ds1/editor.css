@@ -45,7 +45,7 @@
 
 .lex-dir-tabs > .lex-subtab-button{flex:0 1 auto;}
 
-.ds1-directory{flex:0 0 auto;}
+.ds1-maps-left,.ds1-maps-detail{flex:0 0 auto;}
 .ds1-anim{display:flex;gap:8px;align-items:stretch;}
 /* A model thumbnail stays unseen until its snapshot is drawn: before that the
    icon slot keeps its placeholder, so the heading never jumps or flashes. */
@@ -70,7 +70,7 @@
    gives the 26px box, this centers a readable glyph inside it. */
 .lex-preview-gender-toggle{display:flex;align-items:center;justify-content:center;
   padding:0;font:400 16px/1 var(--lex-symbol-font);}
-.ds1-anim-chars,.ds1-anim-list{flex:0 0 auto;}
+.ds1-anim-left,.ds1-anim-detail{flex:0 0 auto;}
 .lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
 /* A record link is a hoverable face (the linked record's name) plus a
    finder button (pick another target). The face takes the row; the
@@ -115,18 +115,38 @@
 }
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
 .ds1-asset-field{display:flex;align-items:center;gap:6px;}
-.ds1-asset-field>*:first-child{flex:1 1 auto;min-width:0;}
-.lex-compact-pager [data-dir-local].lex-pager-toggle>span{writing-mode:horizontal-tb;transform:none;}
+.ds1-asset-field>*:first-child{flex:1 1 auto;min-width:min(9ch,100%);}
+.ds1-icon-gallery{max-width:min(760px,92vw);}
+.ds1-icon-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:60vh;overflow:auto;padding:4px;}
+.ds1-icon-choice{padding:2px;border:1px solid transparent;border-radius:4px;background:transparent;cursor:pointer;}
+.ds1-icon-choice img{width:44px;height:44px;object-fit:contain;display:block;margin:auto;}
+.ds1-icon-choice.current{border-color:currentColor;}
+.ds1-icon-choice:hover{border-color:currentColor;}
 .ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}
-/* The Selection pane is narrow, and its longest name-plus-help ("Enemy" plus
-   its mark) would otherwise shrink to the font floor. The floor is the
-   framework's own lane minimum: wide enough that the names settle with the
-   pane's other labels, narrow enough that the coordinate inputs still fit. */
-[data-maps-side]{--lex-detail-label-floor:68px;}
+/* The selection details are narrow, and their longest name-plus-help
+   ("Enemy" plus its mark) would otherwise shrink to the font floor. The
+   floor is the framework's own lane minimum: wide enough that the names
+   settle with the pane's other labels, narrow enough that the coordinate
+   inputs still fit. */
+[data-maps-detail]{--lex-detail-label-floor:68px;}
 /* The file tabs' texture thumbnails share one wrapping row of squares,
    Models and Textures alike; each square is named under its picture. */
 .ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;}
 .ds1-texture-tile{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;max-width:160px;}
+/* A 16-pixel placeholder texture would otherwise show as a speck:
+   tiles never shrink below a glanceable size, and tiny art upscales
+   crisp instead of smearing. Big textures keep smooth scaling. */
+.ds1-texture-tile img{min-width:64px;min-height:64px;object-fit:contain;}
+.ds1-texture-tile img.ds1-texture-tiny{image-rendering:pixelated;}
+/* A blank texture is a swatch, not a picture: small and labeled. */
+.ds1-texture-tile.ds1-texture-blank img{min-width:32px;min-height:32px;}
+/* The enemy viewer fills the preview drawer: attacks on the left,
+   the stage and the viewed attack hitbox fields on the right. */
+.lex-chr-viewer{display:flex;gap:12px;flex:1 1 auto;min-height:0;min-width:0;}
+.lex-chr-viewer-list{flex:0 0 220px;min-height:0;overflow:auto;}
+.lex-chr-viewer-main{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+.lex-chr-viewer-stage{flex:1 1 auto;min-height:220px;position:relative;}
+.lex-chr-viewer-fields{flex:0 1 38%;min-height:0;overflow:auto;}
 .ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
 .ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
 .ds1-texture-help{flex:0 0 auto;display:flex;}

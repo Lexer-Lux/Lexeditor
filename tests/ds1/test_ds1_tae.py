@@ -51,7 +51,7 @@ def test_reads_event_fields_with_vanilla_and_sharing():
     assert "1 other event shares this timestamp" in by_key["start"]["description"]
     assert by_key["end"]["shared"] == 1
     required = {"key", "label", "description", "group", "dtype", "value", "type",
-                "minimum", "maximum", "enum", "editable", "vanilla", "sliderMin", "sliderMax"}
+                "minimum", "maximum", "enum", "editable", "vanilla"}
     assert all(required <= set(field) for field in row["fields"])
     assert by_key["attackType"]["dtype"] == "s32" and by_key["start"]["dtype"] == "f32"
     # Unknown and empty events expose timing only.

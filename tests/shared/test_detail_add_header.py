@@ -63,6 +63,86 @@ def test_no_add_section_button_outside_developer_mode(page):
     assert not page.locator(ADD).is_visible()
 
 
+NESTED = """() => {
+  const U = LexeditorUI;
+  try { localStorage.clear(); } catch (_error) {}
+  window.__nestedActive = 'combat';
+  const byTab = {combat: ['STR Scaling', 'DEX Scaling', 'INT Scaling', 'FTH Scaling',
+      'Damage: Physical', 'Damage: Magic', 'Damage: Fire', 'Damage: Lightning',
+      'Damage: Stamina', 'Damage: Poise', 'Parry Attack', 'Weight'],
+    basics: ['Weight', 'Price', 'Value']};
+  const fields = () => byTab[window.__nestedActive].map(label => U.detailField({
+    label, property: label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    control: U.el('input', {type: 'number', value: 0})}));
+  const main = document.querySelector('main');
+  main.style.cssText = 'display:block;height:760px';
+  window.__rebuildNested = () => main.replaceChildren(U.detailPanel({title: 'Record',
+    body: [U.tabbedPanel({label: 'Details', active: window.__nestedActive,
+      tabs: [{id: 'combat', label: 'Combat'}, {id: 'basics', label: 'Basics'}],
+      change: id => { window.__nestedActive = id; window.__rebuildNested(); },
+      paginate: {unpaged: true}, content: fields()})]}));
+  window.__rebuildNested();
+}"""
+
+SECTION_IN_COLUMN = """() => [...document.querySelectorAll('.lex-detail-section')]
+  .find(n => n.textContent.includes('New section'))?.closest('.lex-tweak-column') || null"""
+
+
+def mount_nested(page):
+    page.set_viewport_size({"width": 1700, "height": 800})
+    framework(page)
+    mount_shell(page, developer=True)
+    page.evaluate(NESTED)
+    page.wait_for_timeout(400)
+
+
+def test_added_section_joins_the_column_deal_in_bare_field_tabs(page):
+    # DS1's item tabs show bare fields, not sections: the new header
+    # belongs in one column, not full-width below the tabbed content,
+    # and it stays on the tab where it was created.
+    mount_nested(page)
+    assert page.locator(".lex-tweak-column").count() >= 2
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section", has_text="New section").wait_for()
+    page.wait_for_timeout(300)
+    assert page.evaluate("() => !!(%s)()" % SECTION_IN_COLUMN)
+    widths = page.evaluate("""() => {
+      const column = (%s)();
+      const grid = column.closest('.lex-tweak-card-grid');
+      const section = column.querySelector('.lex-detail-section');
+      return [section.getBoundingClientRect().width, grid.getBoundingClientRect().width];
+    }""" % SECTION_IN_COLUMN)
+    assert widths[0] < widths[1] * 0.9, widths
+    page.get_by_role("tab", name="Basics").click()
+    page.wait_for_timeout(400)
+    assert page.locator(".lex-detail-section", has_text="New section").count() == 0
+    page.get_by_role("tab", name="Combat").click()
+    page.wait_for_timeout(400)
+    assert page.evaluate("() => !!(%s)()" % SECTION_IN_COLUMN)
+
+
+def test_stranded_custom_section_is_adopted_into_the_columns(page):
+    # Sections the button appended to the panel body (full-width below
+    # the deal) rejoin the columns on the next layout store.
+    mount_nested(page)
+    page.locator(ADD).click()
+    page.locator(".lex-detail-section", has_text="New section").wait_for()
+    page.wait_for_timeout(300)
+    page.evaluate("""() => {
+      const section = [...document.querySelectorAll('.lex-detail-section')]
+        .find(n => n.textContent.includes('New section'));
+      document.querySelector('.lex-detail-panel > .lex-detail-panel-body').append(section);
+    }""")
+    assert page.evaluate("() => (%s)()" % SECTION_IN_COLUMN) is None
+    source = page.locator('.lex-detail-field-label-text').filter(has_text='DEX Scaling')
+    source.hover()
+    target = page.locator('[data-lex-layout-field="str-scaling"]')
+    box = target.bounding_box()
+    source.drag_to(target, target_position={'x': 10, 'y': 2})
+    page.wait_for_timeout(300)
+    assert page.evaluate("() => !!(%s)()" % SECTION_IN_COLUMN)
+
+
 def test_add_section_button_shows_a_section_glyph_not_a_plus(page):
     # It sits among the record actions, where a bare "+" reads as the
     # record add button that lives in the list panel.
@@ -233,7 +313,7 @@ def test_adding_a_section_to_a_tab_keeps_every_field_and_the_bar(page):
     assert after['contentHeight'] > 100, after
     assert after['barTop'] == before['barTop'], (before, after)
     assert after['headingTop'] == before['headingTop'], (before, after)
-    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll']
+    assert tabbed_custom_parents(page) == ['lex-tweak-column']
 
 
 def test_damaged_tab_layout_heals_on_a_restart(page):
@@ -275,7 +355,7 @@ def test_damaged_tab_layout_heals_on_a_restart(page):
                                'Lightning attack', 'Stamina attack', 'Poise attack']
     assert all(height > 0 for height in after['heights']), after
     assert after['barTop'] < after['headingTop'], after
-    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll']
+    assert tabbed_custom_parents(page) == ['lex-tweak-column']
 
 
 def test_damaged_live_panel_heals_on_the_next_section_add(page):
@@ -292,7 +372,7 @@ def test_damaged_live_panel_heals_on_the_next_section_add(page):
     }""")
     page.locator(ADD).click()
     page.wait_for_timeout(300)
-    assert tabbed_custom_parents(page) == ['lex-tweaks-scroll', 'lex-tweaks-scroll']
+    assert tabbed_custom_parents(page) == ['lex-tweak-column', 'lex-tweak-column']
     after = tabbed_geometry(page)
     assert after['barTop'] < after['headingTop'], after
     assert len(after['labels']) == 6

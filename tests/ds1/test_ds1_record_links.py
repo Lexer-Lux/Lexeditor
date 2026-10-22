@@ -135,13 +135,18 @@ def test_missing_targets_stay_visible_but_unresolved():
     assert display['replaceItemId'] == 'Unknown (400)'
 
 
-def test_none_values_have_no_link():
+def test_none_values_link_unresolved():
+    # None values emit an unresolved entry, so the field keeps its face
+    # and finder instead of falling back to a full-table select (Lexer:
+    # unset drop tables showed a dropdown of every lot in the game).
     document = ItemDocument(make_effects_archive())
     poke(document, 'EquipParamGoods', 100, 'replaceItemId', -1)
     poke(document, 'EquipParamGoods', 100, 'magicId', 0)
     found = links(document, 'EquipParamGoods', 100)
-    assert 'replaceItemId' not in found
-    assert 'magicId' not in found
+    assert found['replaceItemId']['resolved'] is False
+    assert found['replaceItemId']['name'] == 'None'
+    assert found['magicId']['resolved'] is False
+    assert found['magicId']['name'] == 'None'
 
 
 def test_linked_writes_accept_only_existing_targets_or_none():
@@ -373,3 +378,19 @@ def test_source_id_help_names_derivation():
                            for item in document.schemas[table]['fields'] if item['spec'].key == key)
         assert 'blacksmith' in description
         assert 'not separate records' in description
+
+
+def test_a_link_pointing_at_none_is_emitted_unresolved():
+    # Lexer: unset drop tables showed a dropdown of every lot in the game.
+    # The entry is still emitted, so the field keeps its face and finder
+    # instead of falling back to a full-table select.
+    document = ItemDocument(make_archive())
+    poke(document, 'EquipParamGoods', 100, 'magicId', -1)
+    found = links(document, 'EquipParamGoods', 100)
+    assert (found['magicId']['kind'], found['magicId']['table']) == ('catalog', 'Magic')
+    assert found['magicId']['id'] == -1
+    assert found['magicId']['resolved'] is False
+    assert found['magicId']['name'] == 'None'
+    poke(document, 'EquipParamGoods', 100, 'magicId', 102)
+    found = links(document, 'EquipParamGoods', 100)
+    assert found['magicId']['resolved'] is True

@@ -1,4 +1,7 @@
-"""DS1 NPCs: the Model tab shows only when a character model loads."""
+"""DS1 NPCs: the magnifier covers previewable models, so the Model tab
+is the fallback. A placed NPC with a loadable mesh opens the viewer in
+the preview drawer and has no Model tab; an unplaced NPC with no model
+at all keeps the tab for attack and hitbox inspection."""
 import sys
 import tempfile
 from pathlib import Path
@@ -48,12 +51,14 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.evaluate("navigate('npcs','npcs')")
                     page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
-                    # No placement, no model tab: never an empty black stage.
-                    select(page, 'NpcParam', 321001)
-                    page.wait_for_timeout(400)
-                    assert model_tabs(page).count() == 0
-                    # A placed NPC with a loadable binder keeps its Model tab.
+                    # A placed NPC with a loadable mesh opens the viewer
+                    # in the preview drawer: no Model tab, but a magnifier.
                     select(page, 'NpcParam', 251000)
+                    page.wait_for_selector('.lex-model-preview-trigger')
+                    assert model_tabs(page).count() == 0
+                    # No placement, no preview: the Model tab stays as the
+                    # fallback viewer for attacks and hitboxes.
+                    select(page, 'NpcParam', 321001)
                     page.wait_for_timeout(400)
                     assert model_tabs(page).count() == 1
                     page.screenshot(path=str(Path(tempfile.gettempdir()) / 'lex-ds1-npc-model.png'))
@@ -61,6 +66,6 @@ def main():
                     browser.close()
         finally:
             session.stop()
-        print('DS1 NPC model tab: shown only with a loadable model passed.')
+        print('DS1 NPC model tab: drawer covers meshes, tab is the fallback passed.')
 if __name__ == '__main__':
     main()

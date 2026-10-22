@@ -542,7 +542,7 @@ class TaeDocument:
                 'minimum': None, 'maximum': None, 'enum': {}, 'editable': True,
                 'vanilla': (struct.unpack_from('<f', self.original, offset)[0]
                             if offset + 4 <= len(self.original) else None),
-                'sliderMin': None, 'sliderMax': None, 'shared': others}
+                'shared': others}
 
     def read_event(self, anim_index, event_index):
         """One event's editable fields with vanilla values."""
@@ -560,8 +560,7 @@ class TaeDocument:
                                'group': group, 'dtype': kind,
                                'value': self._field_value(event, kind, offset), 'type': 'number',
                                'minimum': minimum, 'maximum': maximum, 'enum': {}, 'editable': True,
-                               'vanilla': self._field_original(event, kind, offset),
-                               'sliderMin': None, 'sliderMax': None})
+                               'vanilla': self._field_original(event, kind, offset)})
         return {'anim': anim['id'], 'animName': anim['name'], 'index': event['index'],
                 'type': event['type'], 'label': group, 'fields': fields,
                 'vanillaIndex': event['vanilla_index']}
@@ -708,7 +707,8 @@ class TaeDocument:
             event['end_off'] = t_off + stop * 4
         event = {'index': len(anim['events']), 'type': etype,
                  'start_off': t_off + (len(pool) - 2) * 4, 'end_off': t_off + (len(pool) - 1) * 4,
-                 'data_off': data_base, 'tight': False, 'empty': False, 'vanilla_index': None}
+                 'data_off': data_base, 'tight': False, 'empty': False, 'vanilla_index': None,
+                 'added': True}
         anim['events'].append(event)
         self._refresh_users(anim_index)
         for key in ('start', 'end'):
@@ -721,10 +721,15 @@ class TaeDocument:
         """Delete an event. Later events keep their values and vanilla
         links; only their indices shift down."""
         anim, event = self._event(anim_index, event_index)
-        if event['vanilla_index'] is not None:
+        if event['vanilla_index'] is not None or not event.get('added', False):
+            # A vanilla event leaves a tombstone by its vanilla slot; a
+            # project-side event (added by an earlier save, so parsed
+            # without a vanilla link) leaves one by its loaded slot.
+            # Only an event added and removed in this session cancels
+            # cleanly, since the file never changed underneath it.
             known = EVENT_TYPES.get(event['type'])
             self.removed.append({'anim': anim['index'], 'animName': anim['name'],
-                                 'event': event['vanilla_index'],
+                                 'event': event['vanilla_index'] if event['vanilla_index'] is not None else event['index'],
                                  'label': known[1] if known else f"Unknown event {event['type']}",
                                  'start': self._time(event['start_off']),
                                  'end': self._time(event['end_off'])})

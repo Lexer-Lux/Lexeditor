@@ -45,6 +45,13 @@ def main():
                     assert tiles.count() == 1, tiles.count()
                     assert tiles.nth(0).locator(".ds1-texture-name").inner_text() == "c9999_cloak"
                     assert tiles.nth(0).locator("img").get_attribute("src").startswith("data:image/png")
+                    # The fixture texture is 8 by 4 pixels; the tile
+                    # still renders at a glanceable size, upscaled crisp.
+                    image = tiles.nth(0).locator("img")
+                    page.wait_for_function(
+                        "document.querySelector('.ds1-texture-tile img').classList.contains('ds1-texture-tiny')")
+                    box = image.bounding_box()
+                    assert box["width"] >= 64 and box["height"] >= 64, box
                 finally:
                     browser.close()
     assert not errors, errors

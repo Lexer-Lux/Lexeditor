@@ -126,6 +126,12 @@ def main():
                                 assert abs(value - expected) < 1e-6, (value, expected)
                             low, high = sorted((curve['growth'][0], curve['growth'][1]))
                             assert low <= curve['mid'] <= high, curve
+                            # The formula rides the line, as on FF8's curves.
+                            formula = page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-follow')
+                            assert formula.count() == 1
+                            assert formula.get_attribute('aria-label') == \
+                                'V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S'
+                            assert page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-atom').count() > 0
                         elif tab == 'starting-gifts':
                             assert set(keys) == set(GIFT_FIELDS), keys
                         elif tab == 'levelup':
@@ -176,13 +182,14 @@ def main():
                             page.wait_for_function('state.pending===0')
                             sizes = pair_widths(page, 'item_09')
                             assert sizes['item'] >= 8 * sizes['em'], sizes
-                            assert page.locator('[data-lex-property="item_01"] select').count() == 1
-                            assert page.locator('[data-lex-property="equip_Accessory02"] select').count() == 1
-                            reveal(page, page.locator('[data-lex-property="item_01"] select'))
-                            empty = page.evaluate("document.querySelector('[data-lex-property=\"item_01\"] select').getBoundingClientRect().width")
-                            reveal(page, page.locator('[data-lex-property="equip_Accessory02"] select'))
-                            ring = page.evaluate("document.querySelector('[data-lex-property=\"equip_Accessory02\"] select').getBoundingClientRect().width")
-                            assert empty >= ring, {'empty': empty, 'ring': ring}
+                            # Reference slots keep a face and a finder, never a
+                            # full-table select, empty ones included: the face
+                            # names the pick (None here) and the finder changes it.
+                            for prop in ("item_01", "equip_Accessory02"):
+                                assert page.locator(f'[data-lex-property="{prop}"] select').count() == 0
+                                assert page.locator(f'[data-lex-property="{prop}"] .ds1-reference-face').count() == 1
+                                assert page.locator(f'[data-lex-property="{prop}"] .ds1-find-reference').count() == 1
+                            assert "None" in page.locator('[data-lex-property="item_01"] .ds1-reference-face').inner_text()
                         elif tab == 'starting-gifts':
                             pair = page.locator('[data-lex-property="item_01"]')
                             assert pair.count() == 1
