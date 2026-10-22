@@ -21,6 +21,50 @@ from core.service_session import request_json
 from playwright.sync_api import sync_playwright
 
 
+def select_filled_slot(page, session, tab, table, key):
+    """Open the first listed row whose `key` slot holds an item.
+
+    Both -1 and 0 read as None for starting kits and materials, so
+    anything else is a filled slot, in fixtures and the shipped game alike.
+    The master list pages client-side while state.rows holds every row, so
+    only visible rows are candidates, page by page from the first.
+    """
+    first = page.get_by_role('button', name='First page', exact=True)
+    if first.count():
+        first.first.click()
+        page.wait_for_timeout(600)
+    for _ in range(100):
+        for data_key in page.locator('.lex-list-row[data-key]').evaluate_all(
+                'nodes=>nodes.map(n=>n.dataset.key)'):
+            head, _, tail = data_key.partition(':')
+            if head != table or not tail.lstrip('-').isdigit():
+                continue
+            row_id = int(tail)
+            candidate = request_json(session.url + f"api/row?table={table}&id={row_id}&sub={tab}")['row']
+            if next(f['value'] for f in candidate['fields'] if f['key'] == key) not in (-1, 0, None):
+                if page.evaluate('state.row && state.row.id') != row_id:
+                    page.locator(f'.lex-list-row[data-key="{data_key}"]').click()
+                    page.wait_for_function(f'state.row && state.row.id==={row_id} && !state.error')
+                return
+        following = page.get_by_role('button', name='Next page', exact=True)
+        if not following.count() or not following.first.is_enabled():
+            break
+        following.first.click()
+        page.wait_for_timeout(600)
+    raise AssertionError(f'no {table} row fills {key}')
+
+
+def pair_widths(page, prop):
+    """Item-half, count-half and em widths of one item/count pair row."""
+    return page.evaluate("""(prop) => {
+        const group = document.querySelector(`[data-lex-property="${prop}"] .lex-detail-parts`);
+        const parts = [...group.children];
+        return {item: parts[0].getBoundingClientRect().width,
+                count: parts[1].getBoundingClientRect().width,
+                em: parseFloat(getComputedStyle(group).fontSize)};
+    }""", prop)
+
+
 def main():
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     if output:
@@ -97,6 +141,22 @@ def main():
                                 assert pair.locator(f'[data-field-key="{item}"]').count() == 1
                                 assert pair.locator(f'input[data-field-key="{num}"]').count() == 1
                             assert page.locator('[data-lex-property="itemNum_09"]').count() == 0
+                            # The pair's room goes to the item: on a row with a
+                            # filled slot the item half is wider than the count
+                            # half and reads at least 8em, and an empty slot's
+                            # select shows None as wide as a Ring select.
+                            select_filled_slot(page, session, tab, table, 'item_09')
+                            reveal(page, page.locator('[data-lex-property="item_09"]'))
+                            sizes = pair_widths(page, 'item_09')
+                            assert sizes['item'] > sizes['count'], sizes
+                            assert sizes['item'] >= 8 * sizes['em'], sizes
+                            assert page.locator('[data-lex-property="item_01"] select').count() == 1
+                            assert page.locator('[data-lex-property="equip_Accessory02"] select').count() == 1
+                            reveal(page, page.locator('[data-lex-property="item_01"] select'))
+                            empty = page.evaluate("document.querySelector('[data-lex-property=\"item_01\"] select').getBoundingClientRect().width")
+                            reveal(page, page.locator('[data-lex-property="equip_Accessory02"] select'))
+                            ring = page.evaluate("document.querySelector('[data-lex-property=\"equip_Accessory02\"] select').getBoundingClientRect().width")
+                            assert empty >= ring, {'empty': empty, 'ring': ring}
                         elif tab == 'starting-gifts':
                             pair = page.locator('[data-lex-property="item_01"]')
                             assert pair.count() == 1
@@ -105,6 +165,13 @@ def main():
                             pair = page.locator('[data-lex-property="materialId01"]')
                             assert pair.count() == 1
                             assert pair.locator('input[data-field-key="itemNum01"]').count() == 1
+                            # The same shared pair: the filled material's name
+                            # gets the room, the count keeps its narrow box.
+                            select_filled_slot(page, session, tab, table, 'materialId01')
+                            reveal(page, page.locator('[data-lex-property="materialId01"]'))
+                            sizes = pair_widths(page, 'materialId01')
+                            assert sizes['item'] > sizes['count'], sizes
+                            assert sizes['item'] >= 8 * sizes['em'], sizes
                         control = reveal(page, page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))

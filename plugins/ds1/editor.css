@@ -89,8 +89,30 @@
   text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .ds1-find-reference{flex:0 0 auto;}
 /* An item/count pair gives the item lane the row and the count lane a
-   short box: equal lanes starved the linked name for digits it never holds. */
-.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) minmax(6.5em,8.5em);}
+   fixed 3-digit box: a wider count lane took most of a narrow
+   three-column row and the item collapsed to its arrow or finder. */
+.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 4.5em;}
+.lex-detail-parts.ds1-item-count-pair>.lex-detail-part{margin-right:0;}
+/* On a narrow property row even a 4.5em count leaves the item no room
+   beside a side label, so the pair's label moves above its boxes the way
+   a switch row's does, and the item keeps the full width. Em units also
+   account for a larger editor font. */
+.lex-detail-field:has(.ds1-item-count-pair){
+  container:lex-pair-row / inline-size;
+}
+@container lex-pair-row (max-width:24em){
+  .lex-detail-field>.lex-detail-field-label:has(+ .lex-detail-field-control .ds1-item-count-pair){
+    grid-column:1 / -1;
+    contain:none;
+    min-height:30px;
+    height:auto;
+    justify-content:flex-start;
+    text-align:left;
+  }
+  .lex-detail-field>.lex-detail-field-control:has(.ds1-item-count-pair){
+    grid-column:1 / -1;
+  }
+}
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
 .ds1-asset-field{display:flex;align-items:center;gap:6px;}
 .ds1-asset-field>*:first-child{flex:1 1 auto;min-width:0;}
