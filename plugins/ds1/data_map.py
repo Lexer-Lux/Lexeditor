@@ -1,10 +1,10 @@
 """Coverage of the selected DS1 archives, derived from the existing editors."""
 from .formats import SUBTABS, EFFECT_TABLE, GRAPH_TABLE
-from . import assets, texts
+from . import assets, scripts, texts
 
 TAB_LABELS = {'items':'Items', 'enemies':'Enemies', 'ai':'AI', 'attacks':'Attacks', 'effects':'Effects',
               'stats':'Stats', 'misc':'Misc.',
-              'maps':'Maps', 'animations':'Animations', 'text':'Text',
+              'maps':'Maps', 'animations':'Animations', 'text':'Text', 'scripts':'Scripts',
               'npcs':'NPCs', 'drops':'Drops',
               'models':'Models', 'textures':'Textures', 'sound':'Sound effects',
               'music':'Music'}
@@ -21,12 +21,12 @@ ASSET_TARGETS = {'chr': ('models', 'files'),
                  'obj': ('models', 'files'),
                  'parts': ('models', 'files'),
                  'remo': ('models', 'files'),
-                 'sound': ('sound', 'files')}
-# Folders whose files no tab lists: movies, scripts and the like have no
+                 'sound': ('sound', 'files'), 'script': ('scripts', 'talk')}
+# Folders whose files no tab lists: movies and the like have no
 # browser, but Apply still installs files a mod carries there.
 UNTARGETED_ASSETS = {'event': 'event scripts', 'movww': 'movies',
                      'mtd': 'material data', 'other': 'these files',
-                     'script': 'scripts', 'sfx': 'visual effects',
+                     'sfx': 'visual effects',
                      'shader': 'shaders'}
 
 
@@ -218,6 +218,10 @@ def payload(store, native_rules=None, theme=None):
             continue
         controls = 'Assets: whole-file replacement with previews'
         notes = 'Add game files to the mod to replace them. Models and textures preview. Sounds replace without a preview. Files owned by another editor change there instead.'
+        if top == 'script':
+            controls = 'Scripts: dialogue logic'
+            notes = ('Read each conversation step by step: what each state runs and what moves it on. '
+                     'Apply still installs files the mod carries here.')
         if top == 'parts':
             controls = 'Assets: whole-file replacement with previews'
             notes = ('Add game files to the mod to replace them. Models and textures preview. Weapon and armor models also preview '
@@ -226,6 +230,17 @@ def payload(store, native_rules=None, theme=None):
             'coverage': 'structured', 'status': 'partial', 'openable': True,
             'target': ASSET_TARGETS[top][0], 'sub': ASSET_TARGETS[top][1],
             'controls': controls, 'notes': notes})
+    # Menu logic lives under menu/, whose folder row belongs to Textures.
+    # The two script archives open on their own Scripts subtabs instead.
+    for archive in ("ingame", "common"):
+        relative = scripts.MENU_ARCHIVES[archive]
+        if (store.game_root / relative).is_file():
+            rows.append({'id': 'script:' + archive, 'filename': relative.as_posix(),
+                'path': str(store.game_root / relative),
+                'coverage': 'structured', 'status': 'partial', 'openable': True,
+                'target': 'scripts', 'sub': archive,
+                'controls': 'Scripts: menu logic',
+                'notes': 'Read the menu logic step by step: what each state runs and what moves it on. Read-only for now.'})
     # The cosmetic theme, drawn from the installed game into a private cache.
     parts = []
     if isinstance(theme, dict):

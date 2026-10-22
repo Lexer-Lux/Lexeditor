@@ -1,12 +1,12 @@
 "use strict";
-const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
+const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,logView,pagedListDetail,columnList,subtabBar,
   actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview,audioColumn}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sort:{key:"name",dir:1},error:"",deployment:null,deployBusy:false,
   monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,
-  assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"},{id:"files",label:"Files"}],assetDetail:null,assetBusy:false,assetUpload:null,
+  assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"},{id:"files",label:"Files"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
@@ -87,6 +87,7 @@ const shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ds1",name:"Dark Souls Remastered",themeName:"ds1",theme:{accent:"#a4824c","accent-text":"#141210"}},
   tabs:[{id:"items",label:"Items",help:"Edit item properties in the selected mod. Vanilla is read-only. Unknown fields stay protected. Saves do not install a mod."},
     {id:"text",label:"Text",help:"Edit the game's menu text: NPC dialogue, event and system messages, help and menu labels. Item names and descriptions edit on the item."},
+    {id:"scripts",label:"Scripts",help:"How the menus and conversations work, step by step. Pick a script on the left to read one state: the commands it runs and the conditions that move it on. Read-only for now."},
     {id:"enemies",label:"Enemies",help:"Edit reviewed monster stats: health, defense, drops and effects. A monster's Attacks tab lists the attack records its parameters reference; its brains live in the AI tab. Vanilla is read-only. Save changes the mod project."},
     {id:"npcs",label:"NPCs",help:"Edit friendly characters: merchants, blacksmiths and quest givers. Health, souls and defense work the same as on monsters. Each merchant's Shop tab holds their stock and prices. Vanilla is read-only. Save changes the mod project."},
     {id:"drops",label:"Drops",help:"Edit enemy and corpse drop tables: what each lot drops and at what rates. One lot may serve several enemies. Vanilla is read-only. Save changes the mod project."},
@@ -110,7 +111,7 @@ const shell=LexeditorUI.mountShell({
 });
 const subtabsFor=tab=>tab==="enemies"?state.enemyTabs:tab==="ai"?state.aiTabs:tab==="npcs"?state.npcTabs:tab==="drops"?state.worldTabs.filter(entry=>entry.id==="drops"):tab==="attacks"?state.attackTabs:tab==="animations"?state.animTabs:tab==="effects"?state.effectTabs:tab==="text"?state.textTabs:
   tab==="stats"?state.statsTabs.map(entry=>entry.id==="levelup"?{...entry,help:"What each level-up adds to defense. 0 removes a gain. Save and Apply to use your values."}:entry):
-  tab==="sound"?state.soundTabs:ASSET_TABS.has(tab)?state.assetTabs:
+  tab==="sound"?state.soundTabs:tab==="scripts"?state.scriptTabs:ASSET_TABS.has(tab)?state.assetTabs:
   tab==="misc"?state.miscTabs.map(entry=>entry.id==="encumbrance"?{...entry,help:"Add or merge load ranges. Each band has a movement profile and its own recovery percentage. The last band has no upper limit. Save and Apply to use your rules."}:entry.id==="misc"?{...entry,help:"Base stamina recovery before effects and load penalties. Save and Apply to use your value."}:entry.id==="encumbrance-overrides"?{...entry,help:"Special conditions that replace band recovery. They take priority over load ranges and do not create another range. Save and Apply to use your rules."}:entry):state.tabs;
 async function refreshState(){
   const result=await api("/api/state");
@@ -137,7 +138,9 @@ function sortedRows(){
     return parts.join(" ").toLowerCase();
   };
   const filtered=state.rows.filter(row=>haystack(row).includes(query));
-  if(state.tab==="misc"||(state.tab==="stats"&&state.sub==="levelup")||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
+  // Script states keep the archive's own order (script, group, state),
+  // which a name sort would scramble (state 10 sorts before state 3).
+  if(state.tab==="scripts"||state.tab==="misc"||(state.tab==="stats"&&state.sub==="levelup")||(state.tab==="animations"&&state.animScope.level==="events"))return filtered;
   // The game's own order (by record) breaks ties.
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,state.sort)||a.id-b.id);
 }
@@ -201,6 +204,7 @@ async function loadItems(){
   let url="/api/table?tab="+encodeURIComponent(sub);
   if(wantSounds)url="/api/sounds?kind="+sub;
   else if(ASSET_TABS.has(state.tab))url="/api/assets?scope=all";
+  else if(state.tab==="scripts")url="/api/scripts?scope="+encodeURIComponent(sub);
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
   if(wantSounds)state.rows=(result.rows||[]).map(row=>({...row,values:{bank:row.bank,length:formatSoundLength(row.duration||0),size:row.size}}));
@@ -263,6 +267,12 @@ async function loadDetail(){
     if(state.selected!==key(row))return;
     state.row={table:"AnimPlayback",id:row.id,name:row.name};state.animView=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;return;
   }
+  if(row.table==="ScriptState"){
+    const detail=await api(`/api/script/state?id=${encodeURIComponent(row.id)}`);
+    if(state.selected!==key(row))return;
+    state.row={table:"ScriptState",id:row.id,name:row.name};state.scriptDetail=detail.row;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;state.assetDetail=null;
+    return;
+  }
   const detail=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}&sub=${encodeURIComponent(sub)}`);
   if(state.selected!==key(row))return;
   const isMonster=row.table==="NpcParam";
@@ -304,10 +314,11 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab!=="sound"&&ASSET_TABS.has(tab)&&!state.assetTabs.some(entry=>entry.id===sub))sub="files";
   else if(tab==="items"&&!state.tabs.some(entry=>entry.id===sub))sub="consumables";
   else if(tab==="text"&&!state.textTabs.some(entry=>entry.id===sub))sub="menu-labels";
+  else if(tab==="scripts"&&!state.scriptTabs.some(entry=>entry.id===sub))sub="ingame";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
   try{
-    if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","text"].includes(tab))await loadItems();
+    if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","text","scripts"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
@@ -1669,16 +1680,34 @@ function curveDetail(actions,groups){
       help:infoHelp("The line passes exactly through every stage point; between stages it blends with the left stage's Curve shape value. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shaping, C1-C4 the level-up cost fields. Edit every value from the variables drawer over the graph."),
       body:[host]})]});
 }
+function renderScriptDetail(){
+  const info=state.scriptDetail;
+  if(!info)return detailPanel({title:state.row?.name||"State",body:[LexeditorUI.detailNote("Select a state.")]});
+  const commandLine=command=>`${command.bank}:${command.id}`+(command.args.length?`  ${command.args.join(", ")}`:"");
+  const showList=list=>list.length?list.map(command=>`  ${commandLine(command)}`).join("\n"):"  (none)";
+  const showCondition=(condition,depth)=>{
+    const pad="  ".repeat(depth);
+    const head=`${pad}if ${condition.evaluator}`+(condition.target===null||condition.target===undefined?"":` -> state ${condition.target}`);
+    return [head,...condition.pass.map(command=>`${pad}  ${commandLine(command)}`),
+      ...condition.sub.flatMap(entry=>showCondition(entry,depth+1))];
+  };
+  const commands=`entry:\n${showList(info.entry)}\nexit:\n${showList(info.exit)}\nwhile:\n${showList(info.while)}`;
+  const conditions=info.conditions.length?info.conditions.flatMap(condition=>showCondition(condition,0)).join("\n"):"(no conditions)";
+  return detailPanel({title:state.row.name,
+    body:[detailSection({title:"COMMANDS",body:[logView(commands)]}),
+      detailSection({title:"CONDITIONS",body:[logView(conditions)]})]});
+}
 function detail(){
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
-  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="drops"?"Drop":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):state.tab==="sound"?"Sound":"Item";
+  const noun=state.tab==="npcs"?(state.sub==="unowned-shops"?"Shop entry":"NPC"):state.tab==="drops"?"Drop":state.tab==="attacks"?(state.sub==="projectiles"?"Projectile":"Attack"):state.tab==="enemies"?(state.sub==="behaviors"?"Behavior":state.sub==="ai"?"AI record":"Monster"):state.tab==="maps"?mapsNoun():state.tab==="animations"?"Event":state.tab==="effects"?"Effect":state.tab==="misc"?(state.sub==="encumbrance"?"Load band":state.sub==="encumbrance-overrides"?"Override":"Stamina"):state.tab==="text"?"Label":state.tab==="scripts"?"State":state.tab==="stats"?(state.sub==="levelup"?"Defense":state.sub==="curves"?"Curve":state.sub==="upgrade-materials"?"Material set":state.sub==="starting-classes"?"Class":state.sub==="starting-gifts"?"Gift":"Upgrade"):state.tab==="sound"?"Sound":"Item";
   if(state.tab==="sound"&&state.row?.table==="SoundStream"){
     const soundRow=state.rows.find(row=>key(row)===state.selected);
     if(soundRow)return renderSoundDetail(soundRow);
   }
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
+  if(state.tab==="scripts"&&state.row?.table==="ScriptState")return renderScriptDetail();
   if(!state.row){
     if(state.tab==="animations"&&state.animScope.level==="events")
       return detailPanel({title:"Event",actions:taeActions().slice(0,1),
@@ -2061,8 +2090,8 @@ function renderItems(){
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
-  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="scripts"?"states":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):ASSET_TABS.has(state.tab)?"files":"items";
+  const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="scripts"?"Scripts":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),
     page:state.page,pageSize:state.pageSize,defaultSplit:32,minLeft:230,minRight:380,splitKey:"ds1-"+state.tab+"-"+state.sub,rowsKey:"ds1-"+state.tab+"-"+state.sub,barrelKey:"ds1-"+state.tab+"-"+state.sub,
@@ -2119,6 +2148,7 @@ function renderItems(){
     // names: starting classes and gifts take fixed reference names;
     // the game stores no name to change.
     // names: behavior and AI rows take fixed reference names; the game stores no name to change.
+    // names: script states have no stored names; the list names them by archive, script, group and state.
     // names: a menu label is named by its text; editing the text renames it.
     renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
@@ -2127,7 +2157,7 @@ function renderItems(){
   const subtabs=subtabsFor(state.tab);
   // Enemies names its one list (Monsters) so the category reads; Attacks
   // under Attacks would only repeat the tab.
-  const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,order:state.tab==="sound"?"given":undefined,change:id=>navigate(state.tab,id)});
+  const strip=subtabBar({tabs:subtabs,showSingle:state.tab==="enemies",active:state.sub,label,order:(state.tab==="sound"||state.tab==="scripts")?"given":undefined,change:id=>navigate(state.tab,id)});
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){

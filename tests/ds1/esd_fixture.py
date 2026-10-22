@@ -1,4 +1,5 @@
 """Synthetic ESD builder for unit tests (no game data)."""
+import struct
 import sys
 from pathlib import Path
 
@@ -31,3 +32,25 @@ def build_esd():
                   [Condition(4, assemble("mstat() == ongoing()"))])
     return Esd({0: {0: first}, 5: {4: lone, 6: other}}, "t999999",
                1, True, (1, 2, 3, 4))
+
+
+def make_bnd(members):
+    """A synthetic BND3: {base name: payload}, shaped like the game ships."""
+    entries = sorted(members.items())
+    encoded = [name.encode("shift_jis") + b"\0" for name, _ in entries]
+    directory_end = 32 + len(entries) * 24
+    names_end = directory_end + sum(map(len, encoded))
+    plain = bytearray(names_end)
+    plain[:4] = b"BND3"
+    plain[4:12] = b"TEST0000"
+    plain[12] = 0x74
+    struct.pack_into("<II", plain, 16, len(entries), names_end)
+    name_offset = directory_end
+    for index, ((name, payload), raw) in enumerate(zip(entries, encoded)):
+        data_offset = len(plain)
+        struct.pack_into("<6I", plain, 32 + index * 24, 0x40, len(payload),
+                         data_offset, index, name_offset, len(payload))
+        plain[name_offset:name_offset + len(raw)] = raw
+        name_offset += len(raw)
+        plain.extend(payload)
+    return bytes(plain)
