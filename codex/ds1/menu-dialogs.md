@@ -147,6 +147,20 @@ placement `compose` does not offer (it moves nodes vertically only).
   (id / 10^4) % 10 and the thousands digit; area 0 with that digit 0 (or
   area 99) is the group's global block. A missing block makes reads 0 and
   writes no-ops.
+- The start menu's top row: `0x66F6A0` (enter) switches on categories 0-3
+  only; `0x66F1F0`, run when the root's byte `[dialog+0x249]` is set,
+  shows `changeover_<category>` for 0-3 and moves the cursor to the node
+  named `cursor0_%d` (wide format string), so a layout node `cursor0_4`
+  is a valid cursor target for a fifth entry.
+- The message writer is menu script T04 (`FrpgMenuDlgBloodMsg`), opened
+  when menu channel 18 becomes 1. `0x688710` is the only code that sets
+  that: it writes channel 18 = 1, asks the start menu to close (channel
+  0x88 = 1 unless `0x681EA0` says otherwise) and is what the item-use
+  menu switch calls for the orange soapstone (`0x35A672`). It needs no
+  item.
+- `0x749310(inventory, index, delta, 1, 0, 1)` is the count change the
+  inventory Use calls (`0x6AEA25`); an entry that reaches 0 leaves the
+  inventory and its quick slot.
 - Inventory entries (`player data + 0x280`, layout in
   `codex/ds1/ammunition-hud.md`) start with a category word,
   `category << 28`: weapons 0, armour `0x10000000`, rings `0x20000000`,
