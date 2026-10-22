@@ -173,26 +173,29 @@ class ScriptModTests(unittest.TestCase):
             self.assertFalse((self.mod / "hext").exists())
             self.assertEqual(json.loads(manifest.read_text()), malformed)
 
-    def test_changed_generated_files_are_preserved_on_rebuild_removal_and_clear(self):
+    def test_hand_edits_to_generated_files_are_overwritten_on_rebuild_removal_and_clear(self):
+        # A rebuild always comes from the mod's script (generated-file guard
+        # dropped in cdb352a0): edits to its output are replaced, not refused.
         script_mods.save_values(self.mod, {"amount": 60})
         self.build()
         extra = self.mod / "direct/extra.bin"
-        extra.write_bytes(b"my changes")
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
-        original = patch.read_bytes()
         manifest = self.mod / script_mods.MANIFEST_FILE
-        original_manifest = manifest.read_bytes()
-        for amount in (70, 5):
-            script_mods.save_values(self.mod, {"amount": amount})
-            with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-                self.build()
-            self.assertEqual(extra.read_bytes(), b"my changes")
-            self.assertEqual(patch.read_bytes(), original)
-        with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-            script_mods.clear(self.mod)
-        self.assertEqual(extra.read_bytes(), b"my changes")
-        self.assertEqual(patch.read_bytes(), original)
-        self.assertEqual(manifest.read_bytes(), original_manifest)
+        extra.write_bytes(b"my changes")
+        patch.write_bytes(b"my changes")
+        script_mods.save_values(self.mod, {"amount": 70})
+        self.build()
+        self.assertEqual(extra.read_bytes(), bytes([70]))
+        self.assertEqual(patch.read_text(encoding="utf-8"), "00 = 46")
+        extra.write_bytes(b"my changes")
+        script_mods.save_values(self.mod, {"amount": 5})
+        self.build()
+        self.assertFalse(extra.exists())
+        self.assertEqual(patch.read_text(encoding="utf-8"), "00 = 05")
+        patch.write_bytes(b"my changes")
+        self.assertEqual(script_mods.clear(self.mod), ["hext/ff8/en_nv/patch.txt"])
+        self.assertFalse(patch.exists())
+        self.assertFalse(manifest.exists())
 
     def test_generated_paths_cannot_follow_a_directory_link_outside_the_mod(self):
         outside = self.dir / "outside"
