@@ -41,6 +41,10 @@ MANIFEST_FILE = ".lexeditor-generated.json"
 # The files a tweak mod owns besides its game files. A loader that validates
 # mod contents accepts these for a tweak mod, and only for one.
 OWN_FILES = frozenset({SCHEMA_FILE, VALUES_FILE, MANIFEST_FILE})
+# script/ is also a game folder (Dark Souls keeps its talk and AI scripts
+# there as .dcx archives). A tweak's own code is never one, so those stay
+# game files a tweak mod can ship.
+GAME_ARCHIVE_SUFFIXES = frozenset({".dcx"})
 FIELD_TYPES = frozenset({"bool", "int", "number", "enum", "sound", "intList"})
 _IMPORT_LOCK = threading.Lock()
 
@@ -68,8 +72,11 @@ def is_script_mod(root: Path) -> bool:
 
 def owns(relative: str | Path) -> bool:
     """True for a file that belongs to the tweak-mod format, not to the game."""
-    parts = PurePosixPath(str(relative).replace("\\", "/")).parts
-    return bool(parts) and (parts[0] == SCRIPT_FOLDER or (len(parts) == 1 and parts[0] in OWN_FILES))
+    path = PurePosixPath(str(relative).replace("\\", "/"))
+    parts = path.parts
+    if parts and parts[0] == SCRIPT_FOLDER:
+        return path.suffix.casefold() not in GAME_ARCHIVE_SUFFIXES
+    return len(parts) == 1 and parts[0] in OWN_FILES
 
 
 def spec(root: Path) -> dict:

@@ -61,6 +61,10 @@ class ScriptModTests(unittest.TestCase):
         self.assertTrue(script_mods.owns("settings.json"))
         self.assertFalse(script_mods.owns("hext/ff8/en_nv/patch.txt"))
         self.assertFalse(script_mods.owns("direct/settings.json"))
+        # Game archives under script/ (DS1 talk and AI scripts) stay game files.
+        self.assertTrue(script_mods.owns("script/humanity_x64.S"))
+        self.assertFalse(script_mods.owns("script/talk/m10_02_00_00.talkesdbnd.dcx"))
+        self.assertFalse(script_mods.owns("script/m10_00_00_00.luabnd.DCX"))
 
     def test_values_start_at_defaults_and_bad_stored_values_fall_back(self):
         self.assertEqual(script_mods.values(self.mod), {"enabled": True, "amount": 10, "mode": "a"})
