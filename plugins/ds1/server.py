@@ -9,7 +9,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, fsb, icons, shops, theme
+from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore, parse_key
@@ -166,7 +166,8 @@ class Handler(PluginRequestHandler):
                     '/api/map/view', '/api/map/geometry', '/api/map/geometries',
                     '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
-                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx'):
+                    '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx',
+                    '/api/scripts', '/api/script/state'):
             try:
                 with LOCK:
                     _warm_icon_table()
@@ -379,6 +380,12 @@ class Handler(PluginRequestHandler):
                         result['dirtyCount'] = STORE.get().dirty_count
                     elif path == '/api/shop':
                         result = {'rows': shops.stock(STORE.get(), query.get('npc', [''])[0])}
+                    elif path == '/api/scripts':
+                        result = {'rows': scripts.list_rows(
+                            STORE.game_root, query.get('scope', ['talk'])[0])}
+                    elif path == '/api/script/state':
+                        result = {'row': scripts.read_state(
+                            STORE.game_root, query.get('id', [''])[0])}
                     elif path == '/api/table':
                         tab = query.get('tab', [''])[0]
                         if tab == 'placements':
