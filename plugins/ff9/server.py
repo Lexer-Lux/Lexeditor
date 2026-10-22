@@ -54,7 +54,7 @@ UNRESOLVED_AREAS = (
     ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Audio evidence plus remaining packed Unity asset families",
      "Public research byte-identifies at least title BGM music033.akb in p0data61.bin/p0data601.bin, and Memoria recognizes p0data61.bin, p0data62.bin and p0data63.bin as mod-content bundle names. That does not establish a bounded schema for the whole p0data6* family, so Lexeditor keeps the remaining contents visible and unintegrated rather than guessing."),
     ("x64/FF9_Data/resources.assets (EmbeddedAsset/Text)", "Item, ability, command and other game message text",
-     "Original US English item, action, support-ability and command descriptions are shown read-only in their detail panels. Editing message text, other languages and reading mod text replacements remain unsupported."),
+     "US English item, action, support-ability and command descriptions are editable through a project FF9_Data text overlay; saving writes only that overlay, and Deploy Project activates it in Memoria. Other languages, other message tables and reading external-mod text replacements remain unsupported."),
 )
 
 
@@ -200,7 +200,7 @@ class Handler(PluginRequestHandler):
                 key = query.get("key", [""])[0]
                 scene = query.get("scene", [None])[0]
                 payload = BattleSceneStore().load(key) if key in BattleSceneStore.KEYS else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key)
-                self.json_response(message_text.add_descriptions(payload, paths.GAME_ROOT))
+                self.json_response(message_text.add_descriptions(payload, paths.GAME_ROOT, paths.PROJECT_ROOT))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
             elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
@@ -239,11 +239,19 @@ class Handler(PluginRequestHandler):
             elif path == "/api/deployment/revert": result = features.revert()
             else:
                 key = str(payload.get("key", ""))
+                descriptions = payload.get("descriptions") or {}
+                if descriptions:
+                    if key not in message_text.TABLES:
+                        raise ValueError("This dataset has no editable descriptions")
+                    message_text.save_descriptions(paths.GAME_ROOT, paths.PROJECT_ROOT, key,
+                                                   str(payload.get("textSha256", "")), descriptions)
                 result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in BattleSceneStore.KEYS else
                           FIELD_WALKMESH.save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in FIELD_WALKMESH.KEYS else
                           MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))
+                if key in message_text.TABLES:
+                    result = message_text.add_descriptions(result, paths.GAME_ROOT, paths.PROJECT_ROOT)
             self.json_response(result)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
         except RuntimeError as error: self.json_response({"error": str(error)}, 409)

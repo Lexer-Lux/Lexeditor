@@ -26,7 +26,8 @@ def test_vanilla_source_edit_offers_creation_without_creating_on_cancel(page, tm
     page.wait_for_function("document.querySelector('.lex-project-name')?.textContent==='Vanilla'")
     page.get_by_role('searchbox').fill('test')
     assert page.get_by_role('button',name='Create a mod',exact=True).count() == 0
-    target = page.locator('.lex-detail-field-label' if control == 'field' else '.lex-toggle-name')
+    # The value box, or a switch row (one control end to end).
+    target = page.locator('.lex-detail-field-control' if control == 'field' else '.lex-toggle-name')
     box = target.bounding_box()
     page.mouse.click(box['x'] + box['width']/2, box['y'] + box['height']/2)
     page.get_by_role('button',name='Create a mod',exact=True).wait_for()

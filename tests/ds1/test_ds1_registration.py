@@ -15,7 +15,10 @@ from plugins.ds1.plugin import DS1Session, PLUGIN
 
 def test_ds1_detection_and_read_only_service():
     assert discover_plugins()["ds1"] is PLUGIN
-    assert PLUGIN.projects is not None and PLUGIN.mod_adapter is None
+    # Switching mods combines every enabled one (plugins/ds1/mod_loader.py).
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    assert PLUGIN.projects is not None and isinstance(PLUGIN.mod_adapter, Ds1ModAdapter)
+    assert PLUGIN.lexmod == "Lexer-Lux/Lexers-Mod-For-DS1"
     with tempfile.TemporaryDirectory(prefix="lexeditor-ds1-") as temporary:
         root = Path(temporary)
         manager = GameInstallationManager({"ds1": PLUGIN}, root / "locations.json",

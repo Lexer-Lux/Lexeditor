@@ -12,12 +12,15 @@ import argparse
 import copy
 import json
 import re
+import sys
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 MISC = "Fixture/GameContents/DataObject/MiscData"
 EQUIPMENT = "Fixture/GameContents/DataObject/Equipment"
@@ -439,7 +442,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.screenshot(path=str(output / "initial-render-1200.png"), full_page=True)
 
         expect(page.locator(".ff7r-table .lex-column-list-row")).not_to_have_count(0)
-        power = page.get_by_role("textbox", name="Power", exact=True)
+        power = page.get_by_label("Power", exact=True)
         expect(power).to_have_value("10")
 
         power.fill("77")
@@ -460,7 +463,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         page.evaluate("loadAsset(state.asset)")
         page.wait_for_function("state.data && !state.busy")
-        power = page.get_by_role("textbox", name="Power", exact=True)
+        power = page.get_by_label("Power", exact=True)
         expect(power).to_have_value("77")
         assert page.evaluate("state.data.usingProject") is True
 
@@ -470,7 +473,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         expect(page.get_by_role("button", name="Discard Changes", exact=True)).to_be_visible()
         page.get_by_role("button", name="Discard Changes", exact=True).click()
         page.wait_for_function("dirtyCount()===0")
-        power = page.get_by_role("textbox", name="Power", exact=True)
+        power = page.get_by_label("Power", exact=True)
         expect(power).to_have_value("77")
         page.screenshot(path=str(output / "edit-save-discard-1200.png"), full_page=True)
 
@@ -560,6 +563,25 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             assert page.evaluate("state.tab") == expected, (target, expected)
         page.screenshot(path=str(output / "datamap-routing-1200.png"), full_page=True)
 
+        # Mod contents only on the Text tab leaves the one edited entry.
+        page.evaluate("target => { void openMapRow({target}); }", TEXT)
+        page.wait_for_function("state.tab==='text' && !state.textBusy")
+        trows = '.ff7r-layout .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+        assert page.locator(trows).count() == 6
+        page.evaluate("() => { state.textPacks[Object.keys(state.textPacks)[0]].data.records[0].text='Edited blade'; render(); }")
+        toggle = page.locator('#main .lex-pager-toggle input[aria-label="Mod contents only"]')
+        assert toggle.count() == 1
+        assert toggle.is_enabled()
+        toggle.check()
+        page.wait_for_function(
+            "() => document.querySelectorAll('" + trows + "').length===1")
+        assert page.locator(trows).count() == 1
+        assert 'Edited blade' in page.locator(trows).first.inner_text()
+        toggle.uncheck()
+        page.wait_for_function(
+            "() => document.querySelectorAll('" + trows + "').length===6")
+        page.evaluate("() => { state.textPacks[Object.keys(state.textPacks)[0]].data.records[0].text='Fixture Blade'; render(); }")
+
         page.locator("#plugin-info").click()
         page.wait_for_function("state.tab==='info'")
         expect(page.locator('.lex-detail-panel-title').filter(has_text='Information')).to_be_visible()
@@ -573,16 +595,20 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         }""")
         assert "packaged mod-loading file is missing" not in page.locator("#main").inner_text().lower()
         assert "packaged credits file is missing" not in page.locator("#main").inner_text().lower()
-        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-mod-loading").count() == 1
-        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-credits").count() == 1
+        assert page.locator(".lex-information-panel .lex-detail-panel-body .lex-plugin-mod-loading").count() == 1
+        assert page.locator(".lex-information-panel .lex-detail-panel-body .lex-plugin-credits").count() == 1
         shared = page.locator(".lex-information-panel .lex-detail-panel-body")
-        shared.evaluate("node => { node.scrollTop = node.scrollHeight; }")
+        reveal(page, shared.locator('.lex-plugin-mod-loading'))
+        reveal(page, shared.locator('.lex-plugin-credits'))
         page.wait_for_timeout(100)
         page.screenshot(path=str(output / "info-shared-sections-1200.png"), full_page=True)
         remove = page.get_by_role("button", name="Remove deployed PAK", exact=True)
+        page.locator('.lex-information-panel .lex-tweaks-pages').get_by_role('button', name='First page', exact=True).click()
+        reveal(page, remove)
         expect(remove).to_be_enabled()
         remove.click()
         page.wait_for_function("state.info.projectDeployment.state==='absent'")
+        reveal(page, remove)
         expect(page.get_by_role("button", name="Remove deployed PAK", exact=True)).to_be_disabled()
         assert "Removed Lexeditor's deployed PAK" in page.locator("#main").inner_text()
         page.screenshot(path=str(output / "info-remove-1200.png"), full_page=True)

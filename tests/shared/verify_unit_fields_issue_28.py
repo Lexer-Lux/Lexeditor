@@ -1,12 +1,13 @@
 """Static unit-display contracts for Lexeditor issue 28."""
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+ff8 = plugin_ui('ff8')
 
 assert "const unitField" in framework and "unitField," in framework
 assert "const readonlyField" in framework and "readonlyField," in framework
@@ -18,7 +19,8 @@ assert 'sell=readonlyField(row.sellPrice)' in ff8
 assert 'unitField(sell,"G"' in ff8
 assert 'unitField(numberControl(row.sellMultiplier' in ff8 and '),"%"' in ff8
 assert 'unitField(numberControl(row.upgradePrice' in ff8
-assert 'unitField(flying,"% EVA")' in ff8
+# The old bespoke Flying EVA tweak control was retired. Sale percentages above
+# still cover this editor's percent unit; tweak schema units have shared checks.
 assert 'render:row=>gilValue(row.buyPrice)' in ff8
 assert 'render:row=>gilValue(row.sellPrice)' in ff8
 

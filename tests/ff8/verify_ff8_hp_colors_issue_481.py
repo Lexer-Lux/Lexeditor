@@ -23,7 +23,7 @@ def static_contract():
     # default, and the Tweaks page draws the mod from its schema.
     require('"enable_ff8_better_hp_colors": False,' in settings,"Lexeditor default missing")
     require("{**FFNX_DEFAULTS, **built[\"ffnx\"]}" in settings,"config writer missing")
-    require('"aria-label":row.name' in editor and "panel(schema.title||row.name.toUpperCase(),schema.help," in editor,"UI missing")
+    require("LexeditorUI.tweakModPanels({rows:settings.tweaks||[]" in editor,"shared tweak schema renderer missing")
 def library_contract():
     """The installed Better HP Colors tweak mod, when the reader's library has one."""
     sys.path.insert(0,str(ROOT))

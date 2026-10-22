@@ -14,16 +14,43 @@
     return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
       apply:value=>{if(readonly())return;delete state.invalid[key];row.values[field.key]=Number(value);input.value=String(value);shellRefresh()}});
   }
+  // Encoded-byte length mirroring format_codec.encode_text: a backslash
+  // escape (\xHH or \\) is one game byte and every other character is one
+  // game byte. Returns -1 when an escape is malformed.
+  function ff7EncodedByteCount(text){
+    let count=0,position=0;
+    while(position<text.length){
+      if(text[position]!=="\\"){count++;position++;continue;}
+      if(text[position+1]==="\\"){count++;position+=2;continue;}
+      if(text[position+1]==="x"&&/^[0-9a-fA-F]{2}$/.test(text.slice(position+2,position+4))){count++;position+=4;continue;}
+      return -1;
+    }
+    return count;
+  }
   function textControl(row,field){
-    const input=el("textarea",{rows:field.language?12:3,spellcheck:"false",value:row.values[field.key],disabled:readonly(),
+    const capacity=row.byteCapacity??field.byteCapacity;
+    const metered=Number.isInteger(capacity)&&capacity>0;
+    const input=LexeditorUI.textArea({rows:field.language?12:3,spellcheck:"false",value:row.values[field.key],disabled:readonly(),
       "aria-label":`${field.label} for ${row.name}`,oninput:event=>{
         if(readonly())return;
-        row.values[field.key]=event.target.value;shellRefresh();
+        row.values[field.key]=event.target.value;refreshMeter();shellRefresh();
       }});
     input.value=String(row.values[field.key]);
+    const meter=metered?el("small",{class:"lex-ff7-byte-meter","aria-live":"polite"}):null;
+    const refreshMeter=()=>{
+      if(!meter)return;
+      const count=ff7EncodedByteCount(input.value),over=count<0||count>capacity;
+      meter.textContent=count<0?`Check the byte escapes. The save limit is ${capacity} encoded bytes.`
+        :over?`${count} of ${capacity} encoded bytes. Too long to save.`
+        :`${count} of ${capacity} encoded bytes.`;
+      meter.classList.toggle("lex-ff7-byte-meter-over",over);
+      meter.style.color=over?"#ff8080":"";meter.style.fontWeight=over?"bold":"";
+    };
+    refreshMeter();
+    const control=meter?el("div",{class:"lex-ff7-text-wrap",style:"display:grid;gap:2px"},input,meter):input;
     const vanilla=rowById(state.tab,row.id,state.data.vanilla).values[field.key];
-    return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
-      apply:value=>{if(readonly())return;row.values[field.key]=String(value);input.value=String(value);shellRefresh()}});
+    return provenanceControl({control,current:()=>row.values[field.key],vanilla,internal:true,
+      apply:value=>{if(readonly())return;row.values[field.key]=String(value);input.value=String(value);refreshMeter();shellRefresh()}});
   }
   function enumSummary(field,value){
     const choice=(field.choices||[]).find(candidate=>Number(candidate.value)===Number(value));
@@ -187,7 +214,7 @@
   }
 
   function descriptionControl(row){
-    const input=el("textarea",{rows:3,spellcheck:"false",value:row.description||"",disabled:readonly(),
+    const input=LexeditorUI.textArea({rows:3,spellcheck:"false",value:row.description||"",disabled:readonly(),
       "aria-label":`Description for ${row.name}`,oninput:event=>{
         if(readonly())return;
         row.description=event.target.value;shellRefresh();

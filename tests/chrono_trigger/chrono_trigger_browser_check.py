@@ -11,6 +11,17 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
+
+
+def field(page, name, **options):
+    """Find a field after navigation and turn its detail page into view."""
+    locator = page.get_by_label(name, **options)
+    locator.first.wait_for(state="attached")
+    return reveal(page, locator)
+
+
 ARTIFACTS = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "chrono-trigger-browser"
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
@@ -501,238 +512,240 @@ def main():
                 page.screenshot(path=str(ARTIFACTS/f"text-{shot}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Areas").click()
-                page.locator("#main").get_by_text("PC WORD", exact=True).wait_for()
+                field(page, "PC WORD", exact=True).wait_for()
                 assert "Millennial Fair" in page.locator("#main").inner_text()
                 assert "PC WORD" in page.locator("#main").inner_text()
-                assert page.get_by_label("PC WORD",exact=True).input_value()=="0xBEEF"
+                assert field(page, "PC WORD",exact=True).input_value()=="0xBEEF"
                 page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
-                page.get_by_label("Area data",exact=True).select_option("render")
-                page.get_by_label("UNKNOWN EFFECT BIT",exact=True).wait_for()
-                assert page.get_by_label("UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
-                assert page.get_by_label("DIMENSION / MODE BYTE",exact=True).input_value()=="0x00"
-                page.get_by_label("L2 X SPEED",exact=True).select_option("7")
-                page.get_by_label("L2 Y SPEED",exact=True).select_option("15")
-                page.get_by_label("LAYER 1 MAIN",exact=True).check()
-                page.get_by_label("LAYER 2 MAIN",exact=True).uncheck()
-                page.get_by_label("LAYER 1 EFFECT",exact=True).uncheck()
+                field(page, "Area data",exact=True).select_option("render")
+                field(page, "UNKNOWN EFFECT BIT",exact=True).wait_for()
+                assert field(page, "UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
+                assert field(page, "DIMENSION / MODE BYTE",exact=True).input_value()=="0x00"
+                field(page, "L2 X SPEED",exact=True).select_option("7")
+                field(page, "L2 Y SPEED",exact=True).select_option("15")
+                field(page, "LAYER 1 MAIN",exact=True).check()
+                field(page, "LAYER 2 MAIN",exact=True).uncheck()
+                field(page, "LAYER 1 EFFECT",exact=True).uncheck()
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-render-settings/save')")
-                assert page.get_by_label("UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
+                assert field(page, "UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
                 page.screenshot(path=str(ARTIFACTS/f"area-render-{width}.png"),full_page=True)
-                page.get_by_label("Area data",exact=True).select_option("map")
-                page.get_by_label("TILE INDEX",exact=True).wait_for()
-                assert page.get_by_label("BANK",exact=True).input_value()=="Upper · 256-511"
-                assert page.get_by_label("PROPERTY BYTES",exact=True).input_value()=="7"
-                assert page.get_by_label("SCREEN FLAGS",exact=True).input_value()=="0x5A"
-                page.get_by_label("TILE INDEX",exact=True).fill("300")
+                field(page, "Area data",exact=True).select_option("map")
+                field(page, "TILE INDEX",exact=True).wait_for()
+                assert field(page, "BANK",exact=True).input_value()=="Upper · 256-511"
+                assert field(page, "PROPERTY BYTES",exact=True).input_value()=="7"
+                assert field(page, "SCREEN FLAGS",exact=True).input_value()=="0x5A"
+                field(page, "TILE INDEX",exact=True).fill("300")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-map/save')")
-                assert page.get_by_label("TILE INDEX",exact=True).input_value()=="300"
+                assert field(page, "TILE INDEX",exact=True).input_value()=="300"
                 page.screenshot(path=str(ARTIFACTS/f"area-map-{width}.png"),full_page=True)
-                page.get_by_label("Area data",exact=True).select_option("properties")
-                page.get_by_label("REPEAT COUNT",exact=True).wait_for()
+                field(page, "Area data",exact=True).select_option("properties")
+                field(page, "REPEAT COUNT",exact=True).wait_for()
                 page.locator(".lex-column-list-row",has_text="255").first.click()
-                assert page.get_by_label("REPEAT COUNT",exact=True).input_value()=="255"
-                assert page.get_by_label("COMPRESSED",exact=True).input_value()=="Yes"
-                assert page.get_by_label("UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
-                assert page.get_by_label("UNKNOWN BYTE 3 BIT 4",exact=True).input_value()=="Set"
-                page.get_by_label("COLLISION",exact=True).select_option("30")
-                page.get_by_label("MOVE DIRECTION",exact=True).select_option("3")
-                page.get_by_label("MOVE SPEED",exact=True).fill("2")
-                page.get_by_label("TOP ABOVE ALL",exact=True).check()
-                page.get_by_label("NPC COLLISION",exact=True).check()
+                assert field(page, "REPEAT COUNT",exact=True).input_value()=="255"
+                assert field(page, "COMPRESSED",exact=True).input_value()=="Yes"
+                assert field(page, "UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
+                assert field(page, "UNKNOWN BYTE 3 BIT 4",exact=True).input_value()=="Set"
+                field(page, "COLLISION",exact=True).select_option("30")
+                field(page, "MOVE DIRECTION",exact=True).select_option("3")
+                field(page, "MOVE SPEED",exact=True).fill("2")
+                field(page, "TOP ABOVE ALL",exact=True).check()
+                field(page, "NPC COLLISION",exact=True).check()
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-properties/save')")
-                assert page.get_by_label("REPEAT COUNT",exact=True).input_value()=="255"
-                assert page.get_by_label("UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
+                assert field(page, "REPEAT COUNT",exact=True).input_value()=="255"
+                assert field(page, "UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
                 page.screenshot(path=str(ARTIFACTS/f"area-properties-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Worlds").click()
-                page.locator("#main").get_by_text("PALETTE ANIMATION BYTE", exact=True).wait_for()
+                field(page, "PALETTE ANIMATION BYTE", exact=True).wait_for()
                 assert "World 0" in page.locator("#main").inner_text()
-                assert page.get_by_label("BYTE OFFSET",exact=True).input_value()=="0xFD10"
-                page.get_by_label("MAP",exact=True).fill("42")
+                assert field(page, "BYTE OFFSET",exact=True).input_value()=="0xFD10"
+                field(page, "MAP",exact=True).fill("42")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/worlds/save')")
-                assert page.get_by_label("MAP",exact=True).input_value()=="42"
+                assert field(page, "MAP",exact=True).input_value()=="42"
                 page.screenshot(path=str(ARTIFACTS/f"worlds-{width}.png"),full_page=True)
-                page.get_by_label("World data",exact=True).wait_for()
+                field(page, "World data",exact=True).wait_for()
 
-                page.get_by_label("World data",exact=True).select_option("map")
-                page.get_by_label("TILE INDEX",exact=True).wait_for()
-                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
-                page.get_by_label("TILE INDEX",exact=True).fill("9")
+                field(page, "World data",exact=True).select_option("map")
+                field(page, "TILE INDEX",exact=True).wait_for()
+                assert field(page, "TRAILING BYTES",exact=True).input_value()=="1"
+                field(page, "TILE INDEX",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-map/save')")
-                page.get_by_label("World data",exact=True).wait_for()
-                assert page.get_by_label("TILE INDEX",exact=True).input_value()=="9"
+                field(page, "World data",exact=True).wait_for()
+                assert field(page, "TILE INDEX",exact=True).input_value()=="9"
                 page.screenshot(path=str(ARTIFACTS/f"world-map-{width}.png"),full_page=True)
 
-                page.get_by_label("World data",exact=True).select_option("properties")
-                page.get_by_label("TOP LEFT",exact=True).wait_for()
-                page.get_by_label("TOP LEFT",exact=True).select_option("4")
+                field(page, "World data",exact=True).select_option("properties")
+                field(page, "TOP LEFT",exact=True).wait_for()
+                field(page, "TOP LEFT",exact=True).select_option("4")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-properties/save')")
-                page.get_by_label("World data",exact=True).wait_for()
-                assert page.get_by_label("TOP RIGHT",exact=True).input_value()=="2"
+                field(page, "World data",exact=True).wait_for()
+                assert field(page, "TOP RIGHT",exact=True).input_value()=="2"
                 page.screenshot(path=str(ARTIFACTS/f"world-properties-{width}.png"),full_page=True)
 
-                page.get_by_label("World data",exact=True).select_option("music")
-                page.get_by_label("RIGHT MUSIC",exact=True).wait_for()
-                page.get_by_label("RIGHT MUSIC",exact=True).fill("9")
+                field(page, "World data",exact=True).select_option("music")
+                field(page, "RIGHT MUSIC",exact=True).wait_for()
+                field(page, "RIGHT MUSIC",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-music/save')")
-                page.get_by_label("World data",exact=True).wait_for()
-                assert page.get_by_label("LEFT MUSIC",exact=True).input_value()=="10"
+                field(page, "World data",exact=True).wait_for()
+                assert field(page, "LEFT MUSIC",exact=True).input_value()=="10"
                 page.screenshot(path=str(ARTIFACTS/f"world-music-{width}.png"),full_page=True)
 
-                page.get_by_label("World data",exact=True).select_option("colors")
+                field(page, "World data",exact=True).select_option("colors")
                 world_color=page.locator('#main input[type="color"]').first
                 world_color.wait_for()
-                assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
+                assert field(page, "BIT 15",exact=True).input_value()=="Set"
+                reveal(page, world_color)
                 world_color.fill("#00ff00")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-colors/save')")
-                page.get_by_label("World data",exact=True).wait_for()
-                assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
+                field(page, "World data",exact=True).wait_for()
+                assert field(page, "BIT 15",exact=True).input_value()=="Set"
                 page.screenshot(path=str(ARTIFACTS/f"world-colors-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="World Exits").click()
-                page.locator("#main").get_by_text("Y FLAG BITS", exact=True).wait_for()
+                field(page, "Y FLAG BITS", exact=True).wait_for()
                 assert "Truce Canyon" in page.locator("#main").inner_text()
-                assert page.get_by_label("Y FLAG BITS",exact=True).input_value()=="0xC0"
-                assert page.get_by_label("FACING FLAG BITS",exact=True).input_value()=="0xA1"
-                page.get_by_label("SCENE",exact=True).fill("33")
+                assert field(page, "Y FLAG BITS",exact=True).input_value()=="0xC0"
+                assert field(page, "FACING FLAG BITS",exact=True).input_value()=="0xA1"
+                field(page, "SCENE",exact=True).fill("33")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-navigation/save')")
-                assert page.get_by_label("SCENE",exact=True).input_value()=="33"
+                assert field(page, "SCENE",exact=True).input_value()=="33"
                 page.screenshot(path=str(ARTIFACTS/f"world-exits-{width}.png"),full_page=True)
                 page.locator(".lex-column-list-row",has_text="trigger").first.click()
-                page.get_by_label("SCRIPT ADDRESS",exact=True).fill("1")
+                field(page, "SCRIPT ADDRESS",exact=True).fill("1")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
-                assert page.get_by_label("SCRIPT ADDRESS",exact=True).input_value()=="1"
+                assert field(page, "SCRIPT ADDRESS",exact=True).input_value()=="1"
                 page.screenshot(path=str(ARTIFACTS/f"world-triggers-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Tiles").click()
-                page.locator("#main").get_by_text("FRAME 0 LOW BITS", exact=True).wait_for()
-                assert page.get_by_label("FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
-                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
-                page.get_by_label("DESTINATION CHIP",exact=True).fill("7")
-                page.get_by_label("FRAME 0 DURATION",exact=True).select_option("32")
-                page.get_by_label("FRAME 1 SOURCE CHIP",exact=True).fill("9")
+                field(page, "FRAME 0 LOW BITS", exact=True).wait_for()
+                assert field(page, "FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
+                assert field(page, "TRAILING BYTES",exact=True).input_value()=="1"
+                field(page, "DESTINATION CHIP",exact=True).fill("7")
+                field(page, "FRAME 0 DURATION",exact=True).select_option("32")
+                field(page, "FRAME 1 SOURCE CHIP",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/chip-animations/save')")
-                assert page.get_by_label("DESTINATION CHIP",exact=True).input_value()=="7"
-                assert page.get_by_label("FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
+                assert field(page, "DESTINATION CHIP",exact=True).input_value()=="7"
+                assert field(page, "FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
                 page.screenshot(path=str(ARTIFACTS/f"tile-animations-{width}.png"),full_page=True)
-                page.get_by_label("Tile data",exact=True).wait_for()
+                field(page, "Tile data",exact=True).wait_for()
 
-                page.get_by_label("Tile data",exact=True).select_option("tilesets")
-                page.get_by_label("GRAPHICS SET 0",exact=True).wait_for()
-                assert page.get_by_label("GRAPHICS SET 7",exact=True).input_value()=="255"
-                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
-                page.get_by_label("GRAPHICS SET 0",exact=True).fill("9")
+                field(page, "Tile data",exact=True).select_option("tilesets")
+                field(page, "GRAPHICS SET 0",exact=True).wait_for()
+                assert field(page, "GRAPHICS SET 7",exact=True).input_value()=="255"
+                assert field(page, "TRAILING BYTES",exact=True).input_value()=="1"
+                field(page, "GRAPHICS SET 0",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/graphics-sets/save')")
-                assert page.get_by_label("GRAPHICS SET 0",exact=True).input_value()=="9"
+                assert field(page, "GRAPHICS SET 0",exact=True).input_value()=="9"
                 page.screenshot(path=str(ARTIFACTS/f"tile-graphics-sets-{width}.png"),full_page=True)
-                page.get_by_label("Tile data",exact=True).wait_for()
+                field(page, "Tile data",exact=True).wait_for()
 
-                page.get_by_label("Tile data",exact=True).select_option("assemblies")
-                page.get_by_label("UNKNOWN PRIORITY BITS",exact=True).wait_for()
-                assert page.get_by_label("UNKNOWN PRIORITY BITS",exact=True).input_value()=="0xA0"
-                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
-                page.get_by_label("CHIP INDEX",exact=True).fill("511")
-                page.get_by_label("PALETTE",exact=True).fill("6")
-                page.get_by_label("FLIP HORIZONTAL",exact=True).uncheck()
-                page.get_by_label("FLIP VERTICAL",exact=True).check()
-                page.get_by_label("PRIORITY",exact=True).uncheck()
+                field(page, "Tile data",exact=True).select_option("assemblies")
+                field(page, "UNKNOWN PRIORITY BITS",exact=True).wait_for()
+                assert field(page, "UNKNOWN PRIORITY BITS",exact=True).input_value()=="0xA0"
+                assert field(page, "TRAILING BYTES",exact=True).input_value()=="1"
+                field(page, "CHIP INDEX",exact=True).fill("511")
+                field(page, "PALETTE",exact=True).fill("6")
+                field(page, "FLIP HORIZONTAL",exact=True).uncheck()
+                field(page, "FLIP VERTICAL",exact=True).check()
+                field(page, "PRIORITY",exact=True).uncheck()
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/tile-assemblies/save')")
-                assert page.get_by_label("CHIP INDEX",exact=True).input_value()=="511"
-                assert page.get_by_label("UNKNOWN PRIORITY BITS",exact=True).input_value()=="0xA0"
+                assert field(page, "CHIP INDEX",exact=True).input_value()=="511"
+                assert field(page, "UNKNOWN PRIORITY BITS",exact=True).input_value()=="0xA0"
                 page.screenshot(path=str(ARTIFACTS/f"tile-assemblies-{width}.png"),full_page=True)
-                page.get_by_label("Tile data",exact=True).select_option("sprites")
-                page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).wait_for()
-                assert page.get_by_label("STORED BITMAP",exact=True).input_value()=="9"
-                assert page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
-                assert page.get_by_label("UNKNOWN FLAGS",exact=True).input_value()=="0xD2"
-                assert page.get_by_label("ENEMY UNKNOWN 1",exact=True).input_value()=="0x11"
-                page.get_by_label("SIZE GROUP CODE",exact=True).fill("2")
-                page.get_by_label("PRIMARY ENEMY",exact=True).uncheck()
-                page.get_by_label("ANIMATION SET",exact=True).fill("9")
-                page.get_by_label("HAND X",exact=True).fill("-8")
-                page.get_by_label("HAND Y",exact=True).fill("12")
+                field(page, "Tile data",exact=True).select_option("sprites")
+                field(page, "UNKNOWN SIZE FLAGS",exact=True).wait_for()
+                assert field(page, "STORED BITMAP",exact=True).input_value()=="9"
+                assert field(page, "UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
+                assert field(page, "UNKNOWN FLAGS",exact=True).input_value()=="0xD2"
+                assert field(page, "ENEMY UNKNOWN 1",exact=True).input_value()=="0x11"
+                field(page, "SIZE GROUP CODE",exact=True).fill("2")
+                field(page, "PRIMARY ENEMY",exact=True).uncheck()
+                field(page, "ANIMATION SET",exact=True).fill("9")
+                field(page, "HAND X",exact=True).fill("-8")
+                field(page, "HAND Y",exact=True).fill("12")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/sprite-headers/save')")
-                assert page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
-                assert page.get_by_label("ANIMATION SET",exact=True).input_value()=="9"
+                assert field(page, "UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
+                assert field(page, "ANIMATION SET",exact=True).input_value()=="9"
                 page.screenshot(path=str(ARTIFACTS/f"sprite-descriptors-{width}.png"),full_page=True)
-                page.get_by_label("Tile data",exact=True).select_option("spriteassemblies")
-                page.get_by_label("ODD SOURCE BIT",exact=True).wait_for()
-                assert page.get_by_label("ODD SOURCE BIT",exact=True).input_value()=="Set"
-                assert page.get_by_label("UNKNOWN FLAGS",exact=True).input_value()=="0xA0"
-                assert page.get_by_label("HEADER WORD",exact=True).input_value()=="0xBEEF"
-                assert page.get_by_label("PREFIX",exact=True).input_value()=="AABBCC"
-                page.get_by_label("CHIP INDEX",exact=True).fill("511")
-                page.get_by_label("X OFFSET",exact=True).fill("7")
-                page.get_by_label("Y OFFSET",exact=True).fill("-10")
-                page.get_by_label("FLIP HORIZONTAL",exact=True).uncheck()
+                field(page, "Tile data",exact=True).select_option("spriteassemblies")
+                field(page, "ODD SOURCE BIT",exact=True).wait_for()
+                assert field(page, "ODD SOURCE BIT",exact=True).input_value()=="Set"
+                assert field(page, "UNKNOWN FLAGS",exact=True).input_value()=="0xA0"
+                assert field(page, "HEADER WORD",exact=True).input_value()=="0xBEEF"
+                assert field(page, "PREFIX",exact=True).input_value()=="AABBCC"
+                field(page, "CHIP INDEX",exact=True).fill("511")
+                field(page, "X OFFSET",exact=True).fill("7")
+                field(page, "Y OFFSET",exact=True).fill("-10")
+                field(page, "FLIP HORIZONTAL",exact=True).uncheck()
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/sprite-assemblies/save')")
-                assert page.get_by_label("ODD SOURCE BIT",exact=True).input_value()=="Set"
-                assert page.get_by_label("UNKNOWN FLAGS",exact=True).input_value()=="0xA0"
-                assert page.get_by_label("CHIP INDEX",exact=True).input_value()=="511"
+                assert field(page, "ODD SOURCE BIT",exact=True).input_value()=="Set"
+                assert field(page, "UNKNOWN FLAGS",exact=True).input_value()=="0xA0"
+                assert field(page, "CHIP INDEX",exact=True).input_value()=="511"
                 page.screenshot(path=str(ARTIFACTS/f"sprite-assemblies-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
-                page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
+                field(page, "PRESERVED BITS", exact=True).wait_for()
                 assert "PRESERVED BITS" in page.locator("#main").inner_text()
-                assert page.get_by_label("PRESERVED BITS",exact=True).input_value()=="0xA0"
+                assert field(page, "PRESERVED BITS",exact=True).input_value()=="0xA0"
                 page.screenshot(path=str(ARTIFACTS/f"exits-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Treasure").click()
-                page.locator("#main").get_by_text("PRESERVED WORD", exact=True).wait_for()
+                field(page, "PRESERVED WORD", exact=True).wait_for()
                 assert "Ruby Vest" in page.locator("#main").inner_text()
-                assert page.get_by_label("PRESERVED WORD",exact=True).input_value()=="0xCAFE"
+                assert field(page, "PRESERVED WORD",exact=True).input_value()=="0xCAFE"
                 page.screenshot(path=str(ARTIFACTS/f"treasure-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Palettes").click()
                 page.locator('input[type="color"]').wait_for()
                 assert page.locator('input[type="color"]').count()==1
+                field(page, "BIT 15", exact=True)
                 assert "BIT 15" in page.locator("#main").inner_text()
                 page.screenshot(path=str(ARTIFACTS/f"palettes-{width}.png"),full_page=True)
 
                 page.locator("#plugin-data-map").click()
                 page.locator(".lex-data-map-table").wait_for()
                 assert page.locator(".lex-data-map-table").count()==1
-                page.get_by_label("Search the data map",exact=True).fill("Area settings")
+                field(page, "Search the data map",exact=True).fill("Area settings")
                 area_settings_row=page.locator(".lex-column-list-row",has_text="Area settings").first
                 area_settings_row.wait_for()
                 assert area_settings_row.get_by_label("Integrated",exact=True).count()==1

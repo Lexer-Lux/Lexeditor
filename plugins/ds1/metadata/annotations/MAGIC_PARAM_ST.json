@@ -26,8 +26,8 @@
     },
     {
       "Field": "mp",
-      "Name": "MP Consumption",
-      "Description": "The MP consumption of this spell when triggered."
+      "Name": "Mana cost override",
+      "Description": "Mana this spell costs per cast while the Mana tweak is on. 0 uses the tweak's derived cost from usages instead. The unmodded game ignores this value."
     },
     {
       "Field": "stamina",
@@ -57,7 +57,7 @@
     {
       "Field": "maxQuantity",
       "Name": "Usage Count",
-      "Description": "The number of uses this spell allows when equipped before requiring a bonfire reset."
+      "Description": "The number of uses this spell allows when equipped before requiring a bonfire reset. The Mana tweak derives this spell's default mana cost from it."
     },
     {
       "Field": "heroPoint",
@@ -67,12 +67,12 @@
     {
       "Field": "overDexterity",
       "Name": "Maximum Dexterity",
-      "Description": "The maximum value of dexterity over start value."
+      "Description": "Unknown. Its effect is not documented."
     },
     {
       "Field": "sfxVariationId",
       "Name": "Particle Variation ID",
-      "Description": "The offset to apply to the SFX ID invoked in the TAE event."
+      "Description": "Shifts which particle effect the cast animation plays."
     },
     {
       "Field": "slotLength",
@@ -117,7 +117,7 @@
     {
       "Field": "refType",
       "Name": "Motion Category",
-      "Description": "The TimeAct offset used in the c0000 TAE to find the casting animations."
+      "Description": "Which casting animation set this spell uses."
     },
     {
       "Field": "opmeMenuType",

@@ -31,6 +31,8 @@ import re
 from pathlib import Path, PurePosixPath
 import zipfile
 
+from core.numeric_values import finite_number
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 RUNTIME = PLUGIN_ROOT / "runtime"
@@ -374,7 +376,7 @@ def _coerce(setting: Setting, value: object) -> object:
     if isinstance(value, bool):
         raise ValueError(f"{setting.label} must be a number.")
     try:
-        number = float(value) if setting.kind == "float" else int(str(value).strip(), 10)
+        number = finite_number(value, setting.label) if setting.kind == "float" else int(str(value).strip(), 10)
     except (TypeError, ValueError) as error:
         raise ValueError(f"{setting.label} must be a number.") from error
     if setting.kind in ("int", "key", "choice") and isinstance(value, float) and not float(value).is_integer():

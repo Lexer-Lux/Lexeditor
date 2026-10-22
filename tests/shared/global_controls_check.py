@@ -85,21 +85,23 @@ def main() -> None:
             root.style.height='350px';document.querySelector('#main').replaceChildren(root);};
           __panels();
         }''')
-        divider = page.locator('[role=separator]').first
-        divider.focus(); page.keyboard.press('ArrowRight');page.wait_for_timeout(100)
-        moved = float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))
-        assert moved > 42, moved
-        page.evaluate('__panels()');page.wait_for_timeout(100)
-        restored = int(divider.get_attribute('aria-valuenow'))
-        assert abs(restored-moved) <= 1, (restored,moved)
-        # Double-click must NOT reset the split. A divider is dragged, and a
-        # drag that begins with two quick presses would throw the layout away
-        # instead of moving it; two contracts record that decision. Right-click
-        # is the reset, and the next line is what proves it.
-        divider.dblclick();page.wait_for_timeout(100)
-        assert float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")')) > 42
-        divider.focus();page.keyboard.press('ArrowLeft');divider.click(button='right');page.wait_for_timeout(100)
-        assert abs(float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))-42)<.1
+        # Splits are automatic: the strip is no separator, takes no keys,
+        # and stores nothing. Drag, arrows and right-click change nothing.
+        assert page.locator('[role=separator]').count() == 0
+        divider = page.locator('.lex-panel-layout-divider').first
+        assert divider.get_attribute('tabindex') is None
+        assert divider.evaluate('node => getComputedStyle(node).cursor') == 'default'
+        read = "document.querySelector('.lex-panel-layout').style.getPropertyValue"
+        before = page.evaluate(f"{read}('--lex-panel-layout-template')")
+        box = divider.bounding_box()
+        x, y = box['x'] + box['width'] / 2, box['y'] + box['height'] / 2
+        page.mouse.move(x, y);page.mouse.down()
+        page.mouse.move(x + 120, y, steps=5);page.mouse.up()
+        page.keyboard.press('ArrowRight');page.wait_for_timeout(100)
+        page.mouse.click(x, y, button='right');page.wait_for_timeout(100)
+        assert page.evaluate(f"{read}('--lex-panel-layout-template')") == before
+        keys = page.evaluate('Object.keys(localStorage)')
+        assert [key for key in keys if 'list-detail' in key] == [], keys
         page.set_viewport_size({'width':650,'height':800});page.wait_for_timeout(150)
         assert not divider.is_visible()
         page.set_viewport_size({'width':1280,'height':800})
@@ -178,7 +180,7 @@ def main() -> None:
         page.wait_for_function('document.querySelector("#reset-number").value === "20" && Math.abs(Number(document.querySelector(".lex-value-fill").style.getPropertyValue("--lex-value-ratio"))-.2)<.001')
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
-          'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',
+          'divider_auto_sizes_not_saved_stack':'pass','units_integer_bounds':'pass',
           'settings_save_discard_isolation_and_visible_failure':'pass','native_control_tooltips':'pass','semantic_info_bubbles':'pass','history_cancellation_and_failure':'pass',
           'page_errors':errors,'storage':'in-memory test double' if server is None else 'browser localStorage',
           'note':'Shared browser fixtures; not physical mouse, native window, sound or installed-game acceptance.'}

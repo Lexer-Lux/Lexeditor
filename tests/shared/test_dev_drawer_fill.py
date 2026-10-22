@@ -40,6 +40,7 @@ def open_drawer(page, base, width, height, rows=ROWS):
                                        "totalShared": 1, "totalHand": 0}}}
     stub = (f"window.pywebview={{api:new Proxy({{lexeditor_settings:async()=>({json.dumps(settings)}),"
             f"plugins:async()=>([]),developer_overview:async()=>({json.dumps(overview)}),"
+            "developer_issue_board:async()=>({games:{}}),"
             "loading_quote:async()=>({quote:''}),app_update_status:async()=>({available:false}),"
             "window_state:async()=>({maximized:false}),game_process_status:async()=>({running:false}),"
             "theme_sounds:async()=>({rows:[]}),helper_versions:async()=>({helpers:[]}),"
@@ -67,6 +68,7 @@ MEASURE = """()=>{
     // Rows painted past the bottom of a box that cannot scroll.
     clipped:wrap.scrollHeight<=wrap.clientHeight+1&&last.bottom>box.bottom+1,
     tableGrew:table.getBoundingClientRect().height>=wrap.clientHeight-2,
+    tableHeight:table.getBoundingClientRect().height,wrapHeight:wrap.clientHeight,
     files:document.querySelectorAll('#lexer-dev-files li').length};
 }"""
 
@@ -100,7 +102,7 @@ def test_a_short_table_fills_the_drawer_instead_of_stopping_half_way(base):
             # The last game reaches the bottom of the region it was given,
             # instead of the table stopping and leaving the rest of it blank.
             assert abs(fit["gapBelowLastRow"]) <= 6, fit
-            assert fit["tableGrew"], fit
+            assert fit["tableGrew"], json.dumps(fit)
             assert fit["files"] == 1, fit
         finally:
             browser.close()

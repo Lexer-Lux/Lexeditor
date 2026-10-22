@@ -65,8 +65,8 @@ cache state, correct visibility, ownership/teardown and placement.
 The image names `Ins_F20-00_arrow_l`, `Ins_F20-00_arrow_r` and
 `F20_01_arrow_change`. Native widget construction around `0x67A610` is a
 continuation point; merely locating these names does not establish safe cloning.
-The on-disk image references `menu:/menu.drb`; the actual layout was not available
-for inspection in this investigation.
+The on-disk image references `menu:/menu.drb`; the layout format and which file
+Remastered reads are in [menu-layout.md](menu-layout.md).
 
 ## On-disk code is not always the loaded code
 

@@ -35,7 +35,7 @@
     if(LexeditorUI.sharedSettings()?.developerMode){
       body.push(detailSection({title:"PLUGIN SFX",body:[LexeditorUI.soundCoverageTable(dashboard.themeSounds?.rows||[])]}));
     }
-    $("#main").replaceChildren(detailPanel({className:"lex-information-panel ff8-information",
+    $("#main").replaceChildren(detailPanel({paginate:{unpaged:true},className:"lex-information-panel ff8-information",
       icon:infoIcon(),title:"Information",meta:"Installation, extracted game data, and the FFNx helper",body}));
   }
   function delingFieldToggle(){
@@ -53,8 +53,10 @@
     return input;
   }
   // Each gameplay tweak is a tweak mod in the mod library; this page shows
-  // every one from its own settings schema. Only changed switches and values
-  // are sent, so saving never rewrites a tweak the reader did not touch.
+  // every one from its own settings schema. A value edited on another screen
+  // (GF HP Casting's costs on Magic) waits for Save with that screen's data;
+  // only changed switches and values are sent, so saving never rewrites a
+  // tweak the reader did not touch.
   const settingsPayload=()=>{
     const settings=state.data.settings,before=state.base.settings||{},tweaks={};
     for(const row of settings.tweaks||[]){
@@ -64,68 +66,66 @@
       if(signature(row.values)!==signature(old.values))change.values=row.values;
       if(Object.keys(change).length)tweaks[row.id]=change;
     }
-    return {gfSpellbooksEnabled:settings.gfSpellbooksEnabled,sharedMagicInventory:settings.sharedMagicInventory,tweaks};
+    return {tweaks};
   };
+  // A tweak's settings belong to its mod, not to the open project, so the
+  // Tweaks page saves them at once, to both copies - on Vanilla too. The
+  // number boxes report every keystroke; the save waits for a pause.
+  const tweakSaves=new Map();
+  function saveTweakValues(row){
+    clearTimeout(tweakSaves.get(row.id));
+    tweakSaves.set(row.id,setTimeout(async()=>{
+      tweakSaves.delete(row.id);
+      const values=clone(row.values);
+      try{
+        const result=await api("/api/settings/save",post({tweaks:{[row.id]:{values}}}));
+        const fresh=result.tweaks.find(item=>item.id===row.id);
+        for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id);if(match&&fresh)match.values=clone(fresh.values)}
+      }catch(error){
+        const saved=(state.base.settings?.tweaks||[]).find(item=>item.id===row.id);
+        if(saved)row.values=clone(saved.values);
+        showAlert({title:"Could not save the tweak",message:error.message||String(error)});
+        renderSettings();
+      }
+      shell.refresh();
+    },400));
+  }
   const soundNotes={1:"menus and the turn chime",9:"a menu sound",16:"menu refusal buzz"};
   const soundEntries=()=>(state.data.sfx?.rows||[]).filter(row=>row.kind==="sfx"&&row.valid).map(row=>({id:row.id,name:soundNotes[row.id]?`${row.name} · ${soundNotes[row.id]}`:row.name}));
-  async function trustTweak(row,trusted){
-    try{
-      const result=await api("/api/settings/trust",post({id:row.id,trusted}));
-      // Trust is not a pending edit: it applies at once, to both copies.
-      for(const copy of [state.data.settings,state.base.settings]){const match=(copy?.tweaks||[]).find(item=>item.id===row.id),fresh=result.tweaks.find(item=>item.id===row.id);if(match&&fresh){match.trust=fresh.trust;match.describe=fresh.describe;match.error=fresh.error}}
-      renderSettings();
-    }catch(error){showAlert({title:"Could not change trust",message:error.message||String(error)})}
-  }
-  function renderGameplaySettings(){
-    if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
+  function renderGameplaySettings(tabProps){
     const settings=state.data.settings;
-    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:()=>shell.refresh(),trust:trustTweak,
+    const {panels,bind}=LexeditorUI.tweakModPanels({rows:settings.tweaks||[],change:saveTweakValues,
       sounds:soundEntries,number:numberControl,select:selectControl});
-    const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
-    const gfSpellbooks=el("input",{type:"checkbox",checked:settings.gfSpellbooksEnabled,"aria-label":"GF Spellbooks",onchange:event=>{settings.gfSpellbooksEnabled=event.target.checked;shell.refresh()}});
-    panels.push(
-      LexeditorUI.tweakPanel("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
-      LexeditorUI.tweakPanel("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic));
-    if(!(settings.tweaks||[]).length)panels.unshift(LexeditorUI.notice({message:`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`}));
-    const settingsView=LexeditorUI.settingsColumns(panels,tweakTabProps());
-    $("#main").replaceChildren(settingsView);
-    bind(settingsView);
+    if(!panels.length)panels.unshift(LexeditorUI.notice({message:!(settings.tweaks||[]).length?`No tweak mods are installed. Tweaks live in the mod library (${settings.modsRoot||"Mods/ff8"}).`
+      :(settings.tweaks||[]).some(row=>row.enabled)?"The switched-on tweaks have no settings to change."
+      :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}));
+    const settingsView=LexeditorUI.settingsColumns(panels,tabProps);
+    requestAnimationFrame(()=>bind(settingsView));
+    return settingsView;
   }
 
-  async function loadReshade(){
-    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff8");if(value)state.reshade=value}
-    catch(_error){/* browser preview has no desktop host; the page names it below */}
+  function renderPlatformSettings(tabProps){
+    return platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tabProps,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}});
   }
-  async function actReshade(method,...args){
-    try{const value=await LexeditorUI.callWindow?.(method,"ff8",...args);if(value)state.reshade=value;else await loadReshade()}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    renderSettings();
-  }
-  async function renderReshade(){
-    if(!state.reshade)await loadReshade();
-    const section=LexeditorUI.reshadeSection({snapshot:state.reshade,act:actReshade});
-    const body=section||LexeditorUI.notice({message:"Open this page in the Lexeditor desktop app to manage ReShade."});
-    $("#main").replaceChildren(LexeditorUI.settingsColumns([body],tweakTabProps()));
-  }
-  function renderPlatformSettings(){
-    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
-  }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
-  // The subtab stays visible and openable even while its owning switch cannot
-  // be turned on - the same treatment GFs -> Spellbook uses. A tab that goes
-  // dead reads as a broken page; a tab that opens onto the reason reads as a
-  // feature that is not finished yet.
-  const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,
-    tabsLabel:"Tweak settings",
-    changeTab:value=>{state.settingsTab=value;renderSettings()}});
+  // The shared Tweaks page: FF8's own pages as subtabs, and ReShade on a
+  // subtab of its own, which the page loads and drives. Each of FF8's pages
+  // draws its own view with the shared subtab props. A subtab stays visible
+  // and openable even while its owning switch cannot be turned on - the same
+  // treatment GFs -> Spellbook uses: a tab that opens onto the reason reads as
+  // a feature that is not finished yet, not a broken page.
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
-    if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else if(state.settingsTab==="reshade")renderReshade();else renderGameplaySettings();
+    const view=LexeditorUI.tweaksPage({plugin:"ff8",render:renderSettings,tabsLabel:"Tweak settings",
+      active:state.settingsTab,change:id=>{state.settingsTab=id;renderSettings()},
+      pages:[{id:"gameplay",label:"Gameplay",view:renderGameplaySettings},
+        {id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet.",view:renderFormulae},
+        {id:"platform",label:"FFNx",view:renderPlatformSettings}]});
+    $("#main").replaceChildren(view);
   }
 
   const DEFAULT_FLYING_EVA_BONUS=25;
   function formulaInput(label,key,min,max,step=1){return detailField({label,control:numberControl(state.formula[key],min,max,step,value=>{state.formula[key]=value})})}
-  function renderFormulae(){
+  function renderFormulae(tabProps){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const f=state.formula,weapons=state.data.weapons?.rows||[],formulaeMod=tweakMod("formulae-rework"),rework=tweakOn("formulae-rework");
     const formulaRows=formulaeMod?.describe?.formulas||[];
@@ -189,17 +189,23 @@
     // tweaks scroll container; without it the lowest cards render below the
     // window with no way to reach them.
     // The Tweaks subtab bar sits above the scroll container, matching the Gameplay and FFNx lists, so the viewer can leave this subtab again.
-    const tweaks=tweakTabProps(),scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
-    $("#main").replaceChildren(subtabBar({tabs:tweaks.tabs,active:"formulae",label:tweaks.tabsLabel,change:tweaks.changeTab}),scroller);
+    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({paginate:{unpaged:true},heading:false,body:view}));
+    // The shared stack keeps the bar's height; laid out loose in #main the
+    // scroller rode up over the subtab names.
+    return LexeditorUI.stack(subtabBar({tabs:tabProps.tabs,active:"formulae",label:tabProps.tabsLabel,change:tabProps.changeTab}),scroller);
   }
 
   function startingDataEdits(){const edits=[],current=state.data.init,before=state.base.init;if(!current||!before)return edits;for(const kind of ["general","config"])current[kind].fields.forEach((field,index)=>{if(field.value!==before[kind].fields[index].value)edits.push({kind,id:0,field:field.field,value:field.value})});for(const [key,kind] of [["gfs","gf"],["characters","character"]])for(const row of current[key].rows){const base=before[key].rows.find(value=>value.id===row.id);row.fields.forEach((field,index)=>{if(field.value!==base.fields[index].value)edits.push({kind,id:row.id,field:field.field,value:field.value})});if(kind==="character")row.magics.forEach((slot,index)=>{const old=base.magics[index];if(slot.magicId!==old.magicId||slot.quantity!==old.quantity)edits.push({kind:"magic",id:row.id,slot:slot.slot,magicId:slot.magicId,quantity:slot.quantity})})}current.inventory.rows.forEach((slot,index)=>{const old=before.inventory.rows[index];if(slot.itemId!==old.itemId||slot.quantity!==old.quantity)edits.push({kind:"inventory",id:0,slot:slot.slot,itemId:slot.itemId,quantity:slot.quantity})});return edits}
 
   async function saveAll(){
     try{
+      const invalid=[...document.querySelectorAll('input[data-lex-validate-number]:invalid')]
+        .find(input=>!input.disabled&&!input.readOnly&&input.getClientRects().length);
+      if(invalid){invalid.reportValidity();throw new Error(`Correct ${invalid.getAttribute("aria-label")||"the invalid numeric field"} before saving.`)}
+      validateEncounterChances();
       syncEnemyScanDetails();
       const jobs=[],kernelEdits=[];let textEdits=[],enemyAiDocuments=[],enemyBattleTextEdits=[];
-      const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});
+      const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power","startingOwner"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});
       if(cardEdits.length)jobs.push(api("/api/cards/save",post({edits:cardEdits})));
       if(signature(state.data.items.rows)!==signature(state.base.items)){
         const edits=state.data.items.rows.filter((row,index)=>
@@ -287,7 +293,7 @@
       }
       if(signature(state.data.world.rows)!==signature(state.base.world)){
         const edits=state.data.world.rows.filter((row,index)=>signature(row)!==signature(state.base.world[index]));
-        jobs.push(api("/api/world-map/save",post({edits})));
+        jobs.push(api("/api/world-map/save",post({edits,sha256:state.data.world.sha256})));
       }
       if(signature(state.data.fields.rows)!==signature(state.base.fields)){
         const edits=[];for(const row of state.data.fields.rows){if(!row._loaded)continue;const base=state.base.fields.find(value=>value.key===row.key),fieldEncounters=row.randomEncounters,oldEncounters=base?.randomEncounters;if(fieldEncounters?.formations?.length&&oldEncounters){for(let slot=0;slot<fieldEncounters.formations.length;slot++)if(Number(fieldEncounters.formations[slot])!==Number(oldEncounters.formations?.[slot]))edits.push({type:"fieldEncounter",map:row.key,kind:"formation",slot,value:fieldEncounters.formations[slot]});if(Number(fieldEncounters.rate)!==Number(oldEncounters.rate))edits.push({type:"fieldEncounter",map:row.key,kind:"rate",value:fieldEncounters.rate})}for(const tile of row.background?.tiles||[]){const before=base?.background?.tiles?.[tile.id];if(!before)continue;const edit={type:"background",map:row.key,tile:tile.id};for(const field of row.background.editableFields||[])if(tile[field]!==before[field])edit[field]=tile[field];if(Object.keys(edit).length>3)edits.push(edit)}for(const line of row.dialogue||[]){const before=base?.dialogue?.[line.id];if(before&&line.text!==before.text)edits.push({type:"dialogue",map:row.key,line:line.id,text:line.text})}for(const method of row.scripts?.methods||[]){const before=base?.scripts?.methods?.find(value=>value.id===method.id);if(before&&method.source!==before.source)edits.push({type:"script",map:row.key,method:method.id,source:method.source})}for(const triangle of row.walkmesh?.triangles||[])for(const vertex of triangle.vertices){const before=base?.walkmesh?.triangles?.[triangle.id]?.vertices?.[vertex.id];if(!before)continue;const edit={type:"walkmesh",map:row.key,triangle:triangle.id,vertex:vertex.id};for(const field of ["x","y","z","adjacent"])if(Number(vertex[field])!==Number(before[field]))edit[field]=vertex[field];if(Object.keys(edit).length>4)edits.push(edit)}for(const player of row.players||[])for(const param of player.params||[]){const before=base?.players?.[player.id]?.params?.[param.id];if(before&&Number(param.value)!==Number(before.value))edits.push({map:row.key,player:player.id,param:param.id,value:param.value})}for(const kind of ["gateway","trigger"]){const collection=kind==="gateway"?"gateways":"triggers",entries=row.entrances?.[collection]||[],oldEntries=base?.entrances?.[collection]||[];for(const entry of entries){const old=oldEntries[entry.id],idField=kind==="gateway"?"fieldId":"doorId";if(old&&Number(entry[idField])!==Number(old[idField]))edits.push({type:"entrance",map:row.key,kind,slot:entry.id,field:idField,value:entry[idField]});for(const point of (kind==="gateway"?["exitA","exitB","destination"]:["lineA","lineB"]))for(const axis of ["x","y","z"])if(old&&Number(entry[point][axis])!==Number(old[point][axis]))edits.push({type:"entrance",map:row.key,kind,slot:entry.id,field:point,axis,value:entry[point][axis]})}}for(const headerField of ["control","pvp","focus"]){const header=row.entrances?.header,oldHeader=base?.entrances?.header;if(header&&oldHeader&&Number(header[headerField])!==Number(oldHeader[headerField]))edits.push({type:"entrance",map:row.key,kind:"misc",field:headerField,value:header[headerField]})}for(const collection of ["cameraRanges","screenRanges"]){const rangeKind=collection==="cameraRanges"?"cameraRange":"screenRange";for(const entry of row.entrances?.[collection]||[]){const old=base?.entrances?.[collection]?.[entry.id];if(!old||!entry.present)continue;for(const edge of ["top","bottom","right","left"])if(Number(entry[edge])!==Number(old[edge]))edits.push({type:"entrance",map:row.key,kind:rangeKind,slot:entry.id,field:edge,value:entry[edge]})}}for(const camera of row.camera?.cameras||[]){const old=base?.camera?.cameras?.[camera.id];if(!old)continue;if(Number(camera.zoom)!==Number(old.zoom))edits.push({type:"camera",map:row.key,camera:camera.id,field:"zoom",value:camera.zoom});for(let vector=0;vector<3;vector++)for(const axis of ["x","y","z"])if(Number(camera.axis[vector][axis])!==Number(old.axis[vector][axis]))edits.push({type:"camera",map:row.key,camera:camera.id,field:"axis"+vector,axis,value:camera.axis[vector][axis]});for(const axis of ["x","y","z"])if(Number(camera.position[axis])!==Number(old.position[axis]))edits.push({type:"camera",map:row.key,camera:camera.id,field:"position",axis,value:camera.position[axis]})}for(const frame of row.movie?.frames||[]){const old=base?.movie?.frames?.[frame.id];if(!old)continue;for(let point=0;point<frame.points.length;point++)for(const axis of ["x","y","z"])if(Number(frame.points[point][axis])!==Number(old.points[point][axis]))edits.push({type:"movie",map:row.key,frame:frame.id,point,axis,value:frame.points[point][axis]})}}
@@ -325,9 +331,16 @@
     }catch(error){const view=state.tab,row=state.data[view]?.rows?.find(candidate=>candidate.id===state.selected[view]),message=error.message||String(error);setStatus("Save failed");showAlert({title:"Save failed",items:[{item:row?.name||"Save",issue:message,activate:row?()=>{state.selected[view]=row.id;navigate(view)}:null}],closeLabel:"Confirm and Close"});throw error}
   }
   function post(body){return {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}}
-  async function loadDataset(dataset,tolerant=false){const suffix=`dataset=${encodeURIComponent(dataset)}`,get=path=>tolerant?api(path).catch(()=>null):api(path);const [enemyAbilities,battleItems,ammoEffects,cards,items,menuItems,shops,weapons,magic,gfs,characters,abilityJunction,abilityCommand,abilityStat,abilityCharacter,abilityParty,abilityGf,abilityMenu,text,names,wm2field,enemies,enemyTables,enemyAi,enemyBattleText,refine,encounters,world,fields,init,sfx,models,textures,drawPointData]=await Promise.all([get(`/api/kernel?section=4&${suffix}`),get(`/api/kernel?section=8&${suffix}`),get(`/api/kernel?section=22&${suffix}`),get(`/api/cards?${suffix}`),get(`/api/items?${suffix}`),get(`/api/menu-items?${suffix}`),get(`/api/shops?${suffix}`),get(`/api/weapons?${suffix}`),get(`/api/kernel?section=2&${suffix}`),get(`/api/kernel?section=3&${suffix}`),get(`/api/kernel?section=7&${suffix}`),get(`/api/kernel?section=12&${suffix}`),get(`/api/kernel?section=13&${suffix}`),get(`/api/kernel?section=14&${suffix}`),get(`/api/kernel?section=15&${suffix}`),get(`/api/kernel?section=16&${suffix}`),get(`/api/kernel?section=17&${suffix}`),get(`/api/kernel?section=18&${suffix}`),get(`/api/text?${suffix}`),get(`/api/namedic?${suffix}`),get(`/api/wm2field?${suffix}`),get(`/api/enemies?${suffix}`),get(`/api/enemy-tables?${suffix}`),get(`/api/enemy-ai?${suffix}`),get(`/api/enemy-battle-text?${suffix}`),get(`/api/refine?${suffix}`),get(`/api/encounters?${suffix}`),get(`/api/world-map?${suffix}`),get(`/api/fields?${suffix}`),get(`/api/init?${suffix}`),get(`/api/sfx?${suffix}`),get(`/api/models?${suffix}`),get(`/api/textures?${suffix}`),get(`/api/draw-point-data?${suffix}`)]);return {enemyAbilities,battleItems,ammoEffects,cards,items,menuItems,shops,weapons,magic,gfs,characters,abilityJunction,abilityCommand,abilityStat,abilityCharacter,abilityParty,abilityGf,abilityMenu,text,names,wm2field,enemies,enemyTables,enemyAi,enemyBattleText,refine,encounters,world,fields,init,sfx,models,textures,drawPointData}}
-  async function reloadEditable(){const [current,vanilla,settings,references,platformConfig,mods]=await Promise.all([loadDataset("current"),loadDataset("vanilla"),api("/api/settings"),api("/api/references"),api("/api/platform-config"),api("/api/mods")]);for(const dataset of [current,vanilla])for(const row of dataset.encounters.rows)row.name=encounterName(row);Object.assign(state.data,{...current,settings});state.vanilla=vanilla;state.mods=mods;state.references=references.rows||[];state.platformConfig=platformConfig;state.savedPlatformConfig=clone(platformConfig);state.referenceData={};await Promise.all(state.references.map(async reference=>{const dataset=await loadDataset(`reference:${reference.id}`,true);if(dataset?.encounters)for(const row of dataset.encounters.rows)row.name=encounterName(row);state.referenceData[reference.id]=dataset}));for(const name of editableDatasets)state.base[name]=clone(state.data[name].rows);state.base.init=clone(state.data.init);state.base.settings=clone(settings);resetHistoryBaseSigs()}
-  async function switchProjectSource(value){const next=String(value||"mine");if(next===state.activeSource)return;if(next==="mine"){state.activeSource="mine";await reloadEditable()}else if(next==="vanilla"){state.activeSource="vanilla";for(const name of editableDatasets)state.data[name]=clone(state.vanilla[name]);state.data.init=clone(state.vanilla.init);state.data.settings=clone(state.base.settings||state.data.settings)}else if(next.startsWith("mod:")){const dataset=await loadDataset(next);for(const row of dataset.encounters.rows)row.name=encounterName(row);state.activeSource=next;Object.assign(state.data,dataset);state.data.settings=clone(state.base.settings||state.data.settings)}else throw new Error(`Unknown mod source: ${next}`);shell.history?.clear();render()}
+  async function loadDataset(dataset,tolerant=false,skipHeavy=false){const suffix=`dataset=${encodeURIComponent(dataset)}`,get=path=>tolerant?api(path).catch(()=>null):api(path);const [enemyAbilities,battleItems,ammoEffects,cards,items,menuItems,shops,weapons,magic,gfs,characters,abilityJunction,abilityCommand,abilityStat,abilityCharacter,abilityParty,abilityGf,abilityMenu,text,names,wm2field,enemies,enemyTables,enemyAi,enemyBattleText,refine,encounters,world,fields,init,sfx,models,textures,drawPointData]=await Promise.all([get(`/api/kernel?section=4&${suffix}`),get(`/api/kernel?section=8&${suffix}`),get(`/api/kernel?section=22&${suffix}`),get(`/api/cards?${suffix}`),get(`/api/items?${suffix}`),get(`/api/menu-items?${suffix}`),get(`/api/shops?${suffix}`),get(`/api/weapons?${suffix}`),get(`/api/kernel?section=2&${suffix}`),get(`/api/kernel?section=3&${suffix}`),get(`/api/kernel?section=7&${suffix}`),get(`/api/kernel?section=12&${suffix}`),get(`/api/kernel?section=13&${suffix}`),get(`/api/kernel?section=14&${suffix}`),get(`/api/kernel?section=15&${suffix}`),get(`/api/kernel?section=16&${suffix}`),get(`/api/kernel?section=17&${suffix}`),get(`/api/kernel?section=18&${suffix}`),get(`/api/text?${suffix}`),get(`/api/namedic?${suffix}`),get(`/api/wm2field?${suffix}`),get(`/api/enemies?${suffix}`),get(`/api/enemy-tables?${suffix}`),get(`/api/enemy-ai?${suffix}`),get(`/api/enemy-battle-text?${suffix}`),get(`/api/refine?${suffix}`),get(`/api/encounters?${suffix}`),get(`/api/world-map?${suffix}`),get(`/api/fields?${suffix}`),get(`/api/init?${suffix}`),get(`/api/sfx?${suffix}`),(skipHeavy?Promise.resolve({rows:[],deferred:true}):get(`/api/models?${suffix}`)),(skipHeavy?Promise.resolve({rows:[],deferred:true}):get(`/api/textures?${suffix}`)),get(`/api/draw-point-data?${suffix}`)]);return {enemyAbilities,battleItems,ammoEffects,cards,items,menuItems,shops,weapons,magic,gfs,characters,abilityJunction,abilityCommand,abilityStat,abilityCharacter,abilityParty,abilityGf,abilityMenu,text,names,wm2field,enemies,enemyTables,enemyAi,enemyBattleText,refine,encounters,world,fields,init,sfx,models,textures,drawPointData}}
+  let heavyPromise=null,heavyGen=0;
+  // Models and Textures decode hundreds of battle files (~5s); they load in
+  // the background after first paint instead of blocking boot. Nothing else
+  // reads reference models, so only the active source and vanilla are fetched.
+  function heavyTargets(){const active=state.activeSource==="mine"?"current":state.activeSource;return [...new Set([active,"vanilla"])]}
+  async function ensureHeavy(){const missing=heavyTargets().filter(dataset=>!state.heavyReady[dataset]);if(!missing.length)return;const gen=heavyGen;if(!heavyPromise)heavyPromise=(async()=>{for(const dataset of missing){const models=await api(`/api/models?dataset=${encodeURIComponent(dataset)}`);if(gen!==heavyGen)return;const textures=await api(`/api/textures?dataset=${encodeURIComponent(dataset)}`);if(gen!==heavyGen)return;if(dataset==="vanilla"){state.vanilla.models=models;state.vanilla.textures=textures;if(state.activeSource==="vanilla"){state.data.models=clone(models);state.data.textures=clone(textures)}}else{state.data.models=models;state.data.textures=textures;if(dataset==="current"){state.base.models=clone(models.rows);state.base.textures=clone(textures.rows)}}state.heavyReady[dataset]=true;state.heavyError="";if(["models","textures","enemies","encounters"].includes(state.tab))render()}})().catch(error=>{if(gen!==heavyGen)return;state.heavyError=error.message||String(error);if(["models","textures"].includes(state.tab))render()}).finally(()=>{heavyPromise=null});return heavyPromise}
+  function queueHeavy(){state.heavyError="";ensureHeavy().catch(()=>{})}
+  async function reloadEditable(){const [current,vanilla,settings,references,platformConfig,mods]=await Promise.all([loadDataset("current",false,true),loadDataset("vanilla",false,true),api("/api/settings"),api("/api/references"),api("/api/platform-config"),api("/api/mods")]);for(const dataset of [current,vanilla])for(const row of dataset.encounters.rows)row.name=encounterName(row);Object.assign(state.data,{...current,settings});state.vanilla=vanilla;state.mods=mods;state.references=references.rows||[];state.platformConfig=platformConfig;state.savedPlatformConfig=clone(platformConfig);state.referenceData={};await Promise.all(state.references.map(async reference=>{const dataset=await loadDataset(`reference:${reference.id}`,true,true);if(dataset?.encounters)for(const row of dataset.encounters.rows)row.name=encounterName(row);state.referenceData[reference.id]=dataset}));for(const name of editableDatasets)state.base[name]=clone(state.data[name].rows);state.base.init=clone(state.data.init);state.base.settings=clone(settings);resetHistoryBaseSigs();state.heavyReady={};heavyGen++;queueHeavy()}
+  async function switchProjectSource(value){const next=String(value||"mine");if(next===state.activeSource)return;if(next==="mine"){state.activeSource="mine";await reloadEditable()}else if(next==="vanilla"){state.activeSource="vanilla";for(const name of editableDatasets)state.data[name]=clone(state.vanilla[name]);state.data.init=clone(state.vanilla.init);state.data.settings=clone(state.base.settings||state.data.settings)}else if(next.startsWith("mod:")){const dataset=await loadDataset(next,false,true);for(const row of dataset.encounters.rows)row.name=encounterName(row);state.activeSource=next;Object.assign(state.data,dataset);state.data.settings=clone(state.base.settings||state.data.settings)}else throw new Error(`Unknown mod source: ${next}`);shell.history?.clear();queueHeavy();render()}
   function displayModName(name){return name==="Lexer's Mod for FF8"?"Lexer's Mod":name}
   function projectSources(){
     const rows=[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.root||"Extracted unchanged FF8 data",readOnly:true,enabled:true}];
@@ -415,7 +428,7 @@
   const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,enemies:renderEnemies,encounters:renderEncounters,fields:renderFields,world:renderWorldMap,settings:renderSettings,sfx:renderSfx,models:renderModels,textures:renderTextures,datamap:renderDataMap,dashboard:renderDashboard};
   // An ability record lives in a category subtab of Abilities, so a link to one
   // names its dataset (abilityJunction) and lands on that subtab.
-  async function navigate(tab){if(!(await enemyAiBeforeLeave()))return false;if(tab==="formulae"){state.settingsTab="formulae";tab="settings"}if(/^ability[A-Z]/.test(tab)){const row=state.data[tab]?.rows.find(row=>row.id===state.selected[tab]);if(row)state.selected.gfAbilities=row.abilityId;state.abilityTab="gfAbilities";tab="abilities"}if(tab==="magic"||tab==="enemyAbilities"){state.abilityTab=tab;tab="abilities"}if(tab==="names"){state.textTab="names";tab="text"}state.tab=tab;render()}
+  async function navigate(tab){if(!(await enemyAiBeforeLeave()))return false;if(tab==="models"||tab==="textures"){state.tab=tab;render();await ensureHeavy();if(state.tab===tab)render();return}if(tab==="formulae"){state.settingsTab="formulae";tab="settings"}if(/^ability[A-Z]/.test(tab)){const row=state.data[tab]?.rows.find(row=>row.id===state.selected[tab]);if(row)state.selected.gfAbilities=row.abilityId;state.abilityTab="gfAbilities";tab="abilities"}if(tab==="magic"||tab==="enemyAbilities"){state.abilityTab=tab;tab="abilities"}if(tab==="names"){state.textTab="names";tab="text"}state.tab=tab;render()}
   function render(){document.querySelectorAll("nav button[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting||state.bootFailed)return;const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.classList.toggle("portrait-toolbar",state.tab==="gfs"||state.tab==="characters");views[state.tab]();shell.refresh()}
   async function prepareGameplayLaunch(){if(dirtyCount())await saveAll();const result=await api("/api/settings/activate",post({}));if(!result.ready)throw new Error("The FFNx gameplay patch did not pass its launch check.");setStatus("Gameplay patch ready")}
   async function confirmGameplayPatch(){

@@ -44,13 +44,11 @@
     const name=character?.name||`Character ${field.value}`;
     const origin=()=>{state.selected.weapons=row.id;navigate('weapons')};
     const apply=value=>{field.value=Number(value);renderWeapons();shell.refresh()};
-    const finder=el('button',{type:'button','aria-label':`Choose character for ${row.name}`,
-      disabled:field.readonly||state.activeSource!=='mine',onclick:()=>beginSearcher({
-        type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
-        target:()=>navigate('characters'),accept:value=>{
-          if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
-        }})},LexeditorUI.selectionIcon());
-    const card=LexeditorUI.recordCard({image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
+    const finder=LexeditorUI.thingFinderButton({type:'characters',prompt:`Choose the character for ${row.name}.`,origin,
+      target:()=>navigate('characters'),accept:value=>{
+        if(state.activeSource==='mine'&&entries.some(entry=>Number(entry.value)===Number(value)))apply(value);
+      },disabled:field.readonly||state.activeSource!=='mine',label:`Choose character for ${row.name}`});
+    const card=LexeditorUI.recordCard({className:'weapon-character-card',image:el('img',{src:`/assets/portraits/characters/${field.value}.png`,alt:name}),action:finder});
     const figure=LexeditorUI.figureGrid([{media:card,caption:recordHoverLabel('characters',{id:Number(field.value),name},name)}]);
     return sourceControl(figure,()=>field.value,rowOf(state.vanilla,'weapons',row.id)?.fields?.find(entry=>entry.field===field.field)?.value,
       referenceValues('weapons',row.id,value=>value?.fields?.find(entry=>entry.field===field.field)?.value),apply,
@@ -64,7 +62,7 @@
     const data=character?el('div',{class:'lex-detail-panel-beside'},
       weaponDataField('',weaponCharacterCard(row,character),'',prefs,'field:character_id'),
       el('div',{},...dataFields)):dataFields;
-    const ingredients=row.ingredients.map(ingredient=>{const vanillaIngredient=vanilla.ingredients[ingredient.slot],refs=referenceValues("weapons",row.id,value=>value?.ingredients?.[ingredient.slot]),setItem=value=>{const itemId=Number(value);ingredient.itemId=itemId;ingredient.quantity=itemId===0?0:Math.max(1,Number(ingredient.quantity)||1);renderWeapons();shell.refresh()},origin=()=>{state.selected.weapons=row.id;navigate("weapons")},item=sourceControl(itemSearchControl(ingredient.itemId,`Select the Item for ${row.name}.`,setItem,origin),()=>ingredient.itemId,vanillaIngredient.itemId,refs.map(entry=>({...entry,value:entry.value?.itemId})),setItem,value=>state.data.weapons.items.find(item=>item.id===value)?.name||`Item ${value}`,{internal:true}),quantity=ingredient.itemId===0?null:sourceControl(numberControl(ingredient.quantity,1,255,1,value=>ingredient.quantity=value,{"aria-label":`Quantity for ingredient ${ingredient.slot+1}`}),()=>ingredient.quantity,vanillaIngredient.quantity,refs.map(entry=>({...entry,value:entry.value?.quantity})),value=>ingredient.quantity=value,undefined,{internal:true});return detailField({className:"weapon-ingredient-row",label:`ITEM ${ingredient.slot+1}`,control:LexeditorUI.controlGroup([item,quantity].filter(Boolean))})});
+    const ingredients=row.ingredients.map(ingredient=>{const vanillaIngredient=vanilla.ingredients[ingredient.slot],refs=referenceValues("weapons",row.id,value=>value?.ingredients?.[ingredient.slot]),setItem=value=>{const itemId=Number(value);ingredient.itemId=itemId;ingredient.quantity=itemId===0?0:Math.max(1,Number(ingredient.quantity)||1);renderWeapons();shell.refresh()},origin=()=>{state.selected.weapons=row.id;navigate("weapons")},item=sourceControl(itemSearchControl(ingredient.itemId,`Select the Item for ${row.name}.`,setItem,origin),()=>ingredient.itemId,vanillaIngredient.itemId,refs.map(entry=>({...entry,value:entry.value?.itemId})),setItem,value=>state.data.weapons.items.find(item=>item.id===value)?.name||`Item ${value}`,{internal:true}),quantity=sourceControl(numberControl(ingredient.quantity,1,255,1,value=>{if(ingredient.itemId!==0)ingredient.quantity=value;},{"aria-label":`Quantity for ingredient ${ingredient.slot+1}`,...(ingredient.itemId===0?{value:"",readOnly:true}:{})}),()=>ingredient.quantity,vanillaIngredient.quantity,refs.map(entry=>({...entry,value:entry.value?.quantity})),value=>{if(ingredient.itemId!==0)ingredient.quantity=value;},undefined,{internal:true});return detailField({className:"weapon-ingredient-row",label:`ITEM ${ingredient.slot+1}`,control:LexeditorUI.controlGroup([item,quantity].filter(Boolean))})});
     return sharedDetail(row,prefs,[detailSection({title:"DATA",body:data}),detailSection({title:"COST",body:[detailField({label:"",control:price,pin:prefs?.pinButton("upgradePrice","Price")}),...ingredients]})],"")
   }
 
@@ -135,7 +133,7 @@
       junction:()=>detailSection({body:junctionRows}),
     };
     const active=sections[state.magicDetailTab]?state.magicDetailTab:"attack";
-    const body=[LexeditorUI.tabbedPanel({label:"Magic details",active,
+    const body=[LexeditorUI.tabbedPanel({paginate:{unpaged:true},label:"Magic details",active,
       tabs:[{id:"attack",label:"Attack data",help:"What this spell does when it is cast: animation, power, targeting, element and status."},
         {id:"junction",label:"Junction",help:"What this spell gives the character it is junctioned to: stat bonuses, elemental and status attack and defence."}],
       change:id=>{state.magicDetailTab=id;renderAbilities()},
@@ -243,12 +241,12 @@
     const button=(entry,content,extra={})=>el("button",{type:"button",title:entry.caption||entry.label,"aria-label":`Insert ${entry.label}`,onmousedown:event=>event.preventDefault(),onclick:()=>insert(entry.text),...extra},content);
     // One bubble per group of inserting controls, instead of one long bubble on
     // the box: the reader is pointing at the thing they want explained.
-    const group=(label,children,help)=>el("div",{class:"lex-toolbar ff8-text-token-group",role:"group","aria-label":label},...children,help?infoHelp(help):null);
+    const group=(label,children,help,cls="")=>el("div",{class:`lex-toolbar ff8-text-token-group${cls?" "+cls:""}`,role:"group","aria-label":label},...children,help?infoHelp(help):null);
     const choose=(label,entries)=>el("select",{"aria-label":`Insert ${label}`,onchange:event=>{if(event.target.value)insert(event.target.value);event.target.value=""}},el("option",{value:""},label),...entries.map(entry=>el("option",{value:entry.text},entry.label)));
     return el("div",{class:"lex-toolbar lex-toolbar-icons ff8-text-token-toolbar",role:"group","aria-label":"Special text"},
       group("Character names",tokens.characters.map(entry=>button(entry,
         entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""})
-          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile"})),
+          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile lex-toolbar-tile-portrait"})),
         "Insert a character's name. The game draws that name where the token stands. "
         +"The three tiles without a portrait are the game's animal characters, shown "
         +"by their initials."),
@@ -264,7 +262,7 @@
       group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)],
         "Insert a stored name, a variable, a key icon or a special character at the "
         +"cursor. Locations, variables and keys are tokens the game resolves when the "
-        +"message is shown."));
+        +"message is shown.","ff8-text-token-choices"));
   }
   function textDetail(row,prefs){
     const input=LexeditorUI.textArea({rows:8,"aria-label":`Text for ${row.name}`,oninput:event=>{row.value=event.target.value;shell.refresh()}});input.value=row.value;
@@ -279,7 +277,7 @@
       exe_card_texts:"Card text is saved as ff8/en/exe/card_texts.msd in this mod. FFNx replaces the two card-text pointers at runtime; Lexeditor never changes FF8_EN.exe.",
     };
     const boundary=boundaries[row.source]||"This text source is not writable.";
-    return detailPanel({heading:false,body:[
+    return detailPanel({paginate:{unpaged:true},heading:false,body:[
       LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key]),pin:prefs?.pinButton(key,label)})),{columns:4,stacked:true}),
       textTokenToolbar(input),
       detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,
@@ -390,34 +388,31 @@
     }
     return 10*at("gf_level_modifier_1")*level+Math.floor(at("gf_level_modifier_2")*level*level/256);
   };
-  function gfStatGrowth(fields,rowId){
+  // One graph per tab: the Leveling tab split into HP and XP, and the
+  // pager went away with it.
+  function gfCurveCards(fields,rowId){
     const pick=names=>names.map(name=>fields.find(field=>field.field===name)).filter(Boolean);
     const hpFields=pick(["gf_hp_modifier_1","gf_hp_modifier_2","gf_hp_modifier_3"]);
     const expFields=pick(["gf_level_modifier_1","gf_level_modifier_2"]);
-    const cards=[];
+    const cards={};
     const axis=kind=>{
       const peak=Math.max(...Array.from({length:100},(_,index)=>Number(gfCurveValue(kind,fields,index+1))||0));
       return{min:0,max:Math.max(1,Math.ceil(peak*1.08/5)*5)};
     };
-    if(hpFields.length===3)cards.push(curveEditor({title:"HP",overlayExtrema:true,
+    if(hpFields.length===3)cards.hp=curveEditor({title:"HP",overlayExtrema:true,
       variables:hpFields.map((field,index)=>({label:"ABC"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
       domain:{min:1,max:100},range:()=>axis("HP"),
       graphLabel:"GF HP from level 1 to level 100",
       evaluate:level=>gfCurveValue("HP",fields,level),
       formula:coloredCurveFormula("HP(L) = C + L * A + floor(10 * L^2 / B)"),
-      invalidText:"A DIVISOR IS 0"}));
-    if(expFields.length===2)cards.push(curveEditor({title:"XP",overlayExtrema:true,
+      invalidText:"A DIVISOR IS 0"});
+    if(expFields.length===2)cards.xp=curveEditor({title:"XP",overlayExtrema:true,
       variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
       domain:{min:1,max:100},range:()=>axis("XP"),
       graphLabel:"Cumulative experience required from level 1 to level 100",
       evaluate:level=>gfCurveValue("XP",fields,level),
-      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")}));
-    if(!cards.length)return null;
-    // One graph a page, like an enemy's stat graphs (Lexer: GF Leveling
-    // should be paged like the Enemies one, not stacked).
-    const index=Math.max(0,Math.min(cards.length-1,state.gfLevelPage||0));
-    return LexeditorUI.pagedPane(cards[index],pager({inline:true,page:index,pages:cards.length,pageSize:1,
-      total:cards.length,noun:"graphs",change:value=>{state.gfLevelPage=value;renderGFs()}}));
+      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")});
+    return cards;
   }
   function characterDetail(row){
     const visible=row.fields.filter(field=>field.field!=="gender"&&field.name!=="gender"&&field.label!=="Gender"),growth=visible.filter(field=>field.group==="Stat coefficients"),exp=visible.filter(field=>["exp_linear","exp_quadratic"].includes(field.field)),other=visible.filter(field=>field.group!=="Stat coefficients"&&!exp.includes(field));

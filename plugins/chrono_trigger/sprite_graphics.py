@@ -18,6 +18,8 @@ import re
 
 from PIL import Image
 
+from core.numeric_values import integer_value
+
 from .project import OverlayStore, digest
 
 
@@ -26,10 +28,15 @@ MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 
 def sprite_bmp_path(sprite_index: int, bitmap_index: int) -> str:
+    sprite_index = integer_value(sprite_index, "Sprite index")
+    bitmap_index = integer_value(bitmap_index, "Bitmap index")
+    if not 0 <= sprite_index <= 999 or bitmap_index < 0:
+        raise ValueError("Invalid sprite or bitmap index")
     return f"Game/chara/bmp/c{sprite_index:03d}_{bitmap_index}.bmp"
 
 
 def sprite_frame_indexes(store: OverlayStore, sprite_index: int) -> list[int]:
+    sprite_index = integer_value(sprite_index, "Sprite index")
     prefix = f"Game/chara/bmp/c{sprite_index:03d}_"
     frames = []
     for path in store.archive.paths(prefix):
@@ -49,6 +56,8 @@ def _to_png_base64(payload: bytes) -> tuple[str, int, int]:
 
 
 def load_sprite_image(store: OverlayStore, sprite_index: int, bitmap_index: int, source: str = "mine") -> dict:
+    sprite_index = integer_value(sprite_index, "Sprite index")
+    bitmap_index = integer_value(bitmap_index, "Bitmap index")
     if source not in {"mine", "vanilla"}:
         raise ValueError("source must be mine or vanilla")
     path = sprite_bmp_path(sprite_index, bitmap_index)
@@ -69,14 +78,18 @@ def load_sprite_image(store: OverlayStore, sprite_index: int, bitmap_index: int,
 def save_sprite_image(
     store: OverlayStore, sprite_index: int, bitmap_index: int, expected_sha256: str, image_base64: str
 ) -> dict:
+    sprite_index = integer_value(sprite_index, "Sprite index")
+    bitmap_index = integer_value(bitmap_index, "Bitmap index")
     path = sprite_bmp_path(sprite_index, bitmap_index)
     if not store.archive.has(path):
         raise KeyError(f"No sprite graphic at {path}")
     current, _ = store.read(path, "mine")
     if digest(current) != expected_sha256:
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
+    if not isinstance(image_base64, str):
+        raise ValueError("Replacement image base64 must be text")
     try:
-        raw = base64.b64decode(str(image_base64), validate=True)
+        raw = base64.b64decode(image_base64, validate=True)
     except ValueError as error:
         raise ValueError("Replacement image is not valid base64") from error
     if not raw:

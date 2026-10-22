@@ -105,12 +105,13 @@
       });
       const vanilla = state.vanilla.stringTable?.rows
         ?.find(entry => entry.id === row.id);
-      const control = el("textarea", {
+      const control = UI.textArea({
         disabled: state.activeSource !== "mine",
         spellcheck: true,
         "aria-label": "Localized text",
+        value: value(row),
         oninput: event => edit(row, event.target.value),
-      }, value(row));
+      });
       return UI.detailPanel({
         className:"record-detail string-detail",
         title: row.identifier || row.hash,

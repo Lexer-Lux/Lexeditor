@@ -1,6 +1,8 @@
 # These files are SHA-256 locked by runtime_package.py. Git must not change
 # their bytes on Windows (core.autocrlf) or on Linux checkouts/build runners.
 plugins/ff8/ffnx_issue_51/package/** -text
+# DS1's loader (dinput8.dll) is SHA-256 locked by its runtime-manifest.json.
+plugins/ds1/runtime/package/** -text
 
 # The vendored Shader Injector release is SHA-256 locked. Line endings must
 # not change. Its licence text lives in plugins/ff7r2/credits.md and is

@@ -23,6 +23,28 @@ class Sounds(unittest.TestCase):
         for edits in ([{'id':identity,'value':'BRASS'}],[{'id':'missing','value':'AMMO'}],[{'id':identity,'value':'AMMO'}]*2):
             with self.assertRaises(ValueError):loot_sounds.apply(XML,edits)
 
+    def test_malformed_batches_are_validation_errors_without_files(self):
+        from plugins.rdr2 import server
+        identity=loot_sounds.read(XML)['rows'][1]['id']
+        valid={'id':identity,'value':'WATCH'}
+        malformed=[None,{},'',False,1,[None],[[]],[{}],
+                   [dict(valid,unknown='opaque')],[{'id':[], 'value':'WATCH'}],
+                   [{'id':identity,'value':[]}],[{'id':identity,'value':None}]]
+        with tempfile.TemporaryDirectory() as temp:
+            mod=Path(temp);target=mod/'loot_sounds.meta';manifest=mod/'install.xml'
+            target.write_text(XML);manifest.write_bytes(b'<LennyModLoader><Resources /></LennyModLoader>')
+            before={p.name:p.read_bytes() for p in mod.iterdir()}
+            with patch.object(server,'DATASETS',{'mine':{'dir':mod,'readonly':False}}):
+                for edits in malformed:
+                    with self.subTest(edits=edits),self.assertRaises(ValueError):server.save_loot_sounds(edits)
+                    self.assertEqual({p.name:p.read_bytes() for p in mod.iterdir()},before)
+                with self.assertRaises(ValueError):server.save_loot_sounds([valid,dict(valid,unknown='opaque')])
+                self.assertEqual({p.name:p.read_bytes() for p in mod.iterdir()},before)
+            with patch.object(server,'DATASETS',{'mine':{'dir':mod,'readonly':True}}):
+                with self.assertRaisesRegex(ValueError,'read-only'):server.save_loot_sounds([valid])
+                self.assertEqual(server.save_loot_sounds([]),0)
+                self.assertEqual({p.name:p.read_bytes() for p in mod.iterdir()},before)
+
     def test_server_saves_routed_mod_file_and_preserves_reference(self):
         from plugins.rdr2 import server
         with tempfile.TemporaryDirectory(prefix='lex-loot-sounds-') as temp:

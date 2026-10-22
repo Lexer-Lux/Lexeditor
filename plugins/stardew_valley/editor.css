@@ -1,3 +1,2 @@
 /* Stardew Valley draws on the shared baseline and nothing else: colour
    and structure come from the framework; this file only tunes the page. */
-:root{--lex-detail-label-width:8.5em}

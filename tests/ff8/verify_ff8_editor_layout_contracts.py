@@ -26,7 +26,7 @@ def require(source: str, needle: str, contract: str) -> None:
 require(EDITOR, 'const layout=panelLayout(panels,"gf-three-panel",{layoutKey:"ff8-gfs",defaultSizes:[.9,1.05,1.4],minSizes:[230,245,470],stackAt:1000});', "GF three-panel layout")
 require(EDITOR, 'table.dataset.gfPanel="compatibility"', "GF Compatibility panel marker")
 require(EDITOR, 'attrs:{"data-gf-panel":"abilities"}', "GF Abilities panel marker")
-require(EDITOR, 'const growth=className==="general"?gfStatGrowth(curveFields,row.id):null;', "GF curves routed through General/shared controls")
+require(EDITOR, "const curves=(active==='hp'||active==='xp')?gfCurveCards(routed.get('General').filter(field=>GF_CURVE_FIELDS.includes(field.field)),row.id):null;", "GF curves routed through General/shared controls")
 require(EDITOR, 'const GF_CURVE_FIELDS=["gf_hp_modifier_1","gf_hp_modifier_2","gf_hp_modifier_3","gf_level_modifier_1","gf_level_modifier_2"]', "all five GF curve coefficients")
 
 # #39 — Enemy Stats/AI/Battle Text share the dedicated leading pane. Stats uses

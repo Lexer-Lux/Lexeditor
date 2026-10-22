@@ -1,5 +1,6 @@
 "use strict";
 const main=document.getElementById("main");
+let loadError=null;
 let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},datamap={rows:[]},deployment=null,shell=null;
 const shellTabs=[
   {id:"metadata",label:"Metadata"},
@@ -87,16 +88,26 @@ function renderEmpty(title,message){
     LexeditorUI.el("p",{class:"lex-detail-note"},message),
   ]});
 }
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);return payload}
+async function api(path,options={}){
+  let response;
+  try{response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}})}
+  catch(error){throw new Error(`${path}: ${error.message||String(error)}`)}
+  let payload;
+  try{payload=await response.json()}
+  catch{throw new Error(`${path}: ${response.ok?"Invalid JSON response":`Request failed (${response.status})`}`)}
+  if(!response.ok)throw new Error(`${path}: ${payload.error||`Request failed (${response.status})`}`);
+  return payload;
+}
 function setStatus(message,error=false){LexeditorUI.showToast?.(message,error)}
 async function reload(){
+  loadError=null;
   renderLoading();
   try{
     [metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([
       api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")
     ]);
     render();
-  }catch(error){setStatus(error.message,true);renderLoadError(error)}
+  }catch(error){loadError=error;setStatus(error.message,true);render()}
 }
 function renderLoadError(error){
   const message=error.message||String(error);
@@ -105,6 +116,7 @@ function renderLoadError(error){
       LexeditorUI.detailNote(message,{className:"pz-error-message"}),
       sharedReadonly("Recovery","Reload after fixing the project or install problem.","The error above is the actual load failure. Fix its cause, then reload this plugin."),
     ]}),
+    LexeditorUI.actionRow(LexeditorUI.el("button",{type:"button",onclick:reload},"Retry")),
   ]}));
 }
 function renderMetadata(){
@@ -292,7 +304,7 @@ function sharedControl(kind,row,spec){
     control=LexeditorUI.el("select",{disabled:availability.disabled,"aria-label":spec.label},...values.map(value=>{const option=LexeditorUI.el("option",{value},value);option.selected=value===raw;return option}));
     dataType="ENUM";
   }else if(spec.type==="textarea"){
-    control=LexeditorUI.el("textarea",{disabled:availability.disabled,"aria-label":spec.label});control.value=raw;dataType="TEXT";
+    control=LexeditorUI.textArea({disabled:availability.disabled,"aria-label":spec.label});control.value=raw;dataType="TEXT";
   }else{
     const attrs={type:spec.type==="number"?"number":"text",value:raw,disabled:availability.disabled,"aria-label":spec.label};
     if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;if(spec.step!==undefined)attrs.step=spec.step;
@@ -383,7 +395,7 @@ function renderStructured(kind){
   if(state.selected&&!rows.some(row=>row.key===state.selected))state.selected=null;
   if(!state.selected&&rows.length)state.selected=rows[0].key;
   const tableSpecs=(tableFieldKeys[kind]||[]).map(key=>config.fields.find(spec=>spec.key===key)).filter(Boolean);
-  const view=LexeditorUI.pagedListDetail({...recordCreationOptions(kind),rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
+  const view=LexeditorUI.pagedListDetail({...recordCreationOptions(kind),order:"given",rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
     search:{key:"project-zomboid-"+kind,value:state.query,label:"Search "+config.title,change:value=>{state.query=value;state.page=0;renderStructured(kind)}},
     sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;renderStructured(kind)},
@@ -434,7 +446,7 @@ function scriptDetail(row){
 }
 function renderScripts(){
   const rows=scriptRows();if(scriptState.selected&&!rows.some(row=>row.key===scriptState.selected))scriptState.selected=null;if(!scriptState.selected&&rows.length)scriptState.selected=rows[0].key;
-  const view=LexeditorUI.pagedListDetail({...recordCreationOptions("scripts"),rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",slots:false,className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",fit:{minRowHeight:34},
+  const view=LexeditorUI.pagedListDetail({...recordCreationOptions("scripts"),order:"given",rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",slots:false,className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",fit:{minRowHeight:34},
     search:{key:"project-zomboid-scripts",value:scriptState.query,label:"Search Build 42 script records",change:value=>{scriptState.query=value;scriptState.page=0;renderScripts()}},
     sync:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected},
     change:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected;renderScripts()},
@@ -462,7 +474,7 @@ function renderInfo(){
   ]}));
 }
 async function changeDeployment(path){try{deployment=await api(path,{method:"POST",body:"{}"});setStatus(path.endsWith("undeploy")?"Owned deployment removed":"Local mod deployed");await reload()}catch(error){setStatus(error.message,true)}}
-function render(){if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
+function render(){if(loadError){renderLoadError(loadError);shell?.refresh?.();return}if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
 function navigate(value){
   tab=value;renderLoading(`Opening ${shellTabs.find(entry=>entry.id===value)?.label||value}…`);shell?.refresh?.();
   queueMicrotask(render);

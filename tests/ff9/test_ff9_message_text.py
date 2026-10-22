@@ -48,8 +48,12 @@ def test_installed_resource_lookup_and_record_identity(tmp_path):
     (folder / 'resources.assets').write_bytes(archive(objects))
     payload = {'key': 'items', 'rows': [{'id': '1'}, {'id': 0}, {'id': 900}]}
     text.add_descriptions(payload, tmp_path)
-    assert payload['rows'] == [{'id': '1', 'vanillaDescription': 'Second items'},
-                               {'id': 0, 'vanillaDescription': 'First items'}, {'id': 900}]
+    assert payload['rows'] == [{'id': '1', 'vanillaDescription': 'Second items',
+                                'vanillaText': '[A85038]Second items[HSHD]',
+                                'description': '[A85038]Second items[HSHD]'},
+                               {'id': 0, 'vanillaDescription': 'First items',
+                                'vanillaText': 'First items', 'description': 'First items'},
+                               {'id': 900}]
     assert payload['descriptionLanguage'] == 'US'
     assert text.messages(tmp_path)['abilities'][0] == 'First abilities'
 

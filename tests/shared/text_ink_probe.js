@@ -12,28 +12,29 @@
   const bad = [];
   const measure = document.createElement("canvas").getContext("2d");
 
-  // The nearest ancestor that cuts the text off, or null when the text is
-  // reachable by scrolling and therefore not lost.
-  const clipBox = node => {
-    let positioned = false;
-    for (let step = node; step && step !== document.documentElement; step = step.parentElement) {
+  // Each ancestor that can cut the text off. A roomy inner clip does not
+  // guarantee that an outer one leaves the glyphs visible.
+  const clipBoxes = node => {
+    const boxes=[];
+    let containingBlock=null;
+    for (let step = node; step; step = step.parentElement) {
+      if(containingBlock&&step!==containingBlock)continue;
+      containingBlock=null;
       const cs = getComputedStyle(step);
       if (cs.display === "inline" || cs.display === "contents") continue;
-      if (/auto|scroll/.test(cs.overflowX)) return null;
+      // Scrolling can reveal what an outer container hides, but it cannot
+      // restore ink already lost to an inner non-scrolling clip.
+      if (/auto|scroll/.test(cs.overflowX)) break;
       // A screen-reader-only box is one pixel square and clipped away on
       // purpose: nothing there is meant to be read on screen.
-      if (step.clientWidth <= 2 || step.clientHeight <= 2) return null;
-      const clips = /hidden|clip/.test(cs.overflowX + " " + cs.overflowY);
-      const here = cs.position !== "static";
-      // The page's own pager is nested in a panel but laid out against the
-      // viewport, so that panel never cuts it. Only the containing block of an
-      // absolutely positioned box, or any ancestor of a statically positioned
-      // one, can clip.
-      if (clips) return (!positioned || here) ? step : null;
-      if (cs.position === "fixed") return null;
-      if (here) positioned = true;
+      if (step.clientWidth <= 2 || step.clientHeight <= 2) break;
+      if (/hidden|clip/.test(cs.overflowX)) boxes.push(step);
+      // Absolutely positioned text escapes intermediate boxes before its
+      // containing block. That block can still be clipped by outer ancestors.
+      if(cs.position==='fixed'&&!step.offsetParent)break;
+      if(cs.position==='absolute'||cs.position==='fixed')containingBlock=step.offsetParent;
     }
-    return null;
+    return boxes;
   };
 
   for (const node of document.querySelectorAll("*")) {
@@ -47,12 +48,8 @@
     // shortened, so it is not this defect.
     if (cs.textOverflow === "ellipsis" && cs.whiteSpace !== "normal"
         && node.scrollWidth > node.clientWidth + 1) continue;
-    const box = clipBox(node);
-    if (!box) continue;
-    const rect = box.getBoundingClientRect();
-    const scaleX = box.offsetWidth ? rect.width / box.offsetWidth : 1;
-    const left = rect.left + box.clientLeft * scaleX;
-    const right = left + box.clientWidth * scaleX;
+    const clips = clipBoxes(node);
+    if (!clips.length) continue;
     measure.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     if ("letterSpacing" in measure) measure.letterSpacing = cs.letterSpacing;
     for (const run of runs) {
@@ -69,16 +66,23 @@
       if (Math.abs(metrics.width - r.width) > 1) continue;
       const inkLeft = r.left - metrics.actualBoundingBoxLeft;
       const inkRight = r.left + metrics.actualBoundingBoxRight;
-      const overLeft = left - inkLeft;
-      const overRight = inkRight - right;
-      // Under three quarters of a device-independent pixel the ink is
-      // antialiased across the edge rather than lost, so it is not a cut.
-      if (overLeft > 0.75 || overRight > 0.75) {
-        bad.push({text:value.slice(0, 60), cls:String(node.className).slice(0, 60),
-          tag:node.tagName, clippedBy:String(box.className || box.tagName).slice(0, 60),
-          inkLeft:Math.round(inkLeft * 10) / 10, boxLeft:Math.round(left * 10) / 10,
-          inkRight:Math.round(inkRight * 10) / 10, boxRight:Math.round(right * 10) / 10,
-          overLeft:Math.round(overLeft * 10) / 10, overRight:Math.round(overRight * 10) / 10});
+      for (const box of clips) {
+        const rect = box.getBoundingClientRect();
+        const scaleX = box.offsetWidth ? rect.width / box.offsetWidth : 1;
+        const left = rect.left + box.clientLeft * scaleX;
+        const right = left + box.clientWidth * scaleX;
+        const overLeft = left - inkLeft;
+        const overRight = inkRight - right;
+        // Under three quarters of a device-independent pixel the ink is
+        // antialiased across the edge rather than lost, so it is not a cut.
+        if (overLeft > 0.75 || overRight > 0.75) {
+          bad.push({text:value.slice(0, 60), cls:String(node.className).slice(0, 60),
+            tag:node.tagName, clippedBy:String(box.className || box.tagName).slice(0, 60),
+            inkLeft:Math.round(inkLeft * 10) / 10, boxLeft:Math.round(left * 10) / 10,
+            inkRight:Math.round(inkRight * 10) / 10, boxRight:Math.round(right * 10) / 10,
+            overLeft:Math.round(overLeft * 10) / 10, overRight:Math.round(overRight * 10) / 10});
+          break;
+        }
       }
     }
   }

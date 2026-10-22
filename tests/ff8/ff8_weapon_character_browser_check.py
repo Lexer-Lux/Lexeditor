@@ -21,8 +21,14 @@ def main():
             page.evaluate("state.selected.weapons=0;navigate('weapons')")
             page.wait_for_selector('button[aria-label="Choose character for Revolver"]')
             page.wait_for_function("[...document.querySelectorAll('.lex-record-card img')].every(i=>i.complete&&i.naturalWidth>0)")
+            page.wait_for_function("document.fonts.status==='loaded'")
             card = page.locator('.lex-record-card')
             assert card.locator('img').get_attribute('alt') == 'Squall'
+            # The portrait box matches the 32x48 portrait: a tall box letterboxes
+            # invisibly against the card and reads as a squeezed face.
+            box = card.locator('img').bounding_box()
+            natural = page.evaluate("()=>[document.querySelector('.lex-record-card img').naturalWidth,document.querySelector('.lex-record-card img').naturalHeight]")
+            assert abs(box['width'] / box['height'] - natural[0] / natural[1]) < 0.1, (box, natural)
             assert card.bounding_box()['width'] >= 90
             assert page.locator('.lex-detail-panel-beside').evaluate('''node=>{
                 const [portrait,fields]=node.children;

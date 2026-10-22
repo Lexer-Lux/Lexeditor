@@ -1,0 +1,83 @@
+{
+  "Param": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Type": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Name": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Description": "Determines the parameters for reinforcing armor.",
+  "Fields": [
+    {
+      "Field": "physicsDefRate",
+      "Name": "Physical Defense (x)",
+      "Description": "The multiplier to apply to base physical defense for this tier of reinforcement."
+    },
+    {
+      "Field": "magicDefRate",
+      "Name": "Magic Defense (x)",
+      "Description": "The multiplier to apply to base magic defense for this tier of reinforcement."
+    },
+    {
+      "Field": "fireDefRate",
+      "Name": "Fire Defense (x)",
+      "Description": "The multiplier to apply to base fire defense for this tier of reinforcement."
+    },
+    {
+      "Field": "thunderDefRate",
+      "Name": "Lightning Defense (x)",
+      "Description": "The multiplier to apply to base lightning defense for this tier of reinforcement."
+    },
+    {
+      "Field": "slashDefRate",
+      "Name": "Slash Defense (x)",
+      "Description": "The multiplier to apply to base slash defense for this tier of reinforcement."
+    },
+    {
+      "Field": "blowDefRate",
+      "Name": "Strike Defense (x)",
+      "Description": "The multiplier to apply to base strike defense for this tier of reinforcement."
+    },
+    {
+      "Field": "thrustDefRate",
+      "Name": "Thrust Defense (x)",
+      "Description": "The multiplier to apply to base thrust defense for this tier of reinforcement."
+    },
+    {
+      "Field": "resistPoisonRate",
+      "Name": "Poison Resistance (x)",
+      "Description": "The multiplier to apply to base poison resistance for this tier of reinforcement."
+    },
+    {
+      "Field": "resistDiseaseRate",
+      "Name": "Toxic Resistance (x)",
+      "Description": "The multiplier to apply to base toxic resistance for this tier of reinforcement."
+    },
+    {
+      "Field": "resistBloodRate",
+      "Name": "Bleed Resistance (x)",
+      "Description": "The multiplier to apply to base bleed resistance for this tier of reinforcement."
+    },
+    {
+      "Field": "resistCurseRate",
+      "Name": "Curse Resistance (x)",
+      "Description": "The multiplier to apply to base curse resistance for this tier of reinforcement."
+    },
+    {
+      "Field": "residentSpEffectId1",
+      "Name": "Resident SpEffect Offset: 1",
+      "Description": "Added to the armor's first resident effect at this reinforcement level."
+    },
+    {
+      "Field": "residentSpEffectId2",
+      "Name": "Resident SpEffect Offset: 2",
+      "Description": "Added to the armor's second resident effect at this reinforcement level."
+    },
+    {
+      "Field": "residentSpEffectId3",
+      "Name": "Resident SpEffect Offset: 3",
+      "Description": "Added to the armor's third resident effect at this reinforcement level."
+    },
+    {
+      "Field": "materialSetId",
+      "Name": "Material Set Offset",
+      "Description": "Added to the armor's material set at this reinforcement level."
+    }
+  ]
+}

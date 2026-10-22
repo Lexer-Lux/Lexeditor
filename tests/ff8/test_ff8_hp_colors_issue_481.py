@@ -5,7 +5,6 @@ enable_ff8_better_hp_colors, and every driver switch no enabled mod asks for
 is written off. The fixture library below stands in for the reader's library.
 """
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -30,8 +29,6 @@ class FixtureLibrary:
     def __enter__(self):
         self._temp = tempfile.TemporaryDirectory(prefix="ff8-hp-colors-")
         temp = Path(self._temp.name)
-        self._trust = os.environ.get(script_mods.TRUST_ENV)
-        os.environ[script_mods.TRUST_ENV] = str(temp / "trust.json")
         self.project, self.game = temp / "project", temp / "game"
         self.library = self.project / ".lexeditor-mods"
         self.game.mkdir()
@@ -49,7 +46,6 @@ class FixtureLibrary:
         (root / "mod.json").write_text(json.dumps(
             {"id": mod_id, "name": name, "order": 400 + len(self.roots), "enabled": False,
              "script": {"version": 1}}), encoding="utf-8")
-        script_mods.set_trusted(root, True)
         self.roots[mod_id] = root
 
     def enable(self, **switches):
@@ -66,10 +62,6 @@ class FixtureLibrary:
         return built
 
     def __exit__(self, *exc):
-        if self._trust is None:
-            os.environ.pop(script_mods.TRUST_ENV, None)
-        else:
-            os.environ[script_mods.TRUST_ENV] = self._trust
         self._temp.cleanup()
 
 
@@ -96,17 +88,31 @@ class BetterHpColorsTests(unittest.TestCase):
             self.assertEqual(disabled.count("enable_ff8_better_hp_colors = false"), 1)
 
     def test_editor_exposes_control_and_semantics(self):
-        # The Tweaks page draws every tweak mod from its schema: the switch is
-        # labelled with the mod's name and the help bubble is the schema help.
-        editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
-        self.assertIn('"aria-label":row.name', editor)
-        self.assertIn("panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker)", editor)
+        # Better HP Colors has no settings of its own: it stays out of the
+        # Tweaks page whether off or on. Enabling the mod belongs to the
+        # Mods tab.
         with FixtureLibrary() as fixture:
             fixture.add("better-hp-colors", "Better HP Colors", "enable_ff8_better_hp_colors", HELP)
             row = next(row for row in gameplay_settings.load(fixture.project, fixture.game)["tweaks"]
                        if row["id"] == "better-hp-colors")
             self.assertEqual((row["name"], row["schema"]["title"]), ("Better HP Colors", "BETTER HP COLORS"))
             self.assertIs(row["schema"]["needsDriver"], True)
+            self.assertIn("white at full HP", row["schema"]["help"])
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as play:
+                browser = play.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={"width": 1200, "height": 800})
+                    page.route('http://fixture/', lambda route: route.fulfill(
+                        body='<main></main>', content_type='text/html'))
+                    page.goto('http://fixture/')
+                    page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
+                    page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
+                    count = '''row => LexeditorUI.tweakModPanels({rows: [row]}).panels.length'''
+                    self.assertEqual(page.evaluate(count, row), 0)
+                    self.assertEqual(page.evaluate(count, {**row, "enabled": True}), 0)
+                finally:
+                    browser.close()
 
     def test_library_mod_semantics(self):
         mod = Path(paths.MODS_ROOT) / "Better HP Colors"

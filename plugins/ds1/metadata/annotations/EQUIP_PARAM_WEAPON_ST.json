@@ -21,13 +21,13 @@
     },
     {
       "Field": "weight",
-      "Name": "Weight",
+      "Name": "Weight (kg)",
       "Description": "Weight [kg]."
     },
     {
       "Field": "weaponWeightRate",
       "Name": "Equipment Weight Ratio",
-      "Description": "Affects animation recovery timing (such as dodging or follow-up attacks) via TAE event 300.\nHigher values mean slower recovery, lower values mean faster recovery.\nValues determine how much of the early recovery event (if present) is not active, from 0% to 100%.\nEffects of values will be dependent on the length of the early recovery event.\n1 = 100% (slowest), .5 = 50% (half), 0 = 0% (fastest)"
+      "Description": "Recovery speed after attacks and dodges. Higher values recover slower. 1 is slowest, 0 is fastest."
     },
     {
       "Field": "fixPrice",
@@ -66,22 +66,22 @@
     },
     {
       "Field": "physGuardCutRate",
-      "Name": "Guard Absorption %: Physical",
+      "Name": "Guard Absorption: Physical (%)",
       "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
     },
     {
       "Field": "magGuardCutRate",
-      "Name": "Guard Absorption %: Magic",
+      "Name": "Guard Absorption: Magic (%)",
       "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
     },
     {
       "Field": "fireGuardCutRate",
-      "Name": "Guard Absorption %: Fire",
+      "Name": "Guard Absorption: Fire (%)",
       "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
     },
     {
       "Field": "thunGuardCutRate",
-      "Name": "Guard Absorption %: Lightning",
+      "Name": "Guard Absorption: Lightning (%)",
       "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
     },
     {
@@ -201,22 +201,22 @@
     },
     {
       "Field": "antiDemonDamageRate",
-      "Name": "Damage Adjustment %: Demon",
+      "Name": "Damage Adjustment: Demon (x)",
       "Description": "Damage multiplier applied to targets that are classified with isDemon."
     },
     {
       "Field": "antSaintDamageRate",
-      "Name": "Damage Adjustment %: Divine",
+      "Name": "Damage Adjustment: Divine (x)",
       "Description": "Damage multiplier applied to targets that are classified with isWeakSaint."
     },
     {
       "Field": "antWeakA_DamageRate",
-      "Name": "Damage Adjustment %: Occult",
+      "Name": "Damage Adjustment: Occult (x)",
       "Description": "Damage multiplier applied to targets that are classified with isWeakA"
     },
     {
       "Field": "antWeakB_DamageRate",
-      "Name": "Damage Adjustment %: Darkwraith",
+      "Name": "Damage Adjustment: Darkwraith (x)",
       "Description": "Damage multiplier applied to targets that are classified with isWeakB"
     },
     {
@@ -261,7 +261,7 @@
     },
     {
       "Field": "parryDamageLife",
-      "Name": "Parry Damage Duration",
+      "Name": "Parry Damage Duration (frames)",
       "Description": "The duration of parry damage. It is capped by the duration set in the TAE. In frames."
     },
     {
@@ -301,12 +301,12 @@
     },
     {
       "Field": "guardAngle",
-      "Name": "Horizontal Guard Angle",
+      "Name": "Horizontal Guard Angle (degrees)",
       "Description": "Defense generation range angle when guarding with a weapon (horizontal direction). In degrees."
     },
     {
       "Field": "staminaGuardDef",
-      "Name": "Guard Stability",
+      "Name": "Guard Stability (%)",
       "Description": "Defense power against stamina drain from enemy attacks when guarding correctly."
     },
     {
@@ -377,7 +377,7 @@
     {
       "Field": "correctType",
       "Name": "Damage Correction Graph",
-      "Description": "Determine the calculcation correction graph to use when correcting damage."
+      "Description": "Which scaling graph this weapon uses. It stays read-only because the graph choices are not documented."
     },
     {
       "Field": "spAttribute",
@@ -446,27 +446,27 @@
     },
     {
       "Field": "guardCutCancelRate",
-      "Name": "Guard Absorption Invalidation",
+      "Name": "Guard Absorption Invalidation (%)",
       "Description": "Guard cut rate invalidation ratio (-100 to 100)  Normal at 0 / Completely invalidated at -100 / Doubles the defense effect of the opponent at 100  -50, 100% cut shield becomes 50% cut Become "
     },
     {
       "Field": "guardLevel",
       "Name": "Guard Damage Level",
-      "Description": "When guarding, the guard animation offset to use when being attacked."
+      "Description": "Which guard animation plays when a hit lands."
     },
     {
       "Field": "slashGuardCutRate",
-      "Name": "Guard Absorption %: Slash",
+      "Name": "Guard Absorption: Slash (%)",
       "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "blowGuardCutRate",
-      "Name": "Guard Absorption %: Strike",
+      "Name": "Guard Absorption: Strike (%)",
       "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "thrustGuardCutRate",
-      "Name": "Guard Absorption %: Thrust",
+      "Name": "Guard Absorption: Thrust (%)",
       "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
@@ -492,7 +492,7 @@
     {
       "Field": "isDurabilityDivergence",
       "Name": "Is Animation Changed by Durability",
-      "Description": "The offset to apply to the animation set based on durability."
+      "Description": "Changes the weapon's animations based on its remaining durability."
     },
     {
       "Field": "rightHandEquipable",
@@ -617,7 +617,7 @@
     {
       "Field": "baseChangeCategory",
       "Name": "Job Category",
-      "Description": "The weapon job category (e.g. ascension or infusion). Used to display the attribute icon."
+      "Description": "Which ascension or infusion family this weapon belongs to. The game shows the matching attribute icon."
     },
     {
       "Field": "isDragonSlayer",

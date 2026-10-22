@@ -46,7 +46,7 @@
     },
     {
       "Field": "weight",
-      "Name": "Weight",
+      "Name": "Weight (kg)",
       "Description": "Weight [kg]."
     },
     {
@@ -71,7 +71,7 @@
     },
     {
       "Field": "partsDamageRate",
-      "Name": "Part Damage %",
+      "Name": "Part Damage (x)",
       "Description": "The damage correction to apply to this part when hit."
     },
     {
@@ -326,7 +326,7 @@
     },
     {
       "Field": "flickDamageCutRate",
-      "Name": "Repulsion Damage Absorption %",
+      "Name": "Repulsion Damage Absorption (%)",
       "Description": "The absorption rate to use when calculating the repulsion damage this part incurs."
     },
     {

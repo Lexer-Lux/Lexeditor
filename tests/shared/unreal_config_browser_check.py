@@ -53,6 +53,16 @@ def overflow_x(page) -> dict:
     })""")
 
 
+def assert_reachable(control) -> None:
+    """A visible button must sit in the viewport and receive pointer input."""
+    hit = control.evaluate("""node=>{
+      const box=node.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2;
+      return {x,y,inViewport:x>=0&&y>=0&&x<innerWidth&&y<innerHeight,
+        receivesPointer:node.contains(document.elementFromPoint(x,y))};
+    }""")
+    assert hit['inViewport'] and hit['receivesPointer'], hit
+
+
 def reveal(page, locator, *, pages: int = 12) -> None:
     """Turn tweaks-pager pages until the target is on screen, like a reader."""
     pager = page.locator(".lex-tweaks-pages")
@@ -88,6 +98,8 @@ def check_engine_panel(page, ini: Path, *, name: str) -> None:
     # page over to Save settings like a reader would.
     reveal(page, save)
     expect(save).to_be_enabled()
+    assert_reachable(save)
+    page.screenshot(path=str(OUT / f"{name}-engine-before-save.png"))
     save.click()
     # Saving re-renders back to page one, so the file reaching disk — not the
     # button state on a later page — proves the round trip.
@@ -98,6 +110,8 @@ def check_engine_panel(page, ini: Path, *, name: str) -> None:
         page.wait_for_timeout(200)
     reveal(page, save)
     expect(save).to_be_disabled()
+    reveal(page, motion)
+    expect(motion).to_have_value("2")
     page.screenshot(path=str(OUT / f"{name}-engine.png"), full_page=True)
 
     page.set_viewport_size({"width": 800, "height": 600})
@@ -107,6 +121,8 @@ def check_engine_panel(page, ini: Path, *, name: str) -> None:
     reveal(page, page.get_by_text("ENGINE CONFIG", exact=True))
     reveal(page, page.locator('input[aria-label="Motion blur"]'))
     page.screenshot(path=str(OUT / f"{name}-engine-small.png"), full_page=True)
+    reveal(page, save)
+    assert_reachable(save)
 
     page.set_viewport_size({"width": 1440, "height": 900})
     page.evaluate('document.documentElement.style.zoom="150%"')
@@ -117,6 +133,8 @@ def check_engine_panel(page, ini: Path, *, name: str) -> None:
     # multiplies Chromium's document height and adds an artificial blank tail
     # that is not visible in the host.
     page.screenshot(path=str(OUT / f"{name}-engine-150-percent.png"), full_page=False)
+    reveal(page, save)
+    assert_reachable(save)
     page.evaluate('document.documentElement.style.zoom="100%"')
 
 

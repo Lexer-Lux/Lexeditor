@@ -10,6 +10,8 @@ work, even if your tool does not load skills on its own.
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
+| ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-modding/SKILL.md` |
+| build or change an editor screen, panel, preview, header or shared control | `.agents/skills/ux-design/SKILL.md` |
 
 ## Editor UI
 
@@ -23,6 +25,15 @@ work, even if your tool does not load skills on its own.
 - Keep list and detail views consistent with the RDR2 plugin: record identity
   stays in the master list, and all editable fields stay in the selected
   record's detail pane.
+- Whatever the game lets a mod change is editable, names included. A record
+  whose name the game stores is renamed through `pagedListDetail`'s `rename`
+  (the table's Name cell and the detail heading, by double-click); a page
+  that cannot says why in a `// names:` comment above the call
+  (`tests/shared/test_list_names_decided.py`). Every property of a
+  list-and-detail page can be pinned as a table column; the framework adds
+  the pins, and rows carry the values (`row.values` / `row.display`).
+- A field that stores another record's ID is never shown as a bare number:
+  show what it points to, preview it on hover, and link to it.
 - Give a field, section or tab a question-mark bubble only when its label and
   control do not already say everything. Write it per the help-text skill.
 - Necessary information belongs in the question-mark help, not in a paragraph
@@ -33,6 +44,15 @@ work, even if your tool does not load skills on its own.
   game's own data, read-only, and the mod selector names that source Vanilla;
   creating or copying a mod is an explicit action. An edit attempt in that
   state offers to create one. See `codex/shared/no-mod-state.md`.
+- Every mod, for every game, is one folder with a root `mod.json` holding at
+  least a name (author, description and credits optional); every game gets
+  the shared Mods tab and first-run screen from the shell. Lexer's Mod for a
+  game is `lexmod` in its plugin.json. See `codex/shared/mod-format.md`.
+- A mod changes records, not files. A game's loader combines every enabled
+  mod over the game's own (vanilla) files, never copies one mod's whole file
+  over another's, and reports only what it truly cannot combine through its
+  adapter's `conflicts()`; the Mods tab marks those mods
+  (`core/mod_conflicts.py`, DS1's `plugins/ds1/mod_loader.py`).
 - Every game plugin exposes a Data Map screen. A generic Files tab is not the
   player-facing editor for data that needs a format-specific view.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the
@@ -47,6 +67,10 @@ work, even if your tool does not load skills on its own.
   large to keep correct in hand-written assembly. Say which of those applies
   when adding driver code.
 - In-game messages use the game's own message box, never an overlay imitation.
+- Never write a game's executable. Native changes are applied in memory as
+  the game starts (FF8: FFNx and Hext; DS1: Lexeditor's dinput8.dll loader,
+  `plugins/ds1/runtime/`). A crashed game Windows keeps listed locks its
+  executable, and a patched executable then cannot be restored until reboot.
 
 ## Tweaks
 
@@ -69,19 +93,22 @@ work, even if your tool does not load skills on its own.
 ## Git and publishing
 
 - Branches are fine; leftovers are not. When a task is done and verified, merge
-  its branch into master and delete the branch, its worktree and any stash in
-  the same session. Say plainly if you stop with unmerged work. A worker may
-  push the branch it owns. Pushing master, or merging into it, is the root
-  agent's job and needs Lexer's explicit go-ahead.
-- This repository is public. Never commit credentials, private binaries,
-  proprietary game dumps or unrelated personal data.
+  its branch into local master and delete the branch, its worktree and any stash
+  in the same session, no go-ahead needed: local master is the default place
+  finished work lives. Say plainly if you stop with unmerged work. A worker may
+  push the branch it owns. Pushing master to the remote is the root
+  agent's job and needs Lexer's explicit go-ahead (the sync word).
+- This repository is public. Never commit credentials, private binaries
+  or unrelated personal data.
 
 ## Checks
 
 - Verify on CI, not on Lexer's machine. Several agents running suites at once
-  pin his six-core CPU at 100%. Locally, run only the one check that covers what
-  you changed, one browser at a time. For a full suite, push the branch you own
-  and open a draft pull request; never merge it yourself.
+  pin his six-core CPU at 100%. Locally, run only the one test file that
+  covers what you changed, one browser at a time. Never run a whole suite
+  locally: not `check_plugin.py --global` (the shared suite), not a plugin's.
+  For a full suite, push the branch you own and open a draft pull request;
+  never merge it yourself.
 - `python tools/check_plugin.py <plugin>` runs a plugin's checks and `--global`
   runs the shared ones; CI runs exactly these. New tests go in `tests/<plugin>/`
   or `tests/shared/` as `test_*.py`, `verify_*.py` or `*_check.py`, with file
@@ -104,7 +131,10 @@ work, even if your tool does not load skills on its own.
 
 ## Editing files from a shell
 
-- Never pass code with quotes or backslashes through a bash heredoc. Write the
-  script to your scratchpad with the file-writing tool and run it.
+- Never pass code with quotes or backslashes through a bash heredoc, sed or
+  `python -c`. Write the script to your scratchpad with the file-writing tool
+  and run it. Inside a patch script, text that holds backslashes (`\n`, a
+  Windows path) goes in raw strings (`r'''...'''`), or the edit is made with
+  the editing tool instead: an ordinary string turns `\n` into a line break.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.

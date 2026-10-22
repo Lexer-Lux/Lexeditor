@@ -10,8 +10,8 @@ import pytest
 from test_shared_ui_feedback import framework, page
 
 
-def mount_shell(page, developer=True):
-    page.evaluate("""developer => {
+def mount_shell(page, developer=True, history=False):
+    page.evaluate("""([developer, withHistory]) => {
       window.savedCalls = [];
       window.pywebview = {api: {
         lexeditor_settings: async () => ({developerMode: developer}),
@@ -24,8 +24,9 @@ def mount_shell(page, developer=True):
       window.shell = LexeditorUI.mountShell({host:'#shell',brand:'LEXEDITOR',
         plugin:{id:'fixture',name:'Fixture'},
         tabs:[{id:'items',label:'Items'},{id:'magic',label:'Magic'}],
+        ...(withHistory ? {history: {}} : {}),
         activeTab:()=> 'items', navigate(){}});
-    }""", developer)
+    }""", [developer, history])
     page.wait_for_timeout(300)
 
 
@@ -276,3 +277,161 @@ def test_holding_right_click_on_a_subtab_saves_its_page_view(page):
     plugin, page_tab, preferences = saved[0]
     assert (plugin, page_tab) == ('fixture', 'items'), saved
     assert preferences.get('lexeditor:list-detail:fixture-items') == '40', preferences
+
+
+def mount_rebuilding_subtabs(page):
+    # Like the real app: every change rebuilds the strip from scratch.
+    page.evaluate("""()=>{
+      window.activeSub = 'stats';
+      window.drawSubs = () => document.querySelector('main').replaceChildren(
+        LexeditorUI.subtabBar({label: 'Sections', active: window.activeSub,
+          tabs: [{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+          change: id => { window.activeSub = id; window.drawSubs(); }}));
+      window.drawSubs();
+    }""")
+    page.wait_for_timeout(200)
+
+
+def test_double_clicking_the_active_subtab_renames_it(page):
+    framework(page)
+    mount_shell(page)
+    mount_rebuilding_subtabs(page)
+    span = page.locator('.lex-subtab-button[data-subtab="stats"] .lex-tab-label-text')
+    span.dblclick()
+    field = page.locator('.lex-subtab-button[data-subtab="stats"] .lex-label-rename')
+    field.wait_for(timeout=3000)
+    page.wait_for_timeout(400)
+    assert field.count() == 1, "the rename box was rebuilt away"
+    field.press("Escape")
+    page.wait_for_timeout(200)
+    span.dblclick()
+    field.wait_for(timeout=3000)
+    assert field.count() == 1, "the rename box did not come back"
+
+
+def test_clicking_the_active_subtab_runs_no_change(page):
+    framework(page)
+    mount_shell(page)
+    page.evaluate("""()=>{
+      window.changes = [];
+      document.querySelector('main').replaceChildren(LexeditorUI.subtabBar({
+        label: 'Sections', active: 'stats',
+        tabs: [{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+        change: id => window.changes.push(id)}));
+    }""")
+    page.wait_for_timeout(200)
+    page.locator('.lex-subtab-button[data-subtab="stats"]').click()
+    page.locator('.lex-subtab-button[data-subtab="growth"]').click()
+    assert page.evaluate("window.changes") == ["growth"]
+
+def mount_switching_shell(page):
+    # A plugin that renders its subtabs inside navigate, the way the real
+    # app does, and records which tab the shell had marked at the time.
+    page.evaluate("""() => {
+      window.renderedActive = [];
+      window.pywebview = {api: {
+        lexeditor_settings: async () => ({developerMode: true}),
+        save_default_view: async () => ({saved: true}),
+      }};
+      document.body.insertAdjacentHTML('afterbegin','<div id="shell"></div>');
+      let current = 'items';
+      window.shell = LexeditorUI.mountShell({host:'#shell',brand:'LEXEDITOR',
+        plugin:{id:'fixture',name:'Fixture'},
+        tabs:[{id:'items',label:'Items'},{id:'magic',label:'Magic'}],
+        activeTab:()=> current,
+        navigate(tab){current = tab;
+          renderedActive.push(document.querySelector(
+            '.lex-shell-header nav button.active')?.dataset.tab || '');
+          document.querySelector('main').replaceChildren(
+            LexeditorUI.subtabBar({label:'Sections', active:'port', showSingle:true,
+              tabs:[{id:'port',label:'Port'}], change(){}}));}});
+    }""")
+    page.wait_for_timeout(300)
+
+
+def test_the_shell_marks_the_tab_before_the_plugin_renders(page):
+    # Every label and layout key is read from the marked tab. If the plugin
+    # renders first, the new page is built under the old tab's keys and
+    # every rename on it silently falls back to its shipped name.
+    framework(page)
+    mount_switching_shell(page)
+    page.locator('nav button[data-tab="magic"]').click()
+    assert page.evaluate("window.renderedActive") == ["magic"]
+
+
+def test_a_subtab_rename_survives_a_tab_switch(page):
+    framework(page)
+    mount_switching_shell(page)
+    page.evaluate("localStorage.setItem('fixture-magic.sub.port.label','Harbour')")
+    page.locator('nav button[data-tab="magic"]').click()
+    assert subtab_label(page, "port") == "Harbour"
+
+
+def test_double_clicking_an_inactive_subtab_renames_it(page):
+    # The first click switches to the tab, rebuilding the strip the way
+    # every panel does, so the label's own dblclick listener never sees
+    # both clicks on one node. The second quick click renames anyway.
+    framework(page)
+    mount_shell(page)
+    page.evaluate("""()=>{
+      window.changes = [];
+      window.drawBar = active => document.querySelector('main').replaceChildren(
+        LexeditorUI.subtabBar({label:'Sections', active,
+          tabs:[{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+          change:id=>{changes.push(id); drawBar(id);}}));
+      drawBar('stats');
+    }""")
+    page.locator('.lex-subtab-button[data-subtab="growth"] .lex-tab-label-text').dblclick()
+    field = page.locator('.lex-subtab-button[data-subtab="growth"] .lex-label-rename')
+    field.wait_for(timeout=3000)
+    field.fill("Progress")
+    field.press("Enter")
+    page.wait_for_timeout(250)
+    assert subtab_label(page, "growth") == "Progress"
+    assert page.evaluate("window.changes") == ["growth"]
+    assert page.evaluate('localStorage.getItem("fixture-items.sub.growth.label")') == "Progress"
+
+def subtab_order(page):
+    return page.locator(".lex-subtab-bar > .lex-subtab-button").evaluate_all(
+        "nodes => nodes.map(node => node.dataset.subtab)")
+
+
+def test_renamed_subtabs_sort_by_their_shown_names(page):
+    # Lexer renamed "Value & rewards" to "Drops" and it sat last on every
+    # fresh render: the build sorted by the shipped name, while only the
+    # re-sort after the rename used the shown one.
+    framework(page)
+    mount_shell(page)
+    page.evaluate("localStorage.setItem('fixture-items.sub.growth.label','Zulu')")
+    mount_subtabs(page)
+    assert subtab_label(page, "growth") == "Zulu"
+    assert subtab_order(page) == ["stats", "growth"]
+
+
+def test_renamed_panel_tabs_sort_by_their_shown_names(page):
+    framework(page)
+    mount_shell(page)
+    page.evaluate("localStorage.setItem('fixture-items.sub.properties.label','Drops')")
+    page.evaluate("""()=>{
+      document.querySelector('main').replaceChildren(LexeditorUI.tabbedPanel({
+        label: 'Details', active: 'defense',
+        tabs: [{id:'defense',label:'Defense'},{id:'properties',label:'Properties'},
+               {id:'model',label:'Model'}],
+        change(){}, content: 'x'}));
+    }""")
+    page.wait_for_timeout(200)
+    assert subtab_order(page) == ["defense", "properties", "model"]
+
+
+def test_renamed_page_tabs_sort_by_their_shown_names(page):
+    framework(page)
+    mount_shell(page)
+    rename(page, "magic", "AAA")
+    page.evaluate("document.querySelector('.lex-shell-header').remove()")
+    mount_shell(page)
+    order = page.locator("nav button[data-tab]").evaluate_all(
+        "nodes => nodes.map(node => node.dataset.tab)")
+    # Mods stays leftmost by design; the renamed tab rejoins the rest.
+    assert order == ["mods", "magic", "items"], order
+
+

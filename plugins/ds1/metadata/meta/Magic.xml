@@ -11,7 +11,7 @@
     <iconId />
     <behaviorId />
     <mtrlItemId Refs="EquipMtrlSetParam" />
-    <replaceMagicId />
+    <replaceMagicId Refs="Magic" />
     <maxQuantity />
     <heroPoint />
     <overDexterity />
