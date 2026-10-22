@@ -89,9 +89,9 @@
   text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .ds1-find-reference{flex:0 0 auto;}
 /* An item/count pair gives the item lane the row and the count lane a
-   fixed 3-digit box: a wider count lane took most of a narrow
-   three-column row and the item collapsed to its arrow or finder. */
-.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 4.5em;}
+   fixed box that still shows three digits beside the vanilla reference and
+   the stepper, which share the box: at 4.5em a changed 30 read as 3. */
+.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 6.5em;}
 .lex-detail-parts.ds1-item-count-pair>.lex-detail-part{margin-right:0;}
 /* On a narrow property row even a 4.5em count leaves the item no room
    beside a side label, so the pair's label moves above its boxes the way

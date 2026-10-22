@@ -150,6 +150,32 @@ def main():
                             sizes = pair_widths(page, 'item_09')
                             assert sizes['item'] > sizes['count'], sizes
                             assert sizes['item'] >= 8 * sizes['em'], sizes
+                            # A changed count shares its box with the vanilla
+                            # reference and the stepper; three digits still show.
+                            count = page.locator('input[data-field-key="itemNum_09"]')
+                            before = count.input_value()
+                            count.fill('300')
+                            count.press('Tab')
+                            page.wait_for_function('state.pending===0')
+                            page.wait_for_timeout(200)
+                            reveal(page, page.locator('[data-lex-property="item_09"]'))
+                            assert page.locator('[data-lex-property="item_09"] .lex-reference-values').count() == 1
+                            fit = page.evaluate("""() => {
+                                const box = document.querySelector('input[data-field-key="itemNum_09"]');
+                                const style = getComputedStyle(box);
+                                const pen = document.createElement('canvas').getContext('2d');
+                                pen.font = style.font;
+                                return {text: pen.measureText(box.value).width,
+                                        room: box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)};
+                            }""")
+                            assert fit['text'] <= fit['room'], fit
+                            if output:
+                                page.screenshot(path=str(output / 'stats-starting-classes-count.png'))
+                            count.fill(before)
+                            count.press('Tab')
+                            page.wait_for_function('state.pending===0')
+                            sizes = pair_widths(page, 'item_09')
+                            assert sizes['item'] >= 8 * sizes['em'], sizes
                             assert page.locator('[data-lex-property="item_01"] select').count() == 1
                             assert page.locator('[data-lex-property="equip_Accessory02"] select').count() == 1
                             reveal(page, page.locator('[data-lex-property="item_01"] select'))
