@@ -36,7 +36,7 @@ def test_inline_pages_split_and_never_scroll():
         + `<div class="lex-detail-field-label">R${i}</div>`
         + `<div class="lex-detail-field-control"><input value="${i}" aria-label="R${i}"></div></div>`).join('');
       const section = (title, count) =>
-        `<section class="lex-detail-section"><h2 class="lex-detail-section-title">${title}</h2>`
+        `<section class="lex-detail-section" aria-label="${title}"><h2 class="lex-detail-section-title">${title}</h2>`
         + `<div class="lex-detail-section-content">${rows(count)}</div></section>`;
       const content = document.createElement('div');
       content.innerHTML = section('Tall', 20) + section('Short', 3);
@@ -55,10 +55,15 @@ def test_inline_pages_split_and_never_scroll():
               const scroll = root.querySelector('.lex-tweaks-scroll');
               return {pages: root.lexPaging().starts.length,
                       continued: root.querySelectorAll('.lex-detail-section-continued').length,
+                      labels: [...root.querySelectorAll('.lex-detail-section[aria-label]')]
+                        .map(node => node.getAttribute('aria-label')),
                       client: scroll.clientHeight, height: scroll.scrollHeight};
             }""")
             assert state['pages'] > 1, state
             assert state['continued'] >= 1, state
+            assert state['labels'].count('Tall') == 1, state
+            assert all(label in ('Tall', 'Short') or label.endswith(' (continued)')
+                       for label in state['labels']), state
             assert state['height'] <= state['client'] + 1, state
             for _ in range(state['pages'] - 1):
                 page.locator(".lex-tweaks-pages button[aria-label='Next page']").click()

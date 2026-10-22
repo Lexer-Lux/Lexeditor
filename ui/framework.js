@@ -5824,6 +5824,13 @@
       }
       pieces = [];
     };
+    // A continued piece inherits its card's accessible name; point it at the
+    // continued title instead so no two sections announce alike.
+    const continuedLabel = (piece, name) => {
+      const label = piece.getAttribute("aria-label");
+      if (label === null) return;
+      piece.setAttribute("aria-label", `${(name || label).replace(/ \(continued\)$/, "")} (continued)`);
+    };
     // A section splits between its rows; a panel between its sections; a
     // settings card between its subs.
     const splitSection = (card, available) => {
@@ -5889,6 +5896,7 @@
       for (const segment of segments) {
         const piece = card.cloneNode(false);
         piece.classList.add("lex-detail-section-continued");
+        continuedLabel(piece, name);
         const rest = body.cloneNode(false);
         rest.append(...segment);
         let head = null;
@@ -5942,6 +5950,7 @@
       const title = card.querySelector(":scope > h2");
       const head = title ? element(title.tagName.toLowerCase(), {class: title.className},
         `${plain(title)} (continued)`) : null;
+      continuedLabel(piece, title ? plain(title) : "");
       piece.append(...(head ? [head] : []), rest);
       card.after(piece);
       cards.splice(cards.indexOf(card) + 1, 0, piece);
