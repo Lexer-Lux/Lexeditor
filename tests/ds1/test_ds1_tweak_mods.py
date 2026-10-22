@@ -392,6 +392,133 @@ class LayoutLoaderTests(unittest.TestCase):
         self.assertFalse((self.game / tweak_mods.RUNTIME_DLL).exists())
 
 
+ESD_TWEAK = '''import json
+
+def build(settings, context):
+    return {"native/%s.json": json.dumps(%s), "esd/%s.json": json.dumps(%s)}
+'''
+
+
+class EsdLoaderTests(unittest.TestCase):
+    """A tweak that adds menu commands: the scripts follow the layout's rules."""
+
+    def setUp(self):
+        from test_ds1_menu_scripts import ANCHOR, NEW, archive, build_script
+        from plugins.ds1 import menu_scripts
+        self.menu_scripts = menu_scripts
+        temp = tempfile.TemporaryDirectory(prefix="lexeditor-ds1-esd-")
+        self.addCleanup(temp.cleanup)
+        self.temp = Path(temp.name)
+        self.library = self.temp / "library"
+        self.game = self.temp / "game"
+        (self.game / "menu").mkdir(parents=True)
+        self.live = self.game / exe_patches.EXECUTABLE
+        self.live.write_bytes(VANILLA)
+        self.vanilla = {"ingame": archive({"i02-00.esd": build_script().to_bytes()}),
+                        "common": archive({"e00-00.esd": build_script(where="sub").to_bytes()})}
+        self.live_ingame = self.game / "menu" / "ingame.menuesdbnd.dcx"
+        self.live_common = self.game / "menu" / "common.menuesdbnd.dcx"
+        self.live_ingame.write_bytes(self.vanilla["ingame"])
+        self.live_common.write_bytes(self.vanilla["common"])
+        self.spec = {"version": 1, "changes": [
+            {"archive": "ingame", "script": "i02-00.esd",
+             "after": dict(ANCHOR), "commands": [dict(NEW)]},
+            {"archive": "common", "script": "e00-00.esd",
+             "after": {"bank": 1, "id": 7, "args": []},
+             "commands": [{"bank": 1, "id": 8, "args": []}]}]}
+        root = self.library / "Scripts"
+        (root / "script").mkdir(parents=True)
+        (root / "script" / "__init__.py").write_text("", encoding="utf-8")
+        (root / "script" / "tweak.py").write_text(
+            ESD_TWEAK % ("scripts", repr(SPECS["alpha"]), "scripts", repr(self.spec)), encoding="utf-8")
+        (root / "mod.json").write_text(json.dumps({"id": "scripts", "name": "Scripts", "enabled": False,
+                                                   "script": {"version": 1}}), encoding="utf-8")
+        for patcher in (
+            mock.patch.object(exe_patches, "VANILLA_SIZE", len(VANILLA)),
+            mock.patch.object(exe_patches, "VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
+            mock.patch.object(menu_scripts, "VANILLA",
+                              {name: (len(data), hashlib.sha256(data).hexdigest())
+                               for name, data in self.vanilla.items()}),
+            mock.patch.object(tweak_mods, "ensure_game_closed"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def enable(self, on=True):
+        tweak_mods.save({"scripts": {"enabled": on}}, self.library)
+
+    def expected(self, name):
+        specs = [self.menu_scripts.validate(self.spec, "Scripts")]
+        return self.menu_scripts.compose(self.vanilla[name], specs, name)
+
+    def menu_files(self):
+        return sorted(path.name for path in (self.game / "menu").iterdir())
+
+    def test_a_game_without_script_tweaks_never_touches_the_archives(self):
+        tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.menu_files(), ["common.menuesdbnd.dcx", "ingame.menuesdbnd.dcx"])
+        self.assertEqual(self.live_ingame.read_bytes(), self.vanilla["ingame"])
+        self.assertEqual(self.live_common.read_bytes(), self.vanilla["common"])
+
+    def test_apply_changes_both_archives_and_restore_puts_both_back(self):
+        self.enable()
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.live_ingame.read_bytes(), self.expected("ingame"))
+        self.assertEqual(self.live_common.read_bytes(), self.expected("common"))
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        self.assertTrue((self.game / tweak_mods.RUNTIME_PATCH).is_file())
+        self.assertEqual(self.menu_files(), ["common.menuesdbnd.dcx",
+                                             "common.menuesdbnd.dcx.lexeditor-original",
+                                             "common.menuesdbnd.dcx.lexeditor-tweaks.json",
+                                             "ingame.menuesdbnd.dcx",
+                                             "ingame.menuesdbnd.dcx.lexeditor-original",
+                                             "ingame.menuesdbnd.dcx.lexeditor-tweaks.json"])
+        self.assertEqual((result["state"], result["applied"], result["problem"]),
+                         ("tweaked", ["Scripts"], ""))
+        result = tweak_mods.restore(self.game, self.library)
+        self.assertEqual(self.live_ingame.read_bytes(), self.vanilla["ingame"])
+        self.assertEqual(self.live_common.read_bytes(), self.vanilla["common"])
+        self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
+        self.assertEqual(self.menu_files(), ["common.menuesdbnd.dcx",
+                                             "common.menuesdbnd.dcx.lexeditor-original",
+                                             "ingame.menuesdbnd.dcx",
+                                             "ingame.menuesdbnd.dcx.lexeditor-original"])
+
+    def test_turning_the_tweak_off_and_applying_restores_the_archives(self):
+        self.enable()
+        tweak_mods.apply(self.game, self.library)
+        self.enable(False)
+        result = tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.live_ingame.read_bytes(), self.vanilla["ingame"])
+        self.assertEqual(self.live_common.read_bytes(), self.vanilla["common"])
+        self.assertEqual(result["state"], "vanilla")
+
+    def test_scripts_changed_elsewhere_are_never_overwritten(self):
+        self.enable()
+        tweak_mods.apply(self.game, self.library)
+        foreign = self.live_ingame.read_bytes() + b"\0"
+        self.live_ingame.write_bytes(foreign)
+        for action in (tweak_mods.apply, tweak_mods.restore):
+            with self.assertRaisesRegex(tweak_mods.TweakError,
+                                        "ingame menu scripts was changed outside Lexeditor"):
+                action(self.game, self.library)
+        self.assertEqual(self.live_ingame.read_bytes(), foreign)
+        self.assertIn("ingame menu scripts", tweak_mods.status(self.game, self.library)["problem"])
+
+    def test_scripts_the_tweak_cannot_patch_change_nothing(self):
+        bad = {"version": 1, "changes": [
+            {"archive": "ingame", "script": "i02-00.esd",
+             "after": {"bank": 1, "id": 999, "args": []}, "commands": [{"bank": 1, "id": 29, "args": ['"Ins_I02-02"', '"button5_0"', '"button_item_select"', '"Ins_button5_item_select"', '"FrpgMenuDlgEquipListIcon"']}]}]}
+        root = self.library / "Scripts"
+        (root / "script" / "tweak.py").write_text(
+            ESD_TWEAK % ("scripts", repr(SPECS["alpha"]), "scripts", repr(bad)), encoding="utf-8")
+        self.enable()
+        with self.assertRaisesRegex(tweak_mods.TweakError, "no command matching"):
+            tweak_mods.apply(self.game, self.library)
+        self.assertEqual(self.live.read_bytes(), VANILLA)
+        self.assertEqual(self.menu_files(), ["common.menuesdbnd.dcx", "ingame.menuesdbnd.dcx"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
