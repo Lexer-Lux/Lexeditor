@@ -53,6 +53,8 @@ DLG_SIZE = 64
 TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
 TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
+FONT_AT = 20  # a text node's font size step
+MIN_FONT, MAX_FONT = 1, 15
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
 MAX_SIZE = 4096
@@ -346,6 +348,21 @@ class Drb:
             raise LayoutError(f"{dialog}/{name} has no rectangle to move")
         struct.pack_into("<4h", self.sections["SHPR"][0], start, left, top, right, bottom)
 
+    def set_font(self, dialog: str, name: str, size: int) -> None:
+        """Set a text node's font size step (shape byte 20) in place.
+
+        Vanilla uses steps 4-11 (7 for most rows, 9 for titles); the glyphs
+        are drawn at this size whatever the rectangle, so a narrowed panel
+        needs a smaller step, not a smaller box.
+        """
+        if type(size) is not int or not MIN_FONT <= size <= MAX_FONT:
+            raise LayoutError(f"{dialog}/{name}: font is a size step from {MIN_FONT} to {MAX_FONT}")
+        item = self.node(dialog, name)
+        kind, start, end = self._span("SHAP", "SHPR", item.shape)
+        if kind != "Text" or end - start <= TEXT_PREFIX:
+            raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no font")
+        self.sections["SHPR"][0][start + FONT_AT] = size
+
     def _insert(self, dialog: str, name: str, shape_type: int, shape: bytes,
                 control_type: int, control: bytes, before: str | None = None) -> None:
         """One new object at the end of a dialog, or just before its node
@@ -493,10 +510,12 @@ def validate(spec: object, owner: str) -> dict:
     clean_moves = []
     for move in moves:
         keys = set(move) if isinstance(move, dict) else set()
-        if keys not in ({"dialog", "name", "rect"}, {"dialog", "name", "rect", "optional"}):
-            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true)")
+        if not {"dialog", "name", "rect"} <= keys or keys - {"dialog", "name", "rect", "optional", "font"}:
+            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true, font)")
         if "optional" in move and move["optional"] is not True:
             raise LayoutError(f"{owner}: a layout move's optional is true or absent")
+        if "font" in move and (type(move["font"]) is not int or not MIN_FONT <= move["font"] <= MAX_FONT):
+            raise LayoutError(f"{owner}: a layout move's font is a size step from {MIN_FONT} to {MAX_FONT}")
         if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout move names must be text")
         rect = move["rect"]
@@ -507,6 +526,8 @@ def validate(spec: object, owner: str) -> dict:
         entry = {"dialog": move["dialog"], "name": move["name"], "rect": list(rect)}
         if move.get("optional"):
             entry["optional"] = True
+        if "font" in move:
+            entry["font"] = move["font"]
         clean_moves.append(entry)
     return {"owner": owner, "nodes": clean, "moves": clean_moves}
 
@@ -554,6 +575,8 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
         moved[key] = owner
         try:
             layout.move(move["dialog"], move["name"], move["rect"])
+            if "font" in move:
+                layout.set_font(move["dialog"], move["name"], move["font"])
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     return formats.deflate(original, layout.to_bytes())

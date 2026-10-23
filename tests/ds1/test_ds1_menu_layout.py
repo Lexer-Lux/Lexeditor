@@ -319,6 +319,22 @@ class MoveTests(unittest.TestCase):
         with self.assertRaisesRegex(menu_layout.LayoutError, "not in the original layout"):
             menu_layout.compose(original, [added, stray])
 
+    def test_a_move_can_set_a_text_font_step(self):
+        original = dcx(drb())
+        spec = menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": 5}]}, "Font")
+        self.assertEqual(spec["moves"][0]["font"], 5)
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [spec])))
+        node = layout.node(MOVES[0]["dialog"], MOVES[0]["name"])
+        _kind, blob = layout._blob("SHAP", "SHPR", node.shape)
+        self.assertEqual(blob[menu_layout.FONT_AT], 5)
+        sprite = menu_layout.validate({"version": 1, "moves": [
+            {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "font": 5}]}, "Sprite")
+        with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
+            menu_layout.compose(original, [sprite])
+        for font in (0, 16, "5", 5.0):
+            with self.subTest(font=font), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": font}]}, "Bad")
+
     def test_optional_moves_follow_other_tweaks_nodes_or_skip(self):
         original = dcx(drb())
         added = menu_layout.validate({"version": 1, "nodes": STAMINA[:1]}, "Adder")
