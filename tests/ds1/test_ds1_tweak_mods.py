@@ -122,8 +122,9 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual((self.game / tweak_mods.LOCK_FILE).read_bytes(), b"0")
         self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
 
-    def test_debug_mode_installs_the_debug_loader_and_off_puts_the_normal_one_back(self):
+    def test_debug_mode_installs_the_loader_even_with_no_tweak(self):
         # Debug mode: Arxan off and no network, so a debugger can attach (#742).
+        # Apply installs that protected loader in every mode (PROTECTED_LOADER).
         self.assertFalse(tweak_mods.status(self.game, self.library)["debugMode"])
         tweak_mods.set_debug_mode(True, self.library)
         status = tweak_mods.status(self.game, self.library)
@@ -139,10 +140,10 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.runtime(), self.expected("alpha"))
         self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
-        # Off, then Apply: the everyday loader again.
+        # Off, then Apply: still the protected loader while a tweak is enabled.
         tweak_mods.set_debug_mode(False, self.library)
         result = tweak_mods.apply(self.game, self.library)
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes())
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
         self.assertEqual((result["debugMode"], result["debugInstalled"]), (False, False))
         with self.assertRaises(tweak_mods.TweakError):
             tweak_mods.set_debug_mode("yes", self.library)
@@ -157,7 +158,7 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.runtime(), self.expected("alpha"))
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes())
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE, tweak_mods.RUNTIME_DLL,
                                                tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD]))
         lock = self.game / tweak_mods.LOCK_FILE

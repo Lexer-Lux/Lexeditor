@@ -647,7 +647,8 @@ def loader_bytes(debug: bool = False) -> bytes:
     """The shipped loader, checked against the hash it was published with.
 
     The debug loader (runtime/package/debug) blocks the game's network and
-    switches Arxan off with dearxan, so a debugger can attach (#742)."""
+    switches Arxan off with dearxan, so a debugger can attach (#742). It is
+    the one Apply installs (PROTECTED_LOADER)."""
     package = LOADER_PACKAGE / "debug" if debug else LOADER_PACKAGE
     manifest = json.loads((package / "runtime-manifest.json").read_text(encoding="utf-8"))
     data = (package / RUNTIME_DLL).read_bytes()
@@ -656,8 +657,15 @@ def loader_bytes(debug: bool = False) -> bytes:
     return data
 
 
+# Apply always installs the debug loader: Arxan off (tweaks hook code Arxan
+# checks, and only Debug mode's play tests proved them) and no network (a
+# patched game must never reach other players). Lexer's call, 2026-10-23; the
+# standalone loader (#954) is to do the same.
+PROTECTED_LOADER = True
+
 # Debug mode is the reader's choice, kept beside the DS1 mod library so Play
-# and Apply both follow it.
+# and Apply both follow it. With PROTECTED_LOADER it only decides whether the
+# loader goes in when no tweak is enabled.
 DEBUG_FILE = ".lexeditor-ds1.json"
 
 
@@ -784,7 +792,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
                          "remove or rename the other file, then Apply again. Nothing was changed.")
-    loader = loader_bytes(debug)
+    loader = loader_bytes(debug or PROTECTED_LOADER)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader), "debug": bool(debug),
               "built": dict(built or {})}
