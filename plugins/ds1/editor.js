@@ -3582,12 +3582,12 @@ function renderTweaks(){
     :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",
+    help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. The loader switches the game's anti-tamper protection off and keeps the game offline, so a modded game never meets other players. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       // Debug mode: the game runs offline with Arxan off, so a debugger
       // (Cheat Engine's "find what writes", x64dbg) can attach (#742).
       detailField({label:"DEBUG MODE",dataType:"BOOL",
-        help:infoHelp("For finding things in the running game with a debugger. Save or Play installs a loader that switches the game's anti-debug protection (Arxan) off with dearxan, so Cheat Engine or x64dbg can attach without the game closing itself. The game has no network access while it is on: it cannot go online. Turn it off and save again for normal play."),
+        help:infoHelp("Installs Lexeditor's loader even when no tweak is on, for finding things in the running game with a debugger. The loader always switches the game's anti-debug protection (Arxan) off, so Cheat Engine or x64dbg can attach. While it is installed the game has no network access and cannot go online."),
         control:el("input",{type:"checkbox",checked:!!status.debugMode,disabled:busy,"aria-label":"Debug mode",
           onchange:event=>tweakRequest("/api/tweaks/debug",{on:event.target.checked},"Could not switch debug mode")})}),
       !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(state.readOnly
