@@ -1,7 +1,4 @@
-"""DS1 NPCs: the magnifier covers previewable models, so the Model tab
-is the fallback. A placed NPC with a loadable mesh opens the viewer in
-the preview drawer and has no Model tab; an unplaced NPC with no model
-at all keeps the tab for attack and hitbox inspection."""
+"""DS1 enemy drawer: the viewport fills its stage, no blank quarter below."""
 import sys
 import tempfile
 from pathlib import Path
@@ -16,16 +13,10 @@ from plugins.ds1.msb import MAP_DIR
 from plugins.ds1.store import MARKER, RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
-def select(page, table, row_id):
-    row = page.locator(f'.lex-list-row[data-key="{table}:{row_id}"]')
-    row.scroll_into_view_if_needed()
-    row.click()
-    page.wait_for_function('(key) => state.row && `${state.row.table}:${state.row.id}` === key',
-                           arg=f'{table}:{row_id}')
-def model_tabs(page):
-    return page.locator('.lex-tabbed-panel [data-subtab="model"]')
+
+
 def main():
-    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-npc-model-') as folder:
+    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-drawer-fill-') as folder:
         temp = Path(folder)
         game, mod = temp / 'game', temp / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
@@ -46,26 +37,34 @@ def main():
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True)
                 try:
-                    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+                    page = browser.new_page(viewport={'width': 1440, 'height': 1200})
                     page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]')
+                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
                     page.evaluate("navigate('npcs','npcs')")
                     page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
-                    # A placed NPC with a loadable mesh opens the viewer
-                    # in the preview drawer: no Model tab, but a magnifier.
-                    select(page, 'NpcParam', 251000)
-                    page.wait_for_selector('.lex-model-preview-trigger')
-                    assert model_tabs(page).count() == 0
-                    # No placement, no preview: the Model tab stays as the
-                    # fallback viewer for attacks and hitboxes.
-                    select(page, 'NpcParam', 321001)
-                    page.wait_for_timeout(400)
-                    assert model_tabs(page).count() == 1
-                    page.screenshot(path=str(Path(tempfile.gettempdir()) / 'lex-ds1-npc-model.png'))
+                    row = page.locator('.lex-list-row[data-key="NpcParam:251000"]')
+                    row.scroll_into_view_if_needed()
+                    row.click()
+                    page.wait_for_function(
+                        "state.row && `${state.row.table}:${state.row.id}` === 'NpcParam:251000'")
+                    page.locator('.lex-detail-panel-heading .lex-model-preview-trigger').click()
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=60000)
+                    page.wait_for_timeout(500)
+                    fit = page.evaluate("""() => {
+                      const host = document.querySelector('.lex-chr-viewer-stage');
+                      const canvas = host.querySelector('canvas');
+                      const outer = host.getBoundingClientRect();
+                      const inner = canvas.getBoundingClientRect();
+                      return {top: inner.top - outer.top, left: inner.left - outer.left,
+                              bottom: outer.bottom - inner.bottom, right: outer.right - inner.right};
+                    }""")
+                    assert all(abs(edge) <= 2 for edge in fit.values()), fit
                 finally:
                     browser.close()
         finally:
             session.stop()
-        print('DS1 NPC model tab: drawer covers meshes, tab is the fallback passed.')
+        print('DS1 enemy drawer: the viewport fills its stage passed.')
+
+
 if __name__ == '__main__':
     main()

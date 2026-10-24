@@ -61,12 +61,17 @@ def test_starting_class_stats_have_icons():
     assert found['baseMag'] == 'int'
     assert found['baseFai'] == 'faith'
     assert found['baseDurability'] == 'res'
-    assert found['baseLuc'] == 'luc'
     assert found['baseHp'] == 'hp'
-    assert found['baseMp'] == 'att'
+    assert found['baseMp'] == 'mp'
     assert found['baseSp'] == 'stamina'
     assert found['soulLv'] == 'soulLv'
     assert found['soul'] == 'souls'
+
+
+def test_unnamed_class_values_carry_no_icon():
+    found = icons(ItemDocument(make_stats_archive()), 'CharaInitParam', 2000)
+    assert found['baseLuc'] is None
+    assert found['baseHeroPoint'] is None
 
 
 def test_souls_fields_have_icons():
@@ -102,7 +107,7 @@ def test_enemy_vitals_have_stat_icons():
     rows = npc._rows_by_id['NpcParam']
     found = icons(npc, 'NpcParam', next(iter(rows)))
     assert found['hp'] == 'hp'
-    assert found['mp'] == 'att'
+    assert found['mp'] == 'mp'
     assert found['stamina'] == 'stamina'
     assert found['staminaRecoverBaseVel'] == 'stamina'
 
@@ -119,6 +124,39 @@ def test_item_humanity_fields_have_icons():
     assert found['heroPoint'] == 'humanity'
     found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
     assert found['isLuckCorrect'] == 'humanity'
+
+
+def test_slash_strike_and_thrust_reuse_the_physical_shield():
+    # Slash, strike and thrust have no menu cell of their own, so their
+    # rows reuse the physical shield game art (Lexer: the geometric
+    # slash/strike/thrust glyphs read as made-up icons next to it).
+    found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
+    assert found['slashGuardCutRate'] == 'physicalDef'
+    assert found['blowGuardCutRate'] == 'physicalDef'
+    assert found['thrustGuardCutRate'] == 'physicalDef'
+    found = icons(ItemDocument(make_archive()), 'EquipParamProtector', 100)
+    assert found['defenseSlash'] == 'physicalDef'
+    assert found['defenseBlow'] == 'physicalDef'
+    assert found['defenseThrust'] == 'physicalDef'
+    npc = ItemDocument(make_archive())
+    found = icons(npc, 'NpcParam', next(iter(npc._rows_by_id['NpcParam'])))
+    assert found['def_slash'] == 'physicalDef'
+    assert found['def_blow'] == 'physicalDef'
+    assert found['def_thrust'] == 'physicalDef'
+    assert found['slashGuardCutRate'] == 'physicalDef'
+    found = icons(ItemDocument(make_effects_archive()), 'SpEffectParam', 6890)
+    assert found['slashDamageCutRate'] == 'physicalDef'
+    assert found['blowDamageCutRate'] == 'physicalDef'
+    assert found['thrustDamageCutRate'] == 'physicalDef'
+    armored = ItemDocument(make_archive(table_ids={'ReinforceParamProtector': [200]}))
+    found = icons(armored, 'ReinforceParamProtector', 200)
+    assert found['slashDefRate'] == 'physicalDef'
+    assert found['blowDefRate'] == 'physicalDef'
+    assert found['thrustDefRate'] == 'physicalDef'
+    from plugins.ds1.formats import ABSORPTION_ICONS
+    assert ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
+    assert ABSORPTION_ICONS['blowDamageCutRate'] == 'physicalDef'
+    assert ABSORPTION_ICONS['thrustDamageCutRate'] == 'physicalDef'
 
 
 def test_divine_and_occult_fields_have_icons():

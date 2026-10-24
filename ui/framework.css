@@ -1275,10 +1275,19 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
   right:calc(6px + var(--lex-readonly-lock-inset, 0px));
   width:11px;
   height:11px;
+  /* Control children clamp to their container's width; laid out while the
+     panel was still zero-wide, that clamp shrank the lock to nothing and no
+     later layout restored it. An 11px icon never scales with its box. */
+  max-width:none;
   fill:currentColor;
   opacity:.75;
   transform:translateY(-50%);
   pointer-events:none;
+}
+/* Locked values keep clear of the lock: without the lane, long text slid
+   underneath the icon it was supposed to sit beside. */
+.lex-has-readonly-lock :is(input,select,textarea):disabled {
+  padding-right:20px;
 }
 
 .lex-field-type-name {
@@ -1506,7 +1515,7 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 
 }
 
-.lex-subtab-button:hover {
+.lex-subtab-button:not([aria-disabled="true"]):hover {
 
   /* State changes change the paint, never the tab or label geometry. */
 
@@ -2829,8 +2838,8 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 }
 
 .lex-column-sort {
-  /* One line, whether or not this column is the sorted one: the arrow used to
-     add a second line to the header, which pushed the last row out of view. */
+  /* The name wraps; the sort arrow is a flex item, so it stays on the first
+     line while the text flows inside its own item. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2845,7 +2854,7 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   font: inherit;
   line-height: 1.35;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .lex-column-heading {
@@ -2863,7 +2872,7 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   flex:0 1 auto;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap;
+  white-space:normal;
 }
 
 .lex-column-list-head-cell.lex-column-align-start,
@@ -2885,7 +2894,7 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   gap:.35em;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap;
+  white-space:normal;
 }
 
 .lex-column-list-head-cell.lex-column-align-start .lex-column-sort {
@@ -5302,10 +5311,10 @@ html[data-lex-project-readonly="true"] main .lex-detail-field .lex-value-handle,
 .lex-detail-field.lex-column-lit {
   background: color-mix(in srgb, var(--lex-highlight) 6%, transparent);
 }
-/* A lit tab reads like a drop target but stays solid: hovering points at
-   the tab, it does not invite a drop. */
+/* A lit tab glows like the field and header it stands in for: hovering
+   points at the tab with the same background wash, not an outline box. */
 .lex-tabbed-panel-tabs .lex-subtab-button.lex-column-lit {
-  outline:2px solid var(--lex-highlight); outline-offset:-2px;
+  background: color-mix(in srgb, var(--lex-highlight) 7%, transparent);
 }
 
 /* ---- Curve layout ---------------------------------------------------- */
@@ -5753,6 +5762,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
  z-index:20;
 }
 .lex-panel-layout-divider { pointer-events:none; }
+/* A divider with nothing on it stays click-through, but one carrying the
+   Barrels/Columns gizmos must receive hover: the gizmos reveal on
+   divider:hover, and with no hover they could never be summoned by mouse. */
+.lex-panel-layout-divider:has(> .lex-barrel-control) { pointer-events:auto; }
 .lex-panel-layout-divider > .lex-barrel-control { z-index:30; pointer-events:auto; }
 .lex-barrel-control button {
 
@@ -5890,11 +5903,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   visibility:visible;
   pointer-events:auto;
 }
-/* The drawer must never cover the heading that closes it. On a grid
-   panel it sits in the body's row, but a tabbed panel is flex, where
-   its grid row means nothing and inset:0 covers the whole panel. The
-   heading floats above it either way; the tab strip stays covered
-   until the drawer closes. */
+/* The drawer starts below the heading that closes it: its grid row on
+   grid panels, its JS-pinned top edge on flex (tabbed) panels, where
+   the grid row means nothing. The heading keeps its higher layer either
+   way, and the tab strip stays covered until the drawer closes. */
 .lex-model-preview-open > .lex-detail-panel-heading { position:relative; z-index:7; }
 .lex-model-preview-open > .lex-model-preview-drawer { opacity:1; }
 .lex-model-preview-trigger:is(:hover,:focus-visible) > .lex-model-preview-close,
@@ -6123,13 +6135,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    about it and carries the shared radius and alignment. Numbers keep tabular
    figures, which lines digits up without changing the box around them. */
 .lex-detail-field[data-lex-type="STRING"] :is(input,textarea,.lex-readonly-field), .lex-detail-field[data-lex-type="TEXT"] :is(input,textarea,.lex-readonly-field) {
-  border-radius:0;
   box-shadow:none;
   text-align:left;
 }
 .lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
 
-  border-radius:0;
   box-shadow:none;
   text-align:left;
 
@@ -6139,7 +6149,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
 
-  border-radius:0;
   box-shadow:none;
   text-align:left;
 
@@ -6992,6 +7001,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    flex:0 1 auto;min-width:0;
  overflow:hidden;
 }
+/* The fit lays an inline name out on at most two lines; what still needs
+   more ends in an ellipsis instead of painting past its lane into the next
+   column. Stacked names keep the full width and wrap freely. */
+.lex-detail-field:not(.lex-detail-field-stacked) > .lex-detail-field-label > .lex-detail-field-label-text {
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
 /* A label renamed in place keeps its row: the input fills the name lane
    and the value stays where it was, so nothing on the page moves while
    it is being typed. */
@@ -7190,7 +7207,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   text-overflow:clip;
   line-height:1.12;
 
- white-space:nowrap;overflow-wrap:normal;word-break:normal;
+ white-space:normal;overflow-wrap:normal;word-break:normal;
 }
 
 /* Reusable property grids reserve room for the label, value and reference rail.
@@ -7227,6 +7244,13 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   position:static;
   padding:0;
 }
+/* A stacked control with a lock anchors it, the way a text editor's already
+   does for its copy button: static left the lock sizing against the whole
+   field instead of the box it belongs inside. The copy button rides into
+   the box top with it, where the editor's already sits. */
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control.lex-has-readonly-lock {
+  position:relative;
+}
 .lex-detail-field.lex-detail-field-stacked > .lex-detail-field-label {
   contain:none;
   min-height:30px;
@@ -7261,6 +7285,51 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   right:8px;
   left:auto;
   transform:none;
+}
+/* Below two hundred pixels an inline field stacks like a stacked one: label
+   above, control full width. Side by side that narrow, the lane and the value
+   squeeze each other unreadable; stacked, both get the whole column. Boolean
+   rows stay inline - a lone checkbox under its name reads worse, not better.
+   Keep in sync with .lex-detail-field-stacked above: same layout, one static,
+   one for narrow columns. */
+@container (max-width: 200px) {
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked) {
+    grid-template-columns:minmax(0,1fr);
+    padding:0;
+    align-items:start;
+  }
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked)
+      > .lex-detail-field-label {
+    contain:none;
+    min-height:30px;
+    padding:6px 30px 6px var(--lex-field-type-gutter);
+    justify-content:flex-start;
+    text-align:left;
+  }
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked)
+      > .lex-detail-field-control {
+    display:block;
+    position:static;
+    padding:0;
+  }
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked)
+      > .lex-detail-field-control.lex-has-readonly-lock {
+    position:relative;
+  }
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked)
+      > .lex-detail-field-control > .lex-copy-value {
+    position:absolute;
+    top:7px;
+    right:8px;
+    left:auto;
+    transform:none;
+  }
+  .lex-tweak-column .lex-detail-field:not(.lex-boolean-field):not(.lex-detail-field-stacked)
+      > .lex-field-type-rail {
+    top:0;
+    bottom:auto;
+    height:30px;
+  }
 }
 
 /* Provenance checkboxes keep the ordinary property label track. The arrow
@@ -7374,7 +7443,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    column here packs on its own. */
 /* Cards inherit the same percentage name lane as other detail panels. */
 .lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
-.lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
+.lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; container-type:inline-size; }
 /* An emptied column keeps a drop height: with none it could never take a property again. */
 .lex-tweak-column:empty { min-height:96px; }
 .lex-tweak-column > .lex-detail-panel {
@@ -7718,12 +7787,6 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
 }
 /* The monster Model tab's stage fills its panel the way a table does: a
    fixed-height stage left the panel's bottom quarter blank on tall panes. */
-.lex-tabbed-panel-content:has(> [data-chr-host]) {
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-.lex-tabbed-panel-content:has(> [data-chr-host]) > .lex-viewport-bar { flex:0 0 auto; display:flex; gap:8px; }
 .lex-tabbed-panel-content > .lex-column-list:not([hidden]) {
   flex:1 1 0;
   min-height:0;
@@ -8020,7 +8083,10 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
   /* 1.1 cropped descenders against the cell's overflow:hidden. */
   line-height:1.35;
 
-  white-space: nowrap;
+  /* A long property name wraps instead of widening its column past what the
+     values need; the header row grows taller for it. A single word that fits
+     nowhere still ends in an ellipsis. */
+  white-space: normal;
 
  min-width:0;
  transition: background-color .14s ease;
@@ -8692,10 +8758,45 @@ body { text-shadow: var(--lex-text-shadow, none); }
   box-shadow: var(--lex-subtab-shadow, none);
   text-shadow: var(--lex-subtab-text-shadow, inherit);
 }
-.lex-subtab-button:hover {
+.lex-subtab-button:not([aria-disabled="true"]):hover {
   color: var(--lex-subtab-hover-fg, var(--lex-text));
   background: var(--lex-subtab-hover-bg, color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-highlight)));
 }
+
+/* An empty husk goes with one click. The mark hides until the tab is
+   hovered or focused, so the strip reads clean until someone aims at it. */
+.lex-subtab-button > .lex-subtab-remove {
+  display:none;
+  margin-left:auto;
+  padding:0 4px;
+  font-size:1em;
+  line-height:1;
+  color:inherit;
+  opacity:.65;
+  cursor:pointer;
+  border-radius:var(--lex-radius);
+}
+.lex-subtab-button:hover > .lex-subtab-remove,
+.lex-subtab-button:focus-within > .lex-subtab-remove,
+.lex-subtab-remove:focus-visible {
+  display:inline-block;
+}
+.lex-subtab-remove:hover { opacity:1; }
+.lex-subtab-remove:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:-2px; }
+/* Hidden tabs come back through one quiet counter at the bar's end. */
+.lex-subtab-restore {
+  align-self:center;
+  margin-left:4px;
+  padding:1px 7px;
+  font-size:.85em;
+  color:var(--lex-text-dim, var(--lex-text));
+  background:transparent;
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  cursor:pointer;
+  opacity:.7;
+}
+.lex-subtab-restore:hover { opacity:1; }
 .lex-subtab-button.active {
   color: var(--lex-subtab-active-fg, var(--lex-accent-text));
   border-color: var(--lex-subtab-active-border-color, transparent);
@@ -8907,6 +9008,12 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-property-dragging { opacity: .45; }
 .lex-property-drop-before { box-shadow: inset 0 2px currentColor; }
 .lex-property-drop-after { box-shadow: inset 0 -2px currentColor; }
+/* A column takes drops with an outline, not an insertion line: the drop
+   pins a lane rather than sequencing between rows. An empty lane holds
+   its height open while a drag is over the panel. */
+.lex-tweak-column.lex-property-drop-target{outline:2px solid currentColor;outline-offset:-2px;}
+.lex-tweak-column.lex-property-drop-target,.lex-detail-panel:has(.lex-property-dragging) .lex-tweak-column:empty{min-height:72px;}
+.lex-detail-panel:has(.lex-property-dragging) .lex-tweak-column:empty{border:1px dashed var(--lex-border);}
 /* While a property is dragged, an emptied section keeps a landing pad:
    its content has no height otherwise, and the title now means beside
    the section, so there would be no way back in. */

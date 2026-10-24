@@ -1,10 +1,12 @@
-"""A column header lights its property, or the tab holding it.
+"""A column header and its property light each other.
 
 Hovering a header lights the matching detail field when that field is
-showing. Only the active panel tab renders, so a property on another
-tab has no field to light: its tab button glows instead, showing
-where to find it. Pinned columns carry a pin: prefix their property
-does not share; matching compares the property underneath.
+showing, and hovering the field lights its header back. Only the
+active panel tab renders, so a property on another tab has no field
+to light: its tab button glows instead, with the same background wash
+as the header, showing where to find it. Pinned columns carry a pin:
+prefix their property does not share; matching compares the property
+underneath, both directions.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401
 
@@ -63,3 +65,25 @@ def test_leaving_the_header_unlights_the_tab(page):
 def test_unprefixed_header_still_lights_its_field(page):
     build(page, "basics", '.lex-column-list-head-cell[data-column-key="name"]')
     assert page.locator('[data-lex-property="name"].lex-column-lit').count() == 1
+def test_field_hover_lights_its_header_back(page):
+    build(page, "other", FIELD)
+    assert page.locator(FIELD + ".lex-column-lit").count() == 1
+    assert page.locator(HEAD + ".lex-column-lit").count() == 1
+    assert page.locator(TAB + ".lex-column-lit").count() == 0
+
+
+def test_lit_tab_uses_the_header_glow(page):
+    build(page, "basics")
+    assert page.locator(TAB + ".lex-column-lit").count() == 1
+    tab, head = page.evaluate("""() => [
+      getComputedStyle(document.querySelector(
+        '.lex-tabbed-panel-tabs .lex-subtab-button[data-subtab="other"]')),
+      getComputedStyle(document.querySelector(
+        '.lex-column-list-head-cell[data-column-key="pin:price"]')),
+    ].map(style => [style.backgroundColor, style.outlineStyle])""")
+    # The hovered header also carries self-hover (8%) over its lit wash;
+    # the tab keeps the lit wash itself: same highlight hue at the
+    # header-lit's 7%, and no outline box.
+    assert tab[0].rsplit('/', 1)[0] == head[0].rsplit('/', 1)[0], (tab, head)
+    assert tab[0].endswith('/ 0.07)'), tab
+    assert tab[1] == 'none', tab

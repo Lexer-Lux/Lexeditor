@@ -48,6 +48,20 @@ def test_plain_goods_and_magic_references_link():
     assert display['magicId'] == document.display_name('Magic', 102)
 
 
+def test_attacks_link_their_applied_effects():
+    document = ItemDocument(make_effects_archive())
+    poke(document, 'AtkParam_Npc', 100, 'spEffectId0', 40)
+    poke(document, 'AtkParam_Pc', 100, 'spEffectId1', 41)
+    found = links(document, 'AtkParam_Npc', 100)
+    assert (found['spEffectId0']['kind'], found['spEffectId0']['table']) == ('effect', 'SpEffectParam')
+    assert found['spEffectId0']['id'] == 40
+    assert found['spEffectId0']['resolved']
+    found = links(document, 'AtkParam_Pc', 100)
+    assert (found['spEffectId1']['kind'], found['spEffectId1']['table']) == ('effect', 'SpEffectParam')
+    assert found['spEffectId1']['id'] == 41
+    assert found['spEffectId1']['resolved']
+
+
 def test_switch_decides_the_targets_table():
     document = ItemDocument(make_effects_archive())
     poke(document, 'EquipParamAccessory', 100, 'refCategory', 2)

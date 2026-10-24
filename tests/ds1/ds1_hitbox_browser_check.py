@@ -1,4 +1,4 @@
-"""Render the enemy Model tab on synthetic data, never game files.
+"""Render the enemy model drawer on synthetic data, never game files.
 
 Runs read-only with no mod: viewing models must work for Vanilla readers,
 so the attack switcher must not count as an edit attempt.
@@ -59,39 +59,46 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab==="enemies" && state.rows.length>0 && !state.error')
-                    page.wait_for_function('state.row?.table==="NpcParam" && state.chrView && !state.error')
-                    # Scoped to the Enemies strip: the monster detail pane
-                    # carries its own tabs further down the page, including
-                    # the Model tab that replaced the Models subtab.
+                    page.locator('[data-subtab="monsters"]').click()
+                    page.wait_for_function('state.sub==="monsters" && state.rows.length>0 && !state.error')
+                    rows = page.locator(".lex-column-list .lex-list-row")
+                    for index in range(rows.count()):
+                        rows.nth(index).click()
+                        page.wait_for_timeout(300)
+                        if page.evaluate("state.selected") == "NpcParam:120000":
+                            break
+                    page.wait_for_function('state.row?.table==="NpcParam" && state.row?.id===120000 && !state.error')
+                    # Scoped to the Enemies strip: boss and monster subtabs
+                    # only, not the monster detail pane's own tabs further
+                    # down the page.
                     strip = page.locator('[aria-label="Enemies"] [data-subtab]')
                     assert strip.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)') == ['bosses', 'monsters']
-                    page.locator('.lex-tabbed-panel [data-subtab="model"]').click()
-                    page.wait_for_function('state.monsterTab==="model" && !state.error')
-                    page.wait_for_selector('[data-chr-host][data-ready="true"]', timeout=30000)
-                    status = page.locator('[data-chr-status]').inner_text()
+                    page.locator('.lex-detail-panel-heading .lex-model-preview-trigger').click()
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=30000)
+                    status = page.locator('.lex-chr-viewer .lex-viewport-status').inner_text()
                     assert 'c1200' in status, status
                     assert '1 mesh' in status and '2 triangles' in status, status
                     assert '1 model point' in status, status
                     assert '2 live hitboxes' in status, status
                     assert '1 slot points at a missing model point' in status, status
                     assert 'Body R 0.5 x H 1.8' in status, status
-                    assert page.locator('canvas[data-viewport]').count() == 1
-                    modes = page.locator('[data-chr-host] .lex-model-view-modes button')
+                    assert page.locator('.lex-chr-viewer-stage canvas').count() == 1
+                    modes = page.locator('.lex-chr-viewer-stage .lex-model-view-modes button')
                     assert modes.count() == 3
                     assert [modes.nth(index).get_attribute('aria-label')
                             for index in range(3)] == ['Regular', 'Fullbright', 'Wireframe']
                     # The quad, the green model point, the blue body and the
                     # red hitboxes paint more than a blank canvas ever could.
-                    shot = page.locator('canvas[data-viewport]').screenshot()
+                    shot = page.locator('.lex-chr-viewer-stage canvas').screenshot()
                     colors = Image.open(io.BytesIO(shot)).convert('RGB').getcolors(maxcolors=1 << 20)
                     count = 'many' if colors is None else len(colors)
                     assert colors is None or len(colors) > 8, f'hitbox canvas blank ({count} colors)'
-                    attacks = page.evaluate('state.chrView.attacks.map(a=>a.name)')
+                    attacks = page.evaluate(
+                        "fetch('/api/chr/view?npc=120000').then(r=>r.json()).then(v=>v.attacks.map(a=>a.name))")
                     assert len(attacks) >= 2, attacks
-                    page.locator('.lex-viewport-bar [aria-label="Attack"]').click()
-                    page.locator('.lex-choice-popover button', has_text=attacks[1]).click()
-                    page.wait_for_function('(want)=>document.querySelector("[data-chr-status]")?.textContent?.includes(want)', arg=attacks[1], timeout=30000)
-                    page.wait_for_selector('[data-chr-host][data-ready="true"]', timeout=30000)
+                    page.locator('.lex-chr-viewer-list .lex-list-row').nth(1).click()
+                    page.wait_for_function('(want)=>document.querySelector(".lex-chr-viewer .lex-viewport-status")?.textContent?.includes(want)', arg=attacks[1], timeout=30000)
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=30000)
                     if output:
                         page.screenshot(path=str(output / 'hitbox.png'))
                     assert not errors, errors

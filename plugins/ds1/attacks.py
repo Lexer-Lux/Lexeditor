@@ -8,11 +8,22 @@ invocation. No row-number or translated-name ownership heuristic is used.
 """
 from collections import defaultdict
 
-ATTACK_FIELDS = {
-    key: (label, 'Base damage', f'Base {label.lower()} attack power before defense and other modifiers. This is not the final health lost.')
-    for key, label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
-                       ('atkFire', 'Fire'), ('atkThun', 'Lightning')]
-}
+# Enemy damage is flat: points of health before defense. Player damage is a
+# motion value: a percentage of the weapon's attack rating, applied before
+# defense (worklog 887 decoded the motion-value corrections from the game;
+# the pinned annotation marks damage "used primarily for NPC attacks").
+# The four correction multipliers were hidden by the allowlist; both tables
+# store them (only the poise and guard corrections are player-only).
+ATTACK_FIELDS = {}
+for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
+                     ('atkFire', 'Fire'), ('atkThun', 'Lightning')]:
+    ATTACK_FIELDS[_key] = (
+        f'{_label} (points)', 'Base damage',
+        f'Base {_label.lower()} attack power in points of health, before defense. '
+        f'Higher values hit harder. This is not the final health lost.')
+    ATTACK_FIELDS[_key + 'Correction'] = (
+        f'{_label} correction', 'Base damage',
+        f'Multiplies the base {_label.lower()} attack value. Higher values hit harder.')
 ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
     'Selects the physical defense used against this attack. Standard has no slash, strike or thrust attribute.')
 
@@ -43,6 +54,26 @@ ATTACK_FIELDS['knockbackDist'] = (
 ATTACK_FIELDS['hitStopTime'] = (
     'Hit pause (seconds)', 'Impact',
     "How long the victim's animation pauses when hit, in seconds.")
+# The status effects this attack applies to its victim, and their master
+# switch. Hidden by the allowlist until now: record links only cover shown
+# fields, so the effects were invisible everywhere, including Linked records.
+for _slot in range(5):
+    ATTACK_FIELDS[f'spEffectId{_slot}'] = (
+        f'Effect on hit {_slot + 1}', 'Effects',
+        'An effect this attack applies to its victim. None applies nothing.')
+ATTACK_FIELDS['disableHitSpEffect'] = (
+    'Disable on-hit effects', 'Effects',
+    "If ON, this attack applies none of its effects to the victim.")
+PC_ATTACK_FIELDS = dict(ATTACK_FIELDS)
+for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
+                     ('atkFire', 'Fire'), ('atkThun', 'Lightning')]:
+    PC_ATTACK_FIELDS[_key] = (
+        f'{_label} (%)', 'Motion values',
+        f"Motion value: the percentage of the weapon's attack rating this swing deals. "
+        f'100 deals the full rating. The game applies it before defense.')
+    PC_ATTACK_FIELDS[_key + 'Correction'] = (
+        f'{_label} correction', 'Motion values',
+        f"Multiplies this swing's {_label.lower()} motion value. Higher values hit harder.")
 
 # Every editable Bullet property in presentation order: lifetime, how
 # it flies, how it homes, how it spreads, what it hits, what it

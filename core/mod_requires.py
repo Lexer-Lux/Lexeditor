@@ -182,3 +182,37 @@ def unmet_lines(library: Path) -> dict[str, list[str]]:
                 f"Requires {need}, which is {'switched off' if need in enabled else 'not installed'}."
                 for need in missing]
     return lines
+
+
+def table(library: Path) -> dict[str, dict]:
+    """Each mod folder's needs with their library state, by resolved folder.
+
+    One entry per need: its id, the installed mod's name ("" when nothing
+    by that id is installed), and whether it is installed and switched on.
+    A mod whose own requires list is not valid reports that instead, under
+    "error"; an unreadable mod is absent, and the Mods tab shows that row
+    from its own error state.
+    """
+    root = Path(library)
+    if not root.is_dir():
+        return {}
+    enabled, names, _ = _states(root)
+    out: dict[str, dict] = {}
+    for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+        if not folder.is_dir() or folder.name.startswith("."):
+            continue
+        try:
+            wanted = needs(folder)
+        except ValueError:
+            out[str(folder.resolve())] = {
+                "needs": [], "error": "Its list of required mods is not valid."}
+            continue
+        except OSError:
+            continue
+        out[str(folder.resolve())] = {
+            "needs": [{"id": need, "name": names.get(need, ""),
+                       "installed": need in enabled,
+                       "enabled": bool(enabled.get(need, False))}
+                      for need in wanted],
+            "error": ""}
+    return out

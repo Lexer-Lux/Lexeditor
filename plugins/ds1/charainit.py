@@ -22,10 +22,12 @@ TWINS = {row: row - 1000 for row in CLASS_ROWS} | {row - 1000: row for row in CL
 #: The twin rows intentionally differ here, so it is never mirrored.
 UNMIRRORED = frozenset({'npcPlayerDrawType'})
 
-#: What a gift grants: its item slots with counts, and its ring slots.
+#: What a gift grants: its item slots with counts, its ring slots, and the
+#: description shown under it on the character creation screen.
 GIFT_FIELDS = tuple([f'item_{index:02d}' for index in range(1, 11)]
                     + [f'itemNum_{index:02d}' for index in range(1, 11)]
-                    + [f'equip_Accessory{index:02d}' for index in range(1, 6)])
+                    + [f'equip_Accessory{index:02d}' for index in range(1, 6)]
+                    + ['longDescription'])
 
 #: Detail sections by field; the rest stay under Properties.
 GROUPS = {

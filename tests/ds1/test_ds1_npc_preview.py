@@ -4,11 +4,17 @@ Humans walk on the shared player rig, which carries bones but no meshes:
 their bodies are armor sets the game assembles, not one model file.
 Previewing the bare rig used to mount a glitched empty thumbnail and
 magnifier. The header now shows the placeholder with the reason and no
-magnifier, while the Model tab stays for attack and hitbox viewing.
+magnifier, and there is no Model tab: an NPC with neither a model nor
+attacks has nothing to inspect. Armor-assembled NPCs that do have
+attacks open the attack drawer instead, with their hitboxes floating
+on the bare rig.
 """
+import io
 import sys
 import tempfile
 from pathlib import Path
+
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -69,7 +75,7 @@ def test_armor_assembled_npc_has_no_clickable_preview():
                     assert 'armor' in (icon.get_attribute('aria-label') or ''), \
                         icon.get_attribute('aria-label')
                     assert page.locator('.lex-model-preview-trigger').count() == 0
-                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 1
+                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 0
                     select(page, 'NpcParam', 251000)
                     page.wait_for_selector('.lex-model-preview-trigger')
                     assert not errors, errors
@@ -79,12 +85,16 @@ def test_armor_assembled_npc_has_no_clickable_preview():
             session.stop()
 
 
-def drawer_session(temp):
+def drawer_session(temp, field_values=None):
     temp = Path(temp)
     game, mod = temp / 'game', temp / 'mod'
+    values = {'NpcParam': {223000: {'npcType': 2}}}
+    for table, rows in (field_values or {}).items():
+        merged = values.setdefault(table, {})
+        for row_id, fields in rows.items():
+            merged.setdefault(row_id, {}).update(fields)
     (game / RELATIVE).parent.mkdir(parents=True)
-    (game / RELATIVE).write_bytes(make_archive(field_values={
-        'NpcParam': {223000: {'npcType': 2}}}))
+    (game / RELATIVE).write_bytes(make_archive(field_values=values))
     (game / MAP_DIR).mkdir(parents=True)
     (game / MAP_DIR / 'm0.msb').write_bytes(build_msb(
         parts=(('enemy', 2, 0, 0, 251000), ('enemy', 2, 1, 1, 223000)),
@@ -142,6 +152,56 @@ def test_drawer_lists_attacks_and_edits_hitboxes():
                         "document.querySelector('.lex-chr-viewer-fields input').value === '0'")
                     assert attack_radius(page) == 0
                     assert page.locator('.lex-chr-viewer').count() == 1
+                    assert not errors, errors
+                finally:
+                    browser.close()
+        finally:
+            session.stop()
+def test_armor_assembled_npc_with_attacks_opens_attack_drawer():
+    errors = []
+    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-npc-armor-drawer-') as folder:
+        session = drawer_session(folder, field_values={
+            'BehaviorParam': {102: {'variationId': 223000, 'refType': 0}},
+            'AtkParam_Npc': {102: {'hit0_Radius': 0.5, 'hit0_DmyPoly1': 100,
+                                   'hit0_DmyPoly2': -1}}})
+        session.start()
+        try:
+            with sync_playwright() as play:
+                browser = play.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+                    page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.goto(session.url)
+                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
+                    page.evaluate("navigate('npcs','npcs')")
+                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    select(page, 'NpcParam', 223000)
+                    # No model to picture, so the placeholder stays, but the
+                    # magnifier opens the attack drawer.
+                    trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
+                    trigger.wait_for()
+                    icon = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
+                    assert icon.locator('.lex-no-thumbnail').count() == 1
+                    assert icon.locator('img.ds1-model-thumbnail').count() == 0
+                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 0
+                    trigger.click()
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=30000)
+                    status = page.locator('.lex-chr-viewer .lex-viewport-status').inner_text()
+                    assert 'c0000' in status, status
+                    assert '0 meshes' in status, status
+                    assert '1 live hitbox' in status, status
+                    dots = page.evaluate(
+                        'document.querySelector(".lex-chr-viewer-stage").dataset.dots')
+                    assert dots == '1', dots
+                    names = page.locator('.lex-chr-viewer-list .lex-list-row').all_inner_texts()
+                    assert len(names) == 1, names
+                    assert 'NPC_test2' in names[0], names
+                    field = page.locator('.lex-chr-viewer-fields input').first
+                    assert field.input_value() == '0.5'
+                    shot = page.locator('.lex-chr-viewer-stage canvas').screenshot()
+                    colors = Image.open(io.BytesIO(shot)).convert('RGB').getcolors(maxcolors=1 << 20)
+                    count = 'many' if colors is None else len(colors)
+                    assert colors is None or len(colors) > 8, f'hitbox canvas blank ({count} colors)'
                     assert not errors, errors
                 finally:
                     browser.close()

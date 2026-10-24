@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paged_detail import reveal
-from ds1_fixture import make_archive, make_text_archive
+from ds1_fixture import make_archive, make_menu_archive, make_text_archive
 from ds1_stats_fixture import make_stats_archive
 from plugins.ds1 import levelup_gains, texts
 from plugins.ds1.charainit import GIFT_FIELDS
@@ -80,6 +80,11 @@ def main():
         (game / RELATIVE).write_bytes(raw)
         (game / texts.RELATIVE).parent.mkdir(parents=True)
         (game / texts.RELATIVE).write_bytes((Path(real_root) / texts.RELATIVE).read_bytes() if real_root else make_text_archive())
+        (game / texts.MENU_RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+        (game / texts.MENU_RELATIVE).write_bytes(
+            (Path(real_root) / texts.MENU_RELATIVE).read_bytes() if real_root else make_menu_archive(
+                extra={texts.CLASS_DESCRIPTION_FILE: {
+                    132320: 'Warrior test.', 132355: 'Gift test.', 132357: 'Gift test.'}}))
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),

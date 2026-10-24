@@ -61,6 +61,12 @@ KIND_LABELS = {'name': 'Name', 'description': 'Description',
                'longDescription': 'Full description'}
 MAX_DESCRIPTION = 200
 MAX_LONG_DESCRIPTION = 2000
+#: Starting classes and gifts describe themselves from Menu_others_, not the
+#: item archive: each CharaInitParam row range with the entry holding its
+#: first row's description. Class row 3000+i reads 132320+i, gift row
+#: 2401+i reads 132351+i, as the game ships them.
+CLASS_DESCRIPTION_FILE = 'Menu_others_.fmg'
+CLASS_DESCRIPTION_ROWS = {'CharaInitParam': ((3000, 3009, 132320), (2401, 2408, 132351))}
 MAX_FMG_TEXT = 4000
 HEADER = 0x1C
 
@@ -347,6 +353,54 @@ class MenuDocument(TextDocument):
             if text:
                 return text
         return None
+
+    @staticmethod
+    def _class_entry(table: str, row_id: int) -> int | None:
+        for first, last, entry in CLASS_DESCRIPTION_ROWS.get(table, ()):
+            if first <= row_id <= last:
+                return entry + (row_id - first)
+        return None
+
+    def class_describable(self, table: str) -> bool:
+        return table in CLASS_DESCRIPTION_ROWS and bool(self._copies_of(CLASS_DESCRIPTION_FILE))
+
+    def class_description(self, table: str, row_id: int) -> str | None:
+        text_id = self._class_entry(table, row_id)
+        if text_id is None:
+            return None
+        for position in self._copies_of(CLASS_DESCRIPTION_FILE):
+            text = self.tables[position][1].get(text_id)
+            if text:
+                return text
+        return None
+
+    def original_class_description(self, table: str, row_id: int):
+        text_id = self._class_entry(table, row_id)
+        if text_id is None:
+            return None
+        for position in self._copies_of(CLASS_DESCRIPTION_FILE):
+            if text_id in self.original_texts[position]:
+                return self.original_texts[position][text_id]
+        return None
+
+    def set_class_description(self, table: str, row_id: int, value):
+        if not self.class_describable(table):
+            raise FormatError('These records have no in-game description to change.')
+        text_id = self._class_entry(table, row_id)
+        if text_id is None or not any(text_id in self.original_texts[position]
+                                       for position in self._copies_of(CLASS_DESCRIPTION_FILE)):
+            raise FormatError('This record has no shipped description to change.')
+        text = str(value).replace('\r\n', '\n').replace('\r', '\n')
+        if any(ord(char) < 32 and char != '\n' for char in text):
+            raise FormatError('A description holds text and line breaks.')
+        if not text.strip():
+            text = None
+        elif len(text) > MAX_LONG_DESCRIPTION:
+            raise FormatError(f'A description is up to {MAX_LONG_DESCRIPTION} characters.')
+        for position in self._copies_of(CLASS_DESCRIPTION_FILE):
+            self.tables[position][1][text_id] = text
+        self._dirty_cache = {}
+        return text
 
     def original_label(self, key: str) -> str | None:
         _display, text_id = self._label_entry(key)

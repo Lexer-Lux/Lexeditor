@@ -71,12 +71,12 @@ def payload(store, native_rules=None, theme=None):
                 notes='Edit how enemies sense, approach and answer the player.')
         elif table == 'AtkParam_Npc':
             row.update(coverage='structured',status='partial',openable=True,
-                target='attacks',sub='attacks',controls='Attacks: enemy attack damage and hitboxes',
-                notes='Edit reviewed damage and hitbox properties. An attack may be shared by several enemies.')
+                target='attacks',sub='attacks',controls='Attacks: enemy attack damage, corrections and hitboxes',
+                notes='Edit reviewed damage, correction and hitbox properties. An attack may be shared by several enemies.')
         elif table == 'AtkParam_Pc':
             row.update(coverage='structured',status='partial',openable=True,
-                target='attacks',sub='player-attacks',controls='Attacks: player attack damage and hitboxes',
-                notes='Edit reviewed damage and hitbox properties. An attack may be shared by several player moves.')
+                target='attacks',sub='player-attacks',controls='Attacks: player attack motion values, corrections and hitboxes',
+                notes='Edit reviewed motion values, corrections and hitbox properties. An attack may be shared by several player moves.')
         elif table == 'ReinforceParamWeapon':
             row.update(coverage='structured',status='integrated',openable=True,
                 target='stats',sub='weapon-upgrades',controls='Stats: weapon upgrade multipliers',

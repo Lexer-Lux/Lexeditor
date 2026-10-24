@@ -15,7 +15,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, FieldSpec, ParamView, read_field, write_field
 from .monsters import NPC_FIELDS, RESISTANCES, WEAKNESSES, classified_monster, duplicate_stem, base_stem, MONSTER_FAMILIES, BOSS_FAMILIES, classified_boss, NAME_OVERRIDES
-from .attacks import ATTACK_FIELDS, BULLET_GROUPS, AttackReferences
+from .attacks import ATTACK_FIELDS, PC_ATTACK_FIELDS, BULLET_GROUPS, AttackReferences
 from . import shops as _shops
 from .effects import TABLE as EFFECT_TABLE, SUBTABS as EFFECT_SUBTABS, GROUPS as EFFECT_GROUPS, PROTECTED as EFFECT_PROTECTED, presentation, EffectReferences, reference_switches
 from .materials import TABLE as MATERIAL_TABLE, GOODS_TABLE, GoodsReferences, describe_set, describe_path, path_table
@@ -152,8 +152,8 @@ COMP_TROPHY_HELP = ('This item counts toward a collection achievement. '
 # game's own menus use (icons.py crops them from Menu04_2). Slash,
 # strike and thrust have no cell of their own anywhere in the menu, HUD,
 # font or icon sheets (they are text wherever the game shows them), so
-# those fields keep the shared registry's glyphs, which name the damage
-# kind the value scales. Divine takes the
+# they reuse the physical shield: every one of these fields scales
+# physical defense, which is what the shield means. Divine takes the
 # white ring and occult the black one (the sheet's bottom row); luck
 # stays unmapped, with no cure-item icon that would read as the item
 # instead of the status. HP and stamina take their bar frames (red and
@@ -166,33 +166,38 @@ for _table, _keys, _kinds in (
         ('NpcParam', ('def_phys', 'def_mag', 'def_fire', 'def_thunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('def_slash', 'def_blow', 'def_thrust'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('NpcParam', ('resist_poison', 'resist_desease', 'resist_blood', 'resist_curse'),
          ('poison', 'toxic', 'bleed', 'curse')),
         ('NpcParam', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('NpcParam', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('AtkParam_Npc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
          ('physical', 'magic', 'fire', 'lightning')),
         ('AtkParam_Pc', ('atkPhys', 'atkMag', 'atkFire', 'atkThun'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('AtkParam_Npc', ('atkPhysCorrection', 'atkMagCorrection', 'atkFireCorrection', 'atkThunCorrection'),
+         ('physical', 'magic', 'fire', 'lightning')),
+        ('AtkParam_Pc', ('atkPhysCorrection', 'atkMagCorrection', 'atkFireCorrection', 'atkThunCorrection'),
          ('physical', 'magic', 'fire', 'lightning')),
         ('EquipParamWeapon', ('attackBasePhysics', 'attackBaseMagic', 'attackBaseFire', 'attackBaseThunder'),
          ('physical', 'magic', 'fire', 'lightning')),
         ('EquipParamWeapon', ('physGuardCutRate', 'magGuardCutRate', 'fireGuardCutRate', 'thunGuardCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('EquipParamWeapon', ('slashGuardCutRate', 'blowGuardCutRate', 'thrustGuardCutRate'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('EquipParamWeapon', ('properStrength', 'properAgility', 'properMagic', 'properFaith'),
          ('str', 'dex', 'int', 'faith')),
         ('EquipParamWeapon', ('correctStrength', 'correctAgility', 'correctMagic', 'correctFaith'),
          ('str', 'dex', 'int', 'faith')),
         ('EquipParamWeapon', ('weight',), ('weight',)),
         ('EquipParamWeapon', ('durability', 'durabilityMax'), ('durability', 'durability')),
+        ('EquipParamWeapon', ('throwAtkRate',), ('critical',)),
         ('EquipParamProtector', ('defensePhysics', 'defenseMagic', 'defenseFire', 'defenseThunder'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('EquipParamProtector', ('defenseSlash', 'defenseBlow', 'defenseThrust'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('EquipParamProtector', ('weight',), ('weight',)),
         ('EquipParamProtector', ('durability', 'durabilityMax'), ('durability', 'durability')),
         ('Magic', ('requirementIntellect', 'requirementFaith'), ('int', 'faith')),
@@ -205,7 +210,7 @@ for _table, _keys, _kinds in (
         ('SpEffectParam', ('neutralDamageCutRate', 'magicDamageCutRate', 'fireDamageCutRate', 'thunderDamageCutRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('SpEffectParam', ('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('SpEffectParam', ('physicsDiffence', 'magicDiffence', 'fireDiffence', 'thunderDiffence'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('SpEffectParam', ('physicsDiffenceRate', 'magicDiffenceRate', 'fireDiffenceRate', 'thunderDiffenceRate'),
@@ -238,7 +243,7 @@ for _table, _keys, _kinds in (
         ('ReinforceParamProtector', ('physicsDefRate', 'magicDefRate', 'fireDefRate', 'thunderDefRate'),
          ('physicalDef', 'magicDef', 'fireDef', 'lightningDef')),
         ('ReinforceParamProtector', ('slashDefRate', 'blowDefRate', 'thrustDefRate'),
-         ('slash', 'strike', 'thrust')),
+         ('physicalDef', 'physicalDef', 'physicalDef')),
         ('ReinforceParamProtector', ('resistPoisonRate', 'resistDiseaseRate', 'resistBloodRate', 'resistCurseRate'),
          ('poison', 'toxic', 'bleed', 'curse')),
         ('SpEffectParam', ('guardStaminaCutRate',), ('stability',)),
@@ -277,16 +282,16 @@ for _table, _keys, _kinds in (
         ('EquipParamWeapon', ('antSaintDamageRate', 'antWeakA_DamageRate'),
          ('divine', 'occult')),
         ('NpcParam', ('isWeakSaint', 'isWeakA'), ('divine', 'occult')),        ('CharaInitParam', ('baseVit', 'baseWil', 'baseEnd', 'baseStr', 'baseDex', 'baseMag', 'baseFai',
-         'baseLuc', 'baseHp', 'baseMp', 'baseSp', 'soul', 'baseDurability', 'soulLv'),
-         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'luc', 'hp', 'mp', 'stamina', 'souls', 'res', 'soulLv')),
+         'baseHp', 'baseMp', 'baseSp', 'soul', 'baseDurability', 'soulLv'),
+         ('vit', 'att', 'end', 'str', 'dex', 'int', 'faith', 'hp', 'mp', 'stamina', 'souls', 'res', 'soulLv')),
 ):
     for _key, _kind in zip(_keys, _kinds):
         _FIELD_ICONS[(_table, _key)] = _kind
 del _table, _keys, _kinds, _key, _kind
 ABSORPTION_ICONS = {'neutralDamageCutRate': 'physicalDef', 'magicDamageCutRate': 'magicDef',
                     'fireDamageCutRate': 'fireDef', 'thunderDamageCutRate': 'lightningDef',
-                    'slashDamageCutRate': 'slash', 'blowDamageCutRate': 'strike',
-                    'thrustDamageCutRate': 'thrust'}
+                    'slashDamageCutRate': 'physicalDef', 'blowDamageCutRate': 'physicalDef',
+                    'thrustDamageCutRate': 'physicalDef'}
 
 
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
@@ -440,7 +445,8 @@ STATS_FIELDS = {
                   'bodyScaleHead', 'bodyScaleBreast', 'bodyScaleAbdomen', 'bodyScaleArm',
                   'bodyScaleLeg', 'gestureId0', 'gestureId1', 'gestureId2', 'gestureId3',
                   'gestureId4', 'gestureId5', 'gestureId6', 'npcPlayerType',
-                  'npcPlayerDrawType', 'npcPlayerSex', 'vowType',),
+                  'npcPlayerDrawType', 'npcPlayerSex', 'vowType',
+                  'longDescription',),
 }
 
 
@@ -634,8 +640,10 @@ def schema(table):
         description, group = annotation.get('Description', ''), 'Properties'
         if table == 'NpcParam' and key in NPC_FIELDS:
             label, group, description = NPC_FIELDS[key]
-        if table in ('AtkParam_Npc', 'AtkParam_Pc') and key in ATTACK_FIELDS:
+        if table == 'AtkParam_Npc' and key in ATTACK_FIELDS:
             label, group, description = ATTACK_FIELDS[key]
+        if table == 'AtkParam_Pc' and key in PC_ATTACK_FIELDS:
+            label, group, description = PC_ATTACK_FIELDS[key]
         if table == 'Bullet' and key in BULLET_GROUPS:
             group = BULLET_GROUPS[key]
         if table == 'NpcThinkParam' and key in THINK_GROUPS:
@@ -724,7 +732,9 @@ def schema(table):
             protected = True
         if table == 'NpcThinkParam' and key not in THINK_EDITABLE:
             protected = True
-        if table in ('AtkParam_Npc', 'AtkParam_Pc') and key not in ATTACK_FIELDS:
+        if table == 'AtkParam_Npc' and key not in ATTACK_FIELDS:
+            protected = True
+        if table == 'AtkParam_Pc' and key not in PC_ATTACK_FIELDS:
             protected = True
         label = _unit_suffix(label)
         field = FieldSpec(key, dtype, field_offset, count, bit_used if bits else None, bits,
@@ -920,6 +930,13 @@ class ItemDocument:
                      (self.texts.description(table, row_id, True), self.vanilla_texts.description(table, row_id, True)))
             if any(current != before for current, before in pairs):
                 return True
+        if table == 'CharaInitParam' and self.menu_texts is not None:
+            current = self.menu_texts.class_description(table, row_id)
+            if current != self.menu_texts.original_class_description(table, row_id):
+                return True
+            if self.vanilla_menu_texts is not None and \
+                    current != self.vanilla_menu_texts.class_description(table, row_id):
+                return True
         return False
 
     @property
@@ -950,7 +967,7 @@ class ItemDocument:
                     # The precision the field shows: at one decimal, 3.95% and
                     # 4.04% both read "4.0% -> 4.0%", a change that looked like none.
                     percent = lambda rate: f'{(1 - rate) * 100:.3f}'.rstrip('0').rstrip('.') + '%'
-                    rows.append({'label': f'{name} Â· {kind} absorption',
+                    rows.append({'label': f'{name} · {kind} absorption',
                                  'before': percent(before), 'after': percent(after)})
                     continue
                 item = next(f for f in self.schemas[table]['fields'] if f['spec'].key == key)
@@ -959,25 +976,25 @@ class ItemDocument:
                 added = (table, row_id) in self._added_rows
                 before = None if added else _shown(read_field(bytes(self.original_plain[start:start + len(data)]), field, '<'), field)
                 after = _shown(read_field(data, field, '<'), field)
-                rows.append({'label': f'{name} Â· {field.label}', 'before': before, 'after': after})
+                rows.append({'label': f'{name} · {field.label}', 'before': before, 'after': after})
             except (FormatError, StopIteration, KeyError):
-                rows.append({'label': f'{table} {row_id} Â· {key}'})
+                rows.append({'label': f'{table} {row_id} · {key}'})
         for gone in self._removed_rows:
             rows.append({'label': f"{gone['name']} (removed)",
                          'before': f"{gone['table']} {gone['id']}", 'after': 'removed'})
         if self.texts:
             from .texts import KIND_LABELS
             for kind, table, item in sorted(self.texts.dirty, key=str)[:limit]:
-                rows.append({'label': f'{KIND_LABELS[kind]} Â· {table} {item}'})
+                rows.append({'label': f'{KIND_LABELS[kind]} · {table} {item}'})
         if self.menu_texts:
             from .texts import MENU_LABELS
             for filename, text_id in sorted(self.menu_texts.dirty_texts):
-                rows.append({'label': f'{FMG_LABELS.get(filename, filename)} Â· {text_id}',
+                rows.append({'label': f'{FMG_LABELS.get(filename, filename)} · {text_id}',
                              'before': self.menu_texts.original_text(filename, text_id) or '',
                              'after': self.menu_texts.text(filename, text_id) or ''})
             for key in sorted(self.menu_texts.dirty):
                 display, _text_id = MENU_LABELS[key]
-                rows.append({'label': f'Menu label Â· {display}',
+                rows.append({'label': f'Menu label · {display}',
                              'before': self.menu_texts.original_label(key) or '',
                              'after': self.menu_texts.label(key) or ''})
         return rows
@@ -1041,6 +1058,24 @@ class ItemDocument:
     def _description_fields(self, table, row_id):
         """The item's in-game descriptions as detail fields, longest last."""
         result = []
+        if table == 'CharaInitParam':
+            if self.menu_texts is None or not self.menu_texts.class_describable(table):
+                return result
+            original = self.menu_texts.original_class_description(table, row_id)
+            if original is None:
+                return result
+            current = self.menu_texts.class_description(table, row_id) or ''
+            screen = 'class' if row_id in CLASS_ROWS else 'gift'
+            result.append({'key': 'longDescription', 'label': 'Description',
+                           'description': f'The description shown under the {screen} on the '
+                                          f'character creation screen. It can span lines, up to 2000 '
+                                          f'characters. Blank removes it.',
+                           'group': 'Description',
+                           'dtype': 'text', 'value': current, 'type': 'longtext',
+                           'minimum': None, 'maximum': None, 'maxLength': 2000,
+                           'required': False, 'enum': {}, 'protectedReason': '',
+                           'editable': True, 'vanilla': original})
+            return result
         for key, long, label, help, limit, control in (
                 ('description', False, 'Description',
                  'The one-line summary shown in the inventory list. Up to 200 characters. Blank removes it.',
@@ -1148,10 +1183,13 @@ class ItemDocument:
         a cell of a menu icon sheet. Models carry their thing-finder
         type, so the Models tab offers their binders to hold and choose;
         the binder's number is what writes back into the Model ID. Model
-        paths need no game files; icon sheets do, so icons stay unlinked
-        offline. Consumables name no model file, so their Model ID stays
-        a dead number. Never raises: a row must load even when game
-        files are missing or unreadable.
+        paths need no game files; icon sheets do, so icons without
+        installed game files resolve to nothing. Unresolved entries are
+        still emitted, so the field keeps its face and finder instead of
+        falling back to a bare number. Faces, rings and consumables name
+        no model file at all, so their Model ID stays a dead number.
+        Never raises: a row must load even when game files are missing
+        or unreadable.
         """
         from . import icons as _icons
         from . import viewport as _viewport
@@ -1161,20 +1199,35 @@ class ItemDocument:
             if key not in present:
                 continue
             try:
-                archive = _icons.icon_archive(game_root, int(self.value(table, row_id, key)))
-            except (OSError, ValueError, TypeError, struct.error):
+                icon_id = int(self.value(table, row_id, key))
+            except (ValueError, TypeError, struct.error):
                 continue
+            if icon_id <= 0:
+                found.append({'kind': 'asset', 'table': 'Asset', 'id': None, 'tab': 'textures',
+                              'field': key, 'resolved': False, 'name': 'None'})
+                continue
+            try:
+                archive = _icons.icon_archive(game_root, icon_id)
+            except (OSError, ValueError, TypeError, struct.error):
+                archive = None
             if archive is None:
+                found.append({'kind': 'asset', 'table': 'Asset', 'id': None, 'tab': 'textures',
+                              'field': key, 'resolved': False, 'name': f'Icon {icon_id}'})
                 continue
             found.append({'kind': 'asset', 'table': 'Asset', 'id': archive, 'tab': 'textures',
                           'field': key, 'resolved': True, 'name': archive.rsplit('/', 1)[-1]})
         if 'equipModelId' in present and table in ('EquipParamWeapon', 'EquipParamProtector'):
             try:
                 info = self.part_model(table, row_id)
-                stems, _reason = _viewport.part_candidates(
-                    table, info['category'], info['gender'], info['model_id']) if info['available'] else (None, None)
             except (ValueError, TypeError, KeyError):
-                stems = None
+                info = {'available': False}
+            stems = None
+            if info.get('available'):
+                try:
+                    stems, _reason = _viewport.part_candidates(
+                        table, info['category'], info['gender'], info['model_id'])
+                except (ValueError, TypeError, KeyError):
+                    stems = None
             if stems:
                 relative = f"parts/{stems[0][0]}.partsbnd.dcx"
                 piece = 'WP_A' if table == 'EquipParamWeapon' else _viewport.PART_PREFIXES[info['category']]
@@ -1182,6 +1235,21 @@ class ItemDocument:
                               'field': 'equipModelId', 'resolved': True,
                               'name': f'{stems[0][0]}.partsbnd.dcx',
                               'pick': _viewport.model_pick_type(table, piece)})
+            elif info.get('available'):
+                try:
+                    model_id = int(info.get('model_id', 0))
+                except (ValueError, TypeError):
+                    model_id = 0
+                entry = {'kind': 'asset', 'table': 'Asset', 'id': None, 'tab': 'models',
+                         'field': 'equipModelId', 'resolved': False,
+                         'name': f'Model {model_id}' if model_id > 0 else 'None'}
+                try:
+                    piece = ('WP_A' if table == 'EquipParamWeapon'
+                             else _viewport.PART_PREFIXES[info['category']])
+                    entry['pick'] = _viewport.model_pick_type(table, piece)
+                except (ValueError, TypeError, KeyError):
+                    pass
+                found.append(entry)
         return found
 
     def row_name(self, table, row_id):
@@ -1458,7 +1526,9 @@ class ItemDocument:
             field = item['spec']
             if table == 'NpcParam' and field.key not in NPC_FIELDS:
                 continue
-            if table in ('AtkParam_Npc', 'AtkParam_Pc') and field.key not in ATTACK_FIELDS:
+            if table == 'AtkParam_Npc' and field.key not in ATTACK_FIELDS:
+                continue
+            if table == 'AtkParam_Pc' and field.key not in PC_ATTACK_FIELDS:
                 continue
             if table == 'BehaviorParam' and field.key not in BEHAVIOR_EDITABLE:
                 continue
@@ -1524,8 +1594,11 @@ class ItemDocument:
                     'group': hp['group'], 'dtype': hp['dtype'], 'value': self._effective_hp(row_id),
                     'type': 'number', 'minimum': 0, 'maximum': None, 'enum': {},
                     'protectedReason': '', 'editable': False, 'vanilla': None})
-        if table in ('AtkParam_Npc', 'AtkParam_Pc'):
+        if table == 'AtkParam_Npc':
             order = {key: index for index, key in enumerate(ATTACK_FIELDS)}
+            fields.sort(key=lambda field: order[field['key']])
+        if table == 'AtkParam_Pc':
+            order = {key: index for index, key in enumerate(PC_ATTACK_FIELDS)}
             fields.sort(key=lambda field: order[field['key']])
         if table == 'Bullet':
             order = {key: index for index, key in enumerate(BULLET_GROUPS)}
@@ -1543,7 +1616,10 @@ class ItemDocument:
                 at = next(index for index, field in enumerate(fields) if field['key'] in replaced)
                 fields = ([field for field in fields[:at] if field['key'] not in replaced] + absorption
                           + [field for field in fields[at:] if field['key'] not in replaced])
-        if self.texts is not None and self.texts.describable(table):
+        if table == 'CharaInitParam':
+            if self.menu_texts is not None and self.menu_texts.class_describable(table):
+                fields += self._description_fields(table, row_id)
+        elif self.texts is not None and self.texts.describable(table):
             fields += self._description_fields(table, row_id)
         if only is not None:
             keep = set(only)
@@ -1705,6 +1781,13 @@ class ItemDocument:
         # unambiguously name the item's in-game description texts.
         if key in ('description', 'longDescription'):
             self._row(table, row_id)
+            if table == 'CharaInitParam':
+                if key != 'longDescription':
+                    raise FormatError('This field is protected')
+                if self.menu_texts is None or not self.menu_texts.class_describable(table):
+                    raise FormatError('These records have no in-game description to change.')
+                self.menu_texts.set_class_description(table, row_id, value)
+                return self.read_row(table, row_id, only=only)
             if self.texts is None or not self.texts.describable(table):
                 raise FormatError('These records have no in-game description to change.')
             self.texts.set_description(table, row_id, value, long=key == 'longDescription')

@@ -5,6 +5,7 @@ frames (dark red and dark green boxes, gold outline, plus a mana-mod
 blue MP frame); the detail shows
 the loaded label art, not the vit/end stat glyphs. Resistance and
 Soul Level take the level-up screen's crossed-arms and face icons.
+A pinned vital's table header takes the same bar frame as its field.
 """
 import sys
 import tempfile
@@ -83,6 +84,19 @@ def main():
                             'img.lex-ds1-label-art\'); return img && img.naturalWidth > 0; })()' % field_key)
                         assert field.locator('.lex-type-glyph').count() == 0, \
                             f'{field_key} falls back to a stat glyph'
+                    page.locator('[data-lex-property="hp"]').hover()
+                    page.locator('[data-lex-property="hp"] .lex-column-pin:not(.pinned)').click()
+                    page.wait_for_selector('.lex-column-list-head-cell[data-column-key="pin:hp"]')
+                    head = page.locator('.lex-column-list-head-cell[data-column-key="pin:hp"]')
+                    art = head.locator('img.lex-ds1-label-art')
+                    assert art.count() == 1, 'pinned hp header shows no label art'
+                    assert 'name=hp' in (art.get_attribute('src') or ''), art.get_attribute('src')
+                    page.wait_for_function(
+                        '(() => { const img = document.querySelector('
+                        '\'.lex-column-list-head-cell[data-column-key="pin:hp"] img.lex-ds1-label-art\');'
+                        ' return img && img.naturalWidth > 0; })()')
+                    assert head.locator('.lex-type-glyph').count() == 0, \
+                        'pinned hp header falls back to a stat glyph'
                     page.locator('button[data-tab="stats"]').click()
                     page.wait_for_function('state.tab==="stats" && state.rows.length>0 && !state.error')
                     page.locator('[data-subtab="starting-classes"]').click()

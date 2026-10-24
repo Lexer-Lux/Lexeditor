@@ -21,7 +21,7 @@ MOUNT = """() => {
   window.viewerErrors = [];
   window.viewer = U.animationViewer({host, timeline, status,
     statusText: "Sample: 48 frames.",
-    frames: {count: 48, duration: 2, events: [{start: 0.5, label: "Cue one"}]},
+    frames: {count: 48, duration: 2, events: [{id: "cue-1", start: 0.5, label: "Cue one"}]},
     render: shown => {
       try {
         paint.fillStyle = "#111";
@@ -76,13 +76,13 @@ def test_transport_buttons_drive_playback(page):
     by_label["Play or pause"].click()
     assert page.evaluate("window.viewer.playing") is False
     by_label["Go to animation end"].click()
-    assert readout(page).startswith("47.0"), readout(page)
+    assert readout(page).startswith("47 / 47"), readout(page)
     by_label["Go to animation start"].click()
-    assert readout(page).startswith("0.0"), readout(page)
+    assert readout(page).startswith("0 / 47"), readout(page)
     by_label["Forward one frame"].click()
-    assert readout(page).startswith("1.0"), readout(page)
+    assert readout(page).startswith("1 / 47"), readout(page)
     by_label["Back one frame"].click()
-    assert readout(page).startswith("0.0"), readout(page)
+    assert readout(page).startswith("0 / 47"), readout(page)
     assert page.evaluate("window.viewer.playing") is False
     by_label["Play or pause"].click()
     assert page.evaluate("window.viewer.playing") is True
@@ -118,7 +118,7 @@ def test_arrow_space_and_shift_shortcuts_drive_the_viewer(page):
     assert page.evaluate("window.viewer.frame") == before
     page.keyboard.press("Shift+ArrowRight")
     assert page.evaluate("window.viewer.frame") == 47
-    assert readout(page).startswith("47.0"), readout(page)
+    assert readout(page).startswith("47 / 47"), readout(page)
     page.keyboard.press("Shift+ArrowLeft")
     assert page.evaluate("window.viewer.frame") == 0
     page.keyboard.press("Space")
@@ -224,3 +224,22 @@ def test_view_mode_bar_returns_with_its_mode_after_the_host_is_cleared(page):
     pressed = page.locator("#mode-host .lex-model-view-mode[aria-pressed='true']")
     assert pressed.count() == 1
     assert pressed.get_attribute("data-view-mode") == "wireframe"
+
+
+def test_to_event_seeks_to_the_cue_and_keeps_playing_state(page):
+    mount(page)
+    transport(page).nth(2).click()
+    assert page.evaluate("window.viewer.playing") is False
+    assert page.evaluate("window.viewer.toEvent('cue-1')") is True
+    assert "0.50s" in readout(page)
+    assert page.evaluate("window.viewer.playing") is False
+    assert page.evaluate("window.viewer.frame") == round(0.5 / (2 / 47))
+
+
+def test_to_event_ignores_unknown_ids(page):
+    mount(page)
+    transport(page).nth(2).click()
+    transport(page).nth(0).click()
+    assert "0.00s" in readout(page)
+    assert page.evaluate("window.viewer.toEvent('no-such-cue')") is False
+    assert "0.00s" in readout(page)

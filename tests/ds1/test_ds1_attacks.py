@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
 from plugins.ds1.formats import ItemDocument, FormatError, SIZES
-from plugins.ds1.attacks import ATTACK_FIELDS
+from plugins.ds1.attacks import ATTACK_FIELDS, PC_ATTACK_FIELDS
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds3.formats import write_field
 
@@ -51,18 +51,28 @@ def test_damage_hitbox_and_impact_fields_roundtrip_exact_byte_boundary_and_rever
     fields = doc.read_row('AtkParam_Npc',100)['fields']
     assert {f['key'] for f in fields} == set(ATTACK_FIELDS)
     assert all(f['editable'] for f in fields)
-    assert len(ATTACK_FIELDS) == 24
-    assert [f['key'] for f in fields[:5]] == ['atkPhys', 'atkMag', 'atkFire', 'atkThun', 'atkAttribute']
+    assert len(ATTACK_FIELDS) == 34
+    assert [f['key'] for f in fields[:9]] == ['atkPhys', 'atkPhysCorrection', 'atkMag', 'atkMagCorrection',
+        'atkFire', 'atkFireCorrection', 'atkThun', 'atkThunCorrection', 'atkAttribute']
     assert next(f for f in fields if f['key']=='atkAttribute')['enum'] == {'0':'Standard','1':'Slash','2':'Strike','3':'Thrust','4':'Push'}
+    effects = [f for f in fields if f['group']=='Effects']
+    assert [f['key'] for f in effects] == ['spEffectId0','spEffectId1','spEffectId2','spEffectId3','spEffectId4',
+        'disableHitSpEffect']
+    assert next(f for f in fields if f['key']=='spEffectId0')['label'] == 'Effect on hit 1'
+    assert next(f for f in fields if f['key']=='disableHitSpEffect')['type'] == 'bool'
     source = next(f for f in fields if f['key']=='hitSourceType')
     assert source['type'] == 'enum' and len(source['enum']) == 34
     assert (source['enum']['0'],source['enum']['1'],source['enum']['33']) == ('Weapon','Body','Part 31')
     groups = {f['key']: f['group'] for f in fields}
     assert groups['hit0_Radius'] == 'Hitbox' and groups['knockbackDist'] == 'Impact'
-    values = {'atkPhys':123,'atkMag':234,'atkFire':345,'atkThun':456,'atkAttribute':3,
+    values = {'atkPhys':123,'atkMag':234,'atkFire':345,'atkThun':456,
+              'atkPhysCorrection':150,'atkMagCorrection':250,'atkFireCorrection':350,'atkThunCorrection':450,
+              'atkAttribute':3,
               'hit0_Radius':2.5,'hit1_Radius':0.5,'hit2_Radius':1.25,'hit3_Radius':3.75,
               'hit0_DmyPoly1':10,'hit1_DmyPoly1':11,'hit2_DmyPoly1':12,'hit3_DmyPoly1':13,
               'hit0_DmyPoly2':20,'hit1_DmyPoly2':21,'hit2_DmyPoly2':22,'hit3_DmyPoly2':23,
+              'spEffectId0':-1,'spEffectId1':0,'spEffectId2':1,'spEffectId3':2,'spEffectId4':3,
+              'disableHitSpEffect':1,
               'hti0_Priority':0,'hti1_Priority':1,'hti2_Priority':2,'hti3_Priority':3,
               'hitSourceType':1,'knockbackDist':4.5,'hitStopTime':0.25}
     assert set(values) == set(ATTACK_FIELDS)
@@ -82,6 +92,7 @@ def test_damage_hitbox_and_impact_fields_roundtrip_exact_byte_boundary_and_rever
 
 
 @pytest.mark.parametrize('key,value',[('atkPhys',-1),('atkMag',10000),('atkFire',1.5),('atkThun',float('nan')),('atkAttribute',5),('atkAttribute',-1),('atkPhys','100'),
+    ('atkPhysCorrection',-1),('atkMagCorrection',60001),
     ('hti0_Priority',256),('hti0_Priority',-1),('hitSourceType',34),('hitSourceType',-1),
     ('hit0_Radius','wide'),('hit0_DmyPoly1',40000),('hit0_DmyPoly1',-40000),('hit0_DmyPoly1',1.5),
     ('knockbackDist','far'),('hitStopTime',float('inf'))])
@@ -95,7 +106,7 @@ def test_other_attack_behavior_projectile_fields_protected():
     # well enough to expose (see attacks.py). Behavior and projectile call
     # targets (refId, atkId_Bullet) are editable; identity, judgement and
     # visual-effect fields stay protected.
-    for table,key in [('AtkParam_Npc','atkPhysCorrection'),('AtkParam_Npc','hit0_hitType'),('BehaviorParam','variationId'),('BehaviorParam','behaviorJudgeId'),('Bullet','sfxId_Hit'),('Bullet','Material_AttackType')]:
+    for table,key in [('AtkParam_Npc','hit0_hitType'),('BehaviorParam','variationId'),('BehaviorParam','behaviorJudgeId'),('Bullet','sfxId_Hit'),('Bullet','Material_AttackType')]:
         with pytest.raises(FormatError): doc.edit(table,100,key,1)
 
 
@@ -116,7 +127,7 @@ def test_safe_project_save_reload_and_vanilla(tmp_path):
     with pytest.raises(PermissionError): ItemStore(game).edit('AtkParam_Npc',101,'atkPhys',100)
 
 
-def test_player_attacks_share_the_enemy_attack_fields():
+def test_player_attacks_share_enemy_attack_keys_with_motion_value_presentation():
     import json
     from plugins.ds1.formats import METADATA
     doc = ItemDocument(make_archive())
@@ -127,9 +138,23 @@ def test_player_attacks_share_the_enemy_attack_fields():
     names = {row['ID']: row['Entries'][0] for row in expected['Entries'] if row['Entries']}
     assert rows[1]['name'] == names[101]
     fields = doc.read_row('AtkParam_Pc', 100)['fields']
-    assert {f['key'] for f in fields} == set(ATTACK_FIELDS)
+    assert {f['key'] for f in fields} == set(PC_ATTACK_FIELDS)
+    assert set(PC_ATTACK_FIELDS) == set(ATTACK_FIELDS)
     assert all(f['editable'] for f in fields)
-    assert [f['key'] for f in fields[:5]] == ['atkPhys', 'atkMag', 'atkFire', 'atkThun', 'atkAttribute']
+    assert [f['key'] for f in fields[:9]] == ['atkPhys', 'atkPhysCorrection', 'atkMag', 'atkMagCorrection',
+        'atkFire', 'atkFireCorrection', 'atkThun', 'atkThunCorrection', 'atkAttribute']
+    by_key = {f['key']: f for f in fields}
+    assert by_key['atkPhys']['label'] == 'Physical (%)'
+    assert by_key['atkPhys']['group'] == 'Motion values'
+    assert 'Motion value' in by_key['atkPhys']['description'] and '100' in by_key['atkPhys']['description']
+    assert by_key['atkPhysCorrection']['label'] == 'Physical correction'
+    assert by_key['atkPhysCorrection']['group'] == 'Motion values'
+    npc = {f['key']: f for f in doc.read_row('AtkParam_Npc', 100)['fields']}
+    assert npc['atkPhys']['label'] == 'Physical (points)'
+    assert npc['atkPhys']['group'] == 'Base damage'
+    assert 'points of health' in npc['atkPhys']['description']
+    assert npc['atkPhysCorrection']['label'] == 'Physical correction'
+    assert npc['atkPhysCorrection']['group'] == 'Base damage'
     assert 'impact' not in doc.read_row('AtkParam_Pc', 100)
 
 
@@ -147,5 +172,5 @@ def test_player_attack_edits_roundtrip_and_revert():
 
 def test_player_attack_unknown_fields_stay_protected():
     doc = ItemDocument(make_archive())
-    for key in ['atkPhysCorrection', 'hit0_hitType']:
+    for key in ['hit0_hitType']:
         with pytest.raises(FormatError): doc.edit('AtkParam_Pc', 100, key, 1)

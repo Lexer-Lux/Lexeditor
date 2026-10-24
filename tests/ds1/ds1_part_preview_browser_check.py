@@ -110,6 +110,7 @@ def main():
     put(document, 'EquipParamProtector', 100, 'equipModelId', 200)
     put(document, 'EquipParamProtector', 100, 'equipModelCategory', 2)
     put(document, 'EquipParamProtector', 100, 'equipModelGender', 3)
+    put(document, 'AtkParam_Npc', 100, 'hit0_DmyPoly1', 100)
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-parts-') as folder:
         temp = Path(folder)
         game = temp / 'game'
@@ -121,7 +122,8 @@ def main():
         (game / MAP_DIR).mkdir(parents=True)
         (game / MAP_DIR / 'test.msb').write_bytes(build_msb())
         (game / 'chr').mkdir(parents=True)
-        (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
+        (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver(
+            dummies=[(100, (1.0, 2.0, 3.0)), (200, (4.0, 5.0, 6.0))])))
         (game / 'parts').mkdir(parents=True)
         red = make_dds_rgba(4, 4, [(200, 40, 40, 255)] * 16)
         (game / 'parts' / 'WP_A_0100.partsbnd.dcx').write_bytes(
@@ -311,7 +313,10 @@ def main():
                         "fetch('/api/label?name=divine').then(r => r.status)") == 200
                     assert page.evaluate(
                         "fetch('/api/label?name=luck').then(r => r.status)") == 400
-                    # Enemy drawer: the placed character model renders plain.
+                    # Enemy drawer: the placed character model renders with
+                    # its attack list and hitboxes. Only the viewed
+                    # attack's anchors light up as green dots: the second
+                    # model point stays dark.
                     page.locator('button[data-tab="enemies"]').click()
                     page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')
                     page.locator('[data-subtab="monsters"]').click()
@@ -324,23 +329,102 @@ def main():
                             break
                     pinned(page, "NpcParam", 120000)
                     page.wait_for_function('state.sub === "monsters" && state.row && !state.error')
+                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 0
                     trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
                     trigger.wait_for()
                     attached_thumb(page)
                     trigger.click()
-                    page.wait_for_selector('.lex-model-stage[data-ready="true"]', timeout=30000)
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=30000)
                     trigger_open(page)
-                    assert page.locator('canvas[data-preview]').count() == 1
-                    painted(page, 'canvas[data-preview]')
+                    assert page.locator('.lex-chr-viewer-stage canvas').count() == 1
+                    painted(page, '.lex-chr-viewer-stage canvas')
+                    dots = page.evaluate(
+                        'document.querySelector(".lex-chr-viewer-stage").dataset.dots')
+                    assert dots == '1', dots
+                    gap = page.evaluate("""() => {
+                        const drawer = document.querySelector('.lex-model-preview-drawer');
+                        const heading = document.querySelector('.lex-detail-panel-heading');
+                        return drawer.getBoundingClientRect().top
+                            - heading.getBoundingClientRect().bottom;
+                    }""")
+                    assert abs(gap) <= 1, gap
+                    at = page.evaluate("""() => {
+                        const row = document.querySelector(
+                            '.lex-chr-viewer-list .lex-list-row');
+                        const box = row.getBoundingClientRect();
+                        const hit = document.elementFromPoint(
+                            box.left + box.width / 2, box.top + box.height / 2);
+                        return !!(hit && (hit === row || row.contains(hit)));
+                    }""")
+                    assert at, 'the first attack hides under the heading'
+                    status = page.locator('.lex-chr-viewer .lex-viewport-status').inner_text()
+                    assert 'c1200' in status, status
+                    assert '2 model points' in status, status
+                    assert '0 live hitboxes' in status, status
+                    names = page.locator('.lex-chr-viewer-list .lex-list-row').all_inner_texts()
+                    assert len(names) >= 1, names
+                    assert 'Attack 100' in names[0], names
+                    assert page.locator('.lex-chr-viewer-fields input').count() > 0
                     if output:
                         page.screenshot(path=str(output / 'parts-enemy.png'))
                     trigger.click()
-                    page.wait_for_function('window.__lexPreview === undefined')
-                    assert page.locator('canvas[data-preview]').count() == 0
+                    page.wait_for_function('!document.querySelector(".lex-chr-viewer")')
+                    # Attacks without a model open the same drawer from the
+                    # placeholder: the attack list and hitboxes stay, and
+                    # the stage hides instead of leaving a black hole.
+                    page.locator('button[data-tab="npcs"]').click()
+                    page.wait_for_function('state.tab === "npcs" && state.rows.length > 0 && !state.error')
+                    page.locator('[data-subtab="npcs"]').click()
+                    page.wait_for_function('state.sub === "npcs" && state.rows.length > 0 && !state.error')
+                    friend = page.locator('.lex-list-row[data-key="NpcParam:251000"]')
+                    friend.scroll_into_view_if_needed()
+                    friend.click()
+                    pinned(page, "NpcParam", 251000)
+                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 0
+                    trigger = page.locator('.lex-detail-panel-heading .lex-model-preview-trigger')
+                    trigger.wait_for()
+                    assert page.locator(
+                        '.lex-detail-panel-heading .lex-detail-panel-icon'
+                        ' img.ds1-model-thumbnail').count() == 0
+                    trigger.click()
+                    page.wait_for_selector('.lex-chr-viewer')
+                    assert page.locator('.lex-chr-viewer-stage canvas').count() == 0
+                    assert page.evaluate(
+                        'document.querySelector(".lex-chr-viewer-stage").hidden')
+                    status = page.locator('.lex-chr-viewer .lex-viewport-status').inner_text()
+                    assert 'no placed character model' in status, status
+                    names = page.locator('.lex-chr-viewer-list .lex-list-row').all_inner_texts()
+                    assert len(names) >= 1, names
+                    assert 'Attack 100' in names[0], names
+                    assert page.locator('.lex-chr-viewer-fields input').count() > 0
+                    trigger.click()
+                    page.wait_for_function('!document.querySelector(".lex-chr-viewer")')
+                    # No model and no attacks: the honest empty header with
+                    # no magnifier, and no Model tab anywhere.
+                    page.locator('button[data-tab="enemies"]').click()
+                    page.wait_for_function('state.tab === "enemies" && state.rows.length > 0 && !state.error')
+                    page.locator('[data-subtab="monsters"]').click()
+                    page.wait_for_function('state.sub === "monsters" && state.rows.length > 0 && !state.error')
+                    runt = page.locator('.lex-list-row[data-key="NpcParam:120100"]')
+                    runt.scroll_into_view_if_needed()
+                    runt.click()
+                    pinned(page, "NpcParam", 120100)
+                    page.wait_for_function('state.sub === "monsters" && state.row && !state.error')
+                    assert page.locator(
+                        '.lex-detail-panel-heading .lex-model-preview-trigger').count() == 0
+                    reason = page.locator('.lex-detail-panel-heading .lex-detail-panel-icon')
+                    reason.wait_for()
+                    assert 'no character model' in (reason.get_attribute('aria-label') or ''), \
+                        reason.get_attribute('aria-label')
+                    assert page.locator('.lex-tabbed-panel [data-subtab="model"]').count() == 0
                     thumb = page.evaluate(
                         "fetch('/api/chr/view?npc=120000&view=thumb').then(r => r.json())")
                     assert 'attacks' not in thumb and 'body' not in thumb, sorted(thumb)
                     assert thumb['chrs'] and thumb['name'], thumb
+                    assert thumb['attackCount'] >= 1, thumb
+                    small = page.evaluate(
+                        "fetch('/api/chr/view?npc=120100&view=thumb').then(r => r.json())")
+                    assert small['attackCount'] == 0, small
                     full = page.evaluate(
                         "fetch('/api/chr/view?npc=120000').then(r => r.json())")
                     assert 'attacks' in full and 'body' in full, sorted(full)

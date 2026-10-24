@@ -300,9 +300,16 @@ class Handler(PluginRequestHandler):
                         name = document.display_name('NpcParam', npc)
                         # The list thumbnail needs only links and a name; attacks and
                         # hitboxes stay on the full view, so a broken behavior table
-                        # cannot take the thumbnail down with it.
+                        # cannot take the thumbnail down with it. The drawer decision
+                        # needs to know attacks exist, so the thumbnail carries their
+                        # count, defaulting to none when the behavior table is broken.
                         if query.get('view', [''])[0] == 'thumb':
-                            result = {'npc': npc, 'name': name, 'chrs': chrs}
+                            try:
+                                attack_count = len(document.attack_references().list(npc)['rows'])
+                            except Exception:
+                                attack_count = 0
+                            result = {'npc': npc, 'name': name, 'chrs': chrs,
+                                      'attackCount': attack_count}
                         else:
                             attacks = []
                             for entry in document.attack_references().list(npc)['rows']:

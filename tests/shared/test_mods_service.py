@@ -63,6 +63,24 @@ class ModsServiceTests(unittest.TestCase):
         self.assertEqual(result["lexmod"]["error"], "not published")
         self.assertEqual(result["remote"], [])
 
+    def test_overview_rows_carry_each_mods_resolved_requirements(self):
+        self.make("Base", name="Base Mod", enabled=True)
+        self.make("Off", name="Off Mod", enabled=False)
+        self.make("Tweak", name="Tweak", requires=["Base", "Off", "Ghost"])
+        self.make("Broken", name="Broken", requires="Base")
+        result = mods_service.overview(self.game, "")
+        rows = {row["folder"]: row for row in result["rows"]}
+        self.assertEqual(rows["Tweak"]["requirements"], [
+            {"id": "Base", "name": "Base Mod", "installed": True, "enabled": True},
+            {"id": "Off", "name": "Off Mod", "installed": True, "enabled": False},
+            {"id": "Ghost", "name": "", "installed": False, "enabled": False}])
+        self.assertNotIn("requirementsError", rows["Tweak"])
+        self.assertEqual(rows["Base"]["requirements"], [])
+        self.assertNotIn("requirementsError", rows["Base"])
+        self.assertEqual(rows["Broken"]["requirements"], [])
+        self.assertEqual(rows["Broken"]["requirementsError"],
+                         "Its list of required mods is not valid.")
+
     def test_only_this_games_mod_folders_can_be_touched(self):
         mine = self.make("Mine", name="Mine")
         self.assertEqual(mods_service.checked_mod(self.game, str(mine)), mine.resolve())

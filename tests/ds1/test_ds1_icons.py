@@ -44,9 +44,13 @@ def test_icon_rect_prefers_mapped_over_grid():
 
 def test_icon_rect_continues_each_sheet_grid():
     # DLC overflow past the mapped icons: Stone Greataxe (198) on Icon01,
-    # Bloated Head (1314) on Icon12.
+    # Bloated Head (1314) on Icon12, Black Flame (3072) on Icon30,
+    # Calamity Ring (4043) on Icon40. The last two sat exactly on their
+    # sheet range's old end and rendered nothing.
     assert icons.icon_rect(198, {}) == ('Icon01', 493, 461, 573, 551)
     assert icons.icon_rect(1314, {}) == ('Icon12', 165, 369, 245, 459)
+    assert icons.icon_rect(3072, {}) == ('Icon30', 1, 553, 81, 643)
+    assert icons.icon_rect(4043, {}) == ('Icon40', 575, 277, 655, 367)
     assert icons.icon_rect(999999, {}) is None
 
 
@@ -89,6 +93,7 @@ def test_label_cells_cover_the_equipment_screen():
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
     assert icons.LABELS['lightning'] == (126, 430, 168, 472)
+    assert icons.LABELS['critical'] == (213, 345, 255, 387)
     assert icons.LABELS['poison'] == (83, 43, 125, 85)
     assert icons.LABELS['toxic'] == (83, 86, 125, 128)
     assert icons.LABELS['bleed'] == (83, 0, 125, 42)
@@ -136,12 +141,14 @@ def test_field_icons_follow_damage_defense_and_stats():
     found = formats._FIELD_ICONS
     assert found[('NpcParam', 'def_phys')] == 'physicalDef'
     assert found[('NpcParam', 'physGuardCutRate')] == 'physicalDef'
-    assert found[('NpcParam', 'def_slash')] == 'slash'
-    assert found[('NpcParam', 'blowGuardCutRate')] == 'strike'
-    assert found[('NpcParam', 'thrustGuardCutRate')] == 'thrust'
-    assert found[('EquipParamWeapon', 'slashGuardCutRate')] == 'slash'
-    assert found[('EquipParamProtector', 'defenseThrust')] == 'thrust'
+    assert found[('NpcParam', 'def_slash')] == 'physicalDef'
+    assert found[('NpcParam', 'blowGuardCutRate')] == 'physicalDef'
+    assert found[('NpcParam', 'thrustGuardCutRate')] == 'physicalDef'
+    assert found[('EquipParamWeapon', 'slashGuardCutRate')] == 'physicalDef'
+    assert found[('EquipParamProtector', 'defenseThrust')] == 'physicalDef'
     assert found[('AtkParam_Npc', 'atkThun')] == 'lightning'
+    assert found[('AtkParam_Npc', 'atkPhysCorrection')] == 'physical'
+    assert found[('AtkParam_Pc', 'atkThunCorrection')] == 'lightning'
     assert found[('EquipParamWeapon', 'attackBasePhysics')] == 'physical'
     assert found[('EquipParamWeapon', 'thunGuardCutRate')] == 'lightningDef'
     assert found[('EquipParamWeapon', 'properAgility')] == 'dex'
@@ -165,9 +172,9 @@ def test_field_icons_follow_damage_defense_and_stats():
         assert found[(table, key)] == 'stability', (table, key)
     assert icons.LABELS['stability'] == (169, 87, 211, 129)
     assert formats.ABSORPTION_ICONS['thunderDamageCutRate'] == 'lightningDef'
-    assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'slash'
-    assert formats.ABSORPTION_ICONS['blowDamageCutRate'] == 'strike'
-    assert formats.ABSORPTION_ICONS['thrustDamageCutRate'] == 'thrust'
+    assert formats.ABSORPTION_ICONS['slashDamageCutRate'] == 'physicalDef'
+    assert formats.ABSORPTION_ICONS['blowDamageCutRate'] == 'physicalDef'
+    assert formats.ABSORPTION_ICONS['thrustDamageCutRate'] == 'physicalDef'
     assert found[('NpcParam', 'mp')] == 'mp'
     assert found[('CharaInitParam', 'baseMp')] == 'mp'
     assert found[('CharaInitParam', 'baseWil')] == 'att'
@@ -183,8 +190,8 @@ def test_field_icons_follow_damage_defense_and_stats():
     assert found[('ReinforceParamWeapon', 'poisonGuardResistRate')] == 'poison'
     assert found[('ReinforceParamWeapon', 'curseGuardResistRate')] == 'curse'
     assert found[('ReinforceParamProtector', 'thunderDefRate')] == 'lightningDef'
-    assert found[('ReinforceParamProtector', 'slashDefRate')] == 'slash'
-    assert found[('ReinforceParamProtector', 'blowDefRate')] == 'strike'
+    assert found[('ReinforceParamProtector', 'slashDefRate')] == 'physicalDef'
+    assert found[('ReinforceParamProtector', 'blowDefRate')] == 'physicalDef'
     assert found[('ReinforceParamProtector', 'resistCurseRate')] == 'curse'
     assert found[('EquipParamWeapon', 'basicPrice')] == 'souls'
     assert found[('EquipParamWeapon', 'fixPrice')] == 'souls'
@@ -274,5 +281,28 @@ def test_icon_catalog_merges_layout_and_sheet_grids(tmp_path):
     assert 7000 in found  # layout-mapped, outside every sheet range
     assert 198 in found  # Icon01 grid continuation, unmapped DLC
     assert 1314 in found  # Icon12 grid continuation, unmapped DLC
+    assert 3072 in found  # Black Flame, Icon30 grid end
+    assert 4043 in found  # Calamity Ring, Icon40 grid end
     assert set(range(0, 132)) <= set(found)  # the Icon00 range, all choosable
     assert 999999 not in found
+def test_icon_png_crops_unmapped_range_end_icons(tmp_path):
+    # Calamity Ring's icon has no layout entry, so it crops from the
+    # Icon40 grid cell its ID names; the sheet below paints only that
+    # cell red, and the crop must come back all red at double size.
+    menu = tmp_path / 'menu'
+    menu.mkdir()
+    (menu / 'menu.drb').write_bytes(make_drb(['Icon40'], {
+        'Icon': [('EquIcon_4000', sprite_shape((0, 0, 0, 0), (1, 1, 81, 91), 0))]}))
+    width, height = 1408, 768
+    pixels = [(10, 20, 30, 255)] * (width * height)
+    for y in range(554, 734):
+        for x in range(1150, 1310):
+            pixels[y * width + x] = (200, 40, 40, 255)
+    (menu / 'menu_0.tpf.dcx').write_bytes(
+        make_dcx(make_tpf([('Icon40', make_dds_rgba(width, height, pixels))])))
+    with Image.open(io.BytesIO(icons.icon_png(str(tmp_path), 4043))) as image:
+        image.load()
+        assert image.size == (160, 180)
+        shot = image.copy()
+    assert shot.getpixel((0, 0)) == (200, 40, 40, 255)
+    assert shot.getpixel((159, 179)) == (200, 40, 40, 255)

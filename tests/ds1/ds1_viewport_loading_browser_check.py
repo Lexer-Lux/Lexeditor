@@ -1,6 +1,6 @@
 """DS1 viewports: map and model hosts show the big centered loading panel.
 
-While geometry loads, the map and MODEL-tab stages show the shared
+While geometry loads, the map and model-drawer stages show the shared
 loadingPanel (a centered 32px pulse, aria-only label), not the tiny
 inline loadingStatus with its visible text, and never an empty stage.
 Once the canvas mounts, the panel is gone.
@@ -72,7 +72,7 @@ def main():
                     cdp.send('Network.enable')
                     cdp.send('Network.setCacheDisabled', {'cacheDisabled': True})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.route('**/api/map/geometry*', hold)
+                    page.route('**/api/map/geometries*', hold)
                     page.route('**/api/chr/geometry*', hold)
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
@@ -109,7 +109,7 @@ def main():
                     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=60000)
                     assert page.locator(f'{host} .lex-panel-loading').count() == 0, \
                         'map panel clears once the canvas mounts'
-                    # MODEL stage: same panel instead of an empty black host.
+                    # Model-drawer stage: same panel instead of an empty black host.
                     page.evaluate("navigate('npcs','npcs')")
                     page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
                     row = page.locator('.lex-list-row[data-key="NpcParam:251000"]')
@@ -119,28 +119,27 @@ def main():
                     release_next()
                     page.wait_for_function(
                         "state.row && `${state.row.table}:${state.row.id}` === 'NpcParam:251000'")
-                    page.locator('.lex-tabbed-panel [data-subtab="basics"]').click()
-                    page.wait_for_function("!document.querySelector('[data-chr-host]')",
+                    page.wait_for_function("!document.querySelector('.lex-chr-viewer')",
                         timeout=30000)
-                    page.locator('.lex-tabbed-panel [data-subtab="model"]').click()
+                    page.locator('.lex-detail-panel-heading .lex-model-preview-trigger').click()
                     page.wait_for_function(
-                        "document.querySelector('[data-chr-host] .lex-panel-loading')"
-                        " || document.querySelector('[data-chr-host] .lex-loading-status')"
-                        " || document.querySelector('[data-chr-host] canvas')",
+                        "document.querySelector('.lex-chr-viewer-stage .lex-panel-loading')"
+                        " || document.querySelector('.lex-chr-viewer-stage .lex-loading-status')"
+                        " || document.querySelector('.lex-chr-viewer-stage canvas')",
                         timeout=30000)
-                    host = '[data-chr-host]'
+                    host = '.lex-chr-viewer-stage'
                     assert page.locator(f'{host} .lex-panel-loading').count() == 1, \
                         'model stage shows the centered loading panel while geometry loads'
                     assert page.locator(f'{host} .lex-loading-status').count() == 0, \
                         'model stage shows no tiny corner status while geometry loads'
                     width = page.evaluate(
-                        "document.querySelector('[data-chr-host] .lex-panel-loading"
+                        "document.querySelector('.lex-chr-viewer-stage .lex-panel-loading"
                         " .lex-plugin-loading-pulse').getBoundingClientRect().width")
                     assert width >= 24, f'model pulse is big, got {width}'
                     wait_held(page)
                     page.screenshot(path=str(output / 'ds1-model-loading.png'))
                     release_next()
-                    page.wait_for_selector('[data-chr-host] canvas', timeout=60000)
+                    page.wait_for_selector('.lex-chr-viewer-stage canvas', timeout=60000)
                     assert page.locator(f'{host} .lex-panel-loading').count() == 0, \
                         'model panel clears once the canvas mounts'
                     assert not errors, f'page errors: {errors[:3]}'

@@ -80,6 +80,10 @@
 .ds1-reference-face{width:100%;}
 .ds1-reference-face{flex:1 1 auto;min-width:0;display:flex;}
 .ds1-reference-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+/* A locked face keeps its link text clear of the lock, like a locked input
+   keeps its lane. Unset faces are short labels on their own box already. */
+.ds1-reference-face.lex-has-readonly-lock>.lex-hoverable,
+.ds1-asset-face.lex-has-readonly-lock>.lex-hoverable{padding-right:16px;}
 .ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
 /* A linked face shares its box with the Vanilla reference like an input
    does: without the lane the reference paints over the linked name. */
@@ -114,8 +118,15 @@
   }
 }
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
-.ds1-asset-field{display:flex;align-items:center;gap:6px;}
-.ds1-asset-field>*:first-child{flex:1 1 auto;min-width:min(9ch,100%);}
+.ds1-asset-face{display:flex;align-items:center;gap:6px;min-width:0;}
+.ds1-asset-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+/* An unset or unresolvable link is editable, so it must not borrow the
+   read-only slab (which would also hang a lock on the row): a plain
+   value box with the shared radius, muted only in its text. */
+.ds1-unset-face{flex:1 1 auto;min-width:0;background:var(--lex-input-bg);
+  border:var(--lex-input-border);border-color:var(--lex-input-border-color);
+  border-radius:var(--lex-input-radius);padding:2px 6px;color:var(--lex-muted);
+  font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ds1-icon-gallery{max-width:min(760px,92vw);}
 .ds1-icon-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:60vh;overflow:auto;padding:4px;}
 .ds1-icon-choice{padding:2px;border:1px solid transparent;border-radius:4px;background:transparent;cursor:pointer;}
@@ -138,8 +149,9 @@
    crisp instead of smearing. Big textures keep smooth scaling. */
 .ds1-texture-tile img{min-width:64px;min-height:64px;object-fit:contain;}
 .ds1-texture-tile img.ds1-texture-tiny{image-rendering:pixelated;}
-/* A blank texture is a swatch, not a picture: small and labeled. */
-.ds1-texture-tile.ds1-texture-blank img{min-width:32px;min-height:32px;}
+/* A blank texture carries no picture: its tile is the name with a blank
+   note and no image, never a bare white square. The class marks the tile
+   for checks; no box needs styling. */
 /* The enemy viewer fills the preview drawer: attacks on the left,
    the stage and the viewed attack hitbox fields on the right. */
 .lex-chr-viewer{display:flex;gap:12px;flex:1 1 auto;min-height:0;min-width:0;}

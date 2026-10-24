@@ -5,7 +5,8 @@ menu layout's Icon dialog maps each icon ID to its sheet and pixel rectangle
 (EquIcon_0001 sits at (83,1)-(163,91) on Icon00). The layout predates the
 Remaster's doubled textures, so every rectangle is scaled by two. A few DLC
 icons have no entry; they continue their sheet's 12-column grid, which the
-game's own numbering confirms (Stone Greataxe at 198, Bloated Head at 1314).
+game's own numbering confirms (Stone Greataxe at 198, Bloated Head at
+1314, Black Flame at 3072, Calamity Ring at 4043).
 
 Damage, defense and stat labels reuse the menus' own small icons from
 Menu04_2: the equipment screen's swords and shields, the armor screen's
@@ -48,7 +49,7 @@ SHEET_BASES = {'Icon00': 0, 'Icon01': 132, 'Icon10': 1000, 'Icon11': 1132,
 SHEET_RANGES = (('Icon00', 0, 132), ('Icon01', 132, 205), ('Icon10', 1000, 1132),
                 ('Icon11', 1132, 1264), ('Icon12', 1264, 1316),
                 ('Icon20', 2000, 2132), ('Icon21', 2132, 2221),
-                ('Icon30', 3000, 3072), ('Icon40', 4000, 4043))
+                ('Icon30', 3000, 3073), ('Icon40', 4000, 4044))
 # Label art on Menu04_2, in layout pixels: the menus' own cells, each the
 # layout's sprite rect. Tolerance icons are the armor screen's
 # icon_tolerance_* nodes; vit/att/end/res/soulLv/souls are the level-up

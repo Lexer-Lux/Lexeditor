@@ -1,9 +1,10 @@
-"""Maps details panel split is automatic, canvas follows.
+"""Maps panel splits are automatic, canvas follows.
 
-The viewport and the Selection details share one panelLayout
-strip: it is not draggable, the split is never stored, and the
-WebGL canvas tracks its host across window resizes. Synthetic
-fixtures only; read-only.
+The lists, the viewport and the Selection details share one
+panelLayout with a strip between each pair: strips are not
+draggable, splits are never stored, and the WebGL canvas tracks
+its host across window resizes. Synthetic fixtures only;
+read-only.
 """
 import sys
 import tempfile
@@ -55,13 +56,15 @@ def main():
                     page.wait_for_selector('[data-viewport-host][data-ready="true"]',
                                            timeout=120000)
                     divider = page.locator(".lex-panel-layout-divider")
-                    assert divider.count() == 1
-                    assert divider.first.is_visible()
-                    assert divider.first.get_attribute("role") is None
-                    assert divider.first.get_attribute("tabindex") is None
+                    assert divider.count() == 2
+                    for index in range(2):
+                        strip = divider.nth(index)
+                        assert strip.is_visible()
+                        assert strip.get_attribute("role") is None
+                        assert strip.get_attribute("tabindex") is None
                     side = page.locator("[data-maps-detail-panel]")
                     before = side.bounding_box()["width"]
-                    box = divider.first.bounding_box()
+                    box = divider.nth(1).bounding_box()
                     assert box["width"] >= 8, box
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)

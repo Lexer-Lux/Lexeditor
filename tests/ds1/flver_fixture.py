@@ -41,7 +41,8 @@ def make_chrbnd(flver_bytes, stem='c1200', extra=(), dcx=True):
 def build_flver(strip=False, qloc=False, bones=None, skin=None,
                 pos_offset=(0.0, 0.0, 0.0), bone_list=None, second_uv=False,
                 light_tex=None, mesh_count=1, tex_name='tex0',
-                mtd_name='M[D].mtd', packed_uv=False):
+                mtd_name='M[D].mtd', packed_uv=False, uv_scale=1.0,
+                dummies=None):
     """A minimal FLVER2 0x2000C: mesh_count quads, 1 material, N bones, 1 dummy.
 
     `strip` stores the faces as a triangle strip; `qloc` writes a lying
@@ -54,9 +55,15 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     is the material definition (water shaders name Water).
     `packed_uv` stores both UV sets in one 0x16 member, the way
     Depths map pieces do, instead of two 0x15 members.
+    `uv_scale` multiplies the first UV set, so fixtures can tile their
+    diffuse the way real map pieces do; the second set is untouched.
+    `dummies` is [(ref_id, (x, y, z))] (default the one point 100 at
+    (1.0, 2.0, 3.0)).
     """
     if bones is None:
         bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
+    if dummies is None:
+        dummies = [(100, (1.0, 2.0, 3.0))]
     if bone_list is None:
         bone_list = list(range(len(bones)))
     if qloc and (len(bones) != 1 or skin is not None):
@@ -73,13 +80,14 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     out = bytearray()
     out.extend(b'\0' * 128)  # header
 
-    out.extend(struct.pack('<3f', 1.0, 2.0, 3.0))  # dummy
-    out.extend(bytes((255, 128, 64, 32)))
-    out.extend(struct.pack('<3f', 0.0, 0.0, 1.0))
-    out.extend(struct.pack('<2h', 100, 0))
-    out.extend(struct.pack('<3f', 0.0, 1.0, 0.0))
-    out.extend(struct.pack('<h2B', 0, 1, 1))
-    out.extend(struct.pack('<2I', 0, 0) + bytes(8))
+    for ref_id, (dx, dy, dz) in dummies:  # dummies
+        out.extend(struct.pack('<3f', dx, dy, dz))
+        out.extend(bytes((255, 128, 64, 32)))
+        out.extend(struct.pack('<3f', 0.0, 0.0, 1.0))
+        out.extend(struct.pack('<2h', ref_id, 0))
+        out.extend(struct.pack('<3f', 0.0, 1.0, 0.0))
+        out.extend(struct.pack('<h2B', 0, 1, 1))
+        out.extend(struct.pack('<2I', 0, 0) + bytes(8))
 
     mat_at = len(out)  # material
     out.extend(bytes(32))
@@ -175,10 +183,10 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
                 verts.extend(bytes(ids))
                 verts.extend(bytes(round(min(max(w, 0.0), 1.0) * 255) for w in weights))
             if packed_uv:
-                verts.extend(struct.pack('<4h', round(x * 1024), round(y * 1024),
+                verts.extend(struct.pack('<4h', round(x * 1024 * uv_scale), round(y * 1024 * uv_scale),
                                         round((x + 10) * 1024), round((y + 20) * 1024)))
             else:
-                verts.extend(struct.pack('<2h', round(x * 1024), round(y * 1024)))
+                verts.extend(struct.pack('<2h', round(x * 1024 * uv_scale), round(y * 1024 * uv_scale)))
             if second_uv:
                 verts.extend(struct.pack('<2h', round((x + 10) * 1024), round((y + 20) * 1024)))
         vtx_at = place(bytes(verts))
@@ -191,8 +199,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
         data_at = len(out)
 
     struct.pack_into('<6s2sI', out, 0, b'FLVER\0', b'L\0', 0x2000C)
-    struct.pack_into('<7I', out, 12, data_at, data_len, 1, 1, len(bones),
-                     mesh_count, mesh_count)
+    struct.pack_into('<7I', out, 12, data_at, data_len, len(dummies), 1,
+                     len(bones), mesh_count, mesh_count)
     struct.pack_into('<6f', out, 40, ox, oy, oz, ox + 1.0, oy + 1.0, oz)
     struct.pack_into('<2I', out, 64, 2, 2)
     struct.pack_into('<3B', out, 72, 16, 0, 0)

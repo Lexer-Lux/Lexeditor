@@ -44,7 +44,7 @@ def build(page):
 
 
 def set_columns(page, count):
-    page.locator(".lex-list-detail-divider").first.hover()
+    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
     control = page.locator(".lex-list-detail-divider .lex-detail-column-control")
     for _ in range(8):
         current = int(control.locator(".lex-barrel-count").text_content())
@@ -105,7 +105,7 @@ def test_developer_can_drop_a_property_into_an_empty_column(page):
     assert page.evaluate(COLUMNS)[1] == ['physical']
 
 def tally(page):
-    page.locator(".lex-list-detail-divider").first.hover()
+    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
     return page.locator(
         ".lex-list-detail-divider .lex-detail-column-control .lex-barrel-count").text_content()
 
@@ -131,7 +131,7 @@ def test_tally_counts_empty_fitted_columns(page):
     assert page.evaluate(COLUMNS)[1:] == [[], []]
     # Right-click fits to width again: the deal keeps three columns (the
     # stored three-group layout applies as stored), and the tally says so.
-    page.locator(".lex-list-detail-divider").first.hover()
+    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
     page.locator(".lex-list-detail-divider .lex-detail-column-control").click(button="right")
     page.wait_for_timeout(400)
     columns = page.evaluate(COLUMNS)
@@ -190,3 +190,88 @@ def test_barrel_scoped_counts_stay_independent(page):
     page.wait_for_timeout(400)
     assert tally(page) == "1"
 
+SUBTAB_BUILD = """([key]) => {
+  const U = LexeditorUI;
+  window.__shareActive = 'weapons';
+  const rows = Array.from({length: 6}, (_, id) => ({id, name: 'Ammo ' + id}));
+  const fields = () => ['Damage', 'Weight', 'Price'].map(name => U.detailField({
+    label: name, property: name.toLowerCase(),
+    control: U.el('input', {type: 'number', value: 0, min: 0, max: 100})}));
+  const main = document.querySelector('main');
+  main.style.cssText = 'display:block;height:760px';
+  window.__shareBuild = () => main.replaceChildren(U.pagedListDetail({rows,
+    key: row => row.id, selected: 0, noun: 'ammo', splitKey: 'share-check',
+    slots: false, pageSize: 6, defaultSplit: 22, columnsKey: key,
+    master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
+      select: v.select, columns: [{key: 'name', label: 'Name'}]}),
+    detail: row => U.detailPanel({title: row.name, body: [U.tabbedPanel({label: 'Item details',
+      active: window.__shareActive,
+      tabs: [{id: 'weapons', label: 'Weapons'}, {id: 'ammo', label: 'Ammo'}],
+      change: id => { window.__shareActive = id; window.__shareBuild(); },
+      paginate: {unpaged: true}, content: fields()})]})}));
+  window.__shareBuild();
+}"""
+
+
+def build_subtabs(page, columns_key):
+    page.set_viewport_size({"width": 1700, "height": 800})
+    framework(page)
+    mount_shell(page, True)
+    page.evaluate(SUBTAB_BUILD, [columns_key])
+    page.wait_for_timeout(400)
+
+
+def column_keys(page):
+    return page.evaluate("""() => {
+      const out = [];
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith('lexeditor:columns:')) out.push(key);
+      }
+      return out.sort();
+    }""")
+
+
+def test_shared_columns_key_ignores_the_subtab_path(page):
+    # Lexer: defense shows four columns under Weapons and three under
+    # Ammo. DS1 passes one columnsKey per tab so every subtab shares a
+    # count, but the live subtab path extended that key anyway and split
+    # it again. A shared key stays whole across subtab switches.
+    build_subtabs(page, "shared-tabs")
+    set_columns(page, 1)
+    assert tally(page) == "1"
+    page.locator('.lex-subtab-button[data-subtab="ammo"]').click()
+    page.wait_for_timeout(400)
+    assert tally(page) == "1"
+    assert column_keys(page) == ["lexeditor:columns:shared-tabs"]
+
+
+def test_default_columns_key_stays_per_subtab(page):
+    # Without an explicit columnsKey nothing changes: unrelated tabs
+    # keep their own counts.
+    build_subtabs(page, None)
+    set_columns(page, 1)
+    assert tally(page) == "1"
+    page.locator('.lex-subtab-button[data-subtab="ammo"]').click()
+    page.wait_for_timeout(400)
+    assert tally(page) != "1"
+
+
+def test_per_subtab_counts_migrate_to_the_shared_key(page):
+    # Counts saved under older per-subtab keys move up once: the current
+    # subtab's wins, and the dead keys go away. Each test gets a fresh
+    # profile, so the seeds planted before the build are the whole store,
+    # the way a reader's older keys predate the shared one.
+    page.set_viewport_size({"width": 1700, "height": 800})
+    framework(page)
+    mount_shell(page, True)
+    page.evaluate("""() => {
+      localStorage.setItem('lexeditor:columns:migrate-tabs:weapons', '4');
+      localStorage.setItem('lexeditor:columns:migrate-tabs:ammo', '3');
+    }""")
+    page.evaluate(SUBTAB_BUILD, ["migrate-tabs"])
+    page.wait_for_timeout(400)
+    assert tally(page) == "4"
+    assert column_keys(page) == ["lexeditor:columns:migrate-tabs"]
+    assert page.evaluate(
+        "() => localStorage.getItem('lexeditor:columns:migrate-tabs')") == "4"

@@ -185,13 +185,17 @@
 
   // One matcher for every glow path: a pinned column's pin: prefix is
   // stripped before comparing, so pin:sellValue lights the sellValue
-  // field, its cells, and (off-tab) its tab.
+  // field, its cells, and (off-tab) its tab, and the bare sellValue
+  // key lights the pinned column back.
   const stripPinPrefix = key => String(key ?? "").replace(/^pin:/, "");
   const glowSelector = key => {
     const raw = String(key ?? "");
     const base = stripPinPrefix(raw);
+    // The match runs both ways: a header carries its pin: prefix while
+    // its property does not, so an unprefixed key also matches the
+    // pinned column, and hovering the field lights its header back.
     const columns = raw === base
-      ? [`[data-column-key="${CSS.escape(raw)}"]`]
+      ? [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="pin:${CSS.escape(raw)}"]`]
       : [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="${CSS.escape(base)}"]`];
     return [...columns, `[data-lex-property="${CSS.escape(base)}"]`].join(",");
   };
@@ -2092,6 +2096,39 @@
     try { localStorage.setItem(key, value); } catch (_error) {}
     callWindow("save_default_view", shellPluginId(), activePageTab(), {[key]: value}).catch(() => {});
   };
+  const fieldTabHiddenKey = shape => `${shellPluginId()}-${activePageTab()}.fieldtabs.${shape}.hidden`;
+  const readFieldTabHidden = shape => {
+    if (!shape) return [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(fieldTabHiddenKey(shape)) || "null");
+      return Array.isArray(stored) ? stored.filter(id => typeof id === "string") : [];
+    } catch (_error) { return []; }
+  };
+  const writeFieldTabHidden = (shape, ids) => {
+    const key = fieldTabHiddenKey(shape);
+    const value = JSON.stringify(ids);
+    try { localStorage.setItem(key, value); } catch (_error) {}
+    callWindow("save_default_view", shellPluginId(), activePageTab(), {[key]: value}).catch(() => {});
+  };
+  // Tabs the reader removed, minus any a property moved back to: overrides
+  // and undo can still deal members to a hidden tab's group, and a tab with
+  // members is alive again whether or not the store was cleaned.
+  const visibleFieldTabs = (tabs, shape, members) => {
+    const hidden = readFieldTabHidden(shape);
+    if (!hidden.length) return [...(tabs || [])];
+    return (tabs || []).filter(tab => !hidden.includes(String(tab.id)) || (members?.[tab.id]?.length > 0));
+  };
+  const refreshSubtabBar = bar => {
+    const options = bar?.__lexSubtabOptions;
+    if (!bar || !options) return;
+    if (!bar.isConnected) return;
+    const active = bar.querySelector(".lex-subtab-button.active")?.dataset.subtab;
+    const hadFocus = bar.contains(document.activeElement);
+    const next = subtabBar(options);
+    bar.replaceWith(next);
+    if (hadFocus) (active && next.querySelector(`.lex-subtab-button[data-subtab="${active}"]`)
+      || next.querySelector(".lex-subtab-button"))?.focus({preventScroll: true});
+  };
   // Moves caller-built field nodes across its tab groups per the stored
   // overrides, and answers the shape the panel marks itself with. A move
   // whose target is gone (or whose field the record lacks) stays put.
@@ -2100,7 +2137,19 @@
     const shape = textDigest([...accept].sort().join("\n") + "\n" + String(options.callerShape || ""));
     const entries = Object.entries(readFieldTabOverrides(shape));
     if (!entries.length) return shape;
-    const groupOf = id => groups.get((tabs || []).find(tab => tab.id === id)?.label);
+    // A move whose target tab exists but holds no group yet (an empty tab
+    // the caller accepts drops onto) starts that tab's group: refusing it
+    // would strand the override and the drop would silently do nothing.
+    // Tabs outside accept keep the old behavior and stay put.
+    const groupOf = id => {
+      const tab = (tabs || []).find(tab => tab.id === id);
+      if (!tab) return undefined;
+      if (!groups.has(tab.label)) {
+        if (!accept.includes(tab.id)) return undefined;
+        groups.set(tab.label, []);
+      }
+      return groups.get(tab.label);
+    };
     const find = fieldKey => {
       for (const list of groups.values()) {
         const at = list.findIndex(node => node?.dataset?.lexLayoutField === fieldKey);
@@ -2129,11 +2178,29 @@
       return String(tab.id).toLocaleLowerCase() === "misc" && name === "Misc"
         ? "Misc." : name;
     };
-    const tabs = [...suppliedTabs].sort((a,b)=>tabRank(a)-tabRank(b)
-      ||tabTitle(a).localeCompare(tabTitle(b),undefined,{numeric:true,sensitivity:"base"}));
-    const active = tabs.some(tab => tab.id === options.active)
+    const members = options.fieldTabs?.members;
+    const shape = options.fieldTabs?.shape;
+    const flagged = [...suppliedTabs].sort((a,b)=>tabRank(a)-tabRank(b)
+      ||tabTitle(a).localeCompare(tabTitle(b),undefined,{numeric:true,sensitivity:"base"}))
+      .map(tab => {
+        // A tab with no members is an empty husk the overrides drained: gray
+        // it with a reason, which keeps it focusable and drop-revivable where
+        // native disabled would eat both. Bespoke content tabs never derive.
+        const isEmpty = tab.empty === true || (tab.empty !== false && tab.bespoke !== true
+          && !!members && !(members[tab.id]?.length > 0));
+        const disabled = tab.disabled || isEmpty;
+        if (!disabled) return tab;
+        return {...tab, disabled: true,
+          disabledReason: tab.disabledReason || (isEmpty ? "This tab has no properties." : undefined),
+          ...(isEmpty ? {isEmptyTab: true} : {})};
+      });
+    const tabs = flagged;
+    const visible = visibleFieldTabs(flagged, shape, members);
+    const live = visible.filter(tab => !tab.disabled);
+    const active = (visible.some(tab => tab.id === options.active)
+        && !flagged.find(tab => tab.id === options.active)?.disabled)
       ? options.active
-      : suppliedTabs[0]?.id;
+      : (live[0] || visible[0])?.id;
     const selected = tabs.find(tab => tab.id === active);
     const content = typeof options.content === "function"
       ? options.content(active, selected)
@@ -2148,25 +2215,8 @@
       className: "lex-tabbed-panel-tabs",
       shortcuts: false,
       change: options.change,
+      fieldTabs: options.fieldTabs,
     });
-    // A caller that honors membership overrides marks its bar, so drops
-    // onto its tabs move properties there. Only its accepting tabs (its
-    // field groups, never its bespoke tabs) take the drop.
-    if (options.fieldTabs?.shape) {
-      bar.dataset.lexFieldtabs = options.fieldTabs.shape;
-      const accept = new Set(options.fieldTabs.accept || []);
-      for (const button of bar.querySelectorAll(":scope > .lex-subtab-button"))
-        if (accept.has(button.dataset.subtab)) button.dataset.lexAcceptFields = "true";
-    }
-    // A header hover glows the tab holding its property when the field
-    // itself is off-screen; the caller names each tab's members.
-    if (options.fieldTabs?.members) {
-      const known = new Map();
-      for (const [tabId, keys] of Object.entries(options.fieldTabs.members))
-        for (const key of [keys || []].flat())
-          if (!known.has(String(key))) known.set(String(key), tabId);
-      bar.lexTabMembers = known;
-    }
     return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
       class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
@@ -2215,53 +2265,96 @@
   // a row outside any panel is its own scope. Unscoped controls fit alone,
   // as before, so editing one value never refits untouched controls.
   const autoFitScope = control => {
-    if (!control.closest?.(".lex-multi-number")) return null;
-    return control.closest(".lex-detail-panel") || control.closest(".lex-multi-number");
+    if (control.closest?.(".lex-multi-number"))
+      return control.closest(".lex-detail-panel") || control.closest(".lex-multi-number");
+    return control.closest?.(".lex-detail-section")
+      || control.closest?.(".lex-tabbed-panel-content")
+      || control.closest?.(".lex-detail-panel")
+      || null;
   };
   const autoFitMates = control => {
     const scope = autoFitScope(control);
     if (!scope) return [control];
-    const rows = scope.classList.contains("lex-multi-number")
-      ? [scope] : [...scope.querySelectorAll(".lex-multi-number")];
-    const mates = rows.flatMap(row =>
-      [...row.querySelectorAll("input,select,textarea,.lex-readonly-field")])
+    if (scope.classList.contains("lex-multi-number")) {
+      const mates = [...scope.querySelectorAll("input,select,textarea,.lex-readonly-field")]
+        .filter(node => node.__lexAutoFitUpdate && node.isConnected);
+      return mates.length ? mates : [control];
+    }
+    if (control.closest?.(".lex-multi-number")) {
+      const rows = [...scope.querySelectorAll(".lex-multi-number")];
+      const mates = rows.flatMap(row =>
+        [...row.querySelectorAll("input,select,textarea,.lex-readonly-field")])
+        .filter(node => node.__lexAutoFitUpdate && node.isConnected);
+      return mates.length ? mates : [control];
+    }
+    const mates = [...scope.querySelectorAll("input,select,textarea,.lex-readonly-field")]
       .filter(node => node.__lexAutoFitUpdate && node.isConnected);
     return mates.length ? mates : [control];
   };
   const addAutoFit = control => {
     autoFitQueue.add(control);
-    if (autoFitScope(control)) autoFitMates(control).forEach(mate => autoFitQueue.add(mate));
   };
   const flushAutoFit = () => {
     const controls = [...autoFitQueue].filter(control => control.isConnected);
     autoFitQueue.clear();
+    const queued = new Set(controls);
     controls.forEach(control => control.__lexAutoFitReset());
     const fits = controls.map(control => control.__lexAutoFitMeasure());
-    const scopeSizes = new Map();
-    controls.forEach((control, index) => {
-      if (!fits[index]) return;
-      const scope = autoFitScope(control);
-      if (!scope) return;
-      if (!scopeSizes.has(scope)) scopeSizes.set(scope, []);
-      scopeSizes.get(scope).push(fits[index].size);
-    });
-    const scopeMin = new Map([...scopeSizes].map(([scope, sizes]) => [scope, Math.min(...sizes)]));
+    controls.forEach((control, index) => { control.__lexAutoFitCached = fits[index] || null; });
+    const byScope = new Map();
     controls.forEach((control, index) => {
       const fit = fits[index];
       if (!fit) return;
       const scope = autoFitScope(control);
-      const size = scope && scopeMin.has(scope) ? scopeMin.get(scope) : fit.size;
-      control.__lexAutoFitApply({size, height: size > fit.natural ? fit.height : 0});
+      if (!scope) {
+        control.__lexAutoFitApply({size: fit.size, height: fit.size > fit.natural ? fit.height : 0});
+        return;
+      }
+      if (!byScope.has(scope)) byScope.set(scope, []);
+      byScope.get(scope).push(control);
     });
+    for (const [scope, members] of byScope) {
+      const seen = new Set(members);
+      const sizes = members.map(control => control.__lexAutoFitCached.size);
+      const extra = [];
+      // Multi-number rows mate across rows, not across the scope; everywhere
+      // else one scan finds every mate.
+      const candidates = scope.querySelector(".lex-multi-number")
+        ? members.flatMap(control => autoFitMates(control))
+        : [...scope.querySelectorAll("input,select,textarea,.lex-readonly-field")];
+      for (const mate of candidates) {
+        if (seen.has(mate) || !mate.__lexAutoFitUpdate || !mate.isConnected || !mate.__lexAutoFitCached) continue;
+        seen.add(mate);
+        sizes.push(mate.__lexAutoFitCached.size);
+        extra.push(mate);
+      }
+      const size = Math.min(...sizes);
+      const share = node => {
+        const cached = node.__lexAutoFitCached;
+        node.__lexAutoFitApply({size, height: size > cached.natural ? cached.height : 0});
+      };
+      members.forEach(share);
+      extra.forEach(share);
+    }
   };
-  const queueAutoFit = control => {
+  // An edit queues only the edited control. Its mates keep their cached
+  // fits: their values did not change, so neither did their sizes, and
+  // measuring the whole scope per keystroke is the lag this guard exists
+  // to forbid. Only a cold registration pulls its mates along.
+  const queueAutoFit = (control, mates = false) => {
     if (!autoFitQueue.size) requestAnimationFrame(flushAutoFit);
     addAutoFit(control);
+    if (mates && autoFitScope(control)) autoFitMates(control).forEach(mate => autoFitQueue.add(mate));
   };
   // One observer for every fitted control, held here for the life of the page.
   const autoFitObserver = typeof ResizeObserver === "function"
     ? new ResizeObserver(entries => {
-      entries.forEach(entry => addAutoFit(entry.target));
+      // New geometry voids the cached fit; the flush re-measures the control
+      // and the scope minimum still reaches its mates through their caches.
+      entries.forEach(entry => {
+        delete entry.target.__lexAutoFitCached;
+        addAutoFit(entry.target);
+      });
       flushAutoFit();
     })
     : null;
@@ -2285,9 +2378,10 @@
       // the height of the row otherwise invited.
       // An instruction step reads the same way: a short opcode such as "If"
       // must not tower over the operands beside it.
+      const naturalSize = Number.parseFloat(style.fontSize) || 0;
       const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list, .lex-instruction-controls")
-        ? Number.parseFloat(style.fontSize) || 16
-        : Math.max(minimum,Math.min(28,control.clientHeight*.78));
+        ? naturalSize || 16
+        : Math.min(naturalSize || 28, Math.max(minimum,Math.min(28,control.clientHeight*.78)));
       // A parked unit sits left of the reserved lane, inside the text's
       // own room: the value must end before the unit starts, so the unit's
       // width counts against the text like padding. Short values never bind
@@ -2309,7 +2403,7 @@
       if (!context || !value) return null;
       context.font = `${style.fontStyle} ${style.fontWeight} ${maximum}px ${style.fontFamily}`;
       const measured = context.measureText(value).width;
-      const natural = Number.parseFloat(style.fontSize) || 0;
+      const natural = naturalSize;
       // Padding in em grows with the font, so a size that fits at the natural
       // size can overflow once applied: the box that measured room for "0"
       // grew its own padding past the digit. The padded bound holds padding
@@ -2332,10 +2426,14 @@
       // decides whether the applied size outgrew the natural box.
       return {size, natural, height: control.getBoundingClientRect().height};
     };
+    // The reference overlay inside this value box, if one is mounted.
+    const referenceOverlay = () => control.closest?.(".lex-source-control-internal")
+      ?.querySelector?.(":scope > .lex-reference-values") || null;
     const reset = () => {
       control.style.fontSize = "";
       control.style.height = "";
       control.style.boxSizing = "";
+      referenceOverlay()?.style.setProperty("font-size", "");
     };
     const apply = fit => {
       if (!fit) return;
@@ -2344,6 +2442,11 @@
         control.style.height = `${fit.height}px`;
       }
       control.style.fontSize = `${fit.size}px`;
+      // The reference shares the value box, so it shares the value's fitted
+      // size: a value that shrank beside a full-size reference reads as two
+      // programs. The overlay only sets the em the lane clamp counts in, so
+      // a lane narrower than the reference still shrinks it further.
+      referenceOverlay()?.style.setProperty("font-size", `${fit.size}px`);
     };
     const update = () => {
       const mates = autoFitMates(control).filter(node => node.isConnected);
@@ -2367,7 +2470,7 @@
     control.__lexAutoFitReset = reset;
     control.__lexAutoFitApply = apply;
     autoFitObserver?.observe(control);
-    queueAutoFit(control);
+    queueAutoFit(control, true);
     return control;
   };
   document.fonts?.addEventListener?.("loadingdone", event => {
@@ -2493,8 +2596,16 @@
       // tag + the column gap the stack opens between the two + the value, and
       // two pixels so the last glyph is not flush against the panel edge.
       const widest = entry.tag + entry.text + 6;
+      const changed = entry.panel.style?.getPropertyValue("--lex-panel-reference-rail-width") !== `${widest}px`;
       entry.panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
       entry.panel.style?.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
+      if (changed && entry.panel instanceof Element)
+        entry.panel.querySelectorAll("input,select,textarea").forEach(node => {
+          if (node.__lexAutoFitUpdate) {
+            delete node.__lexAutoFitCached;
+            queueAutoFit(node);
+          }
+        });
       for (const control of entry.controls) {
         control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
         control.style.setProperty("--lex-reference-tag-width", `${entry.tag}px`);
@@ -2504,7 +2615,15 @@
       probe.remove();
       const width = widths[index];
       if (width <= 2) return;
-      control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+      const laneKey = "--lex-internal-reference-requested-width";
+      if (control.style.getPropertyValue(laneKey) !== `${width}px`) {
+        control.style.setProperty(laneKey, `${width}px`);
+        const fitted = control.querySelector("input,select,textarea");
+        if (fitted?.__lexAutoFitUpdate) {
+          delete fitted.__lexAutoFitCached;
+          queueAutoFit(fitted);
+        }
+      }
       // The lane is capped at 35% of the box. Only when that cap is narrower
       // than the reference needs does the reference shrink, and only by that
       // much.
@@ -2548,11 +2667,23 @@
   });
   new MutationObserver(records=>{
     const roots=new Set();
-    for(const record of records)for(const node of record.addedNodes){
-      if(node instanceof Element&&node.isConnected&&
-        (node.matches('.lex-source-control')||node.querySelector('.lex-source-control')))roots.add(node);
+    const healed=new Set();
+    for(const record of records){
+      for(const node of record.addedNodes){
+        if(node instanceof Element&&node.isConnected&&
+          (node.matches('.lex-source-control')||node.querySelector('.lex-source-control')))roots.add(node);
+      }
+      for(const node of record.removedNodes){
+        if(!(node instanceof Element))continue;
+        const gone=node.matches('input,select,textarea')?[node]:[...node.querySelectorAll('input,select,textarea')];
+        if(!gone.some(control=>control.__lexAutoFitUpdate))continue;
+        const scope=record.target instanceof Element&&record.target.isConnected?record.target:null;
+        if(!scope)continue;
+        for(const control of scope.querySelectorAll('input,select,textarea'))healed.add(control);
+      }
     }
     for(const root of roots)alignReferenceRails(root.closest('.lex-detail-panel-body, .lex-detail-panel, .lex-detail')||root);
+    for(const control of healed)if(control.__lexAutoFitUpdate&&control.isConnected)queueAutoFit(control);
   }).observe(document.documentElement,{childList:true,subtree:true});
 
   // A section heading is renamed the same way a property name is: a
@@ -3551,7 +3682,9 @@
     const numericLike = inputType === "number" || (
       ["numeric", "decimal"].includes(String(input?.inputMode || "").toLocaleLowerCase()) &&
       step !== null && step !== undefined && step !== "");
-    const readOnly = Boolean(input && (
+    // A linked face carries no input to sniff, so its caller names the lock
+    // state outright; every other control keeps the sniffed state it has.
+    const readOnly = options.readOnly === true || Boolean(input && (
       input.readOnly || input.disabled || input.tagName === "OUTPUT" ||
       input.classList?.contains("lex-readonly-field")));
     // One checkbox is a boolean; several in one property are the bits of one
@@ -3716,9 +3849,15 @@
       setTimeout(() => typeRail.classList.remove("rejected"), 420);
     };
     if (lock) {
-      // Upright, inside the value box, hard against its right edge.
+      // Upright, inside the value box, hard against its right edge. A face
+      // carries the property key instead of an input, so the keyed element
+      // hosts the lock: the field node would span the label too, and the
+      // wrapper would put the lock over the finder's button.
+      const keyed = control instanceof Element
+        ? (control.matches("[data-field-key]") ? control : control.querySelector("[data-field-key]"))
+        : null;
       const host = control instanceof Element && control.matches(".lex-unit-field")
-        ? control : (input?.parentElement || node);
+        ? control : (input?.parentElement || keyed || node);
       host.classList.add("lex-has-readonly-lock");
       host.append(lock);
       // A checkbox is smaller than the lock's margin, so right-aligned the
@@ -4295,9 +4434,18 @@
     });
   };
   const resortSubtabOf = node => resortSubtabBar(node?.closest?.(".lex-subtab-bar"));
-  const subtabBarElement = (options = {}) => (options.tabs || []).length < (options.showSingle ? 1 : 2)
-    ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
-    : element("div", {
+  const subtabBarElement = (options = {}) => {
+    const full = options.tabs || [];
+    const fieldTabs = options.fieldTabs;
+    const shape = fieldTabs?.shape;
+    const visible = shape ? visibleFieldTabs(full, shape, fieldTabs.members) : [...full];
+    const hidden = shape
+      ? readFieldTabHidden(shape).filter(id => full.some(tab => String(tab.id) === id)
+        && !(fieldTabs.members?.[id]?.length > 0))
+      : [];
+    if (visible.length < (options.showSingle ? 1 : 2) && !hidden.length)
+      return element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true});
+    const bar = element("div", {
     class: ["lex-subtab-bar", options.flush === true ? "lex-subtab-bar-flush" : "",
       options.images ? "lex-subtab-bar-images" : "",
       options.className || ""].filter(Boolean).join(" "),
@@ -4305,7 +4453,7 @@
     "data-lex-subtab-shortcuts": String(options.shortcuts !== false),
     "aria-label": options.label || "Subsections",
     "data-lex-sort": options.order === "given" ? "given" : null,
-    }, ...(options.tabs || []).map((tab, index) => {
+    }, ...visible.map((tab, index) => {
       // A subtab is renamed in place the way a page tab is, and the name is
       // stored under the page tab that owns it, which is where the shippable
       // view defaults for this screen live.
@@ -4340,7 +4488,12 @@
       // listener would never see both clicks on one node.
       onclick: event => {
         const button = event.currentTarget;
-        if (tab.disabled) return;
+        // A cross-tab drop lands through a stale bar: the target's button
+        // still wears its pre-drop gray, and the click that lands the move
+        // must pass it once. The re-render replaces the button; a bar with
+        // no change handler never takes drops, so the flag never sticks.
+        if (button.dataset.lexReviveClick) delete button.dataset.lexReviveClick;
+        else if (tab.disabled) return;
         const bar = button.closest(".lex-subtab-bar");
         const stamp = `${activePageTab()}|${bar?.getAttribute("aria-label") || ""}|${tab.id}`;
         const now = Date.now();
@@ -4368,8 +4521,86 @@
   })() : null,
   (key => key && options.shortcuts !== false ? element("span", {
     class: "lex-tab-shortcut", "aria-hidden": "true",
-  }, `⇧${key}`) : "")(shortcutKeyFor(index + 1)));
-    }));
+  }, `⇧${key}`) : "")(shortcutKeyFor(index + 1)),
+  tab.isEmptyTab && options.change && visible.length > 1 ? (() => {
+    // An empty husk goes with one click; hiding the last tab would strand
+    // the panel, so it keeps no button. Hiding the active tab switches away
+    // through change (the caller re-renders); otherwise the bar refreshes in
+    // place, and undo replays the same refresh from its own entry.
+    const remove = element("span", {class: "lex-subtab-remove", role: "button", tabindex: "0",
+      title: `Remove the empty ${tab.label} tab`, "aria-label": `Remove ${tab.label} tab`}, "×");
+    const hide = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const at = remove.closest(".lex-subtab-bar");
+      if (!at || !shape) return;
+      const before = readFieldTabHidden(shape);
+      const id = String(tab.id);
+      if (before.includes(id)) return;
+      const after = [...before, id];
+      // The hide replaces the bar (or the caller re-renders past it), so by
+      // undo time `at` is detached and a refresh of it is a no-op: find the
+      // live bar for this shape instead.
+      const apply = ids => {
+        writeFieldTabHidden(shape, ids);
+        const live = at.isConnected ? at : document.querySelector(
+          `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"]`) || at;
+        refreshSubtabBar(live);
+      };
+      writeFieldTabHidden(shape, after);
+      pushLabelUndo({before, after, apply});
+      labelRedo.length = 0;
+      labelHistoryChanged();
+      const current = at.querySelector(".lex-subtab-button.active")?.dataset.subtab;
+      if (current === id) {
+        const next = visibleFieldTabs(full, shape, fieldTabs.members).find(candidate => !candidate.disabled);
+        if (next) options.change(next.id);
+        else refreshSubtabBar(at);
+      } else refreshSubtabBar(at);
+    };
+    remove.addEventListener("click", hide);
+    remove.addEventListener("keydown", event => {
+      event.stopPropagation();
+      if (event.key === "Enter" || event.key === " ") hide(event);
+    });
+    return remove;
+  })() : null);
+    }),
+    ...(hidden.length ? [element("button", {type: "button", class: "lex-subtab-restore",
+      title: `Show ${hidden.length} hidden tab${hidden.length === 1 ? "" : "s"}`,
+      "aria-label": `Show ${hidden.length} hidden tab${hidden.length === 1 ? "" : "s"}`,
+      onclick: event => {
+        event.stopPropagation();
+        const at = event.currentTarget.closest(".lex-subtab-bar");
+        choicePopover({label: "Hidden tabs", search: hidden.length > 6 ? "Search hidden tabs" : false,
+          choices: hidden.map(id => ({label: full.find(tab => String(tab.id) === id)?.label || id, value: id})),
+          select: value => {
+            writeFieldTabHidden(shape, readFieldTabHidden(shape).filter(kept => kept !== value));
+            if (at) refreshSubtabBar(at);
+          }}).openFor(event.currentTarget);
+      }}, `+${hidden.length}`)] : []));
+    bar.__lexSubtabOptions = options;
+    // A caller that honors membership overrides marks its bar here, where
+    // every build (and every bar refresh) lands it, so drops onto its tabs
+    // move properties there. Only its accepting tabs (its field groups,
+    // never its bespoke tabs) take the drop. A header hover glows the tab
+    // holding its property when the field itself is off-screen; the caller
+    // names each tab's members.
+    if (fieldTabs?.shape) {
+      bar.dataset.lexFieldtabs = fieldTabs.shape;
+      const accept = new Set(fieldTabs.accept || []);
+      for (const button of bar.querySelectorAll(":scope > .lex-subtab-button"))
+        if (accept.has(button.dataset.subtab)) button.dataset.lexAcceptFields = "true";
+    }
+    if (fieldTabs?.members) {
+      const known = new Map();
+      for (const [tabId, keys] of Object.entries(fieldTabs.members))
+        for (const key of [keys || []].flat())
+          if (!known.has(String(key))) known.set(String(key), tabId);
+      bar.lexTabMembers = known;
+    }
+    return bar;
+  };
 
   // The key that selects the Nth tab, matching the shortcut sequence:
   // 1-9, then 0 for the tenth, then - and = for the eleventh and twelfth.
@@ -6084,8 +6315,9 @@
         // preview line showed. Pins past the count join the last lane, as
         // do cards the stored arrangement never saw.
         if(options.unpaged&&laneMap?.size){
-          const pinned=laneMap.get(card.dataset.lexLayoutSection||"properties");
-          lane=pinned===undefined?count-1:Math.min(Math.max(0,pinned),count-1);
+          const pinned=laneMap.get(card.dataset.lexLayoutSection
+            ||(card.dataset.lexLayoutField?`field:${card.dataset.lexLayoutField}`:"properties"));
+          lane=pinned===undefined?loads.indexOf(Math.min(...loads)):Math.min(Math.max(0,pinned),count-1);
         }
         columns[lane].append(card);loads[lane]+=(loads[lane]?gap:0)+(measured||0);
       });
@@ -6609,6 +6841,9 @@
   const rememberSharedSettings = settings => {
     if (!settings) return null;
     sharedSettingsSnapshot = settings;
+    // Freshly synced preferences can carry per-subtab counts a shared key
+    // already migrated past, so migration re-arms and re-reads them.
+    migratedColumnKeys.clear();
     if (settings.soundEnabled === false || themeSoundGain(settings.soundVolumePercent) <= 0) stopThemeSounds();
     document.documentElement.dataset.lexHoverableAltClick = settings.hoverableAltClick ? "true" : "false";
     document.documentElement.dataset.lexDeveloperMode = settings.developerMode ? "true" : "false";
@@ -6810,7 +7045,7 @@
     const sync = () => {
       const shown = (((state.time / frameDur) % count) + count) % count;
       if (document.activeElement !== slider) slider.value = String(shown);
-      readout.textContent = `${shown.toFixed(1)} / ${count - 1} \u{1D453} \u00B7 ${state.time.toFixed(2)}s`;
+      readout.textContent = `${Math.floor(shown)} / ${count - 1} \u{1D453} \u00B7 ${state.time.toFixed(2)}s`;
       return shown;
     };
     const goToFrame = frame => {
@@ -6866,10 +7101,21 @@
       step: delta => goToFrame(Math.round(state.time / frameDur) + delta),
       toStart: () => goToFrame(0),
       toEnd: () => goToFrame(count - 1),
+      // Selecting an event seeks the playhead to it, the way clicking
+      // its marker does: same cues, same playing state. Unknown ids
+      // (a viewer behind the list) report false and move nothing.
+      toEvent: id => {
+        const cue = (frames.events || []).find(event => event.id === id);
+        if (!cue) return false;
+        state.time = (Number(cue.start) || 0) % duration;
+        sync();
+        return true;
+      },
       get playing() { return state.playing; },
       get follow() { return state.follow; },
       get frame() { return Math.round(state.time / frameDur); },
       get count() { return count; },
+      get duration() { return duration; },
       stop: () => {
         if (!state.live) return;
         state.live = false;
@@ -8874,6 +9120,22 @@ ${contents.path}`});
       const home = section.closest(".lex-detail-panel") || section.closest(".lex-detail-section");
       if (home === root || (boxed && !section.closest(".lex-detail-panel"))) addPropertyGroup(groups, section);
     }
+    // Every live lane column is a group, empty or not, in lane order: an
+    // emptied lane would otherwise vanish from the numbering, and a field
+    // dropped into it would file under the next index - which a fresh
+    // build, seeing it occupied, gives to another node instead. Occupied
+    // lanes keep the exact indices the fields loop always gave them (field
+    // order is lane order), so only empty lanes gain entries, with empty
+    // lists. Scoped like the fields themselves: a nested pager's columns
+    // belong to its own panel, never to this one.
+    if (root.querySelectorAll) for (const pager of root.querySelectorAll(".lex-tweaks-paged")) {
+      const home = pager.closest(".lex-detail-panel") || pager.closest(".lex-detail-section");
+      if (home !== root && !(boxed && !pager.closest(".lex-detail-panel"))) continue;
+      for (const column of pager.querySelectorAll(".lex-tweak-column")) {
+        if (column.closest(".lex-tweaks-paged") !== pager) continue;
+        addPropertyGroup(groups, column);
+      }
+    }
     for (const field of fields) {
       const group = addPropertyGroup(groups, field.parentElement);
       const base = `${group.id}/${field.dataset.lexLayoutField}`;
@@ -8964,10 +9226,30 @@ ${contents.path}`});
     if (!shape || !fieldKey || !sourceTab || sourceTab === targetTab) return;
     const beforeMap = readFieldTabOverrides(shape);
     const afterMap = {...beforeMap, [fieldKey]: {from: sourceTab, to: targetTab}};
-    const clickTab = id => document.querySelector(
-      `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"] .lex-subtab-button[data-subtab="${id}"]`)?.click();
-    const activeTab = () => document.querySelector(
-      `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"] .lex-subtab-button.active`)?.dataset.subtab;
+    const barOf = () => document.querySelector(
+      `.lex-tabbed-panel-tabs[data-lex-fieldtabs="${shape}"]`);
+    const clickTab = id => barOf()?.querySelector(
+      `.lex-subtab-button[data-subtab="${id}"]`)?.click();
+    const activeTab = () => barOf()?.querySelector(
+      ".lex-subtab-button.active")?.dataset.subtab;
+    // The bar is stale the moment the overrides change: a target the move
+    // revives still wears its gray, and a tab the reader hid has no button
+    // at all. Unhide first (a tab with members is alive again), then land
+    // through the gray once so the caller re-renders onto the move.
+    const landOn = showId => {
+      let at = barOf();
+      if (at && !at.querySelector(`.lex-subtab-button[data-subtab="${showId}"]`)) {
+        const hiddenNow = readFieldTabHidden(shape);
+        if (hiddenNow.includes(showId))
+          writeFieldTabHidden(shape, hiddenNow.filter(kept => kept !== showId));
+        refreshSubtabBar(at);
+        at = barOf();
+      }
+      const button = at?.querySelector(`.lex-subtab-button[data-subtab="${showId}"]`);
+      if (button && (button.disabled || button.getAttribute("aria-disabled") === "true"))
+        button.dataset.lexReviveClick = "true";
+      button?.click();
+    };
     writeFieldTabOverrides(shape, afterMap);
     pushLabelUndo({before: beforeMap, after: afterMap, apply: layout => {
       writeFieldTabOverrides(shape, layout);
@@ -8975,11 +9257,11 @@ ${contents.path}`});
       // Clicking the active tab rebuilds nothing, so bounce through the
       // other one: the caller re-renders twice and lands on the move.
       if (activeTab() === showId) clickTab(showId === targetTab ? sourceTab : targetTab);
-      clickTab(showId);
+      landOn(showId);
     }});
     labelRedo.length = 0;
     labelHistoryChanged();
-    clickTab(targetTab);
+    landOn(targetTab);
   };
   const readStoredLayout = state => {
     const parse = text => { try { return JSON.parse(text || "null"); } catch (_error) { return null; } };
@@ -9324,6 +9606,27 @@ ${contents.path}`});
       }
       if (migrated) layout = migrated;
     }
+    // A field pinned to a lane belongs loose in that lane's column, never
+    // in a section: the pin is the source of truth the dealing honors,
+    // while a stored column group is a node a refit already rebuilt. This
+    // runs before the group passes and marks its fields used, so the
+    // passes below never file them under a swapped column index or drag
+    // them back into their template section.
+    for (const [key, lane] of Object.entries(layout.lanes || {})) {
+      if (!key.startsWith("field:")) continue;
+      const prop = key.slice("field:".length);
+      const found = [...state.fields].find(([candidate]) =>
+        candidate.dataset.lexLayoutField === prop);
+      const pinned = found?.[0];
+      const pager = pinned?.closest(".lex-tweaks-paged");
+      if (!pinned || pager?.lexUnpaged !== true) continue;
+      const lanes = [...pager.querySelectorAll(".lex-tweak-column")]
+        .filter(column => column.closest(".lex-tweaks-paged") === pager);
+      const home = lanes[Math.max(0, Math.min(lanes.length - 1, Number(lane) || 0))];
+      if (!home) continue;
+      used.add(pinned);
+      if (pinned.parentElement !== home) home.append(pinned);
+    }
     // Loose properties rejoin their anchor section first, in stored
     // order: the section is a stable node, while the column they were
     // dropped in rebuilds on every refit. The normal passes skip them
@@ -9398,8 +9701,11 @@ ${contents.path}`});
     // Pins land before the ordering refit, or the refit deals stale lanes.
     if (layout.lanes && typeof layout.lanes === "object")
       for (const pager of pagers) pager.lexSetLanes?.(layout.lanes);
-    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
+    // Cards sync before the ordering refit too: a field the passes just
+    // placed loose in a column joins the dealing first, or the refit the
+    // ordering triggers deals it away with its column.
     pagers.forEach(syncPagerCards);
+    orderSections(state, pageOrder ? pageOrder.map(name => `${name}:0`) : layout.order);
     // A hidden flip changes the dealt set, so the pager refits: without
     // this an undo that unhides a section left it stranded outside the deal.
     if (hideRemovedSections(state)) pagers.forEach(pager => pager.lexFitPage?.());
@@ -9528,7 +9834,7 @@ ${contents.path}`});
   }, true);
   let propertyDrag = null, propertyDrop = null;
   const clearPropertyDrop = () => {
-    propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after", "lex-drop-target");
+    propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after", "lex-drop-target", "lex-property-drop-target");
     propertyDrop = null;
   };
   // During a section or property drag, holding the pointer near the top or
@@ -9604,7 +9910,18 @@ ${contents.path}`});
     const target = [...state.groups.values()].map(layoutSectionOf)
       .find(node => node && node !== section && node.contains(event.target) && !node.contains(section) && !section.contains(node)
         && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section));
-    if (!target) return;
+    if (!target) {
+      const column = event.target.closest?.(".lex-tweak-column");
+      const pager = column?.closest(".lex-tweaks-paged");
+      if (!column || !pager || pager.lexUnpaged !== true
+        || pager !== section.closest(".lex-tweaks-paged")
+        || column.querySelector(".lex-detail-section")) return;
+      propertyDrop = {target: column, marker: column, after: true, lane: true};
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      column.classList.add("lex-property-drop-target");
+      return;
+    }
     const after = event.clientY >= target.getBoundingClientRect().top + target.offsetHeight / 2;
     propertyDrop = {target, marker: target, after};
     event.preventDefault();
@@ -9647,8 +9964,9 @@ ${contents.path}`});
     const {state, section, before} = sectionDrag;
     const idOf = node => [...state.groups.values()].find(group => layoutSectionOf(group) === node)?.id;
     const moving = idOf(section), target = idOf(propertyDrop.target);
-    const order = sectionOrder(state).filter(id => id !== moving);
-    order.splice(order.indexOf(target) + (propertyDrop.after ? 1 : 0), 0, moving);
+    const order = target === undefined ? sectionOrder(state)
+      : sectionOrder(state).filter(id => id !== moving);
+    if (target !== undefined) order.splice(order.indexOf(target) + (propertyDrop.after ? 1 : 0), 0, moving);
     const dropTarget = propertyDrop.target;
     const pinned = pinDropLanes(state, section, dropTarget);
     clearPropertyDrop();
@@ -9727,13 +10045,19 @@ ${contents.path}`});
           const empty = column && state.groups.has(column) &&
             ![...column.children].some(child => state.fields.has(child));
           if (empty) propertyDrop = {node: column, before: null, marker: column, after: true};
+          const looseColumn = !empty && column && !state.groups.has(column)
+            && !column.querySelector(".lex-detail-section,.lex-detail-field")
+            && column.closest(".lex-tweaks-paged")?.lexUnpaged === true
+            && column.closest(".lex-tweaks-paged") === field.closest(".lex-tweaks-paged");
+          if (looseColumn) propertyDrop = {node: column, before: null, marker: column, after: true, looseLane: true};
         }
       }
     }
     if (!propertyDrop) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    propertyDrop.marker.classList.add(propertyDrop.after ? "lex-property-drop-after" : "lex-property-drop-before");
+    if (propertyDrop.marker.classList.contains("lex-tweak-column")) propertyDrop.marker.classList.add("lex-property-drop-target");
+    else propertyDrop.marker.classList.add(propertyDrop.after ? "lex-property-drop-after" : "lex-property-drop-before");
   });
   document.addEventListener("drop", event => {
     if (!propertyDrag || !propertyDrop || !sharedSettingsSnapshot?.developerMode) return;
@@ -9744,10 +10068,38 @@ ${contents.path}`});
       return;
     }
     const {state, field, before} = propertyDrag;
+    const nodeExisted = state.groups.has(propertyDrop.node);
     addPropertyGroup(state.groups, propertyDrop.node);
     propertyDrop.node.insertBefore(field, propertyDrop.before);
     syncPagerCards(field.closest(".lex-tweaks-paged"));
     const after = capturePropertyLayout(state);
+    // Lane pins follow looseness, never history: a field loose in a column
+    // pins its lane, and one back inside a section drops its pin, or the
+    // restore below would rip it back out. Bare flows (no section in the
+    // pager) never pin: their columns are the groups, and pins would lock
+    // a redeal that must stay fluid.
+    {
+      const pager = propertyDrop.node.closest?.(".lex-tweaks-paged");
+      if (pager?.lexUnpaged === true && pager.querySelector(".lex-detail-section")) {
+        const lanes = [...pager.querySelectorAll(".lex-tweak-column")]
+          .filter(column => column.closest(".lex-tweaks-paged") === pager);
+        if (!nodeExisted || propertyDrop.looseLane) {
+          const at = lanes.indexOf(propertyDrop.node);
+          if (at >= 0) for (const [candidate] of state.fields) {
+            if (candidate.closest(".lex-tweak-column") !== propertyDrop.node) continue;
+            const prop = candidate.dataset.lexLayoutField;
+            if (prop) after.lanes[`field:${prop}`] = at;
+          }
+        } else {
+          const prop = field.dataset.lexLayoutField;
+          if (field.closest(".lex-detail-section")) delete after.lanes[`field:${prop}`];
+          else if (prop) {
+            const at = lanes.indexOf(field.closest(".lex-tweak-column"));
+            if (at >= 0) after.lanes[`field:${prop}`] = at;
+          }
+        }
+      }
+    }
     clearPropertyDrop();
     if (JSON.stringify(before) === JSON.stringify(after)) return;
     const apply = layout => { storePropertyLayout(state, layout); reapplyStoredLayout(state); };
@@ -10714,12 +11066,14 @@ ${contents.path}`});
       const grow = Number(column.grow)
         || (!declaredGrow && automaticGrow >= 0 && index === automaticGrow ? 1 : 0);
       if (grow > 0) return `minmax(0, ${grow}fr)`;
-      // A max-content track is still squeezed when the wider columns beside it
-      // want the space, and a squeezed number is not a shortened number - it is
-      // a different one. "5,000" cut to "5,00" reads as five hundred. Text may
-      // truncate; a numeric column is floored at its own content and never
-      // does.
-      return column.numeric === true ? "minmax(min-content, max-content)" : "max-content";
+      // Content maximums never yield: beside wider columns the track
+      // overflows instead of shrinking, and the header cannot wrap into the
+      // room there is. A flexible maximum sizes past content when room
+      // suffices and shrinks toward min-content when it does not, so the
+      // header wraps and the column sizes toward its values. Numbers never
+      // wrap, so their min-content is the whole number: "5,000" is never
+      // cut to "5,00".
+      return "minmax(min-content, 1fr)";
     }).join(" ");
   };
 
@@ -10891,7 +11245,10 @@ ${contents.path}`});
     const labelKey = fieldLabelKey(shipped);
     const shown = () => savedLabel(labelKey, shipped);
     return {
-      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey}, typeGlyph(entry.icon), shown()) : shipped, sortable: true, pinnedProperty: entry.key,
+      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey,
+        // The kind rides along so a game can swap the generic glyph for
+        // its own art, the way DS1 label art replaces field glyphs.
+        "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown()) : shipped, sortable: true, pinnedProperty: entry.key,
       sortValue: row => pinnedValue(row, entry.key) ?? "",
       numeric: described?.numeric === true,
       min: described?.minimum, max: described?.maximum, step: described?.step,
@@ -11055,7 +11412,9 @@ ${contents.path}`});
       if (!list || !list.isConnected) return;
       if (list.scrollWidth <= list.clientWidth + 1) return;
       rollback();
-      showToast("No room for another column. Widen the table or unpin a column first.", true);
+      // Dividers are static: nothing the reader can do widens the table,
+      // so the only way out is named.
+      showToast("No room for another column. Unpin a column first.", true);
     }));
   };
 
@@ -11243,29 +11602,21 @@ ${contents.path}`});
     if (!root.isConnected) return null;
     const base = root.lexHeadingTemplate || root.style.getPropertyValue("--lex-column-list-template");
     root.lexHeadingTemplate = base;
-    const tracks = [];
-    let depth = 0, start = 0;
-    for (let index = 0; index <= base.length; index++) {
-      const character = base[index];
-      if (character === '(') depth++;
-      if (character === ')') depth--;
-      if (index === base.length || (!depth && /\s/.test(character))) {
-        if (index > start) tracks.push(base.slice(start, index));
-        start = index + 1;
-      }
-    }
+    const tracks = splitTemplateTracks(base);
     const heads = [...root.querySelectorAll(":scope > .lex-column-list-header:not(.lex-matrix-column-axis) > .lex-column-list-head-cell")];
     if (!heads.length || tracks.length !== heads.length) return null;
     // Probing one column at a time cost a full page layout per column, and a
     // panel holding a dozen tables spent over a second doing it.
+    // Headers wrap: the floor is the longest word, not the whole line,
+    // so a long name wraps instead of widening its column past the values.
     const probes = heads.map(head => {
       const probe = head.cloneNode(true);
       probe.removeAttribute("id");
-      probe.style.cssText = "position:fixed;visibility:hidden;width:max-content;min-width:max-content;max-width:none;white-space:nowrap;";
+      probe.style.cssText = "position:fixed;visibility:hidden;width:min-content;min-width:min-content;max-width:none;";
       probe.querySelectorAll("*").forEach(node => {
-        node.style.whiteSpace = "nowrap";
+        node.style.whiteSpace = "normal";
         node.style.maxWidth = "none";
-        node.style.flexShrink = "0";
+        node.style.flexShrink = "";
       });
       return probe;
     });
@@ -11280,7 +11631,14 @@ ${contents.path}`});
         // Intrinsic sizes are valid grid bounds, but are not CSS math values.
         // Their natural size already includes the unwrapped heading.
         if (range) {
-          if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
+          if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) {
+            // A flexible maximum still needs a definite floor: an intrinsic
+            // minimum resolves the base to max-content and the track never
+            // shrinks, so the header cannot wrap. The longest word floors it.
+            if (!/fr\b/.test(range[2])) return track;
+            const floored = `minmax(${width}px, ${range[2].trim()})`;
+            return CSS.supports('grid-template-columns', floored) ? floored : track;
+          }
           // Grid accepts unitless zero, but CSS math requires a length when
           // comparing against pixels. Otherwise minmax(0,1fr) loses its floor.
           const minimum = /^[-+]?0(?:\.0+)?$/.test(range[1].trim()) ? "0px" : range[1];
@@ -11299,8 +11657,33 @@ ${contents.path}`});
       }).join(" ");
       if (!CSS.supports('grid-template-columns', fitted)) return () => {};
       columnHeadingWidths.set(root.lexHeadingKey, fitted);
+      // The barrel unify floors the same tracks at the shared body width
+      // after this pass. Writing here unconditionally would strip its floor
+      // straight back off, and the two passes would trade templates for ever
+      // on the observers between them. A template already covering this one -
+      // same tracks, every minimum at least this minimum - is left alone.
+      const trackMin = track => {
+        const range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track.trim());
+        const part = range ? range[1] : track;
+        const px = [...part.matchAll(/([\d.]+)px/g)].map(match => parseFloat(match[1]));
+        if (px.length) return Math.max(...px);
+        if (/^[-+]?0(?:\.0+)?$/.test(part.trim())) return 0;
+        if (/^[\d.]+fr$/.test(part.trim())) return 0;
+        return -1;
+      };
+      const trackMax = track => {
+        const range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track.trim());
+        return (range ? range[2] : track).trim();
+      };
+      const covers = current => {
+        const mine = splitTemplateTracks(current);
+        const want = splitTemplateTracks(fitted);
+        return mine.length === want.length && mine.every((track, index) =>
+          trackMax(track) === trackMax(want[index]) && trackMin(track) >= trackMin(want[index]));
+      };
       return () => {
-        if (root.style.getPropertyValue("--lex-column-list-template") !== fitted)
+        const current = root.style.getPropertyValue("--lex-column-list-template");
+        if (current !== fitted && !covers(current))
           root.style.setProperty("--lex-column-list-template", fitted);
       };
     };
@@ -11800,6 +12183,29 @@ ${contents.path}`});
       }
       return widest;
     };
+    // Barrels ask for their content width from the spare room: the floor
+    // above keeps headers readable, but names truncated while the detail
+    // pane sat empty (Textures at two barrels) need the full width asked,
+    // not floored. Summed from the measured columns: a max-content probe of
+    // the whole list under-measures once three tracks share it.
+    const barrelContentWant = node => {
+      const grids = [...node.querySelectorAll(".lex-barrel-grid")]
+        .filter(grid => !grid.closest(".lex-detail-panel") && grid.offsetParent);
+      if (!grids.length) return 0;
+      let want = 0;
+      for (const grid of grids) {
+        const chrome = Math.max(0,
+          node.getBoundingClientRect().width - grid.getBoundingClientRect().width);
+        // Measured fresh: a cached width goes stale the moment an edit or
+        // a pin changes what the cells hold. Reads only, no probing writes.
+        const measured = measureBarrelColumnWidths(grid);
+        if (!measured) continue;
+        want = Math.max(want, chrome
+          + measured.lists.length * (measured.widths.reduce((sum, width) => sum + width, 0) + measured.pad)
+          + 7 * (measured.lists.length - 1));
+      }
+      return Math.ceil(want);
+    };
     const updateResponsive = () => {
       const extent = vertical ? root.clientHeight : root.clientWidth;
       const css = getComputedStyle(root);
@@ -11815,7 +12221,7 @@ ${contents.path}`});
         // pushed the page into a sideways scroll (Bannerlord > Dependencies),
         // where the label fit already shrinks a long name instead.
         const hard=nodes.map((node,index)=>Math.max(configuredMinSizes[index],tableMinimum(node)));
-        const wanted=nodes.map((node,index)=>Math.max(0,readablePropertyWidth([node],9)-hard[index]));
+        const wanted=nodes.map((node,index)=>Math.max(0,Math.max(readablePropertyWidth([node],9),barrelContentWant(node))-hard[index]));
         const asked=wanted.reduce((sum,value)=>sum+value,0);
         const spare=Math.max(0,(extent?available:Infinity)-hard.reduce((sum,value)=>sum+value,0));
         // A layout that stacks below its minimum stacks instead of squeezing.
@@ -11856,6 +12262,27 @@ ${contents.path}`});
       const strip = element("div", {class: "lex-panel-layout-divider"});
       if (options.dividerClass) strip.classList.add(options.dividerClass);
       [accessories[index]].flat().filter(Boolean).forEach(node => strip.append(node));
+      // The Barrels/Columns gizmos meet the cursor where it hovers instead of
+      // waiting at the divider's middle: every summoning puts them under the
+      // eye that asked. Centered on the cursor, clamped to the strip so they
+      // never hang past its ends. (Horizontal dividers keep centered gizmos.)
+      // A gizmo hangs rotated a quarter turn, so its visual height is its
+      // layout width.
+      if (!vertical) strip.addEventListener("pointermove", event => {
+        // Under the cursor it holds still: moving while hovered would slide
+        // its buttons out from under the click that summoned them.
+        if (event.target.closest?.(".lex-barrel-control")) return;
+        const gizmos = strip.querySelectorAll(":scope > .lex-barrel-control");
+        if (!gizmos.length || !strip.clientHeight) return;
+        const at = event.clientY - strip.getBoundingClientRect().top;
+        for (const gizmo of gizmos) {
+          const half = gizmo.offsetWidth / 2;
+          const top = half * 2 >= strip.clientHeight ? strip.clientHeight / 2
+            : Math.min(strip.clientHeight - half, Math.max(half, at));
+          const was = parseFloat(gizmo.style.top);
+          if (!Number.isFinite(was) || Math.abs(was - top) > 0.5) gizmo.style.top = `${top}px`;
+        }
+      });
       return strip;
     });
     nodes.forEach((node, index) => {
@@ -11884,6 +12311,11 @@ ${contents.path}`});
       refreshResponsive();
       document.fonts?.ready.then(() => {labelWidths.clear();if(root.isConnected)refreshResponsive();});
     });
+    root.refreshLayout = () => { if (root.isConnected) refreshResponsive(); };
+    // Pins change what the master must hold: re-derive the shares from the
+    // defaults instead of keeping shares the old columns needed, or the
+    // master keeps room its columns no longer fill after an unpin.
+    root.lexResetSizes = () => { sizes = [...defaults]; if (root.isConnected) refreshResponsive(); };
     return root;
   };
 
@@ -12309,6 +12741,12 @@ ${contents.path}`});
 
   const bottomSearchChangeTimers = new Map();
   let typingSearch = null;
+  // Keystrokes stay adoptable for a second: a delayed search (FF8's 110ms)
+  // races its rebuilds within milliseconds, while a query carried from
+  // another tab under a reused key is long stale. Without this, navigating
+  // away leaked the old tab's query into the new tab's box and filtered
+  // its list to nothing.
+  const BOTTOM_SEARCH_ADOPT_MS = 1000;
   const bottomSearch = options => {
     const key = String(options.key || options.label || "records");
     let composing = false;
@@ -12343,7 +12781,7 @@ ${contents.path}`});
         next.focus({preventScroll: true});
         if (Number.isInteger(start)) next.setSelectionRange(
           start, Number.isInteger(end) ? end : start, direction || "none");
-        typingSearch = {key, control: next, start, end, direction};
+        typingSearch = {key, control: next, start, end, direction, at: typingSearch?.at};
       };
       const delay = Math.max(0, Number(options.delay) || 0);
       if (delay) bottomSearchChangeTimers.set(key, setTimeout(apply, delay));
@@ -12354,28 +12792,57 @@ ${contents.path}`});
     // above only covers a rebuild inside the keystroke. So the box being typed
     // in is remembered, and a box built under the same key while that one
     // has left the page (taking focus with it, to <body>) takes over.
-    const remember = () => { typingSearch = {key, control, start: control.selectionStart,
-      end: control.selectionEnd, direction: control.selectionDirection}; };
+    const remember = typed => { typingSearch = {key, control, start: control.selectionStart,
+      end: control.selectionEnd, direction: control.selectionDirection,
+      at: typed ? performance.now()
+        : (typingSearch?.control === control ? typingSearch.at : undefined)}; };
     // The caret is read before the keystroke's own rebuild: read after it, the
     // box had left the page and reported 0, and the next rebuild put the
     // caret at the front ("travelling" came out "ingtravell").
-    for (const type of ["input", "keyup", "focus", "select"]) control.addEventListener(type, () => {
-      if (control.isConnected) remember();
+    for (const type of ["input", "keyup"]) control.addEventListener(type, () => {
+      if (control.isConnected) remember(true);
+    });
+    for (const type of ["focus", "select"]) control.addEventListener(type, () => {
+      if (control.isConnected) remember(false);
     });
     control.addEventListener("input", change);
     control.addEventListener("blur", () => {
-      // A blur while still on the page is the reader leaving the box.
+      // A blur while the box sits on the page is the reader leaving it, so
+      // the box is forgotten: a box built under this key afterwards must
+      // not adopt a value the reader already walked away from. The check
+      // lands deferred because yanking the box fires blur while the node
+      // still reports connected, and the yanked box keeps its keystrokes
+      // adoptable. (A swap in the same task as the blur still adopts;
+      // renders land on a later task.)
       setTimeout(() => { if (typingSearch?.control === control && control.isConnected) typingSearch = null; }, 0);
     });
     queueMicrotask(() => {
       const last = typingSearch;
       if (!last || last.key !== key || last.control === control || last.control.isConnected || !control.isConnected) return;
-      const active = document.activeElement;
-      if (active && active !== document.body && active !== document.documentElement) return;
-      control.focus({preventScroll: true});
-      if (Number.isInteger(last.start)) control.setSelectionRange(last.start,
+      // The keystrokes that landed in the dead box come along: without this,
+      // a record that finishes loading mid-word eats what was typed into the
+      // box it replaced, and the search never hears about it. A box the
+      // reader left deliberately was already forgotten by its blur, so
+      // its render's fresh value stands instead.
+      const adopted = last.control.value !== control.value &&
+        performance.now() - (last.at || 0) < BOTTOM_SEARCH_ADOPT_MS;
+      if (adopted) {
+        control.value = last.control.value;
+        if (Number.isInteger(last.control.selectionStart)) control.setSelectionRange(
+          last.control.selectionStart, Number.isInteger(last.control.selectionEnd)
+            ? last.control.selectionEnd : last.control.selectionStart,
+          last.control.selectionDirection || "none");
+      } else if (Number.isInteger(last.start)) control.setSelectionRange(last.start,
         Number.isInteger(last.end) ? last.end : last.start, last.direction || "none");
-      remember();
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement)
+        control.focus({preventScroll: true});
+      typingSearch = {key, control, start: control.selectionStart,
+        end: control.selectionEnd, direction: control.selectionDirection,
+        at: adopted ? last.at : undefined};
+      // Last: if this render replaces the box again, the next box takes over
+      // from the remembered one with an equal value and only restores focus.
+      if (adopted) options.change?.(control.value);
     });
     control.addEventListener("compositionstart", () => {
       composing = true;
@@ -12634,6 +13101,9 @@ ${contents.path}`});
     return boundedBarrelCount(fallback, maximum);
   };
   // How many columns a page's details use: 1-6, or none saved for "fit".
+  // Shared-key migration runs once per base key per session; every path
+  // either marks (adopted, purged, or nothing dead) or retries later.
+  const migratedColumnKeys = new Set();
   const detailColumnsKey = options => `columns:${String(
     options.columnsKey || options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
   const readDetailColumns = key => {
@@ -12718,6 +13188,205 @@ ${contents.path}`});
     const fitted = template.replace(/minmax\(\s*[\d.]+px\s*,/gi, "minmax(0,");
     if (fitted !== template) node.style.setProperty("--lex-column-list-template", fitted);
     return node;
+  };
+
+  // Split a grid template into top-level tracks, keeping minmax()/max()
+  // argument lists whole. Shared by the heading fit and the barrel fit.
+  const splitTemplateTracks = base => {
+    const tracks = [];
+    let depth = 0, start = 0;
+    for (let index = 0; index <= base.length; index++) {
+      const character = base[index];
+      if (character === "(") depth++;
+      if (character === ")") depth--;
+      if (index === base.length || (!depth && /\s/.test(character))) {
+        if (index > start) tracks.push(base.slice(start, index));
+        start = index + 1;
+      }
+    }
+    return tracks;
+  };
+
+  // The content width of each barrel column, maxed across the barrels of
+  // one grid. No box here reports its content: the cell stretches to its
+  // track, the content box stretches to the cell, and even the truncating
+  // text span stretches past its text, so every scroll width reports the
+  // track back and any floor built on one ratchets to whatever width the
+  // barrel happened to have. A range over the span's text reports the text
+  // itself, clipped or not, plus the cell's padding. Fixed tracks report
+  // their used width from the header, which stretches to a constant.
+  // Content-sized tracks report the header at its min-content: headings wrap,
+  // so a long name holds its longest word, not the whole line.
+  const measureBarrelColumnWidths = grid => {
+    const lists = [...(grid?.querySelectorAll?.(":scope > .lex-column-list") || [])]
+      .filter(node => node.offsetParent);
+    if (!lists.length) return null;
+    const keys = lists.map(node =>
+      [...node.querySelectorAll(":scope > .lex-column-list-header:not(.lex-matrix-column-axis)"
+        + " > .lex-column-list-head-cell")].map(cell => cell.dataset.columnKey));
+    if (!keys[0].length || keys.some(sequence => sequence.join("\n") !== keys[0].join("\n"))) return null;
+    const templates = lists.map(node => splitTemplateTracks(
+      node.style.getPropertyValue("--lex-column-list-template")));
+    if (templates.some(tracks => tracks.length !== keys[0].length)) return null;
+    const contentSized = track => !/fr\b/.test(track)
+      && /\b(max-content|min-content|auto)\b/.test(track);
+    // Heads of content-sized tracks read at min-content (their longest word),
+    // not at the track they stretch to: the track holds the whole header line
+    // when room suffices, and reading it would size every column to its name
+    // instead of its values. One write batch, one read layout, one restore.
+    const minContentHeads = [];
+    lists.forEach((node, listIndex) => {
+      node.querySelectorAll(":scope > .lex-column-list-header:not(.lex-matrix-column-axis)"
+        + " > .lex-column-list-head-cell").forEach((head, index) => {
+        if (contentSized(templates[listIndex][index])) {
+          minContentHeads.push([head, head.style.width]);
+          head.style.width = "min-content";
+        }
+      });
+    });
+    const range = document.createRange();
+    const cellPad = index => {
+      const cell = lists[0].querySelectorAll(":scope > .lex-column-list-row"
+        + " > .lex-column-list-cell")[index];
+      if (!cell) return 0;
+      const style = getComputedStyle(cell);
+      return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    };
+    const widths = keys[0].map((_key, index) => {
+      let need = 0;
+      for (const node of lists) {
+        const track = templates[lists.indexOf(node)][index];
+        const head = node.querySelectorAll(":scope > .lex-column-list-header"
+          + " > .lex-column-list-head-cell")[index];
+        if (contentSized(track)) {
+          // A content-sized track is already as wide as its widest content,
+          // header included, so the header box reports it directly. Body
+          // ranges alone undercount columns whose heading outruns their
+          // values, and the floor then says "fits" while the boxes overflow.
+          if (head) need = Math.max(need, head.getBoundingClientRect().width);
+        } else if (!/fr\b/.test(track)) {
+          // A grow track absorbs, so it wants its content like any other;
+          // only a truly fixed track reports its used width.
+          if (head) need = Math.max(need, head.getBoundingClientRect().width);
+          continue;
+        }
+        // Filler rows draw the grid below a short barrel; they hold no
+        // values, only a zero-width space outside any text span, so the
+        // fallback below would read their stretched box - the track width
+        // itself - and every refit would feed the last width back as content.
+        node.querySelectorAll(":scope > .lex-column-list-row:not(.lex-filler-row)").forEach(row => {
+          const cell = row.querySelectorAll(":scope > .lex-column-list-cell")[index];
+          if (!cell) return;
+          const spans = cell.querySelectorAll(":scope .lex-column-cell-text");
+          if (spans.length) {
+            spans.forEach(span => {
+              range.selectNodeContents(span);
+              need = Math.max(need, range.getBoundingClientRect().width);
+            });
+          } else {
+            const inner = cell.firstElementChild;
+            if (inner) {
+              // A block or flex child stretches to its track, so its box -
+              // and a range over the element, which covers the stretched box
+              // - reports the track back, and any floor built on it ratchets
+              // a little wider every refit. Text nodes do not stretch: union
+              // the rendered text with any replaced content. Only a child
+              // with neither (a fixed icon) reports its box.
+              let left = Infinity, right = -Infinity;
+              const walker = document.createTreeWalker(inner, NodeFilter.SHOW_TEXT);
+              let textNode = walker.nextNode();
+              while (textNode) {
+                if (textNode.textContent.trim()) {
+                  range.selectNodeContents(textNode);
+                  const box = range.getBoundingClientRect();
+                  if (box.width > 0) {
+                    left = Math.min(left, box.left);
+                    right = Math.max(right, box.right);
+                  }
+                }
+                textNode = walker.nextNode();
+              }
+              for (const replaced of inner.querySelectorAll("img,svg,canvas,video")) {
+                const box = replaced.getBoundingClientRect();
+                if (box.width > 0) {
+                  left = Math.min(left, box.left);
+                  right = Math.max(right, box.right);
+                }
+              }
+              need = Math.max(need, right > left ? right - left : inner.getBoundingClientRect().width);
+            }
+          }
+        });
+      }
+      // Two pixels of slack, the way the heading fit adds two: ranges,
+      // padding and grid shares all round, and a single sub-pixel of
+      // overflow still draws an ellipsis.
+      return Math.ceil(need + (need > 0 ? cellPad(index) + 2 : 0));
+    });
+    for (const [head, width] of minContentHeads) head.style.width = width;
+    const style = getComputedStyle(lists[0]);
+    const pad = ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"]
+      .reduce((sum, prop) => sum + (parseFloat(style[prop]) || 0), 0);
+    return {lists, keys: keys[0], templates, widths, pad};
+  };
+
+  // Barrels of one table share their columns, so they share their column
+  // widths: each barrel used to fit its own rows, and one barrel holding a
+  // long value ("Split archive" in Kind) squeezed its other columns while
+  // its neighbours stayed wide. Every content-sized track takes the widest
+  // body content found in ANY barrel, so the columns line up across barrels.
+  // Fixed and grow tracks are untouched: the grow column still absorbs.
+  // A font that lands late re-metrics every column: re-fit all barrels
+  // after each font batch, not only the first. Ready fires once no matter
+  // how many batches arrive after it; without this a late swap leaves
+  // floors measured in the fallback font behind.
+  let barrelFontWatcher = false;
+  const watchBarrelFonts = () => {
+    if (barrelFontWatcher || !document.fonts?.addEventListener) return;
+    barrelFontWatcher = true;
+    document.fonts.addEventListener("loadingdone", () => {
+      requestAnimationFrame(() => {
+        for (const grid of document.querySelectorAll(".lex-barrel-grid")) {
+          if (!grid.isConnected) continue;
+          unifyBarrelTemplates(grid);
+          grid.closest(".lex-panel-layout")?.refreshLayout?.();
+        }
+      });
+    });
+  };
+
+  const unifyBarrelTemplates = grid => {
+    watchBarrelFonts();
+    const measured = measureBarrelColumnWidths(grid);
+    if (!measured || measured.lists.length < 2) return;
+    const contentSized = track => !/fr\b/.test(track)
+      && /\b(max-content|min-content|auto)\b/.test(track);
+    if (!measured.templates[0].some(contentSized)) return;
+    measured.lists.forEach((node, listIndex) => {
+      const original = splitTemplateTracks(node.lexHeadingTemplate || "");
+      const next = measured.templates[listIndex].map((track, index) => {
+        // Flexible tracks align like content ones, floored at the shared body
+        // width, except the absorbent grow track (a zero minimum in the
+        // original template), which keeps truncating into the slack.
+        const frRange = /^minmax\((.*),\s*([\d.]+fr)\)$/.exec(track);
+        if (frRange) {
+          const originalMin = /^minmax\((.*),\s*[\d.]+fr\)$/.exec(original[index] || "")?.[1].trim();
+          if (originalMin === "0" || originalMin === "0px") return track;
+          const fittedMin = Math.max(0, ...[...frRange[1].matchAll(/([\d.]+)px/g)]
+            .map(match => parseFloat(match[1])));
+          return `minmax(${Math.max(measured.widths[index], Math.ceil(fittedMin))}px, ${frRange[2].trim()})`;
+        }
+        // The shared body width floors the track; the track's own maximum is
+        // kept, so an auto maximum keeps yielding (and its header wrapping)
+        // where max-content would overflow instead.
+        if (!contentSized(track)) return track;
+        const range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
+        const maximum = range ? range[2].trim() : track.trim();
+        return `minmax(${measured.widths[index]}px, ${maximum})`;
+      }).join(" ");
+      if (node.style.getPropertyValue("--lex-column-list-template") !== next)
+        node.style.setProperty("--lex-column-list-template", next);
+    });
   };
 
   // A short final barrel used to simply stop, leaving its background drawn but
@@ -13131,20 +13800,63 @@ ${contents.path}`});
       element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(barrels)), increase));
     // COLUMNS mirrors BARRELS on the other side of the same divider: how many
     // columns the selected record's details flow into. Right-click: fit again.
-    // Each panel tab keeps its own column count: the key extends with the
-    // active tabs in the detail, outer to inner, so one item section and the
-    // next (or the GF's HP tab and its XP tab) can differ. Callers that show
-    // the same fields under several subtabs pass columnsKey to share one count
-    // across them, the way the property layout already does. Counts persist
-    // through the same saved preferences as before, one entry per tab.
+    // Without an explicit columnsKey each panel tab keeps its own column
+    // count: the key extends with the active tabs in the detail, outer to
+    // inner, so one item section and the next (or the GF's HP tab and its
+    // XP tab) can differ. Callers that show the same fields under several
+    // subtabs pass columnsKey to share one count across them, the way the
+    // property layout already does; the subtab path stays off that key.
     const columnsBaseKey = detailColumnsKey(options);
+    const sharedColumnsKey = Boolean(options.columnsKey);
+    const columnsPathNow = () => [...(detailNode?.querySelectorAll?.(".lex-subtab-bar") || [])]
+      .map(bar => bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab?.replace(/[^A-Za-z0-9_-]/g, "_"))
+      .filter(Boolean);
     const columnsKeyNow = () => {
-      const path = [...(detailNode?.querySelectorAll?.(".lex-subtab-bar") || [])]
-        .map(bar => bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab?.replace(/[^A-Za-z0-9_-]/g, "_"))
-        .filter(Boolean);
+      if (sharedColumnsKey) return columnsBaseKey;
+      const path = columnsPathNow();
       return path.length ? `${columnsBaseKey}:${path.join(":")}` : columnsBaseKey;
     };
+    // A count saved under an older per-subtab key moves up to the shared
+    // key once: the current subtab's wins, else the largest dead one (a
+    // real count beats a fitted guess), and the dead per-subtab keys go
+    // away from every store. Fresh readers with no saved count keep the
+    // fitted default: nothing is written for them.
+    const migrateSharedColumns = () => {
+      if (!sharedColumnsKey || migratedColumnKeys.has(columnsBaseKey))
+        return readDetailColumns(columnsBaseKey);
+      const prefix = `${columnsBaseKey}:`;
+      const dead = new Set();
+      try {
+        for (let index = 0; index < localStorage.length; index++) {
+          const candidate = localStorage.key(index);
+          if (candidate?.startsWith(`lexeditor:${prefix}`))
+            dead.add(candidate.slice("lexeditor:".length));
+        }
+      } catch (_error) {}
+      for (const candidate of Object.keys(sharedSettingsSnapshot?.viewPreferences || {}))
+        if (candidate.startsWith(prefix)) dead.add(candidate);
+      if (!dead.size) {
+        migratedColumnKeys.add(columnsBaseKey);
+        return readDetailColumns(columnsBaseKey);
+      }
+      const shared = readDetailColumns(columnsBaseKey);
+      if (shared) {
+        for (const key of dead) saveDetailColumns(key, 0);
+        migratedColumnKeys.add(columnsBaseKey);
+        return shared;
+      }
+      const path = columnsPathNow();
+      if (!path.length) return 0;
+      let adopted = readDetailColumns(`${columnsBaseKey}:${path.join(":")}`);
+      if (!adopted) for (const key of dead)
+        adopted = Math.max(adopted, readDetailColumns(key));
+      if (adopted) saveDetailColumns(columnsBaseKey, adopted);
+      for (const key of dead) saveDetailColumns(key, 0);
+      migratedColumnKeys.add(columnsBaseKey);
+      return adopted;
+    };
     let columnsKey = columnsKeyNow();
+    migrateSharedColumns();
     let chosenColumns = readDetailColumns(columnsKey);
     const shownColumns = () => {
       // Every visible column counts, empty ones included: they still take
@@ -13167,6 +13879,7 @@ ${contents.path}`});
     });
     const showColumnCount = () => {
       columnsKey = columnsKeyNow();
+      migrateSharedColumns();
       chosenColumns = readDetailColumns(columnsKey);
       const count = shownColumns();
       columnTally.textContent = String(count);
@@ -13233,12 +13946,23 @@ ${contents.path}`});
     // place instead of the whole page, leaving the detail pane, its focus
     // and scroll, and its giant dropdowns, alone.
     root.refreshMaster = () => {
+      masterNodes[0]?.__lexFitListObserver?.disconnect?.();
       const scrollers = [masterNode, barrelGrid, ...masterNodes];
       const scroll = scrollers.map(node => [node.scrollTop, node.scrollLeft]);
       masterNodes = buildMasters();
       barrelGrid.replaceChildren(...masterNodes);
       [masterNode, barrelGrid, ...masterNodes].forEach((node, index) => {
         if (node && scroll[index]) { node.scrollTop = scroll[index][0]; node.scrollLeft = scroll[index][1]; }
+      });
+      fitMasters();
+      // The new columns unify across barrels and the layout refits around
+      // them; heading fits registered during the build run first in the frame.
+      // Shares re-derive from the defaults, so unpinning releases the room
+      // pinning took instead of leaving the master stretched.
+      requestAnimationFrame(() => {
+        unifyBarrelTemplates(barrelGrid);
+        if (root.lexResetSizes) root.lexResetSizes();
+        else root.refreshLayout?.();
       });
     };
     root.refreshValues = () => { for (const node of masterNodes) node.refreshValues?.(); };
@@ -13442,7 +14166,10 @@ ${contents.path}`});
     window.addEventListener("lexeditor-settings-changed", event =>
       useSavedTableRows(event.detail), {once: true});
 
-    if (options.fit !== false && masterNodes[0]) {
+    // New barrels start without fitted rows, and their text falls back to
+    // the default size; a pin rebuild re-fits them from the cached geometry.
+    const fitMasters = () => {
+      if (options.fit === false || !masterNodes[0]) return;
       const fit = options.fit || {};
       const searchActive = Boolean(String(options.search?.value ?? options.search?.query ?? "").trim());
       fitListPage({
@@ -13495,7 +14222,20 @@ ${contents.path}`});
           applyResize();
         },
       });
-    }
+    };
+    fitMasters();
+    // Barrels line up their columns and ask for content width once laid
+    // out; heading fits registered during the build run first in the frame.
+    requestAnimationFrame(() => {
+      if (!barrelGrid.isConnected) return;
+      unifyBarrelTemplates(barrelGrid);
+      root.refreshLayout?.();
+    });
+    document.fonts?.ready.then(() => {
+      if (!barrelGrid.isConnected) return;
+      unifyBarrelTemplates(barrelGrid);
+      root.refreshLayout?.();
+    });
     return root;
   };
 
@@ -14368,7 +15108,8 @@ ${contents.path}`});
       const region = from ? regionOf(from) : null;
       const bar = (from && bars.find(node => node.contains(from)))
         || (region && bars.find(node => region.contains(node))) || bars[0];
-      const buttons = [...bar.querySelectorAll(".lex-subtab-button")].filter(node => shown(node) && !node.disabled);
+      const buttons = [...bar.querySelectorAll(".lex-subtab-button")]
+        .filter(node => shown(node) && !node.disabled && node.getAttribute("aria-disabled") !== "true");
       if (buttons.length < 2) return false;
       const index = buttons.findIndex(node => node.classList.contains("active"));
       const next = buttons[(Math.max(0, index) + step + buttons.length) % buttons.length];
@@ -14957,6 +15698,11 @@ ${contents.path}`});
           detailField({label: "AUTHOR", control: textControl(row, "author", "Author")}),
           detailField({label: "DESCRIPTION", control: textControl(row, "description", "Description", true)}),
           detailField({label: "CREDITS", control: textControl(row, "credits", "Credits", true)})]}),
+        ...((row.requirements?.length || row.requirementsError) ? [detailSection({title: "REQUIRES", body: [
+          ...(row.requirementsError ? [detailNote(row.requirementsError)] : []),
+          ...(row.requirements || []).map(need => detailField({label: need.name || need.id,
+            control: readonlyField(!need.installed ? "Not installed"
+              : need.enabled ? "Switched on" : "Switched off")}))]})] : []),
         detailSection({title: "SOURCE", body: [
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
           ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
@@ -15135,6 +15881,9 @@ ${contents.path}`});
             {key: "name", label: "Name", grow: 1, render: row => element("span", {class: row.remote ? "lex-mods-remote" : "lex-mods-name"},
               element("span", {class: "lex-mods-name-text"}, row.name), modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
+            {key: "version", label: "Version", width: "max-content", align: "center",
+              help: "The version the mod gives itself. A module you have not downloaded yet shows none.",
+              render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.version || "—")},
             {key: "on", label: "On", sortable: false, render: row => row.remote
               ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,
                   onclick: event => { event.stopPropagation(); selected = keyOf(row); draw();
@@ -15413,6 +16162,21 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     drawer.hidden = true;
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
     heading.after(drawer);
+    // The drawer covers the editing surface below the heading. Its grid
+    // row does that on grid panels, but a tabbed panel is flex, where
+    // the grid row means nothing and the drawer would cover the whole
+    // panel with the heading floating over its top rows. Pinning its top
+    // edge to the heading's measured bottom edge fits both.
+    const fitDrawer = () => {
+      if (!panel.classList.contains('lex-model-preview-open')) return;
+      const panelBox = panel.getBoundingClientRect();
+      const headBox = heading.getBoundingClientRect();
+      drawer.style.top = `${Math.max(0, headBox.bottom - panelBox.top)}px`;
+    };
+    if (typeof ResizeObserver === 'function') {
+      const headingWatch = new ResizeObserver(() => fitDrawer());
+      headingWatch.observe(heading);
+    }
 
     const snapshotSlot = () => {
       const box = icon.getBoundingClientRect();
@@ -15460,6 +16224,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         }
         drawer.hidden = false;
         panel.classList.add('lex-model-preview-open');
+        fitDrawer();
         lockIconSlot(frozenSlot);
         holdIconSlot(frozenSlot);
         icon.setAttribute('aria-expanded', 'true');
@@ -15509,7 +16274,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       }
     });
     window.addEventListener('resize', () => {
-      if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
+      if (!panel.classList.contains('lex-model-preview-open')) return;
+      fitDrawer();
+      if (!frozenSlot) return;
       releaseIconSlot();
       frozenSlot = snapshotSlot();
       lockIconSlot(frozenSlot);
@@ -15546,15 +16313,19 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       copy.getContext('2d')?.drawImage(canvas, 0, 0);
       return copy;
     }
-    // The picture, not the pin on its corner or a sound's play button.
+    // The picture, not the pin on its corner, a sound's play button, or
+    // a no-thumbnail placeholder: an empty preview has nothing to enlarge.
     const art = [...icon.querySelectorAll('img,svg,picture')]
-      .find(node => !node.hidden && !node.closest('.lex-column-pin,.lex-audio-play,.lex-no-image'));
+      .find(node => !node.hidden && !node.closest('.lex-column-pin,.lex-audio-play,.lex-no-image,.lex-no-thumbnail'));
     return art instanceof Element ? art.cloneNode(true) : null;
   };
   document.addEventListener('pointerover', event => {
     if (headerZoom) return;
     const icon = event.target.closest?.('.lex-detail-panel-icon');
     if (!icon || !icon.isConnected || icon.classList.contains('lex-model-preview-trigger')) return;
+    // A preview the game cannot supply states so on its icon; the mark
+    // stays unzoomable even when an inventory picture stands beside it.
+    if (icon.hasAttribute('data-lex-preview-state')) return;
     const art = headerZoomArt(icon);
     if (!art) return;
     const box = icon.getBoundingClientRect();
@@ -15591,12 +16362,16 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   window.addEventListener('scroll', closeHeaderZoom, true);
 
   // Local mirror of the glow matcher: this block keeps its own scope.
+  // It matches the canonical one above, both directions included.
   const stripPinPrefix = key => String(key ?? "").replace(/^pin:/, "");
   const glowSelector = key => {
     const raw = String(key ?? "");
     const base = stripPinPrefix(raw);
+    // The match runs both ways: a header carries its pin: prefix while
+    // its property does not, so an unprefixed key also matches the
+    // pinned column, and hovering the field lights its header back.
     const columns = raw === base
-      ? [`[data-column-key="${CSS.escape(raw)}"]`]
+      ? [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="pin:${CSS.escape(raw)}"]`]
       : [`[data-column-key="${CSS.escape(raw)}"]`, `[data-column-key="${CSS.escape(base)}"]`];
     return [...columns, `[data-lex-property="${CSS.escape(base)}"]`].join(",");
   };
@@ -15827,31 +16602,65 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // The common pass: the label that asked still fits at the size it has,
     // for the box, text and base it has now. Reads only, so the whole sweep
     // answers from one layout.
+    // A lane that fits its own box can still hog its field: the floor
+    // outlives the wide columns it was raised for, and the label's box is
+    // the floor, so "fits" never reopens the sweep on its own. Half the row
+    // reopens it; the sweep applies the narrowest row in the scope.
+    const floorOver = (pane, cap) => pane
+      && (parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0) > cap;
+    // Full size is preferred: a label left shrunk by narrow columns regrows
+    // while the floor has room under the cap. Without this the sweep kept a
+    // fitted-at-narrow size after widening, a downward ratchet to match the
+    // upward one the floor cap fixes.
+    const shrunkWithRoom = (label, pane, cap) => label.style.fontSize
+      && (parseFloat(pane?.style.getPropertyValue('--lex-detail-label-floor')) || 0) < cap - 1;
     if (hint instanceof HTMLElement && fieldLabelScope(hint) === scope &&
         !hint.parentElement?.classList.contains('lex-detail-field-stacked')) {
       const base = fieldLabelBase(hint);
-      if (fitted.get(hint) === scopedFieldKey(hint, base) && labelFits(hint)) return;
+      const hintPane = hint.closest('.lex-tweak-card-grid') || hint.parentElement?.parentElement;
+      const hintCap = (hint.parentElement?.clientWidth || 0) / 2;
+      if (!floorOver(hintPane, hintCap) && !shrunkWithRoom(hint, hintPane, hintCap)
+        && fitted.get(hint) === scopedFieldKey(hint, base) && labelFits(hint)) return;
     }
-    const labels = scopeFieldLabels(scope);
+    // Narrow columns stack their fields by container query, without the
+    // stacked class: the label spans the field instead of sharing the lane.
+    // Those labels take no part in the lane fit - an inline label never
+    // spans nine tenths of its row (the floor caps the lane at half of it).
+    // When every label is stacked the lane is unused and its floor clears.
+    const scoped = scopeFieldLabels(scope);
+    const labels = scoped.filter(label =>
+      label.clientWidth <= label.parentElement.clientWidth * 0.9);
+    if (scoped.length && !labels.length) {
+      const pane = scoped[0].closest('.lex-tweak-card-grid') || scoped[0].parentElement?.parentElement;
+      if (pane?.style.getPropertyValue('--lex-detail-label-floor'))
+        pane.style.removeProperty('--lex-detail-label-floor');
+      return;
+    }
     if (!labels.length) return;
     const base = fieldLabelBase(labels[0]);
-    if (labels.every(label => fitted.get(label) === scopedFieldKey(label, base) && labelFits(label))) return;
+    const pane = labels[0].closest('.lex-tweak-card-grid') || labels[0].parentElement?.parentElement;
+    const cap = Math.min(...labels.map(label => label.parentElement.clientWidth)) / 2;
+    if (!floorOver(pane, cap) && !labels.some(label => shrunkWithRoom(label, pane, cap))
+      && labels.every(label => fitted.get(label) === scopedFieldKey(label, base) && labelFits(label))) return;
     labels.forEach(label => {
       label.style.fontSize = '';
       const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
       if (nameText) nameText.style.width = '';
     });
     // Names that all fit at full size keep it. Wrapping comes before
-    // shrinking, so a name that fits on two lines never shrinks for it.
+    // shrinking, so a name that fits on two lines never shrinks for it. The
+    // floor stays: they may fit thanks to it, and clearing here traded sets
+    // with the lane growth below for ever. Past the cap it lowers to the cap
+    // and the resize it causes refits from there.
     if (labels.every(labelFits)) {
-      labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
+      const floorNow = parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0;
+      if (floorNow > cap) pane.style.setProperty('--lex-detail-label-floor', `${Math.ceil(cap)}px`);
+      else labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
       return;
     }
     // A name that only fits on three lines asks for the room first: the
     // lane grows to lay every name out on at most two lines at full size,
     // capped at half the row. Past the cap the shrink below applies.
-    const pane = labels[0].closest('.lex-tweak-card-grid') || labels[0].parentElement?.parentElement;
-    const cap = Math.min(...labels.map(label => label.parentElement.clientWidth)) / 2;
     if (pane && cap > 0) {
       const needy = labels.filter(label => !labelFits(label));
       let need = 0;
@@ -15863,13 +16672,19 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         for (const label of needy) need = Math.max(need, needTwoLines(label));
         needy.forEach(label => { label.style.whiteSpace = ''; });
       }
+      // The floor follows the cap down as well as the need up: it was
+      // only ever raised, so a lane widened for wide columns kept hogging
+      // after the reader narrowed them past it.
       const floor = Math.min(cap, need);
-      if (floor > (parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0)) {
-        pane.style.setProperty('--lex-detail-label-floor', `${Math.ceil(floor)}px`);
-        if (labels.every(labelFits)) {
-          labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
-          return;
-        }
+      const floorNow = pane.style.getPropertyValue('--lex-detail-label-floor');
+      const floorWant = floor > 0 ? `${Math.ceil(floor)}px` : '';
+      if (floorWant !== floorNow) {
+        if (floorWant) pane.style.setProperty('--lex-detail-label-floor', floorWant);
+        else pane.style.removeProperty('--lex-detail-label-floor');
+      }
+      if (labels.every(labelFits)) {
+        labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
+        return;
       }
     }
     let size = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
@@ -15884,9 +16699,15 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         // Stats). The pane's lane grows just enough (framework.css), so every
         // name in it keeps one edge.
         const pane=label.closest('.lex-tweak-card-grid')||label.parentElement?.parentElement;
-        const need=Math.ceil(label.scrollWidth+1);
+        // Capped at half the narrowest row like the floor above: an uncapped
+        // word here took the whole field in narrow columns. The clipped
+        // remainder stays reachable on hover; the title is always true, so it
+        // is never cleared.
+        const need=Math.min(cap,Math.ceil(label.scrollWidth+1));
         if(pane&&need>(parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor'))||0))
           pane.style.setProperty('--lex-detail-label-floor',`${need}px`);
+        const titleText=label.querySelector(':scope > .lex-detail-field-label-text');
+        if(titleText&&!label.title)label.title=titleText.textContent.trim();
       }
       // A wrapped name's box is as wide as its lane, not its longest line, so
       // in a lane widened for a neighbour the help mark sat far past "Crit /

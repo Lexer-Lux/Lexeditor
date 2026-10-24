@@ -2,7 +2,8 @@
 
 Every texture file row carries its first texture as a loaded icon, the
 way item rows carry their pictures. Split archives have no per-texture
-preview, so their rows keep the word Archive and no icon.
+preview, so their rows keep the word Archive and no icon. A blank
+texture tile shows no picture at all, just the name with a blank note.
 """
 import struct
 import sys
@@ -104,15 +105,14 @@ def main():
                         'split archives have no per-texture preview'
                     assert 'Split archive' in archive.inner_text()
                     page.evaluate(f'navigate("textures", "files", "Asset:{BLANK}")')
-                    page.wait_for_selector('.ds1-texture-tile img')
+                    page.wait_for_selector('.ds1-texture-tile')
                     tile = page.locator('.ds1-texture-tile')
                     page.wait_for_function(
                         "document.querySelector('.ds1-texture-tile').classList.contains"
                         "('ds1-texture-blank')")
                     assert tile.count() == 1, tile.count()
                     assert 'blank' in tile.locator('.ds1-texture-name').inner_text()
-                    box = tile.locator('img').bounding_box()
-                    assert box['width'] < 64, box
+                    assert tile.locator('img').count() == 0
                     assert not errors, f'page errors: {errors[:3]}'
                 finally:
                     browser.close()

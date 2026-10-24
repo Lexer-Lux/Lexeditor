@@ -1,10 +1,11 @@
-"""Model and icon IDs pick visually: thing finder and gallery.
+"""Model and icon IDs pick visually: face, thing finder and gallery.
 
-Lexer: Model and Icon IDs were bare sliders on storage ranges. A Model
-ID now earns the shared thing finder: the Models tab's binders of its
-piece become hold-to-choose candidates, and the binder's number writes
-back into the ID. Icon IDs choose from a gallery of every menu icon.
-Neither draws a slider: IDs are identifiers, not quantities.
+Lexer: a cross-tab ID is a hoverable face plus a finder button, like a
+record link. A Model ID names its parts binder and earns the shared
+thing finder: the Models tab's binders of its piece become
+hold-to-choose candidates, and the binder's number writes back into
+the ID. Icon IDs choose from a gallery of every menu icon. Neither
+keeps a number box; an ID with no file stays a plain ranged number.
 """
 import sys
 import tempfile
@@ -78,13 +79,20 @@ def main():
                     page.locator('.lex-column-list .lex-list-row', has_text='Item 100').click()
                     pinned(page, 'EquipParamWeapon', 100)
                     page.locator('.lex-tabbed-panel [data-subtab="appearance"]').click()
-                    page.wait_for_selector('input[data-field-key="equipModelId"]')
-                    # IDs carry no bounds, so no slider; other numbers keep theirs.
+                    page.wait_for_selector('.ds1-asset-face[data-field-key="equipModelId"]')
+                    # Faces replace the number boxes; other numbers keep sliders.
                     for key in ('equipModelId', 'iconId'):
-                        control = page.locator(f'input[data-field-key="{key}"]')
-                        assert control.count() == 1, key
-                        assert control.evaluate('node => node.getAttribute("min")') is None, key
-                        assert control.evaluate('node => node.getAttribute("max")') is None, key
+                        assert page.locator(
+                            f'input[data-field-key="{key}"]').count() == 0, key
+                        face = page.locator(f'.ds1-asset-face[data-field-key="{key}"]')
+                        assert face.count() == 1, key
+                    model_face = page.locator(
+                        '.ds1-asset-face[data-field-key="equipModelId"] .lex-hoverable')
+                    assert 'WP_A_0100.partsbnd.dcx' in model_face.inner_text()
+                    icon_face = page.locator(
+                        '.ds1-asset-face[data-field-key="iconId"] .lex-hoverable')
+                    assert 'Icon 5' in icon_face.inner_text()
+                    assert icon_face.locator('img.lex-hoverable-icon').count() == 1
                     assert page.locator(
                         '.lex-detail-panel input[type="number"][min]').count() > 0
                     # The icon gallery lists the menu catalog and commits a choice.

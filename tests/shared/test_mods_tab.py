@@ -16,6 +16,10 @@ HOST = """(options) => {
      script: {schema: {fields: [{key: 'amount', label: 'Amount', type: 'int', default: 1, min: 0, max: 9}]},
               values: {amount: 3}, error: ''}, error: '', remote: false},
   ];
+  if (options.versions) rows[0].version = '1.2';
+  if (options.requires) rows[1].requirements = [
+    {id: 'Mine', name: 'Mine', installed: true, enabled: true},
+    {id: 'Ghost', name: '', installed: false, enabled: false}];
   if (options.bundle) rows.push(
     {path: 'C:/lib/game/Collection', folder: 'Collection', name: 'Collection', author: 'Me', description: '', credits: '',
      version: '', missing: [], enabled: true, order: 3, lexmod: null, script: null, error: '', remote: false,
@@ -114,10 +118,12 @@ HOST = """(options) => {
 }"""
 
 
-def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False, projects=False):
+def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False, projects=False,
+          requires=False, versions=False):
     framework(page)
     page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
-                       "alerts": alerts, "bundle": bundle, "save": save, "projects": projects})
+                       "alerts": alerts, "bundle": bundle, "save": save, "projects": projects, "requires": requires,
+                       "versions": versions})
     page.wait_for_timeout(250)
 
 
@@ -155,6 +161,25 @@ def test_the_table_lists_mods_then_downloadable_modules_and_edits_details(page):
     page.get_by_role("checkbox", name="Mine enabled").uncheck()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
     assert calls(page, "set_mod_enabled")[-1][1:] == ["C:/lib/game/Mine", False]
+
+
+def test_version_gets_its_own_column(page):
+    mount(page, versions=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    heads = page.locator(
+        ".lex-mods-page .lex-barrelled-master .lex-column-list-head-cell").all_inner_texts()
+    assert any(head.startswith("Version") for head in heads), heads
+    table = page.locator(".lex-mods-page .lex-barrelled-master")
+    mine = table.locator(".lex-column-list-row", has_text="Mine").locator(
+        '.lex-column-list-cell[data-column-key="version"]')
+    assert mine.inner_text().strip() == "1.2"
+    combat = table.locator(".lex-column-list-row", has_text="Combat").locator(
+        '.lex-column-list-cell[data-column-key="version"]')
+    assert combat.inner_text().strip() == "—"
+    extra = table.locator(".lex-column-list-row", has_text="Extra").locator(
+        '.lex-column-list-cell[data-column-key="version"]')
+    assert extra.inner_text().strip() == "—"
 
 
 def test_mods_reorder_with_alt_arrow_keys(page):
@@ -840,3 +865,24 @@ def test_mods_files_fill_the_tab_and_turn_with_the_wheel(page):
     page.wait_for_function(
         "document.querySelector('.lex-mod-contents .lex-column-list-row')"
         f".innerText === {before!r}")
+def test_detail_shows_what_mods_the_mod_requires(page):
+    # Lexer: the Details panel under Mods should show what mods that mod
+    # requires. Each need names its mod and says whether it is on, off,
+    # or not installed; a mod with no needs shows no section.
+    mount(page, requires=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row").filter(
+        has_text="Combat").click()
+    section = page.locator(".lex-mods-page .lex-detail-section", has_text="REQUIRES")
+    section.wait_for()
+    fields = section.locator(".lex-detail-field")
+    assert fields.count() == 2
+    assert "Mine" in fields.nth(0).inner_text()
+    assert fields.nth(0).locator("input").input_value() == "Switched on"
+    assert "Ghost" in fields.nth(1).inner_text()
+    assert fields.nth(1).locator("input").input_value() == "Not installed"
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row").filter(
+        has_text="Mine").first.click()
+    page.wait_for_timeout(250)
+    assert page.locator(".lex-mods-page .lex-detail-section", has_text="REQUIRES").count() == 0

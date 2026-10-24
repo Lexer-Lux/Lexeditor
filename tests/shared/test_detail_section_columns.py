@@ -99,6 +99,57 @@ def test_section_drop_across_columns_moves_reading_order(page):
     assert page.evaluate(SECTIONS) == [["Drop 4", "Drop 1"], ["Drop 2", "Drop 3"]]
 
 
+EMPTY_COLUMN = """() => [...document.querySelectorAll('main .lex-tweaks-paged .lex-tweak-column')]
+  .findIndex(column => !column.querySelector('.lex-detail-section,.lex-detail-field'))"""
+
+FIELD_LANE = """() => {
+  const field = [...document.querySelectorAll('.lex-detail-field')]
+    .find(node => node.textContent.includes('three field 1'));
+  const columns = [...document.querySelectorAll('main .lex-tweaks-paged .lex-tweak-column')];
+  return columns.indexOf(field.closest('.lex-tweak-column'));
+}"""
+
+
+def test_section_drop_into_an_empty_column_pins_its_lane(page):
+    # Lexer: "when I create a new column it's empty... I try to move a
+    # header to that blank column... I can't." A page never deals more
+    # lanes than cards, so the blank lane comes from pins: Drop 4 joins
+    # Drop 1, vacating a lane, and Drop 3's header drops into it. The
+    # lane pins, and the arrangement survives a rebuild.
+    build(page)
+    set_columns(page, 4)
+    drag_section(page, "Drop 4", "Drop 1", after=True)
+    empty = page.evaluate(EMPTY_COLUMN)
+    assert empty >= 0
+    page.locator(".lex-detail-section-title", has_text="Drop 3").drag_to(
+        page.locator("main .lex-tweaks-paged .lex-tweak-column").nth(empty))
+    page.wait_for_timeout(250)
+    deal = page.evaluate(SECTIONS)
+    assert deal[empty] == ["Drop 3"], deal
+    assert page.evaluate(LANES).get("Drop 3") == empty
+    page.evaluate("() => window.__rebuildSections()")
+    page.wait_for_timeout(400)
+    assert page.evaluate(SECTIONS)[empty] == ["Drop 3"]
+
+def test_property_drop_into_an_empty_column_sticks_there(page):
+    # The same blank lane takes a property too: it goes loose there and
+    # the pin keeps it there across rebuilds.
+    build(page)
+    set_columns(page, 4)
+    drag_section(page, "Drop 4", "Drop 1", after=True)
+    empty = page.evaluate(EMPTY_COLUMN)
+    assert empty >= 0
+    page.locator(".lex-detail-field-label-text", has_text="three field 1").drag_to(
+        page.locator("main .lex-tweaks-paged .lex-tweak-column").nth(empty))
+    page.wait_for_timeout(250)
+    assert page.evaluate(FIELD_LANE) == empty
+    lanes = page.evaluate(LANES)
+    assert [lane for key, lane in lanes.items()
+            if key.startswith("field:") and lane == empty], lanes
+    page.evaluate("() => window.__rebuildSections()")
+    page.wait_for_timeout(400)
+    assert page.evaluate(FIELD_LANE) == empty
+
 def test_stranded_section_rejoins_the_deal_instead_of_vanishing(page):
     # A section the grid holds directly but the dealing dropped (a custom
     # section placed between deals, a re-attached tab shell) used to be

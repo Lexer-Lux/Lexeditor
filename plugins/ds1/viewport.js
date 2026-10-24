@@ -588,14 +588,15 @@ window.Ds1Viewport = (() => {
     fullyLoaded = true;
     return controller;
   }
-  // Read-only character view: bind-pose mesh, dummy points, the
-  // body's own hitbox, and one attack's hit slots as spheres and
-  // capsules. Points resolve on the enemy's own model; a slot that
-  // names a point the model lacks is reported, not drawn.
+  // Read-only character view: bind-pose mesh, the body's own
+  // hitbox, and one attack's hit slots as spheres and capsules. Only
+  // the dummies the viewed attack's slots name light up as dots;
+  // a slot that names a point the model lacks is reported, not drawn.
   async function mountChr(host, view, attackId, status) {
     stop(host);
     const mine = ++session;
     if (!host.isConnected || !view) return;
+    host.dataset.dots = "0";
     const chr = (view.chrs || []).find(entry => entry.available) || (view.chrs || [])[0];
     if (!chr) { status.textContent = `${view.name}: no placed character model.`; return; }
     if (!chr.available) { status.textContent = `${view.name}: ${chr.id} — ${chr.reason || "model unavailable"}.`; return; }
@@ -666,19 +667,54 @@ window.Ds1Viewport = (() => {
       tris += geo.index.count / 3;
     }
     const byId = new Map((chr.dummies || []).map(dummy => [dummy.id, new THREE.Vector3(dummy.pos[0], dummy.pos[1], dummy.pos[2])]));
+    const attack = (view.attacks || []).find(entry => entry.id === attackId);
+    // Green dots mark the viewed attack's anchors, not every model
+    // point: a dummy lights up only when one of the attack's slots
+    // names it, so an idle rig stays clean while a hitbox's ends show
+    // even when the slot itself has no size yet.
+    const wanted = new Set();
+    for (const slot of (attack && attack.slots) || []) {
+      if (typeof slot.first === "number") wanted.add(slot.first);
+      if (slot.shape === "capsule" && typeof slot.second === "number") wanted.add(slot.second);
+    }
+    const shown = [...byId].filter(([id]) => wanted.has(id));
+    const body = view.body || {};
     const box = new THREE.Box3();
     root.traverse(obj => { if (obj.isMesh) box.expandByObject(obj); });
-    for (const point of byId.values()) box.expandByPoint(point);
-    const size = box.isEmpty() ? 2 : box.getSize(new THREE.Vector3()).length();
+    for (const [, point] of shown) box.expandByPoint(point);
+    // The frame fits everything the stage shows: meshes, the viewed
+    // attack's anchors, its hitboxes, and the body capsule. Hitboxes
+    // count as bounds, or a lone anchor would frame to a point and
+    // park the camera inside the hitbox it was meant to show.
+    const pad = (center, radius) => {
+      box.expandByPoint(new THREE.Vector3(center.x - radius, center.y - radius, center.z - radius));
+      box.expandByPoint(new THREE.Vector3(center.x + radius, center.y + radius, center.z + radius));
+    };
+    for (const slot of (attack && attack.slots) || []) {
+      if (!slot.active) continue;
+      const first = byId.get(slot.first);
+      if (!first) continue;
+      pad(first, slot.radius);
+      if (slot.shape === "capsule") {
+        const second = byId.get(slot.second);
+        if (second) pad(second, slot.radius);
+      }
+    }
+    if (body.radius > 0 && body.height > 0) {
+      pad(new THREE.Vector3(0, body.offset || 0, 0), body.radius);
+      pad(new THREE.Vector3(0, (body.offset || 0) + body.height, 0), body.radius);
+    }
+    const span = box.isEmpty() ? 0 : box.getSize(new THREE.Vector3()).length();
+    const size = span < 1e-6 ? 2 : span;
     const dotGeo = new THREE.SphereGeometry(Math.max(size * 0.004, 0.005), 8, 8);
     const dotMat = new THREE.MeshBasicMaterial({color: 0x44dd66});
     trash.push(dotGeo, dotMat);
-    for (const point of byId.values()) {
+    for (const [, point] of shown) {
       const dot = new THREE.Mesh(dotGeo, dotMat);
       dot.position.copy(point);
       root.add(dot);
     }
-    const body = view.body || {};
+    host.dataset.dots = String(shown.length);
     let bodyShown = false;
     if (body.radius > 0 && body.height > 0) {
       const geo = new THREE.CapsuleGeometry(body.radius, Math.max(body.height - body.radius * 2, 0), 8, 16);
@@ -689,7 +725,6 @@ window.Ds1Viewport = (() => {
       root.add(capsule);
       bodyShown = true;
     }
-    const attack = (view.attacks || []).find(entry => entry.id === attackId);
     const hitMat = new THREE.MeshBasicMaterial({color: 0xff5533, transparent: true, opacity: 0.4, depthWrite: false});
     trash.push(hitMat);
     const up = new THREE.Vector3(0, 1, 0);
@@ -754,6 +789,7 @@ window.Ds1Viewport = (() => {
       renderer.forceContextLoss();
       canvas.remove();
       delete host.dataset.ready;
+      delete host.dataset.dots;
       for (const item of trash) item.dispose();
     };
     const loop = () => {

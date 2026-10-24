@@ -11,6 +11,7 @@ window.Ds1Anim = (() => {
       delete host.dataset.ready;
     }
     delete host._animBones;
+    delete host._animMotion;
   }
 
   async function get(url) {
@@ -36,9 +37,12 @@ window.Ds1Anim = (() => {
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
     if (mine !== session || !host.isConnected) { overlay.remove(); return; }
+    // The player base ships no model of its own, so its geometry fetch
+    // fails: that must not sink the mount, which falls back to the bare
+    // Havok skeleton below.
     const [skel, geo, frames] = await Promise.all([
       get(`/api/anim/skeleton?chr=${encodeURIComponent(chrId)}`),
-      get(`/api/chr/geometry?chr=${encodeURIComponent(chrId)}&skin=1`),
+      get(`/api/chr/geometry?chr=${encodeURIComponent(chrId)}&skin=1`).catch(() => null),
       get(`/api/anim/frames?chr=${encodeURIComponent(chrId)}&binder=${encodeURIComponent(motion.binder)}&anim=${encodeURIComponent(motion.file)}`),
     ]);
     if (mine !== session || !host.isConnected) { overlay.remove(); return; }
@@ -155,7 +159,7 @@ window.Ds1Anim = (() => {
       trash.push(textured);
       return textured;
     };
-    for (const mesh of geo.meshes) {
+    for (const mesh of geo?.meshes || []) {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
       g.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
@@ -269,6 +273,9 @@ window.Ds1Anim = (() => {
         for (const item of trash) item.dispose();
       },
     });
+    // The motion this viewer plays: event seeks land only while it
+    // matches the events scope, never onto an older motion's cues.
+    host._animMotion = `${chrId}|${motion.binder || ""}|${motion.file || ""}`;
   }
   return {mount, stop};
 })();

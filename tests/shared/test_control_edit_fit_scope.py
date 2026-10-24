@@ -50,6 +50,73 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
     assert result['markerScans'] == 0, result
 
 
+def test_reference_follows_its_value_size(page):
+    framework(page)
+    page.evaluate("""() => {
+      const U = LexeditorUI;
+      const input = U.el('input', {type: 'number', min: 0, max: 999999999, value: 123456789});
+      const field = U.detailField({label: 'Value', control: U.provenanceControl({control: input,
+        internal: true, current: () => Number(input.value), vanilla: 25,
+        apply: v => { input.value = v; }})});
+      const main = document.querySelector('main');
+      main.replaceChildren(U.detailSection({title: 'Narrow', body: [field]}));
+      main.style.width = '120px';
+    }""")
+    page.wait_for_function("document.querySelector('input').style.fontSize !== ''")
+    page.wait_for_timeout(300)
+    sizes = page.evaluate("""() => {
+      const input = document.querySelector('input');
+      const overlay = document.querySelector('.lex-source-control-internal > .lex-reference-values');
+      const text = overlay.querySelector('.lex-reference-text');
+      return {input: input.style.fontSize, overlay: overlay.style.fontSize,
+        text: getComputedStyle(text).fontSize, natural: getComputedStyle(document.body).fontSize};
+    }""")
+    assert sizes['input'] and sizes['input'] == sizes['overlay'], sizes
+    assert float(sizes['input'].replace('px', '')) < float(sizes['natural'].replace('px', '')), sizes
+    assert float(sizes['text'].replace('px', '')) <= float(sizes['input'].replace('px', '')), sizes
+
+
+def test_removed_dragger_releases_scope_survivors(page):
+    framework(page)
+    page.evaluate("""() => {
+      const U = LexeditorUI;
+      const make = value => U.detailField({label: 'Value', dataType: 'INT', min: 0, max: 255,
+        control: U.el('input', {type: 'number', min: 0, max: 255, value})});
+      const main = document.querySelector('main');
+      main.replaceChildren(U.detailSection({title: 'Scope', body: [make('7'), make('12')]}));
+      main.style.width = '300px';
+    }""")
+    page.wait_for_function(
+        "document.querySelectorAll('input').length === 2 && "
+        "[...document.querySelectorAll('input')].every(i => i.style.fontSize !== '')")
+    page.wait_for_timeout(300)
+    natural = page.evaluate(
+        "[...document.querySelectorAll('input')].map(i => getComputedStyle(i).fontSize)")
+    page.evaluate("""() => {
+      const U = LexeditorUI;
+      const section = document.querySelector('.lex-detail-section');
+      const field = U.detailField({label: 'Dragger',
+        control: U.el('input', {type: 'text', value: '9'.repeat(60)})});
+      section.append(field);
+      // Text boxes do not self-register; the suite registers this one.
+      U.autoFitControlText(field.querySelector('input'), {minimum: 8});
+    }""")
+    page.wait_for_function(
+        "[...document.querySelectorAll('input')].every(i => parseFloat(getComputedStyle(i).fontSize) < 10)")
+    dragged = page.evaluate(
+        "[...document.querySelectorAll('input')].map(i => getComputedStyle(i).fontSize)")
+    assert all(size != natural[0] for size in dragged), (natural, dragged)
+    page.evaluate("""() => {
+      const inputs = [...document.querySelectorAll('input')];
+      inputs[inputs.length - 1].closest('.lex-detail-field').remove();
+    }""")
+    page.wait_for_function(
+        f"[...document.querySelectorAll('input')].every(i => getComputedStyle(i).fontSize === '{natural[0]}')",
+        timeout=10000)
+    assert page.evaluate(
+        "[...document.querySelectorAll('input')].map(i => getComputedStyle(i).fontSize)") == natural
+
+
 def test_loaded_font_refits_controls_and_mounted_reference_rails(page):
     pending=[]
     page.route('http://fixture/probe-font.ttf', lambda route: pending.append(route))

@@ -135,6 +135,12 @@ def main():
                     field=page.locator('[data-field-key="atkPhys"]:visible')
                     field.fill('321'); field.press('Tab')
                     page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="atkPhys").value===321')
+                    assert 'Physical (%)' in page.evaluate('state.row.fields.find(f=>f.key==="atkPhys").label')
+                    assert 'Motion values' in page.evaluate('state.row.fields.find(f=>f.key==="atkPhys").group')
+                    preview_html=page.evaluate('(id)=>attackPreview(id,"AtkParam_Pc").then(n=>n.outerHTML)',arg=pc_attack)
+                    assert 'motion value' in preview_html and 'Physical (%)' in preview_html
+                    page.evaluate('(id)=>openAttack(id,"AtkParam_Pc")',arg=pc_attack)
+                    page.wait_for_function('(id)=>state.tab==="attacks" && state.sub==="player-attacks" && state.selected===`AtkParam_Pc:${id}`',arg=pc_attack)
                     if output: page.screenshot(path=str(output/'attacks-player.png'))
                     box.click(); box.press('ControlOrMeta+a'); box.press('Backspace')
                     page.locator('[data-subtab="projectiles"]').click()
@@ -150,7 +156,7 @@ def main():
                     control.fill(str(int(value)) if value.is_integer() else str(value)); control.press('Tab')
                     page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',arg={'key':key,'value':value})
                     if output: page.screenshot(path=str(output/'attacks-projectiles.png'))
-                    for table,key,value in [('AtkParam_Npc','atkPhys',10000),('AtkParam_Npc','atkAttribute',5),('AtkParam_Npc','atkPhysCorrection',1),('Bullet','sfxId_Hit',1),('AtkParam_Pc','atkPhys',10000),('AtkParam_Pc','atkPhysCorrection',1)]:
+                    for table,key,value in [('AtkParam_Npc','atkPhys',10000),('AtkParam_Npc','atkAttribute',5),('Bullet','sfxId_Hit',1),('AtkParam_Pc','atkPhys',10000),('AtkParam_Npc','atkPhysCorrection',60001),('AtkParam_Pc','atkMagCorrection',-1)]:
                         try:
                             request_json(session.url+'api/edit',{'table':table,'id':first_attack,'field':key,'value':value})
                             raise AssertionError('Invalid edit accepted')

@@ -12,7 +12,7 @@ from pathlib import Path
 import threading
 import time
 
-from core import bundled_mods, lexmods, mod_metadata, script_mods
+from core import bundled_mods, lexmods, mod_metadata, mod_requires, script_mods
 from core.mod_library import metadata
 
 CATALOG_TTL = 600
@@ -146,6 +146,15 @@ def catalog(repository: str, *, fresh: bool = False) -> dict:
 def overview(game_root: Path, repository: str) -> dict:
     """Everything the Mods tab lists: local mods first, then downloadable ones."""
     rows = library_rows(game_root)
+    wanted = mod_requires.table(game_root)
+    for row in rows:
+        try:
+            entry = wanted.get(str(Path(row["path"]).resolve()), {})
+        except OSError:
+            entry = {}
+        row["requirements"] = entry.get("needs", [])
+        if entry.get("error"):
+            row["requirementsError"] = entry["error"]
     result = {"rows": rows, "remote": [], "lexmod": None}
     if not repository:
         return result

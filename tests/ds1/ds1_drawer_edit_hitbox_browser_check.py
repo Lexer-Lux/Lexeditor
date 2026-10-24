@@ -1,4 +1,4 @@
-"""DS1 Model tab: the viewed attack's hitboxes open for editing in Attacks."""
+"""DS1 enemy drawer: the viewed attack's hitboxes open for editing in Attacks."""
 import sys
 import tempfile
 from pathlib import Path
@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-model-edit-') as folder:
+    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-drawer-edit-') as folder:
         temp = Path(folder)
         game, mod = temp / 'game', temp / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
@@ -47,11 +47,13 @@ def main():
                     row.click()
                     page.wait_for_function(
                         "state.row && `${state.row.table}:${state.row.id}` === 'NpcParam:251000'")
-                    page.locator('.lex-tabbed-panel [data-subtab="model"]').click()
-                    page.wait_for_selector('[data-chr-host] canvas', timeout=60000)
-                    attack = page.evaluate("state.chrAttack")
-                    assert attack, 'the model tab picked no attack'
-                    edit = page.get_by_role('button', name='Edit in Attacks')
+                    page.locator('.lex-detail-panel-heading .lex-model-preview-trigger').click()
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=60000)
+                    attack = page.evaluate(
+                        "fetch('/api/chr/view?npc=251000').then(r=>r.json()).then(v=>v.attacks[0].id)")
+                    assert attack, 'the drawer lists no attack'
+                    edit = page.locator('.lex-chr-viewer-fields').get_by_role(
+                        'button', name='in Attacks')
                     assert edit.count() == 1
                     edit.click()
                     page.wait_for_function(
@@ -67,7 +69,7 @@ def main():
                     browser.close()
         finally:
             session.stop()
-        print('DS1 Model tab: the viewed attack opens for editing in Attacks passed.')
+        print('DS1 enemy drawer: the viewed attack opens for editing in Attacks passed.')
 
 
 if __name__ == '__main__':

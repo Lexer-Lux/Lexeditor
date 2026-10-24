@@ -7,10 +7,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from ds1_fixture import make_archive
+from ds1_fixture import make_archive, make_menu_archive
 from ds1_stats_fixture import make_stats_archive, CURVE_ROWS, MATERIAL_ROWS, CHARA_ROWS
 from plugins.ds1.charainit import GIFT_FIELDS
-from plugins.ds1 import data_map
+from plugins.ds1 import data_map, texts
 from plugins.ds1.formats import (
     GRAPH_TABLE, STATS_FIELDS, STATS_SUBTABS, TABLES, FormatError, ItemDocument,
     schema, stats_fields,
@@ -47,7 +47,8 @@ def test_stats_subtabs_list_their_rows():
     document = ItemDocument(make_stats_archive())
     assert [entry[0] for entry in STATS_SUBTABS] == ['curves', 'weapon-upgrades',
                                                       'armor-upgrades', 'upgrade-materials',
-                                                      'starting-classes', 'starting-gifts']
+                                                      'starting-classes', 'starting-gifts',
+                                                      'levelup']
     curves = document.list_rows('curves')
     assert {row['id'] for row in curves} == set(CURVE_ROWS)
     assert all(row['table'] == GRAPH_TABLE for row in curves)
@@ -186,13 +187,13 @@ def test_state_reports_stats_tabs(tmp_path):
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 3),
         ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3),
-        ('starting-classes', 1), ('starting-gifts', 2)]
+        ('starting-classes', 1), ('starting-gifts', 2), ('levelup', 0)]
     game, mod = project(tmp_path / 'plain', make_archive())
     tabs = ItemStore(game, mod, False).state()['statsTabs']
     assert [(tab['id'], tab['count']) for tab in tabs] == [
         ('curves', 0),
         ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 0),
-        ('starting-classes', 0), ('starting-gifts', 0)]
+        ('starting-classes', 0), ('starting-gifts', 0), ('levelup', 0)]
 
 
 def test_data_map_points_curves_at_stats(tmp_path):
@@ -226,7 +227,7 @@ def test_service_row_sub_filters_stats_fields(tmp_path):
         assert [(tab['id'], tab['count']) for tab in request('/api/state')['statsTabs']] == [
             ('curves', 3),
             ('weapon-upgrades', 3), ('armor-upgrades', 3), ('upgrade-materials', 3),
-            ('starting-classes', 1), ('starting-gifts', 2)]
+            ('starting-classes', 1), ('starting-gifts', 2), ('levelup', 0)]
         assert {row['id'] for row in request('/api/table?tab=curves')['rows']} == set(CURVE_ROWS)
         full = request('/api/row?table=EquipParamWeapon&id=100')['row']
         assert {'properStrength', 'properAgility', 'properMagic', 'properFaith',
@@ -403,8 +404,12 @@ def test_class_edits_mirror_the_twin():
     assert reopened.value('CharaInitParam', 2000, 'npcPlayerDrawType') == 4
 
 
-def test_gifts_show_only_what_they_grant():
-    document = ItemDocument(make_stats_archive())
+def test_gifts_show_only_what_they_grant(tmp_path):
+    game, mod = project(tmp_path)
+    (game / texts.MENU_RELATIVE).parent.mkdir(parents=True)
+    (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive(extra={
+        texts.CLASS_DESCRIPTION_FILE: {132355: 'Divine holy water test.'}}))
+    document = ItemStore(game, mod, False).get()
     row = document.read_row('CharaInitParam', 2405,
                             only=stats_fields('starting-gifts', 'CharaInitParam'))
     assert {field['key'] for field in row['fields']} == set(GIFT_FIELDS)

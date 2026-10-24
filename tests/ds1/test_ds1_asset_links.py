@@ -37,7 +37,8 @@ def asset_links(document, table, row_id, game_root=None):
 def test_weapon_model_id_opens_its_parts_binder():
     document = ItemDocument(make_archive())
     put(document, 'EquipParamWeapon', 100, 'equipModelId', 100)
-    (entry,) = asset_links(document, 'EquipParamWeapon', 100)
+    (entry,) = [entry for entry in asset_links(document, 'EquipParamWeapon', 100)
+                if entry['field'] == 'equipModelId']
     assert entry['table'] == 'Asset'
     assert entry['id'] == 'parts/WP_A_0100.partsbnd.dcx'
     assert entry['tab'] == 'models'
@@ -50,7 +51,8 @@ def test_armor_model_id_opens_the_first_fit_binder():
     put(document, 'EquipParamProtector', 100, 'equipModelId', 100)
     put(document, 'EquipParamProtector', 100, 'equipModelCategory', 2)
     put(document, 'EquipParamProtector', 100, 'equipModelGender', 3)
-    (entry,) = asset_links(document, 'EquipParamProtector', 100)
+    (entry,) = [entry for entry in asset_links(document, 'EquipParamProtector', 100)
+                if entry['field'] == 'equipModelId']
     assert entry['id'] == 'parts/BD_M_0100.partsbnd.dcx'
     assert entry['tab'] == 'models'
 
@@ -82,14 +84,22 @@ def test_icon_id_opens_the_archive_holding_its_sheet(tmp_path):
     assert entries[0]['resolved']
 
 
-def test_icon_id_without_game_files_stays_unlinked(tmp_path):
+def test_icon_id_without_game_files_stays_unresolved(tmp_path):
     assert icons.icon_archive(None, 5) is None
     assert icons.icon_archive(tmp_path / 'empty', 5) is None
     assert icons.icon_archive(tmp_path / 'empty', 999999) is None
     document = ItemDocument(make_archive())
     put(document, 'EquipParamWeapon', 100, 'iconId', 5)
-    assert [entry for entry in asset_links(document, 'EquipParamWeapon', 100)
-            if entry['field'] == 'iconId'] == []
+    (entry,) = [entry for entry in asset_links(document, 'EquipParamWeapon', 100)
+                if entry['field'] == 'iconId']
+    assert entry['resolved'] is False
+    assert entry['name'] == 'Icon 5'
+    assert entry['tab'] == 'textures'
+    put(document, 'EquipParamWeapon', 100, 'iconId', 0)
+    (empty,) = [entry for entry in asset_links(document, 'EquipParamWeapon', 100)
+                if entry['field'] == 'iconId']
+    assert empty['resolved'] is False
+    assert empty['name'] == 'None' 
 
 
 def test_asset_links_leave_existing_links_alone():
@@ -98,40 +108,47 @@ def test_asset_links_leave_existing_links_alone():
     found = {entry['field']: entry
              for entry in document.read_row('EquipParamWeapon', 100)['recordLinks']}
     assert found['equipModelId']['kind'] == 'asset'
-    assert 'iconId' not in found
+    assert found['iconId']['resolved'] is False
     values, display = document.row_values('EquipParamWeapon', 100)
     assert values['equipModelId'] == 100
     assert 'equipModelId' not in display
 
 
-def test_asset_links_open_through_the_field_label():
+def test_asset_faces_open_their_targets():
+    # Lexer: a cross-tab ID is a hoverable face plus a finder button,
+    # like a record link; the label stays plain text.
     assert 'if(link.kind==="asset")return openAsset(link);' in EDITOR
     assert re.search(r"navigate\(link\.tab===\"textures\"\?\"textures\":\"models\",\"files\",`Asset:\$\{link\.id\}`\)",
                      EDITOR) is not None
+    assert 'function assetFaceControl(row,field,entry){' in EDITOR
     assert 'targetType:"ds1-asset"' in EDITOR
-    assert EDITOR.count('entry.kind!=="asset"') == 2
-    assert 'assetPreview(row,assetLink)' in EDITOR
+    assert 'activate:()=>openRecord(current)' in EDITOR
+    assert 'assetPreview(row,current)' in EDITOR
+    assert 'content:shown,targetType:"ds1-asset"' not in EDITOR
 
 
-def test_asset_faces_show_beside_their_numbers():
-    # The number input stays editable; the icon picture / binder name
-    # shows beside it, previews on hover and opens the file on click.
-    assert 'function assetFace(row,field,entry){' in EDITOR
-    assert 'class:"ds1-asset-field"' in EDITOR
-    assert '&key=${encodeURIComponent(field.key)}&v=${field.value}`' in EDITOR
-    assert 'targetLabel:`${entry.name} in Models`' in EDITOR
+def test_asset_faces_replace_their_number_inputs():
+    # The face names the file and opens it; no number sits beside it.
+    assert 'function assetFaceControl(row,field,entry){' in EDITOR
+    assert 'class:"ds1-asset-field"' not in EDITOR
+    assert 'function assetFace(row,field,entry){' not in EDITOR
+    assert '&key=${encodeURIComponent(field.key)}&v=${value}`' in EDITOR
+    assert 'targetLabel:`${current.name} in ${isIcon?"Textures":"Models"}`' in EDITOR
+    assert 'class:"ds1-unset-face"' in EDITOR
 
 
 def test_model_entries_carry_their_picker_type():
     document = ItemDocument(make_archive())
     put(document, 'EquipParamWeapon', 100, 'equipModelId', 100)
-    (entry,) = asset_links(document, 'EquipParamWeapon', 100)
+    (entry,) = [entry for entry in asset_links(document, 'EquipParamWeapon', 100)
+                if entry['field'] == 'equipModelId']
     assert entry['pick'] == 'ds1-model-EquipParamWeapon-WP_A'
     document = ItemDocument(make_archive())
     put(document, 'EquipParamProtector', 100, 'equipModelId', 100)
     put(document, 'EquipParamProtector', 100, 'equipModelCategory', 2)
     put(document, 'EquipParamProtector', 100, 'equipModelGender', 3)
-    (entry,) = asset_links(document, 'EquipParamProtector', 100)
+    (entry,) = [entry for entry in asset_links(document, 'EquipParamProtector', 100)
+                if entry['field'] == 'equipModelId']
     assert entry['pick'] == 'ds1-model-EquipParamProtector-BD'
 
 
@@ -161,6 +178,9 @@ def test_icon_gallery_lists_the_menu_catalog():
     assert 'ds1-icon-choice' in EDITOR
 
 
-def test_asset_ids_draw_no_slider():
-    assert '...(assetId?{}:{min:field.minimum,max:field.maximum})' in EDITOR
+def test_dead_model_ids_keep_their_sliders():
+    # Linked IDs have faces, not numbers; an unlinked ID is a plain
+    # number with its range back.
+    assert 'value:field.value,min:field.minimum,max:field.maximum' in EDITOR
+    assert 'const assetId=' not in EDITOR
     assert '...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})' in EDITOR
