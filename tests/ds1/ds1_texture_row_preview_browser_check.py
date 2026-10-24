@@ -1,9 +1,10 @@
-"""DS1 textures tab: rows show preview thumbnails, not just the word.
+"""DS1 textures tab: the pinned icon column previews each file.
 
-Every texture file row carries its first texture as a loaded icon, the
-way item rows carry their pictures. Split archives have no per-texture
-preview, so their rows keep the word Archive and no icon. A blank
-texture tile shows no picture at all, just the name with a blank note.
+Pinning the header preview adds the thumbnail column like any other
+pin: every texture file row then carries its first texture as a
+loaded icon. Split archives have no per-texture preview, so their
+rows keep the word Archive and no icon. A blank texture tile shows
+no picture at all, just the name with a blank note.
 """
 import struct
 import sys
@@ -89,6 +90,13 @@ def main():
                     page.locator('[data-tab="textures"]').click()
                     page.wait_for_function("state.tab==='textures'&&state.rows&&state.rows.length")
                     page.wait_for_selector('#main .lex-list-row')
+                    assert page.locator('#main .lex-list-row img').count() == 0, \
+                        'no icon column until the preview is pinned'
+                    page.locator('#main .lex-list-row').first.click()
+                    page.wait_for_function("state.row && !state.error")
+                    page.wait_for_timeout(300)
+                    page.locator('.lex-detail-panel-icon > .lex-column-pin').click(force=True)
+                    page.wait_for_timeout(400)
                     for relative in (TPF, DDS):
                         row = page.locator('#main .lex-list-row', has_text=relative)
                         assert row.count() == 1, f'{relative} listed'

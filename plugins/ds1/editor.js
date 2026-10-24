@@ -662,6 +662,9 @@ function commit(row,field,value,control,beforeOverride){
   }).catch(notify);
 }
 function describePinnedCell(propertyKey){
+  if(propertyKey==="icon")return{editable:false,label:"",sortable:false,
+    width:"var(--lex-fitted-row-height,36px)",
+    render:row=>state.tab==="textures"?textureIconCell(row):recordIconCell(row)};
   // Field shape is per table, not per row: effect options are global and
   // bounds come from the schema, so the open record describes every row.
   const field=(state.row?.fields||[]).find(item=>item.key===propertyKey);
@@ -1555,7 +1558,8 @@ function renderAssetDetail(){
     fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
     progress?el("span",{role:"status"},progress):null].filter(Boolean);
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
-  return detailPanel({title:row.name,actions:[assetUploadButton()],meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body});
+  return detailPanel({title:row.name,actions:[assetUploadButton()],meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body,
+    ...(state.tab==="textures"?{previewPin:{key:"icon",label:"Icon"}}:{})});
 }
 async function uploadAsset(target,file,refresh){
   if(state.assetBusy)return;
@@ -2101,6 +2105,7 @@ async function ds1PreviewTarget(table,id){
       return {reason:`${view.name} is assembled from armor, so there is no one model to preview.`};
     return {reason:`${view.name} has no character model.`};
   }
+  if(table==="Magic")return {reason:"Spells have no model to preview."};
   if(!["EquipParamWeapon","EquipParamProtector","EquipParamGoods","EquipParamAccessory"].includes(table))return null;
   const view=await api(`/api/parts/view?table=${encodeURIComponent(table)}&id=${id}`);
   if(!view.available)return {reason:view.reason||"The model file is not installed."};
@@ -2136,6 +2141,10 @@ function ds1PreviewReason(panel,table,id,reason){
   heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason,
     "data-lex-preview-state":"unavailable"},LexeditorUI.iconSlot({content:art})));
   heading.classList.remove("no-icon");
+  if(state.tab==="items"&&state.pagedView?.pinOwner){
+    const previewBox=heading.querySelector('.lex-detail-panel-icon');
+    if(previewBox)LexeditorUI.attachPreviewPin(previewBox,state.pagedView.pinOwner,"icon","Icon");
+  }
 }
 function ds1PreviewContent(target){
   const stage=LexeditorUI.modelStage({message:`Loading ${target.name}\u2026`});
@@ -2300,6 +2309,9 @@ function armDs1Preview(panel,table,id){
       openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
       content:()=>ds1PreviewContent(target),
       onClose:drawer=>{chrDrawerRefresh=null;window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
+    const previewBox=heading&&heading.querySelector('.lex-detail-panel-icon');
+    if(previewBox&&state.tab==="items"&&state.pagedView?.pinOwner)
+      LexeditorUI.attachPreviewPin(previewBox,state.pagedView.pinOwner,"icon","Icon");
   };
   // Detail panels mount after detail() returns, so a cached answer settles
   // on a microtask: settling synchronously would find a detached panel.
@@ -2511,10 +2523,8 @@ function renderItems(){
         if(!event?.shiftKey&&!event?.ctrlKey&&!event?.metaKey){state.selected=key(row);await loadDetail();}
         select(row,event);shell.refresh();},
       columns:(misc&&state.sub==="encumbrance")?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
-        state.tab==="items"?[{key:"icon",label:"",width:"var(--lex-fitted-row-height,36px)",sortable:false,render:row=>recordIconCell(row)},
-          {key:"name",label:"Name",sortable:true,grow:1}]:
-        state.tab==="textures"?[{key:"icon",label:"",width:"var(--lex-fitted-row-height,36px)",sortable:false,render:row=>textureIconCell(row)},
-          {key:"name",label:"Name",sortable:true,grow:1},
+        state.tab==="items"?[{key:"name",label:"Name",sortable:true,grow:1}]:
+        state.tab==="textures"?[{key:"name",label:"Name",sortable:true,grow:1},
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         state.tab==="sound"&&(state.sub==="sfx"||state.sub==="music")?[{key:"name",label:"Name",sortable:true,grow:1},
           {key:"bank",label:"Bank",sortable:true,render:row=>row.bank||""},

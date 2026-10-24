@@ -2000,6 +2000,8 @@
       options.icon ? element("div", {class: sound
         ? "lex-detail-panel-icon lex-detail-panel-icon-audio"
         : "lex-detail-panel-icon",
+        ...(options.previewPin ? {"data-lex-preview-pin": options.previewPin.key,
+          "data-lex-preview-pin-label": options.previewPin.label || "Icon"} : {}),
         // The record's picture can be pinned as a table column like any
         // property: its pin sits on the thumbnail's corner, and a right-click
         // on the thumbnail places or removes it.
@@ -11241,25 +11243,67 @@ ${contents.path}`});
     const editable = !!described?.editable && typeof owner.commitCell === "function";
     // A pin header reads as the developer last named it, here as in
     // the record's field: the rename store keys by shipped label.
-    const shipped = described?.label || entry.shipped || entry.label || entry.key;
+    const shipped = described?.label ?? entry.shipped ?? entry.label ?? entry.key;
     const labelKey = fieldLabelKey(shipped);
     const shown = () => savedLabel(labelKey, shipped);
     return {
       key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey,
         // The kind rides along so a game can swap the generic glyph for
         // its own art, the way DS1 label art replaces field glyphs.
-        "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown()) : shipped, sortable: true, pinnedProperty: entry.key,
+        "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown()) : shipped, sortable: described?.sortable !== false,
+      ...(described?.width ? {width: described.width} : {}), pinnedProperty: entry.key,
       sortValue: row => pinnedValue(row, entry.key) ?? "",
       numeric: described?.numeric === true,
       min: described?.minimum, max: described?.maximum, step: described?.step,
       choices: described?.choices || null,
       editValue: row => row?.values?.[entry.key] ?? "",
       edit: editable ? ((row, value) => owner.commitCell(row, entry.key, value)) : null,
-      render: row => {
+      render: described?.render || (row => {
         const shown = row?.display?.[entry.key] ?? pinnedValue(row, entry.key);
         return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
-      }};
+      })};
   });
+  const autoPinButton = (owner, key, label, icon) => {
+    const pinned = owner.store.pinned.some(entry => entry.key === key);
+    return element("button", {
+      type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`, "data-lex-control": "pin", "data-lex-auto-pin": "",
+      "data-lex-pin-column": key, "aria-pressed": String(pinned),
+      title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
+      "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
+      onclick: event => {
+        event.preventDefault(); event.stopPropagation();
+        const inserting = !owner.store.pinned.some(entry => entry.key === key);
+        owner.toggle(key, label, icon);
+        const button = event.currentTarget;
+        button.classList.toggle("pinned", inserting);
+        button.setAttribute("aria-pressed", String(inserting));
+        button.title = inserting ? `Hide ${label} in the table` : `Show ${label} in the table`;
+        button.setAttribute("aria-label", inserting ? `Unpin ${label} column` : `Pin ${label} column`);
+        if (inserting) refusePinWhenCrowded(button, () => {
+          owner.toggle(key, label, icon);
+          button.classList.toggle("pinned", false);
+          button.setAttribute("aria-pressed", "false");
+          button.title = `Show ${label} in the table`;
+          button.setAttribute("aria-label", `Pin ${label} column`);
+        });
+      },
+    }, pinIcon());
+  };
+  // A record's own picture pins as a table column through the same
+  // toggle as any property: the pin sits on the thumbnail's corner,
+  // and a right-click on the thumbnail places or removes it. The
+  // right-click stops here, so Developer Mode does not also add a
+  // section from the heading behind it.
+  const attachPreviewPin = (iconBox, owner, key, label) => {
+    if (!(iconBox instanceof Element) || !owner || !key) return null;
+    if (iconBox.querySelector(":scope > .lex-column-pin")) return iconBox.querySelector(":scope > .lex-column-pin");
+    const button = autoPinButton(owner, key, label || "Icon", "");
+    iconBox.append(button);
+    iconBox.addEventListener("contextmenu", event => {
+      event.preventDefault(); event.stopPropagation(); button.click();
+    });
+    return button;
+  };
   const autoPinDetail = (node, owner) => {
     for (const field of node.querySelectorAll(".lex-detail-field[data-lex-layout-field]")) {
       if (field.querySelector(".lex-column-pin")) continue;
@@ -11267,32 +11311,10 @@ ${contents.path}`});
       if (!box) continue;
       const key = field.dataset.lexLayoutField;
       const label = field.querySelector(".lex-detail-field-label-text")?.textContent?.trim() || key;
-      const icon = field.dataset.lexIcon || "";
-      const pinned = owner.store.pinned.some(entry => entry.key === key);
-      box.append(element("button", {
-        type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`, "data-lex-control": "pin", "data-lex-auto-pin": "",
-        "data-lex-pin-column": key, "aria-pressed": String(pinned),
-        title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
-        "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
-        onclick: event => {
-          event.preventDefault(); event.stopPropagation();
-          const inserting = !owner.store.pinned.some(entry => entry.key === key);
-          owner.toggle(key, label, icon);
-          const button = event.currentTarget;
-          button.classList.toggle("pinned", inserting);
-          button.setAttribute("aria-pressed", String(inserting));
-          button.title = inserting ? `Hide ${label} in the table` : `Show ${label} in the table`;
-          button.setAttribute("aria-label", inserting ? `Unpin ${label} column` : `Pin ${label} column`);
-          if (inserting) refusePinWhenCrowded(button, () => {
-            owner.toggle(key, label, icon);
-            button.classList.toggle("pinned", false);
-            button.setAttribute("aria-pressed", "false");
-            button.title = `Show ${label} in the table`;
-            button.setAttribute("aria-label", `Pin ${label} column`);
-          });
-        },
-      }, pinIcon()));
+      box.append(autoPinButton(owner, key, label, field.dataset.lexIcon || ""));
     }
+    const preview = node.querySelector?.(":scope > .lex-detail-panel-heading > .lex-detail-panel-icon[data-lex-preview-pin]");
+    if (preview) attachPreviewPin(preview, owner, preview.dataset.lexPreviewPin, preview.dataset.lexPreviewPinLabel || "Icon");
   };
 
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
@@ -13966,6 +13988,7 @@ ${contents.path}`});
       });
     };
     root.refreshValues = () => { for (const node of masterNodes) node.refreshValues?.(); };
+    root.pinOwner = options.columnPreferences ? null : pinOwner;
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];
@@ -16109,6 +16132,7 @@ ${contents.path}`});
 
 window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
+window.LexeditorUI.attachPreviewPin = attachPreviewPin;
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.

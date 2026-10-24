@@ -58,10 +58,10 @@ def test_ds1_wires_pinned_cells():
 
 def test_ds1_patches_rows_on_edit_and_repaints_only_the_table():
     source = ds1()
-    assert 'function patchRowValues(table,id,values,display){' in source
+    assert 'function patchRowValues(table,id,values,display,name,modified){' in source
     assert 'target.values=values;target.display=display||{};' in source
     assert 'else state.pagedView?.refreshValues?.();' in source
-    assert 'if(next.reason==="pins"&&state.pagedView?.refreshMaster)state.pagedView.refreshMaster();else render();' in source
+    assert 'if(next.reason==="pins"&&state.pagedView?.refreshMaster){state.pagedView.refreshMaster();ds1LabelArt(state.pagedView);}else render();' in source
 
 
 def test_ds1_lazy_fills_giant_dropdowns():

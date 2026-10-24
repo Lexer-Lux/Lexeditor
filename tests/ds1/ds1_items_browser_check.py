@@ -74,14 +74,20 @@ def main():
                         assert page.locator('.lex-column-list .lex-list-row').count() > 0
                         cells = page.locator('.lex-column-list .lex-list-row').first.evaluate(
                             'row=>row.children.length')
-                        assert cells == 2, (tab, cells)
+                        # No fixed icon column: thumbnails arrive through the
+                        # header preview's pin like any other column.
+                        assert cells == 1, (tab, cells)
                         if real_root:
+                            page.locator('.lex-detail-panel-icon > .lex-column-pin').click(force=True)
+                            page.wait_for_timeout(400)
                             done = ("()=>[...document.querySelectorAll("
                                 + "'.lex-column-list .lex-list-row img')].every(i=>i.complete)")
                             page.wait_for_function(done)
                             loaded = page.locator('.lex-column-list .lex-list-row img').evaluate_all(
                                 'imgs=>imgs.filter(img=>img.naturalWidth>0).length')
                             assert loaded > 0, (tab, loaded)
+                            page.locator('.lex-detail-panel-icon > .lex-column-pin.pinned').click(force=True)
+                            page.wait_for_timeout(400)
                         panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
                         if panel_tabs.count():
                             for index in range(panel_tabs.count()):
