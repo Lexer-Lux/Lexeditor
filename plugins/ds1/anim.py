@@ -18,10 +18,68 @@ from .tae import TaeError
 from .viewport import CHR_ID, _overlay, resolve_chr
 
 BINDER_NAME = re.compile(r'^[A-Za-z0-9_]+\.anibnd\.dcx$')
-MEMBER_NAME = re.compile(r'^[A-Za-z0-9_]+\.hkx$')
-ANIM_NAME = re.compile(r'^(a\d+)_(\d+)\.hkx$')
+MEMBER_NAME = re.compile(r'^[A-Za-z0-9_]+\.[Hh][Kk][Xx]$')
+ANIM_NAME = re.compile(r'^(a\d+)_(\d+)\.[Hh][Kk][Xx]$')
 SKELETONS = ('Skeleton.hkx', 'skeleton.hkx')
 MAX_BINDER = 512 * 1024 * 1024
+
+
+def _skel_member(names):
+    """The skeleton member's actual binder name. Most binders spell it
+    Skeleton.hkx, but bosses and DLC-era characters use SKELETON.HKX,
+    which an exact match misses. Exact-case spellings win."""
+    candidates = list(names) if isinstance(names, dict) else [m.name for m in names]
+    for want in SKELETONS:
+        if want in candidates:
+            return want
+    lowered = {name.lower(): name for name in candidates}
+    for want in SKELETONS:
+        if want.lower() in lowered:
+            return lowered[want.lower()]
+    return None
+
+
+def _chr_hkx_member(names, chr_id):
+    """The model binder's own rig (cXXXX.hkx), for characters whose
+    animation binder ships an empty skeleton file."""
+    want = f'{chr_id}.hkx'
+    candidates = list(names) if isinstance(names, dict) else [m.name for m in names]
+    if want in candidates:
+        return want
+    lowered = {name.lower(): name for name in candidates}
+    return lowered.get(want)
+
+
+def _chrbnd_path(game_root, project, chr_id):
+    relative = Path('chr') / f'{chr_id}.chrbnd.dcx'
+    own = _overlay(project, relative)
+    if own is not None:
+        return own
+    live = Path(game_root) / relative
+    return live if live.is_file() else None
+
+
+def _skeleton_source(game_root, project, chr_id, binders):
+    """(binder path, member name) of the character's Havok skeleton.
+
+    The animation binders carry it as Skeleton.hkx (or SKELETON.HKX);
+    when every one of them ships an empty skeleton file, the model
+    binder's own rig (cXXXX.hkx) is the skeleton instead. Both the
+    skeleton endpoint and the frame sampler resolve through here, so
+    the names the viewer poses are the bones the frames drive.
+    """
+    for _binder, path in binders:
+        docs, _broken = _parsed_binder(str(path), _stamp(path))
+        found = _skel_member(docs)
+        if found is not None and docs[found].skeletons:
+            return str(path), found
+    chrbnd = _chrbnd_path(game_root, project, chr_id)
+    if chrbnd is not None:
+        docs, _broken = _parsed_binder(str(chrbnd), _stamp(chrbnd))
+        found = _chr_hkx_member(docs, chr_id)
+        if found is not None and docs[found].skeletons:
+            return str(chrbnd), found
+    raise HkxError('No skeleton is installed')
 
 
 def _binder_path(game_root, project, binder):
@@ -110,13 +168,27 @@ def _parsed_binder(binder, stamp):
     plain, names = _open(binder)
     docs, broken = {}, {}
     for member in sorted(names):
-        if not member.endswith('.hkx'):
+        if not member.lower().endswith('.hkx'):
             continue
         try:
             docs[member] = HkxDocument(_entry(plain, names, binder, member))
         except HkxError as error:
             broken[member] = str(error)
     return docs, broken
+
+
+def _event_counts(taes):
+    """Event counts per (event file, animation index), for the list's
+    Events column. list_anims already carries each animation's count."""
+    counts = {}
+    for name, tae in (taes or {}).items():
+        try:
+            anims = tae.list_anims()
+        except (TaeError, ValueError):
+            continue
+        for anim in anims:
+            counts[(name, anim['index'])] = anim['events']
+    return counts
 
 
 def _stamp(path):
@@ -157,19 +229,30 @@ def list_anims(game_root, project, chr_id, tae_store=None):
     stamps = tuple((binder, _stamp(path)) for binder, path in binders)
     listed = _listed_anims(chr_id, stamps,
                            tuple(str(path) for _binder, path in binders))
+    if not listed['skeleton']:
+        # A character whose animation binders ship an empty skeleton
+        # still has one when the model binder carries its own rig.
+        try:
+            _skeleton_source(game_root, project, chr_id, binders)
+        except HkxError:
+            pass
+        else:
+            listed = {**listed, 'skeleton': True}
     if tae_store is None:
         return listed
     try:
         taes = tae_store.get(f'{chr_id}.anibnd.dcx')['taes']
     except (TaeError, ValueError, OSError):
         taes = {}
+    counts = _event_counts(taes)
     anims, linked = [], set()
     for motion in listed['anims']:
         link = tae_link(taes, chr_id, motion['file']) if motion.get('file') else None
         if link is not None:
             linked.add(link)
         anims.append({**motion, 'tae': link[0] if link else None,
-                      'taeIndex': link[1] if link else None})
+                      'taeIndex': link[1] if link else None,
+                      'eventCount': counts.get(link, 0) if link else 0})
     return {'chr': listed['chr'], 'skeleton': listed['skeleton'],
             'anims': anims, 'orphans': event_orphans(tae_store, chr_id, linked)}
 
@@ -194,10 +277,11 @@ def _listed_anims(chr_id, stamps, paths):
     skeleton, anims, seen = False, [], {}
     for (binder, _stamp), path in zip(stamps, paths):
         plain, names = _open(path)
+        skel_name = _skel_member(names)
         for member in sorted(names):
-            if not member.endswith('.hkx'):
+            if not member.lower().endswith('.hkx'):
                 continue
-            if member in SKELETONS:
+            if member == skel_name:
                 try:
                     doc = HkxDocument(_entry(plain, names, path, member))
                 except HkxError:
@@ -228,21 +312,16 @@ def _listed_anims(chr_id, stamps, paths):
 def skeleton(game_root, project, chr_id):
     """The Havok skeleton (names, parents, reference pose) with the
     FLVER bone list it drives. FLVER bones carry extras the animation
-    never moves (SFX and dummy anchors); they keep the bind pose."""
+    never moves (SFX and dummy anchors); they keep the bind pose. The
+    skeleton resolves through the shared source, so an empty anibnd
+    skeleton falls back to the model binder's own rig."""
     from .flver import FlverDocument
     binders = _binders(game_root, project, chr_id)
     if not binders:
         raise HkxError('No animation binder is installed')
-    hka = None
-    for binder, path in binders:
-        docs, _broken = _parsed_binder(str(path), _stamp(path))
-        for member in SKELETONS:
-            if member in docs and docs[member].skeletons:
-                hka = docs[member].skeletons[0]
-        if hka is not None:
-            break
-    if hka is None:
-        raise HkxError('No skeleton is installed')
+    skel_path, skel_member = _skeleton_source(game_root, project, chr_id, binders)
+    docs, _broken = _parsed_binder(skel_path, _stamp(skel_path))
+    hka = docs[skel_member].skeletons[0]
     flver_bones = []
     resolved = resolve_chr(game_root, project, chr_id)
     if resolved[0] == 'member':
@@ -373,20 +452,15 @@ def anim_events(tae_store, chr_id, binder, member):
 def anim_frames(game_root, project, chr_id, binder, member, tae_store=None):
     """Sampled local transforms per skeleton bone per frame, root
     motion samples, and the motion's TAE event cues."""
-    if not MEMBER_NAME.match(member or '') or member in SKELETONS:
+    if not MEMBER_NAME.match(member or '') or (member or '').lower() == 'skeleton.hkx':
         raise HkxError('Unknown animation file')
     path = _binder_path(game_root, project, binder)
-    expected = [name for name, _ in _binders(game_root, project, chr_id)]
+    pairs = _binders(game_root, project, chr_id)
+    expected = [name for name, _ in pairs]
     if binder not in expected:
         raise HkxError('Animation binder belongs to another character')
-    skel_binder = next((name for name in expected if name == f'{chr_id}.anibnd.dcx'), expected[0])
-    skel_path = _binder_path(game_root, project, skel_binder)
-    skel_docs, _broken = _parsed_binder(str(skel_path), _stamp(skel_path))
-    skel_member = next((name for name in SKELETONS if name in skel_docs
-                        and skel_docs[name].skeletons), None)
-    if skel_member is None:
-        raise HkxError('No skeleton is installed')
-    payload = _sampled_frames(str(path), member, _stamp(path), str(skel_path),
+    skel_path, skel_member = _skeleton_source(game_root, project, chr_id, pairs)
+    payload = _sampled_frames(str(path), member, _stamp(path), skel_path,
                               skel_member, _stamp(skel_path))
     payload['events'] = anim_events(tae_store, chr_id, binder, member)
     return payload

@@ -22,8 +22,8 @@ for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
         f'Base {_label.lower()} attack power in points of health, before defense. '
         f'Higher values hit harder. This is not the final health lost.')
     ATTACK_FIELDS[_key + 'Correction'] = (
-        f'{_label} correction', 'Base damage',
-        f'Multiplies the base {_label.lower()} attack value. Higher values hit harder.')
+        f'{_label} correction (%)', 'Base damage',
+        f'Percent of the base {_label.lower()} attack applied. 100 applies the full value.')
 ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
     'Selects the physical defense used against this attack. Standard has no slash, strike or thrust attribute.')
 
@@ -72,8 +72,8 @@ for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
         f"Motion value: the percentage of the weapon's attack rating this swing deals. "
         f'100 deals the full rating. The game applies it before defense.')
     PC_ATTACK_FIELDS[_key + 'Correction'] = (
-        f'{_label} correction', 'Motion values',
-        f"Multiplies this swing's {_label.lower()} motion value. Higher values hit harder.")
+        f'{_label} correction (%)', 'Motion values',
+        f"Percent of the {_label.lower()} motion value this swing deals. 100 deals the full value.")
 
 # Every editable Bullet property in presentation order: lifetime, how
 # it flies, how it homes, how it spreads, what it hits, what it

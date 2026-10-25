@@ -165,7 +165,7 @@
   function enemyStatGrowth(fields,rowId){
     const cards=enemyCurveOrder.map(stat=>{
       const statFields=enemyCurveFields(fields,stat),variables=statFields.map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"enemies",rowId,{internal:true})}));
-      return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat))});
+      return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat),variables)});
     });
     const index=Math.max(0,Math.min(cards.length-1,state.enemyStatPage||0));
     return LexeditorUI.pagedPane(cards[index],pager({inline:true,page:index,pages:cards.length,pageSize:1,total:cards.length,noun:"stats",change:value=>{state.enemyStatPage=value;renderEnemies()}}));

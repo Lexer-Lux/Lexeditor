@@ -1,4 +1,4 @@
-"""Picking a character keeps the characters pane's page.
+"""Picking a character keeps the characters pane's page, and the wheel wraps it.
 
 Lexer: "every time I click on a different enemy to see its animations it
 pushes me back to the very first page in this leftmost panel."
@@ -57,6 +57,38 @@ def main():
                     page.wait_for_function(f'state.animCharId !== "{before}"')
                     kept = page.evaluate('state.animCharPage')
                     assert kept == 1, f'characters pane reset to page {kept + 1} on pick'
+                    pages = page.evaluate(
+                        "Number(document.querySelector('[data-anim-chars] .lex-page-total')"
+                        ".textContent)")
+                    assert pages > 1, pages
+                    last = pages - 1
+                    wheel = page.locator('[data-anim-chars] .lex-paged-pane-content')
+                    wheel.hover()
+                    # Clicking Next past the last page wraps to the first.
+                    for _ in range(pages + 1):
+                        if page.evaluate('state.animCharPage') == 0:
+                            break
+                        page.evaluate(
+                            'document.querySelector('
+                            "'[data-anim-chars] [aria-label=\"Next page\"]').click()")
+                        page.wait_for_timeout(120)
+                    assert page.evaluate('state.animCharPage') == 0
+                    # The wheel turns pages, and wraps past either end.
+                    page.mouse.wheel(0, 240)
+                    page.wait_for_function('state.animCharPage === 1')
+                    page.wait_for_timeout(300)
+                    for _ in range(pages + 1):
+                        if page.evaluate('state.animCharPage') == 0:
+                            break
+                        page.mouse.wheel(0, 240)
+                        page.wait_for_timeout(300)
+                    assert page.evaluate('state.animCharPage') == 0
+                    page.wait_for_timeout(300)
+                    page.mouse.wheel(0, -240)
+                    page.wait_for_function(f'state.animCharPage === {last}')
+                    page.wait_for_timeout(300)
+                    page.mouse.wheel(0, 240)
+                    page.wait_for_function('state.animCharPage === 0')
                     if output:
                         page.screenshot(path=str(output / 'anim-char-page.png'))
                     assert not errors, errors

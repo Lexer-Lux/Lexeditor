@@ -4,6 +4,7 @@ The DS1 viewer keeps its textured Havok-mapped playback and gains the shared
 transport row, arrow/space bindings and context-filtered shortcuts menu.
 Synthetic fixtures only; read-only with no mod.
 """
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -63,6 +64,13 @@ def main():
                     assert page.evaluate("typeof LexeditorUI.animationViewer") == "function"
                     assert page.evaluate(
                         "!!document.querySelector('[data-anim-host]')._animViewer")
+                    posed = page.evaluate(
+                        "document.querySelector('[data-anim-host]')._animBones()")
+                    assert posed, "viewer mounted no bones"
+                    assert all(isinstance(bone["peak"], (int, float)) and
+                               all(math.isfinite(v) for v in bone["pos"])
+                               for bone in posed), posed
+                    assert any(bone["mapped"] for bone in posed), posed
                     modes = page.locator(
                         "[data-anim-host] .lex-model-view-modes button:not([data-anim-follow])")
                     assert modes.count() == 3
@@ -114,13 +122,13 @@ def main():
                     by_label = {label: buttons.nth(index) for index, label in enumerate(LABELS)}
                     by_label["Play or pause"].click()
                     by_label["Go to animation end"].click()
-                    assert readout().startswith(f"{float(last):.1f}"), readout()
+                    assert readout().startswith(f"{last} / {last}"), readout()
                     by_label["Go to animation start"].click()
-                    assert readout().startswith("0.0"), readout()
+                    assert readout().startswith("0 / "), readout()
                     by_label["Forward one frame"].click()
-                    assert readout().startswith("1.0"), readout()
+                    assert readout().startswith("1 / "), readout()
                     by_label["Back one frame"].click()
-                    assert readout().startswith("0.0"), readout()
+                    assert readout().startswith("0 / "), readout()
                     outline = page.evaluate(
                         """getComputedStyle(document.querySelector(
                           "[data-anim-timeline] [aria-label='Back one frame']"))
@@ -128,13 +136,13 @@ def main():
                     assert outline == "none", outline
                     page.evaluate("document.activeElement?.blur()")
                     page.keyboard.press("ArrowRight")
-                    assert readout().startswith("1.0"), readout()
+                    assert readout().startswith("1 / "), readout()
                     page.keyboard.press("ArrowLeft")
-                    assert readout().startswith("0.0"), readout()
+                    assert readout().startswith("0 / "), readout()
                     page.keyboard.press("Shift+ArrowRight")
-                    assert readout().startswith(f"{float(last):.1f}"), readout()
+                    assert readout().startswith(f"{last} / {last}"), readout()
                     page.keyboard.press("Shift+ArrowLeft")
-                    assert readout().startswith("0.0"), readout()
+                    assert readout().startswith("0 / "), readout()
                     glyph = lambda: page.locator(
                         "[data-anim-timeline] [aria-label='Play or pause']").text_content()
                     paused_glyph = glyph()

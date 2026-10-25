@@ -490,9 +490,30 @@ class MapStore:
                 rows.append(self._light_row(map_name, light))
         return rows
 
+    def _message_row(self, map_name, message):
+        values = {"map": map_name, "part": message["partName"], "kind": "Message",
+                  "text": message["textId"], "point": message["point"],
+                  "flag": message["flag"], "who": message["name"],
+                  "mapNames": [self.display_name(map_name)]}
+        if message["pos"] is not None:
+            values.update({"posX": message["pos"][0], "posY": message["pos"][1],
+                           "posZ": message["pos"][2]})
+        modified = self.get(map_name).message_modified(("message", message["seq"]))
+        return {"id": message["key"], "table": map_name,
+                "name": message["name"],
+                "range": message["name"], "values": values, "display": {},
+                "modified": modified}
+
     def row_values(self, map_name, key):
         """One placement's list values, display names and title, fresh after
         an edit, so undo can patch the lists without re-reading the map."""
+        if str(key).startswith("message:"):
+            message = next((entry for entry in self.get(map_name).messages()
+                            if entry["key"] == key), None)
+            if message is None:
+                raise MsbError("Unknown message")
+            row = self._message_row(map_name, message)
+            return row["values"], row["display"], row["name"]
         if str(key).startswith("light:"):
             light = next((entry for entry in self.get(map_name).lights()
                           if entry["key"] == key), None)
@@ -526,6 +547,8 @@ class MapStore:
         return 'enemies', 'monsters'
 
     def read(self, map_name, key):
+        if str(key).startswith("message:"):
+            return self.read_message(map_name, key)
         if str(key).startswith("light:"):
             return self.read_light(map_name, key)
         _ids, names, types = self._npc()
@@ -555,6 +578,23 @@ class MapStore:
                                        'tab': tab, 'sub': sub})
         return row
 
+    def read_message(self, map_name, key):
+        seq = int(str(key).split(":")[1])
+        row = self.get(map_name).read_message(("message", seq))
+        try:
+            originals = {item["key"]: item["value"]
+                         for item in self._vanilla_doc(map_name).read_message(
+                             ("message", seq))["fields"]}
+        except MsbError:
+            originals = {}
+        row.update(id=key, table=map_name, map=map_name)
+        row["shortName"] = row["name"]
+        for item in row["fields"]:
+            if item["key"] in originals:
+                item["vanilla"] = originals[item["key"]]
+        row["recordLinks"] = []
+        return row
+
     def read_light(self, map_name, key):
         seq = int(str(key).split(":")[1])
         row = self.get(map_name).read_light(("light", seq))
@@ -572,13 +612,20 @@ class MapStore:
         return row
 
     def row_modified(self, map_name, key):
-        """Whether this session changed the placement or light."""
+        """Whether this session changed the placement, light or message."""
+        if str(key).startswith("message:"):
+            return self.get(map_name).message_modified(
+                ("message", int(str(key).split(":")[1])))
         if str(key).startswith("light:"):
             return self.get(map_name).light_modified(("light", int(str(key).split(":")[1])))
         return self.get(map_name).placement_modified(parse_key(key))
 
     def edit(self, map_name, key, field, value):
         self.writable()
+        if str(key).startswith("message:"):
+            seq = int(str(key).split(":")[1])
+            self.get(map_name).edit_message(("message", seq), field, value)
+            return self.read(map_name, key)
         if str(key).startswith("light:"):
             seq = int(str(key).split(":")[1])
             self.get(map_name).edit_light(("light", seq), field, value)
@@ -591,6 +638,10 @@ class MapStore:
 
     def add_placement(self, map_name, key):
         self.writable()
+        if str(key).startswith("message:"):
+            row = self.get(map_name).add_message(
+                ("message", int(str(key).split(":")[1])))
+            return self.read(map_name, row["key"])
         row = self.get(map_name).add_placement(parse_key(key))
         self._npc_models = None
         return self.read(map_name, f"{row['type']}:{row['partId']}")
@@ -604,6 +655,9 @@ class MapStore:
     def remove_placement(self, map_name, key):
         self.writable()
         self._npc_models = None
+        if str(key).startswith("message:"):
+            return self.get(map_name).remove_message(
+                ("message", int(str(key).split(":")[1])))
         return self.get(map_name).remove_placement(parse_key(key))
 
     @property
@@ -616,6 +670,15 @@ class MapStore:
         for map_name, document in self.docs.items():
             known = {(part["type"], part["id"]): part["name"] for part in document.parts}
             for (ptype, pid), field in sorted(document.dirty, key=str):
+                if ptype == "message":
+                    row = document.read_message((ptype, pid))
+                    message_label = next(
+                        message["name"] for message in document.messages()
+                        if message["seq"] == pid)
+                    item = next(entry for entry in row["fields"] if entry["key"] == field)
+                    changes.append({"label": f"{map_name} {message_label}, {item['label']}",
+                                    "before": item["vanilla"], "after": item["value"]})
+                    continue
                 if ptype == "light":
                     row = document.read_light((ptype, pid))
                     light_label = next(

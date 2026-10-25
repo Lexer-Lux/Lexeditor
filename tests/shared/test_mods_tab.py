@@ -886,3 +886,36 @@ def test_detail_shows_what_mods_the_mod_requires(page):
         has_text="Mine").first.click()
     page.wait_for_timeout(250)
     assert page.locator(".lex-mods-page .lex-detail-section", has_text="REQUIRES").count() == 0
+
+
+def test_column_hover_glows_detail_property_and_back(page):
+    # Lexer: hovering a column glows its property in the detail panel and
+    # hovering the property glows the column back, filler rows included.
+    mount(page, versions=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row").filter(
+        has_text="Mine").first.click()
+    page.locator('.lex-mods-page [data-lex-property="version"]').wait_for()
+    page.locator('.lex-mods-page .lex-column-list-head-cell[data-column-key="version"]').hover()
+    page.wait_for_function(
+        "document.querySelector('.lex-mods-page [data-lex-property=\"version\"]')"
+        ".classList.contains('lex-column-lit')")
+    lit, total = page.evaluate("""() => {
+        const cells = document.querySelectorAll(
+            '.lex-mods-page .lex-column-list-cell[data-column-key="version"]');
+        return [[...cells].filter(cell => cell.classList.contains('lex-column-lit')).length,
+                cells.length];
+    }""")
+    assert total > 0 and lit == total, (lit, total)
+    fillers_lit, fillers_total = page.evaluate("""() => {
+        const cells = document.querySelectorAll(
+            '.lex-mods-page .lex-filler-row .lex-column-list-cell[data-column-key="version"]');
+        return [[...cells].filter(cell => cell.classList.contains('lex-column-lit')).length,
+                cells.length];
+    }""")
+    assert fillers_total > 0 and fillers_lit == fillers_total, (fillers_lit, fillers_total)
+    page.locator('.lex-mods-page [data-lex-property="version"]').hover()
+    page.wait_for_function(
+        "document.querySelector('.lex-mods-page .lex-column-list-head-cell[data-column-key=\"version\"]')"
+        ".classList.contains('lex-column-lit')")

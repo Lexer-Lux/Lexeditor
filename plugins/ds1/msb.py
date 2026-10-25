@@ -48,6 +48,25 @@ EVENT_TYPE_LABELS = {0: 'Light', 1: 'Sound', 2: 'SFX', 3: 'Wind',
 MAX_FILE = 8 * 1024 * 1024
 
 
+MESSAGE_EVENT = 6
+MESSAGE_TEXT_BANK = 131072
+# Event-chain tail [28, nextPart, nextType, ordinal, aheadOff, bheadOff]
+# follows this many data ints. Verified by locating the 28 slot against
+# file order for every event in all 17 maps; types 3, 4, 5 and 11+
+# carry no chain fields (see codex/ds1/map-messages.md).
+CHAIN_PREFIX = {0: 1, 1: 2, 2: 1, 6: 2, 7: 4, 8: 4, 9: 4, 10: 4}
+MESSAGE_FIELDS = {
+    'text': ('Message', 'Message',
+             "Which developer message shows here. The list holds the Text tab's Blood writing "
+             'entries; templates need words this message cannot supply.'),
+    'point': ('Marker', 'Position',
+              'The invisible marker this message sits on. None hides the message.'),
+    'flag': ('Flag', 'Message',
+             'The game probably shows this message only while this event flag is set. '
+             '-1 leaves no flag on it.'),
+}
+
+
 class MsbError(FormatError):
     """A map file Lexeditor cannot safely read."""
 
@@ -284,6 +303,8 @@ class MsbDocument:
             self._strings.extend(event['spans'])
         self._lights = {(0, event['seq']): event for event in self.events
                         if event['type'] == LIGHT_EVENT}
+        self._messages = {(MESSAGE_EVENT, event['seq']): event for event in self.events
+                          if event['type'] == MESSAGE_EVENT}
 
     def placements(self):
         """Enemy, object and player-start parts in file order."""
@@ -349,6 +370,164 @@ class MsbDocument:
                            'sharers': sharers})
         return result
 
+    def messages(self):
+        """Developer soapstone messages in file order."""
+        return [self._message_entry(event)
+                for (_etype, _seq), event in sorted(self._messages.items())]
+
+    def _message_entry(self, event):
+        point = event['point']
+        if 0 <= point < len(self.points):
+            pos = tuple(self.points[point]['pos'])
+            point_name = self.points[point]['name']
+        else:
+            pos, point_name = None, None
+        sharers = [other['name'] for other in self.events
+                   if other is not event and other['point'] == point and point >= 0]
+        stored = struct.unpack_from('<i', self.plain, event['bhead'])[0]
+        part_name = (self.parts[event['part']]['name']
+                     if 0 <= event['part'] < len(self.parts) else None)
+        area = event['area']
+        area_name = (self.parts[area]['name']
+                     if 0 <= area < len(self.parts) else None)
+        return {'key': f"message:{event['seq']}", 'type': event['type'], 'seq': event['seq'],
+                'name': event['name'], 'pos': pos, 'point': point, 'pointName': point_name,
+                'part': event['part'], 'partName': part_name, 'area': area, 'areaName': area_name,
+                'flag': event['flag'], 'textId': stored - MESSAGE_TEXT_BANK, 'storedId': stored,
+                'sharers': sharers}
+
+    def _message(self, message_key):
+        key = tuple(message_key) if isinstance(message_key, list) else message_key
+        event = self._messages.get((MESSAGE_EVENT, key[1]) if isinstance(key, tuple) else None)
+        if event is None:
+            raise MsbError('Select a message on the map')
+        return event
+
+    def _message_readback(self, event, field):
+        if field in LIGHT_POINT_OFFSETS:
+            point = self.points[event['point']]
+            return struct.unpack_from(
+                '<f', self.plain, point['base'] + LIGHT_POINT_OFFSETS[field])[0]
+        if field == 'text':
+            return struct.unpack_from('<i', self.plain, event['bhead'])[0] - MESSAGE_TEXT_BANK
+        if field == 'flag':
+            return struct.unpack_from('<i', self.plain, event['ahead'] + 8)[0]
+        return struct.unpack_from('<i', self.plain, event['ahead'] + 4)[0]
+
+    def _message_original(self, event, field):
+        if ('message', event['seq']) in self.added:
+            return None
+        try:
+            if field in LIGHT_POINT_OFFSETS:
+                point = self.points[event['point']]
+                return struct.unpack_from(
+                    '<f', self.original, point['base'] + LIGHT_POINT_OFFSETS[field])[0]
+            if field == 'text':
+                return struct.unpack_from('<i', self.original, event['bhead'])[0] - MESSAGE_TEXT_BANK
+            if field == 'flag':
+                return struct.unpack_from('<i', self.original, event['ahead'] + 8)[0]
+            return struct.unpack_from('<i', self.original, event['ahead'] + 4)[0]
+        except (struct.error, IndexError):
+            return None
+
+    def read_message(self, message_key):
+        event = self._message(message_key)
+        entry = self._message_entry(event)
+        fields = []
+        label, group, description = MESSAGE_FIELDS['text']
+        fields.append({'key': 'text', 'label': label, 'description': description, 'group': group,
+                       'dtype': 's32', 'value': entry['textId'], 'type': 'number',
+                       'minimum': None, 'maximum': None,
+                       'enum': {}, 'editable': True,
+                       'vanilla': self._message_original(event, 'text')})
+        label, group, description = MESSAGE_FIELDS['point']
+        fields.append({'key': 'point', 'label': label, 'description': description, 'group': group,
+                       'dtype': 's32', 'value': entry['point'], 'type': 'number',
+                       'minimum': None, 'maximum': None,
+                       'enum': ({str(index): point['name'] for index, point in enumerate(self.points)}
+                                | {'-1': 'None (hidden)'}),
+                       'editable': True,
+                       'vanilla': self._message_original(event, 'point')})
+        label, group, description = MESSAGE_FIELDS['flag']
+        fields.append({'key': 'flag', 'label': label, 'description': description, 'group': group,
+                       'dtype': 's32', 'value': entry['flag'], 'type': 'number',
+                       'minimum': None, 'maximum': None,
+                       'enum': {}, 'editable': True,
+                       'vanilla': self._message_original(event, 'flag')})
+        if entry['pos'] is not None:
+            sharers = entry['sharers']
+            shared = (' ' + ', '.join(sharers) + ' share this spot, so they move too.'
+                      if sharers else '')
+            for key in ('posX', 'posY', 'posZ'):
+                label, group, description = LIGHT_FIELDS[key]
+                raw_vanilla = self._message_original(event, key)
+                fields.append({'key': key, 'label': label, 'description': description + shared,
+                               'group': group, 'dtype': 'f32',
+                               'value': round(self._message_readback(event, key), 3), 'type': 'number',
+                               'minimum': None, 'maximum': None,
+                               'enum': {}, 'editable': True,
+                               'vanilla': None if raw_vanilla is None else round(raw_vanilla, 3)})
+        return {'key': f"message:{event['seq']}", 'kind': 'Message', 'textId': entry['textId'],
+                'name': event['name'], 'point': entry['pointName'], 'part': entry['partName'],
+                'areaPart': entry['areaName'], 'fields': fields}
+
+    def message_modified(self, message_key):
+        """Whether this session changed the message."""
+        key = tuple(message_key)
+        if key in self.added:
+            return True
+        return any(entry[0] == key for entry in self.dirty)
+
+    def edit_message(self, message_key, field, value):
+        """Change one message field. message_key is the ('message', seq)
+        identity from messages(). The position writes the shared point,
+        so markers standing on it move along."""
+        event = self._message(message_key)
+        if field in LIGHT_POINT_OFFSETS:
+            if event['point'] < 0:
+                raise MsbError('Give this message a position marker before moving it')
+            if type(value) not in (int, float) or isinstance(value, bool):
+                raise MsbError('Enter a finite number')
+            if not math.isfinite(value):
+                raise MsbError('Enter a finite number')
+            point = self.points[event['point']]
+            start = point['base'] + LIGHT_POINT_OFFSETS[field]
+            try:
+                saved = struct.unpack_from('<f', self.original, start)[0]
+            except struct.error:
+                saved = float('nan')
+            if math.isfinite(saved) and float(f'{float(value):.7g}') == float(f'{saved:.7g}'):
+                value = saved
+            self._write(start, 4, struct.pack('<f', value))
+            pos = list(point['pos'])
+            pos[['posX', 'posY', 'posZ'].index(field)] = struct.unpack_from('<f', self.plain, start)[0]
+            point['pos'] = tuple(pos)
+        elif field == 'text':
+            if type(value) is not int or isinstance(value, bool) or value < 0:
+                raise MsbError('Pick one of the offered messages')
+            if value > 2 ** 31 - 1 - MESSAGE_TEXT_BANK:
+                raise MsbError('That message number cannot be stored in a map file')
+            self._write(event['bhead'], 4, struct.pack('<i', value + MESSAGE_TEXT_BANK))
+        elif field == 'flag':
+            if type(value) is not int or isinstance(value, bool) or not -(2 ** 31) <= value < 2 ** 31:
+                raise MsbError('Enter a whole number')
+            self._write(event['ahead'] + 8, 4, struct.pack('<i', value))
+            event['flag'] = value
+        elif field == 'point':
+            if type(value) is not int or isinstance(value, bool) or not -1 <= value < len(self.points):
+                raise MsbError("Select one of this map's markers or none")
+            self._write(event['ahead'] + 4, 4, struct.pack('<i', value))
+            event['point'] = value
+        else:
+            raise MsbError('This message field is protected')
+        key = (('message', event['seq']), field)
+        if (self.plain == self.original
+                or self._message_readback(event, field) == self._message_original(event, field)):
+            self.dirty.discard(key)
+        else:
+            self.dirty.add(key)
+        return self.read_message(('message', event['seq']))
+
     @property
     def dirty_count(self):
         return len(self.dirty) + len(self.removed)
@@ -378,6 +557,19 @@ class MsbDocument:
             if part['type'] in ENEMY_TYPES:
                 units.append(((part['type'], part['id']), 'npcId', part['type_data'] + 12,
                               4, PLACEMENT_FIELDS['npcId'][0], part['name']))
+        for (_etype, seq), event in sorted(self._messages.items()):
+            name = event['name']
+            units.append((('message', seq), 'text', event['bhead'], 4,
+                          MESSAGE_FIELDS['text'][0], name))
+            units.append((('message', seq), 'point', event['ahead'] + 4, 4,
+                          MESSAGE_FIELDS['point'][0], name))
+            units.append((('message', seq), 'flag', event['ahead'] + 8, 4,
+                          MESSAGE_FIELDS['flag'][0], name))
+            if 0 <= event['point'] < len(self.points):
+                point = self.points[event['point']]
+                for field, offset in LIGHT_POINT_OFFSETS.items():
+                    units.append((('message', seq), field, point['base'] + offset, 4,
+                                  LIGHT_FIELDS[field][0], name))
         return units
 
     def _write(self, start, size, payload):
@@ -575,27 +767,307 @@ class MsbDocument:
             ids.append(struct.unpack_from('<i', self.plain, ent)[0])
         return ids
 
-    def _relocate_parts(self, extra=(), drop=()):
-        """Rewrite the PARTS directory at the end of the file: the old entry
-        offsets minus drops plus extras, then point POINT's next at it. Every
-        entry keeps its bytes; only the directory moves."""
+    def _relocate_param(self, index, extra=(), drop=(), at=None):
+        """Rewrite one parameter directory at the end of the file: the old
+        entry offsets minus drops plus extras, then point the previous
+        directory's link at it. Directory links must keep climbing through
+        the file, so a moved directory drags every directory after it
+        along; entries keep their bytes throughout. Callers pass the
+        format's directory index (1 for EVENTS, 2 for POINTS, 3 for
+        PARTS); at files extras mid-list instead of last."""
         bases, base = [], 0
-        for index in range(4):
+        for step in range(4):
             bases.append(base)
-            base = _param(self.plain, base, index)['next']
-        point_base, parts_base = bases[2], bases[3]
-        version, name_off, count = struct.unpack_from('<iIi', self.plain, parts_base)
-        old = struct.unpack_from('<%di' % (count - 1), self.plain, parts_base + 12) if count > 1 else ()
-        kept = [off for off in old if off not in drop] + list(extra)
+            base = _param(self.plain, base, step)['next']
+        heads = [struct.unpack_from('<iIi', self.plain, bases[step]) for step in range(4)]
+        olds = [struct.unpack_from('<%di' % (heads[step][2] - 1), self.plain, bases[step] + 12)
+                if heads[step][2] > 1 else ()
+                for step in range(4)]
+        kept = [off for off in olds[index] if off not in drop]
+        kept = kept + list(extra) if at is None else kept[:at] + list(extra) + kept[at:]
         if len(set(kept)) != len(kept):
-            raise MsbError('Map part entries are not unique')
-        site = len(self.plain)
-        self.plain += struct.pack('<iIi', version, name_off, len(kept) + 1)
-        for off in kept:
-            self.plain += struct.pack('<i', off)
-        self.plain += struct.pack('<i', 0)
-        point_count = struct.unpack_from('<i', self.plain, point_base + 8)[0]
-        struct.pack_into('<i', self.plain, point_base + 12 + 4 * (point_count - 1), site)
+            raise MsbError('Map entries are not unique')
+        entries = [list(olds[step]) for step in range(4)]
+        entries[index] = kept
+        sites = []
+        for step in range(index, 4):
+            version, name_off, _count = heads[step]
+            sites.append(len(self.plain))
+            self.plain += struct.pack('<iIi', version, name_off, len(entries[step]) + 1)
+            for off in entries[step]:
+                self.plain += struct.pack('<i', off)
+            self.plain += struct.pack('<i', 0)
+        for pos, step in enumerate(range(index, 4)):
+            struct.pack_into('<i', self.plain, sites[pos] + 12 + 4 * len(entries[step]),
+                             sites[pos + 1] if pos + 1 < len(sites) else 0)
+        if index > 0:
+            prev_base = bases[index - 1]
+            prev_count = struct.unpack_from('<i', self.plain, prev_base + 8)[0]
+            struct.pack_into('<i', self.plain, prev_base + 12 + 4 * (prev_count - 1), sites[0])
+
+    def _shift_dirs(self, at, delta):
+        """Slide every live directory offset at or past at by delta. Names
+        and every entry-internal pointer are entry-relative; only the
+        directory links and entry offsets are absolute."""
+        base = 0
+        for _ in range(4):
+            _version, _name_off, count = struct.unpack_from('<iIi', self.plain, base)
+            if _name_off >= at:
+                struct.pack_into('<i', self.plain, base + 4, _name_off + delta)
+            for slot in range(count - 1):
+                off = struct.unpack_from('<i', self.plain, base + 12 + 4 * slot)[0]
+                if off >= at:
+                    struct.pack_into('<i', self.plain, base + 12 + 4 * slot, off + delta)
+            link_at = base + 12 + 4 * (count - 1)
+            nxt = struct.unpack_from('<i', self.plain, link_at)[0]
+            if nxt > 0 and nxt >= at:
+                struct.pack_into('<i', self.plain, link_at, nxt + delta)
+                nxt += delta
+            if nxt <= 0:
+                break
+            base = nxt
+
+    def _shift_caches(self, at, delta):
+        """Slide every cached absolute span at or past at by delta."""
+        for part in self.parts:
+            if part['base'] >= at:
+                part['base'] += delta
+            if part['type_data'] >= at:
+                part['type_data'] += delta
+            part['spans'] = [(low + delta, high + delta) if low >= at else (low, high)
+                             for low, high in part['spans']]
+        for point in self.points:
+            if point['base'] >= at:
+                point['base'] += delta
+            point['spans'] = [(low + delta, high + delta) if low >= at else (low, high)
+                              for low, high in point['spans']]
+        for event in self.events:
+            if event['base'] >= at:
+                event['base'] += delta
+            if event['ahead'] >= at:
+                event['ahead'] += delta
+            if event['bhead'] >= at:
+                event['bhead'] += delta
+            event['spans'] = [(low + delta, high + delta) if low >= at else (low, high)
+                              for low, high in event['spans']]
+        for model in self.models:
+            model['spans'] = [(low + delta, high + delta) if low >= at else (low, high)
+                              for low, high in model['spans']]
+        self._strings = [(low + delta, high + delta) if low >= at else (low, high)
+                         for low, high in self._strings]
+
+    def _splice(self, at, blob):
+        """Insert blob at at, sliding later bytes, caches, directories and
+        the vanilla shadow along. The shadow takes zeros: added bytes have
+        no original to compare, and added entries never read it."""
+        self.plain[at:at] = blob
+        self.original = self.original[:at] + bytes(len(blob)) + self.original[at:]
+        self._shift_caches(at, len(blob))
+        self._shift_dirs(at, len(blob))
+
+    def _excise(self, start, end):
+        """Cut [start, end) out, sliding later bytes, caches, directories
+        and the vanilla shadow down. The victim's bytes leave both sides,
+        so survivors keep their originals beside them."""
+        del self.plain[start:end]
+        self.original = self.original[:start] + self.original[end:]
+        self._shift_caches(end, start - end)
+        self._shift_dirs(end, start - end)
+
+    def _relocate_parts(self, extra=(), drop=()):
+        self._relocate_param(3, extra=extra, drop=drop)
+
+
+    @staticmethod
+    def _chain_slots(etype, bhead):
+        """(nextPart, nextType) offsets for an event, or None when the type
+        carries no chain fields. Indexed by CHAIN_PREFIX, not text-bearing."""
+        prefix = CHAIN_PREFIX.get(etype)
+        if prefix is None:
+            return None
+        return bhead + 4 * (prefix + 1), bhead + 4 * (prefix + 2)
+
+    def _message_insert_at(self):
+        """Where a new message event files: before the first event above
+        type 6. Messages sort among their own kind in the engine's
+        directory, and without a follower there is nowhere to file one."""
+        for index, event in enumerate(self.events):
+            if event['type'] > MESSAGE_EVENT:
+                return index
+        raise MsbError('This map files nothing after messages, so it cannot take one')
+
+    def _message_link(self, event, next_part, next_type):
+        """Retired no-op: each chain tail overlaps its follower's header,
+        so filing the bytes in order links them; writes would clobber."""
+        return  # Retired: tails overlap follower headers, so stitching writes nothing.
+        if slots is None:
+            return
+        struct.pack_into('<i', self.plain, slots[0], next_part)
+        struct.pack_into('<i', self.plain, slots[1], next_type)
+
+    def _message_renumber(self):
+        """Retired no-op: ordinals alias follower seqs; filing order numbers them."""
+        return  # Retired: ordinals alias follower seqs, so renumbering writes nothing.
+        slot = 4 * (CHAIN_PREFIX[MESSAGE_EVENT] + 3)
+        for pos, event in enumerate(run):
+            struct.pack_into('<i', self.plain, event['bhead'] + slot,
+                             0 if pos == len(run) - 1 else pos + 1)
+
+    def _add_point(self, pos, hint):
+        """Append a point entry at the end of the file and file it with the
+        rest. Its shape follows the nearest existing point: unknown header
+        values come from there, repointed at the new entry's own name."""
+        taken = {point['name'] for point in self.points}
+        name, suffix = hint, 2
+        while name in taken:
+            name, suffix = f"{hint}_{suffix}", suffix + 1
+        try:
+            name_bytes = name.encode('shift_jis') + b'\0'
+        except UnicodeEncodeError:
+            raise MsbError('That name cannot be stored in a map file') from None
+        padded = name_bytes + bytes(-len(name_bytes) % 4)
+        ahead = 60 + len(padded)
+        if self.points:
+            template = min(self.points,
+                           key=lambda item: sum((one - two) ** 2
+                                                for one, two in zip(item['pos'], pos)))
+            t_padded = len(template['name'].encode('shift_jis')) + 1
+            t_padded += -t_padded % 4
+            t_ahead = 60 + t_padded
+            header = bytearray(self.plain[template['base']:template['base'] + 60])
+            struct.pack_into('<i', header, 8, len(self.points))
+            struct.pack_into('<3f', header, 16, *pos)
+            ints = list(struct.unpack_from('<8i', header, 28))
+            rebase = {t_ahead: ahead,
+                      t_ahead + 4: ahead + 4,
+                      t_ahead + 8: ahead + 8}
+            header[28:60] = struct.pack('<8i', *[rebase.get(value, value) for value in ints])
+            tail = self.plain[template['base'] + 60 + t_padded:template['base'] + 60 + t_padded + 12]
+        else:
+            header = bytearray(60)
+            struct.pack_into('<i', header, 0, 60)
+            struct.pack_into('<3f', header, 16, *pos)
+            header[28:60] = struct.pack('<8i', 0, 0, 0, ahead, ahead + 4, 0, ahead + 8, 0)
+            tail = bytes(12)
+        base = len(self.plain)
+        self.plain += bytes(header) + padded + bytes(tail)
+        self._relocate_param(2, extra=[base])
+        point = {'name': name, 'index': len(self.points), 'type': 0, 'pos': tuple(pos),
+                 'base': base, 'spans': [(base + 60, base + 60 + len(name_bytes))]}
+        self.points.append(point)
+        self._strings.append((base + 60, base + 60 + len(name_bytes)))
+        return len(self.points) - 1
+
+    def _insert_message_event(self, hint, part, area, point, flag, stored, unknown):
+        """Splice one message event's owned bytes ahead of the first
+        greater-typed event. Its tail is the follower's header, so no writes stitch it."""
+        try:
+            hint_bytes = hint.encode('shift_jis')
+        except UnicodeEncodeError:
+            raise MsbError('That name cannot be stored in a map file') from None
+        del hint_bytes
+        at = self._message_insert_at()
+        seqs = [seq for (_etype, seq) in self._messages]
+        new_seq = max(seqs) + 1 if seqs else 0
+        if new_seq >= 2 ** 31:
+            raise MsbError('This map holds no free message identity')
+        taken = {event['name'] for event in self.events}
+        name, suffix = f"{hint}_{new_seq}", 2
+        while name in taken:
+            name, suffix = f"{hint}_{new_seq}_{suffix}", suffix + 1
+        name_bytes = name.encode('shift_jis') + b'\0'
+        base = len(self.plain)
+        padded = name_bytes + bytes(-len(name_bytes) % 4)
+        ahead, bhead = 28 + len(padded), 28 + len(padded) + 16
+        base = self.events[at]['base']
+        self._splice(base, (struct.pack('<7i', 28, part, MESSAGE_EVENT, new_seq, ahead, bhead, 0)
+                       + padded + struct.pack('<4i', area, point, flag, 0)
+                       + struct.pack('<2i', stored, unknown)))
+        self._relocate_param(1, extra=[base], at=at)
+        event = {'part': part, 'type': MESSAGE_EVENT, 'seq': new_seq, 'name': name,
+                 'area': area, 'point': point, 'flag': flag,
+                 'base': base, 'ahead': base + ahead, 'bhead': base + bhead,
+                 'spans': [(base, base + 28), (base + 28, base + 28 + len(name_bytes))]}
+        self.events.insert(at, event)
+        self._messages[(MESSAGE_EVENT, new_seq)] = event
+        self._strings.append((base + 28, base + 28 + len(name_bytes)))
+        follower = self.events[at + 1]
+        self._message_link(event, follower['part'], follower['type'])
+        if at > 0:
+            self._message_link(self.events[at - 1], part, MESSAGE_EVENT)
+        self._message_renumber()
+        return event
+
+    def add_message(self, message_key):
+        """Duplicate a message: fresh identity and name, but the same
+        marker and anchor, so it stands on its source's spot until it
+        takes a marker of its own."""
+        source = self._message(message_key)
+        stored = struct.unpack_from('<i', self.plain, source['bhead'])[0]
+        unknown = struct.unpack_from('<i', self.plain, source['bhead'] + 4)[0]
+        event = self._insert_message_event(source['name'], source['part'], source['area'],
+                                           source['point'], source['flag'], stored, unknown)
+        key = ('message', event['seq'])
+        self.added.add(key)
+        self.dirty.add((key, 'text'))
+        if event['point'] >= 0:
+            for field in LIGHT_POINT_OFFSETS:
+                self.dirty.add((key, field))
+        return self.read_message(key)
+
+    def create_message(self, text_id, pos, name=None):
+        """A new message from scratch: a fresh marker under it, anchored
+        to the map's first piece, with no flag on it."""
+        if type(text_id) is not int or isinstance(text_id, bool) or text_id < 0:
+            raise MsbError('Pick one of the offered messages')
+        if text_id > 2 ** 31 - 1 - MESSAGE_TEXT_BANK:
+            raise MsbError('That message number cannot be stored in a map file')
+        try:
+            pos = [float(axis) for axis in pos]
+        except (TypeError, ValueError):
+            raise MsbError('A new message needs somewhere to stand') from None
+        if len(pos) != 3 or not all(math.isfinite(axis) for axis in pos):
+            raise MsbError('A new message needs somewhere to stand')
+        part = next((index for index, item in enumerate(self.parts)
+                     if item['type'] in (0, 1)), None)
+        if part is None:
+            raise MsbError('This map has no map piece or object to hang a message on')
+        # Nothing may file after messages: fail here, before the marker lands.
+        self._message_insert_at()
+        point = self._add_point(pos, 'MessagePoint')
+        areas = [item['area'] for item in self.events if item['type'] == MESSAGE_EVENT]
+        event = self._insert_message_event('Message' if name is None else str(name), part,
+                                           areas[0] if areas else -1, point, -1,
+                                           text_id + MESSAGE_TEXT_BANK, 0)
+        key = ('message', event['seq'])
+        self.added.add(key)
+        self.dirty.add((key, 'text'))
+        for field in LIGHT_POINT_OFFSETS:
+            self.dirty.add((key, field))
+        return self.read_message(key)
+
+    def remove_message(self, message_key):
+        """Cut a message out of the map; its neighbours re-seat across the gap.
+        Its marker stays where it stood; other events may share it."""
+        key = tuple(message_key)
+        event = self._message(key)
+        at = next(index for index, item in enumerate(self.events) if item is event)
+        if at + 1 >= len(self.events):
+            raise MsbError('That message files last, so lifting it would break the chain')
+        follower = self.events[at + 1]
+        if at > 0:
+            self._message_link(self.events[at - 1], follower['part'], follower['type'])
+        self._relocate_param(1, drop=[event['base']])
+        self._excise(event['base'], self.events[at + 1]['base'])
+        del self.events[at]
+        del self._messages[(MESSAGE_EVENT, event['seq'])]
+        self._strings = [span for span in self._strings if span not in event['spans']]
+        self._message_renumber()
+        self.added.discard(key)
+        self.removed.append({'type': MESSAGE_EVENT, 'id': event['seq'], 'name': event['name'],
+                             'kind': 'Message'})
+        self.dirty = {entry for entry in self.dirty if entry[0] != key}
+        return {'type': MESSAGE_EVENT, 'id': event['seq'], 'name': event['name']}
 
     def add_placement(self, part_key):
         """Duplicate a placement: fresh identity and name, its own entity,

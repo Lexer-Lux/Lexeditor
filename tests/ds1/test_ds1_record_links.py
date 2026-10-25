@@ -187,15 +187,18 @@ def test_dialog_link_shows_the_yes_no_prompt():
     poke(document, 'EquipParamGoods', 100, 'yesNoDialogMessageId', 10010710)
     dialogs = document.read_row('EquipParamGoods', 100)['dialogLinks']
     assert dialogs == [{'field': 'yesNoDialogMessageId', 'id': 10010710,
-                        'text': 'Return to the last bonfire?'}]
+                        'text': 'Return to the last bonfire?',
+                        'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'}]
     poke(document, 'EquipParamGoods', 101, 'yesNoDialogMessageId', 0)
     assert document.read_row('EquipParamGoods', 101)['dialogLinks'] == [
-        {'field': 'yesNoDialogMessageId', 'id': 0, 'text': ''}]
+        {'field': 'yesNoDialogMessageId', 'id': 0, 'text': '',
+         'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'}]
     # Spells ask too: two vanilla scrolls reuse the bonfire prompt.
     poke(document, 'Magic', 100, 'yesNoDialogMessageId', 10010710)
     assert document.read_row('Magic', 100)['dialogLinks'] == [
         {'field': 'yesNoDialogMessageId', 'id': 10010710,
-         'text': 'Return to the last bonfire?'}]
+         'text': 'Return to the last bonfire?',
+         'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'}]
 
 
 def test_field_link_ignores_unlinked_tables():
@@ -338,11 +341,14 @@ def test_spell_and_treasure_dialogs_preview_event_text():
     poke(document, 'ObjActParam', 100, 'actionFailedMsgId', 10010710)
     assert document.read_row('Magic', 100)['dialogLinks'] == [
         {'field': 'yesNoDialogMessageId', 'id': 10010710,
-         'text': 'Return to the last bonfire?'}]
+         'text': 'Return to the last bonfire?',
+         'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'}]
     assert document.read_row('ObjActParam', 100)['dialogLinks'] == [
-        {'field': 'actionEnableMsgId', 'id': 10010500, 'text': 'Kick ladder'},
+        {'field': 'actionEnableMsgId', 'id': 10010500, 'text': 'Kick ladder',
+         'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'},
         {'field': 'actionFailedMsgId', 'id': 10010710,
-         'text': 'Return to the last bonfire?'}]
+         'text': 'Return to the last bonfire?',
+         'table': 'Event_text_.fmg', 'sub': 'fmg-event-text'}]
 
 
 def test_upgrade_material_summarizes_the_whole_path():

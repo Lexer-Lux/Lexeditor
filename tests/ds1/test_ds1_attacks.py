@@ -147,13 +147,13 @@ def test_player_attacks_share_enemy_attack_keys_with_motion_value_presentation()
     assert by_key['atkPhys']['label'] == 'Physical (%)'
     assert by_key['atkPhys']['group'] == 'Motion values'
     assert 'Motion value' in by_key['atkPhys']['description'] and '100' in by_key['atkPhys']['description']
-    assert by_key['atkPhysCorrection']['label'] == 'Physical correction'
+    assert by_key['atkPhysCorrection']['label'] == 'Physical correction (%)'
     assert by_key['atkPhysCorrection']['group'] == 'Motion values'
     npc = {f['key']: f for f in doc.read_row('AtkParam_Npc', 100)['fields']}
     assert npc['atkPhys']['label'] == 'Physical (points)'
     assert npc['atkPhys']['group'] == 'Base damage'
     assert 'points of health' in npc['atkPhys']['description']
-    assert npc['atkPhysCorrection']['label'] == 'Physical correction'
+    assert npc['atkPhysCorrection']['label'] == 'Physical correction (%)'
     assert npc['atkPhysCorrection']['group'] == 'Base damage'
     assert 'impact' not in doc.read_row('AtkParam_Pc', 100)
 

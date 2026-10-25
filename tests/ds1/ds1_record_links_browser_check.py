@@ -3,8 +3,9 @@
 A goods row with an item, a spell and a dialog reference shows a
 hoverable face plus a finder button for each record link (clicking the
 face opens the linked record; the button opens the shared thing finder
-to hold-to-choose another target), and the dialog line beside its
-number. An accessory's effect link is picked from the Effects tab and
+to hold-to-choose another target), and the dialog line as a hoverable
+message face with its own finder. An accessory's effect link is picked
+from the Effects tab and
 opens it from its face. Linked items show their menu icons; a
 missing target stays text with no icon.
 """
@@ -47,6 +48,26 @@ def face(page, key):
     return page.locator(f'.ds1-reference-face[data-field-key="{key}"]:visible')
 
 
+def release_hold(page):
+    # Releasing over the candidate's old spot clicks the list row that
+    # took its place after navigation and reselects mid-test. The
+    # divider swallows a bare click, so release there instead. The DOM
+    # rebuilds under us while navigating, so retry until one sticks.
+    box = None
+    for _ in range(30):
+        divider = page.locator('.lex-list-detail-divider').first
+        try:
+            divider.wait_for(timeout=2000)
+        except Exception:
+            continue
+        box = divider.bounding_box()
+        if box:
+            break
+    assert box, 'no divider to release the hold over'
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    page.mouse.up()
+
+
 def show_face(page, key):
     """Click through the record's panel tabs until the link face shows."""
     tabs = page.locator('.lex-tabbed-panel [data-subtab]')
@@ -85,7 +106,8 @@ def main():
     poke(document, 'Magic', 102, 'iconId', 1)
     poke(document, 'EquipParamGoods', 103, 'magicId', 400)
     raw = document.export()
-    menu = make_menu_archive(extra={'Event_text_.fmg': {10010710: 'Use it? Yes or no?'}})
+    menu = make_menu_archive(extra={'Event_text_.fmg': {10010710: 'Use it? Yes or no?',
+                                                                 10010711: 'Really use it?'}})
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-links-') as temp:
         temp = Path(temp)
         game, mod = temp / 'game', temp / 'mod'
@@ -205,7 +227,7 @@ def main():
                     page.mouse.down()
                     page.wait_for_function(
                         'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
-                    page.mouse.up()
+                    release_hold(page)
                     wanted = int(picked[0].split(':')[1])
                     assert wanted != before
                     page.wait_for_function(
@@ -214,12 +236,57 @@ def main():
                         arg=wanted)
                     show_face(page, 'replaceItemId')
                     assert picked[1] in face(page, 'replaceItemId').inner_text()
-                    # The dialog line reads beside its number.
+                    # The dialog line is a hoverable message face with a finder.
                     show_field(page, 'yesNoDialogMessageId')
                     dialog = page.locator(
                         '.ds1-dialog-row [data-field-key="yesNoDialogMessageId"][data-lex-dialog]')
                     assert dialog.count() == 1
-                    assert dialog.input_value() == 'Use it? Yes or no?'
+                    assert 'lex-hoverable' in (dialog.get_attribute('class') or '')
+                    assert dialog.inner_text() == 'Use it? Yes or no?'
+                    dialog.hover()
+                    preview = page.locator('.lex-hover-preview').first
+                    preview.wait_for()
+                    assert 'Use it? Yes or no?' in preview.inner_text()
+                    finder = page.locator(
+                        '.ds1-reference-field:has(.ds1-dialog-row) .ds1-find-reference')
+                    assert 'lex-thing-finder' in (finder.get_attribute('class') or '')
+                    # Clicking the face opens the message in the Text tab.
+                    dialog.click()
+                    page.wait_for_function('state.tab === "text" && state.sub === "fmg-event-text"'
+                        ' && state.row?.table === "Event_text_.fmg" && state.row?.id === 10010710')
+                    page.locator('button[data-tab="items"]').click()
+                    page.wait_for_function('state.tab === "items" && state.sub === "consumables"'
+                        ' && state.row?.table === "EquipParamGoods" && state.row?.id === 100'
+                        ' && !state.pending')
+                    # The finder holds another message to choose it like any edit.
+                    show_field(page, 'yesNoDialogMessageId')
+                    page.locator(
+                        '.ds1-reference-field:has(.ds1-dialog-row) .ds1-find-reference').click()
+                    page.wait_for_function('state.tab === "text" && state.sub === "fmg-event-text"')
+                    page.wait_for_function(
+                        "document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    picked = page.evaluate("""() => {
+                      const rows = [...document.querySelectorAll('.lex-search-candidate')];
+                      const other = rows.find(row => row.getAttribute('data-key')
+                        !== 'Event_text_.fmg:10010710');
+                      return other.getAttribute('data-key');
+                    }""")
+                    assert picked == 'Event_text_.fmg:10010711', picked
+                    box = page.locator(f'.lex-search-candidate[data-key="{picked}"]'
+                                       ).bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function(
+                        'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    release_hold(page)
+                    page.wait_for_function(
+                        'state.sub === "consumables" && state.pending === 0'
+                        ' && state.row?.fields?.find(item => item.key === "yesNoDialogMessageId")'
+                        '?.value === 10010711')
+                    show_field(page, 'yesNoDialogMessageId')
+                    assert page.locator(
+                        '.ds1-dialog-row [data-field-key="yesNoDialogMessageId"][data-lex-dialog]'
+                        ).inner_text() == 'Really use it?'
                     # An effect link is picked from the Effects tab itself.
                     page.locator('[data-subtab="rings"]').click()
                     page.wait_for_function('state.sub === "rings" && state.row && !state.pending')
@@ -247,7 +314,7 @@ def main():
                     page.mouse.down()
                     page.wait_for_function(
                         'document.querySelector(".lex-searcher-bar") === null', timeout=10000)
-                    page.mouse.up()
+                    release_hold(page)
                     effect_wanted = int(picked[0].split(':')[1])
                     assert effect_wanted != effect_before
                     page.wait_for_function(

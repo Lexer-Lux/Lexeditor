@@ -1131,7 +1131,12 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   line-height:1;
   font-weight:700;
 }
-.lex-header-icon{background:var(--lex-input-bg,var(--lex-panel-2));border:var(--lex-input-border,1px solid var(--lex-border));padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+/* Header buttons wear the thing-finder look: full-strength icon on
+   the near-black box with the dim bronze border, never the loud
+   border with a dimmed icon. Sizing stays with the context (the
+   detail header keeps its fixed square; row buttons keep filling
+   their row). */
+.lex-header-icon{background:var(--lex-input-bg,var(--lex-panel-2));border:var(--lex-input-border,1px solid var(--lex-border));border-color:var(--lex-input-border-color,var(--lex-border));padding:2px;cursor:pointer;color:var(--lex-text);opacity:1;}
 .lex-header-icon:hover{opacity:1;}
 .lex-header-icon>svg{width:16px;height:16px;vertical-align:middle;}
 .lex-header-icon:disabled{opacity:.3;cursor:default;}
@@ -1443,6 +1448,14 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   background:var(--lex-input-bg, var(--lex-panel-2));
 }
 .lex-detail-field-control > .lex-column-pin { position:absolute;z-index:5;top:4px;right:4px; }
+/* Every single-line value box stands the same height: the boolean box
+   already stood 26px while inputs stood 26.3 and selects 28, so rows
+   breathed with their control. Textareas size to content, listboxes
+   to their rows, and cells and instruction bars own theirs already. */
+.lex-detail-field-control :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="reset"]),
+  select:not([multiple]):not([size]), select[size="1"]) {
+  height:26px;
+}
 .lex-tabbed-panel { display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden; }
 .lex-tabbed-panel > .lex-tabbed-panel-tabs { flex:0 0 auto; }
 .lex-tabbed-panel-content.lex-tabbed-panel-empty { display:grid; align-content:center; }
@@ -2802,6 +2815,7 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 /* A part of a control group keeps its pin one level down, in its control box.
    Without this an unpinned part's pin could never be seen again. */
 .lex-detail-part:hover > .lex-detail-part-control > .lex-column-pin:not(.pinned),
+.lex-detail-panel-icon:hover > .lex-column-pin:not(.pinned),
 /* The ghost is what an empty pin looks like before it is used. A pin that is
    already in the column keeps its own colour while the row is pointed at:
    dimming it to the ghost made the pin read as absent. */
@@ -4428,6 +4442,12 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }
 .lex-curve-variable-c { color:#f1d34f; fill:#f1d34f; }
 .lex-curve-variable-d { color:#7fd777; fill:#7fd777; }
+/* Family keys after FF8: thresholds orange, values violet, shapes
+   teal, and cost fields a quiet gray (they never enter the curve). */
+.lex-curve-variable-t { color:#ff9e5e; fill:#ff9e5e; }
+.lex-curve-variable-v { color:#c792ea; fill:#c792ea; }
+.lex-curve-variable-s { color:#5fd7d7; fill:#5fd7d7; }
+.lex-curve-variable-cost { color:#9aa4b2; fill:#9aa4b2; }
 .lex-curve-variable-highlight { text-decoration:underline; }
 .lex-curve-path-formula:has([data-curve-variable]) { pointer-events:auto; }
 .lex-curve-path-formula [data-curve-variable] { pointer-events:bounding-box; }
@@ -4564,6 +4584,12 @@ button.lex-thing-finder:not(.lex-thing-finder-custom) { display:grid; place-item
 .lex-choice-field > button svg,
 .lex-record-card-action > button svg,
 button.lex-thing-finder:not(.lex-thing-finder-custom) svg { width:1em; height:1em; }
+/* The finder is a square that fills its row: it stretches to the row
+   height and the 1:1 ratio sets the width from it, so it grows and
+   shrinks with the space around it the way row header buttons do.
+   Where the row gives no height (an indefinite flex rail) the floor
+   matches the 26px single-line value boxes beside it. */
+button.lex-thing-finder:not(.lex-thing-finder-custom) { aspect-ratio:1/1; width:auto; min-width:0; align-self:stretch; height:100%; max-height:100%; min-height:max(26px,1.6em); }
 /* ---- Paged panes and graph grids --------------------------------------- */
 /* The one column fills the pane but never outgrows it: an auto column
    sized to the pager's min-content and pushed the bar past the panel's
@@ -7285,6 +7311,12 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   right:8px;
   left:auto;
   transform:none;
+}
+/* A stacked control's pin owns the corner: its copy button docks left
+   of the pin instead of under it (class descriptions showed both in
+   the same spot). */
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control:has(> .lex-column-pin) > .lex-copy-value {
+  right:30px;
 }
 /* Below two hundred pixels an inline field stacks like a stacked one: label
    above, control full width. Side by side that narrow, the lane and the value

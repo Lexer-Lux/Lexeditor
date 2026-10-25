@@ -134,6 +134,12 @@
 .ds1-icon-choice.current{border-color:currentColor;}
 .ds1-icon-choice:hover{border-color:currentColor;}
 .ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* The message face borrows the value box it replaces: same height as the
+   number beside it, muted italic like the read-only text it was. */
+.ds1-dialog-row>.lex-hoverable{flex:1 1 auto;min-width:0;height:26px;box-sizing:border-box;
+  background:var(--lex-input-bg);border:var(--lex-input-border);border-color:var(--lex-input-border-color);
+  border-radius:var(--lex-input-radius);padding:2px 6px;font-style:italic;color:var(--lex-muted);text-align:left;}
+.ds1-dialog-preview{white-space:pre-wrap;max-width:320px;}
 /* The selection details are narrow, and their longest name-plus-help
    ("Enemy" plus its mark) would otherwise shrink to the font floor. The
    floor is the framework's own lane minimum: wide enough that the names
@@ -142,7 +148,7 @@
 [data-maps-detail]{--lex-detail-label-floor:68px;}
 /* The file tabs' texture thumbnails share one wrapping row of squares,
    Models and Textures alike; each square is named under its picture. */
-.ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;}
+.ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;max-height:480px;overflow:auto;}
 .ds1-texture-tile{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;max-width:160px;}
 /* A 16-pixel placeholder texture would otherwise show as a speck:
    tiles never shrink below a glanceable size, and tiny art upscales
@@ -162,3 +168,14 @@
 .ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
 .ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
 .ds1-texture-help{flex:0 0 auto;display:flex;}
+/* The texture drawer's full-size stack carries its own scroller: the
+   drawer itself clips, so without this only the first texture shows. */
+.ds1-texture-drawer{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;padding:8px;}
+/* The hitbox viewer's model-point chips: small pickups in a wrapping,
+   capped strip. A slot's point field lights up while one hovers it. */
+.ds1-dummy-strip{display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow:auto;}
+.ds1-dummy-chip{background:var(--lex-input-bg);border:var(--lex-input-border);border-color:var(--lex-input-border-color);border-radius:var(--lex-input-radius);padding:2px 8px;cursor:grab;color:var(--lex-text);touch-action:none;}
+.ds1-dummy-chip:disabled{opacity:.4;cursor:default;}
+.ds1-hitbox-over{outline:2px solid var(--lex-accent);outline-offset:1px;border-radius:var(--lex-input-radius);}
+/* A message list preview clips to its cell: Blood writing runs long. */
+.ds1-message-preview{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

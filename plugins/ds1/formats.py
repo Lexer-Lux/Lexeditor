@@ -507,18 +507,31 @@ class Member:
 
 
 def members(plain):
-    # This adapter handles the measured PC Remastered uncompressed-member shape.
-    if len(plain) < 32 or plain[:4] != b'BND3' or plain[12:16] != b'\x74\0\0\0':
+    # PC Remastered binders come as 07D7 (header word 0x74: params, most
+    # models; 24-byte records with an unpacked-size field) and the older
+    # 07C1/07F3 (header word 0x70: early characters, the Centipede family;
+    # 20-byte records with no unpacked size, every observed member stored
+    # plain). Names parse the same; the per-member bounds checks below
+    # still apply either way.
+    if len(plain) < 32 or plain[:4] != b'BND3' or plain[12:16] not in (b'\x74\0\0\0', b'\x70\0\0\0'):
         raise FormatError('Unsupported BND3 format; expected PC Remastered parameters')
+    wide = plain[12:16] == b'\x74\0\0\0'
+    stride = 24 if wide else 20
     count, names_end = struct.unpack_from('<II', plain, 16)
-    directory_end = 32 + count * 24
+    directory_end = 32 + count * stride
     if not 1 <= count <= 4096 or not directory_end <= names_end <= len(plain):
         raise FormatError('Invalid BND3 directory')
     result = {}
     spans = []
     for index in range(count):
-        flags, size, offset, _id, name_offset, unpacked = struct.unpack_from('<6I', plain, 32 + index * 24)
-        if flags != 0x40 or size != unpacked or not names_end <= offset <= len(plain) - size:
+        at = 32 + index * stride
+        if wide:
+            flags, size, offset, _id, name_offset, unpacked = struct.unpack_from('<6I', plain, at)
+            stored = size != unpacked
+        else:
+            flags, size, offset, _id, name_offset = struct.unpack_from('<5I', plain, at)
+            stored = False
+        if flags != 0x40 or stored or not names_end <= offset <= len(plain) - size:
             raise FormatError('Compressed, overlapping or invalid BND3 member')
         if not directory_end <= name_offset < names_end:
             raise FormatError('BND3 name is outside its directory')
@@ -531,7 +544,10 @@ def members(plain):
             raise FormatError('BND3 name is not decodable')
         name = name.replace('\\', '/').rsplit('/', 1)[-1]
         if name in result:
-            raise FormatError('Duplicate BND3 member name')
+            # c3471 stores its event file twice, byte-identical: the
+            # first copy wins, and packing writes the same bytes to
+            # every twin record, so a save cannot split them.
+            continue
         result[name] = Member(name, offset, size)
         spans.append((offset, offset + size))
     spans.sort()
@@ -551,12 +567,17 @@ def pack(template, items):
     owned = members(template)
     if set(items) != set(owned):
         raise FormatError('Rebuilt binder members do not match its template')
+    # A rebuilt binder keeps its template's record width: repacking an
+    # older 20-byte binder with 24-byte records would corrupt it, and the
+    # header (version and width word) carries over untouched below.
+    wide = template[12:16] == b'\x74\0\0\0'
+    stride = 24 if wide else 20
     count = struct.unpack_from('<I', template, 16)[0]
-    directory_end = 32 + count * 24
+    directory_end = 32 + count * stride
     stored = []
     for index in range(count):
-        _flags, _size, _offset, file_id, name_offset, _unpacked = struct.unpack_from(
-            '<6I', template, 32 + index * 24)
+        record = struct.unpack_from('<6I' if wide else '<5I', template, 32 + index * stride)
+        _flags, _size, _offset, file_id, name_offset = record[:5]
         full = bytes(template[name_offset:template.find(b'\0', name_offset) + 1])
         base = full[:-1].decode('shift_jis').replace('\\', '/').rsplit('/', 1)[-1]
         stored.append((file_id, full, bytes(items[base])))
@@ -574,8 +595,12 @@ def pack(template, items):
         # payload, and only a payload with bytes moves to a 16-byte boundary.
         if data:
             out += b'\0' * (-len(out) % 16)
-        struct.pack_into('<6I', out, 32 + index * 24, 0x40, len(data), len(out),
-                         file_id, name_offset, len(data))
+        if wide:
+            struct.pack_into('<6I', out, 32 + index * stride, 0x40, len(data), len(out),
+                             file_id, name_offset, len(data))
+        else:
+            struct.pack_into('<5I', out, 32 + index * stride, 0x40, len(data), len(out),
+                             file_id, name_offset)
         out += data
     return bytes(out)
 
@@ -1661,11 +1686,15 @@ class ItemDocument:
         dialogs = []
         wanted = DIALOG_TEXT_FIELDS.get(table, ()) if self.menu_texts is not None else ()
         if wanted:
+            from .texts import EVENT_TEXT_FILE
+            event_sub = next(tab for tab, _label, filename in FMG_SUBTABS
+                             if filename == EVENT_TEXT_FILE)
             for field in fields:
                 if field['key'] not in wanted:
                     continue
                 dialogs.append({'field': field['key'], 'id': field['value'],
-                                'text': self.menu_texts.event_text(field['value']) or ''})
+                                'text': self.menu_texts.event_text(field['value']) or '',
+                                'table': EVENT_TEXT_FILE, 'sub': event_sub})
         result['dialogLinks'] = dialogs
         if table == 'AtkParam_Npc': result['impact'] = self.attack_references().impact(row_id)
         return result

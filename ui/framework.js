@@ -2389,13 +2389,21 @@
       // width counts against the text like padding. Short values never bind
       // on it (the unit follows them instead), so only long values shrink.
       const parkedUnit = control.closest?.(".lex-unit-field")?.querySelector?.(":scope > .lex-unit");
-      const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
-        (Number.parseFloat(style.paddingRight) || 0) +
-        (Number.parseFloat(style.borderLeftWidth) || 0) +
-        (Number.parseFloat(style.borderRightWidth) || 0) +
-        (control instanceof HTMLSelectElement ? 22 : 2) +
-        (parkedUnit ? parkedUnit.offsetWidth || 0 : 0);
-      const available = Math.max(1, control.clientWidth - horizontal);
+      const padLeft = Number.parseFloat(style.paddingLeft) || 0;
+      const border = (Number.parseFloat(style.borderLeftWidth) || 0) +
+        (Number.parseFloat(style.borderRightWidth) || 0);
+      // A select face runs to its arrow: padding-right sits shadowed under
+      // the arrow zone, so counting it shrank faces like "Walk to Target"
+      // that fit with daylight to spare. The arrow glyph starts ~13px from
+      // the client edge (pixel-measured); 15 keeps a gap. An inner
+      // reference rail still paints over the face, so its lane counts.
+      const internalRail = control instanceof HTMLSelectElement ? Number.parseFloat(
+        style.getPropertyValue("--lex-internal-reference-width")) || 0 : 0;
+      const horizontal = control instanceof HTMLSelectElement
+        ? padLeft + border + 15 + internalRail
+        : padLeft + (Number.parseFloat(style.paddingRight) || 0) + border + 2;
+      const withUnit = horizontal + (parkedUnit ? parkedUnit.offsetWidth || 0 : 0);
+      const available = Math.max(1, control.clientWidth - withUnit);
       const value = control instanceof HTMLSelectElement
         ? control.selectedOptions[0]?.textContent || ""
         : readOnlyBox ? (control.value ?? control.textContent ?? "").trim()
@@ -4613,7 +4621,20 @@
     : position === 11 ? "-"
     : position === 12 ? "=" : "");
 
-  const mathFormula = (source) => {
+  const mathFormula = (source, options = {}) => {
+    // A curve's variables decide which identifiers take a color: each
+    // spelling (the label plus its extra tokens) maps to its key, so
+    // DS1's T_lo lights with the T1-T5 family while FF8's A-D keep
+    // their letters. No variables means no coloring anywhere.
+    const spellings = new Map();
+    for (const variable of options.variables || []) {
+      const key = String(variable.key || variable.label || "").trim().toLocaleLowerCase();
+      if (!key) continue;
+      for (const spelling of [variable.label, ...(variable.tokens || [])]) {
+        const text = String(spelling || "").trim();
+        if (text && !spellings.has(text)) spellings.set(text, key);
+      }
+    }
     const [expression, ...notes] = String(source).split(";");
     const normalized = expression.replaceAll("−","-").replaceAll("·","*")
       .replaceAll("×","*").replaceAll("⌊","floor(").replaceAll("⌋",")").replaceAll("²","^2");
@@ -4638,7 +4659,8 @@
       if (/^\d/.test(token)) return node("mn", token);
       if (!/^[A-Za-z_]/.test(token)) throw new Error("Unexpected token");
       const name = node("mi", token);
-      if (/^[ABCD]$/.test(token)) name.setAttribute("class", `lex-curve-variable-${token.toLowerCase()}`);
+      const colored = spellings.get(token);
+      if (colored) name.setAttribute("class", `lex-curve-variable-${colored}`);
       if (tokens[index] !== "(") return name;
       index++;
       const argument = parse(1);
@@ -4757,14 +4779,23 @@
     formulaPath.setAttribute("href", `#${formulaGuideId}`);
     formulaPath.setAttribute("startOffset", "50%");
     formulaPath.setAttribute("text-anchor", "middle");
-    const curveVariableKeys = (options.variables || []).map(variable =>
-      String(variable.label || "").trim()).filter(Boolean);
-    const curveVariableSet = new Set(curveVariableKeys.map(key => key.toLocaleLowerCase()));
+    const curveVariables = (options.variables || []).map(variable => ({
+      key: String(variable.key || variable.label || "").trim().toLocaleLowerCase(),
+      spellings: [variable.label, ...(variable.tokens || [])].map(spelling =>
+        String(spelling || "").trim()).filter(Boolean),
+    })).filter(entry => entry.key && entry.spellings.length);
+    const curveVariableSet = new Set(curveVariables.map(entry => entry.key));
+    const spellingKey = new Map();
+    for (const entry of curveVariables)
+      for (const spelling of entry.spellings)
+        if (!spellingKey.has(spelling.toLocaleLowerCase()))
+          spellingKey.set(spelling.toLocaleLowerCase(), entry.key);
+    const curveVariableKeys = curveVariables.map(entry => entry.key);
     const formulaContent = source => {
       if (source?.cloneNode) return source.cloneNode(true);
       const text = String(source ?? "");
-      if (!curveVariableKeys.length) return text;
-      const escaped = curveVariableKeys
+      if (!spellingKey.size) return text;
+      const escaped = [...spellingKey.keys()]
         .sort((left, right) => right.length - left.length)
         .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
       const matcher = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
@@ -4772,8 +4803,8 @@
       let offset = 0;
       for (const match of text.matchAll(matcher)) {
         if (match.index > offset) fragment.append(text.slice(offset, match.index));
-        const key = match[0].toLocaleLowerCase();
-        fragment.append(element("span", {class: `lex-curve-variable-${key}`}, match[0]));
+        fragment.append(element("span",
+          {class: `lex-curve-variable-${spellingKey.get(match[0].toLocaleLowerCase())}`}, match[0]));
         offset = match.index + match[0].length;
       }
       if (offset < text.length) fragment.append(text.slice(offset));
@@ -4834,7 +4865,7 @@
     }, "BARS");
     const variables = element("div", {class: "lex-curve-variables lex-curve-variable-strip"},
       ...(options.variables || []).map(variable => {
-        const key = String(variable.label || "").trim().toLocaleLowerCase();
+        const key = String(variable.key || variable.label || "").trim().toLocaleLowerCase();
         return element("label", {class: "lex-curve-variable", "data-curve-variable": key},
           element("span", {class: `lex-curve-variable-name lex-curve-variable-${key}`}, variable.label), variable.control);
       }),
@@ -10752,8 +10783,12 @@ ${contents.path}`});
     };
     let gameRunning = false, gameCanLaunch = true, gameBusy = false;
     const renderGameProcess = (running, canLaunch = gameCanLaunch) => {
-      gameRunning = !!running;
-      gameCanLaunch = canLaunch !== false;
+      const nextRunning = !!running;
+      const nextCanLaunch = canLaunch !== false;
+      if (nextRunning === gameRunning && nextCanLaunch === gameCanLaunch && game.childElementCount)
+        return;
+      gameRunning = nextRunning;
+      gameCanLaunch = nextCanLaunch;
       game.replaceChildren(gameRunning ? stopIcon() : playIcon());
       game.title = gameRunning ? "Stop game" : gameCanLaunch ? "Launch game" : "Start this game from Steam";
       game.setAttribute("aria-label", game.title);
@@ -12313,8 +12348,12 @@ ${contents.path}`});
     });
     const refreshResponsive = () => {
       const fitted = fitResponsiveSizes(updateResponsive());
-      if (fitted) sizes = sizesWithMinimums(fitted);
-      root.style.setProperty('--lex-panel-layout-template', template(sizes));
+      // The fitted pixel shares render but never persist: persisting them
+      // rewrote the configured split (32/68 narrowed to 44/56), and the
+      // widened window never violated a minimum again, so panes froze
+      // narrow with their labels shrunk for the narrow room.
+      root.style.setProperty('--lex-panel-layout-template',
+        template(fitted ? sizesWithMinimums(fitted) : sizes));
     };
     refreshResponsive();
     if (typeof ResizeObserver !== "undefined") {
@@ -12911,6 +12950,9 @@ ${contents.path}`});
     const inline = options.inline === true;
     const pages = Math.max(1, Number(options.pages) || 1);
     const page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
+    // Paging past either end wraps to the other, like the master list: a
+    // wheel at the last page turns to the first instead of dying there.
+    const wraps = sharedSettingsSnapshot?.pageWrapAround !== false && pages > 1;
     const change = target => options.change?.(Math.max(0, Math.min(target, pages - 1)));
     const pageInput = element("input", {
       class: "lex-page-number", type: "text", inputmode: "numeric", value: page + 1,
@@ -12945,11 +12987,11 @@ ${contents.path}`});
     const last = !total ? 0 : options.range ? options.range[1] : Math.min(total, first + pageSize - 1);
     const controls = element("div", {class: "lex-pager-controls"},
       button("<<", 0, page <= 0, "First page"),
-      button("<", page - 1, page <= 0, "Previous page"),
+      button("<", wraps && page <= 0 ? pages - 1 : page - 1, !wraps && page <= 0, "Previous page"),
       element("span", {class: "lex-page-position"},
         pageInput, element("span", {"aria-hidden": "true"}, "/"),
         element("span", {class: "lex-page-total", text: pages})),
-      button(">", page + 1, page + 1 >= pages, "Next page"),
+      button(">", wraps && page + 1 >= pages ? 0 : page + 1, !wraps && page + 1 >= pages, "Next page"),
       button(">>", pages - 1, page + 1 >= pages, "Last page"));
     const filters=options.filters || [];
     const createControls=filters.filter(control=>control?.matches?.('.lex-new-button'));
@@ -13425,10 +13467,15 @@ ${contents.path}`});
       const filler = element("div", {
         class: "lex-list-row lex-column-list-row lex-filler-row", role: "row", "aria-hidden": "true",
       });
+      const keys = [...header.querySelectorAll(".lex-column-list-head-cell")]
+        .map(cell => cell.dataset.columnKey || null);
       for (let column = 0; column < cells; column++) {
         // Mirror a real cell's structure, including its content span, so the
-        // filler rows line up exactly with the barrel beside them.
-        filler.append(element("div", {class: "lex-column-list-cell", role: "cell"},
+        // filler rows line up exactly with the barrel beside them. The key
+        // rides along so a lit column glows to the bottom of the panel
+        // instead of stopping at the last real row.
+        filler.append(element("div", {class: "lex-column-list-cell", role: "cell",
+          "data-column-key": keys[column] || null},
           element("span", {class: "lex-column-cell-content"}, "​")));
       }
       node.append(filler);
@@ -15717,8 +15764,8 @@ ${contents.path}`});
       if (settingsPanels.length) sections.push(detailSection({title: "SETTINGS", body: settingsPanels}));
       sections.push(
         detailSection({title: "DETAILS", body: [
-          detailField({label: "NAME", control: textControl(row, "name", "Name")}),
-          detailField({label: "AUTHOR", control: textControl(row, "author", "Author")}),
+          detailField({label: "NAME", property: "name", control: textControl(row, "name", "Name")}),
+          detailField({label: "AUTHOR", property: "author", control: textControl(row, "author", "Author")}),
           detailField({label: "DESCRIPTION", control: textControl(row, "description", "Description", true)}),
           detailField({label: "CREDITS", control: textControl(row, "credits", "Credits", true)})]}),
         ...((row.requirements?.length || row.requirementsError) ? [detailSection({title: "REQUIRES", body: [
@@ -15728,7 +15775,7 @@ ${contents.path}`});
               : need.enabled ? "Switched on" : "Switched off")}))]})] : []),
         detailSection({title: "SOURCE", body: [
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
-          ...(row.version ? [detailField({label: "VERSION", control: readonlyField(row.version)})] : []),
+          ...(row.version ? [detailField({label: "VERSION", property: "version", control: readonlyField(row.version)})] : []),
         ]}));
       if (selected !== contentsMod) {
         contentsMod = selected;
@@ -16712,9 +16759,26 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       }
     }
     let size = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
-    while (size > LABEL_MIN_PX && !labels.every(labelFits)) {
-      size = Math.max(LABEL_MIN_PX, size - .5);
+    // Largest uniform size where every label fits: binary search over the
+    // same half-pixel steps the old loop walked one by one, so a sweep
+    // costs a few measures instead of a forced layout per step per drop.
+    if (!labels.every(labelFits)) {
+      const start = size;
+      const steps = Math.max(0, Math.round((start - LABEL_MIN_PX) / .5));
+      let lo = 0, hi = steps, best = steps;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const candidate = Math.max(LABEL_MIN_PX, start - mid * .5);
+        labels.forEach(label => { label.style.fontSize = `${candidate}px`; });
+        if (labels.every(labelFits)) { best = mid; hi = mid - 1; }
+        else lo = mid + 1;
+      }
+      size = Math.max(LABEL_MIN_PX, start - best * .5);
       labels.forEach(label => { label.style.fontSize = `${size}px`; });
+      while (size > LABEL_MIN_PX && !labels.every(labelFits)) {
+        size = Math.max(LABEL_MIN_PX, size - .5);
+        labels.forEach(label => { label.style.fontSize = `${size}px`; });
+      }
     }
     for (const label of labels) {
       if (label.scrollWidth > label.clientWidth) {
@@ -16733,16 +16797,25 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         const titleText=label.querySelector(':scope > .lex-detail-field-label-text');
         if(titleText&&!label.title)label.title=titleText.textContent.trim();
       }
-      // A wrapped name's box is as wide as its lane, not its longest line, so
-      // in a lane widened for a neighbour the help mark sat far past "Crit /
-      // bonus". The box hugs the longest line and the mark follows the name.
+    }
+    // Hugs batched after every floor: a wrapped name's box is as wide as
+    // its lane, not its longest line, so in a lane widened for a neighbour
+    // the help mark sat far past "Crit / bonus". Measure every name first,
+    // then place every mark: one layout for the reads, one for the writes.
+    // Each hug only narrows its own name, so measuring them together reads
+    // the same lines the old interleaved loop did.
+    const hugs = [];
+    for (const label of labels) {
       const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
       if (nameText && label.querySelector(':scope > .lex-field-help')) {
-        const range=document.createRange();range.selectNodeContents(nameText);
-        const lines=[...range.getClientRects()].filter(box=>box.width&&box.height);
-        const scale=nameText.getBoundingClientRect().width/(nameText.offsetWidth||1)||1;
-        if (lines.length>1) nameText.style.width=`${Math.ceil(Math.max(...lines.map(box=>box.width))/scale)+1}px`;
+        const range = document.createRange(); range.selectNodeContents(nameText);
+        const lines = [...range.getClientRects()].filter(box => box.width && box.height);
+        const scale = nameText.getBoundingClientRect().width / (nameText.offsetWidth || 1) || 1;
+        if (lines.length > 1) hugs.push([nameText, Math.ceil(Math.max(...lines.map(box => box.width)) / scale) + 1]);
       }
+    }
+    for (const [node, width] of hugs) node.style.width = `${width}px`;
+    for (const label of labels) {
       placeBooleanHelp(label);
       fitted.set(label, scopedFieldKey(label, base));
     }
@@ -16796,16 +16869,44 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         return space-inset;
       };
       const fits=()=>range.getBoundingClientRect().width<=room();
-      while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
+      // Largest size that fits: binary search over the same half-pixel
+      // steps instead of a forced layout per step.
+      if(!fits()){
+        const start=size,steps=Math.max(0,Math.round((start-LABEL_MIN_PX)/.5));
+        let lo=0,hi=steps,best=steps;
+        while(lo<=hi){
+          const mid=(lo+hi)>>1;
+          label.style.fontSize=`${Math.max(LABEL_MIN_PX,start-mid*.5)}px`;
+          if(fits()){best=mid;hi=mid-1;}
+          else lo=mid+1;
+        }
+        size=Math.max(LABEL_MIN_PX,start-best*.5);
+        label.style.fontSize=`${size}px`;
+        while(size>LABEL_MIN_PX&&!fits()){size=Math.max(LABEL_MIN_PX,size-.5);label.style.fontSize=`${size}px`;}
+      }
       fitted.set(label,fitKey(label));
       return;
     }
     // A record's name stops shrinking at 14px while wrapping can still help;
     // one long word that fits nowhere keeps shrinking to the shared floor
     // rather than being clipped.
-    for (const minimum of label.classList.contains('lex-detail-panel-name') ? [14, LABEL_MIN_PX] : [LABEL_MIN_PX]) {
+    // Largest size that fits: binary search over the same half-pixel
+    // steps the phased loop below used to walk. The phases shared one
+    // outcome (nothing runs between them), so one search answers both.
+    if (!labelFits(label)) {
+      const start = size, minimum = LABEL_MIN_PX;
+      const steps = Math.max(0, Math.round((start - minimum) / .5));
+      let lo = 0, hi = steps, best = steps;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        label.style.fontSize = `${Math.max(minimum, start - mid * .5)}px`;
+        if (labelFits(label)) { best = mid; hi = mid - 1; }
+        else lo = mid + 1;
+      }
+      size = Math.max(minimum, start - best * .5);
+      label.style.fontSize = `${size}px`;
       while (size > minimum && !labelFits(label)) {
-        size = Math.max(minimum,size-.5);
+        size = Math.max(minimum, size - .5);
         label.style.fontSize = `${size}px`;
       }
     }
@@ -17034,10 +17135,28 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // of a tab follows its own font.
     fitNavStrip(nav, laneChanged);
   }));
-  const fitAllLabels = (root, reset) => {
-    const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
+  const fitAllLabels = (root, reset, lanes) => {
+    // Shared-lane labels fit as one scope: fitting each label alone ran the
+    // whole scope sweep per label (quadratic), which made every property
+    // drop cost hundreds of milliseconds. Each scope fits once per frame,
+    // with its first label as the hint; the frame shares one map across
+    // every target so separate roots in one scope still fit but once.
+    const laneScopes = lanes || new Map();
+    const fit = label => {
+      labelSizeObserver.observe(label);
+      if (label.classList.contains('lex-detail-field-label') &&
+          !label.parentElement?.classList.contains('lex-detail-field-stacked')) {
+        const scope = fieldLabelScope(label);
+        if (scope) {
+          if (!laneScopes.has(scope)) laneScopes.set(scope, label);
+          return;
+        }
+      }
+      fitLabel(label);
+    };
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
+    if (!lanes) laneScopes.forEach((hint, scope) => fitFieldLabelScope(scope, hint));
     const scopes = new Set();
     const collect = label => {
       labelSizeObserver.observe(label);
@@ -17087,7 +17206,11 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       fitRoots = new Set();
       fitReset = false;
       if (targets === null || !targets.size) fitAllLabels(document, resetNow);
-      else for (const root of targets) if (root.isConnected) fitAllLabels(root, resetNow);
+      else {
+        const lanes = new Map();
+        for (const root of targets) if (root.isConnected) fitAllLabels(root, resetNow, lanes);
+        lanes.forEach((hint, scope) => fitFieldLabelScope(scope, hint));
+      }
     });
   };
   const labelObserver = new MutationObserver(records => {

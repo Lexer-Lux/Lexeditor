@@ -96,17 +96,23 @@ def build_tae():
     return bytes(out)
 
 
-def build_anibnd(members):
-    """A synthetic .anibnd.dcx: {name: payload} packed uncompressed."""
-    entries = sorted(members.items())
+def build_anibnd(members, wide=True):
+    """A synthetic .anibnd.dcx: {name: payload} packed uncompressed.
+
+    wide=False writes the older 20-byte records; a list of pairs
+    instead of a dict packs duplicate names, like c3471's twin
+    event file."""
+    pairs = members.items() if isinstance(members, dict) else members
+    entries = sorted(pairs)
+    stride = 24 if wide else 20
     names = ["N:/FRPG/data/MOTION/" + name for name, _ in entries]
     encoded = [name.encode("shift_jis") + b"\0" for name in names]
-    directory_end = 32 + len(entries) * 24
+    directory_end = 32 + len(entries) * stride
     names_end = directory_end + sum(map(len, encoded))
     plain = bytearray(names_end)
     plain[:4] = b"BND3"
     plain[4:12] = b"TEST0000"
-    plain[12] = 0x74
+    plain[12] = 0x74 if wide else 0x70
     struct.pack_into("<II", plain, 16, len(entries), names_end)
     name_offset = directory_end
     for (name, payload), raw in zip(entries, encoded):
@@ -119,8 +125,13 @@ def build_anibnd(members):
         if payload:
             while len(plain) % 16:
                 plain.append(0)
-        struct.pack_into("<6I", plain, 32 + index * 24, 0x40, len(payload),
-                         len(plain), index, name_offset, len(payload))
+        record = 32 + index * stride
+        if wide:
+            struct.pack_into("<6I", plain, record, 0x40, len(payload),
+                             len(plain), index, name_offset, len(payload))
+        else:
+            struct.pack_into("<5I", plain, record, 0x40, len(payload),
+                             len(plain), index, name_offset)
         name_offset += len(raw)
         plain.extend(payload)
     compressed = zlib.compress(bytes(plain), 9)

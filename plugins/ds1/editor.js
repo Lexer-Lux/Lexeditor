@@ -25,6 +25,50 @@ const assetRows=files=>(files||[]).filter(file=>state.tab==="sound"?file.kind===
       values:{size:file.size,...(kind?{kind}:{})},
       ...(kind?{display:{kind:kind==="archive"?"Split archive":"Textures"}}:{}),
       created:file.status==="new",modified:file.status==="modified",...(file.modelPick?{modelPick:file.modelPick}:{})};});
+// A container's own listing: a multi-texture TPF expands into one row
+// per texture (the Textures tab lists textures, not archives), while
+// single-texture files, split archives and anything unreadable keep
+// their file row. Counts come from the detail route, cached by path,
+// size and status, so a tab revisit refetches nothing and an upload
+// or removal re-expands on its new bytes.
+const textureListCache=new Map();
+const textureCacheKey=row=>`${row.id}|${row.values?.size}|${row.created?"new":row.modified?"modified":""}`;
+const textureExpandable=row=>row.table==="Asset"&&row.values?.kind!=="archive"
+  &&String(row.id||"").toLowerCase().replace(/\.dcx$/,"").endsWith(".tpf");
+function textureRow(fileRow,texture){
+  return {table:"AssetTexture",id:`${fileRow.id}#${texture.index}`,name:texture.name,
+    file:fileRow.id,member:texture.member||"",index:texture.index,
+    width:texture.width,height:texture.height,format:texture.format,
+    values:{file:fileRow.id,format:texture.format,width:texture.width,height:texture.height},
+    display:{kind:"Textures"},created:fileRow.created,modified:fileRow.modified};
+}
+async function expandTextureRows(rows){
+  const expandable=rows.filter(textureExpandable);
+  const missing=[...new Set(expandable.filter(row=>!textureListCache.has(textureCacheKey(row))).map(row=>row.id))];
+  // Bounded parallel reads: a full game ships hundreds of containers.
+  for(let at=0;at<missing.length;at+=6){
+    await Promise.all(missing.slice(at,at+6).map(async relative=>{
+      try{
+        const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(relative)}`);
+        const row=expandable.find(entry=>entry.id===relative);
+        textureListCache.set(textureCacheKey(row),(detail.textures||[]).filter(entry=>entry&&entry.name!==undefined));
+      }catch(_error){/* unreadable files keep their file row */}
+    }));
+  }
+  return rows.flatMap(row=>{
+    if(!textureExpandable(row))return [row];
+    const textures=textureListCache.get(textureCacheKey(row))||[];
+    if(textures.length<2)return [row];
+    return textures.map(texture=>textureRow(row,texture));
+  });
+}
+function remapTextureSelection(){
+  if(state.tab!=="textures"||!state.selected?.startsWith("Asset:"))return;
+  if(state.rows.some(row=>key(row)===state.selected))return;
+  const file=state.selected.slice("Asset:".length);
+  const first=state.rows.find(row=>row.table==="AssetTexture"&&row.file===file);
+  if(first)state.selected=key(first);
+}
 async function api(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();
@@ -199,6 +243,7 @@ function animMotionRows(view){
   const orphans=(view.orphans||[]).map(entry=>({table:"AnimMotion",
     id:`tae:${entry.tae}|${entry.taeIndex}`,name:entry.name,values:{},
     motion:{file:null,name:entry.name,binder:entry.binder,tae:entry.tae,taeIndex:entry.taeIndex,
+      eventCount:entry.events??0,
       available:false,reason:"This animation has events but no playable motion."}}));
   return [...motions,...orphans].sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true,sensitivity:"base"}));
 }
@@ -238,7 +283,7 @@ async function loadItems(){
   const result=await api(url);
   if(request!==recordsRequest||state.sub!==sub)return;
   if(wantSounds)state.rows=(result.rows||[]).map(row=>({...row,values:{bank:row.bank,length:formatSoundLength(row.duration||0),size:row.size}}));
-  else if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);}
+  else if(ASSET_TABS.has(state.tab)){state.assetFiles=result.files;state.rows=assetRows(result.files);if(state.tab==="textures"){state.rows=await expandTextureRows(state.rows);remapTextureSelection();}}
   else state.rows=result.rows;
   if(state.tab==="maps")await loadDirectory();
   state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
@@ -267,13 +312,15 @@ async function loadDetail(){
   if(!row&&state.tab==="maps"&&state.mapView){
     const light=(state.mapView.lights||[]).find(entry=>`${state.mapView.map}:${entry.key}`===state.selected);
     if(light)row={id:light.key,table:state.mapView.map,name:light.name};
+    const message=(state.mapView.messages||[]).find(entry=>`${state.mapView.map}:${entry.key}`===state.selected);
+    if(message)row={id:message.key,table:state.mapView.map,name:message.name};
   }
   if(!row||row.table==="AnimMotion"){state.row=null;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;state.assetDetail=null;return;}
-  if(row.table==="Asset"){
+  if(row.table==="Asset"||row.table==="AssetTexture"){
     state.assetDetail=null;state.assetSounds=null;
-    const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.id)}`);
+    const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(row.file||row.id)}`);
     if(state.selected!==key(row))return;
-    state.row={table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;
+    state.row=row.table==="AssetTexture"?{table:"AssetTexture",id:row.id,name:row.name,file:row.file,member:row.member,index:row.index,width:row.width,height:row.height,format:row.format}:{table:"Asset",id:row.id,name:row.name};state.assetDetail=detail;state.monsterAttacks=null;state.npcShop=null;state.thinkRow=null;state.monsterBehaviors=null;
     return;
   }
   if(row.table==="SoundStream"){
@@ -352,7 +399,7 @@ async function navigate(tab,sub=state.sub,selected=null){
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
-    if(tab==="maps"&&selected){state.mapTab="placements";if(String(selected).includes(".msb:"))state.dirTab="all";}
+    if(tab==="maps"&&selected){state.mapTab=String(selected).includes(".msb:message:")?"messages":"placements";if(String(selected).includes(".msb:"))state.dirTab="all";}
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
     state.error="";render();
     if(selected)revealSelection();
@@ -555,9 +602,13 @@ function modOnlySpec(){
     if(other===control||other===document.activeElement)continue;
     if(other.hasAttribute("data-lex-dialog")){
       const dialog=(state.row?.dialogLinks||[]).find(entry=>entry.field===propertyKey);
-      const text=dialog?(dialog.text||`(no dialog text ${dialog.id})`):"";
-      if("value" in other)other.value=text;else other.textContent=text;
-      other.title=dialog?.text||"";
+      const field=state.row?.fields?.find(item=>item.key===propertyKey);
+      if(dialog&&field&&other.isConnected)other.replaceWith(dialogFace(state.row,field,dialog));
+      else{
+        const text=dialog?(dialog.text||`(no dialog text ${dialog.id})`):"";
+        if("value" in other)other.value=text;else other.textContent=text;
+        other.title=dialog?.text||"";
+      }
       continue;
     }
     if(other.type==="checkbox")other.checked=!!value;
@@ -618,11 +669,13 @@ function commit(row,field,value,control,beforeOverride){
           const fresh=updates[updates.length-1].result.values||{};
           if(row.table===state.mapView.map){
             const lightRow=String(row.id).startsWith("light:");
-            const part=state.mapView.parts.find(entry=>entry.key===row.id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===row.id):null);
+            const messageRow=String(row.id).startsWith("message:");
+            const part=state.mapView.parts.find(entry=>entry.key===row.id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===row.id):messageRow?(state.mapView.messages||[]).find(entry=>entry.key===row.id):null);
             const pos=[fresh.posX,fresh.posY,fresh.posZ];
             if(part)part.pos=pos;
-            viewportCtl?.moveTo?.(row.id,pos);
-            if(!lightRow){
+            // Messages stand in no scene: the cached view moves, the viewport does not.
+            if(!messageRow)viewportCtl?.moveTo?.(row.id,pos);
+            if(!lightRow&&!messageRow){
               const rot=[fresh.rotX,fresh.rotY,fresh.rotZ],scale=[fresh.scaleX,fresh.scaleY,fresh.scaleZ];
               if(part){part.rot=rot;part.scale=scale;}
               viewportCtl?.turnTo?.(row.id,rot);
@@ -636,6 +689,13 @@ function commit(row,field,value,control,beforeOverride){
           const entry=(state.mapView.lights||[]).find(item=>item.key===row.id);
           const fresh=updates[updates.length-1].result.values||{};
           if(entry){if(fresh.posX!==undefined)entry.pos=[fresh.posX,fresh.posY,fresh.posZ];if(fresh.preset!==undefined)entry.preset=fresh.preset;}
+        }
+        if(row.table.endsWith(".msb")&&String(row.id).startsWith("message:")&&state.tab==="maps"&&state.mapView&&row.table===state.mapView.map){
+          // The messages list reads the view like the lights list, so a
+          // typed text edit refreshes the cached message itself.
+          const entry=(state.mapView.messages||[]).find(item=>item.key===row.id);
+          const fresh=updates[updates.length-1].result.values||{};
+          if(entry&&fresh.text!==undefined)entry.textId=fresh.text;
         }
         if(row.table.endsWith(".msb")&&field.key==="npcId"&&state.tab==="maps"){
           // An enemy swap can move a placement between the NPC and
@@ -775,6 +835,36 @@ function referencePicker(row,field,face,knownLink){
       const [tab,sub]=await finderTarget(link,value());await navigate(tab,sub);},
     origin:()=>navigate(source.tab,source.sub,source.selected),
     accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),face);face.value=String(picked);}});
+}
+// A Message Text ID shows its Event text as a hoverable face beside the
+// number: hover previews the message, clicking opens it in the Text tab.
+// The face carries the dialog sync marks, so an edit rebuilds it with
+// the fresh message in place.
+function dialogFace(row,field,dialog){
+  const marks={"data-field-key":field.key,"data-lex-dialog":""};
+  if(!dialog?.text)return readonlyField(dialog?`(no dialog text ${dialog.id})`:"",
+    {"aria-label":`${field.label} text`,title:dialog?.text||"",format:false,...marks});
+  const first=dialog.text.split("\n",1)[0].slice(0,80);
+  const face=hoverable({content:dialog.text,targetType:"ds1-text",
+    targetId:`${dialog.table}:${dialog.id}`,targetLabel:`${first} in Text`,
+    "aria-label":`${field.label} text: ${first}`,
+    preview:()=>el("div",{class:"ds1-dialog-preview"},dialog.text),
+    activate:()=>navigate("text",dialog.sub,`${dialog.table}:${dialog.id}`)});
+  face.dataset.fieldKey=field.key;
+  face.setAttribute("data-lex-dialog","");
+  return face;
+}
+function dialogPicker(row,field,dialog,input){
+  const clearEntry=Object.entries(field.enum||{}).find(([,label])=>label==="None");
+  const source={};
+  return LexeditorUI.thingFinderButton({class:"ds1-find-reference",label:`Change ${field.label}`,
+    disabled:state.readOnly||field.disabled,type:`ds1-${dialog.table}`,
+    clearValue:clearEntry?.[0],clearLabel:clearEntry?.[1],
+    prompt:`Choose the message for ${row.name}.`,
+    target:async()=>{Object.assign(source,{tab:state.tab,sub:state.sub,selected:state.selected,selection:state.selection});
+      await navigate("text",dialog.sub);},
+    origin:()=>navigate(source.tab,source.sub,source.selected),
+    accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),input);}});
 }
 // A Model ID earns the shared thing finder: the Models tab's binders
 // of its piece become hold-to-choose candidates, and the binder's
@@ -1134,10 +1224,11 @@ function fieldSections(row){
       control=el("span",{class:"ds1-reference-field"},control,referencePicker(row,field,face));
     }
     const dialog=dialogs.get(field.key);
-    if(dialog)control=el("span",{class:"ds1-dialog-row"},control,
-      readonlyField(dialog.text||`(no dialog text ${dialog.id})`,
-        {"aria-label":`${field.label} text`,"data-field-key":field.key,"data-lex-dialog":"",
-          title:dialog.text||"",format:false}));
+    if(dialog){
+      const input=control.querySelector?.("input")??control;
+      control=el("span",{class:"ds1-dialog-row"},control,dialogFace(row,field,dialog));
+      control=el("span",{class:"ds1-reference-field"},control,dialogPicker(row,field,dialog,input));
+    }
     if(fieldAssetLink&&field.editable){
       const face=control.matches?.(".ds1-asset-face")?control
         :control.querySelector?.(".ds1-asset-face")??control;
@@ -1256,10 +1347,10 @@ function recordIconCell(row){
   return picture;
 }
 function textureIconCell(row){
-  if(!row||row.table!=="Asset")return "";
+  if(!row||(row.table!=="Asset"&&row.table!=="AssetTexture"))return "";
   if(row.values&&row.values.kind==="archive")return "";
   const picture=el("img",{class:"lex-ds1-shop-icon",loading:"lazy",
-    src:`/api/assets/preview?file=${encodeURIComponent(row.id)}`,
+    src:`/api/assets/preview?file=${encodeURIComponent(row.file||row.id)}&member=${encodeURIComponent(row.member||"")}&index=${row.index||0}`,
     alt:"",draggable:"false","data-lex-no-image":"off"});
   picture.addEventListener("error",()=>{if(picture.isConnected)picture.remove();},{once:true});
   return picture;
@@ -1274,9 +1365,11 @@ function npcShopSection(){
       activate:()=>toggleShopLine(line,full)}),
     price:shopNumberControl(line,"value","price"),
     stock:shopNumberControl(line,"sellQuantity","stock")}));
-  return [detailSection({title:"Stock",body:[columnList({rows,key:row=>row.key,
+  // The tab is the header: the bare table owns the tab, and the opened
+  // line docks under it, with no repeated section title.
+  return [columnList({rows,key:row=>row.key,
     columns:[{key:"icon",label:"",width:"36px"},{key:"name",label:"Item",grow:1,align:"start"},
-      {key:"price",label:"Price",numeric:true},{key:"stock",label:"Stock",numeric:true}]}),full]})];
+      {key:"price",label:"Price",numeric:true},{key:"stock",label:"Stock",numeric:true}]}),full];
 }
 function monsterThinkSection(){
   const aiField=(state.row.fields||[]).find(item=>item.key==="aiThinkId");
@@ -1319,8 +1412,8 @@ function monsterBehaviorsSection(){
   if(!data)return LexeditorUI.loadingPanel({label:"Loading behaviors"});
   const head=detailField({label:"Behaviors ID",control:behaviorVariationControl(data.variation),
     help:infoHelp("The behavior set this enemy uses. Every behavior in the set is one move it can choose. Only existing sets are accepted.")});
-  if(!data.rows.length)return [detailSection({title:`Behavior set ${data.variation}`,body:[head,
-    LexeditorUI.detailNote(`Behavior set ${data.variation} holds no behaviors. This enemy cannot act.`)]})];
+  if(!data.rows.length)return [head,
+    LexeditorUI.detailNote(`Behavior set ${data.variation} holds no behaviors. This enemy cannot act.`)];
   const here=behaviorMatches();
   const size=state.pageSize;
   const pages=Math.max(1,Math.ceil(here.length/size));
@@ -1335,13 +1428,16 @@ function monsterBehaviorsSection(){
       preview:()=>move.target.kind==="attack"?attackPreview(move.target.id,move.target.table):recordPreview({kind:move.target.kind,table:move.target.table,id:move.target.id}),
       activate:()=>move.target.kind==="attack"?openAttack(move.target.id,move.target.table):openEffect({id:move.target.id})})
       :move.target.detail}));
-  return [detailSection({title:`Behavior set ${data.variation}`,body:[head,
+  // The tab is the header: the bare controls own the tab, the table
+  // takes the middle and the pager pins at its foot, with no repeated
+  // section title.
+  return [head,
     LexeditorUI.bottomSearch({key:"monster-behaviors",value:state.behaviorQuery,label:"Search behaviors",
       change:value=>{state.behaviorQuery=value;state.behaviorPage=0;render();}}),
     columnList({rows,key:row=>row.key,
       columns:[{key:"behavior",label:"Behavior",grow:1},{key:"calls",label:"Calls",grow:1}]}),
     LexeditorUI.pager({inline:true,stacked:true,pages,page:state.behaviorPage,total:here.length,pageSize:size,
-      change:value=>{state.behaviorPage=value;render();}})]})];
+      change:value=>{state.behaviorPage=value;render();}})]
 }
 function monsterAttacksSection(){
   const links=state.monsterAttacks;
@@ -1351,8 +1447,10 @@ function monsterAttacksSection(){
     name:hoverable({content:attack.name,targetType:"ds1-attack",targetId:attack.id,
       targetLabel:`${attack.name} in Attacks`,preview:()=>attackPreview(attack.id,attack.table),activate:()=>openAttack(attack.id,attack.table)}),
     route:attack.route}));
-  return detailSection({title:"Referenced attacks",body:[columnList({rows,key:row=>row.key,
-    columns:[{key:"name",label:"Attack",grow:1},{key:"route",label:"Route"}]})]});
+  // The tab is the header, so the bare table owns the tab below it with
+  // no repeated section title (framework.css fills a bare table tab).
+  return columnList({rows,key:row=>row.key,
+    columns:[{key:"name",label:"Attack",grow:1},{key:"route",label:"Route"}]});
 }
 function monsterDetail(groups){
   const links=state.monsterAttacks;
@@ -1381,7 +1479,7 @@ function monsterDetail(groups){
   // overrides may have drained the remembered tab (or the record under it
   // changed), and the panel falls back to the first live tab.
   const content=resolved=>resolved==="attacks"?monsterAttacksSection()
-    :resolved==="effects"?[detailSection({title:"Effects",body:effects})]
+    :resolved==="effects"?effects
     :resolved==="shop"?npcShopSection()
     :resolved==="ai"?monsterThinkSection()
     :resolved==="behaviors"?monsterBehaviorsSection()
@@ -1459,6 +1557,7 @@ function lightDetail(row,groups){
 }
 function msbDetail(row,groups){
   if(row.kind==="Light")return lightDetail(row,groups);
+  if(row.kind==="Message")return messageDetail(row,groups);
   // Coordinates first, with no header above them: the placement's own
   // position, rotation and scale are the instance, and the Placement
   // group below names what stands there.
@@ -1492,6 +1591,35 @@ function bytesToBase64(buffer){
   return btoa(text);
 }
 const formatSoundLength=seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,"0")}`;
+// One stream's bytes, fetched once: the heading player rebuilds on
+// every render, and the stream route serves no-store bytes, so a
+// server URL re-downloaded and server-side re-extracted the whole
+// stream on every render (open, every search keystroke, every
+// selection), serializing the app behind extracts. The first render
+// keeps the eager server URL for its play button; the landed bytes
+// swap it for a blob URL all later renders reuse. Single entry:
+// streams run to tens of megabytes, so only the current one is kept.
+const soundAudioCache={id:null,url:null,loading:null,failed:null};
+const soundStreamUrl=row=>`/api/sound/stream?file=${encodeURIComponent(row.bank||"")}&stream=${encodeURIComponent(row.name||"")}`;
+function soundAudioSrc(row){
+  const id=key(row);
+  if(soundAudioCache.id!==id){
+    if(soundAudioCache.url)URL.revokeObjectURL(soundAudioCache.url);
+    soundAudioCache.id=id;soundAudioCache.url=null;soundAudioCache.loading=null;soundAudioCache.failed=null;
+  }
+  if(!soundAudioCache.url&&!soundAudioCache.loading&&!soundAudioCache.failed&&row.bank&&row.name){
+    const wanted=id,url=soundStreamUrl(row);
+    soundAudioCache.loading=fetch(url).then(response=>{
+      if(!response.ok)throw new Error(`Could not load ${row.name}.`);
+      return response.blob();
+    }).then(blob=>{
+      if(soundAudioCache.id!==wanted)return;
+      soundAudioCache.url=URL.createObjectURL(blob);
+      soundAudioCache.loading=null;render();
+    }).catch(()=>{if(soundAudioCache.id===wanted){soundAudioCache.loading=null;soundAudioCache.failed=wanted;}});
+  }
+  return soundAudioCache.url||soundStreamUrl(row);
+}
 function renderSoundDetail(row){
   const bank=row.bank||"",stream=row.name||"";
   const body=[
@@ -1502,7 +1630,7 @@ function renderSoundDetail(row){
     detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...soundBankActions(row))})]})];
   return detailPanel({title:row.name,meta:formatSoundLength(row.duration||0),
     help:"The bank file holds this stream. Replacing the bank replaces every stream inside it.",
-    audio:{src:`/api/sound/stream?file=${encodeURIComponent(bank)}&stream=${encodeURIComponent(stream)}`,label:stream},
+    audio:{src:soundAudioSrc(row),label:stream},
     paginate:{unpaged:true},body});
 }
 function soundBankActions(row){
@@ -1540,7 +1668,7 @@ function renderAssetDetail(){
   const busy=state.assetBusy;
   const locked=state.readOnly||busy;
   const progress=state.assetUpload?`Uploading ${formatAssetSize(state.assetUpload.received)} of ${formatAssetSize(state.assetUpload.total)}`:"";
-  const previewUrl=texture=>`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.id)}&member=${encodeURIComponent(texture.member||"")}&index=${texture.index}`;
+  const previewUrl=texture=>`/api/assets/preview?side=${info.source}&file=${encodeURIComponent(row.file||row.id)}&member=${encodeURIComponent(texture.member||"")}&index=${texture.index}`;
   const textureHelp=texture=>infoHelp(`${texture.width} by ${texture.height}, ${texture.format}. Preview of the ${fromMod?"mod":"installed game"} file, shrunk to fit.`);
   // Vanilla-vs-mod already shows in the list (tinted names, pen nibs), so
   // the panel carries no SOURCE row; files join the mod through + in the
@@ -1548,14 +1676,14 @@ function renderAssetDetail(){
   const body=[];
   let icon=null,preview=null,help="",audio=null;
   if(state.tab==="models")({icon,preview,help}=assetModelPanel(row,info,body,previewUrl,textureHelp));
-  else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,info,body,previewUrl,textureHelp));
+  else if(state.tab==="textures")({icon,preview,help}=assetTexturePanel(row,row.table==="AssetTexture"?{...info,textures:singleTexture(info,row)}:info,body,previewUrl,textureHelp));
   else{
     help="Add this file to the mod with + in the header. The game loads the mod's copy once applied. Remove drops the mod's copy.";
     body.push(detailSection({title:"PREVIEW",body:[soundPreview({note:"No preview",
       help:infoHelp("Files play in the game. They have no picture to show.")})]}));
   }
   const actions=[
-    fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.id)},"Remove override"):null,
+    fromMod?el("button",{type:"button","data-asset-action":"remove",disabled:locked,onclick:()=>removeAssetOverride(row.file||row.id)},"Remove override"):null,
     progress?el("span",{role:"status"},progress):null].filter(Boolean);
   if(actions.length)body.push(detailSection({title:"ACTIONS",body:[detailField({label:"",control:actionRow(...actions)})]}));
   return detailPanel({title:row.name,actions:[assetUploadButton()],meta:formatAssetSize(info.size),icon,help,modelPreview:preview,paginate:{unpaged:true},audio,body,
@@ -1579,8 +1707,8 @@ async function uploadAsset(target,file,refresh){
     }
     state.assetBusy=false;state.assetUpload=null;
     if(refresh){await refresh();return;}
-    if(files){state.assetFiles=files;state.rows=assetRows(files);}
-    state.selected=`Asset:${target}`;
+    if(files){state.assetFiles=files;state.rows=assetRows(files);if(state.tab==="textures")state.rows=await expandTextureRows(state.rows);}
+    state.selected=`Asset:${target}`;remapTextureSelection();
     await loadDetail();render();
   }
   catch(error){state.assetBusy=false;state.assetUpload=null;render();notify(error);}
@@ -1591,8 +1719,8 @@ async function removeAssetOverride(target){
   state.assetBusy=true;render();
   try{
     const result=await api("/api/assets/remove",{relative:target});
-    state.assetFiles=result.files;state.rows=assetRows(result.files);
-    state.selected=`Asset:${target}`;state.row=null;state.assetDetail=null;
+    state.assetFiles=result.files;state.rows=assetRows(result.files);if(state.tab==="textures")state.rows=await expandTextureRows(state.rows);
+    state.selected=`Asset:${target}`;remapTextureSelection();state.row=null;state.assetDetail=null;
     await loadDetail();
   }
   catch(error){notify(error);}
@@ -1633,10 +1761,12 @@ function assetPreviewStrip(textures,previewUrl,textureHelp){
       if(!ctx){reveal();return;}
       ctx.drawImage(image,0,0);
       const pixels=ctx.getImageData(0,0,sample.width,sample.height).data;
-      const step=Math.max(1,Math.floor(pixels.length/4/256))*4;
-      const first=pixels[0]*65536+pixels[1]*256+pixels[2];
-      for(let at=0;at<pixels.length;at+=step){
-        if(pixels[at]*65536+pixels[at+1]*256+pixels[at+2]!==first){reveal();return;}
+      // Every pixel votes, alpha included: sampling one pixel in
+      // sixteen called a white texture with one red pixel blank.
+      const red=pixels[0],green=pixels[1],blue=pixels[2],alpha=pixels[3];
+
+      for(let at=4;at<pixels.length;at+=4){
+        if(pixels[at]!==red||pixels[at+1]!==green||pixels[at+2]!==blue||pixels[at+3]!==alpha){reveal();return;}
       }
       tile.classList.add("ds1-texture-blank");
       name.textContent=`${name.textContent} \u00b7 blank`;
@@ -1679,17 +1809,26 @@ function assetModelPanel(row,info,body,previewUrl,textureHelp){
       onClose:drawer=>{window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}}:null,
     help:"Add this file to the mod with + in the header. The game loads the mod's copy once applied. The magnifier opens the 3D model. Remove drops the mod's copy."};
 }
+// One texture row previews its own texture only; a stale index (the
+// container changed under it) falls back to the whole file.
+function singleTexture(info,row){
+  const match=(info.textures||[]).filter(entry=>entry.index===row.index&&(entry.member||"")===(row.member||""));
+  return match.length?match:info.textures||[];
+}
 function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   const textures=info.textures||[];
   if(textures.length){
     body.push(detailSection({title:"PREVIEW",body:[assetPreviewStrip(textures,previewUrl,textureHelp)]}));
     const first=textures[0];
+    if(row.table==="AssetTexture")body.push(
+      detailField({label:"FILE",control:readonlyField(row.file,{format:false}),
+        help:infoHelp("The container this texture ships in. Add and Remove replace the whole file.")}));
     return {icon:LexeditorUI.iconSlot({content:el("img",{src:previewUrl(first),alt:row.name,loading:"lazy"})}),
       preview:{label:`${row.name} textures`,
         openLabel:`View ${row.name} textures`,closeLabel:`Close ${row.name} textures`,
-        content:()=>LexeditorUI.stack(...textures.map(texture=>detailField({label:texture.name,
+        content:()=>el("div",{class:"ds1-texture-drawer"},LexeditorUI.stack(...textures.map(texture=>detailField({label:texture.name,
           control:el("img",{src:previewUrl(texture),alt:texture.name,style:"max-width:100%;height:auto"}),
-          help:textureHelp(texture)}))),
+          help:textureHelp(texture)})))),
         onClose:drawer=>drawer.replaceChildren()},
       help:"Add this file to the mod with + in the header. The game loads the mod's copy once applied. The magnifier shows every texture full-size. Remove drops the mod's copy."};
   }
@@ -1749,7 +1888,7 @@ function assetFilePicker(){
       if(!file){soundBankTarget=null;return;}
       if(soundBankTarget){const bank=soundBankTarget;soundBankTarget=null;void uploadAsset(bank,file,async()=>{await loadItems();render();});return;}
       const target=state.rows.find(row=>key(row)===state.selected);
-      if(target)void uploadAsset(target.id,file);};
+      if(target)void uploadAsset(target.file||target.id,file);};
     document.body.append(assetPicker);
   }
   return assetPicker;
@@ -1816,6 +1955,7 @@ function mapsNoun(){
   const table=state.row?.table||"";
   if(table==="ItemLotParam")return "Drop";
   if(table.endsWith(".msb")&&String(state.row?.id||"").startsWith("light:"))return "Light";
+  if(table.endsWith(".msb")&&String(state.row?.id||"").startsWith("message:"))return "Message";
   if(table==="ShopLineupParam")return "Shop entry";
   if(table==="ObjActParam")return "Treasure";
   return "Placement";
@@ -1823,12 +1963,12 @@ function mapsNoun(){
 function rowActionButtons(kind){
   const locked=state.readOnly||state.rowBusy;
   const playerStart=kind==="placement"&&state.row.kind==="Player";
-  const nouns=kind==="placement"?["placement","map"]:["record","table"];
+  const nouns=kind==="message"?["message","map"]:kind==="placement"?["placement","map"]:["record","table"];
   const light=kind==="light";
-  const goTo=(kind==="placement"||light)
+  const goTo=(kind==="placement"||kind==="message"||light)
     ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
       title:`Show this ${kind} in the map viewport`,"aria-label":`Show this ${kind} in the map viewport`,
-      onclick:()=>light?goToLight(key(state.row)):goToPlacement(state.row.table,key(state.row))},targetIcon())]
+      onclick:()=>light?goToLight(key(state.row)):kind==="message"?goToMessage(key(state.row)):goToPlacement(state.row.table,key(state.row))},targetIcon())]
     :kind==="record"&&state.tab==="maps"&&state.row.table==="ItemLotParam"
     ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
       title:"Show where this drops in the map viewport","aria-label":"Show where this drops in the map viewport",
@@ -1853,7 +1993,43 @@ async function refreshMapsAfterStructure(){
   state.mapView=state.mapId?await api(`/api/map/view?map=${encodeURIComponent(state.mapId)}`):null;
   clampMapSelection();
 }
+// Messages duplicate through the placements route like placements,
+// but the fresh view must land before the detail reads it: message
+// rows ride the view, not the record lists.
+async function duplicateMessage(){
+  if(state.rowBusy||!state.row)return;
+  state.rowBusy=true;render();
+  try{
+    const result=await api("/api/placements/add",{map:state.row.table,id:state.row.id});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+    await loadItems();
+    state.selected=key(result.row);
+    if(state.tab==="maps")await refreshMapsAfterStructure();
+    await loadDetail();
+  }
+  catch(error){notify(error);}
+  finally{state.rowBusy=false;render();}
+}
+async function removeMessage(){
+  if(state.rowBusy||!state.row)return;
+  if(!await confirmAction({title:"Remove this message?",
+    message:"The message leaves the map. Its marker stays for anything else standing on it.",
+    confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
+  state.rowBusy=true;render();
+  try{
+    const result=await api("/api/placements/remove",{map:state.row.table,id:state.row.id});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
+    await loadItems();
+    if(state.tab==="maps")await refreshMapsAfterStructure();
+    const next=(state.mapView?.messages||[])[0];
+    state.selected=next?`${state.mapView.map}:${next.key}`:state.rows[0]?key(state.rows[0]):null;state.row=null;
+    await loadDetail();
+  }
+  catch(error){notify(error);}
+  finally{state.rowBusy=false;render();}
+}
 async function duplicateRow(kind){
+  if(kind==="message")return duplicateMessage();
   if(state.rowBusy||!state.row)return;
   const placement=kind==="placement";
   state.rowBusy=true;render();
@@ -1872,6 +2048,7 @@ async function duplicateRow(kind){
   finally{state.rowBusy=false;render();}
 }
 async function removeRow(kind){
+  if(kind==="message")return removeMessage();
   if(state.rowBusy||!state.row)return;
   const placement=kind==="placement";
   const impact=!placement&&state.tab==="attacks"&&state.row.impact
@@ -1938,15 +2115,15 @@ function curveDetail(actions,groups){
   };
   const variables=row.fields.map(field=>{
     const digit=Number(field.key.slice(-1));
-    const short=field.key.startsWith("stageMaxVal")?`T${digit+1}`
-      :field.key.startsWith("stageMaxGrowVal")?`V${digit+1}`
-      :field.key.startsWith("adjPt_maxGrowVal")?`S${digit+1}`
-      :field.key==="init_inclination_soul"?"C1":field.key==="adjustment_value"?"C2"
-      :field.key==="boundry_inclination_soul"?"C3":"C4";
+    const family=field.key.startsWith("stageMaxVal")?{short:`T${digit+1}`,key:"t",tokens:["T_lo","T_hi"]}
+      :field.key.startsWith("stageMaxGrowVal")?{short:`V${digit+1}`,key:"v",tokens:["V","V_lo","V_hi"]}
+      :field.key.startsWith("adjPt_maxGrowVal")?{short:`S${digit+1}`,key:"s",tokens:["S"]}
+      :{short:field.key==="init_inclination_soul"?"C1":field.key==="adjustment_value"?"C2"
+        :field.key==="boundry_inclination_soul"?"C3":"C4",key:"cost",tokens:[]};
     const control=plainControlFor(row,field);
     if(control instanceof Element&&field.label)control.title=field.label;
     control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
-    return {label:short,control};
+    return {label:family.short,key:family.key,tokens:family.tokens,control};
   });
   const ends=[0,1,2,3,4].map(i=>at(`stageMaxGrowVal${i}`));
   const floor=Math.min(0,...ends),ceil=Math.max(...ends);
@@ -1954,14 +2131,15 @@ function curveDetail(actions,groups){
     domain:{min:stages[0],max:stages[4]>stages[0]?stages[4]:stages[0]+1},
     range:{min:floor,max:ceil>floor?ceil:floor+1},
     graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate,
-    formula:LexeditorUI.mathFormula("V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S")});
+    formula:LexeditorUI.mathFormula("V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S",{variables})});
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=evaluate;
   host.append(graph);
-  return detailPanel({title:row.name,help:row.help,actions,paginate:{unpaged:true},
-    body:[detailSection({title:"GRAPH",
-      help:infoHelp("The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. On the line, T_lo and V_lo belong to the left stage, T_hi and V_hi to the right one. Edit every value from the variables drawer over the graph."),
-      body:[host]})]});
+  // A lone graph fills its tab: no section header around the only content.
+  // Its guidance joins the panel help bubble instead.
+  const graphHelp="The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. On the line, T_lo and V_lo belong to the left stage, T_hi and V_hi to the right one. Edit every value from the variables drawer over the graph.";
+  const panelHelp=typeof row.help==="string"&&row.help?`${row.help}\n\n${graphHelp}`:(row.help||graphHelp);
+  return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[host]});
 }
 function renderScriptDetail(){
   const info=state.scriptDetail;
@@ -2003,11 +2181,11 @@ function detail(){
   const title=state.row.name;
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
-  const meta=state.tab==="maps"&&state.row&&msbRowEarly?(state.row.kind==="Light"?`look ${state.row.preset}`:`model ${state.row.model}`):state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
+  const meta=state.tab==="maps"&&state.row&&msbRowEarly?(state.row.kind==="Light"?`look ${state.row.preset}`:state.row.kind==="Message"?`message ${state.row.textId}`:`model ${state.row.model}`):state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
-  const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons(state.row.kind==="Light"?"light":"placement"):paramRowEarly?rowActionButtons("record"):[];
+  const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons(state.row.kind==="Light"?"light":state.row.kind==="Message"?"message":"placement"):paramRowEarly?rowActionButtons("record"):[];
   if(state.row.table==="NpcParam")return armDs1Preview(detailPanel({title:state.row.name,actions:rowActionsEarly,body:[monsterDetail(groups)]}),state.row.table,state.row.id);
   if(state.tab==="stats"&&state.sub==="curves"&&paramRowEarly)return curveDetail(rowActionsEarly,groups);
   let help=state.row.help;
@@ -2037,7 +2215,7 @@ function detail(){
 const ds1PreviewAvailability=new Map();
 // The open enemy viewer's refresh, when one is open: undo and redo
 // repaint it instead of re-rendering the page out from under it.
-let chrDrawerRefresh=null;
+let chrDrawerRefresh=null,chrFieldsSeq=0;
 // Label kinds with equipment-screen art (icons.py); anything else keeps the
 // shared fallback glyph.
 const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
@@ -2227,7 +2405,13 @@ async function chrDrawerContent(target){
       const result=await api(`/api/row?table=AtkParam_Npc&id=${attackId}&sub=attacks`);
       if(!wrap.isConnected)return;
       const attackRow={table:"AtkParam_Npc",id:attackId,name:result.row.name,fields:result.row.fields};
-      fieldsHost.replaceChildren(chrHitboxFields(attackRow,refreshSoon));
+      // The body's own fields ride along: the hurtbox edits beside its hitboxes.
+      const npcResult=await api(`/api/row?table=NpcParam&id=${target.npc}`).catch(()=>null);
+      if(!wrap.isConnected)return;
+      const npcRow=npcResult?.row?{table:"NpcParam",id:target.npc,name:npcResult.row.name,fields:npcResult.row.fields}:null;
+      fieldsHost.replaceChildren(chrHitboxFields(attackRow,chrDummies(view),refreshSoon),...(npcRow?[chrBodyFields(npcRow,refreshSoon)]:[]));
+      // Test seam: each completed fields paint bumps the generation.
+      fieldsHost.dataset.fieldsSeq=String(++chrFieldsSeq);
     }catch(error){
       if(wrap.isConnected)fieldsHost.replaceChildren(LexeditorUI.detailNote("Could not read the attack."));
       notify(error);
@@ -2258,27 +2442,105 @@ function chrAttackList(attacks,selectedId,onPick){
     columns:[{key:"name",label:"Attack",grow:1},
       {key:"route",label:"Route",render:row=>String(row.values.route||"")}]});
 }
-function chrHitboxFields(attackRow,afterEdit){
+// The viewed model's anchor points: hitbox drop targets read them.
+function chrDummies(view){
+  const chrs=view?.chrs||[];
+  return (chrs.find(entry=>entry.available)||chrs[0])?.dummies||[];
+}
+// A slot's point field doubles as a drop target: a dropped model
+// point re-anchors the hitbox, and the viewer repaints on landing.
+function hitboxPointDrop(shared,def){
+  return el("span",{class:"ds1-hitbox-drop","data-point-field":def.key},shared);
+}
+// A chip drags by pointer, like a panel label: past a few pixels the
+// point field under the pointer lights up, and releasing over one
+// re-anchors the hitbox there.
+function dummyChipDrag(chip,attackRow,defs,afterEdit,dummyId){
+  let down=null;
+  const clear=()=>document.querySelectorAll(".ds1-hitbox-over")
+    .forEach(node=>node.classList.remove("ds1-hitbox-over"));
+  const under=event=>event.clientX===undefined?null
+    :document.elementFromPoint(event.clientX,event.clientY)?.closest("[data-point-field]");
+  chip.addEventListener("pointerdown",event=>{
+    if(state.readOnly||event.button!==0)return;
+    down={x:event.clientX,y:event.clientY};
+    try{chip.setPointerCapture(event.pointerId);}catch(_ignored){}
+  });
+  chip.addEventListener("pointermove",event=>{
+    if(!down)return;
+    if(Math.hypot(event.clientX-down.x,event.clientY-down.y)<4)return;
+    if(event.cancelable)event.preventDefault();
+    clear();
+    under(event)?.classList.add("ds1-hitbox-over");
+  });
+  const drop=event=>{
+    if(!down)return;
+    down=null;
+    const target=under(event);
+    clear();
+    if(!target)return;
+    const def=defs.get(target.dataset.pointField);
+    if(!def)return;
+    commit(attackRow,def,dummyId,target.querySelector("input,select")||target);
+    afterEdit();
+  };
+  chip.addEventListener("pointerup",drop);
+  chip.addEventListener("pointercancel",()=>{down=null;clear();});
+}
+function chrHitboxFields(attackRow,dummies,afterEdit){
   const defs=new Map((attackRow.fields||[]).map(field=>[field.key,field]));
   const body=[];
   for(let slot=0;slot<4;slot++){
     for(const key of [`hit${slot}_Radius`,`hit${slot}_DmyPoly1`,`hit${slot}_DmyPoly2`]){
       const def=defs.get(key);
       if(!def)continue;
-      const input=el("input",{type:"number",value:String(def.value),"aria-label":def.label,
-        ...(state.readOnly?{disabled:true,title:"Open a mod project to edit hitboxes"}:{})});
-      input.addEventListener("change",()=>{
-        if(state.readOnly)return;
-        commit(attackRow,{key:def.key,label:def.label,editable:true},Number(input.value),input);
-        afterEdit();
-      });
+      // The Attacks tab's own controls: units, bounds and the vanilla
+      // reference ride along, and the viewer repaints after each edit.
+      const shared=controlFor(attackRow,def);
+      shared.addEventListener("change",()=>afterEdit());
+      const point=/^hit\d_DmyPoly[12]$/.test(def.key);
+      const input=point?hitboxPointDrop(shared,def):shared;
+
+
+
+
+
+
       body.push(detailField({label:def.label,control:input,
         ...(def.description?{help:infoHelp(def.description)}:{})}));
     }
   }
+  if(dummies.length){
+    const strip=el("div",{class:"ds1-dummy-strip",role:"list"});
+    for(const dummy of dummies){
+      const chip=el("button",{type:"button",class:"ds1-dummy-chip",disabled:state.readOnly,
+        "data-dummy":String(dummy.id),"aria-label":`Model point ${dummy.id}`,
+        title:"Drag onto a slot's point field to move the hitbox there"},`#${dummy.id}`);
+      dummyChipDrag(chip,attackRow,defs,afterEdit,dummy.id);
+      strip.append(chip);
+    }
+    body.push(detailField({label:"Model points",control:strip,
+      help:infoHelp("The viewed model's anchor points. Drag one onto a slot's First or Second point to move that hitbox there.")}));
+  }
   body.push(actionRow(el("button",{type:"button",onclick:()=>openAttack(attackRow.id,attackRow.table)},
     `Edit ${attackRow.name||"attack"} in Attacks`)));
   return detailSection({title:"Hitboxes",body});
+}
+// The body's own hurtbox beside its hitboxes: radius, height and
+// vertical shift, through the same shared controls as every tab.
+function chrBodyFields(npcRow,afterEdit){
+  const defs=new Map((npcRow.fields||[]).map(field=>[field.key,field]));
+  const body=[];
+  for(const name of ["hitRadius","hitHeight","hitYOffset"]){
+    const def=defs.get(name);
+    if(!def)continue;
+    const shared=controlFor(npcRow,def);
+    shared.addEventListener("change",()=>afterEdit());
+    body.push(detailField({label:def.label,control:shared,
+      ...(def.description?{help:infoHelp(def.description)}:{})}));
+  }
+  if(!body.length)return LexeditorUI.detailNote("This enemy's body has no editable hurtbox.");
+  return detailSection({title:"Body",body});
 }
 function armDs1Preview(panel,table,id){
   if(!(panel instanceof Element))return panel;
@@ -2399,9 +2661,16 @@ async function removeTaeEvent(){
 }
 function bandActions(){
   const disabled=state.readOnly||state.bandBusy||state.pending>0;
+  // The shared header-button style: boxed icon buttons with hover
+  // titles, like every other detail header. The accessible names
+  // stay put, so the split and merge forms open as before.
+  const addTitle=state.readOnly?"Open a mod project to add load bands":"Split this band in two";
+  const deleteTitle=state.readOnly?"Open a mod project to delete load bands":"Merge this band into a neighbour";
   return [
-    el("button",{type:"button",disabled:disabled||!state.row.band.canAdd,onclick:()=>beginBandForm("add")},"Add band"),
-    el("button",{type:"button",disabled:disabled||!state.row.band.canDelete,onclick:()=>beginBandForm("delete")},"Delete band")
+    el("button",{type:"button",class:"lex-header-icon","data-band-action":"add",disabled:disabled||!state.row.band.canAdd,
+      title:addTitle,"aria-label":"Add band",onclick:()=>beginBandForm("add")},LexeditorUI.copyIcon()),
+    el("button",{type:"button",class:"lex-header-icon","data-band-action":"delete",disabled:disabled||!state.row.band.canDelete,
+      title:deleteTitle,"aria-label":"Delete band",onclick:()=>beginBandForm("delete")},LexeditorUI.removeIcon())
   ];
 }
 function beginBandForm(action){
@@ -2525,6 +2794,7 @@ function renderItems(){
       columns:(misc&&state.sub==="encumbrance")?[{key:"range",label:"Load",grow:1},{key:"name",label:"Name",grow:1}]:
         state.tab==="items"?[{key:"name",label:"Name",sortable:true,grow:1}]:
         state.tab==="textures"?[{key:"name",label:"Name",sortable:true,grow:1},
+          {key:"file",label:"File",sortable:true,render:row=>row.file||""},
           {key:"kind",label:"Kind",sortable:true,render:row=>row.display?.kind??""}]:
         state.tab==="sound"&&(state.sub==="sfx"||state.sub==="music")?[{key:"name",label:"Name",sortable:true,grow:1},
           {key:"bank",label:"Bank",sortable:true,render:row=>row.bank||""},
@@ -2649,24 +2919,25 @@ async function refreshMapsAfterUndo(entry){
   }
   for(const {map,id} of moved.values()){
     const lightRow=String(id).startsWith("light:");
+    const messageRow=String(id).startsWith("message:");
     const row=state.rows.find(entry=>entry.table===map&&entry.id===id);
     let pos=null,rot=null;
     if(row){pos=[row.values.posX,row.values.posY,row.values.posZ];rot=[row.values.rotX,row.values.rotY,row.values.rotZ];}
-    else if(lightRow&&state.row&&state.row.table===map&&state.row.id===id){
-      // Lights ride no record list; the freshly undone detail row
-      // carries the position back instead.
+    else if((lightRow||messageRow)&&state.row&&state.row.table===map&&state.row.id===id){
+      // Lights and messages ride no record list; the freshly
+      // undone detail row carries the position back instead.
       const val=lookup=>state.row.fields.find(item=>item.key===lookup)?.value;
       pos=[val("posX"),val("posY"),val("posZ")];
     }
     if(!pos)continue;
     if(state.mapView&&map===state.mapView.map){
-      const part=state.mapView.parts.find(entry=>entry.key===id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===id):null);
-      if(part){part.pos=pos;if(!lightRow)part.rot=rot;}
-      viewportCtl?.moveTo?.(id,pos);
-      if(!lightRow)viewportCtl?.turnTo?.(id,rot);
+      const part=state.mapView.parts.find(entry=>entry.key===id)||(lightRow?(state.mapView.lights||[]).find(entry=>entry.key===id):messageRow?(state.mapView.messages||[]).find(entry=>entry.key===id):null);
+      if(part){part.pos=pos;if(!lightRow&&!messageRow)part.rot=rot;}
+      if(!messageRow)viewportCtl?.moveTo?.(id,pos);
+      if(!lightRow&&!messageRow)viewportCtl?.turnTo?.(id,rot);
     }
     syncPlacementRow(map,id,["posX","posY","posZ"],pos);
-    if(!lightRow)syncPlacementRow(map,id,["rotX","rotY","rotZ"],rot);
+    if(!lightRow&&!messageRow)syncPlacementRow(map,id,["rotX","rotY","rotZ"],rot);
   }
   if(namesChanged){
     // An enemy swap can move a placement between the NPC and enemy
@@ -2818,7 +3089,10 @@ async function loadMaps(){
 // adding or removing placements re-points it instead of stranding it.
 function clampMapSelection(){
   const here=state.rows.filter(row=>row.table===state.mapId);
-  if(!here.some(row=>key(row)===state.selected))state.selected=here[0]?key(here[0]):null;
+  // Messages ride the view, not the record lists: a selection on
+  // one survives the clamp like a placement's does.
+  const viewKeys=state.mapView?(state.mapView.messages||[]).map(entry=>`${state.mapView.map}:${entry.key}`):[];
+  if(!here.some(row=>key(row)===state.selected)&&!viewKeys.includes(state.selected))state.selected=here[0]?key(here[0]):null;
   const row=state.rows.find(row=>key(row)===state.selected);
   state.mapSelected=row?row.id:null;
 }
@@ -2837,6 +3111,7 @@ async function selectPlacement(placementKey,fromCanvas){
   const row=state.rows.find(row=>key(row)===placementKey);
   if(!row){
     if(state.tab==="maps"&&/\.msb:light:/.test(placementKey))return selectLight(placementKey,fromCanvas);
+    if(state.tab==="maps"&&/\.msb:message:/.test(placementKey))return selectMessage(placementKey,fromCanvas);
     return;
   }
   if(placementKey===state.selected&&state.row&&key(state.row)===placementKey)return;
@@ -2975,12 +3250,13 @@ async function selectDirectoryParam(row){
   refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"}],
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"}],
     active:state.mapTab,label:"Map views",change:id=>{state.mapTab=id;refreshMapSide();}});
 }
 function mapsPane(){
   if(state.mapTab==="placements")return directoryPane();
   if(state.mapTab==="lights")return lightsPane();
+  if(state.mapTab==="messages")return messagesPane();
   return mapsListPane();
 }
 // The right panel always shows the current selection's details, like
@@ -3106,6 +3382,100 @@ async function goToLight(lightKey){
   if(viewportCtl)viewportCtl.focus(id);
   else state.mapFocus=id;
 }
+// The open map's developer soapstone messages, straight from its
+// view like lights: no fetch, and the list dies with the map, so a
+// map switch cannot strand it. Text previews resolve through the
+// Text tab's Blood writing entries; the view carries no words itself.
+const messageTextCache=new Map();
+async function messageTextPreview(textId){
+  if(messageTextCache.has(textId))return messageTextCache.get(textId);
+  try{
+    const row=(await api(`/api/row?table=Blood_writing_.fmg&id=${textId}`)).row;
+    const text=row.fields.find(field=>field.key==="text")?.value||"";
+    const first=String(text).split("\n",1)[0].slice(0,120);
+    messageTextCache.set(textId,first||`(no message text ${textId})`);
+  }catch(_error){messageTextCache.set(textId,`(no message text ${textId})`);}
+  return messageTextCache.get(textId);
+}
+function messagePreviewCell(row){
+  const textId=row.values?.text;
+  const cell=el("span",{class:"ds1-message-preview","data-message-text":String(textId??"")},"…");
+  if(textId===null||textId===undefined){cell.textContent="—";return cell;}
+  messageTextPreview(textId).then(preview=>{if(cell.isConnected)cell.textContent=preview;});
+  return cell;
+}
+function messagesPane(){
+  const map=state.mapView&&state.mapView.map===state.mapId?state.mapView.map:null;
+  if(state.mapView&&state.mapView.map===state.mapId&&state.mapView.messages===undefined)
+    return LexeditorUI.detailNote("Messages are not available in this build yet.");
+  const pool=map?(state.mapView.messages||[]).map(entry=>({id:entry.key,table:map,name:entry.name,
+    values:{text:entry.textId},message:entry})):[];
+  const needle=(state.messageQuery||"").trim().toLocaleLowerCase();
+  const here=pool.filter(row=>!needle||String(row.name||"").toLocaleLowerCase().includes(needle)
+    ||String(messageTextCache.get(row.values.text)??"").toLocaleLowerCase().includes(needle))
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),undefined,{numeric:true,sensitivity:"base"}));
+  const size=paneSize("messages");
+  const pages=Math.max(1,Math.ceil(here.length/size));
+  if(state.messagePage==null)state.messagePage=0;
+  if(state.messagePage>pages-1)state.messagePage=pages-1;
+  const shown=here.slice(state.messagePage*size,(state.messagePage+1)*size);
+  const select=(row,event)=>{
+    if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
+    selectMessage(key(row),false);
+  };
+  const columns=[{key:"name",label:"Name",grow:1},
+    {key:"text",label:"Message",grow:2,sortValue:row=>row.values.text,render:row=>messagePreviewCell(row)}];
+  columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToMessage(key(row))));
+  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",columns});
+  const pager=LexeditorUI.compactPager({pages,page:state.messagePage||0,total:here.length,pageSize:size,
+    change:value=>{state.messagePage=value;refreshMapSide();}});
+  const both=LexeditorUI.pagedPane(list,pager);
+  both.style.flex="1 1 auto";both.style.minHeight="0";
+  sizePaneRows(list,size,false);
+  fitPaneList(list,"messages",size,both);
+  return LexeditorUI.stack(
+    LexeditorUI.bottomSearch({key:"maps-messages",value:state.messageQuery||"",label:"Search messages",
+      change:value=>{state.messageQuery=value;state.messagePage=0;refreshMapSide();}}),
+    both);
+}
+// Messages ride the open map view like lights: the key after the
+// first colon is the viewport id (message:N).
+async function selectMessage(messageKey,fromCanvas){
+  if(messageKey===state.selected&&state.row&&key(state.row)===messageKey)return;
+  state.selected=messageKey;state.mapSelected=messageKey.slice(messageKey.indexOf(":")+1);
+  if(!fromCanvas&&viewportCtl)viewportCtl.select(state.mapSelected);
+  await loadDetail().catch(notify);
+  refreshMapSide();refreshDirectory();refreshMapsDetail();
+}
+async function goToMessage(messageKey){
+  await selectMessage(messageKey,false);
+  const id=messageKey.slice(messageKey.indexOf(":")+1);
+  if(viewportCtl)viewportCtl.focus(id);
+  else state.mapFocus=id;
+}
+function messagePreviewFace(row){
+  const textId=row.textId;
+  if(textId===null||textId===undefined)return readonlyField("—",{format:false});
+  return hoverable({content:`Message ${textId}`,targetType:"ds1-text",
+    targetId:`Blood_writing_.fmg:${textId}`,targetLabel:`Message ${textId} in Text`,
+    "aria-label":`Message text ${textId}`,
+    preview:()=>messageTextPreview(textId).then(text=>el("div",{class:"ds1-dialog-preview"},text)),
+    activate:()=>navigate("text","fmg-blood-writing",`Blood_writing_.fmg:${textId}`)});
+}
+function messageDetail(row,groups){
+  // Coordinates first like lights; the Message section below names
+  // the text it shows, then the marker it stands on.
+  const vectors=groups.get("Position")||[];
+  const identity=[
+    detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
+    detailField({label:"Message",control:messagePreviewFace(row),
+      help:infoHelp("The words the sign shows, from the Text tab's Blood writing entries. Open it there to change the wording.")}),
+    detailField({label:"Marker",control:readonlyField(row.point??"None (hidden)",{format:false}),
+      help:infoHelp("The invisible marker this message sits on. None hides the message.")}),
+    detailField({label:"Part",control:readonlyField(row.part??"—",{format:false}),
+      help:infoHelp("The map piece or object this message anchors to.")})];
+  return [...vectors,detailSection({title:"Message",body:[...identity,...(groups.get("Message")||[])]})];
+}
 function animCharMatches(){
   const needle=state.animCharQuery.trim().toLocaleLowerCase();
   const rows=(state.animChars||[]).filter(row=>!needle||String(row.name||"").toLocaleLowerCase().includes(needle));
@@ -3126,6 +3496,8 @@ async function chooseAnimChar(row){
   state.animScope={level:"anims"};state.taeForm=null;
   const request=++recordsRequest;
   await loadAnimView(request);
+  if(state.animLeftTab!=="events"&&state.animView&&animMotionRows(state.animView).length===0)
+    state.animLeftTab="chars";
   if(state.animLeftTab==="events"){
     const motion=(state.rows||[]).find(entry=>key(entry)===state.selected);
     if(motion&&motion.motion&&motion.motion.tae){
@@ -3213,15 +3585,6 @@ async function switchAnimLeft(id){
   }else state.animLeftTab="chars";
   refreshAnimLeft();refreshAnimDetail();
 }
-// The per-row Events button jumps to the Events pane for that motion.
-async function animGotoEvents(row){
-  if(!row||!row.motion||!row.motion.tae)return;
-  const same=key(row)===state.selected&&state.animScope.level==="anims";
-  await animDrillEvents(row);
-  state.animLeftTab="events";
-  refreshAnimLeft();refreshAnimDetail();
-  if(!same)remountAnim();
-}
 // A timeline event marker seeks (the viewer does that) and selects
 // the event: the left panel shows its Events pane, the right panel
 // its details.
@@ -3244,7 +3607,10 @@ async function animTimelineEvent(cue){
     const index=animListMatches().findIndex(entry=>key(entry)===state.selected);
     if(index>=0)state.animPage=Math.floor(index/size);
   }
-  refreshAnimLeft();refreshAnimDetail();
+  // A cue only moves the events list: while the reader browses characters
+  // or animations the panes show nothing the cue touches, and rebuilding
+  // them on every cue flickered the detail labels.
+  if(state.animLeftTab==="events"){refreshAnimLeft();refreshAnimDetail();}
 }
 async function animBackToAnims(){
   const scope=state.animScope;
@@ -3294,7 +3660,7 @@ function remountAnim(){
 // row count, so a paginated list never grows its own scrollbar. One set
 // of sizing rules for every side panel: animations and maps alike.
 const PANE_FITS={char:"animCharFit",anims:"animFit",events:"animEventFit",
-  dir:"dirFit",maps:"mapListFit",placements:"mapFit",lights:"mapLightFit"};
+  dir:"dirFit",maps:"mapListFit",placements:"mapFit",lights:"mapLightFit",messages:"mapMessageFit"};
 function paneSize(which){
   return Math.max(1,Math.min(state.pageSize,state[PANE_FITS[which]]||Infinity));
 }
@@ -3306,7 +3672,7 @@ function fitPaneList(list,which,size,available){
     change:value=>{
       if(state[PANE_FITS[which]]===value)return;
       state[PANE_FITS[which]]=value;
-      if(which==="dir"||which==="maps"||which==="placements"||which==="lights"){
+      if(which==="dir"||which==="maps"||which==="placements"||which==="lights"||which==="messages"){
         if(state.tab!=="maps")return;
         if(which==="dir")refreshDirectory();else refreshMapSide();
         return;
@@ -3349,13 +3715,23 @@ function animCharsPane(){
       change:value=>{state.animCharQuery=value;state.animCharPage=0;refreshAnimChars();}}),
     both);
 }
-function animEventsCell(){
-  return {key:"events",label:"Events",sortable:false,render:row=>{
-    const motion=row.motion;
-    if(!motion||!motion.tae)return "";
-    return el("button",{type:"button",class:"lex-goto-button","data-anim-events":key(row),
-      title:`Show events of ${row.name}`,"aria-label":`Show events of ${row.name}`,
-      onclick:event=>{event.stopPropagation();void animGotoEvents(row);}},targetIcon());}};
+// The animations list shows what each motion is, not a button to its
+// events: the event count and the playing length, both sortable. The
+// Events tab (or its timeline markers) still drills into the cues.
+function animEventsCountCell(){
+  return {key:"events",label:"Events",numeric:true,
+    sortValue:row=>row.motion?.eventCount??null,
+    render:row=>{
+      const count=row.motion?.eventCount;
+      return count===undefined||count===null?"—":String(count);}};
+}
+function animLengthCell(){
+  return {key:"length",label:"Length",numeric:true,
+    sortValue:row=>row.motion?.duration??null,
+    render:row=>{
+      const motion=row.motion;
+      if(!motion||typeof motion.duration!=="number")return "—";
+      return `${motion.duration.toFixed(2)}s`;}};
 }
 function animAnimsPane(){
   if(state.animListError)return [LexeditorUI.notice({tone:"warning",message:state.animListError})];
@@ -3366,7 +3742,7 @@ function animAnimsPane(){
   const shown=here.slice(state.animPage*size,(state.animPage+1)*size);
   const select=row=>{if(key(row)!==state.selected)void pickAnimMotion(row);};
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",
-    columns:[{key:"name",label:"Name",grow:1},animEventsCell()]});
+    columns:[{key:"name",label:"Name",grow:1},animEventsCountCell(),animLengthCell()]});
   const pager=LexeditorUI.compactPager({pages,page:state.animPage,total:here.length,pageSize:size,
     change:value=>{state.animPage=value;refreshAnimList();}});
   const both=LexeditorUI.pagedPane(list,pager);
@@ -3412,9 +3788,15 @@ function animLeftTabs(){
   const charActive=!!state.animCharId;
   const motion=currentAnimMotionRef();
   const eventsActive=state.animScope.level==="events"||!!(motion&&motion.tae);
+  // A character whose list loaded with no motions shows a disabled
+  // Animations tab (the viewport holds its bind pose instead); while
+  // the list is still loading, or after it failed, the tab stays
+  // enabled so the reader sees the list or its error.
+  const emptyAnims=state.animScope.level!=="events"&&state.animView&&animMotionRows(state.animView).length===0;
   const tabs=[
     {id:"chars",label:"Characters"},
-    {id:"anims",label:"Animations",...(charActive?{}:{disabled:true,disabledReason:"Select a character first."})},
+    {id:"anims",label:"Animations",...(charActive&&!emptyAnims?{}:{disabled:true,
+      disabledReason:emptyAnims?"This character has no animations.":"Select a character first."})},
     {id:"events",label:"Events",...(eventsActive?{}:{disabled:true,
       disabledReason:charActive?"The current animation has no event file.":"Select a character first."})}];
   return LexeditorUI.tabStrip({label:"Animation lists",tabs,active:state.animLeftTab,
@@ -3466,6 +3848,11 @@ function animMotionDetail(){
   const fields=[
     detailField({label:"File",control:readonlyField(motion.file||"(no playable motion)",{format:false})}),
     detailField({label:"Binder",control:readonlyField(motion.binder||"",{format:false})})];
+  if(typeof motion.duration==="number"&&typeof motion.frames==="number")
+    fields.push(detailField({label:"Length",
+      control:readonlyField(`${motion.duration.toFixed(2)}s, ${motion.frames} frames`,{format:false})}));
+  if(motion.eventCount!==undefined&&motion.eventCount!==null)
+    fields.push(detailField({label:"Events",control:readonlyField(motion.eventCount)}));
   if(motion.tae)fields.push(detailField({label:"Event file",
     control:readonlyField(`${motion.tae} · animation ${motion.taeIndex}`,{format:false})}));
   if(motion.available===false&&motion.reason)fields.push(

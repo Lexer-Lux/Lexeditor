@@ -39,9 +39,12 @@ def test_long_choice_scales_to_its_box():
               const context = canvas.getContext('2d');
               context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
               const text = context.measureText(select.selectedOptions[0].textContent).width;
-              const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-              return {size: parseFloat(style.fontSize),
-                      fits: text <= select.clientWidth - padding - 22 + 1};
+              // The face runs to its arrow: padding-right sits shadowed
+              // under the arrow zone, so the room is pad-left plus the
+              // measured 15px arrow zone, not padding plus 22.
+              const room = select.clientWidth - parseFloat(style.paddingLeft)
+                - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth) - 15;
+              return {size: parseFloat(style.fontSize), fits: text <= room + 1};
             }""")
             assert fit["size"] < 16, fit
             assert fit["fits"], fit

@@ -87,27 +87,27 @@
     {
       "Field": "equip_Accessory01",
       "Name": "Ring 1",
-      "Description": "Ring in this slot. None leaves the slot empty."
+      "Description": "The ring the character wears in the first ring slot. The game has two ring slots."
     },
     {
       "Field": "equip_Accessory02",
       "Name": "Ring 2",
-      "Description": "Ring in this slot. None leaves the slot empty."
+      "Description": "The ring the character wears in the second ring slot. The game has two ring slots."
     },
     {
       "Field": "equip_Accessory03",
       "Name": "Ring 3",
-      "Description": "Ring in this slot. None leaves the slot empty."
+      "Description": "Unused. The game has two ring slots, and no starting class or gift uses this field."
     },
     {
       "Field": "equip_Accessory04",
       "Name": "Ring 4",
-      "Description": "Ring in this slot. None leaves the slot empty."
+      "Description": "Unused. The game has two ring slots, and no starting class or gift uses this field."
     },
     {
       "Field": "equip_Accessory05",
       "Name": "Ring 5",
-      "Description": "Ring in this slot. None leaves the slot empty."
+      "Description": "Unused. The game has two ring slots, and no starting class or gift uses this field."
     },
     {
       "Field": "equip_Skill_01",

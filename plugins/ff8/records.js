@@ -352,7 +352,7 @@
       .replace(/=/g, " = ")
       .replace(/\s{2,}/g, " ");
   }
-  function coloredCurveFormula(text){return LexeditorUI.mathFormula(text)}
+  function coloredCurveFormula(text,variables){return LexeditorUI.mathFormula(text,{variables})}
   function characterXpValue(fields,level){
     const A=Number(fields.find(field=>field.field==="exp_linear")?.value??0),B=Number(fields.find(field=>field.field==="exp_quadratic")?.value??0),progress=Math.max(0,level-1);
     return 10*progress*A+Math.floor(progress*progress*B/256);
@@ -368,9 +368,9 @@
       const statFields=fields.filter(field=>field.subgroup===stat).sort((left,right)=>left.field.localeCompare(right.field,undefined,{numeric:true}));
       const variables=statFields.filter(field=>!field.readonly).map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})}));
       // Show the signed formula result. Recompute the range after every edit.
-      return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>characterCurveRange(stat,statFields),graphLabel:`${stat} raw base from level 1 to level 100, before limits, junctions and bonuses. Negative values are shown.`,evaluate:level=>characterCurveValue(stat,statFields,level,true),formula:coloredCurveFormula(characterCurveFormula(stat)),invalidText:"A DIVISOR IS 0"});
+      return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>characterCurveRange(stat,statFields),graphLabel:`${stat} raw base from level 1 to level 100, before limits, junctions and bonuses. Negative values are shown.`,evaluate:level=>characterCurveValue(stat,statFields,level,true),formula:coloredCurveFormula(characterCurveFormula(stat),variables),invalidText:"A DIVISOR IS 0"});
     });
-    if(expFields.length)cards.push(curveEditor({title:"XP",overlayExtrema:true,variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})})),domain:{min:1,max:100},range:()=>characterXpRange(expFields),graphLabel:"Cumulative experience required from level 1 to level 100",evaluate:level=>characterXpValue(expFields,level),formula:coloredCurveFormula("XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)")}));
+    if(expFields.length){const xpVariables=expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})}));cards.push(curveEditor({title:"XP",overlayExtrema:true,variables:xpVariables,domain:{min:1,max:100},range:()=>characterXpRange(expFields),graphLabel:"Cumulative experience required from level 1 to level 100",evaluate:level=>characterXpValue(expFields,level),formula:coloredCurveFormula("XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)",xpVariables)}));};
     return detailSection({title:"STAT GROWTH",help:infoHelp("Each card shows the signed formula result before limits, junctions and bonuses, including negative values. For STR, VIT, MAG and SPR, A=0, B=1, C=0, D=1 selects exact zero growth in the runtime. Other negative bases are floored at zero in the game."),body:LexeditorUI.curveGrid(...cards)});
   }
   // GF HP and next-level EXP, from the two routines that compute them:
@@ -399,19 +399,19 @@
       const peak=Math.max(...Array.from({length:100},(_,index)=>Number(gfCurveValue(kind,fields,index+1))||0));
       return{min:0,max:Math.max(1,Math.ceil(peak*1.08/5)*5)};
     };
-    if(hpFields.length===3)cards.hp=curveEditor({title:"HP",overlayExtrema:true,
-      variables:hpFields.map((field,index)=>({label:"ABC"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
+    if(hpFields.length===3){const hpVariables=hpFields.map((field,index)=>({label:"ABC"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})}));cards.hp=curveEditor({title:"HP",overlayExtrema:true,
+      variables:hpVariables,
       domain:{min:1,max:100},range:()=>axis("HP"),
       graphLabel:"GF HP from level 1 to level 100",
       evaluate:level=>gfCurveValue("HP",fields,level),
-      formula:coloredCurveFormula("HP(L) = C + L * A + floor(10 * L^2 / B)"),
-      invalidText:"A DIVISOR IS 0"});
-    if(expFields.length===2)cards.xp=curveEditor({title:"XP",overlayExtrema:true,
-      variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})})),
+      formula:coloredCurveFormula("HP(L) = C + L * A + floor(10 * L^2 / B)",hpVariables),
+      invalidText:"A DIVISOR IS 0"});}
+    if(expFields.length===2){const xpVariables=expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"gfs",rowId,{internal:true})}));cards.xp=curveEditor({title:"XP",overlayExtrema:true,
+      variables:xpVariables,
       domain:{min:1,max:100},range:()=>axis("XP"),
       graphLabel:"Cumulative experience required from level 1 to level 100",
       evaluate:level=>gfCurveValue("XP",fields,level),
-      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")});
+      formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)",xpVariables)});}
     return cards;
   }
   function characterDetail(row){

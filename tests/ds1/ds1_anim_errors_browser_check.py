@@ -101,8 +101,11 @@ def main():
                     page.locator("[data-anim-chars] .lex-list-row").first.click()
                     page.wait_for_function("state.animCharId && state.rows.length>0")
                     page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
-                    page.wait_for_selector("[data-anim-list] [data-anim-events]")
-                    page.locator("[data-anim-list] [data-anim-events]").first.click()
+                    page.locator("[data-anim-list] .lex-list-row").first.click()
+                    page.wait_for_function(
+                        "!document.querySelector('[data-anim-left] [data-tabstrip-id=\"events\"]')"
+                        ".hasAttribute('aria-disabled')")
+                    page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_selector("[data-anim-left] .lex-notice")
                     notice = page.locator("[data-anim-left] .lex-notice").inner_text()
                     assert "Cannot open c9999.anibnd.dcx" in notice, notice

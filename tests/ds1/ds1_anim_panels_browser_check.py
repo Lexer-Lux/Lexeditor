@@ -184,7 +184,7 @@ def main():
                     page.locator('[data-anim-timeline] button[aria-label="Play or pause"]').click()
                     page.locator('[data-anim-timeline] input[type="range"]').fill('0')
                     page.wait_for_function(
-                        'document.querySelector("[data-anim-readout]")?.textContent?.startsWith("0.0")',
+                        'document.querySelector("[data-anim-readout]")?.textContent?.startsWith("0 / ")',
                         timeout=10000)
                     page.wait_for_timeout(300)
                     bones = page.evaluate(

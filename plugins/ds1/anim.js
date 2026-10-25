@@ -29,10 +29,18 @@ window.Ds1Anim = (() => {
     timeline.replaceChildren();
     const mine = ++session;
     if (!host.isConnected) return;
-    if (!motion) { status.textContent = `${chrId}: no animations found.`; return; }
-    if (motion.available === false) { status.textContent = `${motion.file || motion.name}: ${motion.reason || "unreadable"}.`; return; }
-    status.replaceChildren(LexeditorUI.loadingStatus(`Loading ${motion.file}`));
-    const overlay = LexeditorUI.loadingPanel({label: `Loading ${motion.file}`});
+    if (!chrId) { status.textContent = "Select a character."; return; }
+    // A character with no motion (or an unreadable one) still shows its
+    // model at rest, the way the model viewer would, instead of an empty
+    // viewport: only a playable file fetches frames below.
+    const playable = motion && motion.available !== false && motion.file;
+    const problem = !motion ? "" : (!motion.file
+      ? (motion.reason || "This animation has no playable motion.")
+      : `${motion.file}: ${motion.reason || "unreadable"}.`);
+    // One throbber: the loading panel owns progress, and the status
+    // line stays for errors and completion, not a second spinner.
+    status.textContent = "";
+    const overlay = LexeditorUI.loadingPanel({label: `Loading ${motion?.file || chrId}`});
     host.append(overlay);
     const THREE = await import("three");
     const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
@@ -43,30 +51,73 @@ window.Ds1Anim = (() => {
     const [skel, geo, frames] = await Promise.all([
       get(`/api/anim/skeleton?chr=${encodeURIComponent(chrId)}`),
       get(`/api/chr/geometry?chr=${encodeURIComponent(chrId)}&skin=1`).catch(() => null),
-      get(`/api/anim/frames?chr=${encodeURIComponent(chrId)}&binder=${encodeURIComponent(motion.binder)}&anim=${encodeURIComponent(motion.file)}`),
+      playable
+        ? get(`/api/anim/frames?chr=${encodeURIComponent(chrId)}&binder=${encodeURIComponent(motion.binder)}&anim=${encodeURIComponent(motion.file)}`)
+        : Promise.resolve(null),
     ]);
     if (mine !== session || !host.isConnected) { overlay.remove(); return; }
     // Bones follow the model when it exists, else the Havok skeleton
     // alone (the player base has no visible mesh of its own).
-    const names = skel.flver.length ? skel.flver.map(b => b.name) : skel.hka.bones;
-    const parents = skel.flver.length ? skel.flver.map(b => b.parent) : skel.hka.parents;
-    const mapped = skel.flver.length ? skel.map : skel.hka.bones.map((_, i) => i);
-    const bindT = [], bindQ = [], bindS = [];
-    for (let i = 0; i < names.length; i++) {
-      const hka = mapped[i];
-      if (hka >= 0) {
-        const pose = skel.hka.pose[hka];
-        bindT.push(pose.t);
-        bindQ.push(new THREE.Quaternion(pose.q[0], pose.q[1], pose.q[2], pose.q[3]).normalize());
-        bindS.push(pose.s);
-      } else {
-        const bone = skel.flver[i];
-        bindT.push(bone.pos);
-        // FLVER bone angles are radians in XZY order (soulstruct).
-        bindQ.push(new THREE.Quaternion().setFromEuler(new THREE.Euler(bone.rot[0], bone.rot[1], bone.rot[2], "XZY")));
-        bindS.push(bone.scale);
-      }
-    }
+    const hasFlver = !!skel.flver.length;
+    const names = hasFlver ? skel.flver.map(b => b.name) : skel.hka.bones;
+    const parents = hasFlver ? skel.flver.map(b => b.parent) : skel.hka.parents;
+    const mapped = hasFlver ? skel.map : skel.hka.bones.map((_, i) => i);
+    // FLVER bone angles are radians in YZX order: composed that way,
+    // every mapped bone's rotation matches its Havok rest quaternion
+    // exactly (the old XZY reading spun tails and cloth skyward).
+    const yzx = rot => new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], "YZX"));
+    const composeLocal = (t, q, s) => new THREE.Matrix4().compose(
+      new THREE.Vector3(t[0], t[1], t[2]), q, new THREE.Vector3(s[0], s[1], s[2]));
+    // The Havok rig lives in its own shifted space: the same pose up to
+    // 4m and 10 degrees from the model's bind (c5202's tail, c2280),
+    // identity for most rigs. X maps the model bind to the Havok
+    // rest, measured where the two meet (the Havok root's model
+    // counterpart); the correction group applies X^-1 above the mapped
+    // bones, so skinning and the skeleton agree in the model's own
+    // space on every character. X keeps only the rigid motion
+    // coinciding the two frames at the joint; a change of coordinates
+    // cannot rescale the motion, whose amplitudes play
+    // at Havok scale (a scale-2 Havok root doubles its children's
+    // offsets, it does not shrink the rig to the model).
+    const rigidT = new THREE.Vector3(), rigidQ = new THREE.Quaternion(),
+      rigidS = new THREE.Vector3(), rigidOne = new THREE.Vector3(1, 1, 1);
+    const jointH = new THREE.Vector3(), jointF = new THREE.Vector3(),
+      jointTmp = new THREE.Vector3(), denseM = new THREE.Matrix4();
+    const rigShift = (() => {
+      if (!hasFlver) return new THREE.Matrix4();
+      const href = skel.hka.bones.findIndex((name, h) => mapped.includes(h));
+      const f = names.findIndex((name, i) => mapped[i] === href);
+      if (href < 0 || f < 0) return new THREE.Matrix4();
+      const chainWorld = (locals, parentsOf, at) => {
+        const chain = [];
+        const seen = new Set([at]);
+        for (let p = at; Number.isInteger(p) && p >= 0;) {
+          chain.unshift(locals[p]);
+          const next = parentsOf[p];
+          if (!Number.isInteger(next) || next < 0 || next >= locals.length || seen.has(next)) break;
+          seen.add(next);
+          p = next;
+        }
+        return chain.reduce((acc, local) => acc.multiply(local), new THREE.Matrix4());
+      };
+      const flverLocals = skel.flver.map(bone => composeLocal(bone.pos, yzx(bone.rot), bone.scale));
+      const hkaLocals = skel.hka.pose.map(pose => composeLocal(pose.t,
+        new THREE.Quaternion(pose.q[0], pose.q[1], pose.q[2], pose.q[3]).normalize(), pose.s));
+      const flverParents = skel.flver.map(bone => bone.parent);
+      const hWorld = chainWorld(hkaLocals, skel.hka.parents, href);
+      const fWorld = chainWorld(flverLocals, flverParents, f);
+      jointH.setFromMatrixPosition(hWorld);
+      jointF.setFromMatrixPosition(fWorld);
+      denseM.multiplyMatrices(hWorld, fWorld.invert());
+      // The rigid motion coinciding the two frames at the joint: X's
+      // rotation, with the translation mapping the model's joint
+      // position onto the Havok one (decompose's own translation
+      // couples in scale, which the frames do not share).
+      denseM.decompose(rigidT, rigidQ, rigidS);
+      rigidT.copy(jointH).sub(jointTmp.copy(jointF).applyQuaternion(rigidQ));
+      return new THREE.Matrix4().compose(rigidT, rigidQ, rigidOne);
+    })();
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const canvas = renderer.domElement;
@@ -87,18 +138,33 @@ window.Ds1Anim = (() => {
     scene.add(rig);
     const mover = new THREE.Group();
     rig.add(mover);
+    const correction = new THREE.Group();
+    correction.matrixAutoUpdate = false;
+    correction.matrix.copy(rigShift).invert();
+    mover.add(correction);
     const bones = names.map((name, i) => {
       const bone = new THREE.Bone();
       bone.name = name;
-      bone.position.set(bindT[i][0], bindT[i][1], bindT[i][2]);
-      bone.quaternion.copy(bindQ[i]);
-      bone.scale.set(bindS[i][0], bindS[i][1], bindS[i][2]);
+      const hka = mapped[i];
+      if (hka >= 0) {
+        const rest = skel.hka.pose[hka];
+        bone.position.set(rest.t[0], rest.t[1], rest.t[2]);
+        bone.quaternion.set(rest.q[0], rest.q[1], rest.q[2], rest.q[3]).normalize();
+        bone.scale.set(rest.s[0], rest.s[1], rest.s[2]);
+      } else {
+        const boneDef = skel.flver[i];
+        bone.position.set(boneDef.pos[0], boneDef.pos[1], boneDef.pos[2]);
+        bone.quaternion.copy(yzx(boneDef.rot));
+        bone.scale.set(boneDef.scale[0], boneDef.scale[1], boneDef.scale[2]);
+      }
       return bone;
     });
     // Mapped bones follow the Havok hierarchy: the model carries
     // extra anchors the animation never moves, and hanging an
     // animated bone under one would offset its whole chain. Bones the
-    // model only (SFX and dummy anchors) keep the model's own parent.
+    // model only (SFX and dummy anchors, never under a mapped bone)
+    // keep the model's own parent under the mover, outside the
+    // correction that only the Havok-mapped bones need.
     const flverOfHka = new Map();
     mapped.forEach((hka, i) => { if (hka >= 0 && !flverOfHka.has(hka)) flverOfHka.set(hka, i); });
     const parentOf = i => {
@@ -117,15 +183,23 @@ window.Ds1Anim = (() => {
     };
     bones.forEach((bone, i) => {
       const p = parentOf(i);
-      (p >= 0 && p < bones.length && p !== i ? bones[p] : mover).add(bone);
+      const under = p >= 0 && p < bones.length && p !== i ? bones[p]
+        : (mapped[i] >= 0 ? correction : mover);
+      under.add(bone);
     });
     mover.updateMatrixWorld(true);
     const skeleton = new THREE.Skeleton(bones, bones.map(bone => bone.matrixWorld.clone().invert()));
-    // Test seam: live bone names and world positions, for alignment checks.
-    host._animBones = () => bones.map(bone => {
+    // Test seam: live bone names, world positions, mapped flags and
+    // world-matrix peaks, for alignment and finiteness checks.
+    host._animBones = () => bones.map((bone, i) => {
       const at = new THREE.Vector3();
       bone.getWorldPosition(at);
-      return {name: bone.name, pos: [at.x, at.y, at.z]};
+      let peak = 0;
+      for (const value of bone.matrixWorld.elements)
+        if (Number.isFinite(value)) peak = Math.max(peak, Math.abs(value));
+        else return {name: bone.name, mapped: mapped[i] >= 0,
+          pos: [at.x, at.y, at.z], peak: String(value)};
+      return {name: bone.name, mapped: mapped[i] >= 0, pos: [at.x, at.y, at.z], peak};
     });
     const helper = new THREE.SkeletonHelper(mover);
     helper.material.linewidth = 1;
@@ -208,6 +282,39 @@ window.Ds1Anim = (() => {
     if (resizer) resizer.observe(host);
     else window.addEventListener("resize", resize);
 
+    const dispose = () => {
+      delete host._animBones;
+      host._animViewer = null;
+      if (resizer) resizer.disconnect();
+      else window.removeEventListener("resize", resize);
+      controls.dispose();
+      renderer.dispose();
+      for (const item of trash) item.dispose();
+    };
+    viewModes.bindScene(scene);
+    // The motion this viewer plays: event seeks land only while it
+    // matches the events scope, never onto an older motion's cues.
+    host._animMotion = `${chrId}|${motion?.binder || ""}|${motion?.file || ""}`;
+    if (!frames) {
+      // Bind pose: no playable motion, so the model simply holds its
+      // rest pose (set above) and redraws only as the reader orbits it.
+      // An unreadable selection names its reason in the status line; a
+      // character with no motions at all explains itself through its
+      // disabled Animations tab instead.
+      const still = () => { controls.update(); renderer.render(scene, camera); };
+      still();
+      // Ready, like the playback path once its frames land: the still
+      // frame is on screen.
+      host.dataset.ready = "true";
+      controls.addEventListener("change", still);
+      status.textContent = problem;
+      host._animViewer = {toEvent: null, stop: () => {
+        controls.removeEventListener("change", still);
+        dispose();
+      }};
+      return;
+    }
+
     const count = frames.frames, bonesTracked = frames.bones;
     const pos = f32(frames.translations), quat = f32(frames.rotations), scl = f32(frames.scales);
     const trot = frames.motion ? f32(frames.motion) : null;
@@ -251,7 +358,6 @@ window.Ds1Anim = (() => {
     // loop from here; this file only poses the skeleton and draws it. The
     // status line stays for loading and errors; a loaded motion writes
     // nothing there.
-    viewModes.bindScene(scene);
     host._animViewer = LexeditorUI.animationViewer({
       host, timeline, status,
       frames: {count, duration: frames.duration, frameDuration: frameDur,
@@ -263,19 +369,8 @@ window.Ds1Anim = (() => {
         controls.update();
         renderer.render(scene, camera);
       },
-      dispose: () => {
-        delete host._animBones;
-        host._animViewer = null;
-        if (resizer) resizer.disconnect();
-        else window.removeEventListener("resize", resize);
-        controls.dispose();
-        renderer.dispose();
-        for (const item of trash) item.dispose();
-      },
+      dispose,
     });
-    // The motion this viewer plays: event seeks land only while it
-    // matches the events scope, never onto an older motion's cues.
-    host._animMotion = `${chrId}|${motion.binder || ""}|${motion.file || ""}`;
   }
   return {mount, stop};
 })();
