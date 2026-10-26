@@ -16773,6 +16773,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   // and a long property name in a narrow lane came out as a smear. A name
   // that still does not fit at the floor keeps the percentage lane.
   const labelFits = label => {
+    // A label being renamed fits whatever its editor does: the input is
+    // an overlay, not the label's text, and the committed text refits
+    // when it swaps back in.
+    if (label.querySelector(':scope > .lex-label-rename')) return true;
     const box=label.getBoundingClientRect(),css=getComputedStyle(label);
     const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
     if(labelTextOutside(label))return false;

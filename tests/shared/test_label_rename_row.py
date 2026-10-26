@@ -4,7 +4,8 @@ Lexer: "when i'm double clicking a property name to edit it the ref rail thing
 should not show. and the text box should expand to fit available space instead
 of being this tiny little thing". The input replaced the label text inside the
 fixed name lane, so it was a tenth of the row wide, and the value's reference
-rail stayed beside it.
+rail stayed beside it. The value keeps its box while hidden, so nothing on
+the page moves while the name is being typed.
 """
 from pathlib import Path
 import sys
@@ -37,12 +38,15 @@ def test_a_rename_input_takes_the_row_and_the_rail_stands_down():
               label=field.querySelector('.lex-detail-field-label-text'),
               input=document.createElement('input');
               input.type='text'; input.className='lex-label-rename'; input.value=label.textContent;
+              const before=field.getBoundingClientRect();
               label.replaceWith(input);
               const box=field.getBoundingClientRect(), control=field.querySelector('.lex-detail-field-control');
               return {field:Math.round(box.width), input:Math.round(input.getBoundingClientRect().width),
-                controlHidden:getComputedStyle(control).display==='none'};}""")
+                controlHidden:getComputedStyle(control).visibility==='hidden',
+                sameBox:Math.abs(box.height-before.height)<1&&Math.abs(box.width-before.width)<1};}""")
             # The row, minus the name lane's own padding.
             assert sizes["input"] >= sizes["field"] - 40, sizes
             assert sizes["controlHidden"], sizes
+            assert sizes["sameBox"], sizes
         finally:
             browser.close()

@@ -43,12 +43,16 @@ def build(page):
     page.wait_for_timeout(400)
 
 
-def set_columns(page, count):
+def summon_columns(page):
     # Summon like a reader: hover the divider strip, not the parked gizmo.
     # Parked it is invisible, click-through, and rotated, with its center
     # deep in pane territory where pane content covers it; the strip is
     # the reveal zone, and the gizmo opens under the cursor at mid-height.
     page.locator(".lex-list-detail-divider").hover()
+
+
+def set_columns(page, count):
+    summon_columns(page)
     control = page.locator(".lex-list-detail-divider .lex-detail-column-control")
     for _ in range(8):
         current = int(control.locator(".lex-barrel-count").text_content())
@@ -109,7 +113,7 @@ def test_developer_can_drop_a_property_into_an_empty_column(page):
     assert page.evaluate(COLUMNS)[1] == ['physical']
 
 def tally(page):
-    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
+    summon_columns(page)
     return page.locator(
         ".lex-list-detail-divider .lex-detail-column-control .lex-barrel-count").text_content()
 
@@ -135,8 +139,10 @@ def test_tally_counts_empty_fitted_columns(page):
     assert page.evaluate(COLUMNS)[1:] == [[], []]
     # Right-click fits to width again: the deal keeps three columns (the
     # stored three-group layout applies as stored), and the tally says so.
-    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
-    page.locator(".lex-list-detail-divider .lex-detail-column-control").click(button="right")
+    summon_columns(page)
+    control = page.locator(".lex-list-detail-divider .lex-detail-column-control")
+    control.hover()
+    control.click(button="right")
     page.wait_for_timeout(400)
     columns = page.evaluate(COLUMNS)
     assert len(columns) == 3, columns

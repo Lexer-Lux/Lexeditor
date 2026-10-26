@@ -5,7 +5,9 @@ DS1 Items -> Ammo -> Standard Arrow -> Defense showed "Strike", "Slash" and
 stayed full size: each label was shrunk alone, and nothing re-measured it
 when its text changed. Labels are now fitted per pane - one size for all,
 only as small as the longest needs, wrapping to two lines at full size
-before shrinking - and any text change refits the pane.
+before shrinking - and any text change refits the pane. This pane's
+rows fit two lines only below full size, so the whole pane shares one
+stamped size, renamed labels included.
 """
 from test_shared_ui_feedback import framework, page
 from test_tab_rename import mount_shell
@@ -67,9 +69,13 @@ def test_renamed_labels_keep_their_panes_size(page, tmp_path):
     neighbours = {by_name[name]["size"] for name in
                   ("Physical Guard Cut Rate", "Magic Guard Cut Rate",
                    "Fire Guard Cut Rate", "Lightning Guard Cut Rate")}
+    stamps = {by_name[name]["inline"] for name in
+              ("Physical Guard Cut Rate", "Magic Guard Cut Rate",
+               "Fire Guard Cut Rate", "Lightning Guard Cut Rate")}
+    assert len(stamps) == 1, after
     for short in ("Strike", "Slash", "Thrust"):
         assert by_name[short]["size"] in neighbours, after
-        assert by_name[short]["inline"] is None, by_name[short]
+        assert by_name[short]["inline"] in stamps, (by_name[short], after)
     assert len({row["size"] for row in after}) == 1, after
     assert len(neighbours) == 1, after
     lines = {row["name"]: row["lines"] for row in page.evaluate(LINES)}
