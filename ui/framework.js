@@ -1948,7 +1948,7 @@
     });
     const panel = element("section", {
       ...(options.attrs || {}),
-      class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
+      class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.tabsBelowHeading ? "lex-tabs-below-heading" : "", options.className || ""].filter(Boolean).join(" "),
     }, heading, bodyBox);
     panel._DetailTabs = bodyBox._detailTabs;
     if (heading) {
@@ -15885,6 +15885,10 @@ ${contents.path}`});
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
             .catch(error => failure("Could not open the folder", error))}, folderIcon()),
+        // A flagged mod's conflicts and loader alerts ride here as the row's
+        // own red "!" (hover lists them): the tab bar below never moves.
+        // The switch still closes the row, always the rightmost control.
+        modFlagsMark(row.enabled ? row.conflicts : null, row.alerts),
         toggle];
 
       const sections = [];
@@ -16042,10 +16046,11 @@ ${contents.path}`});
       const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
       contentsWraps.files = filesWrap;
       contentsWraps.records = recordsWrap;
-      const notes = [row.error ? detailNote(row.error) : null,
-        row.enabled && row.conflicts?.length ? detailNote(element("span", {class: "lex-mods-name"},
-          conflictMark(row.conflicts), "Another switched-on mod changes the same things.")) : null,
-        ...(row.alerts || []).map(line => detailNote(line)),
+      // Nothing stands above the tab bar: an error and a missing name are
+      // states the reader must act on, so they stay visible at the top of
+      // the Details tab, below the bar. Conflicts and loader alerts live in
+      // the header's "!" badge, the same mark the row carries.
+      const stateNotes = [row.error ? detailNote(row.error) : null,
         row.missing?.length ? detailNote("This mod has no name yet. Name it to store it properly.") : null].filter(Boolean);
       // Panel tabs, not sections with a tab strip inside: Details, Files and
       // Records work the way every other detail panel's tabs do. Each table
@@ -16055,7 +16060,9 @@ ${contents.path}`});
       // A loader note still counts as content, so it stays enabled.
       const recordsEmpty = recordsEmptyNow();
       if (modDetailTab === "records" && recordsEmpty) modDetailTab = "details";
-      return detailPanel({title: row.name, actions, body: [...notes, tabbedPanel({
+      // The header carries this mod's actions, so it stays first and the tab
+      // bar below it never moves: flags ride the header's "!" badge.
+      return detailPanel({title: row.name, actions, tabsBelowHeading: true, body: [tabbedPanel({
         label: "Mod details",
         active: modDetailTab,
         paginate: false,
@@ -16069,7 +16076,7 @@ ${contents.path}`});
             help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
         ],
         change: id => { modDetailTab = id; draw(); },
-        content: modDetailTab === "details" ? sections : modDetailTab === "files" ? filesWrap : recordsWrap,
+        content: modDetailTab === "details" ? [...stateNotes, ...sections] : modDetailTab === "files" ? filesWrap : recordsWrap,
       })], paginate: false});
     };
     const draw = () => {

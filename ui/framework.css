@@ -1464,15 +1464,16 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
    under it: "if a details panel is made tabbed, then the tab bar should run
    along its top, like with any other tabbed panel" (FF8's Magic). The body
    and the tabbed panel step aside so the bar, the heading and the tab's
-   content are the panel's own rows. */
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) {
+   content are the panel's own rows. A panel whose header carries the record's
+   actions keeps the heading first instead (tabsBelowHeading, the Mods tab). */
+.lex-detail-panel:not(.lex-tabs-below-heading):has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) {
   display:flex;
   flex-direction:column;
 }
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-body,
-.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child, .lex-detail-panel > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child { display:contents; }
-.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-tabs { order:-1; flex:0 0 auto; }
-.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-heading { flex:0 0 auto; }
+.lex-detail-panel:not(.lex-tabs-below-heading):has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-body,
+.lex-detail-panel:not(.lex-tabs-below-heading) > .lex-detail-panel-body > .lex-tabbed-panel:only-child, .lex-detail-panel:not(.lex-tabs-below-heading) > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child { display:contents; }
+.lex-detail-panel:not(.lex-tabs-below-heading) > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-tabs { order:-1; flex:0 0 auto; }
+.lex-detail-panel:not(.lex-tabs-below-heading):has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child, > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child) > .lex-detail-panel-heading { flex:0 0 auto; }
 .lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-content, .lex-detail-panel > .lex-detail-panel-body > .lex-multi-edit-notice:first-child + .lex-tabbed-panel:last-child > .lex-tabbed-panel-content { flex:1 1 auto; min-height:0; }
 
 .lex-detail-field-control:has(> .lex-source-control:not(.lex-source-control-internal)) > .lex-column-pin {

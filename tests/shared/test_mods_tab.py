@@ -16,6 +16,7 @@ HOST = """(options) => {
      script: {schema: {fields: [{key: 'amount', label: 'Amount', type: 'int', default: 1, min: 0, max: 9}]},
               values: {amount: 3}, error: ''}, error: '', remote: false},
   ];
+  if (options.errorRow) { rows[0].error = 'The mod folder could not be read.'; rows[0].missing = ['name']; }
   if (options.versions) rows[0].version = '1.2';
   if (options.requires) rows[1].requirements = [
     {id: 'Mine', name: 'Mine', installed: true, enabled: true},
@@ -119,11 +120,11 @@ HOST = """(options) => {
 
 
 def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False, projects=False,
-          requires=False, versions=False):
+          requires=False, versions=False, error_row=False):
     framework(page)
     page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
                        "alerts": alerts, "bundle": bundle, "save": save, "projects": projects, "requires": requires,
-                       "versions": versions})
+                       "versions": versions, "errorRow": error_row})
     page.wait_for_timeout(250)
 
 
@@ -480,9 +481,15 @@ def test_a_changed_mod_shows_one_mark_listing_every_flag(page):
     assert "overrides Mine" in popover and "changed since the last build" in popover
     mine = page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list-row", has_text="Mine").locator(".lex-conflict-mark")
     assert (mine.get_attribute("aria-label") or "").startswith("Conflicts with other mods")
-    # The detail pane repeats the alert as its own note.
+    # The detail header carries the same mark; its hover lists every
+    # flag, and nothing stands above the tab bar anymore.
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
-    page.locator(".lex-detail-note", has_text="This mod changed since the last build.").wait_for()
+    badge = page.locator(".lex-mods-page .lex-detail-panel-actions .lex-conflict-mark")
+    assert badge.count() == 1
+    bar = page.locator(".lex-mods-page .lex-tabbed-panel-tabs")
+    head = page.locator(".lex-mods-page .lex-detail-panel-heading")
+    assert head.bounding_box()["y"] + head.bounding_box()["height"] <= bar.bounding_box()["y"]
+    assert page.locator(".lex-mods-page .lex-detail-panel-body > :not(.lex-tabbed-panel)").count() == 0
 
 
 def test_a_bundles_components_are_ordinary_settings_that_save(page):
@@ -934,3 +941,47 @@ def test_column_hover_glows_detail_property_and_back(page):
     page.wait_for_function(
         "document.querySelector('.lex-mods-page .lex-column-list-head-cell[data-column-key=\"version\"]')"
         ".classList.contains('lex-column-lit')")
+
+
+def test_mod_flags_ride_the_header_badge_and_the_tab_bar_never_moves(page):
+    mount(page, conflicts=True, alerts=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    page.locator(".lex-mods-page .lex-column-list-row", has_text="Combat").click()
+    page.wait_for_timeout(300)
+    bar = page.locator(".lex-mods-page .lex-tabbed-panel-tabs")
+    head = page.locator(".lex-mods-page .lex-detail-panel-heading")
+    above = lambda: head.bounding_box()["y"] + head.bounding_box()["height"] <= bar.bounding_box()["y"]
+    assert above()
+    parked = bar.bounding_box()["y"]
+    assert page.locator(".lex-mods-page .lex-detail-panel-actions .lex-conflict-mark").count() == 0
+    page.get_by_role("checkbox", name="Combat enabled").check()
+    page.wait_for_timeout(500)
+    badge = page.locator(".lex-mods-page .lex-detail-panel-actions .lex-conflict-mark")
+    assert badge.count() == 1
+    assert above()
+    assert abs(bar.bounding_box()["y"] - parked) < 0.5
+    actions = page.locator(".lex-mods-page .lex-detail-panel-actions")
+    assert actions.evaluate("el => el.lastElementChild.getAttribute('aria-label')") == "Combat enabled"
+    badge.hover()
+    popover = page.locator(".lex-help-popover")
+    popover.get_by_text("This mod changed since the last build.").wait_for()
+    assert "overrides Mine" in popover.inner_text()
+    assert page.locator(".lex-mods-page .lex-detail-panel-body > :not(.lex-tabbed-panel)").count() == 0
+
+
+def test_mod_error_and_missing_name_stay_visible_below_the_tab_bar(page):
+    mount(page, error_row=True)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("textbox", name="Name").wait_for()
+    bar = page.locator(".lex-mods-page .lex-tabbed-panel-tabs")
+    head = page.locator(".lex-mods-page .lex-detail-panel-heading")
+    assert head.bounding_box()["y"] + head.bounding_box()["height"] <= bar.bounding_box()["y"]
+    bottom = bar.bounding_box()["y"] + bar.bounding_box()["height"]
+    error = page.get_by_text("The mod folder could not be read.")
+    assert error.count() == 1
+    assert error.bounding_box()["y"] > bottom
+    missing = page.get_by_text("This mod has no name yet. Name it to store it properly.")
+    assert missing.count() == 1
+    assert missing.bounding_box()["y"] > bottom
+    assert page.locator(".lex-mods-page .lex-detail-panel-body > :not(.lex-tabbed-panel)").count() == 0
