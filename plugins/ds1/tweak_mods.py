@@ -771,23 +771,6 @@ PROTECTED_LOADER = True
 DEBUG_FILE = ".lexeditor-ds1.json"
 
 
-
-
-    try:
-
-    except (OSError, ValueError, AttributeError):
-        return False
-
-
-def set_debug_mode(on: bool, root: Path | None = None) -> bool:
-    if type(on) is not bool:
-        raise TweakError("Debug mode is on or off")
-    folder = Path(root or mods_root())
-    folder.mkdir(parents=True, exist_ok=True)
-    atomic_write(folder / DEBUG_FILE, (json.dumps({"debugMode": on}, indent=2) + "\n").encode("utf-8"))
-    return on
-
-
 def _runtime(game_root: Path) -> dict:
     """What Lexeditor's loader files in the game folder hold now."""
     game_root = Path(game_root)
