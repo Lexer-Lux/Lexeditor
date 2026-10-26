@@ -10098,6 +10098,24 @@ ${contents.path}`});
       !event.target.closest(".lex-detail-field-control,.lex-label-rename,.lex-help-edit");
   });
   // A heading drags its whole section before or after another section's.
+  // The lane under the pointer when it hits no column box: the grid gaps,
+  // or the room below a short grid. Past the lanes' combined span it is
+  // null, so a scrollbar hover never reads as a lane drop.
+  const laneColumnAt = (pager, x) => {
+    if (!pager) return null;
+    const columns = [...pager.querySelectorAll(".lex-tweak-column")]
+      .filter(column => column.closest(".lex-tweaks-paged") === pager);
+    const boxes = columns.map(column => column.getBoundingClientRect()).filter(box => box.width > 0);
+    if (!boxes.length) return null;
+    if (x < Math.min(...boxes.map(box => box.left)) || x > Math.max(...boxes.map(box => box.right))) return null;
+    let best = null, bestGap = Infinity;
+    for (const column of columns) {
+      const box = column.getBoundingClientRect();
+      const gap = x < box.left ? box.left - x : x > box.right ? x - box.right : 0;
+      if (gap < bestGap) { best = column; bestGap = gap; }
+    }
+    return best;
+  };
   let sectionDrag = null;
   document.addEventListener("dragstart", event => {
     const heading = event.target.closest?.(".lex-detail-section-title");
@@ -10121,11 +10139,10 @@ ${contents.path}`});
       .find(node => node && node !== section && node.contains(event.target) && !node.contains(section) && !section.contains(node)
         && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section));
     if (!target) {
-      const column = event.target.closest?.(".lex-tweak-column");
-      const pager = column?.closest(".lex-tweaks-paged");
-      if (!column || !pager || pager.lexUnpaged !== true
-        || pager !== section.closest(".lex-tweaks-paged")
-        || column.querySelector(".lex-detail-section")) return;
+      const pager = event.target.closest?.(".lex-tweaks-paged");
+      if (!pager || pager.lexUnpaged !== true || pager !== section.closest(".lex-tweaks-paged")) return;
+      const column = event.target.closest?.(".lex-tweak-column") || laneColumnAt(pager, event.clientX);
+      if (!column || column.querySelector(".lex-detail-section")) return;
       propertyDrop = {target: column, marker: column, after: true, lane: true};
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
@@ -10262,7 +10279,10 @@ ${contents.path}`});
           // the column itself is the target. Non-empty columns still take
           // drops on their properties, never here, so aiming between two
           // rows keeps landing between them.
-          const column = event.target.closest?.(".lex-tweak-column");
+          const ownPager = field.closest(".lex-tweaks-paged");
+          const column = event.target.closest?.(".lex-tweak-column")
+            || (ownPager && event.target.closest?.(".lex-tweaks-paged") === ownPager
+              ? laneColumnAt(ownPager, event.clientX) : null);
           const empty = column && state.groups.has(column) &&
             ![...column.children].some(child => state.fields.has(child));
           if (empty) propertyDrop = {node: column, before: null, marker: column, after: true};

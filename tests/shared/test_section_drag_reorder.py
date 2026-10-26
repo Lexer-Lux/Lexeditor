@@ -114,3 +114,79 @@ def test_paged_drop_stays_on_page_in_order(page, tmp_path):
     got = card_order(page)
     assert got[0] == seen[-1], got
     assert reading_order(page) == got[:len(reading_order(page))]
+
+
+def test_unpaged_drop_into_empty_lane_below_its_top_strip(page):
+    # Lexer: AI tab, three columns, dev mode - the right lanes would not
+    # take a dragged header. An empty lane was only a 96px strip at the
+    # grid top; aiming anywhere else in the lane hit the grid, and the
+    # drop computation only looked at the column box. The lane now
+    # stretches to the grid foot, and aims past it resolve by span.
+    mount_sections(page, {'unpaged': True})
+    page.evaluate('''() => {
+      document.querySelector('main').dataset.lexDetailColumns = '3';
+      document.querySelector('.lex-tweaks-paged').lexFitPage();
+    }''')
+    page.wait_for_timeout(200)
+    # Vacate a lane: SENSES and NAVIGATION join COMBAT's lane, so one of
+    # the three lanes must empty whatever the opening deal was.
+    for name in ('SENSES', 'NAVIGATION'):
+        head = page.locator(f'[data-lex-layout-section="{name}"] h3')
+        first = page.locator('[data-lex-layout-section="COMBAT"]')
+        box = first.bounding_box()
+        head.drag_to(first, target_position={'x': 10, 'y': box['height'] - 4})
+        page.wait_for_timeout(200)
+    deal = lanes(page)
+    empty = next((i for i, lane in enumerate(deal) if not lane), -1)
+    assert empty >= 0, deal
+    lane = page.locator('.lex-tweak-column').nth(empty)
+    box = lane.bounding_box()
+    # Past the old 96px strip: pre-fix this aim hit the grid and refused.
+    assert box['height'] > 160, box
+    point = [box['x'] + box['width'] / 2, box['y'] + 160]
+    hit = page.evaluate('([x, y]) => document.elementFromPoint(x, y)?.className', point)
+    assert hit == 'lex-tweak-column', hit
+    page.locator('[data-lex-layout-section="PROPERTIES"] h3').drag_to(
+        lane, target_position={'x': box['width'] / 2, 'y': 160})
+    page.wait_for_timeout(200)
+    got = card_order(page)
+    assert lanes(page)[empty] == ['PROPERTIES'], lanes(page)
+    assert reading_order(page) == got
+
+
+def test_unpaged_header_drop_into_lane_gap_beside_empty_lane(page):
+    # The gap between lanes is grid, not a column box: aiming into the
+    # gap beside an empty lane still drops into that lane, by span.
+    mount_sections(page, {'unpaged': True})
+    page.evaluate('''() => {
+      document.querySelector('main').dataset.lexDetailColumns = '3';
+      document.querySelector('.lex-tweaks-paged').lexFitPage();
+    }''')
+    page.wait_for_timeout(200)
+    for name in ('SENSES', 'NAVIGATION'):
+        head = page.locator(f'[data-lex-layout-section="{name}"] h3')
+        first = page.locator('[data-lex-layout-section="COMBAT"]')
+        box = first.bounding_box()
+        head.drag_to(first, target_position={'x': 10, 'y': box['height'] - 4})
+        page.wait_for_timeout(200)
+    deal = lanes(page)
+    empty = next((i for i, lane in enumerate(deal) if not lane), -1)
+    assert empty >= 0, deal
+    lane = page.locator('.lex-tweak-column').nth(empty)
+    box = lane.bounding_box()
+    # Three pixels into the gap from the empty lane's edge: nearer to it
+    # than to any neighbor, and past the old 96px strip vertically.
+    aim = box['width'] + 3 if empty < len(deal) - 1 else -3
+    point = [box['x'] + aim, box['y'] + 160]
+    hit = page.evaluate('([x, y]) => document.elementFromPoint(x, y)?.className', point)
+    assert 'lex-tweak-card-grid' in hit and 'lex-tweak-column' not in hit, hit
+    # The gap point is grid, so the grid is the drag target: aiming at
+    # the lane with an out-of-box offset fails actionability instead.
+    grid = page.locator('main .lex-tweak-card-grid').bounding_box()
+    page.locator('[data-lex-layout-section="PROPERTIES"] h3').drag_to(
+        page.locator('main .lex-tweak-card-grid'),
+        target_position={'x': point[0] - grid['x'], 'y': point[1] - grid['y']})
+    page.wait_for_timeout(200)
+    got = card_order(page)
+    assert lanes(page)[empty] == ['PROPERTIES'], lanes(page)
+    assert reading_order(page) == got
