@@ -2224,6 +2224,19 @@ function curveExponent(shape){
   if(!(shape>0))return shape<0?-1/shape:1;
   return shape;
 }
+// The graph's own axes, in player terms: what the horizontal value is (the
+// stat or level the curve reads) and what the line measures. Anything not
+// listed is a weapon or spell-tool curve: stat points in, scaling share out.
+function curveAxes(row){
+  const id=Number(row.id);
+  if(id===100)return {x:"Vitality",y:"HP"};
+  if(id===101)return {x:"Attunement",y:"MP"};
+  if(id===102)return {x:"Soul level",y:"Defense"};
+  if(id===110||id===111||id===112)return {x:"Soul level",y:"Resistance"};
+  if(id===113)return {x:"Humanity",y:"Resistance"};
+  if(id===150)return {x:"Kindling",y:"Estus"};
+  return {x:"Stat",y:"Scaling",yUnit:"%"};
+}
 function curveDetail(actions,groups){
   const row=state.row;
   const at=key=>Number(row.fields.find(item=>item.key===key)?.value??0);
@@ -2257,45 +2270,27 @@ function curveDetail(actions,groups){
     const control=plainControlFor(row,field);
     if(control instanceof Element&&field.label)control.title=field.label;
     control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
-    return {label:short,key:short.toLowerCase(),control};
+    return {label:short,key:short.toLowerCase(),control,help:field.description||""};
   });
-  // The equation names the hovered segment's own variables, never
-  // lo/hi abstractions: T3 and T4 are its threshold levels, V3 and
-  // V4 their values, S3 its shape (the left stage's, like the game).
-  let segment=0;
-  const segmentFor=x=>{
-    const cuts=[0,1,2,3,4].map(i=>live(`stageMaxVal${i}`));
-    let found=0;
-    for(let i=0;i<4;i++)if(x>=cuts[i])found=i;
-    return Math.max(0,Math.min(3,found));
-  };
-  const segmentFormula=i=>LexeditorUI.mathFormula(
-    `V(x) = V${i+1} + (V${i+2} - V${i+1}) * ((x - T${i+1})/(T${i+2} - T${i+1}))^S${i+1}`,{variables});
+  // Each span names its own variables, never lo/hi abstractions: T3 and
+  // T4 are its threshold levels, V3 and V4 their values, S3 its shape
+  // (the left stage's, like the game). The left side names the Y axis.
+  const axes=curveAxes(row);
+  const segments=[0,1,2,3].map(i=>({from:stages[i],to:stages[i+1],
+    formula:LexeditorUI.mathFormula(
+      `${axes.y}(x) = V${i+1} + (V${i+2} - V${i+1}) * ((x - T${i+1})/(T${i+2} - T${i+1}))^S${i+1}`,{variables})}));
   const ends=[0,1,2,3,4].map(i=>at(`stageMaxGrowVal${i}`));
   const floor=Math.min(0,...ends),ceil=Math.max(...ends);
   graph=curveEditor({title:row.name,overlayExtrema:true,variables,
     domain:{min:stages[0],max:stages[4]>stages[0]?stages[4]:stages[0]+1},
     range:{min:floor,max:ceil>floor?ceil:floor+1},
-    graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate,
-    formula:segmentFormula(0),
-    onProbe:x=>{const next=segmentFor(x);if(next!==segment){segment=next;graph.refreshFormula(segmentFormula(next));}}});
-  // Hovering a drawer variable pulls a segment that names it into the
-  // equation, so the glow always lands in both places: T3 shows the
-  // T3-T4 segment, and cost fields (which no segment names) glow alone.
-  graph.querySelector(".lex-curve-variables")?.addEventListener("pointerover",event=>{
-    const entry=event.target.closest?.(".lex-curve-variable");
-    const key=entry?.dataset.curveVariable||"";
-    if(key[0]==="c")return;
-    const digit=Number(key.slice(-1));
-    if(!Number.isFinite(digit))return;
-    const next=Math.max(0,Math.min(3,digit-1));
-    if(next!==segment){segment=next;graph.refreshFormula(segmentFormula(next));}
-  });
+    xLabel:axes.x,yLabel:axes.y,yUnit:axes.yUnit,
+    graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate,segments});
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=evaluate;
   // A lone graph fills its tab: no wrapper and no section header around
   // the only content. Its guidance joins the panel help bubble instead.
-  const graphHelp="The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. The equation names the hovered segment's own variables, each in its variable's color; hovering a variable in the drawer or the equation lights it in both. Edit every value from the variables drawer over the graph.";
+  const graphHelp="The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. Each span names its own variables, each in its variable's color. Hovering a variable in the drawer or the equation lights it in both. Edit every value from the variables drawer over the graph.";
   const panelHelp=typeof row.help==="string"&&row.help?`${row.help}\n\n${graphHelp}`:(row.help||graphHelp);
   return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[graph]});
 }
@@ -2318,16 +2313,17 @@ function costDetail(actions,row,groups){
     const control=plainControlFor(row,field);
     if(control instanceof Element&&field.label)control.title=field.label;
     control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
-    return {label:names[field.key],key:names[field.key].toLowerCase(),control};
+    return {label:names[field.key],key:names[field.key].toLowerCase(),control,help:field.description||""};
   });
   const floor=Math.floor(price(12)),ceil=Math.ceil(price(99));
   graph=curveEditor({title:row.name,overlayExtrema:true,variables,
     domain:{min:12,max:99},range:{min:floor,max:ceil>floor?ceil:floor+1},
+    xLabel:"Level",yLabel:"Souls",
     graphLabel:`${row.name} from level 12 to 99`,evaluate:price,
     formula:LexeditorUI.mathFormula("Souls(L) = C3*L^3 + 3.06*L^2 + 105.6*L - 895",{variables})});
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=price;
-  const graphHelp="Souls per level from the community cubic, accurate level 12 and up. Only the cubic term reads the record (C3); the other coefficients are fitted, because their sources are undocumented, so C1, C2 and C4 do not move the line. Edit every value from the variables drawer over the graph.";
+  const graphHelp="Souls per level from the community cubic, accurate level 12 and up. Only the cubic term (C3) reads the record. The other coefficients are fitted because their sources are undocumented. Edit every value from the variables drawer over the graph.";
   const panelHelp=typeof row.help==="string"&&row.help?`${row.help}\n\n${graphHelp}`:(row.help||graphHelp);
   return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[graph]});
 }

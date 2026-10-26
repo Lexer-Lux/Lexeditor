@@ -140,12 +140,28 @@ def main():
                                 assert abs(value - expected) < 1e-6, (value, expected)
                             low, high = sorted((curve['growth'][0], curve['growth'][1]))
                             assert low <= curve['mid'] <= high, curve
-                            # The formula rides the line, as on FF8's curves.
-                            formula = page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-follow')
-                            assert formula.count() == 1
-                            assert formula.get_attribute('aria-label') == \
-                                'V(x) = V1 + (V2 - V1) * ((x - T1)/(T2 - T1))^S1'
-                            assert page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-atom').count() > 0
+                            page.locator('.lex-list-row[data-key="CalcCorrectGraph:0"]').click()
+                            page.wait_for_function('state.row && state.row.id===0 && !state.error')
+                            # Each span draws its own equation, titled after
+                            # the Y axis, as on FF8's curves.
+                            card = page.locator('.lex-curve-editor[data-curve-row]')
+                            follows = card.locator('.lex-curve-math-follow')
+                            assert follows.count() == 4
+                            assert follows.evaluate_all(
+                                'nodes=>nodes.map(n=>n.getAttribute("aria-label"))') == [
+                                f'Scaling(x) = V{i + 1} + (V{i + 2} - V{i + 1})'
+                                f' * ((x - T{i + 1})/(T{i + 2} - T{i + 1}))^S{i + 1}'
+                                for i in range(4)]
+                            assert card.locator('.lex-curve-math-atom').count() > 0
+                            # Axes in player terms, with the shared unit.
+                            assert card.locator(
+                                '.lex-curve-axis-name-x').inner_text() == 'Stat'
+                            y_axis = card.locator('.lex-curve-axis-name-y')
+                            assert 'Scaling' in y_axis.inner_text()
+                            assert y_axis.locator('.lex-unit').inner_text() == '%'
+                            # Every drawer variable carries its own help.
+                            assert card.locator(
+                                '.lex-curve-variable .lex-info-help').count() == 19
                         elif tab == 'starting-gifts':
                             assert set(keys) == set(GIFT_FIELDS), keys
                         elif tab == 'levelup':
@@ -266,6 +282,16 @@ def main():
                             page.locator('input[data-field-key]').all()} == {
                         'init_inclination_soul', 'adjustment_value',
                         'boundry_inclination_soul', 'boundry_value'}
+                    cost = page.locator('.lex-curve-editor[data-curve-row]')
+                    assert cost.locator(
+                        '.lex-curve-axis-name-x').inner_text() == 'Level'
+                    assert 'Souls' in cost.locator(
+                        '.lex-curve-axis-name-y').inner_text()
+                    assert cost.locator('.lex-curve-math-follow').count() == 1
+                    assert cost.locator('.lex-curve-math-follow').get_attribute(
+                        'aria-label').startswith('Souls(L) =')
+                    assert cost.locator(
+                        '.lex-curve-variable .lex-info-help').count() == 4
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload()

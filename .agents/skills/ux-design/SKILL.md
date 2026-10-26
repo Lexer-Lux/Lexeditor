@@ -93,6 +93,20 @@ screen override.
 - Dropdown text scales to fit; it never clips or truncates. If the text cannot
   fit, the control grows or wraps, it does not cut words off.
 
+## Graphs
+
+- Both axes carry names in player terms, with units from the shared unit
+  component where the value has one (`curveEditor`'s `xLabel`/`yLabel` and
+  `xUnit`/`yUnit`).
+- An equation's left side names the Y axis (`Souls(L)` on a Souls axis),
+  never a bare variable.
+- A piecewise curve declares its segments (`segments: [{from, to, formula}]`)
+  and each span draws its own equation. Swapping one equation under the
+  probe is a bug.
+- Drawer variables carry the property's own help text as a question-mark
+  bubble; the panel help keeps graph-level guidance only.
+- Guard: `tests/shared/test_graph_axes.py`.
+
 ## Words on the screen
 
 Help bubbles follow the help-text skill: player terms, three sentences at

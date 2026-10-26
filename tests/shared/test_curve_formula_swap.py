@@ -1,9 +1,9 @@
-"""curveEditor formula swaps and probe callback.
+"""Piecewise curves draw every segment's own equation; the probe never swaps.
 
-Segment curves rename their own equation as the probe moves: the swap
-rebuilds the line text, the overlay atoms and the bottom block, relinks
-every token to its variable, and redraws. The probe callback reports
-each hovered x so the caller knows which segment is under it.
+curveEditor takes segments declared with their own formulas and draws each
+on its own span. The single swapping equation is gone: moving the probe
+across spans leaves every segment's formula in place. The probe callback
+still reports each hovered x so the caller knows what is under it.
 """
 from pathlib import Path
 
@@ -12,17 +12,21 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 BUILD = """() => {
   const seen = [];
+  const variables = [
+    {label: 'T1', key: 't1', control: Object.assign(
+      document.createElement('input'), {value: '0'})},
+    {label: 'T2', key: 't2', control: Object.assign(
+      document.createElement('input'), {value: '10'})},
+  ];
   const editor = window.LexeditorUI.curveEditor({
-    title: 'Swap', domain: {min: 0, max: 10}, range: {min: 0, max: 10},
-    variables: [
-      {label: 'T1', key: 't1', control: Object.assign(
-        document.createElement('input'), {value: '0'})},
-      {label: 'T2', key: 't2', control: Object.assign(
-        document.createElement('input'), {value: '10'})},
+    title: 'Pieces', domain: {min: 0, max: 10}, range: {min: 0, max: 10},
+    variables, evaluate: x => x,
+    segments: [
+      {from: 0, to: 5, formula: window.LexeditorUI.mathFormula(
+        'Y(x) = T1', {variables})},
+      {from: 5, to: 10, formula: window.LexeditorUI.mathFormula(
+        'Y(x) = T2', {variables})},
     ],
-    evaluate: x => x,
-    formula: window.LexeditorUI.mathFormula('V(x) = T1 + T2', {variables: [
-      {label: 'T1', key: 't1'}, {label: 'T2', key: 't2'}]}),
     onProbe: x => seen.push(x),
   });
   document.querySelector('main').append(editor);
@@ -48,27 +52,44 @@ def open_page(play):
     return browser, page, errors
 
 
-def test_refresh_formula_swaps_atoms_and_relinks():
+def test_segments_draw_each_formula_on_its_span_and_never_swap():
     with sync_playwright() as play:
         browser, page, errors = open_page(play)
         try:
-            before = page.evaluate(
-                "document.querySelector('.lex-curve-formula').textContent")
-            assert 'T1' in before and 'T2' in before
-            page.evaluate("""() => document.querySelector('.lex-curve-editor')
-              .refreshFormula(window.LexeditorUI.mathFormula('V(x) = T2', {variables: [
-                {label: 'T1', key: 't1'}, {label: 'T2', key: 't2'}]}))""")
-            after = page.evaluate(
-                "document.querySelector('.lex-curve-formula').textContent")
-            assert after.replace(' ', '') == 'V(x)=T2', after
-            # The T1 token is gone with its link; the T2 token stays linked.
-            page.hover('.lex-curve-editor')
-            page.hover('.lex-curve-variable[data-curve-variable="t1"]')
-            assert page.evaluate(
-                "document.querySelectorAll('.lex-curve-variable-highlight').length") == 1
-            page.hover('.lex-curve-variable[data-curve-variable="t2"]')
-            assert page.evaluate(
-                "document.querySelectorAll('.lex-curve-variable-highlight').length") > 1
+            follows = page.locator('.lex-curve-math-follow')
+            assert follows.count() == 2
+            assert follows.evaluate_all(
+                'nodes=>nodes.map(n=>n.getAttribute("aria-label"))') == [
+                'Y(x) = T1', 'Y(x) = T2']
+            rows = page.locator('.lex-curve-formula-segment')
+            assert rows.count() == 2
+            assert rows.nth(0).evaluate(
+                'n=>n.textContent.replace(/\\s+/g,"")') == 'Y(x)=T1'
+            assert rows.nth(1).evaluate(
+                'n=>n.textContent.replace(/\\s+/g,"")') == 'Y(x)=T2'
+            # The first span names T1 and the second names T2, each linked to
+            # its own drawer variable.
+            assert page.locator(
+                '.lex-curve-math-follow[data-segment="0"]'
+                ' .lex-curve-variable-t1[data-curve-variable="t1"]').count() >= 1
+            assert page.locator(
+                '.lex-curve-math-follow[data-segment="1"]'
+                ' .lex-curve-variable-t2[data-curve-variable="t2"]').count() >= 1
+            # Moving the probe across both spans swaps nothing: both
+            # equations stay where their spans drew them.
+            box = page.locator('.lex-curve-plot svg').bounding_box()
+            for fraction in (0.2, 0.5, 0.8):
+                page.mouse.move(box['x'] + box['width'] * fraction,
+                                box['y'] + box['height'] / 2)
+                page.wait_for_timeout(150)
+            assert follows.count() == 2
+            assert follows.evaluate_all(
+                'nodes=>nodes.map(n=>n.getAttribute("aria-label"))') == [
+                'Y(x) = T1', 'Y(x) = T2']
+            seen = page.evaluate(
+                "document.querySelector('.lex-curve-editor')._seen")
+            assert any(x <= 5 for x in seen), seen
+            assert any(x > 5 for x in seen), seen
             assert not errors, errors
         finally:
             browser.close()

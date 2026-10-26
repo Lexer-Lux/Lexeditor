@@ -188,7 +188,7 @@
   function graphsPanel(){
     const cards=[['Linear',level=>level],['Quadratic',level=>level*level/100]].map(([title,evaluate])=>{
       const scale=el("input",{type:"number",min:0,max:5,step:.1,value:1,"aria-label":`${title} multiplier`});
-      return LexeditorUI.curveEditor({title,variables:[{label:"A",control:scale}],domain:{min:1,max:100},range:{min:0,max:500},overlayExtrema:true,evaluate:level=>evaluate(level)*Number(scale.value),formula:title==="Linear"?"Value = Level × A":"Value = Level² × A / 100"});
+      return LexeditorUI.curveEditor({title,variables:[{label:"A",control:scale}],domain:{min:1,max:100},range:{min:0,max:500},overlayExtrema:true,xLabel:"Level",yLabel:"Value",evaluate:level=>evaluate(level)*Number(scale.value),formula:title==="Linear"?"Value = Level × A":"Value = Level² × A / 100"});
     });
     return LexeditorUI.curveGrid(...cards);
   }

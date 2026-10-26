@@ -1,9 +1,10 @@
 """Stats curves: the bare graph fills the tab with colored variables.
 
 A calculation graph owns its panel with no section header around it;
-the plot takes the panel height. Formula roles light with their
-families (thresholds orange, values violet, shapes teal) and hovering
-a drawer variable highlights its formula atoms and back, like FF8.
+the plot takes the panel height. Each stage owns its own key on the
+line and in the drawer, every drawer variable carries its own help
+bubble, and hovering a drawer variable highlights its formula atoms
+and back, like FF8.
 """
 import sys
 import tempfile
@@ -60,30 +61,45 @@ def main():
                                 plot: plot.getBoundingClientRect().height};
                     }''')
                     assert fill['plot'] >= fill['body'] - 12, fill
-                    # Roles wear family colors on the line and in the drawer.
-                    for key, color in (('t', 'rgb(255, 158, 94)'),
-                                       ('v', 'rgb(199, 146, 234)'),
-                                       ('s', 'rgb(95, 215, 215)')):
-                        assert page.locator(
-                            f'.lex-curve-math-atom .lex-curve-variable-{key}').count() >= 1, key
-                        seen = page.evaluate(
-                            '''(key) => getComputedStyle(document.querySelector(
-                                `.lex-curve-variable-name.lex-curve-variable-${key}`)).color''',
-                            key)
-                        assert seen == color, (key, seen)
-                    # Drawer -> formula and back.
+                    # Each stage owns its key on the line and in the drawer.
                     editor = page.locator('.lex-curve-editor')
+                    for key in ('t1', 't2', 't3', 't4', 't5', 'v1', 'v2',
+                                'v3', 'v4', 'v5', 's1', 's2', 's3', 's4'):
+                        assert editor.locator(
+                            f'.lex-curve-math-atom .lex-curve-variable-{key}'
+                        ).count() >= 1, key
+                        assert editor.locator(
+                            f'.lex-curve-variable-name.lex-curve-variable-{key}'
+                        ).count() == 1, key
+                    # S5 shapes nothing and the cost fields ride no segment,
+                    # so they color the drawer only.
+                    for key in ('s5', 'c1', 'c2', 'c3', 'c4'):
+                        assert editor.locator(
+                            f'.lex-curve-variable-name.lex-curve-variable-{key}'
+                        ).count() == 1, key
+                        assert editor.locator(
+                            f'.lex-curve-math-atom .lex-curve-variable-{key}'
+                        ).count() == 0, key
+                    colors = page.evaluate(
+                        """() => [...document.querySelectorAll(
+                            '.lex-curve-variable-name')].map(node =>
+                            getComputedStyle(node).color)""")
+                    assert len(set(colors)) == 19, colors
+                    # Drawer -> formula and back.
                     editor.hover()
                     editor.locator(
-                        ".lex-curve-variable[data-curve-variable='t']").nth(0).hover()
+                        ".lex-curve-variable[data-curve-variable='t1']").hover()
                     assert editor.locator(
-                        '.lex-curve-math-atom .lex-curve-variable-t'
+                        '.lex-curve-math-atom .lex-curve-variable-t1'
                         '.lex-curve-variable-highlight').count() >= 1
                     editor.locator(
-                        '.lex-curve-math-atom .lex-curve-variable-v').nth(0).hover(force=True)
+                        '.lex-curve-math-atom .lex-curve-variable-v1').first.hover(force=True)
                     assert editor.locator(
-                        ".lex-curve-variable[data-curve-variable='v']"
-                        ".lex-curve-variable-active").count() >= 1
+                        ".lex-curve-variable[data-curve-variable='v1']"
+                        ".lex-curve-variable-active").count() == 1
+                    # Every drawer variable carries its own help bubble.
+                    assert editor.locator(
+                        '.lex-curve-variable .lex-info-help').count() == 19
                     assert not errors, errors
                     print('DS1 curve variables browser check passed')
                 finally:

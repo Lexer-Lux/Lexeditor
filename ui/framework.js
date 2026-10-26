@@ -4781,36 +4781,20 @@
     const rangeHigh = document.createElementNS(svgNamespace, "text");
     rangeHigh.setAttribute("class", "lex-curve-range-value lex-curve-range-high");
     rangeHigh.setAttribute("text-anchor", "end");
-    const formulaText = document.createElementNS(svgNamespace, "text");
-    formulaText.setAttribute("class", "lex-curve-path-formula");
-    formulaText.setAttribute("dy", "-7");
-    const mathematical = options.formula?.classList?.contains("lex-math-formula");
-    const mathOverlay = mathematical ? options.formula.cloneNode(true) : null;
-    let mathSource = mathOverlay?.querySelector(":scope > math");
-    const mathAtoms = [];
-    const addAtom = source => {
-      if (source.localName === "mrow") {
-        [...source.children].forEach(addAtom);
-        return;
-      }
-      // Fractions and powers stay whole; splitting their descendants would
-      // lose the mathematical grouping. Ordinary terms turn independently.
-      const math = document.createElementNS(mathSource.namespaceURI, "math");
-      math.append(source.cloneNode(true));
-      const visual = element("span", {class:"lex-curve-math-atom", "aria-hidden":"true"}, math);
-      mathOverlay.append(visual);
-      mathAtoms.push({source, visual});
-    };
-    if (mathSource) {
-      mathOverlay.classList.add("lex-curve-math-follow");
-      mathOverlay.setAttribute("role", "img");
-      mathOverlay.setAttribute("aria-label", options.formula.title || mathSource.getAttribute("aria-label") || mathSource.textContent);
-      mathSource.classList.add("lex-curve-math-source");
-      mathSource.setAttribute("aria-hidden", "true");
-      [...mathSource.children].forEach(addAtom);
-    }
-    if (mathematical) formulaText.style.display = "none";
-    const formulaPath = document.createElementNS(svgNamespace, "textPath");
+    // A piecewise curve declares its segments, each with the formula its own
+    // span draws: [{from, to, formula}]. One formula without segments is the
+    // same shape with a single rider over the whole line, so the layout below
+    // reads riders and the single-formula graphs render exactly as before.
+    const declared = Array.isArray(options.segments)
+      ? options.segments.filter(segment => segment && segment.formula != null) : [];
+    const riders = (declared.length ? declared : [{formula: options.formula}]).map((entry, index) => ({
+      index,
+      source: entry.formula ?? entry,
+      from: entry.from == null ? null : Number(entry.from),
+      to: entry.to == null ? null : Number(entry.to),
+      center: null,
+    }));
+    const piecewise = declared.length > 0;
     // Glyphs on a textPath rotate to the LOCAL segment slope. On a nearly
     // straight line the sampling jaggies are steep over a few units, so an
     // occasional letter swings ~45 degrees and collides with its neighbours.
@@ -4821,9 +4805,61 @@
     formulaGuide.setAttribute("id", formulaGuideId);
     formulaGuide.setAttribute("fill", "none");
     formulaGuide.setAttribute("stroke", "none");
-    formulaPath.setAttribute("href", `#${formulaGuideId}`);
-    formulaPath.setAttribute("startOffset", "50%");
-    formulaPath.setAttribute("text-anchor", "middle");
+    const riderSpan = rider => piecewise
+      ? {"data-segment": String(rider.index),
+        ...(rider.from == null ? {} : {"data-segment-from": String(rider.from)}),
+        ...(rider.to == null ? {} : {"data-segment-to": String(rider.to)})}
+      : {};
+    const markSpan = (node, rider) => {
+      for (const [name, value] of Object.entries(riderSpan(rider))) node.setAttribute(name, value);
+    };
+    const makeAtom = (rider, source) => {
+      if (source.localName === "mrow") {
+        [...source.children].forEach(child => makeAtom(rider, child));
+        return;
+      }
+      // Fractions and powers stay whole; splitting their descendants would
+      // lose the mathematical grouping. Ordinary terms turn independently.
+      const math = document.createElementNS(rider.mathSource.namespaceURI, "math");
+      math.append(source.cloneNode(true));
+      const visual = element("span", {class:"lex-curve-math-atom", "aria-hidden":"true"}, math);
+      rider.overlay.append(visual);
+      rider.atoms.push({source, visual});
+    };
+    for (const rider of riders) {
+      const formulaText = document.createElementNS(svgNamespace, "text");
+      formulaText.setAttribute("class", "lex-curve-path-formula");
+      formulaText.setAttribute("dy", "-7");
+      markSpan(formulaText, rider);
+      const formulaPath = document.createElementNS(svgNamespace, "textPath");
+      formulaPath.setAttribute("href", `#${formulaGuideId}`);
+      formulaPath.setAttribute("startOffset", "50%");
+      formulaPath.setAttribute("text-anchor", "middle");
+      formulaText.append(formulaPath);
+      rider.text = formulaText;
+      rider.path = formulaPath;
+      rider.math = !!rider.source?.classList?.contains("lex-math-formula");
+      if (!rider.math) continue;
+      // A mathematical rider draws through its overlay; the text stays as the
+      // hidden token source it always was, so linking reads every rider alike.
+      formulaText.style.display = "none";
+      const overlay = rider.source.cloneNode(true);
+      const mathSource = overlay.querySelector(":scope > math");
+      rider.overlay = overlay;
+      rider.mathSource = mathSource;
+      rider.atoms = [];
+      if (mathSource) {
+        overlay.classList.add("lex-curve-math-follow");
+        overlay.setAttribute("role", "img");
+        overlay.setAttribute("aria-label", rider.source.title || mathSource.getAttribute("aria-label") || mathSource.textContent);
+        markSpan(overlay, rider);
+        mathSource.classList.add("lex-curve-math-source");
+        mathSource.setAttribute("aria-hidden", "true");
+        [...mathSource.children].forEach(child => makeAtom(rider, child));
+      }
+    }
+    const textRiders = riders.filter(rider => !rider.math);
+    const mathRiders = riders.filter(rider => rider.math);
     const curveVariables = (options.variables || []).map(variable => ({
       key: String(variable.key || variable.label || "").trim().toLocaleLowerCase(),
       spellings: [variable.label, ...(variable.tokens || [])].map(spelling =>
@@ -4874,8 +4910,7 @@
       }
       target.append(document.createTextNode(String(source)));
     };
-    appendFormulaTokens(formulaPath, formulaContent(options.formula));
-    formulaText.append(formulaPath);
+    for (const rider of riders) appendFormulaTokens(rider.path, formulaContent(rider.source));
     const guide = document.createElementNS(svgNamespace, "line");
     guide.setAttribute("class", "lex-curve-guide");
     const marker = document.createElementNS(svgNamespace, "path");
@@ -4884,7 +4919,8 @@
     // group so switching mode is a class change rather than a rebuild.
     const bars = document.createElementNS(svgNamespace, "g");
     bars.setAttribute("class", "lex-curve-bars");
-    svg.append(grid, fill, bars, lineShadow, line, formulaGuide, rangeLow, rangeHigh, formulaText, guide, marker);
+    svg.append(grid, fill, bars, lineShadow, line, formulaGuide, rangeLow, rangeHigh,
+      ...riders.map(rider => rider.text), guide, marker);
 
     const minimum = element("output", {class: "lex-curve-minimum"}, "—");
     const maximum = element("output", {class: "lex-curve-maximum"}, "—");
@@ -4911,8 +4947,11 @@
     const variables = element("div", {class: "lex-curve-variables lex-curve-variable-strip"},
       ...(options.variables || []).map(variable => {
         const key = String(variable.key || variable.label || "").trim().toLocaleLowerCase();
+        // A variable with help carries the property's own question-mark
+        // bubble; the panel help then keeps graph-level guidance only.
         return element("label", {class: "lex-curve-variable", "data-curve-variable": key},
-          element("span", {class: `lex-curve-variable-name lex-curve-variable-${key}`}, variable.label), variable.control);
+          element("span", {class: `lex-curve-variable-name lex-curve-variable-${key}`}, variable.label), variable.control,
+          variable.help ? infoHelp(variable.help) : null);
       }),
       ...(curveVariableKeys.length ? [modeToggle] : []));
     const tooltip = element("output", {class:"lex-curve-tooltip", "aria-live":"polite"});
@@ -4922,26 +4961,39 @@
     // The title is drawn INTO the plot, behind the drawing, so "centred in the
     // graph" means the graph rather than the card around it. The heading keeps
     // the text for a screen reader and stops painting it.
+    const axisName = (label, unit) => {
+      const text = element("span", {class: "lex-curve-axis-name-text"}, label);
+      return unit ? unitField(text, unit) : text;
+    };
     const plot = element("div", {
       class: "lex-curve-plot",
       "data-curve-title": options.title || "CURVE",
       style:`--lex-curve-title-chars:${Math.max(1,String(options.title||"CURVE").length)}`,
     },
       svg,
-      mathOverlay,
+      ...mathRiders.map(rider => rider.overlay),
       axisTop,
       axisBottom,
       element("span", {class: "lex-curve-axis lex-curve-axis-start"}, formatNumber(domain.min)),
       element("span", {class: "lex-curve-axis lex-curve-axis-end"}, formatNumber(domain.max)),
-      // Both axes are named, in the margin the plot now reserves for them.
+      // Both axes are named, in the margin the plot now reserves for them,
+      // with units from the shared unit component where the value has one.
       element("span", {class: "lex-curve-axis-name lex-curve-axis-name-x"},
-        options.xLabel || "LEVEL"),
+        axisName(options.xLabel || "LEVEL", options.xUnit)),
       element("span", {class: "lex-curve-axis-name lex-curve-axis-name-y"},
-        options.yLabel || options.title || "VALUE"),
+        axisName(options.yLabel || options.title || "VALUE", options.yUnit)),
       options.overlayExtrema ? hoverExtrema : null,
       ...(curveVariableKeys.length ? [] : [modeToggle]),
       tooltip);
-    const formulaBlock = element("div", {class: "lex-curve-formula"}, formulaContent(options.formula));
+    const formulaBlock = piecewise
+      ? element("div", {class: "lex-curve-formula lex-curve-formula-segments"},
+          ...riders.map(rider => element("div", {
+            class: "lex-curve-formula-segment",
+            "data-segment": String(rider.index),
+            "data-segment-from": rider.from,
+            "data-segment-to": rider.to,
+          }, formulaContent(rider.source))))
+      : element("div", {class: "lex-curve-formula"}, formulaContent(options.formula));
     const title = element("h4", {},
       element("span", {class: "lex-curve-heading-title"}, String(options.title || "CURVE").toLocaleUpperCase()));
     if (options.extremaInTitle) title.append(
@@ -5057,10 +5109,15 @@
     });
     plot.addEventListener("pointerleave", () => { clearProbe(); highlightVariable(""); });
 
-    const fitFormula = () => {
+    const fitFormula = rider => {
+      const formulaText = rider.text, formulaPath = rider.path;
+      // Neighbouring spans ride two lanes above the line, so equations
+      // longer than their spans never share ink. A lone rider keeps -7.
+      const lane = rider.index % 2 ? -16 : -7;
       formulaText.style.removeProperty("font-size");
-      formulaPath.setAttribute("startOffset", "50%");
-      formulaText.setAttribute("dy", "-7");
+      formulaPath.setAttribute("startOffset", rider.center == null ? "50%" : `${rider.center * 100}%`);
+      if (rider.index % 2) formulaText.setAttribute("dy", "-16");
+      else formulaText.setAttribute("dy", "-7");
       const natural = formulaText.getComputedTextLength?.() || 0;
       const pathLength = line.getTotalLength?.() || 0;
       // Use most of the drawn line. The old .78 factor, the 256 cap and a 76
@@ -5086,12 +5143,12 @@
       const box = formulaText.getBBox?.();
       if (box && pathLength > 0) {
         const leftInset = 16, rightInset = 304;
-        let offset = 50;
+        let offset = rider.center == null ? 50 : rider.center * 100;
         if (box.x < leftInset) offset += (leftInset - box.x) / pathLength * 100;
         if (box.x + box.width > rightInset) offset -= (box.x + box.width - rightInset) / pathLength * 100;
         formulaPath.setAttribute("startOffset", `${Math.max(10, Math.min(90, offset))}%`);
         const shifted = formulaText.getBBox();
-        let dy = -7;
+        let dy = lane;
         if (shifted.y < 4) dy += 4 - shifted.y;
         if (shifted.y + shifted.height > 156) dy -= shifted.y + shifted.height - 156;
         formulaText.setAttribute("dy", String(dy));
@@ -5107,7 +5164,8 @@
       const box = svg.getBoundingClientRect();
       return {x: (box.width || 320) / 320, y: (box.height || graphHeight) / graphHeight};
     };
-    const glyphQuads = () => {
+    const glyphQuads = rider => {
+      const formulaText = rider.text;
       const count = formulaText.getNumberOfChars?.() ?? 0;
       if (!count) return null;
       const characters = formulaText.textContent || "";
@@ -5171,8 +5229,8 @@
     };
     // Returns the worst penetration in screen pixels, so the search can be
     // inspected rather than only obeyed.
-    const formulaWorstBite = () => {
-      const quads = glyphQuads();
+    const formulaWorstBite = rider => {
+      const quads = glyphQuads(rider);
       if (!quads) return 0;
       // Neighbouring glyph boxes abut by design, so a shared edge is not a
       // collision - only a real bite out of the letter beside it is. Three
@@ -5198,8 +5256,8 @@
       const bites = [];
       for (let step = 0; step < guideSteps.length; step++) {
         formulaGuide.setAttribute("d", buildGuide(guideSteps[step]));
-        fitFormula();
-        bites.push(Number(formulaWorstBite().toFixed(3)));
+        for (const rider of textRiders) fitFormula(rider);
+        bites.push(Number(Math.max(...textRiders.map(formulaWorstBite)).toFixed(3)));
         root.dataset.formulaGuideBites = bites.join(",");
         if (step === guideSteps.length - 1 || bites[step] <= .2) {
           // Which gentleness this curve settled on, so the search can be seen
@@ -5211,10 +5269,18 @@
     };
 
     const positionMath = () => {
-      if (!mathOverlay || !root.isConnected || !line.getAttribute("d")) return;
+      if (!root.isConnected || !line.getAttribute("d")) return;
       const length = line.getTotalLength(), matrix = svg.getScreenCTM();
       if (!length || !matrix) return;
       const bounds = plot.getBoundingClientRect(), scale = bounds.width / plot.offsetWidth || 1;
+      for (const rider of mathRiders) positionMathRider(rider, length, matrix, bounds, scale);
+    };
+    const positionMathRider = (rider, length, matrix, bounds, scale) => {
+      const mathOverlay = rider.overlay, mathSource = rider.mathSource, mathAtoms = rider.atoms;
+      const middle = rider.center == null ? .5 : rider.center;
+      // Neighbouring spans ride two lanes above the line, so equations
+      // longer than their spans never share ink. A lone rider keeps 7.
+      const lift = 7 + (rider.index % 2) * 19;
       if (mathSource) {
         const overlayBounds = mathOverlay.getBoundingClientRect();
         const unit = Math.hypot(matrix.a, matrix.b) / scale;
@@ -5230,7 +5296,7 @@
         for (const {source, visual} of mathAtoms) {
           const box = source.getBoundingClientRect();
           const offset = (box.left + box.width / 2 - sourceBounds.left - sourceBounds.width / 2) / scale;
-          const distance = Math.max(0, Math.min(length, length / 2 + offset / unit));
+          const distance = Math.max(0, Math.min(length, length * middle + offset / unit));
           // The tilt is measured over a window of about two levels of the x
           // axis, not over the term's own width. A stat that grows in whole
           // points moves up one step about every level, and a narrow window
@@ -5245,8 +5311,8 @@
           };
           const center = sample(distance), before = sample(distance - delta), after = sample(distance + delta);
           const angle = Math.atan2(after.y - before.y, after.x - before.x);
-          visual.style.left = `${(center.x - overlayBounds.left) / scale + Math.sin(angle) * 7}px`;
-          visual.style.top = `${(center.y - overlayBounds.top) / scale - Math.cos(angle) * 7}px`;
+          visual.style.left = `${(center.x - overlayBounds.left) / scale + Math.sin(angle) * lift}px`;
+          visual.style.top = `${(center.y - overlayBounds.top) / scale - Math.cos(angle) * lift}px`;
           // Bounded like the single-formula case: a curve that climbs and then
           // comes back down - a MAG curve with a large quadratic term does -
           // turns a term nearly on its side, and the equation reads as a seesaw
@@ -5255,16 +5321,42 @@
           const degrees = Math.max(-40, Math.min(40, angle * 180 / Math.PI));
           visual.style.setProperty("--lex-formula-angle", `${degrees}deg`);
         }
+        if (piecewise && mathAtoms.length) {
+          // A span's equation starts at the plot's own edge, so a long one
+          // would leave the plot where a centred equation never reaches.
+          // Slide the whole equation rigidly into the plot: parked ends stay
+          // readable, clipped ones do not, and sliding never folds the text.
+          const layoutWidth = overlayBounds.width / scale, layoutHeight = overlayBounds.height / scale;
+          let lowX = Infinity, highX = -Infinity, lowY = Infinity, highY = -Infinity;
+          for (const {visual: placed} of mathAtoms) {
+            const box = placed.getBoundingClientRect();
+            lowX = Math.min(lowX, (box.left - overlayBounds.left) / scale);
+            highX = Math.max(highX, (box.right - overlayBounds.left) / scale);
+            lowY = Math.min(lowY, (box.top - overlayBounds.top) / scale);
+            highY = Math.max(highY, (box.bottom - overlayBounds.top) / scale);
+          }
+          let pushX = 0, pushY = 0;
+          if (lowX < 8) pushX = 8 - lowX;
+          else if (highX > layoutWidth - 8) pushX = layoutWidth - 8 - highX;
+          if (lowY < 4) pushY = 4 - lowY;
+          else if (highY > layoutHeight - 4) pushY = layoutHeight - 4 - highY;
+          if (pushX || pushY) {
+            for (const {visual: placed} of mathAtoms) {
+              placed.style.left = `${parseFloat(placed.style.left) + pushX}px`;
+              placed.style.top = `${parseFloat(placed.style.top) + pushY}px`;
+            }
+          }
+        }
         return;
       }
       const point = ratio => {
         const value = line.getPointAtLength(length * ratio);
         return new DOMPoint(value.x,value.y).matrixTransform(matrix);
       };
-      const center = point(.5), before = point(.47), after = point(.53);
+      const center = point(middle), before = point(middle - .03), after = point(middle + .03);
       const angle = Math.max(-40,Math.min(40,Math.atan2(after.y-before.y,after.x-before.x)*180/Math.PI));
       mathOverlay.style.left = `${(center.x-bounds.left)/scale}px`;
-      mathOverlay.style.top = `${(center.y-bounds.top)/scale-7}px`;
+      mathOverlay.style.top = `${(center.y-bounds.top)/scale-lift}px`;
       mathOverlay.style.setProperty("--lex-formula-angle",`${angle}deg`);
       mathOverlay.style.removeProperty("font-size");
       const available = svg.getBoundingClientRect().width / scale * .84;
@@ -5273,11 +5365,11 @@
         mathOverlay.style.fontSize = `${Math.max(7.5,size*available/mathOverlay.scrollWidth)}px`;
       }
     };
-    if (mathOverlay && typeof ResizeObserver !== "undefined") {
+    if (mathRiders.length && typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(positionMath);
       observer.observe(plot);
     }
-    if (mathOverlay) document.fonts?.ready.then(positionMath);
+    if (mathRiders.length) document.fonts?.ready.then(positionMath);
 
     // The samples joined by a curve through every one of them, instead of a
     // straight line between each pair. A level's value is a number at that
@@ -5362,14 +5454,14 @@
         fill.removeAttribute("d");
         bars.replaceChildren();
         rangeLow.textContent = rangeHigh.textContent = "";
-        if (mathOverlay) mathOverlay.hidden = true;
+        for (const rider of mathRiders) rider.overlay.hidden = true;
         minimum.textContent = maximum.textContent = "—";
         status.textContent = options.invalidText || "INVALID CURVE";
         root.classList.add("invalid");
         return;
       }
       root.classList.remove("invalid");
-      if (mathOverlay) mathOverlay.hidden = false;
+      for (const rider of mathRiders) rider.overlay.hidden = false;
       status.textContent = "";
       const values = samples.map(sample => sample.value);
       minimum.textContent = formatNumber(Math.min(...values), options.valueFormat || {});
@@ -5562,12 +5654,39 @@
           .map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`)
           .join(" ");
       };
-      if (mathOverlay) {
-        positionMath();
-        requestAnimationFrame(positionMath);
-      } else {
+      // Each span's equation rides the middle of its own span, measured along
+      // the drawn line rather than the x axis, so a steep span still centers
+      // its equation on the line it describes.
+      for (const rider of riders) {
+        if (rider.from == null || rider.to == null) continue;
+        const midX = (Math.min(rider.from, rider.to) + Math.max(rider.from, rider.to)) / 2;
+        const target = (midX - domain.min) / spanX * width;
+        let total = 0;
+        const breaks = [0];
+        for (let index = 1; index < points.length; index++) {
+          total += Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1]);
+          breaks.push(total);
+        }
+        rider.center = .5;
+        if (total > 0) {
+          for (let index = 1; index < points.length; index++) {
+            if (points[index][0] >= target) {
+              const before = points[index - 1][0], after = points[index][0];
+              const ratio = after > before ? (target - before) / (after - before) : 0;
+              rider.center = (breaks[index - 1]
+                + (breaks[index] - breaks[index - 1]) * Math.max(0, Math.min(1, ratio))) / total;
+              break;
+            }
+          }
+        }
+      }
+      if (textRiders.length) {
         layoutFormula(buildGuide);
         requestAnimationFrame(() => layoutFormula(buildGuide));
+      }
+      if (mathRiders.length) {
+        positionMath();
+        requestAnimationFrame(positionMath);
       }
     };
     let pending = false;
@@ -5584,26 +5703,6 @@
     if(typeof ResizeObserver!=="undefined")new ResizeObserver(scheduleDraw).observe(svg);
     draw();
     root.refreshCurve = draw;
-    root.refreshFormula = source => {
-      formulaPath.replaceChildren();
-      appendFormulaTokens(formulaPath, formulaContent(source));
-      if (mathOverlay && source?.classList?.contains("lex-math-formula")) {
-        const fresh = source.cloneNode(true);
-        const math = fresh.querySelector(":scope > math");
-        mathOverlay.replaceChildren();
-        mathAtoms.length = 0;
-        if (math) {
-          math.classList.add("lex-curve-math-source");
-          math.setAttribute("aria-hidden", "true");
-          mathOverlay.append(math);
-          mathSource = math;
-          [...math.children].forEach(addAtom);
-        } else mathSource = null;
-      }
-      formulaBlock.replaceChildren(formulaContent(source));
-      linkFormulaTokens();
-      draw();
-    };
     return root;
   };
 
