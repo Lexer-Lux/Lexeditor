@@ -51,10 +51,13 @@ def test_damage_hitbox_and_impact_fields_roundtrip_exact_byte_boundary_and_rever
     fields = doc.read_row('AtkParam_Npc',100)['fields']
     assert {f['key'] for f in fields} == set(ATTACK_FIELDS)
     assert all(f['editable'] for f in fields)
-    assert len(ATTACK_FIELDS) == 34
+    assert len(ATTACK_FIELDS) == 35
     assert [f['key'] for f in fields[:9]] == ['atkPhys', 'atkPhysCorrection', 'atkMag', 'atkMagCorrection',
         'atkFire', 'atkFireCorrection', 'atkThun', 'atkThunCorrection', 'atkAttribute']
     assert next(f for f in fields if f['key']=='atkAttribute')['enum'] == {'0':'Standard','1':'Slash','2':'Strike','3':'Thrust','4':'Push'}
+    stamina = next(f for f in fields if f['key']=='atkStam')
+    assert stamina['label'] == 'Stamina (points)' and stamina['group'] == 'Base damage'
+    assert 'blocking victim' in stamina['description']
     effects = [f for f in fields if f['group']=='Effects']
     assert [f['key'] for f in effects] == ['spEffectId0','spEffectId1','spEffectId2','spEffectId3','spEffectId4',
         'disableHitSpEffect']
@@ -67,7 +70,7 @@ def test_damage_hitbox_and_impact_fields_roundtrip_exact_byte_boundary_and_rever
     assert groups['hit0_Radius'] == 'Hitbox' and groups['knockbackDist'] == 'Impact'
     values = {'atkPhys':123,'atkMag':234,'atkFire':345,'atkThun':456,
               'atkPhysCorrection':150,'atkMagCorrection':250,'atkFireCorrection':350,'atkThunCorrection':450,
-              'atkAttribute':3,
+              'atkAttribute':3,'atkStam':50,
               'hit0_Radius':2.5,'hit1_Radius':0.5,'hit2_Radius':1.25,'hit3_Radius':3.75,
               'hit0_DmyPoly1':10,'hit1_DmyPoly1':11,'hit2_DmyPoly1':12,'hit3_DmyPoly1':13,
               'hit0_DmyPoly2':20,'hit1_DmyPoly2':21,'hit2_DmyPoly2':22,'hit3_DmyPoly2':23,
@@ -127,7 +130,7 @@ def test_safe_project_save_reload_and_vanilla(tmp_path):
     with pytest.raises(PermissionError): ItemStore(game).edit('AtkParam_Npc',101,'atkPhys',100)
 
 
-def test_player_attacks_share_enemy_attack_keys_with_motion_value_presentation():
+def test_player_attacks_mirror_enemy_keys_except_stamina_with_motion_value_presentation():
     import json
     from plugins.ds1.formats import METADATA
     doc = ItemDocument(make_archive())
@@ -139,14 +142,14 @@ def test_player_attacks_share_enemy_attack_keys_with_motion_value_presentation()
     assert rows[1]['name'] == names[101]
     fields = doc.read_row('AtkParam_Pc', 100)['fields']
     assert {f['key'] for f in fields} == set(PC_ATTACK_FIELDS)
-    assert set(PC_ATTACK_FIELDS) == set(ATTACK_FIELDS)
+    assert set(PC_ATTACK_FIELDS) == set(ATTACK_FIELDS) - {'atkStam'}
     assert all(f['editable'] for f in fields)
     assert [f['key'] for f in fields[:9]] == ['atkPhys', 'atkPhysCorrection', 'atkMag', 'atkMagCorrection',
         'atkFire', 'atkFireCorrection', 'atkThun', 'atkThunCorrection', 'atkAttribute']
     by_key = {f['key']: f for f in fields}
     assert by_key['atkPhys']['label'] == 'Physical (%)'
     assert by_key['atkPhys']['group'] == 'Motion values'
-    assert 'Motion value' in by_key['atkPhys']['description'] and '100' in by_key['atkPhys']['description']
+    assert 'motion value' in by_key['atkPhys']['description'] and '100' in by_key['atkPhys']['description']
     assert by_key['atkPhysCorrection']['label'] == 'Physical correction (%)'
     assert by_key['atkPhysCorrection']['group'] == 'Motion values'
     npc = {f['key']: f for f in doc.read_row('AtkParam_Npc', 100)['fields']}

@@ -31,8 +31,8 @@
     },
     {
       "Field": "sellValue",
-      "Name": "Sell Value",
-      "Description": "How many souls feeding this ring to Kingseeker Frampt grants."
+      "Name": "Sell Value (souls)",
+      "Description": "The price Kingseeker Frampt pays for this ring."
     },
     {
       "Field": "sortId",

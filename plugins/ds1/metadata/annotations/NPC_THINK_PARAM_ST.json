@@ -37,7 +37,7 @@
     {
       "Field": "BackHomeLife_OnHitEneWal",
       "Name": "Goal Duration on Wall Collision (seconds)",
-      "Description": "How long this enemy keeps walking home after hitting a barrier. In seconds."
+      "Description": "How long this enemy keeps walking home after hitting a barrier."
     },
     {
       "Field": "goalID_ToCaution",
@@ -67,67 +67,67 @@
     {
       "Field": "eye_dist",
       "Name": "Visual Search Distance (metres)",
-      "Description": "How far this enemy sees. In metres."
+      "Description": "How far this enemy sees."
     },
     {
       "Field": "ear_dist",
-      "Name": "Auditory Search Distance (metres)",
-      "Description": "How far this enemy hears. Set in centimetres."
+      "Name": "Auditory Search Distance (cm)",
+      "Description": "How far this enemy hears."
     },
     {
       "Field": "ear_soundcut_dist",
       "Name": "Auditory Dampening Distance (metres)",
-      "Description": "Past this distance, sounds fade and may go unheard. In metres."
+      "Description": "Past this distance, sounds fade and may go unheard."
     },
     {
       "Field": "nose_dist",
       "Name": "Olfactory Search Distance (metres)",
-      "Description": "How far this enemy smells the player. In metres."
+      "Description": "How far this enemy smells the player."
     },
     {
       "Field": "maxBackhomeDist",
       "Name": "Battle Act: Return Home Distance (metres)",
-      "Description": "Past this distance from home, this enemy always turns back. In metres."
+      "Description": "Past this distance from home, this enemy always turns back."
     },
     {
       "Field": "backhomeDist",
       "Name": "Battle Act: Return Home Distance (Combat) (metres)",
-      "Description": "Past this distance from home, this enemy fights while falling back. In metres."
+      "Description": "Past this distance from home, this enemy fights while falling back."
     },
     {
       "Field": "backhomeBattleDist",
       "Name": "Battle Act: Return Home Abort Distance (metres)",
-      "Description": "Past this distance, this enemy gives up going home and keeps fighting. In metres."
+      "Description": "Past this distance, this enemy gives up going home and keeps fighting."
     },
     {
       "Field": "nonBattleActLife",
       "Name": "Battle Act: Non-Combat Act Duration (seconds)",
-      "Description": "How long this enemy waits before acting on a sensed target. In seconds."
+      "Description": "How long this enemy waits before acting on a sensed target."
     },
     {
       "Field": "BackHome_LookTargetTime",
       "Name": "Return Home: Target Look-At Duration (seconds)",
-      "Description": "How long this enemy watches its target while walking home. In seconds."
+      "Description": "How long this enemy watches its target while walking home."
     },
     {
       "Field": "BackHome_LookTargetDist",
       "Name": "Return Home: Target Look-At Distance (metres)",
-      "Description": "How far this enemy watches its target while walking home. In metres."
+      "Description": "How far this enemy watches its target while walking home."
     },
     {
       "Field": "SightTargetForgetTime",
       "Name": "Visual Target Forget Duration (frames)",
-      "Description": "How long this enemy remembers a seen target. In frames."
+      "Description": "How long this enemy remembers a seen target."
     },
     {
       "Field": "SoundTargetForgetTime",
       "Name": "Auditory Target Forget Duration (frames)",
-      "Description": "How long this enemy remembers a heard target. In frames."
+      "Description": "How long this enemy remembers a heard target."
     },
     {
       "Field": "BattleStartDist",
       "Name": "Battle Start Distance (metres)",
-      "Description": "How close a spotted target must be before this enemy attacks. In metres."
+      "Description": "How close a spotted target must be before this enemy attacks."
     },
     {
       "Field": "callHelp_MyPeerId",
@@ -151,47 +151,47 @@
     },
     {
       "Field": "eye_angX",
-      "Name": "Visual Search: Horizontal Angle (degrees)",
-      "Description": "How tall the sight cone is. In degrees."
+      "Name": "Visual Search: Vertical Angle (degrees)",
+      "Description": "How tall the sight cone is."
     },
     {
       "Field": "eye_angY",
-      "Name": "Visual Search: Vertical Angle (degrees)",
-      "Description": "How wide the sight cone is. In degrees."
+      "Name": "Visual Search: Horizontal Angle (degrees)",
+      "Description": "How wide the sight cone is."
     },
     {
       "Field": "ear_angX",
-      "Name": "Auditory Search: Horizontal Angle (degrees)",
-      "Description": "How tall the hearing cone is. In degrees."
+      "Name": "Auditory Search: Vertical Angle (degrees)",
+      "Description": "How tall the hearing cone is."
     },
     {
       "Field": "ear_angY",
-      "Name": "Auditory Search: Vertical Angle (degrees)",
-      "Description": "How wide the hearing cone is. In degrees."
+      "Name": "Auditory Search: Horizontal Angle (degrees)",
+      "Description": "How wide the hearing cone is. 180 covers every direction."
     },
     {
       "Field": "callHelp_CallValidMinDistTarget",
       "Name": "Call for Help: Minimum Distance to Target (metres)",
-      "Description": "This enemy cannot call for help closer to its target than this. In metres."
+      "Description": "This enemy cannot call for help closer to its target than this."
     },
     {
       "Field": "callHelp_CallValidRange",
       "Name": "Call for Help: Maximum Distance to Friend (metres)",
-      "Description": "Friends past this cannot hear the call. In metres."
+      "Description": "Friends past this cannot hear the call."
     },
     {
       "Field": "callHelp_ForgetTimeByArrival",
       "Name": "Call for Help: Respond Duration (seconds)",
-      "Description": "How long a called friend stays alert after answering. In seconds."
+      "Description": "How long a called friend stays alert after answering."
     },
     {
       "Field": "callHelp_MinWaitTime",
-      "Name": "Call for Help: Minimum Delay (ms)",
+      "Name": "Call for Help: Minimum Delay (tenths of a second)",
       "Description": "Shortest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
     },
     {
       "Field": "callHelp_MaxWaitTime",
-      "Name": "Call for Help: Maximum Delay (ms)",
+      "Name": "Call for Help: Maximum Delay (tenths of a second)",
       "Description": "Longest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
     },
     {

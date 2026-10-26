@@ -7,22 +7,22 @@
     {
       "Field": "baseRec_mp",
       "Name": "MP recovery (seconds)",
-      "Description": "Seconds to recover 1 MP. The game has no MP pool, so this does nothing. Classes store 0."
+      "Description": "The game has no MP pool, so this does nothing. Classes store 0."
     },
     {
       "Field": "baseRec_sp",
       "Name": "Stamina recovery (seconds)",
-      "Description": "Seconds to recover 1 stamina. The game may ignore it. Classes store 0."
+      "Description": "Time to recover 1 stamina. The game may ignore it. Classes store 0."
     },
     {
       "Field": "red_Falldam",
-      "Name": "Fall damage cut (%)",
-      "Description": "May cut damage when another character lands on this one. Set in percent. Classes store 0."
+      "Name": "Cushion When Landed On (%)",
+      "Description": "May cut damage when another character lands on this one. Classes store 0."
     },
     {
       "Field": "soul",
       "Name": "Starting souls",
-      "Description": "Souls the character starts with."
+      "Description": "The amount the character starts with."
     },
     {
       "Field": "equip_Wep_Right",

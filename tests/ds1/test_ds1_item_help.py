@@ -5,6 +5,13 @@ METADATA = Path(__file__).resolve().parents[2] / "plugins/ds1/metadata"
 def description(relative, field):
     annotations = json.loads((METADATA / relative).read_text("utf-8-sig"))
     return next(entry["Description"] for entry in annotations["Fields"] if entry["Field"] == field)
+def name(relative, field):
+    annotations = json.loads((METADATA / relative).read_text("utf-8-sig"))
+    return next(entry["Name"] for entry in annotations["Fields"] if entry["Field"] == field)
+def enum_text(relative, key):
+    enum = json.loads((METADATA / relative).read_text("utf-8-sig"))
+    row = next(row for row in enum["Options"] if row["Key"] == key)
+    return next(text["Text"] for text in row["Names"] if text["Language"] == "English")
 def test_over_dexterity_says_unknown():
     # The Souls modding param wiki marks overDexterity Unknown on Magic, and
     # no source documents the Goods twin either. The old text ("Skill over
@@ -63,7 +70,7 @@ def test_sweep_rewrites_melee():
     assert "Blown Away" in description("annotations/ATK_PARAM_ST.json", "dmgLevel")
     assert "less HP" in description("annotations/ATK_PARAM_ST.json", "atkObj")
     assert "five stages" in description("annotations/CACL_CORRECT_GRAPH_ST.json", "stageMaxVal0")
-    assert "centimetres" in description("annotations/OBJ_ACT_PARAM_ST.json", "validDist")
+    assert "two paces" in description("annotations/OBJ_ACT_PARAM_ST.json", "validDist")
 def test_sweep_rewrites_goods_and_accessories():
     assert "Way of White" in description("annotations/EQUIP_PARAM_GOODS_ST.json", "vowType1")
     assert description("annotations/EQUIP_PARAM_GOODS_ST.json", "basicPrice").startswith("Probably does nothing")
@@ -85,3 +92,29 @@ def test_sweep_rewrites_weapons():
     assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "rightHandEquipable") == ""
     assert "two-handed" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable")
     assert "1 fits Intelligence" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "correctType")
+def test_lexer_parry_lines_stay_untouched():
+    # Hand-written by Lexer: parrying is deterministic (active frames vs a
+    # parryable attack), never chance-based. Do not reword; talk to him.
+    assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "attackBaseParry") == \
+        "The base parry attack damage value. Applied to the enemy parry defense value."
+    assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "defenseBaseParry") == \
+        "The base parry defense value. Compared against enemy parry attack value."
+def test_override_cleanup_labels_and_enum_wiring():
+    assert name("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable") == "Two-Hand Wield"
+    assert "two-handed" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable")
+    assert name("annotations/EQUIP_PARAM_WEAPON_ST.json", "enableSorcery") == "Enables Pyromancy"
+    assert "pyromancy" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "enableSorcery")
+    assert name("annotations/CHARACTER_INIT_PARAM.json", "red_Falldam") == "Cushion When Landed On (%)"
+    assert "lands on" in description("annotations/CHARACTER_INIT_PARAM.json", "red_Falldam")
+    assert name("annotations/NPC_THINK_PARAM_ST.json", "callHelp_MinWaitTime").endswith("(tenths of a second)")
+    assert name("annotations/NPC_THINK_PARAM_ST.json", "callHelp_MaxWaitTime").endswith("(tenths of a second)")
+    assert "Vertical" in name("annotations/NPC_THINK_PARAM_ST.json", "eye_angX")
+    assert "Horizontal" in name("annotations/NPC_THINK_PARAM_ST.json", "eye_angY")
+    assert "Vertical" in name("annotations/NPC_THINK_PARAM_ST.json", "ear_angX")
+    assert "Horizontal" in name("annotations/NPC_THINK_PARAM_ST.json", "ear_angY")
+    assert name("annotations/NPC_THINK_PARAM_ST.json", "ear_dist").endswith("(cm)")
+    assert "2 means poison and 5 means toxic" in description("annotations/SP_EFFECT_PARAM_ST.json", "lifeReductionType")
+    assert enum_text("enums/SP_EFFECT_TYPE.json", "2") == "Poison"
+    assert enum_text("enums/SP_EFFECT_TYPE.json", "5") == "Toxic"
+    assert enum_text("enums/SP_EFFECT_TYPE.json", "171") == "Karmic Justice"
+    assert enum_text("enums/SHOP_LINEUP_SHOPTYPE.json", "2") == "Attunement menu"

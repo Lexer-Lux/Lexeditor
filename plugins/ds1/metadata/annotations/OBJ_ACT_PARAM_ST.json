@@ -21,8 +21,8 @@
     },
     {
       "Field": "validDist",
-      "Name": "Use Distance",
-      "Description": "How close the player must stand to use this, in centimetres. 150 is roughly two paces. Larger values allow use from further away."
+      "Name": "Use Distance (cm)",
+      "Description": "How close the player must stand to use this. 150 is roughly two paces. Larger values allow use from further away."
     },
     {
       "Field": "playerAnimId",
@@ -57,7 +57,7 @@
     {
       "Field": "validPlayerAngle",
       "Name": "Valid Player Angle (degrees)",
-      "Description": "How far off-centre the object can be before the prompt hides, in degrees. 30 needs rough facing. 180 allows any direction."
+      "Description": "How far off-centre the object can be before the prompt hides. 30 needs rough facing. 180 allows any direction."
     },
     {
       "Field": "spQualifiedType",
@@ -72,7 +72,7 @@
     {
       "Field": "validObjAngle",
       "Name": "Valid Object Angle (degrees)",
-      "Description": "How far around the object the player can stand and still use it, in degrees. 30 needs the marked side. 180 allows every side."
+      "Description": "How far around the object the player can stand and still use it. 30 needs the marked side. 180 allows every side."
     },
     {
       "Field": "chrSorbType",

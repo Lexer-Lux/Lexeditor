@@ -759,8 +759,10 @@ const VEL=/\s*\(m\/s\)$/;
 const ACCEL=/\s*\(m\/s\^2\)$/;
 const FRAMES=/\s*\(frames?\)$/;
 const KG=/\s*\(kg\)$/;
+const CM=/\s*\(cm\)$/;
+const SOULS=/\s*\(souls\)$/;
 const PCT_PER_SEC=/\s*\(%\/s\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"");
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"").replace(CM,"").replace(SOULS,"");
 // Think distances carry their metre suffix in their labels, like every
 // other unit below (fifteen fields: eleven annotated plus the four
 // battle distances, the same family).
@@ -787,6 +789,8 @@ function controlFor(row,field){
     :ACCEL.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"m/s\u00b2")
     :FRAMES.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"frames")
     :KG.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"kg")
+    :CM.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"cm")
+    :SOULS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"souls")
     :PCT_PER_SEC.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"%/s"):plain;
 
   if(!field.editable||field.vanilla===null||field.vanilla===undefined||field.type==="text"||field.type==="longtext")return control;

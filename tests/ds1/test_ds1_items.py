@@ -392,6 +392,8 @@ def test_unit_labels_carry_their_control_suffix():
         '(frames)': re.compile(r'\s*\(frames?\)$'),
         '(kg)': re.compile(r'\s*\(kg\)$'),
         '(%/s)': re.compile(r'\s*\(%/s\)$'),
+        '(cm)': re.compile(r'\s*\(cm\)$'),
+        '(tenths of a second)': re.compile(r'\s*\(tenths of a second\)$'),
     }
     expected = {
         ('Bullet', 'life'): '(seconds)',
@@ -431,7 +433,7 @@ def test_unit_labels_carry_their_control_suffix():
         ('NpcThinkParam', 'outDist'): '(metres)',
         ('NpcThinkParam', 'BackHomeLife_OnHitEneWal'): '(seconds)',
         ('NpcThinkParam', 'eye_dist'): '(metres)',
-        ('NpcThinkParam', 'ear_dist'): '(metres)',
+        ('NpcThinkParam', 'ear_dist'): '(cm)',
         ('NpcThinkParam', 'ear_soundcut_dist'): '(metres)',
         ('NpcThinkParam', 'nose_dist'): '(metres)',
         ('NpcThinkParam', 'maxBackhomeDist'): '(metres)',
@@ -450,10 +452,11 @@ def test_unit_labels_carry_their_control_suffix():
         ('NpcThinkParam', 'callHelp_CallValidMinDistTarget'): '(metres)',
         ('NpcThinkParam', 'callHelp_CallValidRange'): '(metres)',
         ('NpcThinkParam', 'callHelp_ForgetTimeByArrival'): '(seconds)',
-        ('NpcThinkParam', 'callHelp_MinWaitTime'): '(ms)',
-        ('NpcThinkParam', 'callHelp_MaxWaitTime'): '(ms)',
+        ('NpcThinkParam', 'callHelp_MinWaitTime'): '(tenths of a second)',
+        ('NpcThinkParam', 'callHelp_MaxWaitTime'): '(tenths of a second)',
         ('ObjActParam', 'validPlayerAngle'): '(degrees)',
         ('ObjActParam', 'validObjAngle'): '(degrees)',
+        ('ObjActParam', 'validDist'): '(cm)',
         ('ReinforceParamWeapon', 'physicsAtkRate'): '(x)',
         ('ReinforceParamWeapon', 'magicAtkRate'): '(x)',
         ('ReinforceParamWeapon', 'fireAtkRate'): '(x)',
@@ -522,12 +525,13 @@ def test_unit_labels_carry_their_control_suffix():
         ('NpcParam', 'hitHeight'): '(metres)',
         ('NpcParam', 'hitRadius'): '(metres)',
         ('NpcParam', 'hitYOffset'): '(metres)',
+        ('NpcParam', 'weight'): '(kg)',
     }
     for table in ('AtkParam_Npc', 'AtkParam_Pc'):
         for slot in range(4):
             expected[(table, f'hit{slot}_Radius')] = '(metres)'
         expected[(table, 'hitStopTime')] = '(seconds)'
-    assert len(expected) == 138, len(expected)
+    assert len(expected) == 140, len(expected)
     for (table, key), suffix in sorted(expected.items()):
         label = next(item['spec'].label for item in schema(table)['fields']
                      if item['spec'].key == key)
@@ -539,11 +543,9 @@ def test_unit_labels_carry_their_control_suffix():
         ('EquipParamProtector', 'knockBack'),
         ('EquipParamProtector', 'faceScaleM_ScaleX'),
         ('NpcThinkParam', 'targetSys_DmgEffectRate'),
-        ('ObjActParam', 'validDist'),
         ('AtkParam_Npc', 'knockbackDist'),
         ('AtkParam_Pc', 'knockbackDist'),
         ('NpcParam', 'superArmorBrakeKnockbackDist'),
-        ('NpcParam', 'weight'),
         ('ItemLotParam', 'lotItemBasePoint01'),
         ('CharaInitParam', 'bodyScaleHead'),
         ('CalcCorrectGraph', 'boundry_value'),

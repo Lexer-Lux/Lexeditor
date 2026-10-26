@@ -21,28 +21,28 @@
     },
     {
       "Field": "turnVellocity",
-      "Name": "Turn Velocity",
-      "Description": "How fast this enemy turns, in degrees per second."
+      "Name": "Turn Velocity (degrees/second)",
+      "Description": "How fast this enemy turns."
     },
     {
       "Field": "hitHeight",
-      "Name": "Simple Collision Height",
-      "Description": "How tall this enemy's collision capsule is, in metres. Only used when Use Ragdoll Collision is off."
+      "Name": "Simple Collision Height (metres)",
+      "Description": "How tall this enemy's collision capsule is. Only used when Use Ragdoll Collision is off."
     },
     {
       "Field": "hitRadius",
-      "Name": "Simple Collision Radius",
-      "Description": "How wide this enemy's collision capsule is, in metres. Only used when Use Ragdoll Collision is off."
+      "Name": "Simple Collision Radius (metres)",
+      "Description": "How wide this enemy's collision capsule is. Only used when Use Ragdoll Collision is off."
     },
     {
       "Field": "weight",
-      "Name": "Weight",
-      "Description": "How heavy this enemy is, in kilograms. What weight changes in the game is unknown."
+      "Name": "Weight (kg)",
+      "Description": "How heavy this enemy is. What weight changes in the game is unknown."
     },
     {
       "Field": "hitYOffset",
-      "Name": "Collision Height Offset",
-      "Description": "Lifts this enemy's visible body above its collision, in metres. Set it wrong and hits land where the body is not."
+      "Name": "Collision Height Offset (metres)",
+      "Description": "Lifts this enemy's visible body above its collision. Set it wrong and hits land where the body is not."
     },
     {
       "Field": "hp",
@@ -57,7 +57,7 @@
     {
       "Field": "getSoul",
       "Name": "Souls",
-      "Description": ""
+      "Description": "Souls dropped on death. Most bosses ignore this field; their souls probably come from the encounter's event script instead."
     },
     {
       "Field": "itemLotId_1",
@@ -142,22 +142,22 @@
     {
       "Field": "physGuardCutRate",
       "Name": "Guard Absorption %: Physical",
-      "Description": "How much physical damage this enemy blocks while guarding, as a percent. 100 blocks it all."
+      "Description": "How much physical damage this enemy blocks while guarding. 100 blocks it all."
     },
     {
       "Field": "magGuardCutRate",
       "Name": "Guard Absorption %: Magic",
-      "Description": "How much magic damage this enemy blocks while guarding, as a percent. 100 blocks it all."
+      "Description": "How much magic damage this enemy blocks while guarding. 100 blocks it all."
     },
     {
       "Field": "fireGuardCutRate",
       "Name": "Guard Absorption %: Fire",
-      "Description": "How much fire damage this enemy blocks while guarding, as a percent. 100 blocks it all."
+      "Description": "How much fire damage this enemy blocks while guarding. 100 blocks it all."
     },
     {
       "Field": "thunGuardCutRate",
       "Name": "Guard Absorption %: Lightning",
-      "Description": "How much lightning damage this enemy blocks while guarding, as a percent. 100 blocks it all."
+      "Description": "How much lightning damage this enemy blocks while guarding. 100 blocks it all."
     },
     {
       "Field": "animIdOffset",
@@ -301,8 +301,8 @@
     },
     {
       "Field": "superArmorBrakeKnockbackDist",
-      "Name": "Poise Break Stagger Distance",
-      "Description": "How far this enemy slides when its Poise breaks, in metres."
+      "Name": "Poise Break Stagger Distance (metres)",
+      "Description": "How far this enemy slides when its Poise breaks."
     },
     {
       "Field": "stamina",
@@ -311,8 +311,8 @@
     },
     {
       "Field": "staminaRecoverBaseVel",
-      "Name": "Stamina Recovery Speed",
-      "Description": "How fast this enemy regains stamina each second."
+      "Name": "Stamina Recovery Speed (stamina/second)",
+      "Description": "How fast this enemy regains stamina."
     },
     {
       "Field": "def_phys",
@@ -321,18 +321,18 @@
     },
     {
       "Field": "def_slash",
-      "Name": "Defense: Slash",
-      "Description": "Adds physical defense against slash attacks, as a percent. Negative values weaken it instead."
+      "Name": "Defense: Slash (%)",
+      "Description": "Adds physical defense against slash attacks. Negative values weaken it instead."
     },
     {
       "Field": "def_blow",
-      "Name": "Defense: Strike",
-      "Description": "Adds physical defense against strike attacks, as a percent. Negative values weaken it instead."
+      "Name": "Defense: Strike (%)",
+      "Description": "Adds physical defense against strike attacks. Negative values weaken it instead."
     },
     {
       "Field": "def_thrust",
-      "Name": "Defense: Thrust",
-      "Description": "Adds physical defense against thrust attacks, as a percent. Negative values weaken it instead."
+      "Name": "Defense: Thrust (%)",
+      "Description": "Adds physical defense against thrust attacks. Negative values weaken it instead."
     },
     {
       "Field": "def_mag",
@@ -386,23 +386,23 @@
     },
     {
       "Field": "guardAngle",
-      "Name": "Horizontal Guard Angle",
-      "Description": "The arc in front of this enemy that its guard covers, in degrees."
+      "Name": "Horizontal Guard Angle (degrees)",
+      "Description": "The arc in front of this enemy that its guard covers."
     },
     {
       "Field": "slashGuardCutRate",
       "Name": "Guard Absorption %: Slash",
-      "Description": "How much slash damage this enemy blocks while guarding, as a percent. Negative values increase the damage."
+      "Description": "How much slash damage this enemy blocks while guarding. Negative values increase the damage."
     },
     {
       "Field": "blowGuardCutRate",
       "Name": "Guard Absorption %: Strike",
-      "Description": "How much strike damage this enemy blocks while guarding, as a percent. Negative values increase the damage."
+      "Description": "How much strike damage this enemy blocks while guarding. Negative values increase the damage."
     },
     {
       "Field": "thrustGuardCutRate",
       "Name": "Guard Absorption %: Thrust",
-      "Description": "How much thrust damage this enemy blocks while guarding, as a percent. Negative values increase the damage."
+      "Description": "How much thrust damage this enemy blocks while guarding. Negative values increase the damage."
     },
     {
       "Field": "superArmorDurability",
@@ -422,7 +422,7 @@
     {
       "Field": "knockbackRate",
       "Name": "Knockback %",
-      "Description": "How much knockback this enemy shrugs off, as a percent. 100 stops it fully."
+      "Description": "How much knockback this enemy shrugs off. 100 stops it fully."
     },
     {
       "Field": "knockbackParamId",
@@ -432,12 +432,12 @@
     {
       "Field": "fallDamageDump",
       "Name": "Fall Damage %",
-      "Description": "How much fall damage this enemy ignores, as a percent."
+      "Description": "How much fall damage this enemy ignores."
     },
     {
       "Field": "staminaGuardDef",
       "Name": "Guard Absorption %: Stamina",
-      "Description": "How much stamina damage this enemy blocks while guarding, as a percent."
+      "Description": "How much stamina damage this enemy blocks while guarding."
     },
     {
       "Field": "pcAttrB",
@@ -481,13 +481,13 @@
     },
     {
       "Field": "mpRecoverBaseVel",
-      "Name": "MP Recovery Speed",
-      "Description": "How fast this enemy regains magic each second, as a percent of its maximum."
+      "Name": "MP Recovery Speed (%/s)",
+      "Description": "How fast this enemy regains magic."
     },
     {
       "Field": "flickDamageCutRate",
       "Name": "Repulsion Absorption %",
-      "Description": "How much damage a bounced hit loses, as a percent. Needs Repulsion Defense to bounce at all."
+      "Description": "Share of damage a bounced hit loses. Needs Repulsion Defense to bounce at all."
     },
     {
       "Field": "defaultLodParamId",
@@ -516,8 +516,8 @@
     },
     {
       "Field": "lockDist",
-      "Name": "Additional Lock-on Distance",
-      "Description": "Extra distance added to how far away the player can lock on, in metres."
+      "Name": "Additional Lock-on Distance (metres)",
+      "Description": "Extra distance added to how far away the player can lock on."
     },
     {
       "Field": "material",
@@ -546,8 +546,8 @@
     },
     {
       "Field": "maxUndurationAng",
-      "Name": "Maximum Angle for Undulation",
-      "Description": "How far this enemy can tilt on slopes, in degrees. Needs Is Undulating turned on."
+      "Name": "Maximum Angle for Undulation (degrees)",
+      "Description": "How far this enemy can tilt on slopes. Needs Is Undulating turned on."
     },
     {
       "Field": "guardLevel",
@@ -562,22 +562,22 @@
     {
       "Field": "poisonGuardResist",
       "Name": "Guard Absorption %: Poison",
-      "Description": "How much poison buildup this enemy blocks while guarding, as a percent."
+      "Description": "How much poison buildup this enemy blocks while guarding."
     },
     {
       "Field": "diseaseGuardResist",
       "Name": "Guard Absorption %: Toxic",
-      "Description": "How much toxic buildup this enemy blocks while guarding, as a percent."
+      "Description": "How much toxic buildup this enemy blocks while guarding."
     },
     {
       "Field": "bloodGuardResist",
       "Name": "Guard Absorption %: Bleed",
-      "Description": "How much bleed buildup this enemy blocks while guarding, as a percent."
+      "Description": "How much bleed buildup this enemy blocks while guarding."
     },
     {
       "Field": "curseGuardResist",
       "Name": "Guard Absorption %: Curse",
-      "Description": "How much curse buildup this enemy blocks while guarding, as a percent."
+      "Description": "How much curse buildup this enemy blocks while guarding."
     },
     {
       "Field": "parryAttack",
@@ -596,8 +596,8 @@
     },
     {
       "Field": "pushOutCamRegionRadius",
-      "Name": "Camera Push-out Radius",
-      "Description": "How far the camera stays from this enemy, in metres."
+      "Name": "Camera Push-out Radius (metres)",
+      "Description": "How far the camera stays from this enemy."
     },
     {
       "Field": "hitStopType",

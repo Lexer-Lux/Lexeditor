@@ -22,7 +22,7 @@
     {
       "Field": "weight",
       "Name": "Weight (kg)",
-      "Description": "How heavy the weapon is, in kilograms. Heavier gear raises Equip Load and slows your rolls."
+      "Description": "How heavy the weapon is. Heavier gear raises Equip Load and slows your rolls."
     },
     {
       "Field": "weaponWeightRate",
@@ -31,18 +31,18 @@
     },
     {
       "Field": "fixPrice",
-      "Name": "Repair Value",
-      "Description": "Souls a blacksmith charges to fully repair this weapon. A partly worn weapon costs less."
+      "Name": "Repair Value (souls)",
+      "Description": "What a blacksmith charges to fully repair this weapon. A partly worn weapon costs less."
     },
     {
       "Field": "basicPrice",
-      "Name": "Reinforcement Value",
-      "Description": "Souls each upgrade step costs. It never sets a shop price."
+      "Name": "Reinforcement Value (souls)",
+      "Description": "What each upgrade step costs. It never sets a shop price."
     },
     {
       "Field": "sellValue",
-      "Name": "Sell Value",
-      "Description": "Souls Kingseeker Frampt pays for this weapon. That may be its only use, but it is unproven."
+      "Name": "Sell Value (souls)",
+      "Description": "The price Kingseeker Frampt pays for this weapon. That may be its only use, but it is unproven."
     },
     {
       "Field": "correctStrength",
@@ -262,7 +262,7 @@
     {
       "Field": "parryDamageLife",
       "Name": "Parry Damage Duration (frames)",
-      "Description": "How long a parry attempt stays active, in frames. The animation can only shorten it, never stretch it."
+      "Description": "How long a parry attempt stays active. The animation can only shorten it, never stretch it."
     },
     {
       "Field": "attackBasePhysics",
@@ -302,7 +302,7 @@
     {
       "Field": "guardAngle",
       "Name": "Horizontal Guard Angle (degrees)",
-      "Description": "May set how wide a block catches attacks, in degrees. It looks unused, so changing it may do nothing."
+      "Description": "May set how wide a block catches attacks. It looks unused, so changing it may do nothing."
     },
     {
       "Field": "staminaGuardDef",
@@ -332,7 +332,7 @@
     {
       "Field": "bowDistRate",
       "Name": "Ammunition Distance %",
-      "Description": "Extra range this weapon gives arrows and bolts, in percent. 0 means no change."
+      "Description": "Extra range this weapon gives arrows and bolts. 0 means no change."
     },
     {
       "Field": "equipModelCategory",
@@ -427,12 +427,12 @@
     {
       "Field": "attackBaseParry",
       "Name": "Parry Attack",
-      "Description": "How well attacks beat enemy parries. Higher breaks through more often."
+      "Description": "The base parry attack damage value. Applied to the enemy parry defense value."
     },
     {
       "Field": "defenseBaseParry",
       "Name": "Parry Defense",
-      "Description": "How likely your parry beats an attack instead of blocking it. Higher values parry more often."
+      "Description": "The base parry defense value. Compared against enemy parry attack value."
     },
     {
       "Field": "guardBaseRepel",
@@ -506,7 +506,7 @@
     },
     {
       "Field": "bothHandEquipable",
-      "Name": "Equipped in either Weapon Slot",
+      "Name": "Two-Hand Wield",
       "Description": "Lets you wield this weapon two-handed. Off locks it to one hand."
     },
     {
@@ -536,7 +536,7 @@
     },
     {
       "Field": "enableSorcery",
-      "Name": "Enables Sorcery",
+      "Name": "Enables Pyromancy",
       "Description": "Casts the readied pyromancy when you attack. Turn it on for flames."
     },
     {

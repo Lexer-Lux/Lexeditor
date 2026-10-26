@@ -11,8 +11,8 @@
     },
     {
       "Field": "value",
-      "Name": "Sale Price",
-      "Description": "How many souls this item costs in a shop. The attunement menu ignores it."
+      "Name": "Sale Price (souls)",
+      "Description": "What this item costs in a shop. The attunement menu ignores it."
     },
     {
       "Field": "mtrlId",

@@ -12,7 +12,7 @@
     {
       "Field": "conditionHp",
       "Name": "Trigger at HP Below %",
-      "Description": "Activates when remaining HP is below this percentage. -1 removes the HP condition."
+      "Description": "Activates while remaining HP is below this cutoff. -1 removes the HP condition."
     },
     {
       "Field": "effectEndurance",
@@ -201,8 +201,8 @@
     },
     {
       "Field": "changeHpRate",
-      "Name": "Damage HP by Percentage",
-      "Description": "Removes this percentage of maximum HP each application. Negative values heal. 100 removes all HP."
+      "Name": "Damage HP (%)",
+      "Description": "Removes this share of maximum HP each application. Negative values heal. 100 removes all HP."
     },
     {
       "Field": "changeHpPoint",
@@ -302,7 +302,7 @@
     {
       "Field": "soul",
       "Name": "Souls",
-      "Description": "Adds or removes a flat amount of souls."
+      "Description": "Adds or removes a flat amount."
     },
     {
       "Field": "animIdOffset",
@@ -542,7 +542,7 @@
     {
       "Field": "lifeReductionType",
       "Name": "Effect Duration Change Type",
-      "Description": "Picks the status whose duration Effect Duration Change % scales. The wiki says 2 means poison and 5 means toxic. The select names disagree, so this needs testing."
+      "Description": "Picks the status whose duration Effect Duration Change % scales. 2 means poison and 5 means toxic."
     },
     {
       "Field": "throwCondition",

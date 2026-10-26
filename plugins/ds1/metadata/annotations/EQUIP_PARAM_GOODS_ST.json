@@ -26,8 +26,8 @@
     },
     {
       "Field": "sellValue",
-      "Name": "Sell Value",
-      "Description": "How many souls feeding this item to Kingseeker Frampt grants."
+      "Name": "Sell Value (souls)",
+      "Description": "The price Kingseeker Frampt pays for this item."
     },
     {
       "Field": "behaviorId",

@@ -2,8 +2,8 @@
 
 Per the help-text skill: a field bubble runs three sentences at most, never
 repeats its label, and exists only where the label and control leave the
-reader guessing. Guard stats, model masks and curve coefficients need one;
-Apply-to checkboxes and the offline toggle do not.
+reader guessing. Guard stats, model masks, phantom targeting and curve
+coefficients need one; ally checkboxes and the offline toggle do not.
 """
 import re
 import sys
@@ -73,10 +73,18 @@ def test_effect_targets_need_no_bubble():
     fields = {entry["spec"].key: entry["spec"]
               for entry in schema("SpEffectParam")["fields"]}
     for key in ("effectTargetSelf", "effectTargetFriend", "effectTargetEnemy",
-                "effectTargetPlayer", "effectTargetAI", "effectTargetLive",
-                "effectTargetGhost", "effectTargetWhiteGhost",
-                "effectTargetBlackGhost"):
+                "effectTargetPlayer", "effectTargetAI"):
         assert fields[key].description.strip() == "", key
+
+
+def test_phantom_targets_explain_who_they_touch():
+    fields = {entry["spec"].key: entry["spec"]
+              for entry in schema("SpEffectParam")["fields"]}
+    assert "human characters" in fields["effectTargetLive"].description
+    assert "Hollows are excluded" in fields["effectTargetLive"].description
+    assert "hollow characters" in fields["effectTargetGhost"].description
+    assert "white phantoms" in fields["effectTargetWhiteGhost"].description
+    assert "red phantoms" in fields["effectTargetBlackGhost"].description
 
 
 def test_offline_toggle_has_a_label_not_a_bubble():

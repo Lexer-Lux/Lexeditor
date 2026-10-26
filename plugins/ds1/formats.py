@@ -668,12 +668,14 @@ def schema(table):
         attrs, annotation = metadata.get(key, {}), annotations.get(key, {})
         label = annotation.get('Name') or key
         description, group = annotation.get('Description', ''), 'Properties'
+        # NPC and attack labels and groups live in code; their help
+        # comes from the annotations.
         if table == 'NpcParam' and key in NPC_FIELDS:
-            label, group, description = NPC_FIELDS[key]
+            label, group = NPC_FIELDS[key]
         if table == 'AtkParam_Npc' and key in ATTACK_FIELDS:
-            label, group, description = ATTACK_FIELDS[key]
+            label, group = ATTACK_FIELDS[key]
         if table == 'AtkParam_Pc' and key in PC_ATTACK_FIELDS:
-            label, group, description = PC_ATTACK_FIELDS[key]
+            label, group = PC_ATTACK_FIELDS[key]
         if table == 'Bullet' and key in BULLET_GROUPS:
             group = BULLET_GROUPS[key]
         if table == 'NpcThinkParam' and key in THINK_GROUPS:

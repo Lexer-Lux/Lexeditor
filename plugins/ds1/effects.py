@@ -11,10 +11,6 @@ SUBTABS = (
     ("effects-items", "Items", TABLE),
 )
 RECOVERY_KEY = "staminaRecoverChangeSpeed"
-RECOVERY_HELP = (
-    "Adds to stamina recovery while this effect is active. Negative values slow recovery. "
-    "This is a modifier, not the final recovery rate or a percentage."
-)
 # The upstream annotation contradicts its PARAMDEF for target routing, and
 # describes several matchmaking flags only as probable. Do not guess.
 PROTECTED = {
@@ -25,28 +21,28 @@ PROTECTED = {
     **{f"vowType{i}": "No supported covenant is identified for this flag." for i in range(10, 16)},
 }
 OVERRIDES = {
-    RECOVERY_KEY: ("Recovery adjustment (stamina/second)", RECOVERY_HELP),
-    "effectEndurance": ("Duration (seconds)", "How long the effect lasts. -1 means permanent. 0 applies it once."),
-    "motionInterval": ("Trigger interval (seconds)", "Time between repeated applications. 0 applies the effect every frame."),
-    "conditionHp": ("Maximum HP to activate (%)", "Activates when remaining HP is below this percentage. -1 removes the HP condition."),
-    "maxHpRate": ("Maximum HP multiplier", "Multiplies maximum HP. 1 is unchanged. 0.5 halves it."),
-    "maxStaminaRate": ("Maximum stamina multiplier", "Multiplies maximum stamina. 1 is unchanged. 0.5 halves it."),
-    "changeStaminaRate": ("Stamina damage (%)", "Removes this percentage of maximum stamina each application. Negative values restore stamina."),
-    "changeStaminaPoint": ("Flat Stamina damage (points)", "Removes this much stamina each application. Negative values restore stamina."),
-    "changeHpRate": ("HP damage (%)", "Removes this percentage of maximum HP each application. Negative values heal."),
-    "changeHpPoint": ("Flat HP damage (points)", "Removes this much HP each application. Negative values heal."),
-    "insideDurability": ("Durability damage (points)", "Damages equipped weapons and armour. Negative values repair them."),
-    "grabityRate": ("Animation speed multiplier", "Multiplies animation speed. 1 is unchanged. 0.5 halves it."),
-    "categoryPriority": ("Stacking priority", "Resolves priority within compatible stacking categories. Lower values have higher priority."),
-    "spCategory": ("Stacking rule", "Controls how this effect combines with another effect in the same category."),
-    "stateInfo": ("Effect behaviour", "Selects the game's built-in effect behaviour. Some properties require a particular behaviour to work."),
-    "replaceSpEffectId": ("Effect on expiry", "Adds the selected effect when this effect ends."),
-    "cycleOccurrenceSpEffectId": ("Repeated effect", "Adds the selected effect at each trigger interval."),
-    "atkOccurrenceSpEffectId": ("Effect on hit", "Adds the selected effect to a victim on a hit. Requires a compatible effect behaviour, such as 152 or 153."),
-    "dispIconNonactive": ("Show icon while inactive", "Keeps the icon visible when the activation conditions are not met."),
-    "bCurrHPIndependeMaxHP": ("Keep current HP unchanged", "When enabled, changing maximum HP does not change current HP."),
-    "maxDurability": ("Extra hits before durability loss", "Adds this many hits before equipment loses durability."),
-    "targetPriority": ("Enemy target preference", "Positive values encourage enemies to target the owner. Negative values encourage another target."),
+    RECOVERY_KEY: "Recovery adjustment (stamina/second)",
+    "effectEndurance": "Duration (seconds)",
+    "motionInterval": "Trigger interval (seconds)",
+    "conditionHp": "Maximum HP to activate (%)",
+    "maxHpRate": "Maximum HP multiplier",
+    "maxStaminaRate": "Maximum stamina multiplier",
+    "changeStaminaRate": "Stamina damage (%)",
+    "changeStaminaPoint": "Flat Stamina damage (points)",
+    "changeHpRate": "HP damage (%)",
+    "changeHpPoint": "Flat HP damage (points)",
+    "insideDurability": "Durability damage (points)",
+    "grabityRate": "Animation speed multiplier",
+    "categoryPriority": "Stacking priority",
+    "spCategory": "Stacking rule",
+    "stateInfo": "Effect behaviour",
+    "replaceSpEffectId": "Effect on expiry",
+    "cycleOccurrenceSpEffectId": "Repeated effect",
+    "atkOccurrenceSpEffectId": "Effect on hit",
+    "dispIconNonactive": "Show icon while inactive",
+    "bCurrHPIndependeMaxHP": "Keep current HP unchanged",
+    "maxDurability": "Extra hits before durability loss",
+    "targetPriority": "Enemy target preference",
 }
 GROUPS = (
     "Timing", "Vitals", "Offense", "Defense", "Immunity", "Move",
@@ -119,10 +115,10 @@ UNITS = {
 
 def presentation(key, label, description):
     """Return one shared label/help definition for each effect property."""
-    label, description = OVERRIDES.get(key, (label, description))
+    label = OVERRIDES.get(key, label)
     if key in UNITS:
         label = UNITS[key]
-    if key not in OVERRIDES and ("Multiplies" in description or "Multiplier" in description):
+    if "Multiplies" in description or "Multiplier" in description:
         label = label.replace(" %", " multiplier")
         if "1 =" not in description and "1 mean" not in description and "1 is" not in description:
             description = description.rstrip(".") + ". 1 is unchanged."
@@ -130,8 +126,6 @@ def presentation(key, label, description):
         group = "Locked"
     elif key.startswith("effectTarget"):
         group = "Links"
-        if key not in OVERRIDES and key not in PROTECTED:
-            description = ""
     elif key.startswith("vowType"):
         group = "Covenants"
     elif key.startswith(("disable", "corrosionIgnore", "antiMagicIgnore", "noDead", "enableCharm")):

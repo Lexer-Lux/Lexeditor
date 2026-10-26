@@ -17,15 +17,13 @@ from collections import defaultdict
 ATTACK_FIELDS = {}
 for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
                      ('atkFire', 'Fire'), ('atkThun', 'Lightning')]:
-    ATTACK_FIELDS[_key] = (
-        f'{_label} (points)', 'Base damage',
-        f'Base {_label.lower()} attack power in points of health, before defense. '
-        f'Higher values hit harder. This is not the final health lost.')
+    ATTACK_FIELDS[_key] = (f'{_label} (points)', 'Base damage')
     ATTACK_FIELDS[_key + 'Correction'] = (
-        f'{_label} correction (%)', 'Base damage',
-        f'Percent of the base {_label.lower()} attack applied. 100 applies the full value.')
-ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
-    'Selects the physical defense used against this attack. Standard has no slash, strike or thrust attribute.')
+        f'{_label} correction (%)', 'Base damage')
+ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage')
+# Enemy stamina damage, documented by the annotations; player-hit
+# stamina is unestablished, so the PC map drops this key below.
+ATTACK_FIELDS['atkStam'] = ('Stamina (points)', 'Base damage')
 
 # Each attack carries four hit slots. A slot's size and its two model points
 # place the hitbox on the attacker; Smithbox's MIT annotations define the
@@ -34,46 +32,32 @@ ATTACK_FIELDS['atkAttribute'] = ('Physical type', 'Base damage',
 # documented well enough to expose.
 for _slot in range(4):
     ATTACK_FIELDS[f'hit{_slot}_Radius'] = (
-        f'Hit {_slot}: Size (metres)', 'Hitbox',
-        f"How large hit slot {_slot}'s hitbox is. Larger values hit a wider area.")
+        f'Hit {_slot}: Size (metres)', 'Hitbox')
     ATTACK_FIELDS[f'hit{_slot}_DmyPoly1'] = (
-        f'Hit {_slot}: First point', 'Hitbox',
-        f"The model point hit slot {_slot} follows. Use an ID from the attacker's model.")
+        f'Hit {_slot}: First point', 'Hitbox')
     ATTACK_FIELDS[f'hit{_slot}_DmyPoly2'] = (
-        f'Hit {_slot}: Second point', 'Hitbox',
-        f"The second model point for hit slot {_slot}. It shapes the hitbox together with the first point.")
+        f'Hit {_slot}: Second point', 'Hitbox')
     ATTACK_FIELDS[f'hti{_slot}_Priority'] = (
-        f'Hit {_slot}: Priority', 'Hitbox',
-        'Which hit wins when several slots strike at once. Higher values win.')
-ATTACK_FIELDS['hitSourceType'] = (
-    'Hitbox source', 'Hitbox',
-    'Which part of the attacker the hitbox points attach to.')
-ATTACK_FIELDS['knockbackDist'] = (
-    'Knockback', 'Impact',
-    'How hard this attack knocks the victim back. Higher values throw the victim further.')
-ATTACK_FIELDS['hitStopTime'] = (
-    'Hit pause (seconds)', 'Impact',
-    "How long the victim's animation pauses when hit, in seconds.")
+        f'Hit {_slot}: Priority', 'Hitbox')
+ATTACK_FIELDS['hitSourceType'] = ('Hitbox source', 'Hitbox')
+ATTACK_FIELDS['knockbackDist'] = ('Knockback', 'Impact')
+ATTACK_FIELDS['hitStopTime'] = ('Hit pause (seconds)', 'Impact')
 # The status effects this attack applies to its victim, and their master
 # switch. Hidden by the allowlist until now: record links only cover shown
 # fields, so the effects were invisible everywhere in detail.
 for _slot in range(5):
     ATTACK_FIELDS[f'spEffectId{_slot}'] = (
-        f'Effect on hit {_slot + 1}', 'Effects',
-        'An effect this attack applies to its victim. None applies nothing.')
-ATTACK_FIELDS['disableHitSpEffect'] = (
-    'Disable on-hit effects', 'Effects',
-    "If ON, this attack applies none of its effects to the victim.")
+        f'Effect on hit {_slot + 1}', 'Effects')
+ATTACK_FIELDS['disableHitSpEffect'] = ('Disable on-hit effects', 'Effects')
 PC_ATTACK_FIELDS = dict(ATTACK_FIELDS)
+# Enemy-only stamina: its player-hit meaning is unestablished, so it
+# stays hidden for player attacks.
+del PC_ATTACK_FIELDS['atkStam']
 for _key, _label in [('atkPhys', 'Physical'), ('atkMag', 'Magic'),
                      ('atkFire', 'Fire'), ('atkThun', 'Lightning')]:
-    PC_ATTACK_FIELDS[_key] = (
-        f'{_label} (%)', 'Motion values',
-        f"Motion value: the percentage of the weapon's attack rating this swing deals. "
-        f'100 deals the full rating. The game applies it before defense.')
+    PC_ATTACK_FIELDS[_key] = (f'{_label} (%)', 'Motion values')
     PC_ATTACK_FIELDS[_key + 'Correction'] = (
-        f'{_label} correction (%)', 'Motion values',
-        f"Percent of the {_label.lower()} motion value this swing deals. 100 deals the full value.")
+        f'{_label} correction (%)', 'Motion values')
 
 # Every editable Bullet property in presentation order: lifetime, how
 # it flies, how it homes, how it spreads, what it hits, what it

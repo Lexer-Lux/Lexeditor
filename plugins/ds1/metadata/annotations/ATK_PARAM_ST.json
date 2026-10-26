@@ -26,13 +26,13 @@
     },
     {
       "Field": "knockbackDist",
-      "Name": "Knockback Distance",
-      "Description": "How far the victim slides when this attack staggers them, in metres. It may move the attacker instead when the victim holds firm, but this is not established."
+      "Name": "Knockback Distance (metres)",
+      "Description": "How far the victim slides when this attack staggers them. It may move the attacker instead when the victim holds firm, but this is not established."
     },
     {
       "Field": "hitStopTime",
-      "Name": "Hit Stop Time",
-      "Description": "How long the impact freezes motion when this hit lands, in seconds. Higher values make hits feel heavier. 0 removes the pause."
+      "Name": "Hit Stop Time (seconds)",
+      "Description": "How long the impact freezes motion when this hit lands. Higher values make hits feel heavier. 0 removes the pause."
     },
     {
       "Field": "spEffectId0",
@@ -107,22 +107,22 @@
     {
       "Field": "atkPhysCorrection",
       "Name": "Attack Correction: Physical",
-      "Description": "Multiplies the attacker's physical damage for this hit, for player attacks. 100 keeps the weapon's full damage."
+      "Description": "Percent of this hit's physical damage that lands. 100 applies the full value."
     },
     {
       "Field": "atkMagCorrection",
       "Name": "Attack Correction: Magic",
-      "Description": "Multiplies the attacker's magic damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
+      "Description": "Percent of this hit's magic damage that lands. 100 applies the full value. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkFireCorrection",
       "Name": "Attack Correction: Fire",
-      "Description": "Multiplies the attacker's fire damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
+      "Description": "Percent of this hit's fire damage that lands. 100 applies the full value. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkThunCorrection",
       "Name": "Attack Correction: Lightning",
-      "Description": "Multiplies the attacker's lightning damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
+      "Description": "Percent of this hit's lightning damage that lands. 100 applies the full value. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkStamCorrection",
@@ -152,22 +152,22 @@
     {
       "Field": "atkPhys",
       "Name": "Damage: Physical",
-      "Description": "Flat physical damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
+      "Description": "Physical damage of this hit, in points of health for enemies. Player swings deal a motion value instead: percent of the weapon's attack rating. 100 deals the full rating."
     },
     {
       "Field": "atkMag",
       "Name": "Damage: Magic",
-      "Description": "Flat magic damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
+      "Description": "Magic damage of this hit, in points of health for enemies. Player swings deal a motion value instead: percent of the weapon's attack rating. 100 deals the full rating."
     },
     {
       "Field": "atkFire",
       "Name": "Damage: Fire",
-      "Description": "Flat fire damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
+      "Description": "Fire damage of this hit, in points of health for enemies. Player swings deal a motion value instead: percent of the weapon's attack rating. 100 deals the full rating."
     },
     {
       "Field": "atkThun",
       "Name": "Damage: Lightning",
-      "Description": "Flat lightning damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
+      "Description": "Lightning damage of this hit, in points of health for enemies. Player swings deal a motion value instead: percent of the weapon's attack rating. 100 deals the full rating."
     },
     {
       "Field": "atkStam",

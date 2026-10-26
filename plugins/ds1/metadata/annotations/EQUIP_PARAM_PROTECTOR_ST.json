@@ -31,18 +31,18 @@
     },
     {
       "Field": "fixPrice",
-      "Name": "Repair Price",
-      "Description": "The souls a full repair costs. The smith scales the price by missing durability."
+      "Name": "Repair Price (souls)",
+      "Description": "What a full repair costs. The smith scales the price by missing durability."
     },
     {
       "Field": "basicPrice",
-      "Name": "Reinforcement Price",
-      "Description": "The souls each upgrade costs. Shop sale prices are set elsewhere."
+      "Name": "Reinforcement Price (souls)",
+      "Description": "What each upgrade costs. Shop sale prices are set elsewhere."
     },
     {
       "Field": "sellValue",
-      "Name": "Sell Value",
-      "Description": "The souls Kingseeker Frampt probably gives for this piece."
+      "Name": "Sell Value (souls)",
+      "Description": "The price Kingseeker Frampt probably pays for this piece."
     },
     {
       "Field": "weight",
@@ -327,7 +327,7 @@
     {
       "Field": "flickDamageCutRate",
       "Name": "Repulsion Damage Absorption (%)",
-      "Description": "The percent of damage stopped when this piece deflects a hit."
+      "Description": "Share of damage stopped when this piece deflects a hit."
     },
     {
       "Field": "equipModelCategory",

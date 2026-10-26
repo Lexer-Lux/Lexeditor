@@ -239,6 +239,13 @@ def effect_specs():
     return {item['spec'].key: item['spec'] for item in schema('SpEffectParam')['fields']}
 
 
+def test_stamina_drain_and_icon_help_come_from_annotations():
+    specs = effect_specs()
+    assert specs['changeStaminaRate'].description == "Does nothing. Use Stamina Recovery Speed instead."
+    assert specs['changeStaminaPoint'].description == "Does nothing. Use Stamina Recovery Speed instead."
+    assert specs['dispIconNonactive'].description.startswith("Unknown.")
+
+
 def test_unit_labels_end_in_a_control_marker_and_keep_their_help():
     specs = effect_specs()
     assert len(UNITS) >= 40
