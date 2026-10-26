@@ -1,7 +1,7 @@
-"""Metadata gestures (renaming a property or a section, rewording a help
-bubble) are Lexeditor's own shipped text, not the record's data, so a
-developer can use them on the game's own read-only Vanilla data. An actual
-data edit - typing into a control - still asks to create a mod first.
+"""Metadata gestures (renaming a property or a section) are Lexeditor's
+own shipped text, not the record's data, so a developer can use them
+on the game's own read-only Vanilla data. An actual data edit - typing
+into a control - still asks to create a mod first.
 """
 import pytest
 
@@ -58,26 +58,6 @@ def test_renaming_a_property_name_works_on_vanilla_without_a_mod_prompt(page):
     assert name.text_content() == "Cost"
     saved = page.evaluate("window.savedCalls")
     assert saved == [["fixture", "items", {"fixture-items.field.Price.label": "Cost"}]], saved
-
-
-def test_rewording_a_help_bubble_works_on_vanilla_without_a_mod_prompt(page):
-    framework(page)
-    mount_vanilla_shell(page)
-    mount_vanilla_field(page)
-    marker = page.locator(".lex-info-help").first
-    marker.dblclick()
-    editor = page.locator(".lex-help-edit")
-    editor.wait_for(timeout=3000)
-    assert page.get_by_role("button", name="Create a mod", exact=True).count() == 0
-    editor.fill("New wording for this bubble.")
-    editor.press("Enter")
-    page.wait_for_timeout(200)
-    saved = page.evaluate("window.savedCalls")
-    assert len(saved) == 1, saved
-    plugin, tab, preferences = saved[0]
-    assert (plugin, tab) == ("fixture", "items")
-    (value,) = preferences.values()
-    assert value == "New wording for this bubble."
 
 
 def test_a_real_edit_attempt_on_vanilla_still_offers_to_create_a_mod(page):

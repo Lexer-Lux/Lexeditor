@@ -32,7 +32,7 @@
     {
       "Field": "stamina",
       "Name": "Stamina Consumption",
-      "Description": "Stamina spent each time this spell is cast. 0 means no cost."
+      "Description": "Each cast of this spell spends this much stamina. All spells cost 0 in vanilla DS1."
     },
     {
       "Field": "iconId",

@@ -738,10 +738,6 @@
 
   const closeHelpPopup = () => {
     if (!activeHelpPopup) return;
-    if (activeHelpPopup.classList.contains("lex-help-editing") && activeHelpPopup.commitEdit) {
-      activeHelpPopup.commitEdit();
-      return;
-    }
     liveHoverPopups.delete(activeHelpPopup.lexHoverEntry);
     activeHelpPopup.cleanup?.();
     activeHelpPopup.remove();
@@ -850,12 +846,7 @@
 
   const infoHelp = (text, attrs = {}) => {
     if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
-    const shipped = typeof text === "string" ? text : null;
-    const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
-    const isCleared = () => shipped !== null && shown() === "";
-    // Cleared help is gone everywhere: clearing means gone. Ctrl+Z brings
-    // the text back, and the next mount shows the marker again.
-    if (isCleared()) return document.createTextNode("");
+    // One store: the bubble shows exactly the text its caller passed.
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, symbol = "?", ...rest
@@ -883,91 +874,11 @@
       cancelClose();
       if (activeHelpPopup?.id === popupId) return;
       closeHelpPopup();
-      // A developer can reword what the bubble says. The shipped string stays
-      // the key, so a bubble reworded here reads the new text on every screen
-      // that shows the same explanation.
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
       }, text instanceof Node ? text.cloneNode(true)
-        : String(shown() ?? title ?? ""));
+        : String(text ?? title ?? ""));
       document.body.append(popup);
-      if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
-        // The bubble itself never takes the pointer, so the editor is started
-        // from the marker and the popover takes the pointer only while it is
-        // being edited.
-        popup.startEditing = () => {
-          popup.classList.add("lex-help-editing");
-          const before = shown();
-          const editor = element("textarea", {class: "lex-help-edit", value: shown()});
-          popup.replaceChildren(editor);
-          editor.focus();
-          editor.select();
-          let finished = false;
-          const finish = async (commit, reopen = true) => {
-            if (finished) return;
-            finished = true;
-            popup.classList.remove("lex-help-editing");
-            const typed = editor.value.trim();
-            // An empty edit clears the bubble instead of restoring the shipped
-            // text, so a developer can delete help that should not be there.
-            const next = typed;
-            if (!commit) {
-              popup.replaceChildren(String(shown()));
-              // The editor's own blur schedules the bubble's close; keep the
-              // wording on screen while the reader is still looking at it.
-              cancelClose();
-              popup.focus();
-              position();
-              return;
-            }
-            try {
-              if (next === shipped) localStorage.removeItem(helpKey(shipped));
-              else localStorage.setItem(helpKey(shipped), next);
-            } catch (_error) {}
-            // The editor took the pointer, and the bubble's close timers key on
-            // the pointer being back on the marker, so reopen it to face the
-            // reader with the wording that was just saved.
-            closeHelpPopup();
-            if (next === "") marker.remove();
-            else if (reopen) open();
-            // A bubble has no lasting node, so undoing a rewording puts the text
-            // back for the next time it opens rather than under the pointer.
-            pushLabelUndo({key: helpKey(shipped), tabId: activePageTab(), before,
-              after: next, shipped, node: null});
-            labelRedo.length = 0;
-            const saved = await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
-            labelHistoryChanged();
-            try {
-              // "Shipped" only when the shared default kept the text.
-              if (saved) {
-                showToast(next === shipped ? "The shipped help text is back."
-                                           : next === "" ? "The help text is cleared."
-                                           : "The new help text is now the shipped one.");
-              } else {
-                showToast(next === shipped ? "The shipped help text is back on this device."
-                                           : next === "" ? "The help text is cleared on this device."
-                                           : "The new help text is saved on this device.");
-              }
-            } catch (_error) {}
-          };
-          // Enter or clicking away keeps the new wording; Shift+Enter starts a
-          // new line; Escape puts the old one back. Clicking away used to throw
-          // the edit away and only Ctrl+Enter kept it, so a reworded bubble
-          // looked as if it had been ignored.
-          editor.addEventListener("keydown", keyEvent => {
-            keyEvent.stopPropagation();
-            if (keyEvent.key === "Escape") { keyEvent.preventDefault(); finish(false); }
-            else if (keyEvent.key === "Enter" && !keyEvent.shiftKey) {
-              keyEvent.preventDefault();
-              finish(true);
-            }
-          });
-          editor.addEventListener("blur", () => finish(true));
-          // A click outside closes the bubble and removes the editor before
-          // it can blur; closing it keeps the wording all the same.
-          popup.commitEdit = () => finish(true, false);
-        };
-      }
       const position = () => {
         if (!marker.isConnected || !popup.isConnected) return;
         const anchor = marker.getBoundingClientRect();
@@ -1024,13 +935,6 @@
     marker.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
-    });
-    marker.addEventListener("dblclick", event => {
-      if (!sharedSettingsSnapshot?.developerMode) return;
-      event.preventDefault();
-      event.stopPropagation();
-      open();
-      activeHelpPopup?.startEditing?.();
     });
     marker.addEventListener("blur", scheduleClose);
     marker.addEventListener("keydown", event => {
@@ -9120,7 +9024,7 @@ ${contents.path}`});
     try {
       const stored = localStorage.getItem(key);
       if (stored === null) return fallback;
-      if (stored === "" && !String(key).includes(".help.")) return fallback;
+      if (stored === "") return fallback;
       return stored;
     } catch (_error) { return fallback; }
   };
@@ -9132,10 +9036,9 @@ ${contents.path}`});
   const shownSubtabName = tab => savedLabel(
     `${shellPluginId()}-${activePageTab()}.sub.${tab.id}.label`,
     String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id));
-  // The help text a developer rewords. A bubble has no name of its own and its
-  // text is far too long for a key, so the key is a short digest of the shipped
-  // text. A string rewritten in a plugin's code simply stops matching, and the
-  // reader then sees the new shipped text rather than an orphaned override.
+  // Short digests key detail layouts, field-tab overrides and
+  // property layouts. Help bubbles carry no key: each shows the text
+  // its caller passed.
   const textDigest = value => {
     let hash = 2166136261;
     for (let index = 0; index < value.length; index += 1) {
@@ -9144,8 +9047,6 @@ ${contents.path}`});
     }
     return (hash >>> 0).toString(16);
   };
-  const helpKey = shipped =>
-    `${shellPluginId()}-${activePageTab()}.help.${textDigest(shipped)}.text`;
   // A name a developer changed is an override, not record data, so the
   // plugin's own history never sees it. The shell keeps the last few renames
   // itself and its undo takes them back, newest first.
@@ -10095,7 +9996,7 @@ ${contents.path}`});
     const field = event.target.closest?.(".lex-detail-field[data-lex-layout-field]");
     if (!field) return;
     field.draggable = !!sharedSettingsSnapshot?.developerMode &&
-      !event.target.closest(".lex-detail-field-control,.lex-label-rename,.lex-help-edit");
+      !event.target.closest(".lex-detail-field-control,.lex-label-rename");
   });
   // A heading drags its whole section before or after another section's.
   // The lane under the pointer when it hits no column box: the grid gaps,
@@ -10656,7 +10557,8 @@ ${contents.path}`});
         const preferences = {};
         for (let index = 0; index < localStorage.length; index += 1) {
           const key = localStorage.key(index);
-          if (key && key.includes(token)) preferences[key] = localStorage.getItem(key);
+          // Help has one store (the shipped text), so a stale rewording never ships.
+          if (key && key.includes(token) && !key.includes(".help.")) preferences[key] = localStorage.getItem(key);
         }
         if (!Object.keys(preferences).length) {
           showToast(`${tab.label} has no view settings to save.`);
@@ -13286,14 +13188,14 @@ ${contents.path}`});
   const compactPager = options => pager({...options, compact: true});
 
   // Editing chrome that stays live in a read-only project: none of it changes
-  // record data. The in-place rename input and the help-bubble editor only
-  // ever exist while Developer Mode is on (their own dblclick handlers check
-  // it before creating them), so exempting them here never opens an edit a
-  // reader without that identity could reach.
+  // record data. The in-place rename input only ever exists while Developer
+  // Mode is on (its own dblclick handler checks it before creating it), so
+  // exempting it here never opens an edit a reader without that identity
+  // could reach.
   const READONLY_EXEMPT = [".lex-pager", ".lex-searcher", ".lex-search", ".lex-dialog",
     ".lex-dialog-backdrop", ".lex-modal", ".lex-global-settings", ".lex-project-control",
     ".lex-shortcut-panel", ".lex-github-workspace", ".lex-toast-stack", ".lex-data-map",
-    ".lex-label-rename", ".lex-help-edit",
+    ".lex-label-rename",
     // View filters narrow a list; they edit no record.
     "[data-lex-view-filter]",
     // Switching, configuring and downloading mods manages the mod library,

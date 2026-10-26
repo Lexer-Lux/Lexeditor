@@ -138,3 +138,11 @@ work, even if your tool does not load skills on its own.
   the editing tool instead: an ordinary string turns `\n` into a line break.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.
+
+## Architecture
+
+1. One store per fact — a second source for the same value is a bug.
+2. No override/precedence layers — disagreeing sources get unified by deletion, never ranked.
+3. Fix the shared component — no per-screen special cases without explicit user say-so in that turn.
+4. Delete, don't wrap — removed behavior loses its code path in the same change.
+5. Each unit's guards enforce its area.

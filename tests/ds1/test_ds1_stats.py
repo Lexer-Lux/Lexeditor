@@ -99,7 +99,8 @@ def test_stats_detail_shows_only_stat_fields():
     stamina = next(field for field in row['fields'] if field['key'] == 'stamina')
     assert stamina['label'] == 'Stamina Consumption'
     assert stamina['minimum'] == 0 and stamina['maximum'] == 9999
-    assert 'Spell Stamina Costs' in stamina['description']
+    assert stamina['description'] == ('Each cast of this spell spends '
+                                     'this much stamina. All spells cost 0 in vanilla DS1.')
     curves = document.read_row(GRAPH_TABLE, 200)
     assert {field['key'] for field in curves['fields']} == set(STATS_FIELDS[GRAPH_TABLE])
     groups = {field['key']: field['group'] for field in curves['fields']}

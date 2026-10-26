@@ -222,7 +222,7 @@
     {
       "Field": "baseHp",
       "Name": "Health",
-      "Description": "Maximum health. Classes store 0 and the game computes it from Vitality."
+      "Description": "Not sure what this field actually does or why it's here, considering your HP is a derived value based on your attributes. 0 for all starting classes, change at your own risk. ~Lex"
     },
     {
       "Field": "baseMp",
@@ -232,7 +232,7 @@
     {
       "Field": "baseSp",
       "Name": "Stamina",
-      "Description": "Maximum stamina. Classes store 0 and the game computes it from Endurance."
+      "Description": "Not sure what this field actually does or why it's here, considering your Stamina is a derived value based on your attributes. 0 for all starting classes, change at your own risk. ~Lex"
     },
     {
       "Field": "arrowNum",
@@ -272,42 +272,42 @@
     {
       "Field": "soulLv",
       "Name": "Soul level",
-      "Description": "Starting soul level."
+      "Description": "Starting soul level. Not actually a combination of your total stats or an average or anything like that, as far as I can tell it's totally arbitrary. ~Lex"
     },
     {
       "Field": "baseVit",
       "Name": "Vitality",
-      "Description": "Starting Vitality."
+      "Description": ""
     },
     {
       "Field": "baseWil",
       "Name": "Attunement",
-      "Description": "Starting Attunement."
+      "Description": ""
     },
     {
       "Field": "baseEnd",
       "Name": "Endurance",
-      "Description": "Starting Endurance."
+      "Description": ""
     },
     {
       "Field": "baseStr",
       "Name": "Strength",
-      "Description": "Starting Strength."
+      "Description": ""
     },
     {
       "Field": "baseDex",
       "Name": "Dexterity",
-      "Description": "Starting Dexterity."
+      "Description": ""
     },
     {
       "Field": "baseMag",
       "Name": "Intelligence",
-      "Description": "Starting Intelligence."
+      "Description": ""
     },
     {
       "Field": "baseFai",
       "Name": "Faith",
-      "Description": "Starting Faith."
+      "Description": ""
     },
     {
       "Field": "baseLuc",
@@ -322,7 +322,7 @@
     {
       "Field": "baseDurability",
       "Name": "Resistance",
-      "Description": "Starting Resistance."
+      "Description": "The most important stat in the game. ~Lex"
     },
     {
       "Field": "itemNum_01",
@@ -452,7 +452,7 @@
     {
       "Field": "vowType",
       "Name": "Starting covenant",
-      "Description": "Covenant the character starts in. Classes store None."
+      "Description": "The covenant your character will be in when you start the game. ~Lex"
     }
   ]
 }

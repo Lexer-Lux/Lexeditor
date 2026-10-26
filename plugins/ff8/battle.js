@@ -397,7 +397,7 @@
       ...(region?[detailField({label:"REGION",help:infoHelp(worldPropertyHelp.region.regionId),control:worldNumber(region,"regionId",0,255,`World map cell ${cellId} region code`)})]:[]),
       ...(segment?[detailField({label:"GROUP ID",help:infoHelp("Stored geometry group for this cell. Its full effect in the game is not established. This is not the encounter group; use the Rules page on the Encounters tab to change battles."),control:worldNumber(segment,"groupId",0,4294967295,`World map cell ${cellId} group ID`)}),
         detailField({label:"POLYGONS",help:infoHelp("Number of terrain faces in this cell."),control:readonlyField(segment.polygonCount)})]:[])]});
-    const blocks=segment?[detailSection({title:"BLOCKS",help:infoHelp("Each world-map cell holds 16 smaller terrain blocks. Polygons are the faces that form the terrain; vertices are the points at their corners."),
+    const blocks=segment?[detailSection({title:"BLOCKS",
       body:[LexeditorUI.tileGrid(segment.blocks.map(block=>detailSection({title:`Block ${block.id}`,body:[detailField({label:"Polygons",control:readonlyField(block.polygonCount)}),detailField({label:"Vertices",control:readonlyField(block.vertexCount)})]})))]})]:[];
     return sharedDetail({id:cellId,name:`CELL ${cellId}`,...(titleContent?{titleContent}:{})},prefs,[
       LexeditorUI.tileGrid([position,cell],{columns:2,minWidth:300}),...worldCellContents(cellId,region,segment),...blocks],

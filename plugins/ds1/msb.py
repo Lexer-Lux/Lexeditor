@@ -72,17 +72,17 @@ class MsbError(FormatError):
 
 
 PLACEMENT_FIELDS = {
-    # One text per vector: the UI shows each triple as one row with one
-    # help bubble, so all three axes share the row's wording.
-    'posX': ('Position X', 'Position', 'Position along each axis, in metres.'),
-    'posY': ('Position Y', 'Position', 'Position along each axis, in metres.'),
-    'posZ': ('Position Z', 'Position', 'Position along each axis, in metres.'),
-    'rotX': ('Rotation X', 'Rotation', 'Rotation around each axis, in degrees.'),
-    'rotY': ('Rotation Y', 'Rotation', 'Rotation around each axis, in degrees.'),
-    'rotZ': ('Rotation Z', 'Rotation', 'Rotation around each axis, in degrees.'),
-    'scaleX': ('Scale X', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
-    'scaleY': ('Scale Y', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
-    'scaleZ': ('Scale Z', 'Scale', 'Scale along each axis, as a multiplier. 1 is full size.'),
+    # The vectors carry no bubble: their help was cleared, so every axis
+    # holds no text.
+    'posX': ('Position X', 'Position', ''),
+    'posY': ('Position Y', 'Position', ''),
+    'posZ': ('Position Z', 'Position', ''),
+    'rotX': ('Rotation X', 'Rotation', ''),
+    'rotY': ('Rotation Y', 'Rotation', ''),
+    'rotZ': ('Rotation Z', 'Rotation', ''),
+    'scaleX': ('Scale X', 'Scale', ''),
+    'scaleY': ('Scale Y', 'Scale', ''),
+    'scaleZ': ('Scale Z', 'Scale', ''),
     'npcId': ('Enemy', 'Placement', "Which enemy's stats and AI this placement uses. The model stays the same."),
 }
 FLOAT_FIELDS = {key: offset for key, offset in
@@ -91,9 +91,9 @@ FLOAT_FIELDS = {key: offset for key, offset in
                  ('scaleX', 0x2c), ('scaleY', 0x30), ('scaleZ', 0x34))}
 LIGHT_POINT_OFFSETS = {'posX': 0x10, 'posY': 0x14, 'posZ': 0x18}
 LIGHT_FIELDS = {
-    'posX': ('Position X', 'Position', 'Position along each axis, in metres.'),
-    'posY': ('Position Y', 'Position', 'Position along each axis, in metres.'),
-    'posZ': ('Position Z', 'Position', 'Position along each axis, in metres.'),
+    'posX': ('Position X', 'Position', ''),
+    'posY': ('Position Y', 'Position', ''),
+    'posZ': ('Position Z', 'Position', ''),
     'preset': ('Light look', 'Light',
                "Which of the game's built-in light looks this light wears. "
                'Lights that look alike share a number; torches change it by area.'),

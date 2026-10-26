@@ -9047,19 +9047,6 @@ body { text-shadow: var(--lex-text-shadow, none); }
   border-radius:var(--lex-input-radius,3px);
 }
 
-/* A help bubble being reworded in the developer page: the popover takes the
-   pointer only while its editor is open. */
-.lex-help-popover.lex-help-editing { pointer-events:auto; }
-/* The editor fills the bubble it replaces, instead of a narrow box beside an
-   empty right-hand strip. */
-.lex-help-edit {
-  display:block;
-  width:100%;
-  min-height:9em;
-  field-sizing:content;
-  box-sizing:border-box;
-  resize:vertical;
-}
 /* A Data Map line being reworded in the developer page. */
 .lex-data-map-scope > .lex-label-rename,
 .lex-data-map-notes > .lex-label-rename {

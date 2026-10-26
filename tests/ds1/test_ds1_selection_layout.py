@@ -153,9 +153,11 @@ def test_selection_vectors_come_first_without_headers():
         assert order[:4] == ["Position", "Rotation", "Scale", "Placement"], order
         assert page.locator(
             "[data-maps-detail] .lex-multi-number .lex-info-help").count() == 0
+        # The Position, Rotation and Scale rows carry no bubble: their help
+        # was cleared, so the store holds no text for them.
         assert page.locator(
             "[data-maps-detail] .lex-detail-field:has(.lex-multi-number) > "
-            ".lex-detail-field-label .lex-info-help").count() == 3
+            ".lex-detail-field-label .lex-info-help").count() == 0
         header = page.locator("[data-maps-detail] .lex-detail-panel-heading").evaluate(
             """n => {
               const buttons = [...n.querySelectorAll('.lex-detail-panel-actions'

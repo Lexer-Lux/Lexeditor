@@ -302,9 +302,7 @@ ABSORPTION_ICONS = {'neutralDamageCutRate': 'physicalDef', 'magicDamageCutRate':
 # What a cast spends. Vanilla leaves every spell at 0 (free); the Spell
 # Stamina Costs tweak sets each spell's Elden Ring value.
 MAGIC_FIELDS = {
-    'stamina': ('Stamina Consumption', 'Properties',
-                'Each cast of this spell spends this much stamina. 0 is free, as in vanilla. '
-                'The Spell Stamina Costs tweak sets each spell\'s Elden Ring value.'),
+    'stamina': ('Stamina Consumption', 'Properties'),
 }
 
 # What the Source ID fields mean. Every armor piece and weapon names, per
@@ -688,7 +686,7 @@ def schema(table):
         if table == 'EquipParamWeapon' and key in WEAPON_FIELDS:
             label, group, description = WEAPON_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
-            label, group, description = MAGIC_FIELDS[key]
+            label, group = MAGIC_FIELDS[key]
         if table == 'EquipParamProtector' and key.startswith('originEquipPro'):
             description = ORIGIN_HELP
         if table == 'EquipParamWeapon' and key.startswith('originEquipWep'):

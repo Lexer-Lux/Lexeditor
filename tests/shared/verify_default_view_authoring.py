@@ -68,6 +68,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-default-view-", ignore_cleanu
         values = api(GitHub()).default_views("ff8")["views"]["items"]
         assert values == {key: '["name","buyPrice"]', layout_key: "{}"}
 
+        stale = "ff8-items.help.01234567.text"
+        api(GitHub()).save_default_view(
+            "ff8", "items", {layout_key: "{}", stale: "a stale rewording"})
+        values = api(GitHub()).default_views("ff8")["views"]["items"]
+        assert stale not in values, values
+        assert values[layout_key] == "{}"
+        try:
+            api(GitHub()).save_default_view("ff8", "items", {stale: "x"})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A help rewording shipped through the view defaults")
+
         blocked = api(GitHub(False))
         try:
             blocked.save_default_view("ff8", "items", {key: "[]"})

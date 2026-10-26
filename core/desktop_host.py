@@ -726,6 +726,9 @@ class HostApi:
             key = str(key)
             if token not in key or len(key) > 220 or not isinstance(value, str) or len(value) > 20_000:
                 continue
+            # Help text ships from its single store; a stale rewording is dropped.
+            if ".help." in key:
+                continue
             clean[key] = value
         if not clean:
             raise ValueError("This tab has no saved view settings")

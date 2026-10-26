@@ -1598,7 +1598,7 @@ function monsterDetail(groups){
   // shows its fields with no repeated section title.
   const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
   const tabs=[...groups].map(([title])=>({id:tabId(title),label:title,
-    help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards. Each value is a percentage off the hit. Nothing here applies to a hit it does not block.":null}));
+    help:title==="Blocking"?"How much damage and buildup this monster blocks while it guards.":null}));
   const accept=tabs.map(tab=>tab.id);
   const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
   tabs.push({id:"attacks",label:"Attacks",bespoke:true,help:attackHelp});
@@ -1647,8 +1647,7 @@ function itemDetail(groups){
   // Every section is a tab; the tab is the header, so a section tab
   // shows its fields with no repeated section title.
   const tabId=title=>title.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
-  const tabs=[...groups].map(([title])=>({id:tabId(title),label:title,
-    help:title==="Upgrades"?"What this item becomes as it is reinforced: its upgrade path, materials, reinforcement cost and ascension.":null}));
+  const tabs=[...groups].map(([title])=>({id:tabId(title),label:title}));
   const active=tabs.some(tab=>tab.id===state.itemTab)?state.itemTab:tabs[0].id;
   const accept=tabs.map(tab=>tab.id);
   const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
@@ -1699,8 +1698,7 @@ function msbDetail(row,groups){
   const identity=[
     // (no Name row: the heading owns the name, like every other record)
     detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
-    detailField({label:"Part",control:readonlyField(row.id,{format:false}),
-      help:infoHelp("This placement's identity. The type comes first, then the part ID.")}),
+    detailField({label:"Part",control:readonlyField(row.id,{format:false})}),
     detailField({label:"Model",control:readonlyField(row.model,{format:false})})];
   if(row.think!==null&&row.think!==undefined)identity.push(
     detailField({label:"AI table",control:readonlyField(row.think,{format:false}),
