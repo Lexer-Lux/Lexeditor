@@ -281,9 +281,13 @@ class NativeRules:
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
         return {"path": str(self.project.resolve()), "settingsHash": digest(encoded), "spec": spec}
 
-    def _needs_native(self):
+    def changes_code(self):
+        """True when the saved rules patch the game's code (and so take it offline)."""
         return (load_bands.native_projection(self.saved) != load_bands.native_projection(DEFAULTS)
-                or levelup_gains.validate(self.saved["levelupGains"]) != levelup_gains.project_defaults()
+                or levelup_gains.validate(self.saved["levelupGains"]) != levelup_gains.project_defaults())
+
+    def _needs_native(self):
+        return (self.changes_code()
                 or any(row["enabled"] for row in tweak_mods.tweak_rows())
                 or any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES))
 

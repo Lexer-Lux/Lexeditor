@@ -70,6 +70,30 @@ def test_the_debug_loader_leaves_the_game_no_network(tmp_path):
     assert "a debugger can attach" in log, log
 
 
+@pytest.mark.parametrize("patch, online", [(b"LXD1PAT\0not for this program", False), (b"", True)])
+def test_the_loader_takes_a_patched_game_offline(tmp_path, patch, online):
+    """A game whose code a mod changes must not reach FromSoftware's servers:
+    any patch at all blocks the network, even one that then fails to apply.
+    An empty patch (a menu-layout-only tweak) leaves the game online."""
+    import shutil
+    try:
+        zig = build_module().find_zig(None)
+    except SystemExit:
+        pytest.skip("Zig is needed to build the test program")
+    folder = tmp_path / "game folder"
+    folder.mkdir()
+    exe = folder / "game.exe"
+    subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-O1", "-o", str(exe),
+                    str(Path(__file__).with_name("runtime_debug_harness.c")), "-lws2_32"], check=True)
+    shutil.copy2(RUNTIME / "package" / "dinput8.dll", folder / "dinput8.dll")
+    (folder / "lexeditor-ds1-patch.bin").write_bytes(patch)
+    out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60, cwd=tmp_path)
+    after = "1,1,1" if online else "0,0,0"
+    assert out.stdout.strip() == f"before=1,1,1 after={after} loaded=1", out
+    log = (folder / "lexeditor-ds1-patch.log").read_text(encoding="utf-8")
+    assert ("Online play is off" in log) != online, log
+
+
 def patch_file(original=bytes.fromhex("B801000000"), image_size=IMAGE_SIZE, delay=None):
     block = 0x10000
     hook = bytes((0xE9,)) + struct.pack("<i", block - (0x1000 + 5))

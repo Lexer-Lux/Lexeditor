@@ -817,6 +817,49 @@ def _runtime_status(game_root: Path) -> dict:
     return result
 
 
+#: Said when the game starts offline; the loader blocks the network for either.
+OFFLINE_MODS = "Online play is off: enabled mods change the game's code, which may trigger anti-cheat."
+OFFLINE_DEBUG = "Online play is off: debug mode is on."
+
+
+def offline_reason(game_root: Path) -> str:
+    """Why the installed loader keeps the game offline, or "" when it is online.
+
+    Reads what is installed, not what the library would build: the loader
+    blocks the network whenever its patch holds anything, and always in
+    debug mode (runtime/lexeditor_ds1_loader.c).
+    """
+    try:
+        runtime = _runtime(checked(Path(game_root)))
+    except (ValueError, OSError):
+        return ""
+    if not runtime["active"]:
+        return ""
+    if runtime["record"].get("debug") is True:
+        return OFFLINE_DEBUG
+    return OFFLINE_MODS if runtime["patch"] else ""
+
+
+def changes_code(folder: Path) -> bool:
+    """True when a tweak mod patches the game's code, so the game goes offline.
+
+    Read from its last build without running anything: built native patches
+    or a native binary mean code. A tweak never built yet counts as code
+    until a build shows otherwise; one that only built a menu layout (a data
+    file) does not.
+    """
+    from core import memory_conflicts
+    folder = Path(folder)
+    if memory_conflicts.carries_native_code(folder):
+        return True
+    try:
+        if any((folder / "native").glob("*.json")):
+            return True
+        return not any((folder / "layout").glob("*.json"))
+    except OSError:
+        return True
+
+
 def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 

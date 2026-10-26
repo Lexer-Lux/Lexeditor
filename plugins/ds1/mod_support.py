@@ -263,7 +263,11 @@ class Ds1ModAdapter:
                 if folder.resolve() in wanted and any(
                         tweak_mods.native_spans(folder, row["name"]).values()):
                     lines.setdefault(str(folder.resolve()), []).append(line)
+        for folder in sorted(wanted):
+            if self._changes_code(folder, Path(game_root)):
+                lines.setdefault(str(folder), []).append(self.ALERT_OFFLINE)
         return lines
+
     def describe_changes(self, folder, game_root):
         """One mod's changed records and loaded files, for its detail panel.
 
@@ -279,3 +283,29 @@ class Ds1ModAdapter:
         result = mod_loader.describe_changes(Path(folder), Path(game_root))
         result['loaded'] = loaded
         return result
+
+    #: On every mod that changes the game's code: the loader then blocks the
+    #: network, so FromSoftware's anti-cheat never sees a patched game.
+    ALERT_OFFLINE = ("Online play is off while this mod is on: it changes the game's code, "
+                     "which may trigger anti-cheat.")
+
+    @staticmethod
+    def _changes_code(folder: Path, game_root: Path) -> bool:
+        """A tweak mod's native patches, or a project's saved native rules.
+
+        Parameters, text, maps, characters and other assets replace data
+        and leave the game online.
+        """
+        try:
+            if script_mods.is_script_mod(folder):
+                return tweak_mods.changes_code(folder)
+            if not (folder / MARKER).is_file():
+                return False
+            from .native_rules import NativeRules
+            return NativeRules(game_root, folder).changes_code()
+        except (OSError, ValueError, PermissionError):
+            return False  # Unreadable metadata is the Mods tab's error row, not a mark.
+
+    def launch_notice(self, game_root: Path) -> str:
+        """The toast Play shows: why the game starts offline, or ""."""
+        return tweak_mods.offline_reason(Path(game_root))
