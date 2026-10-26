@@ -2054,9 +2054,14 @@
         heading.append(actions);
         heading.classList.remove("no-actions");
       }
-      actions.append(element("button", {type: "button", class: "lex-header-icon lex-detail-add-header",
+      // The enable switch is always the rightmost control, so in a header
+      // that ends with one the dev-mode button goes before it, never after.
+      const addHeader = element("button", {type: "button", class: "lex-header-icon lex-detail-add-header",
         title: "Add section (Developer Mode)", "aria-label": "Add section",
-        onclick: () => addDetailHeader(panel)}, sectionIcon()));
+        onclick: () => addDetailHeader(panel)}, sectionIcon());
+      const last = actions.lastElementChild;
+      if (last?.matches?.('input[type="checkbox"]')) actions.insertBefore(addHeader, last);
+      else actions.append(addHeader);
     }
     return panel;
   };
@@ -15815,12 +15820,17 @@ ${contents.path}`});
     };
     const detail = () => {
       const row = rows().find(item => keyOf(item) === selected);
-      if (!row) return detailPanel({title: "Mods", body: [detailNote(rows().length
-        ? "Select a mod." : "This game has no mods yet. Press + to create one or add one you already have.")]});
+      // Creation lives in the detail header: one add button opening the
+      // add/import dialog, in every detail state.
+      const addButton = element("button", {type: "button", class: "lex-header-icon",
+        title: "Add a mod", "aria-label": "Add a mod", onclick: add}, addIcon());
+      if (!row) return detailPanel({title: "Mods", actions: [addButton], body: [detailNote(rows().length
+        ? "Select a mod." : "This game has no mods yet. Press + in the header to create one or add one you already have.")]});
       if (row.remote) {
         const note = detailNote("");
         const button = element("button", {type: "button", class: "lex-mods-detail-download", onclick: () => download(row, button, note)}, "Download");
-        return detailPanel({title: row.name, help: "A module of Lexer's Mod that is not in your library yet. Once downloaded it stays up to date.",
+        return detailPanel({title: row.name, actions: [addButton],
+          help: "A module of Lexer's Mod that is not in your library yet. Once downloaded it stays up to date.",
           body: [detailSection({title: "DETAILS", body: [
             detailField({label: "AUTHOR", control: readonlyField(row.author || "—")}),
             detailField({label: "DESCRIPTION", control: readonlyField(row.description || "—")})]}),
@@ -15856,7 +15866,7 @@ ${contents.path}`});
         : `Remove ${row.name} from the library`;
       const openTitle = `Open ${row.name}'s folder`;
       // The switch closes the header row, always the rightmost record control.
-      const actions = [
+      const actions = [addButton,
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,
@@ -16063,7 +16073,9 @@ ${contents.path}`});
         search: {key: `${pluginId}-mods-search`, value: query, label: "Search mods", change: value => { query = value; page = 0; draw(); }},
         sync: next => { page = next.page; pageSize = next.pageSize; if (next.selected !== selected) { selected = next.selected; draw(); } },
         change: next => { page = next.page; pageSize = next.pageSize; draw(); },
-        add, addTitle: "Add a mod",
+        // Creation lives in the detail header: the add button there opens
+        // the add/import dialog, so the list keeps no add button.
+        tableAdd: false,
         master: ({rows: listed, selected: current, select}) => columnList({
           // The switch column below replaces the automatic on/off mark.
           rows: listed.map(({enabled, ...row}) => ({...row, on: enabled})), key: keyOf, selected: current,

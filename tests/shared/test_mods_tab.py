@@ -307,10 +307,9 @@ def test_a_mods_settings_and_a_downloadable_module(page):
 def test_the_plus_button_offers_create_and_add(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
-    # The add button waits quietly until its pane is hovered.
-    page.locator(".lex-mods-page .lex-barrelled-master").hover()
-    page.wait_for_function("getComputedStyle(document.querySelector('.lex-mods-page .lex-hover-actions')).pointerEvents === 'auto'")
-    page.get_by_role("button", name="Add a mod").click()
+    # Creation lives in the detail header: no add button in the list.
+    assert page.locator(".lex-mods-page .lex-table-add").count() == 0
+    page.locator(".lex-mods-page .lex-detail-panel-actions").get_by_role("button", name="Add a mod").click()
     for label in ("Create a new mod", "Add a folder…", "Add a ZIP…", "Cancel"):
         page.get_by_role("button", name=label, exact=True).wait_for()
     page.get_by_role("button", name="Cancel", exact=True).click()
@@ -613,17 +612,18 @@ def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):
         assert max(lane) - min(lane) <= 1, lane
 
 
-def test_mods_detail_header_has_duplicate_delete_and_open_buttons(page):
+def test_mods_detail_header_has_add_duplicate_delete_and_open_buttons(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     header = page.locator(".lex-mods-page .lex-detail-panel-actions")
     header.get_by_role("checkbox", name="Mine enabled").wait_for()
     buttons = header.get_by_role("button")
     assert [buttons.nth(index).get_attribute("aria-label") for index in range(buttons.count())] == [
-        "Make an editable copy of Mine", "Remove Mine from the library", "Open Mine's folder"]
+        "Add a mod", "Make an editable copy of Mine", "Remove Mine from the library", "Open Mine's folder"]
     assert buttons.nth(0).locator("svg").count() == 1
     assert buttons.nth(1).locator("svg").count() == 1
     assert buttons.nth(2).locator("svg").count() == 1
+    assert buttons.nth(3).locator("svg").count() == 1
     assert page.get_by_role("button", name="Open folder", exact=True).count() == 0
 
 

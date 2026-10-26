@@ -1,6 +1,6 @@
 """The Mods detail header: icons after the name, the switch last.
 
-The copy, delete and open buttons sit after the name; the enable
+The add, copy, delete and open buttons sit after the name; the enable
 switch closes the row on the right, always the rightmost record
 control. Every control in the row is a compact fixed square: the
 record name owns the heading's width, and a roomy header no longer
@@ -19,8 +19,7 @@ def geometry(page):
       return {
         head: rect(document.querySelector('.lex-mods-page .lex-detail-panel-heading')),
         actions: rect(actions),
-        lastIsSwitch: [...actions.children].filter(el => !el.classList.contains('lex-detail-add-header'))
-          .at(-1)?.matches('input[type="checkbox"]') ?? false,
+        lastIsSwitch: [...actions.children].at(-1)?.matches('input[type="checkbox"]') ?? false,
         icons: [...actions.querySelectorAll(':scope > .lex-header-icon:not(.lex-detail-add-header)')].map(rect),
         box: rect(actions.querySelector(':scope > input[type="checkbox"]')),
         svg: actions.querySelector('.lex-header-icon > svg').getBoundingClientRect().width,
@@ -35,7 +34,7 @@ def test_switch_is_last_and_controls_are_compact(page):
     page.wait_for_timeout(300)
     geo = geometry(page)
     box, head, icons = geo["box"], geo["head"], geo["icons"]
-    assert len(icons) == 3, geo
+    assert len(icons) == 4, geo
     # The switch closes the row: last in the DOM, right of every icon.
     assert geo["lastIsSwitch"], geo
     for icon in icons:
@@ -72,3 +71,23 @@ def test_icons_match_the_switch_in_a_short_header(page):
         assert icon["y"] >= geo["head"]["y"] - 1, geo
         assert icon["y"] + icon["height"] <= geo["head"]["y"] + geo["head"]["height"] + 1, geo
         assert abs(icon["height"] - geo["box"]["height"]) <= 2, geo
+
+
+def test_switch_stays_last_with_developer_mode_on(page):
+    # The dev-mode Add-section button joins the header before the
+    # switch, never after it: the switch stays last in the DOM and
+    # rightmost on screen.
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("checkbox", name="Mine enabled").wait_for()
+    page.evaluate("document.documentElement.dataset.lexDeveloperMode = 'true'")
+    page.wait_for_timeout(200)
+    geo = geometry(page)
+    assert geo["lastIsSwitch"], geo
+    order = page.evaluate("""() => {
+      const rect = el => { const b = el.getBoundingClientRect(); return {x: b.x, width: b.width}; };
+      return {dev: rect(document.querySelector('.lex-mods-page .lex-detail-add-header')),
+        box: rect(document.querySelector('.lex-mods-page .lex-detail-panel-actions > input[type="checkbox"]'))};
+    }""")
+    assert order["dev"]["width"] > 0, order
+    assert order["dev"]["x"] + order["dev"]["width"] <= order["box"]["x"] + 1, order
