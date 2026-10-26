@@ -119,11 +119,11 @@ def test_magic_slot_length_has_icon():
 
 def test_item_humanity_fields_have_icons():
     found = icons(ItemDocument(make_archive()), 'EquipParamGoods', 100)
-    assert found['consumeHeroPoint'] == 'humanity'
+    assert found['consumeHeroPoint'] == 'humanityStat'
     found = icons(ItemDocument(make_archive()), 'Magic', 100)
-    assert found['heroPoint'] == 'humanity'
+    assert found['heroPoint'] == 'humanityStat'
     found = icons(ItemDocument(make_archive()), 'EquipParamWeapon', 100)
-    assert found['isLuckCorrect'] == 'humanity'
+    assert found['isLuckCorrect'] == 'humanityStat'
 
 
 def test_slash_strike_and_thrust_reuse_the_physical_shield():

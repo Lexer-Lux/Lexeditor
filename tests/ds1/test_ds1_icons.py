@@ -88,7 +88,8 @@ def test_label_cells_cover_the_equipment_screen():
                                  'str', 'dex', 'int', 'faith', 'weight', 'durability',
                                  'poison', 'toxic', 'bleed', 'curse', 'poise',
                                  'vit', 'att', 'end', 'res', 'soulLv', 'souls', 'slot',
-                                 'hp', 'stamina', 'mp', 'divine', 'occult', 'stability'}
+                                 'hp', 'stamina', 'mp', 'divine', 'occult', 'stability',
+                                 'humanityStat'}
     assert icons.LABELS['physical'] == (127, 302, 169, 344)
     assert icons.LABELS['magic'] == (126, 387, 168, 429)
     assert icons.LABELS['fire'] == (126, 345, 168, 387)
@@ -111,6 +112,18 @@ def test_label_cells_cover_the_equipment_screen():
     assert icons.LABELS['mp'] == icons.LABELS['stamina']
     assert icons.LABELS['divine'] == (126, 473, 168, 512)
     assert icons.LABELS['occult'] == (83, 473, 125, 512)
+    assert icons.LABELS['humanityStat'] == (125, 43, 167, 85)
+
+
+def test_humanity_stat_and_item_icons_split_by_reference():
+    """Stat-shaped humanity uses the level-up icon; item lots keep the goods picture."""
+    found = formats._FIELD_ICONS
+    assert found[('EquipParamGoods', 'consumeHeroPoint')] == 'humanityStat'
+    assert found[('Magic', 'heroPoint')] == 'humanityStat'
+    assert found[('EquipParamWeapon', 'isLuckCorrect')] == 'humanityStat'
+    assert found[('NpcParam', 'humanityLotId')] == 'humanity'
+    assert icons.ICON_LABELS == {'humanity': 2066}
+
 
 def test_item_art_labels_name_catalog_icons():
     assert icons.ICON_LABELS == {'humanity': 2066}

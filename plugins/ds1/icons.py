@@ -11,11 +11,11 @@ game's own numbering confirms (Stone Greataxe at 198, Bloated Head at
 Damage, defense and stat labels reuse the menus' own small icons from
 Menu04_2: the equipment screen's swords and shields, the armor screen's
 tolerance icons (poison, toxic, bleed, curse, poise), the level-up
-screen's stat, soul-level and souls icons, and the attune screen's slot icon.
-Every rectangle is the layout's own sprite rect, read from menu.drb. Soul Level is
+screen's stat, soul-level, souls and humanity icons, and the attune screen's slot icon.
+Every rectangle is the layout's own sprite rect, read from menu.drb (humanity is the icon_9 sprite). Soul Level is
 the status lists' first row (icon_10 on C01_03_bg and R02-04_text, above the
 souls row; the creation detail footer reuses it): the hollow face.
-Humanity rides the item-icon catalog (the Humanity goods picture).
+Stat-shaped humanity fields use the level-up stat icon; item lots ride the item-icon catalog instead (the Humanity goods picture).
 The sheet's bottom row holds white, black and gold rings: divine takes
 the white ring and occult the black one. Luck stays unmapped: no
 invented glyphs, and no cure-item icons that would read as the item.
@@ -76,9 +76,11 @@ LABELS = {
     'souls': (169, 44, 211, 86), 'slot': (125, 215, 167, 257),
     'divine': (126, 473, 168, 512), 'occult': (83, 473, 125, 512),
     'soulLv': (125, 129, 167, 171),
+    'humanityStat': (125, 43, 167, 85),
 }
 # Label kinds served from the item-icon catalog instead of the label
-# sheet: the Humanity goods picture (EquipParamGoods row 350).
+# sheet: humanity drops are paid in Humanity goods (EquipParamGoods
+# row 350), so they show the item picture, not the stat icon.
 ICON_LABELS = {'humanity': 2066}
 LABEL_SHEET = 'Menu04_2'
 EQUICON = re.compile(r'EquIcon_(\d+)')
