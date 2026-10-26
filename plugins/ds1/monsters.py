@@ -129,7 +129,7 @@ for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic')
                   ('thrustGuardCutRate', 'Thrust')]:
     RESISTANCES[key] = (kind + ' (%)', 'Blocking')
 
-# Reviewed combat stats, drops, passive effects and AI links. Damage
+# Reviewed combat stats, drops and passive effects. Damage
 # multipliers state their unchanged baseline of 1, the way effect
 # multipliers do.
 NPC_STATS = {
@@ -151,7 +151,6 @@ NPC_STATS = {
     'humanityLotId': ('Humanity drop table', 'Value & rewards'),
     'dropType': ('Drop style', 'Value & rewards'),
     'GameClearSpEffectID': ('Cleared-game effect', 'Effects & references'),
-    'aiThinkId': ('AI table', 'Effects & references'),
 }
 for index in range(1, 9):
     NPC_STATS[f'partsDamageRate{index}'] = (

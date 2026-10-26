@@ -2366,7 +2366,11 @@ function detail(){
   const tableEarly=String(state.row.table||"");
   const msbRowEarly=tableEarly.endsWith(".msb");
   const meta=state.tab==="maps"&&state.row&&msbRowEarly?(state.row.kind==="Light"?`look ${state.row.preset}`:state.row.kind==="Message"?`message ${state.row.textId}`:`model ${state.row.model}`):state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
-  const groups=fieldSections(state.row);
+  // The enemy's AI table lives on the AI tab's Think record panel; the
+  // field still rides row.fields for that panel, but the tab groups
+  // below must not repeat it as a row of their own.
+  const groups=fieldSections(state.row.table==="NpcParam"
+    ?{...state.row,fields:(state.row.fields||[]).filter(field=>field.key!=="aiThinkId")}:state.row);
   // Hit fields read slot by slot with a status line each, like the
   // viewer, instead of the stored field-by-field order.
   if((state.row.table==="AtkParam_Npc"||state.row.table==="AtkParam_Pc")&&groups.has("Hitbox"))

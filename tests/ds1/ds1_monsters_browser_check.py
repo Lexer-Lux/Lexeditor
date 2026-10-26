@@ -91,7 +91,8 @@ def main():
                     count = page.evaluate('state.rows.length')
                     assert count == (335 if real else 2)
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))
-                    assert expected == set(NPC_FIELDS) | {'effectiveHp'}
+                    # The AI table rides row.fields for the Think panel without a grouping entry.
+                    assert expected == set(NPC_FIELDS) | {'effectiveHp', 'aiThinkId'}
                     units = page.evaluate("""() => {
                         const out = {};
                         for (const key of ['weakPartsDamageRate', 'partsDamageRate1', 'partsDamageRate8']) {
@@ -169,7 +170,9 @@ def main():
                             following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
                             if not following.count() or not following.is_enabled(): break
                             following.click()
-                    assert seen == expected - {'effectiveHp'} and edited == changes.keys()
+                    # Every served field renders a tab row except the derived HP and the
+                    # AI table, which the AI tab's Think panel owns instead.
+                    assert seen == expected - {'effectiveHp', 'aiThinkId'} and edited == changes.keys()
                     assert saw_effective
                     page.locator('.lex-tabbed-panel [data-subtab="basics"]').click()
                     page.wait_for_function('state.monsterTab==="basics"')

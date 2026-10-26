@@ -754,7 +754,9 @@ def schema(table):
                 reason = 'The choices for this property are not documented.'
             if protected:
                 group = 'Locked'
-        if table == 'NpcParam' and key not in NPC_FIELDS:
+        # The enemy's AI table is driven from the AI tab's Think record
+        # panel, not from a tab row: it stays editable without a grouping entry.
+        if table == 'NpcParam' and key not in NPC_FIELDS and key != 'aiThinkId':
             protected = True
         if table in ('BehaviorParam', 'BehaviorParam_PC') and key not in BEHAVIOR_EDITABLE:
             protected = True
@@ -1554,7 +1556,8 @@ class ItemDocument:
                 links[candidate['spec'].key] = resolved
         for item in self.schemas[table]['fields']:
             field = item['spec']
-            if table == 'NpcParam' and field.key not in NPC_FIELDS:
+            # Ungrouped but served: the Think panel reads aiThinkId from row.fields.
+            if table == 'NpcParam' and field.key not in NPC_FIELDS and field.key != 'aiThinkId':
                 continue
             if table == 'AtkParam_Npc' and field.key not in ATTACK_FIELDS:
                 continue
@@ -1614,7 +1617,8 @@ class ItemDocument:
                     pass
         if table == 'NpcParam':
             order = {key: index for index, key in enumerate(NPC_FIELDS)}
-            fields.sort(key=lambda field: order[field['key']])
+            # The ungrouped AI table sorts after the tab rows.
+            fields.sort(key=lambda field: order.get(field['key'], len(order)))
             hp = next((field for field in fields if field['key'] == 'hp'), None)
             if hp is not None:
                 fields.insert(fields.index(hp) + 1, {

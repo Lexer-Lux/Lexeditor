@@ -34,7 +34,8 @@ def test_boss_souls_help_names_the_event_script():
 def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
     doc = ItemDocument(make_archive())
     assert [row['id'] for row in doc.list_rows('monsters')] == [120000, 120100]
-    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(NPC_FIELDS) | {'effectiveHp'}
+    # The AI table rides row.fields for the Think panel without a grouping entry.
+    assert {field['key'] for field in doc.read_row('NpcParam', 120000)['fields']} == set(NPC_FIELDS) | {'effectiveHp', 'aiThinkId'}
     fields = doc.read_row('NpcParam', 120000)['fields']
     assert all(field['editable'] for field in fields if field['key'] != 'effectiveHp')
     effective = next(field for field in fields if field['key'] == 'effectiveHp')
@@ -48,8 +49,10 @@ def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
             doc.read_row('NpcParam', excluded)
         with pytest.raises(FormatError, match='not a reviewed'):
             doc.edit('NpcParam', excluded, 'def_phys', 10)
+    # behaviorVariationId and aiThinkId are driven from bespoke panels, not
+    # tab rows, so neither counts as an unreviewed field here.
     others = [f['spec'].key for f in doc.schemas['NpcParam']['fields']
-              if f['spec'].key not in NPC_FIELDS and f['spec'].key != 'behaviorVariationId']
+              if f['spec'].key not in NPC_FIELDS and f['spec'].key not in ('behaviorVariationId', 'aiThinkId')]
     assert others and 'npcType' in others
     for key in others:
         with pytest.raises(FormatError, match='protected'):
@@ -69,7 +72,7 @@ def test_all_stats_roundtrip_only_their_cells_and_revert_exactly():
         spec = item['spec']
         start = doc._row('NpcParam', 120000)[1] + spec.offset
         allowed.update(range(start, start + SIZES[spec.dtype]))
-        value = 101 if key == 'aiThinkId' else 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
+        value = 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
         doc.edit('NpcParam', 120000, key, value)
         written[key] = value
     reopened = ItemDocument(doc.export())
