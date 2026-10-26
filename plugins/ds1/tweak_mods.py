@@ -899,15 +899,13 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     return result
 
 
-def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project, debug: bool = False,
+def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project,
                    built: dict | None = None) -> None:
     """Install, replace or remove the loader and its patch description.
 
     With the loader mod on, the loader goes in even with no tweak to apply."""
     game_root = checked(Path(game_root))
     state = _runtime(game_root)
-    if patch is None and debug:
-        patch = b""
     dll_path, patch_path, record_path = (checked(game_root / name) for name in (RUNTIME_DLL, RUNTIME_PATCH, RUNTIME_RECORD))
     if patch is None:
         # The DLL first: without it the game never reads the rest.
@@ -920,7 +918,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
                          "remove or rename the other file, then Apply again. Nothing was changed.")
-    loader = loader_bytes(debug or PROTECTED_LOADER)
+    loader = loader_bytes(PROTECTED_LOADER)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {})}
@@ -1020,8 +1018,7 @@ def _undo(game_root: Path, done: list[dict]) -> None:
     for item in reversed(done):
         if item.get("managed") is None:
             previous = item["previous"]
-            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"],
-                           previous.get("debug", False), previous.get("built"))
+            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"))
             continue
         previous = item["previous"]
         _write(game_root, item["after"], item["before"], previous.get("mods", []),
@@ -1044,8 +1041,7 @@ def commit(game_root: Path, plan: dict) -> None:
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
-        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], False,
-                       runtime.get("built"))
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("built"))
     except Exception:
         try:
             _undo(game_root, done)
