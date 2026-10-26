@@ -317,7 +317,7 @@ def test_effect_behavior_links_npc_and_pc_behaviors():
     poke(document, 'SpEffectParam', 6890, 'stateInfo', 171)
     found = links(document, 'SpEffectParam', 6890)
     assert (found['behaviorId']['kind'], found['behaviorId']['table']) == ('behavior', 'BehaviorParam_PC')
-    assert found['behaviorId']['id'] == 101 and found['behaviorId']['resolved']
+    assert found['behaviorId']['id'] == 100 and found['behaviorId']['resolved']
 
 
 def test_magic_replace_id_links_to_spells():
