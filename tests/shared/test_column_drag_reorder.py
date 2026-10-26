@@ -4,6 +4,11 @@ Dropping a header onto its right-hand neighbor was a no-op: the move
 always inserted before the target, so dragging rightward put the column
 back where it started. The pinned-columns path already lands after the
 target when dragged rightward; the shared preferences do the same now.
+
+Pinned columns reorder through the same move, and the guide marks the
+slot the drop would take: a pin lands on the guide in either direction,
+and where the pin store refuses the drop (a pin over a fixed column, a
+fixed column anywhere) no guide shows and nothing moves.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401
 
@@ -54,3 +59,110 @@ def test_header_drag_drops_rightward_onto_its_neighbor(page):
         ".map(n => n.dataset.columnKey).filter(k => ['a', 'b', 'c'].includes(k))"
         ".join(',') === 'b,a,c'")
     assert page.evaluate(ORDER) == ['b', 'a', 'c']
+
+PIN_PAGE = """(pins) => {
+  const U = LexeditorUI;
+  localStorage.setItem('lexeditor:pins:drag-reorder-pins', JSON.stringify(pins));
+  window.state = {selected: 1, page: 0};
+  const rows = [
+    {id: 1, name: 'Alpha', values: {power: 70}},
+    {id: 2, name: 'Beta', values: {power: 90}},
+  ];
+  const picture = () => U.el('span', {class: 'probe-picture'}, '#');
+  let view = null;
+  const render = () => {
+    view = U.pagedListDetail({
+      rows, key: row => row.id, selected: state.selected, slots: false, noun: 'probes',
+      page: state.page, rowsKey: 'drag-reorder-pins',
+      change: next => {
+        if (next.reason === 'pins' && view?.refreshMaster) view.refreshMaster();
+        else { state.page = next.page; render(); }
+      },
+      master: ({rows: listed, selected, select}) => U.columnList({rows: listed,
+        key: row => row.id, selected, select, columns: [{key: 'name', label: 'Name'}]}),
+      describePinnedCell: key => key === 'icon'
+        ? {editable: false, label: '', sortable: false, width: '36px',
+           render: row => U.el('span', {class: 'probe-cell'}, picture())}
+        : {editable: false, label: key},
+      detail: row => U.detailPanel({title: row.name, icon: picture(),
+        previewPin: {key: 'icon', label: 'Icon'},
+        body: [U.detailSection({title: 'Stats', body: [
+          U.detailField({label: 'Power', property: 'power',
+            control: U.el('input', {value: row.values.power})})]})]}),
+    });
+    document.querySelector('main').replaceChildren(view);
+  };
+  render();
+}"""
+
+PIN_ORDER = """() => [...document.querySelectorAll('.lex-column-list-head-cell')]
+  .map(h => h.dataset.columnKey)"""
+
+GUIDE = """() => {
+  const guide = document.querySelector('.lex-column-list-head-cell.drag-target');
+  return guide ? {key: guide.dataset.columnKey,
+    index: [...guide.parentNode.children].indexOf(guide)} : null;
+}"""
+
+
+def drag_hold(page, src, dst):
+    """Hold a header drag over its target and report the guide slot."""
+    head = page.locator(f'.lex-column-list-head-cell[data-column-key="{src}"]')
+    target = page.locator(f'.lex-column-list-head-cell[data-column-key="{dst}"]')
+    box, goal = head.bounding_box(), target.bounding_box()
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    page.mouse.down()
+    page.mouse.move(goal['x'] + goal['width'] / 2, goal['y'] + goal['height'] / 2, steps=8)
+    page.wait_for_timeout(150)
+    return page.evaluate(GUIDE)
+
+
+def pin_order_is(order):
+    return ("() => [...document.querySelectorAll('.lex-column-list-head-cell')]"
+            f".map(h => h.dataset.columnKey).join(',') === '{','.join(order)}'")
+
+
+def test_pin_drop_lands_on_the_guide_when_dragged_rightward(page):
+    framework(page)
+    page.evaluate(PIN_PAGE, [{'key': 'icon', 'label': 'Icon'}, {'key': 'power', 'label': 'Power'}])
+    page.wait_for_timeout(500)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon', 'pin:power']
+    guide = drag_hold(page, 'pin:icon', 'pin:power')
+    assert guide == {'key': 'pin:power', 'index': 2}
+    page.mouse.up()
+    page.wait_for_function(pin_order_is(['name', 'pin:power', 'pin:icon']))
+    assert page.evaluate(PIN_ORDER).index('pin:icon') == guide['index']
+
+
+def test_pin_drop_lands_on_the_guide_when_dragged_leftward(page):
+    framework(page)
+    page.evaluate(PIN_PAGE, [{'key': 'power', 'label': 'Power'}, {'key': 'icon', 'label': 'Icon'}])
+    page.wait_for_timeout(500)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:power', 'pin:icon']
+    guide = drag_hold(page, 'pin:icon', 'pin:power')
+    assert guide == {'key': 'pin:power', 'index': 1}
+    page.mouse.up()
+    page.wait_for_function(pin_order_is(['name', 'pin:icon', 'pin:power']))
+    assert page.evaluate(PIN_ORDER).index('pin:icon') == guide['index']
+
+
+def test_pin_drag_over_a_fixed_column_shows_no_guide_and_stays(page):
+    framework(page)
+    page.evaluate(PIN_PAGE, [{'key': 'icon', 'label': 'Icon'}])
+    page.wait_for_timeout(500)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
+    assert drag_hold(page, 'pin:icon', 'name') is None
+    page.mouse.up()
+    page.wait_for_timeout(300)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
+
+
+def test_fixed_drag_in_a_pinned_table_shows_no_guide_and_stays(page):
+    framework(page)
+    page.evaluate(PIN_PAGE, [{'key': 'icon', 'label': 'Icon'}])
+    page.wait_for_timeout(500)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
+    assert drag_hold(page, 'name', 'pin:icon') is None
+    page.mouse.up()
+    page.wait_for_timeout(300)
+    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']

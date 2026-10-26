@@ -11881,6 +11881,11 @@ ${contents.path}`});
     // list then adds none, so no pin is ever dead.
     if (options.columnPreferences && pagedPinOwner) pagedPinOwner.declined = true;
     const pinOwner = options.columnPreferences ? null : pagedPinOwner;
+    // One reorder path: a table with its own column preferences moves through
+    // them, any other paged table through its pin store. Both movers take the
+    // dragged and target header keys and refuse anything outside their store,
+    // so the guide marks only a slot the drop would take.
+    const mover = options.columnPreferences ?? pinOwner;
     const renameOwner = pagedRenameOwner;
     const ownColumns = (pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
       .filter(column => !(options.columns || []).some(own =>
@@ -12051,7 +12056,7 @@ ${contents.path}`});
         },
       }, content), column.key);
     }));
-    if (options.columnPreferences || pinOwner?.move) {
+    if (mover?.move) {
       let drag = null;
       const clearTargets = () => header.querySelectorAll(".drag-target,.dragging")
         .forEach(node => node.classList.remove("drag-target", "dragging"));
@@ -12071,9 +12076,17 @@ ${contents.path}`});
         drag.cell.classList.add("dragging");
         const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".lex-column-list-head-cell");
         if (!target || !header.contains(target)) return;
-        header.querySelectorAll(".drag-target").forEach(node => node.classList.remove("drag-target"));
-        target.classList.add("drag-target");
         drag.target = target;
+        header.querySelectorAll(".drag-target").forEach(node => node.classList.remove("drag-target"));
+        // The guide marks the slot the drop would take, so a drop the mover
+        // would refuse shows none: the pin store reorders pins among pins,
+        // and a fixed column there, dragged or targeted, lands nowhere.
+        const isPinKey = key => String(key ?? "").startsWith("pin:");
+        if (!options.columnPreferences && !(isPinKey(drag.key) && isPinKey(target.dataset.columnKey))) {
+          event.preventDefault();
+          return;
+        }
+        target.classList.add("drag-target");
         event.preventDefault();
       });
       const finishDrag = event => {
@@ -12082,30 +12095,7 @@ ${contents.path}`});
           event.preventDefault();
           event.stopPropagation();
           suppressSortUntil = performance.now() + 250;
-          if (options.columnPreferences) options.columnPreferences.move(drag.key, drag.target?.dataset.columnKey);
-          else if (pinOwner?.move) {
-            const strip = key => String(key || "").startsWith("pin:") ? String(key).slice(4) : null;
-            const value = strip(drag.key);
-            if (value) {
-              let before = strip(drag.target?.dataset.columnKey);
-              if (before === null) {
-                // Dropped on a fixed column: the dragged pin goes to the
-                // near end of the pinned run, ahead of it when dropped left.
-                const headCells = [...header.querySelectorAll(".lex-column-list-head-cell")];
-                const firstPin = headCells.find(cell => String(cell.dataset.columnKey).startsWith("pin:"));
-                if (firstPin && headCells.indexOf(drag.target) < headCells.indexOf(drag.cell)) before = strip(firstPin.dataset.columnKey);
-              } else {
-                // Dropped on a pin it takes that slot: dragged rightward
-                // it lands after the target, dragged leftward before it.
-                // Always inserting before made a rightward drop a no-op.
-                const order = pinOwner.store?.pinned || [];
-                const from = order.findIndex(entry => entry.key === value);
-                const to = order.findIndex(entry => entry.key === before);
-                if (from >= 0 && to >= 0 && from < to) before = (order[to + 1] || {}).key ?? null;
-              }
-              pinOwner.move(value, before);
-            }
-          }
+          mover.move(drag.key, drag.target?.dataset.columnKey);
         }
         clearTargets();
         drag = null;
@@ -13781,11 +13771,18 @@ ${contents.path}`});
     const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),
       describe:options.describePinnedCell||null,commitCell:options.commitPinnedCell||null,
       move:(value,before)=>{
-      const pinned=pinOwner.store.pinned,moving=pinned.find(entry=>entry.key===value);
-      if(!moving||value===before)return;
-      const rest=pinned.filter(entry=>entry.key!==value);
-      const index=rest.findIndex(entry=>entry.key===before);
-      if(index<0)rest.push(moving);else rest.splice(index,0,moving);
+      const strip=key=>String(key??"").startsWith("pin:")?String(key).slice(4):null;
+      const pinned=pinOwner.store.pinned,moving=strip(value),target=strip(before);
+      const entry=pinned.find(entry=>entry.key===moving);
+      if(!entry||moving===target||!pinned.some(entry=>entry.key===target))return;
+      const rest=pinned.filter(entry=>entry.key!==moving);
+      let index=rest.findIndex(entry=>entry.key===target);
+      // Dropped on a pin it takes that slot: dragged rightward it lands
+      // after the target, dragged leftward before it, the shared move's own
+      // rule. Anything else lands nowhere: a pin over a fixed column shows
+      // no guide and stays put.
+      if(pinned.findIndex(entry=>entry.key===moving)<pinned.findIndex(entry=>entry.key===target))index++;
+      rest.splice(index,0,entry);
       pinOwner.store.pinned=rest;
       try{localStorage.setItem(pinOwner.store.key,JSON.stringify(rest));}catch(_error){}
       change("pins",{});

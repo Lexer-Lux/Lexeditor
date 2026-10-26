@@ -30,13 +30,16 @@ def test_pin_owner_reorders_and_persists():
     source = ui()
     assert 'describe:options.describePinnedCell||null,commitCell:options.commitPinnedCell||null' in source
     assert 'move:(value,before)=>{' in source
+    assert 'const strip=key=>String(key??"").startsWith("pin:")?String(key).slice(4):null;' in source
+    assert 'if(!entry||moving===target||!pinned.some(entry=>entry.key===target))return;' in source
     assert 'localStorage.setItem(pinOwner.store.key,JSON.stringify(rest))' in source
 
 
 def test_header_drag_covers_pinned_columns():
     source = ui()
-    assert 'if (options.columnPreferences || pinOwner?.move) {' in source
-    assert 'pinOwner.move(value, before)' in source
+    assert 'const mover = options.columnPreferences ?? pinOwner;' in source
+    assert 'if (mover?.move) {' in source
+    assert 'mover.move(drag.key, drag.target?.dataset.columnKey);' in source
 
 
 def test_master_refreshes_without_the_detail_pane():
