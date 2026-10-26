@@ -45,15 +45,20 @@ function textureRow(fileRow,texture){
 async function expandTextureRows(rows){
   const expandable=rows.filter(textureExpandable);
   const missing=[...new Set(expandable.filter(row=>!textureListCache.has(textureCacheKey(row))).map(row=>row.id))];
-  // Bounded parallel reads: a full game ships hundreds of containers.
-  for(let at=0;at<missing.length;at+=6){
-    await Promise.all(missing.slice(at,at+6).map(async relative=>{
-      try{
-        const detail=await api(`/api/assets?scope=textures&side=mod&file=${encodeURIComponent(relative)}`);
-        const row=expandable.find(entry=>entry.id===relative);
-        textureListCache.set(textureCacheKey(row),(detail.textures||[]).filter(entry=>entry&&entry.name!==undefined));
-      }catch(_error){/* unreadable files keep their file row */}
-    }));
+  // One call lists every missing container: hundreds of round trips kept
+  // the tab on its throbber for seconds. A lone file answers in the
+  // single-file shape, so both shapes land in the list cache the same way.
+  // Files the answer skips keep their file row and retry next open; files
+  // it refuses are cached empty under a stamp key uploads invalidate.
+  if(missing.length){
+    const query=missing.map(relative=>`file=${encodeURIComponent(relative)}`).join("&");
+    const result=await api(`/api/assets?scope=textures&side=mod&${query}`);
+    const lists=result.lists||(missing.length===1?{[missing[0]]:result}:null)||{};
+    for(const relative of missing){
+      const row=expandable.find(entry=>entry.id===relative);
+      const found=lists[relative];
+      if(row&&found)textureListCache.set(textureCacheKey(row),(found.textures||[]).filter(item=>item&&item.name!==undefined));
+    }
   }
   return rows.flatMap(row=>{
     if(!textureExpandable(row))return [row];

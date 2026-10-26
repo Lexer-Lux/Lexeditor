@@ -714,3 +714,34 @@ def test_service_model_detail_lists_companion_textures(tmp_path):
         assert (tile["width"], tile["height"], tile["format"]) == (8, 4, "uncompressed")
     finally:
         session.stop()
+
+def test_service_assets_textures_batch_lists_many_per_file_errors(tmp_path):
+    """One scope=textures call lists every container; one bad file cannot 400 it."""
+    game, mod = service_project(tmp_path)
+    (game / "chr" / "c0001").mkdir(parents=True)
+    (game / "chr" / "c0001" / "c0001.tpf").write_bytes(
+        make_tpf([("b_diffuse.dds", make_uncompressed_dds(6, 2))]))
+    (game / "chr" / "c0002").mkdir(parents=True)
+    (game / "chr" / "c0002" / "c0002.tpf").write_bytes(b"not a tpf at all")
+    (game / "chr" / "c0003").mkdir(parents=True)
+    (game / "chr" / "c0003" / "c0003.flver").write_bytes(b"not a flver either")
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
+                          "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
+    try:
+        session.start()
+        result = request_json(
+            session, "/api/assets?scope=textures"
+            "&file=chr/c0000/c0000.tpf&file=chr/c0001/c0001.tpf"
+            "&file=chr/c0002/c0002.tpf&file=chr/c0003/c0003.flver"
+            "&file=chr/c0001/c0001.tpf")
+        lists = result["lists"]
+        assert [row["name"] for row in lists["chr/c0000/c0000.tpf"]["textures"]] == ["a_diffuse.dds"]
+        assert lists["chr/c0000/c0000.tpf"]["reason"] is None
+        assert [(row["name"], row["width"], row["height"])
+                for row in lists["chr/c0001/c0001.tpf"]["textures"]] == [("b_diffuse.dds", 6, 2)]
+        assert lists["chr/c0002/c0002.tpf"]["textures"] == []
+        assert lists["chr/c0002/c0002.tpf"]["reason"] is not None
+        assert lists["chr/c0003/c0003.flver"]["textures"] == []
+        assert lists["chr/c0003/c0003.flver"]["reason"] is not None
+    finally:
+        session.stop()

@@ -1,5 +1,6 @@
 """Loopback parameter editor; only explicit deployment writes installed data."""
 from http.server import ThreadingHTTPServer
+from concurrent.futures import ThreadPoolExecutor
 import base64
 import binascii
 import json
@@ -78,6 +79,40 @@ def _asset_bytes(relative, side):
     """The bytes the game would load: the mod's override, else the installed file."""
     live, source, name = _asset_target(relative, side)
     return live.read_bytes(), source, name
+
+
+# One Textures-tab expansion: hundreds of containers list in one call.
+# Per-file failures ride along as reasons; the batch itself never 400s,
+# so one unreadable container cannot hold the expansion hostage.
+# Models-kind files are refused per file: their model strip resolves
+# through the viewport caches, which stay under LOCK.
+TEXTURES_BATCH_MAX = 2000
+# One batch fans out like the six parallel reads it replaces: cold
+# containers inflate and seek on disk, and serializing them behind one
+# thread took longer than the hundreds of round trips it removed.
+TEXTURES_BATCH_WORKERS = 6
+
+
+def _texture_batch_entry(filename, side):
+    """One batch member's (key, value); failures become reasons, never errors."""
+    try:
+        if assets.kind_of(filename) == "models":
+            raise ValueError("Model previews resolve one file at a time")
+        detail = _textures_detail(filename, side)
+    except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+        return str(filename), {"textures": [], "reason": "unreadable",
+                                "note": str(error)[:200]}
+    return detail["file"], {"textures": detail["textures"], "reason": detail["reason"]}
+
+
+def _textures_batch(filenames, side):
+    """{lists: {file: {textures, reason}}} for scope=textures expansion."""
+    unique = list(dict.fromkeys(filenames))[:TEXTURES_BATCH_MAX]
+    if len(unique) < 2:
+        return {"lists": dict([_texture_batch_entry(name, side)] for name in unique)}
+    with ThreadPoolExecutor(max_workers=TEXTURES_BATCH_WORKERS,
+                            thread_name_prefix="lexeditor-texbatch") as pool:
+        return {"lists": dict(pool.map(lambda name: _texture_batch_entry(name, side), unique))}
 
 
 def _textures_detail(filename, side):
@@ -225,10 +260,15 @@ class Handler(PluginRequestHandler):
                 self.send_json({'error': str(error)}, 400)
             return
         if path == '/api/assets' and query.get('scope', ['overrides'])[0] == 'textures' \
-                and assets.kind_of(query.get('file', [''])[0]) != 'models':
+                and (len(query.get('file', [])) > 1
+                     or assets.kind_of(query.get('file', [''])[0]) != 'models'):
             try:
-                self.send_json(_textures_detail(query.get('file', [''])[0],
-                                                query.get('side', ['mod'])[0]))
+                files = query.get('file', [])
+                if len(files) > 1:
+                    self.send_json(_textures_batch(files, query.get('side', ['mod'])[0]))
+                else:
+                    self.send_json(_textures_detail(files[0] if files else '',
+                                                    query.get('side', ['mod'])[0]))
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
