@@ -41,6 +41,15 @@ class MetadataTests(unittest.TestCase):
             with self.assertRaises(mod_metadata.MetadataError, msg=bad):
                 mod_metadata.clean(bad)
 
+    def test_descriptions_and_credits_have_no_length_cap(self):
+        long = "TODO: everything. " * 1250
+        cleaned = mod_metadata.clean({"name": "Long", "description": long, "credits": long})
+        self.assertEqual((cleaned["description"], cleaned["credits"]), (long.strip(), long.strip()))
+        mod = self.root / "mod"
+        mod.mkdir()
+        result = mod_metadata.write(mod, {"name": "Long", "description": long})
+        self.assertEqual(result["description"], long.strip())
+
     def test_an_unnamed_mod_says_so_and_borrows_its_folder_name_for_display(self):
         mod = self.root / "Some Folder"
         mod.mkdir()

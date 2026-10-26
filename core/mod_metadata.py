@@ -18,7 +18,9 @@ from pathlib import Path
 
 FILE = "mod.json"
 FIELDS = ("name", "author", "description", "credits")
-LIMITS = {"name": 120, "author": 200, "description": 4000, "credits": 20000}
+# Name and author stay bounded: they render in table cells, headers and
+# dialog inputs. Description and credits are free text with no cap.
+LIMITS = {"name": 120, "author": 200}
 
 
 class MetadataError(ValueError):
@@ -39,7 +41,7 @@ def _stored(root: Path) -> dict:
 
 
 def clean(values: dict) -> dict:
-    """The four standard fields, validated: text, trimmed, bounded, named."""
+    """The four standard fields, validated: text, trimmed, named."""
     if not isinstance(values, dict):
         raise MetadataError("Mod details must be an object")
     result = {}
@@ -50,8 +52,9 @@ def clean(values: dict) -> dict:
         if not isinstance(value, str):
             raise MetadataError(f"The mod's {key} must be text")
         value = value.strip()
-        if len(value) > LIMITS[key]:
-            raise MetadataError(f"The mod's {key} is longer than {LIMITS[key]} characters")
+        limit = LIMITS.get(key)
+        if limit is not None and len(value) > limit:
+            raise MetadataError(f"The mod's {key} is longer than {limit} characters")
         result[key] = value
     if not result["name"]:
         raise MetadataError("A mod needs a name")

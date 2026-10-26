@@ -7720,7 +7720,7 @@
     // in its mod.json (core/mod_metadata.py). Creating one asks for them here.
     const author = options.details ? element("input", {type: "text", maxlength: "200", value: options.author || "",
       placeholder: "Author (optional)", "aria-label": "Author"}) : null;
-    const about = options.details ? element("textarea", {maxlength: "4000", rows: "5",
+    const about = options.details ? element("textarea", {rows: "5",
       placeholder: "Description (optional)", "aria-label": "Description"}, options.about || "") : null;
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close(null);
