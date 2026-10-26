@@ -11362,9 +11362,13 @@ ${contents.path}`});
       const key = `lexeditor:pins:${viewKey}`;
       let pinned = [];
       try { pinned = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_error) {}
-      autoPinStores.set(viewKey, {key, pinned: (Array.isArray(pinned) ? pinned : [])
+      let headerOrder = null;
+      try { headerOrder = JSON.parse(localStorage.getItem(`lexeditor:header-order:${viewKey}`) || "null"); } catch (_error) {}
+      autoPinStores.set(viewKey, {key, orderKey: `lexeditor:header-order:${viewKey}`,
+        pinned: (Array.isArray(pinned) ? pinned : [])
         .filter(entry => entry && typeof entry.key === "string")
-        .map(entry => ({...entry, shipped: entry.shipped || pinShipped(entry.label)}))});
+        .map(entry => ({...entry, shipped: entry.shipped || pinShipped(entry.label)})),
+        order: Array.isArray(headerOrder) ? headerOrder.filter(key => typeof key === "string") : null});
     }
     return autoPinStores.get(viewKey);
   };
@@ -11410,6 +11414,20 @@ ${contents.path}`});
         return shown === undefined || shown === null ? "" : typeof shown === "number" ? formatNumber(shown) : String(shown);
       })};
   });
+  // A pin-store table orders its whole header - fixed columns and pins
+  // alike - through the pin owner's saved order, so a pin drops anywhere
+  // and a fixed column moves too. Columns the order never named keep the
+  // old layout: the given columns first, then the pins.
+  const orderPinColumns = (owner, fixed) => {
+    const order = owner.seedOrder(fixed.map(column => column.key));
+    const byKey = new Map(fixed.map(column => [column.key, column]));
+    for (const column of pinnedColumns(owner)) {
+      if (!fixed.some(own => String(own.key ?? "").toLowerCase() === String(column.pinnedProperty ?? "").toLowerCase())) {
+        byKey.set(column.key, column);
+      }
+    }
+    return order.map(key => byKey.get(key)).filter(Boolean);
+  };
   const autoPinButton = (owner, key, label, icon) => {
     const pinned = owner.store.pinned.some(entry => entry.key === key);
     return element("button", {
@@ -11464,6 +11482,19 @@ ${contents.path}`});
     if (preview) attachPreviewPin(preview, owner, preview.dataset.lexPreviewPin, preview.dataset.lexPreviewPinLabel || "Icon");
   };
 
+  // One reorder rule for every table header: dropped on a column the drag
+  // takes that slot - dragged rightward it lands after the target, dragged
+  // leftward before it. Always inserting before made a rightward drop a no-op.
+  const moveKeyInOrder = (order, value, before) => {
+    const from = order.indexOf(value);
+    const to = order.indexOf(before);
+    const rest = order.filter(item => item !== value);
+    let index = rest.indexOf(before);
+    if (from >= 0 && to >= 0 && from < to) index = index < 0 ? rest.length : index + 1;
+    rest.splice(index < 0 ? rest.length : index, 0, value);
+    return rest;
+  };
+
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
     const declared = numberedIdColumns(definitions || [], []);
@@ -11499,15 +11530,7 @@ ${contents.path}`});
       },
       move: (value, before) => {
         if (!order.includes(value) || value === before) return;
-        const from = order.indexOf(value);
-        const to = order.indexOf(before);
-        order = order.filter(item => item !== value);
-        let index = order.indexOf(before);
-        // Dropped on a column it takes that slot: dragged rightward it
-        // lands after the target, dragged leftward before it. Always
-        // inserting before made a rightward drop a no-op.
-        if (from >= 0 && to >= 0 && from < to) index = index < 0 ? order.length : index + 1;
-        order.splice(index < 0 ? order.length : index, 0, value);
+        order = moveKeyInOrder(order, value, before);
         save();
       },
       reset: () => { order = [...defaults]; save(); },
@@ -11884,15 +11907,13 @@ ${contents.path}`});
     if (options.columnPreferences && pagedPinOwner) pagedPinOwner.declined = true;
     const pinOwner = options.columnPreferences ? null : pagedPinOwner;
     // One reorder path: a table with its own column preferences moves through
-    // them, any other paged table through its pin store. Both movers take the
-    // dragged and target header keys and refuse anything outside their store,
-    // so the guide marks only a slot the drop would take.
+    // them, any other paged table through its pin store. Both movers order
+    // the whole header through one shared rule, so every drop lands and the
+    // guide marks wherever the pointer is.
     const mover = options.columnPreferences ?? pinOwner;
     const renameOwner = pagedRenameOwner;
-    const ownColumns = (pinOwner ? [...(options.columns || []), ...pinnedColumns(pinOwner)
-      .filter(column => !(options.columns || []).some(own =>
-        String(own.key ?? "").toLowerCase() === String(column.pinnedProperty ?? "").toLowerCase()))] : options.columns || [])
-      .map(column => renameColumn(column, renameOwner));
+    const fixedColumns = (options.columns || []).map(column => renameColumn(column, renameOwner));
+    const ownColumns = pinOwner ? orderPinColumns(pinOwner, fixedColumns) : fixedColumns;
     const columns = preferredColumns
       ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
@@ -12080,14 +12101,8 @@ ${contents.path}`});
         if (!target || !header.contains(target)) return;
         drag.target = target;
         header.querySelectorAll(".drag-target").forEach(node => node.classList.remove("drag-target"));
-        // The guide marks the slot the drop would take, so a drop the mover
-        // would refuse shows none: the pin store reorders pins among pins,
-        // and a fixed column there, dragged or targeted, lands nowhere.
-        const isPinKey = key => String(key ?? "").startsWith("pin:");
-        if (!options.columnPreferences && !(isPinKey(drag.key) && isPinKey(target.dataset.columnKey))) {
-          event.preventDefault();
-          return;
-        }
+        // Every header slot takes the drop: both movers order the whole
+        // header, so the guide marks wherever the pointer is.
         target.classList.add("drag-target");
         event.preventDefault();
       });
@@ -13772,21 +13787,20 @@ ${contents.path}`});
     options.sync?.({page, pageSize, selected, selection: [...selection.keys]});
     const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),
       describe:options.describePinnedCell||null,commitCell:options.commitPinnedCell||null,
+      seedOrder:fixedKeys=>{
+      const store=pinOwner.store,live=new Set([...fixedKeys,...store.pinned.map(entry=>`pin:${entry.key}`)]);
+      const order=[];
+      for(const key of store.order||[]){if(live.has(key)&&!order.includes(key))order.push(key);}
+      for(const key of fixedKeys){if(!order.includes(key))order.push(key);}
+      for(const entry of store.pinned){const key=`pin:${entry.key}`;if(!order.includes(key))order.push(key);}
+      store.order=order;
+      return order;
+    },
       move:(value,before)=>{
-      const strip=key=>String(key??"").startsWith("pin:")?String(key).slice(4):null;
-      const pinned=pinOwner.store.pinned,moving=strip(value),target=strip(before);
-      const entry=pinned.find(entry=>entry.key===moving);
-      if(!entry||moving===target||!pinned.some(entry=>entry.key===target))return;
-      const rest=pinned.filter(entry=>entry.key!==moving);
-      let index=rest.findIndex(entry=>entry.key===target);
-      // Dropped on a pin it takes that slot: dragged rightward it lands
-      // after the target, dragged leftward before it, the shared move's own
-      // rule. Anything else lands nowhere: a pin over a fixed column shows
-      // no guide and stays put.
-      if(pinned.findIndex(entry=>entry.key===moving)<pinned.findIndex(entry=>entry.key===target))index++;
-      rest.splice(index,0,entry);
-      pinOwner.store.pinned=rest;
-      try{localStorage.setItem(pinOwner.store.key,JSON.stringify(rest));}catch(_error){}
+      const store=pinOwner.store,order=store.order||[];
+      if(!order.includes(value)||value===before)return;
+      store.order=moveKeyInOrder(order,value,before);
+      try{localStorage.setItem(store.orderKey,JSON.stringify(store.order));}catch(_error){}
       change("pins",{});
     },toggle:(key,label,icon)=>{
       const store=pinOwner.store;

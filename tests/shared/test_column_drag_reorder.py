@@ -7,8 +7,7 @@ target when dragged rightward; the shared preferences do the same now.
 
 Pinned columns reorder through the same move, and the guide marks the
 slot the drop would take: a pin lands on the guide in either direction,
-and where the pin store refuses the drop (a pin over a fixed column, a
-fixed column anywhere) no guide shows and nothing moves.
+a pin drops left of a fixed column, and a fixed column moves too.
 """
 from test_shared_ui_feedback import framework, page  # noqa: F401
 
@@ -63,6 +62,7 @@ def test_header_drag_drops_rightward_onto_its_neighbor(page):
 PIN_PAGE = """(pins) => {
   const U = LexeditorUI;
   localStorage.setItem('lexeditor:pins:drag-reorder-pins', JSON.stringify(pins));
+  localStorage.removeItem('lexeditor:header-order:drag-reorder-pins');
   window.state = {selected: 1, page: 0};
   const rows = [
     {id: 1, name: 'Alpha', values: {power: 70}},
@@ -146,23 +146,25 @@ def test_pin_drop_lands_on_the_guide_when_dragged_leftward(page):
     assert page.evaluate(PIN_ORDER).index('pin:icon') == guide['index']
 
 
-def test_pin_drag_over_a_fixed_column_shows_no_guide_and_stays(page):
+def test_pin_drop_left_of_a_fixed_column_lands_on_the_guide(page):
     framework(page)
     page.evaluate(PIN_PAGE, [{'key': 'icon', 'label': 'Icon'}])
     page.wait_for_timeout(500)
     assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
-    assert drag_hold(page, 'pin:icon', 'name') is None
+    guide = drag_hold(page, 'pin:icon', 'name')
+    assert guide == {'key': 'name', 'index': 0}
     page.mouse.up()
-    page.wait_for_timeout(300)
-    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
+    page.wait_for_function(pin_order_is(['pin:icon', 'name']))
+    assert page.evaluate(PIN_ORDER).index('pin:icon') == guide['index']
 
 
-def test_fixed_drag_in_a_pinned_table_shows_no_guide_and_stays(page):
+def test_fixed_drop_right_of_a_pin_lands_on_the_guide(page):
     framework(page)
     page.evaluate(PIN_PAGE, [{'key': 'icon', 'label': 'Icon'}])
     page.wait_for_timeout(500)
     assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
-    assert drag_hold(page, 'name', 'pin:icon') is None
+    guide = drag_hold(page, 'name', 'pin:icon')
+    assert guide == {'key': 'pin:icon', 'index': 1}
     page.mouse.up()
-    page.wait_for_timeout(300)
-    assert page.evaluate(PIN_ORDER) == ['name', 'pin:icon']
+    page.wait_for_function(pin_order_is(['pin:icon', 'name']))
+    assert page.evaluate(PIN_ORDER).index('name') == guide['index']
