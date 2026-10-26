@@ -1,10 +1,10 @@
-"""Per-subtab column counts migrate up to the shared key once.
+"""A retired shared column count moves down into the open subtab's own key.
 
-Callers that show the same fields under several subtabs share one count;
-counts saved under older per-subtab keys move up on first mount: the
-current subtab's wins, else the largest dead one, and the dead keys go
-away. A shared count already saved wins over the dead ones, and fresh
-readers keep the fitted default with nothing written.
+Each subtab keeps its own manually-set count now. A count saved under
+the retired shared key moves into the open subtab's key once and the
+shared key goes away from every store; a subtab with its own count
+keeps it and leaves the shared key for its siblings; fresh readers
+keep the fitted default with nothing written.
 """
 import sys
 from pathlib import Path
@@ -18,7 +18,7 @@ BUILD = """(active) => {
   main.style.cssText = 'display:block;height:760px';
   const rows = [{id: 0, name: 'Lot 0'}];
   main.replaceChildren(U.pagedListDetail({rows, key: row => row.id, selected: 0,
-    noun: 'lot', columnsKey: 'test-shared-columns', slots: false, pageSize: 6,
+    noun: 'lot', legacyColumnsKey: 'test-shared-columns', slots: false, pageSize: 6,
     master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
       select: v.select, columns: [{key: 'name', label: 'Name'}]}),
     detail: row => U.detailPanel({title: row.name, body: [U.tabbedPanel({label: 'Lot',
@@ -29,12 +29,26 @@ BUILD = """(active) => {
           control: U.el('input', {type: 'number', value: 0})})]})})]})}));
 }"""
 
+PLAIN_BUILD = """() => {
+  const U = LexeditorUI;
+  const main = document.querySelector('main');
+  main.style.cssText = 'display:block;height:760px';
+  const rows = [{id: 0, name: 'Lot 0'}];
+  main.replaceChildren(U.pagedListDetail({rows, key: row => row.id, selected: 0,
+    noun: 'lot', legacyColumnsKey: 'test-shared-columns', slots: false, pageSize: 6,
+    master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
+      select: v.select, columns: [{key: 'name', label: 'Name'}]}),
+    detail: row => U.detailPanel({title: row.name, body: [
+      U.detailField({label: 'Weight', property: 'w',
+        control: U.el('input', {type: 'number', value: 0})})]})}));
+}"""
+
 STATE = """() => {
   const control = document.querySelector('main .lex-detail-column-control .lex-barrel-count');
   const keys = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key.startsWith('lexeditor:columns:test-shared-columns'))
+    if (key.startsWith('lexeditor:columns:'))
       keys[key.slice('lexeditor:'.length)] = localStorage.getItem(key);
   }
   const rendered = [...document.querySelectorAll('main .lex-tweak-column')].filter(c => c.offsetParent).length;
@@ -47,37 +61,35 @@ def seed(page, entries):
         page.evaluate(f"localStorage.setItem('lexeditor:{key}', '{value}')")
 
 
-def test_current_subtab_count_wins(page):
+def test_shared_count_moves_into_the_open_subtab(page):
     framework(page)
-    seed(page, {'columns:test-shared-columns:defense': 4,
-                'columns:test-shared-columns:basics': 3})
+    seed(page, {'columns:test-shared-columns': 4})
     page.evaluate(BUILD, 'defense')
     page.wait_for_timeout(400)
     state = page.evaluate(STATE)
     assert state['shown'] == 4, state
-    assert state['keys'] == {'columns:test-shared-columns': '4'}, state
+    assert state['keys'] == {'columns:lot:defense': '4'}, state
 
 
-def test_largest_dead_count_wins_without_current(page):
+def test_own_count_wins_and_leaves_legacy_for_siblings(page):
     framework(page)
-    seed(page, {'columns:test-shared-columns:basics': 3,
-                'columns:test-shared-columns:combat': 5})
-    page.evaluate(BUILD, 'defense')
-    page.wait_for_timeout(400)
-    state = page.evaluate(STATE)
-    assert state['shown'] == 5, state
-    assert state['keys'] == {'columns:test-shared-columns': '5'}, state
-
-
-def test_saved_shared_count_wins_over_dead(page):
-    framework(page)
-    seed(page, {'columns:test-shared-columns': 2,
-                'columns:test-shared-columns:defense': 4})
+    seed(page, {'columns:test-shared-columns': 4, 'columns:lot:defense': 2})
     page.evaluate(BUILD, 'defense')
     page.wait_for_timeout(400)
     state = page.evaluate(STATE)
     assert state['shown'] == 2, state
-    assert state['keys'] == {'columns:test-shared-columns': '2'}, state
+    assert state['keys'] == {'columns:lot:defense': '2',
+                             'columns:test-shared-columns': '4'}, state
+
+
+def test_shared_count_moves_into_the_base_key_without_subtabs(page):
+    framework(page)
+    seed(page, {'columns:test-shared-columns': 5})
+    page.evaluate(PLAIN_BUILD)
+    page.wait_for_timeout(400)
+    state = page.evaluate(STATE)
+    assert state['shown'] == 5, state
+    assert state['keys'] == {'columns:lot': '5'}, state
 
 
 def test_fresh_reader_keeps_fitted_default_unwritten(page):

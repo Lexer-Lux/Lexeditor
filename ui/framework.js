@@ -13275,11 +13275,10 @@ ${contents.path}`});
     return boundedBarrelCount(fallback, maximum);
   };
   // How many columns a page's details use: 1-6, or none saved for "fit".
-  // Shared-key migration runs once per base key per session; every path
-  // either marks (adopted, purged, or nothing dead) or retries later.
+  // Legacy-key migration runs once per base key per session.
   const migratedColumnKeys = new Set();
   const detailColumnsKey = options => `columns:${String(
-    options.columnsKey || options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
+    options.barrelKey || options.splitKey || options.noun || "records").replace(/[^A-Za-z0-9:_-]/g, "_")}`;
   const readDetailColumns = key => {
     const managed = sharedSettingsSnapshot?.viewPreferences?.[key];
     let value = managed;
@@ -14012,63 +14011,40 @@ ${contents.path}`});
     }
     // COLUMNS mirrors BARRELS on the other side of the same divider: how many
     // columns the selected record's details flow into. Right-click: fit again.
-    // Without an explicit columnsKey each panel tab keeps its own column
-    // count: the key extends with the active tabs in the detail, outer to
-    // inner, so one item section and the next (or the GF's HP tab and its
-    // XP tab) can differ. Callers that show the same fields under several
-    // subtabs pass columnsKey to share one count across them, the way the
-    // property layout already does; the subtab path stays off that key.
+    // Each subtab keeps its own manually-set count: the key extends with
+    // the active tabs in the detail, outer to inner, so one item section
+    // and the next (or the GF's HP tab and its XP tab) can differ, and
+    // setting one subtab never changes another.
     const columnsBaseKey = detailColumnsKey(options);
-    const sharedColumnsKey = Boolean(options.columnsKey);
     const columnsPathNow = () => [...(detailNode?.querySelectorAll?.(".lex-subtab-bar") || [])]
       .map(bar => bar.querySelector(":scope > .lex-subtab-button.active")?.dataset.subtab?.replace(/[^A-Za-z0-9_-]/g, "_"))
       .filter(Boolean);
     const columnsKeyNow = () => {
-      if (sharedColumnsKey) return columnsBaseKey;
       const path = columnsPathNow();
       return path.length ? `${columnsBaseKey}:${path.join(":")}` : columnsBaseKey;
     };
-    // A count saved under an older per-subtab key moves up to the shared
-    // key once: the current subtab's wins, else the largest dead one (a
-    // real count beats a fitted guess), and the dead per-subtab keys go
-    // away from every store. Fresh readers with no saved count keep the
-    // fitted default: nothing is written for them.
-    const migrateSharedColumns = () => {
-      if (!sharedColumnsKey || migratedColumnKeys.has(columnsBaseKey))
-        return readDetailColumns(columnsBaseKey);
-      const prefix = `${columnsBaseKey}:`;
-      const dead = new Set();
-      try {
-        for (let index = 0; index < localStorage.length; index++) {
-          const candidate = localStorage.key(index);
-          if (candidate?.startsWith(`lexeditor:${prefix}`))
-            dead.add(candidate.slice("lexeditor:".length));
-        }
-      } catch (_error) {}
-      for (const candidate of Object.keys(sharedSettingsSnapshot?.viewPreferences || {}))
-        if (candidate.startsWith(prefix)) dead.add(candidate);
-      if (!dead.size) {
-        migratedColumnKeys.add(columnsBaseKey);
-        return readDetailColumns(columnsBaseKey);
-      }
-      const shared = readDetailColumns(columnsBaseKey);
-      if (shared) {
-        for (const key of dead) saveDetailColumns(key, 0);
-        migratedColumnKeys.add(columnsBaseKey);
-        return shared;
-      }
-      const path = columnsPathNow();
-      if (!path.length) return 0;
-      let adopted = readDetailColumns(`${columnsBaseKey}:${path.join(":")}`);
-      if (!adopted) for (const key of dead)
-        adopted = Math.max(adopted, readDetailColumns(key));
-      if (adopted) saveDetailColumns(columnsBaseKey, adopted);
-      for (const key of dead) saveDetailColumns(key, 0);
+    // A count saved under the retired shared key moves down into this
+    // subtab's own key once: columns:ds1-items (4) becomes
+    // columns:ds1-items-weapons:defense (4) for the subtab open at the
+    // time, and the shared key goes away from every store. The open
+    // subtab inherits the shared count; a subtab with its own count
+    // keeps it and leaves the shared key for its siblings; fresh
+    // readers keep the fitted default with nothing written. The
+    // legacyColumnsKey option names that retired key; delete the
+    // option once no reader can still hold one.
+    const migrateLegacyColumns = () => {
+      if (!options.legacyColumnsKey || migratedColumnKeys.has(columnsBaseKey)) return;
       migratedColumnKeys.add(columnsBaseKey);
-      return adopted;
+      const legacy = `columns:${String(options.legacyColumnsKey).replace(/[^A-Za-z0-9:_-]/g, "_")}`;
+      const target = columnsKeyNow();
+      if (readDetailColumns(target)) return;
+      const inherited = readDetailColumns(legacy);
+      if (!inherited) return;
+      saveDetailColumns(target, inherited);
+      saveDetailColumns(legacy, 0);
     };
     let columnsKey = columnsKeyNow();
-    migrateSharedColumns();
+    migrateLegacyColumns();
     let chosenColumns = readDetailColumns(columnsKey);
     const shownColumns = () => {
       // Every visible column counts, empty ones included: they still take
@@ -14091,7 +14067,7 @@ ${contents.path}`});
     });
     const showColumnCount = () => {
       columnsKey = columnsKeyNow();
-      migrateSharedColumns();
+      migrateLegacyColumns();
       chosenColumns = readDetailColumns(columnsKey);
       const count = shownColumns();
       columnTally.textContent = String(count);

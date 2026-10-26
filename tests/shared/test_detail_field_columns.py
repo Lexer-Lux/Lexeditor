@@ -151,7 +151,7 @@ def test_tally_counts_empty_fitted_columns(page):
     assert page.locator(
         ".lex-list-detail-divider .lex-detail-column-control .lex-barrel-decrease").is_enabled()
 
-SCOPED_BUILD = """([barrel, columnsKey]) => {
+SCOPED_BUILD = """([barrel, legacyKey]) => {
   const U = LexeditorUI;
   try { localStorage.clear(); } catch (_error) {}
   const rows = Array.from({length: 6}, (_, id) => ({id, name: 'Ammo ' + id}));
@@ -162,7 +162,7 @@ SCOPED_BUILD = """([barrel, columnsKey]) => {
   main.style.cssText = 'display:block;height:760px';
   window.__scopedBuild = barrelNow => main.replaceChildren(U.pagedListDetail({rows,
     key: row => row.id, selected: 0, noun: 'ammo', splitKey: 'scope-check', slots: false,
-    pageSize: 6, defaultSplit: 22, barrelKey: barrelNow, columnsKey,
+    pageSize: 6, defaultSplit: 22, barrelKey: barrelNow, legacyColumnsKey: legacyKey,
     master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
       select: v.select, columns: [{key: 'name', label: 'Name'}]}),
     detail: row => U.detailPanel({title: row.name, body: fields()})}));
@@ -170,29 +170,30 @@ SCOPED_BUILD = """([barrel, columnsKey]) => {
 }"""
 
 
-def build_scoped(page, barrel, columns_key):
+def build_scoped(page, barrel, legacy_key):
     page.set_viewport_size({"width": 1700, "height": 800})
     framework(page)
     mount_shell(page, True)
-    page.evaluate(SCOPED_BUILD, [barrel, columns_key])
+    page.evaluate(SCOPED_BUILD, [barrel, legacy_key])
     page.wait_for_timeout(400)
 
 
-def test_columns_key_shares_count_across_subtab_barrels(page):
-    # DS1 renders every record tab through one paged list whose barrel key
-    # carries the subtab, so a count change in Ammo never reached
-    # Consumables while dragged properties did. A shared columnsKey keeps
-    # one count per tab across its subtabs.
+def test_legacy_columns_key_shares_nothing_across_barrels(page):
+    # The retired shared key is migrate-only: passing it never shares a
+    # count. Each barrel keeps its own manually-set count under its own
+    # key, and no shared key is written.
     build_scoped(page, 'ds1-items-ammo', 'ds1-items')
     assert tally(page) == "1"
     set_columns(page, 3)
+    assert column_keys(page) == ["lexeditor:columns:ds1-items-ammo"]
     page.evaluate("() => window.__scopedBuild('ds1-items-consumables')")
     page.wait_for_timeout(400)
-    assert tally(page) == "3"
+    assert tally(page) == "1"
+    assert column_keys(page) == ["lexeditor:columns:ds1-items-ammo"]
 
 
 def test_barrel_scoped_counts_stay_independent(page):
-    # Without a columnsKey the count stays per barrel key, so unrelated
+    # Without a legacy key the count stays per barrel key, so unrelated
     # lists keep their own counts as before.
     build_scoped(page, 'scope-list-a', None)
     set_columns(page, 3)
@@ -211,7 +212,7 @@ SUBTAB_BUILD = """([key]) => {
   main.style.cssText = 'display:block;height:760px';
   window.__shareBuild = () => main.replaceChildren(U.pagedListDetail({rows,
     key: row => row.id, selected: 0, noun: 'ammo', splitKey: 'share-check',
-    slots: false, pageSize: 6, defaultSplit: 22, columnsKey: key,
+    slots: false, pageSize: 6, defaultSplit: 22, legacyColumnsKey: key,
     master: v => U.columnList({rows: v.rows, key: row => row.id, selected: v.selected,
       select: v.select, columns: [{key: 'name', label: 'Name'}]}),
     detail: row => U.detailPanel({title: row.name, body: [U.tabbedPanel({label: 'Item details',
@@ -242,22 +243,31 @@ def column_keys(page):
     }""")
 
 
-def test_shared_columns_key_ignores_the_subtab_path(page):
-    # Lexer: defense shows four columns under Weapons and three under
-    # Ammo. DS1 passes one columnsKey per tab so every subtab shares a
-    # count, but the live subtab path extended that key anyway and split
-    # it again. A shared key stays whole across subtab switches.
-    build_subtabs(page, "shared-tabs")
+def test_subtab_counts_stay_manual_both_ways(page):
+    # Setting one subtab never changes another, with the retired shared
+    # key passed or not: each subtab keeps its own manually-set count
+    # under its own key. Weapons 1 stays 1 while ammo keeps its own.
+    build_subtabs(page, "legacy-tabs")
     set_columns(page, 1)
     assert tally(page) == "1"
     page.locator('.lex-subtab-button[data-subtab="ammo"]').click()
     page.wait_for_timeout(400)
+    fitted = tally(page)
+    assert fitted != "1"
+    manual = int(fitted) % 6 + 1
+    set_columns(page, manual)
+    page.locator('.lex-subtab-button[data-subtab="weapons"]').click()
+    page.wait_for_timeout(400)
     assert tally(page) == "1"
-    assert column_keys(page) == ["lexeditor:columns:shared-tabs"]
+    page.locator('.lex-subtab-button[data-subtab="ammo"]').click()
+    page.wait_for_timeout(400)
+    assert tally(page) == str(manual)
+    assert column_keys(page) == ["lexeditor:columns:share-check:ammo",
+                                 "lexeditor:columns:share-check:weapons"]
 
 
 def test_default_columns_key_stays_per_subtab(page):
-    # Without an explicit columnsKey nothing changes: unrelated tabs
+    # Without an explicit legacy key nothing changes: unrelated tabs
     # keep their own counts.
     build_subtabs(page, None)
     set_columns(page, 1)
@@ -266,22 +276,3 @@ def test_default_columns_key_stays_per_subtab(page):
     page.wait_for_timeout(400)
     assert tally(page) != "1"
 
-
-def test_per_subtab_counts_migrate_to_the_shared_key(page):
-    # Counts saved under older per-subtab keys move up once: the current
-    # subtab's wins, and the dead keys go away. Each test gets a fresh
-    # profile, so the seeds planted before the build are the whole store,
-    # the way a reader's older keys predate the shared one.
-    page.set_viewport_size({"width": 1700, "height": 800})
-    framework(page)
-    mount_shell(page, True)
-    page.evaluate("""() => {
-      localStorage.setItem('lexeditor:columns:migrate-tabs:weapons', '4');
-      localStorage.setItem('lexeditor:columns:migrate-tabs:ammo', '3');
-    }""")
-    page.evaluate(SUBTAB_BUILD, ["migrate-tabs"])
-    page.wait_for_timeout(400)
-    assert tally(page) == "4"
-    assert column_keys(page) == ["lexeditor:columns:migrate-tabs"]
-    assert page.evaluate(
-        "() => localStorage.getItem('lexeditor:columns:migrate-tabs')") == "4"
