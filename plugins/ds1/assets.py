@@ -290,6 +290,50 @@ def list_streams(game_root, project=None):
     return found
 
 
+def stream_number(name):
+    """The TAE sound ID a stream answers to, or None.
+
+    Bank streams carry their event number after a letter tag
+    (o7230.wav answers 7230, v713000400.wav answers 713000400);
+    names without a bare number (birds.wav, o1201open.wav,
+    CURSOL_MOVE.wav) answer nothing.
+    """
+    match = re.fullmatch(r"[A-Za-z]*(\d+)\.[Ww][Aa][Vv]", str(name or ""))
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def find_sound(game_root, project, sound_id):
+    """Installed banks holding stream number `sound_id`.
+
+    [{bank, stream, sub, duration, size, overridden}], sound-effect
+    banks before music ones. The bank derives by search: a TAE
+    Play-sound event stores only the number, and the bank holding
+    that stream is where it plays from. Reads the cached stream
+    list, so resolving costs no bank scan of its own.
+    """
+    if isinstance(sound_id, bool):
+        return []
+    try:
+        wanted = int(sound_id)
+    except (TypeError, ValueError):
+        return []
+    streams = list_streams(game_root, project)
+    found = []
+    for kind, sub in (("sound", "sfx"), ("music", "music")):
+        for entry in streams.get(kind, []):
+            if stream_number(entry["name"]) == wanted:
+                found.append({"bank": entry["bank"], "stream": entry["name"],
+                              "sub": sub, "duration": entry["duration"],
+                              "size": entry["size"],
+                              "overridden": entry["overridden"]})
+    return found
+
+
 def store_bytes(project, relative, data):
     """Carry `data` as the mod's override of a game file."""
     relative = check_relative(relative)

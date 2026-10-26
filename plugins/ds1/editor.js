@@ -428,7 +428,7 @@ async function textLabelPreview(id){
 const openAttack=(id,table="AtkParam_Npc")=>navigate("attacks",table==="AtkParam_Pc"?"player-attacks":"attacks",`${table}:${id}`);
 const BEHAVIOR_SUBS={BehaviorParam:"behaviors",BehaviorParam_PC:"player-behaviors"};
 const openBehavior=(id,table="BehaviorParam")=>navigate("ai",BEHAVIOR_SUBS[table]||"behaviors",`${table}:${id}`);
-const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats",behavior:"AI"};
+const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats",behavior:"AI",sound:"Sound"};
 const ATTACK_SUBS={AtkParam_Npc:"attacks",AtkParam_Pc:"player-attacks"};
 const STAT_SUBS={EquipMtrlSetParam:"upgrade-materials",ReinforceParamWeapon:"weapon-upgrades",ReinforceParamProtector:"armor-upgrades",CalcCorrectGraph:"curves"};
 const recordRows=new Map();
@@ -466,6 +466,7 @@ function openRecord(link){
   if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
   if(link.kind==="stat")return navigate("stats",STAT_SUBS[link.table],`${link.table}:${link.id}`);
   if(link.kind==="behavior")return openBehavior(link.id,link.table);
+  if(link.kind==="sound")return navigate("sound",link.sub||"sfx",`SoundStream:${link.bank}::${link.stream}`);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -476,7 +477,7 @@ function openAsset(link){
 // rows become hold-to-choose candidates (see the master list's
 // decorateRow), and the source tab, sub and selection are captured when
 // the finder opens so the way back survives browsing.
-const LINK_NOUNS={effect:"effect",attack:"attack",bullet:"projectile",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table",behavior:"behavior"};
+const LINK_NOUNS={effect:"effect",attack:"attack",bullet:"projectile",goods:"item",ai:"AI table",npc:"NPC",drop:"drop table",behavior:"behavior",sound:"sound"};
 const STAT_NOUNS={EquipMtrlSetParam:"material set",ReinforceParamWeapon:"weapon upgrade table",ReinforceParamProtector:"armor upgrade table",CalcCorrectGraph:"scaling curve"};
 const NPC_TAB_LABELS={enemies:"Enemies",npcs:"NPCs"};
 const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece",EquipParamAccessory:"accessory",Magic:"spell"};
@@ -491,10 +492,12 @@ async function finderTarget(link,value){
   if(link.kind==="drop")return ["drops","drops"];
   if(link.kind==="stat")return ["stats",STAT_SUBS[link.table]];
   if(link.kind==="behavior")return ["ai",BEHAVIOR_SUBS[link.table]||"behaviors"];
+  if(link.kind==="sound")return ["sound",link.sub||"sfx"];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
 async function recordPreview(link){
+  if(link.kind==="sound")return soundLinkPreview(link);
   if(link.field==="materialSetId"&&Array.isArray(link.path)&&link.path.length){
     const table=el("div",{style:"display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;"});
     table.replaceChildren(...link.path.flatMap(entry=>[el("span",{style:"white-space:nowrap;opacity:.75;"},`+${entry.level}`),
@@ -614,6 +617,12 @@ function modOnlySpec(){
         if("value" in other)other.value=text;else other.textContent=text;
         other.title=dialog?.text||"";
       }
+      continue;
+    }
+    if(other.hasAttribute("data-lex-sound")){
+      const entry=(state.row?.recordLinks||[]).find(item=>item.field===propertyKey&&item.kind==="sound");
+      const field=state.row?.fields?.find(item=>item.key===propertyKey);
+      if(entry&&field&&other.isConnected)other.replaceWith(soundFace(state.row,field,entry));
       continue;
     }
     if(other.type==="checkbox")other.checked=!!value;
@@ -875,6 +884,108 @@ function dialogPicker(row,field,dialog,input){
       await navigate("text",dialog.sub);},
     origin:()=>navigate(source.tab,source.sub,source.selected),
     accept:picked=>{state.selection=source.selection;commit(row,field,Number(picked),input);}});
+}
+// The TAE sound ID a stream answers to, mirroring assets.stream_number:
+// o7230.wav answers 7230; birds.wav and o1201open.wav answer nothing.
+function soundStreamNumber(name){
+  const match=/^[A-Za-z]*(\d+)\.wav$/i.exec(String(name||""));
+  return match?Number(match[1]):null;
+}
+// A Play-sound event's sound: the derived bank's stream, playable in
+// place, opening in the Sound tab on click. An orphaned player stops
+// instead of playing on where no pause button can reach it.
+function soundLinkPreview(link){
+  const player=el("audio",{controls:true,preload:"none",
+    src:`/api/sound/stream?file=${encodeURIComponent(link.bank||"")}&stream=${encodeURIComponent(link.stream||"")}`,
+    style:"width:100%;color-scheme:dark;",
+    "aria-label":`Play ${link.name||`sound ${link.id}`}`});
+  player.addEventListener("timeupdate",()=>{if(!player.isConnected)player.pause();});
+  // Detail rows crush in a hover card, so the bank rides one text line.
+  const sub=typeof link.duration==="number"&&link.bank?`${link.bank} \u00b7 ${formatSoundLength(link.duration)}`:(link.bank||"");
+  return LexeditorUI.stack({fill:false,compact:true},el("strong",{},link.name||`Sound ${link.id}`),
+    ...(sub?[el("span",{},sub)]:[]),player);
+}
+// A Play-sound event's Sound is a number with a face beside it: the face
+// names the bank the number derives to, previews the stream on hover and
+// opens it in the Sound tab, while the number stays editable. Like a
+// reference face it repaints from the live links and carries a value
+// property, so commits and detail sync treat it the same way; like a
+// dialog face it carries the sync marks, so a typed edit rebuilds it.
+function soundFace(row,field,link){
+  const face=el("span",{class:"ds1-sound-face ds1-reference-face","data-field-key":field.key,"data-lex-sound":""});
+  const paint=()=>{
+    const live=state.row&&key(state.row)===key(row)?state.row:row;
+    const entry=(live.recordLinks||[]).find(item=>item.field===field.key&&item.kind==="sound")||link;
+    const value=live.fields?.find(item=>item.key===field.key)?.value??field.value;
+    face.replaceChildren(entry&&entry.resolved?hoverable({content:entry.name,targetType:"ds1-sound",
+      targetId:`${entry.bank}::${entry.stream}`,targetLabel:`${entry.name} in Sound`,
+      preview:()=>soundLinkPreview(entry),activate:()=>openRecord(entry)})
+      :el("span",{class:"ds1-unset-face"},`Unknown sound ${value}`));
+  };
+  let current=String(field.value);
+  Object.defineProperty(face,"value",{configurable:true,
+    get:()=>current,
+    set:next=>{current=String(next);paint();}});
+  paint();
+  return face;
+}
+// A Play-sound event's Sound earns the shared thing finder: the Sound
+// tab's numbered streams become hold-to-choose candidates, and the picked
+// stream's number writes back into the event. The animations tab cannot
+// rebuild its drill from a bare navigate(), so the way back carries the
+// source character, scope and selection with it.
+function soundPicker(row,field,face,link){
+  const source={};
+  return LexeditorUI.thingFinderButton({class:"ds1-find-reference",label:`Change ${field.label}`,
+    disabled:state.readOnly||field.disabled||!link,type:"ds1-SoundStream",
+    prompt:link?`Choose the ${linkNoun(link)} for ${row.name}.`:"Choose a record.",
+    target:async()=>{Object.assign(source,{tab:state.tab,sub:state.sub,selected:state.selected,selection:state.selection,
+      charId:state.animCharId,leftTab:state.animLeftTab,
+      scope:state.animScope?{level:state.animScope.level,binder:state.animScope.binder,tae:state.animScope.tae,
+        anim:state.animScope.anim,motionFile:state.animScope.motionFile,charName:state.animScope.charName}:null});
+      const [tab,sub]=await finderTarget(link,face.value);await navigate(tab,sub);},
+    origin:()=>source.tab!=="animations"?navigate(source.tab,source.sub,source.selected):restoreAnimSource(source),
+    accept:picked=>{
+      state.selection=source.selection;
+      // A picked stream answers by its number (o7230.wav answers 7230):
+      // that number is what the event stores. The bank stays derived, so
+      // the event's own bank selector is untouched.
+      const number=soundStreamNumber(String(picked).split("::").pop());
+      if(number===null){notify(new Error("That stream has no number, so no event can play it."));return;}
+      commit(row,field,number,face.parentElement?.querySelector("input")??face);
+      face.value=String(number);}});
+}
+// The sound finder returns to the animations tab the way it left it: the
+// character, the drilled motion's events and the selected event. A bare
+// navigate() resets the scope to the motions list, stranding the reader
+// away from the event they just picked a sound for.
+async function restoreAnimSource(source){
+  await navigate(source.tab||"animations",source.sub);
+  state.selection=source.selection;
+  if(!(state.animChars||[]).some(entry=>key(entry)===source.charId))return;
+  // navigate() preserves the character and loads its motions; only a
+  // drilled events list needs rebuilding, the way a timeline cue drills it.
+  const scope=source.scope||{};
+  if(scope.level==="events"){
+    const same=(state.rows||[]).find(entry=>entry.motion&&(entry.motion.file||null)===(scope.motionFile||null)&&
+      (entry.motion.tae||null)===(scope.tae||null)&&String(entry.motion.taeIndex??"")===String(scope.anim??""));
+    if(same){state.selected=key(same);await animDrillEvents(same);}
+  }else if((state.rows||[]).some(entry=>key(entry)===source.selected)){
+    state.selected=source.selected;
+  }
+  state.animLeftTab=source.leftTab||state.animLeftTab;
+  const picked=(state.rows||[]).find(entry=>key(entry)===source.selected);
+  if(picked&&state.animScope.level==="events"){
+    // The drill leaves no row, so the pick always loads, even when the
+    // event was already the selection.
+    state.selected=null;
+    await pickAnimEvent(picked);
+    const size=paneSize("events");
+    const index=animListMatches().findIndex(entry=>key(entry)===state.selected);
+    if(index>=0)state.animPage=Math.floor(index/size);
+  }
+  refreshAnimLeft();refreshAnimDetail();
+  remountAnim();
 }
 // A Model ID earns the shared thing finder: the Models tab's binders
 // of its piece become hold-to-choose candidates, and the binder's
@@ -1232,10 +1343,15 @@ function fieldSections(row){
     const link=field.editable&&links.get(field.key);
     const fieldAssetLink=(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key)||null;
     let control=controlFor(row,field);
+    // A Play-sound event's Sound keeps its number input and gains the
+    // derived stream's face beside it, the way a message ID keeps its
+    // number beside its dialog face.
+    if(link&&link.kind==="sound")control=el("span",{class:"ds1-sound-row"},control,soundFace(row,field,link));
     if(link){
       const face=control.matches?.(".ds1-reference-face")?control
         :control.querySelector?.(".ds1-reference-face")??control;
-      control=el("span",{class:"ds1-reference-field"},control,referencePicker(row,field,face));
+      const picker=link.kind==="sound"?soundPicker(row,field,face,link):referencePicker(row,field,face);
+      control=el("span",{class:"ds1-reference-field"},control,picker);
     }
     const dialog=dialogs.get(field.key);
     if(dialog){
@@ -2960,7 +3076,7 @@ function renderItems(){
     master:({rows:listed,selected,select})=>{
       selectVisibleRecord=select;
       return columnList({rows:listed,key,selected,
-      decorateRow:(node,row)=>{LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});
+      decorateRow:(node,row)=>{if(row.table!=="SoundStream"||soundStreamNumber(row.name)!==null)LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});
         if(row.modelPick)LexeditorUI.decorateSearchCandidate(node,{type:row.modelPick.type,value:row.modelPick.value,label:row.name});
         return node;},
       sortState:tabSort(),
@@ -3820,6 +3936,19 @@ function currentAnimMotion(){
   const row=state.rows.find(row=>key(row)===state.selected);
   return row&&row.table==="AnimMotion"?row.motion:null;
 }
+// A missing skeleton or an unreadable motion is routine browsing, not an
+// action failure: the reason stays in the viewport, centered the way the
+// loading throbber centers while it works, no alert. A top strip over a
+// black void read as a stuck load (c9999's pure-black viewport).
+function failAnimMount(host,status,error){
+  host.querySelector(":scope > .lex-panel-loading")?.remove();
+  status.textContent="Could not load the animation.";
+  const reason=LexeditorUI.notice({tone:"warning",message:error.message||String(error)});
+  reason.style.maxWidth="440px";
+  host.append(el("div",{"data-anim-failed":"",
+    style:"position:absolute;inset:0;display:grid;place-items:center;padding:24px;"},reason));
+  console.error(error);
+}
 function remountAnim(){
   if(state.tab!=="animations")return;
   const host=document.querySelector("[data-anim-host]");
@@ -3829,12 +3958,7 @@ function remountAnim(){
   const token=++animMount;
   Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status,animTimelineEvent).then(()=>flushAnimSeek()).catch(error=>{
     if(token!==animMount)return;
-    host.querySelector(":scope > .lex-panel-loading")?.remove();
-    // A missing skeleton or an unreadable motion is routine browsing, not
-    // an action failure: the reason stays in the viewport, no alert.
-    status.textContent="Could not load the animation.";
-    host.append(LexeditorUI.notice({tone:"warning",message:error.message||String(error)}));
-    console.error(error);
+    failAnimMount(host,status,error);
   });
 }
 // A panel pages only what fits it: the fitted size caps the global
@@ -4119,12 +4243,7 @@ function renderAnimPanels(){
     if(token!==animMount)return;
     Ds1Anim.mount(host,currentAnimCharId(),currentAnimMotion(),timeline,status,animTimelineEvent).then(()=>flushAnimSeek()).catch(error=>{
       if(token!==animMount)return;
-      host.querySelector(":scope > .lex-panel-loading")?.remove();
-      // Same as remountAnim: routine browsing failures stay in the
-      // viewport with their reason, no alert.
-      status.textContent="Could not load the animation.";
-      host.append(LexeditorUI.notice({tone:"warning",message:error.message||String(error)}));
-      console.error(error);
+      failAnimMount(host,status,error);
     });
   });
   // Plain panels, not collapsible ones: the lists are the page, and

@@ -66,6 +66,12 @@ def main():
                     assert page.evaluate(
                         "document.querySelector('[data-anim-host]')._animViewer.toEvent") is None
                     assert page.locator("[data-anim-status]").inner_text().strip() == ""
+                    skeleton = page.locator(
+                        "[data-anim-host] .lex-model-view-modes [data-anim-skeleton]")
+                    assert skeleton.count() == 1
+                    assert skeleton.get_attribute("aria-pressed") == "true"
+                    assert page.evaluate(
+                        "document.querySelector('[data-anim-host]')._animSkeletonShown()") is True
                     if output:
                         page.screenshot(path=str(output / "ds1-anim-empty.png"))
                     assert not errors, errors

@@ -80,6 +80,12 @@ def main():
                     page.wait_for_selector("[data-anim-host] .lex-notice")
                     notice = page.locator("[data-anim-host] .lex-notice").inner_text()
                     assert "No skeleton is installed" in notice, notice
+                    # The reason centers in the viewport: a top strip over a
+                    # black void read as a stuck load (c9999 pure black).
+                    box = page.locator("[data-anim-host] .lex-notice").bounding_box()
+                    host = page.locator("[data-anim-host]").bounding_box()
+                    center = box["y"] + box["height"] / 2
+                    assert host["y"] + host["height"] * 0.25 < center < host["y"] + host["height"] * 0.75, (box, host)
                     assert page.locator("[data-anim-status]").inner_text().strip() != ""
                     no_alert()
 

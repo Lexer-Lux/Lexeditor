@@ -72,7 +72,7 @@ def main():
                                for bone in posed), posed
                     assert any(bone["mapped"] for bone in posed), posed
                     modes = page.locator(
-                        "[data-anim-host] .lex-model-view-modes button:not([data-anim-follow])")
+                        "[data-anim-host] .lex-model-view-modes button:not([data-anim-follow]):not([data-anim-skeleton])")
                     assert modes.count() == 3
                     assert [modes.nth(index).get_attribute("aria-label")
                             for index in range(3)] == ["Regular", "Fullbright", "Wireframe"]
@@ -104,6 +104,34 @@ def main():
                         "._animViewer.follow") is True
                     follow.click()
                     assert follow.get_attribute("aria-pressed") == "false"
+                    skeleton = page.locator(
+                        "[data-anim-host] .lex-model-view-modes [data-anim-skeleton]")
+                    assert skeleton.count() == 1
+                    assert skeleton.get_attribute("aria-label") == "Skeleton"
+                    assert skeleton.locator("svg").count() == 1
+                    assert skeleton.inner_text().strip() == ""
+                    assert skeleton.get_attribute("aria-pressed") == "true"
+                    assert "active" in (skeleton.get_attribute("class") or "")
+                    shown = lambda: page.evaluate(
+                        "document.querySelector('[data-anim-host]')._animSkeletonShown()")
+                    assert shown() is True
+                    skeleton.click()
+                    assert skeleton.get_attribute("aria-pressed") == "false"
+                    assert "active" not in (skeleton.get_attribute("class") or "")
+                    assert shown() is False
+                    # Global: the choice survives a motion change.
+                    page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
+                    page.locator("[data-anim-list] .lex-list-row",
+                                 has_text="a87_3301.hkx").click()
+                    page.wait_for_function("state.selected.includes('3301')")
+                    page.wait_for_function(
+                        "document.querySelector('[data-anim-host]').dataset.ready === undefined")
+                    page.wait_for_selector("[data-anim-host][data-ready='true']", timeout=30000)
+                    assert skeleton.get_attribute("aria-pressed") == "false"
+                    assert shown() is False
+                    skeleton.click()
+                    assert skeleton.get_attribute("aria-pressed") == "true"
+                    assert shown() is True
                     overflow = page.evaluate(
                         """() => { const host = document.querySelector(
                             '[data-anim-host]');

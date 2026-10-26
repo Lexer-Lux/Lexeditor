@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.plugin_files import atomic_write
 
+from . import assets
 from . import deployment
 from .formats import FormatError, deflate, inflate, members, pack
 from .msb import MsbDocument
@@ -242,7 +243,33 @@ class TaeStore:
             if item["key"] == "effect":
                 item["type"] = "enum"
                 item["enum"] = {str(row_id): effect_names[row_id] for row_id in sorted(effect_names)}
+        row["recordLinks"] = self._sound_links(row)
         return row
+
+    def _sound_links(self, row):
+        """A Play-sound event Sound as a record link.
+
+        The bank holding its number derives by search across the
+        installed banks, so the reader picks sounds, never banks.
+        Numbers no installed bank holds (and games without readable
+        banks) stay unresolved links, never errors.
+        """
+        if not any(item["key"] == "soundId" for item in row["fields"]):
+            return []
+        sound_id = next(item["value"] for item in row["fields"] if item["key"] == "soundId")
+        try:
+            found = assets.find_sound(self.game_root, self.project, sound_id)
+        except (OSError, FormatError):
+            found = []
+        if not found:
+            return [{"kind": "sound", "table": "SoundStream", "id": sound_id,
+                     "field": "soundId", "resolved": False,
+                     "name": f"Unknown sound {sound_id}"}]
+        first = found[0]
+        return [{"kind": "sound", "table": "SoundStream", "id": sound_id,
+                 "field": "soundId", "resolved": True, "name": first["stream"],
+                 "bank": first["bank"], "stream": first["stream"], "sub": first["sub"],
+                 "duration": first["duration"], "size": first["size"]}]
 
     def edit(self, binder, key, field, value):
         self.writable()

@@ -3087,6 +3087,11 @@
       // Crossed arrows: the root carries the skeleton through space.
       shape("path", {d: "M12 3v18M3 12h18"});
       shape("path", {d: "M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"});
+    } else if (mode === "skeleton") {
+      // A bone chain: joints and the bones between them.
+      shape("path", {d: "M12 5L6 19M12 5l6 14"});
+      for (const [cx, cy] of [[12, 5], [6, 19], [18, 19]])
+        shape("circle", {cx: String(cx), cy: String(cy), r: "2.4", fill: "currentColor", stroke: "none"});
     } else {
       // A grid square: edges only, no faces.
       shape("rect", {x: "4", y: "4", width: "16", height: "16"});
@@ -16302,7 +16307,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, addIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, modelViewModeIcon, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, addIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 window.LexeditorUI.attachPreviewPin = attachPreviewPin;
 // The pad path is on for every page that mounts the shared UI, so a plugin
@@ -16880,16 +16885,19 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // lane grows to lay every name out on at most two lines at full size,
     // capped at half the row. Past the cap the shrink below applies.
     if (pane && cap > 0) {
-      const needy = labels.filter(label => !labelFits(label));
+      // Every label contributes its two-line need, not just the ones
+      // failing now: a need drawn from the failing set alone drops the
+      // floor out from under the labels that fit, and the floor trades
+      // two values for ever (the animations character panel flickered
+      // its lane between 71px and 85px this way). The need is now a pure
+      // function of the labels, so the floor lands in one step.
+      // Line inks must be measured unwrapped: a range over a wrapped line
+      // reads its longest line, not the line being asked for, and the lane
+      // came out forty pixels short.
+      labels.forEach(label => { label.style.whiteSpace = 'nowrap'; });
       let need = 0;
-      if (needy.length) {
-        // Line inks must be measured unwrapped: a range over a wrapped line
-        // reads its longest line, not the line being asked for, and the lane
-        // came out forty pixels short.
-        needy.forEach(label => { label.style.whiteSpace = 'nowrap'; });
-        for (const label of needy) need = Math.max(need, needTwoLines(label));
-        needy.forEach(label => { label.style.whiteSpace = ''; });
-      }
+      for (const label of labels) need = Math.max(need, needTwoLines(label));
+      labels.forEach(label => { label.style.whiteSpace = ''; });
       // The floor follows the cap down as well as the need up: it was
       // only ever raised, so a lane widened for wide columns kept hogging
       // after the reader narrowed them past it.

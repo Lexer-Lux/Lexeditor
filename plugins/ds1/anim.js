@@ -1,5 +1,8 @@
 window.Ds1Anim = (() => {
   let session = 0;
+  // The skeleton overlay is global: one switch for the whole viewer,
+  // kept across motions and characters until the reader flips it back.
+  let skeletonShown = true;
   const decode = b64 => Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
   const f32 = b64 => new Float32Array(decode(b64).buffer);
   const u32 = b64 => new Uint32Array(decode(b64).buffer);
@@ -11,6 +14,7 @@ window.Ds1Anim = (() => {
       delete host.dataset.ready;
     }
     delete host._animBones;
+    delete host._animSkeletonShown;
     delete host._animMotion;
   }
 
@@ -21,6 +25,26 @@ window.Ds1Anim = (() => {
     return data;
   }
 
+  // The skeleton switch sits with the view-mode buttons, styled like the
+  // root-motion one; unlike it, the choice is global, kept across mounts.
+  function skeletonToggle(host, apply) {
+    const bar = host.querySelector(":scope > .lex-model-view-modes");
+    if (!bar) return;
+    // Remounts re-attach the cached bar with its stale toggle, like the
+    // follow switch: the old one goes before the fresh one lands.
+    bar.querySelectorAll("[data-anim-skeleton]").forEach(node => node.remove());
+    const paint = () => {
+      button.setAttribute("aria-pressed", String(skeletonShown));
+      button.classList.toggle("active", skeletonShown);
+    };
+    const button = LexeditorUI.element("button", {type: "button",
+      class: "lex-model-view-mode", "data-anim-skeleton": "",
+      "aria-label": "Skeleton", title: "Skeleton",
+      onclick: () => { skeletonShown = !skeletonShown; paint(); apply(skeletonShown); }},
+      LexeditorUI.modelViewModeIcon("skeleton"));
+    paint();
+    bar.append(button);
+  }
   // Read-only skeletal playback: the model's bind pose comes from its
   // bones, each frame poses them from the sampled motion, and the
   // timeline scrubs frames with the motion's TAE event cues as markers.
@@ -203,6 +227,9 @@ window.Ds1Anim = (() => {
     });
     const helper = new THREE.SkeletonHelper(mover);
     helper.material.linewidth = 1;
+    helper.visible = skeletonShown;
+    // Test seam: whether the overlay shows, for the toggle check.
+    host._animSkeletonShown = () => helper.visible;
     rig.add(helper);
     const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
     const double = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.DoubleSide});
@@ -284,6 +311,7 @@ window.Ds1Anim = (() => {
 
     const dispose = () => {
       delete host._animBones;
+      delete host._animSkeletonShown;
       host._animViewer = null;
       if (resizer) resizer.disconnect();
       else window.removeEventListener("resize", resize);
@@ -292,6 +320,7 @@ window.Ds1Anim = (() => {
       for (const item of trash) item.dispose();
     };
     viewModes.bindScene(scene);
+    skeletonToggle(host, shown => { helper.visible = shown; });
     // The motion this viewer plays: event seeks land only while it
     // matches the events scope, never onto an older motion's cues.
     host._animMotion = `${chrId}|${motion?.binder || ""}|${motion?.file || ""}`;

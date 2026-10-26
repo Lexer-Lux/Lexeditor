@@ -119,6 +119,11 @@
   }
 }
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.ds1-sound-row{display:flex;align-items:center;gap:6px;}
+/* The number keeps a short digit lane while the stream's face takes the
+   rest: an unconstrained input ate the whole narrow lane and crushed
+   the face to zero width. Long ids scroll inside the lane. */
+.ds1-sound-row>input,.ds1-sound-row>.lex-source-control{flex:0 1 80px;min-width:0;}
 .ds1-asset-face{display:flex;align-items:center;gap:6px;min-width:0;}
 .ds1-asset-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
 /* An unset or unresolvable link is editable, so it must not borrow the
