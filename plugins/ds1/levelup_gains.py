@@ -67,6 +67,14 @@ DEFAULTS = {key: {name: value for (name, _, _), value in zip(INPUTS, row)}
             for (key, _), row in zip(OUTPUTS, _DEFAULTS)}
 
 ROW_IDS = {key: 101 + index for index, (key, _) in enumerate(OUTPUTS)}
+# Equipment-screen label art per stat and per defense row, shared with
+# every other tab through /api/label (icons.py): the detail weights
+# read as the stats they cost, the list rows as the defenses they grow.
+FIELD_ICONS = {"vit": "vit", "att": "att", "end": "end", "str": "str",
+               "dex": "dex", "int": "int", "fai": "faith",
+               "hum": "humanity", "res": "res"}
+ROW_ICONS = {"physical": "physicalDef", "magic": "magicDef",
+             "flame": "fireDef", "lightning": "lightningDef"}
 
 ROW_HELP = ("How {label} grows when you level up. Each stat adds its value "
             "per point, and humanity above 99 counts as 99. "
@@ -182,5 +190,6 @@ def row(output: str, config, *, read_only=False) -> dict:
         for position, (name, stat, _) in enumerate(INPUTS)]
     for field in fields:
         field["disabled"] = read_only
+        field["icon"] = FIELD_ICONS[field["key"]]
     return {"id": ROW_IDS[output], "table": "NativeRules", "name": label,
             "fields": fields, "help": ROW_HELP.format(label=label.lower())}

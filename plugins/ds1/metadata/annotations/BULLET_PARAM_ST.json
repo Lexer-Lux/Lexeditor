@@ -7,332 +7,332 @@
     {
       "Field": "atkId_Bullet",
       "Name": "Attack ID",
-      "Description": "Set the attack parameters that are applied when this bullet impacts a victim."
+      "Description": "The attack this shot deals when it hits someone. It sets the damage, stamina drain and knockback. -1 means None."
     },
     {
       "Field": "sfxId_Bullet",
       "Name": "Particle ID: Projectile",
-      "Description": "SFX ID before acceleration. If the SFX ID after acceleration is -1, this SFX will continue to fly even after acceleration."
+      "Description": "How the shot looks and sounds while it flies. -1 means None."
     },
     {
       "Field": "sfxId_Hit",
       "Name": "Particle ID: Impact",
-      "Description": "Impact SFX ID. -1 means it does not occur."
+      "Description": "The flash and sound when the shot hits something or ends. -1 means None."
     },
     {
       "Field": "sfxId_Flick",
       "Name": "Particle ID: Repel",
-      "Description": "SFX ID when repelling projectile. -1 means it does not occur."
+      "Description": "The flash and sound when the shot is blocked or knocked away. -1 means None. The exact trigger is not established."
     },
     {
       "Field": "life",
       "Name": "Duration (seconds)",
-      "Description": "Time for projectile to exist in flight (-1 is infinite). In seconds."
+      "Description": "How long the shot lasts before it vanishes. -1 means it never expires on its own."
     },
     {
       "Field": "dist",
       "Name": "Attenuation Range (metres)",
-      "Description": "If the bullet flight distance exceeds this value, the attenuation set by other parameters will be applied."
+      "Description": "How far the shot flies before it starts to weaken. Past this point the out-of-range flight values apply and it deals no stamina damage. It can still fly further."
     },
     {
       "Field": "shootInterval",
       "Name": "Shoot Interval (seconds)",
-      "Description": "The interval at which the projectile is emitted. Applied when generated via the TAE Bullet Behavior event. In seconds."
+      "Description": "How often the shot fires again while its attack lasts. 0 fires only once."
     },
     {
       "Field": "gravityInRange",
       "Name": "Gravity: In Range (m/s^2)",
-      "Description": "Gravity applied downward within range. In metres per second ^ 2."
+      "Description": "How fast the shot drops while inside its range. Negative values make it climb instead."
     },
     {
       "Field": "gravityOutRange",
       "Name": "Gravity: Out of Range (m/s^2)",
-      "Description": "Gravity applied downward outside of range. In metres per second ^ 2."
+      "Description": "How fast the shot drops after passing its range. Negative values make it climb instead."
     },
     {
       "Field": "hormingStopRange",
       "Name": "Homing Stop Range (metres)",
-      "Description": "The distance at which the bullet homing will stop being applied."
+      "Description": "How close to its target the shot gets before it stops homing. Past this point it flies straight."
     },
     {
       "Field": "initVellocity",
       "Name": "Initial Velocity (m/s)",
-      "Description": "Initial speed of projectile."
+      "Description": "How fast the shot moves when fired."
     },
     {
       "Field": "accelInRange",
       "Name": "Acceleration: In Range (m/s^2)",
-      "Description": "Acceleration whilst projectile is within distance threshold. In metres per second ^ 2."
+      "Description": "How fast the shot speeds up while inside its range. Negative values slow it down."
     },
     {
       "Field": "accelOutRange",
       "Name": "Acceleration: Out of Range (m/s^2)",
-      "Description": "Acceleration whilst projectile is beyond the distance threshold. In metres per second ^ 2."
+      "Description": "How fast the shot speeds up after passing its range. Negative values slow it down."
     },
     {
       "Field": "maxVellocity",
       "Name": "Maximum Velocity (m/s)",
-      "Description": "The maximum speed of the bullet. In metres per second."
+      "Description": "The fastest the shot can move. Acceleration never pushes it past this."
     },
     {
       "Field": "minVellocity",
       "Name": "Minimum Velocity (m/s)",
-      "Description": "The minimum speed of the bullet. In metres per second."
+      "Description": "The slowest the shot can move. Slowing never drops it below this."
     },
     {
       "Field": "accelTime",
       "Name": "Acceleration Start Delay (seconds)",
-      "Description": "The delay before the projectile will start accelerating. In seconds."
+      "Description": "How long after firing before acceleration starts. 0 accelerates at once."
     },
     {
       "Field": "homingBeginDist",
       "Name": "Homing Start Distance (metres)",
-      "Description": "The distance at which projectile homing will start to be applied."
+      "Description": "How far the shot flies before it starts homing. 0 homes at once."
     },
     {
       "Field": "hitRadius",
       "Name": "Hit Radius: Initial (metres)",
-      "Description": "The initial radius of the hitbox."
+      "Description": "How wide the shot is for hitting targets. Wider shots connect more easily."
     },
     {
       "Field": "hitRadiusMax",
       "Name": "Hit Radius: Maximum (metres)",
-      "Description": "The maximum radius of the hitbox, the duration for the hitbox to change from initial to max radius is determined by spreadTime. (If -1, radius is same as initial hitbox radius)."
+      "Description": "How wide the shot grows to over time. -1 keeps the starting size."
     },
     {
       "Field": "spreadTime",
       "Name": "Hit Radius: Spread Time (seconds)",
-      "Description": "The amount of time  takes for hitbox radius to grow from initial value to max value. If 0, only the initial radius is used. In seconds."
+      "Description": "How long the shot takes to grow to its full size. Below 0.2 only the starting size is used."
     },
     {
       "Field": "expDelay",
       "Name": "Hit Radius: Expansion Delay (seconds)",
-      "Description": "The duration from the projectile landing to the start of hit radius expansion (if 0, it expands immediately)."
+      "Description": "Unknown. From's notes describe a delay after landing, but no used row shows what it does."
     },
     {
       "Field": "hormingOffsetRange",
       "Name": "Homing Correction Offset (metres)",
-      "Description": "If set to 0, the projectile tracks with perfect accuracy. Otherwise the target point shifts by this amount in the direction the victim is moving."
+      "Description": "How far ahead of a moving target the shot aims. 0 aims straight at the target."
     },
     {
       "Field": "dmgHitRecordLifeTime",
       "Name": "Damage Application Interval (seconds)",
-      "Description": "The interval at which damage can be applied by this bullet to a victim. 0 means it will only ever apply once."
+      "Description": "How often a piercing shot can hit the same target again. 0 means it hits only once."
     },
     {
       "Field": "externalForce",
       "Name": "External Force Modifier",
-      "Description": "The external force modifier to apply to the projectile in the direction of shooting (Y-axis is removed) based on map factor."
+      "Description": "Extra push along the shot's path. Its exact strength is not established."
     },
     {
       "Field": "spEffectIDForShooter",
       "Name": "Shooter SpEffect ID",
-      "Description": "The SpEffect applied to owner of bullet upon being emitted."
+      "Description": "An effect placed on whoever fires the shot. -1 means None."
     },
     {
       "Field": "autoSearchNPCThinkID",
       "Name": "Funnel Think ID",
-      "Description": "The think parameters used by the funnel to search for the target (e.g. soulmass)."
+      "Description": "Controls orbiting shots like Homing Soulmass, such as when they launch. Its exact details are not established."
     },
     {
       "Field": "HitBulletID",
       "Name": "Hit Bullet ID",
-      "Description": "The bullet to generate when the projectile expires, or conditionally according to some launchConditionType values."
+      "Description": "A second shot fired when this one ends, used for explosions. -1 means None. When it fires depends on Launch Condition Type."
     },
     {
       "Field": "spEffectId0",
       "Name": "Target SpEffect ID: 0",
-      "Description": "The SpEffect to apply when the projectile hits target."
+      "Description": "An effect placed on whoever the shot hits, such as poison. -1 means None."
     },
     {
       "Field": "spEffectId1",
       "Name": "Target SpEffect ID: 1",
-      "Description": "SpEffect to apply when the projectile hits target."
+      "Description": "An effect placed on whoever the shot hits, such as poison. -1 means None."
     },
     {
       "Field": "spEffectId2",
       "Name": "Target SpEffect ID: 2",
-      "Description": "SpEffect to apply when the projectile hits target."
+      "Description": "An effect placed on whoever the shot hits, such as poison. -1 means None."
     },
     {
       "Field": "spEffectId3",
       "Name": "Target SpEffect ID: 3",
-      "Description": "SpEffect to apply when the projectile hits target."
+      "Description": "An effect placed on whoever the shot hits, such as poison. -1 means None."
     },
     {
       "Field": "spEffectId4",
       "Name": "Target SpEffect ID: 4",
-      "Description": "SpEffect to apply when the projectile hits target."
+      "Description": "An effect placed on whoever the shot hits, such as poison. -1 means None."
     },
     {
       "Field": "numShoot",
       "Name": "Number of Shots",
-      "Description": "The number of projectiles produced per emitter interval."
+      "Description": "How many shots fire each time. Spacing comes from the firing angle intervals."
     },
     {
       "Field": "homingAngle",
       "Name": "Homing Strength (degrees/second)",
-      "Description": "The amount of tracking correction made each second, affecting the speed the projectile faces the victim. In degrees per second."
+      "Description": "How fast the shot turns toward its target. Higher values track harder."
     },
     {
       "Field": "shootAngle",
       "Name": "Horizontal Firing Angle (degrees)",
-      "Description": "Horizontal firing angle in degrees, measured from the emitter."
+      "Description": "Sideways aim of the shot. 0 fires straight ahead."
     },
     {
       "Field": "shootAngleInterval",
       "Name": "Horizontal Firing Angle Interval (degrees)",
-      "Description": "When firing multiple projectiles, specify the horizontal angle interval at which to fire (Y-axis). In degrees."
+      "Description": "Sideways spread between shots when firing several at once."
     },
     {
       "Field": "shootAngleXInterval",
       "Name": "Vertical Firing Angle Interval (degrees)",
-      "Description": "When firing multiple projectiles, specify the vertical angle interval at which to fire (X-axis). Positive angle upwards, negative angle downwards. In degrees."
+      "Description": "Upward or downward spread between shots when firing several at once. Positive angles up, negative angles down."
     },
     {
       "Field": "damageDamp",
       "Name": "Damage Falloff: Physical (%/s)",
-      "Description": "After passing attenuation distance, Physical damage falls off by this % every second."
+      "Description": "How fast the shot loses physical damage after passing its range. Higher values drain it faster. 0 keeps full damage."
     },
     {
       "Field": "spelDamageDamp",
       "Name": "Damage Falloff: Magic (%/s)",
-      "Description": "After passing attenuation distance, Magic damage falls off by this % every second."
+      "Description": "How fast the shot loses magic damage after passing its range. Higher values drain it faster. 0 keeps full damage."
     },
     {
       "Field": "fireDamageDamp",
       "Name": "Damage Falloff: Fire (%/s)",
-      "Description": "After passing attenuation distance, Fire damage falls off by this % every second."
+      "Description": "How fast the shot loses fire damage after passing its range. Higher values drain it faster. 0 keeps full damage."
     },
     {
       "Field": "thunderDamageDamp",
       "Name": "Damage Falloff: Lightning (%/s)",
-      "Description": "After passing attenuation distance, Lightning damage falls off by this % every second."
+      "Description": "How fast the shot loses lightning damage after passing its range. Higher values drain it faster. 0 keeps full damage."
     },
     {
       "Field": "staminaDamp",
       "Name": "Damage Falloff: Stamina (%/s)",
-      "Description": "After passing attenuation distance, Stamina damage falls off by this % every second."
+      "Description": "How fast the shot loses stamina damage after passing its range. Higher values drain it faster. 0 keeps full damage."
     },
     {
       "Field": "knockbackDamp",
       "Name": "Damage Falloff: Knockback (%/s)",
-      "Description": "After passing attenuation distance, knockback falls off by this % every second."
+      "Description": "How fast the shot loses knockback after passing its range. Higher values drain it faster. 0 keeps full knockback."
     },
     {
       "Field": "shootAngleXZ",
       "Name": "Vertical Firing Angle (degrees)",
-      "Description": "Specify the vertical angle of the projectile that should be fired. Positive values angle upwards, negative values angle downwards. In degrees."
+      "Description": "Upward or downward aim of the shot. Positive angles up, negative angles down. 0 fires level."
     },
     {
       "Field": "lockShootLimitAng",
       "Name": "Maximum Tracking Angle (degrees)",
-      "Description": "The maximum angle the bullet's initial direction can change to face towards player locked-on target or AI focused enemy. In degrees."
+      "Description": "How far off a locked-on target the aim can be before the shot stops turning toward it."
     },
     {
       "Field": "isPenetrate",
       "Name": "Penetrate Map",
-      "Description": "If ON, allows a projectile to pierce through enemies and objects. Also potentially allows hitting the same enemy multiple times using dmgHitRecordLifetime. See isPenetrateMap to ignore map."
+      "Description": "Lets the shot pass through characters and objects instead of stopping. It may hit the same target again once the damage interval passes."
     },
     {
       "Field": "prevVelocityDirRate",
       "Name": "Previous Movement Direction Addition %",
-      "Description": "The ratio to add the previous movement direction to the current direction when the sliding projectile hits the wall."
+      "Description": "Unknown. From's notes link it to sliding shots off walls, but this is not established."
     },
     {
       "Field": "atkAttribute",
       "Name": "Attack Attribute",
-      "Description": "Attack attribute to use when applying attack against the victim."
+      "Description": "What kind of physical blow the shot counts as, such as slash or thrust. Armor resists each kind separately."
     },
     {
       "Field": "spAttribute",
       "Name": "Special Attribute",
-      "Description": "Special attributes to use when applying attack against the victim."
+      "Description": "The shot's element, used for its look and the death animation it causes. Its damage still comes from the attack."
     },
     {
       "Field": "Material_AttackType",
       "Name": "Attack Presentation Type",
-      "Description": "Specify the particles and sounds to apply for the attack against the victim."
+      "Description": "May change the hit flash and sound. Its exact effect is not established."
     },
     {
       "Field": "Material_AttackMaterial",
       "Name": "Attack Presentation: Material",
-      "Description": "Specify the particles and sounds to apply for the attack against the victim."
+      "Description": "May change the hit flash and sound. Its exact effect is not established."
     },
     {
       "Field": "Material_Size",
       "Name": "Attack Presentation: Size",
-      "Description": "Specify the size of the particles to apply for the attack against the victim."
+      "Description": "Unknown. It is never used."
     },
     {
       "Field": "launchConditionType",
       "Name": "Launch Condition Type",
-      "Description": "Conditions required for HitBulletID to generate upon impact or expiration."
+      "Description": "When the extra shot from Hit Bullet ID appears. Always fires it when this shot ends or hits something."
     },
     {
       "Field": "FollowType",
       "Name": "Follow Type",
-      "Description": "Affects projectile position and behavior."
+      "Description": "How the shot moves. Do not follow flies straight. The rest track the owner, the victim, or the ground."
     },
     {
       "Field": "EmittePosType",
       "Name": "Emitter Position Type",
-      "Description": "Where projectile appears when created."
+      "Description": "Where the shot appears when fired. Higher values scatter shots around the caster or the target. The details are not established."
     },
     {
       "Field": "isAttackSFX",
       "Name": "Persistent Hit Particles",
-      "Description": "If ON, the projectile SFX will remain stuck in the victim it it collides."
+      "Description": "Leaves the shot stuck in whoever it hits, like an arrow."
     },
     {
       "Field": "isEndlessHit",
       "Name": "Allow Continuous Hit",
-      "Description": "If ON, the projectile will hit continously upon impact."
+      "Description": "Unknown. Only a few rows use it."
     },
     {
       "Field": "isPenetrateMap",
       "Name": "Penetrate Map",
-      "Description": "If ON, the projectile will pass through collision and map pieces."
+      "Description": "Lets the shot fly through walls and floors."
     },
     {
       "Field": "isHitBothTeam",
       "Name": "Hit Both Teams",
-      "Description": "If ON, the projectile will collide with both victim and owner team types."
+      "Description": "Lets the shot hit the shooter's allies too."
     },
     {
       "Field": "isUseSharedHitList",
       "Name": "Use Shared Hit List",
-      "Description": "If ON, multiple projectile from the same emitter that collide with a victim will count as one projectile in terms of updating the damage interval."
+      "Description": "Makes several shots from one firing share one damage timer on a target. Its exact effect is not established."
     },
     {
       "Field": "isUseMultiDmyPolyIfPlace",
       "Name": "Use Multiple Dummy Polygons for Emit",
-      "Description": "If ON, multiple dummy polygons with shared ID can be used for emitting the projectile."
+      "Description": "Unknown. It is never used."
     },
     {
       "Field": "attachEffectType",
       "Name": "Deflection Type",
-      "Description": "The deflection type for this projectile against other projectiles."
+      "Description": "Lets this shot knock other shots out of the air, like Force. 1 stops physical shots and 3 stops dark shots."
     },
     {
       "Field": "isHitForceMagic",
       "Name": "Is Physical Projectile (for Deflection)",
-      "Description": "If ON, this projectile can be deflected by projectiles with attachEffectType set to 1."
+      "Description": "Lets this shot be knocked away by shots like Force. Those use Deflection Type 1."
     },
     {
       "Field": "isIgnoreSfxIfHitWater",
       "Name": "Block Hit Particle Emit on Water Collision",
-      "Description": "If ON, do not emit the hit particle if the projectile hits the water surface"
+      "Description": "Skips the hit flash and sound when the shot lands in water. No used row proves it works."
     },
     {
       "Field": "isIgnoreMoveStateIfHitWater",
       "Name": "Penetrate Water Collision",
-      "Description": "If ON, the projectile will pass through water collision."
+      "Description": "Lets the shot fly through water instead of stopping."
     },
     {
       "Field": "isHitDarkForceMagic",
       "Name": "Is Magical Projectile (for Deflection)",
-      "Description": "If ON, this projectile can be deflected by projectiles with attachEffectType set to 3."
+      "Description": "Lets this shot be knocked away by dark-deflecting shots. Those use Deflection Type 3."
     },
     {
       "Field": "pad",

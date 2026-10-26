@@ -29,7 +29,8 @@ METADATA = Path(__file__).with_name('metadata')
 TABLES = {'EquipParamGoods': (92, 1), 'EquipParamWeapon': (272, 1),
           'EquipParamProtector': (232, 2), 'EquipParamAccessory': (64, 1), 'Magic': (48, 2),
           'NpcParam': (336, 3), 'AtkParam_Npc': (128, 1), 'AtkParam_Pc': (128, 1),
-          'BehaviorParam': (32, 2), 'Bullet': (160, 2), 'SpEffectParam': (368, 2),
+          'BehaviorParam': (32, 2), 'BehaviorParam_PC': (32, 2),
+          'Bullet': (160, 2), 'SpEffectParam': (368, 2),
           'ReinforceParamWeapon': (88, 1), 'ReinforceParamProtector': (48, 1),
           'EquipMtrlSetParam': (32, 1),
           'CharaInitParam': (240, 2),
@@ -71,7 +72,8 @@ FMG_TABLES = frozenset(filename for _tab, _label, filename in FMG_SUBTABS)
 FMG_LABELS = {filename: label for _tab, label, filename in FMG_SUBTABS}
 ENEMY_SUBTABS = (('monsters', 'Monsters', 'NpcParam'), ('bosses', 'Bosses', 'NpcParam'))
 AI_SUBTABS = (('ai', 'AI tables', 'NpcThinkParam'),
-              ('behaviors', 'Behaviors', 'BehaviorParam'))
+              ('behaviors', 'Behaviors', 'BehaviorParam'),
+              ('player-behaviors', 'Player behaviors', 'BehaviorParam_PC'))
 MISC_SUBTABS = (('encumbrance', 'Bands', 'NativeRules'),
                 ('misc', 'Stamina', 'NativeRules'),
                 ('encumbrance-overrides', 'Overrides', 'NativeRules'))
@@ -227,6 +229,9 @@ for _table, _keys, _kinds in (
         ('BehaviorParam', ('stamina',), ('stamina',)),
         ('BehaviorParam', ('mp',), ('mp',)),
         ('BehaviorParam', ('heroPoint',), ('humanity',)),
+        ('BehaviorParam_PC', ('stamina',), ('stamina',)),
+        ('BehaviorParam_PC', ('mp',), ('mp',)),
+        ('BehaviorParam_PC', ('heroPoint',), ('humanity',)),
         ('NpcParam', ('staminaGuardDef',), ('stability',)),
         ('EquipParamWeapon', ('staminaGuardDef',), ('stability',)),
         ('ReinforceParamWeapon', ('staminaGuardDefRate',), ('stability',)),
@@ -751,7 +756,7 @@ def schema(table):
                 group = 'Locked'
         if table == 'NpcParam' and key not in NPC_FIELDS:
             protected = True
-        if table == 'BehaviorParam' and key not in BEHAVIOR_EDITABLE:
+        if table in ('BehaviorParam', 'BehaviorParam_PC') and key not in BEHAVIOR_EDITABLE:
             protected = True
         if table == 'Bullet' and key not in BULLET_EDITABLE:
             protected = True
@@ -824,10 +829,10 @@ def field_link(document, table, row_id, spec):
     the player table.
     Kinds: effect, goods, catalog (equipment and spells), attack
     (enemy and player attacks), bullet (projectiles), behavior
-    (NPC behaviors), ai (think records), drop (drop tables), stat
-    (upgrade material sets and upgrade-level tables). Anything
-    else (PC behavior tables, knockback and world tendency) has
-    no picker or tab to open, so it stays a number.
+    (enemy and player behaviors), ai (think records), drop
+    (drop tables), stat (upgrade material sets and upgrade levels).
+    Anything else (knockback and world tendency) has no picker
+    or tab to open, so it stays a number.
     """
     fallback = None
     for expression in (spec.reference or '').split(','):
@@ -852,7 +857,7 @@ def field_link(document, table, row_id, spec):
             return ('bullet', name)
         if name == 'NpcThinkParam':
             return ('ai', name)
-        if name == 'BehaviorParam':
+        if name in ('BehaviorParam', 'BehaviorParam_PC'):
             return ('behavior', name)
         if name == 'ItemLotParam':
             return ('drop', name)
@@ -1051,7 +1056,7 @@ class ItemDocument:
             fallback = f'Shop entry {row_id}'
         elif table == 'ObjActParam':
             fallback = f'Treasure {row_id}'
-        elif table == 'BehaviorParam':
+        elif table in ('BehaviorParam', 'BehaviorParam_PC'):
             fallback = f'Behavior {row_id}'
         elif table == 'Bullet':
             fallback = f'Projectile {row_id}'
@@ -1555,7 +1560,7 @@ class ItemDocument:
                 continue
             if table == 'AtkParam_Pc' and field.key not in PC_ATTACK_FIELDS:
                 continue
-            if table == 'BehaviorParam' and field.key not in BEHAVIOR_EDITABLE:
+            if table in ('BehaviorParam', 'BehaviorParam_PC') and field.key not in BEHAVIOR_EDITABLE:
                 continue
             if table == 'Bullet' and field.key not in BULLET_EDITABLE:
                 continue

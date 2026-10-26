@@ -979,7 +979,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 /* A pinnable thumbnail carries its pin on its top-right corner, shown on
    hover like a property's and always once pinned. */
 .lex-detail-panel-icon:has(> .lex-column-pin) { position:relative; }
-.lex-detail-panel-icon > .lex-column-pin { position:absolute; top:-4px; right:-4px; z-index:4; }
+.lex-detail-panel-icon > .lex-column-pin { position:absolute; top:4px; right:4px; z-index:4; }
 .lex-detail-panel-icon:not(:hover) > .lex-column-pin:not(.pinned) { opacity:0; }
 .lex-detail-panel-heading.lex-audio-heading { position:relative; border-bottom-color:transparent; }
 /* Tag buttons under a text box: small chips in collapsing family
@@ -2429,7 +2429,6 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 .lex-barrel-control:hover,
 .lex-barrel-control.open,
 .lex-panel-layout-divider:focus-visible > .lex-barrel-control,
-.lex-panel-layout-divider:focus-within > .lex-barrel-control,
 .lex-panel-layout-divider.dragging > .lex-barrel-control,
 .lex-panel-layout-dragging .lex-panel-layout-divider > .lex-barrel-control {
   opacity: 1;
@@ -3394,8 +3393,6 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
 .lex-source-control-internal.no-reference {
   --lex-internal-reference-width:0px;
 }
-/* Scrollbars take no room: the system bar is hidden (page shell) and a thumb
-   is drawn over the content by installOverlayScrollbars. */
 /* A select's open list is drawn by the system, which paints it white with
    black text unless told otherwise, and a theme's text shadow comes along and
    smears it. The list wears the panel and ink of the page that opened it. */
@@ -3423,6 +3420,12 @@ select optgroup {
 }
 .lex-source-control-internal.lex-compact-box > :is(.lex-stepper,.lex-reference-values,.lex-reference-placeholder) {
   display:none;
+}
+/* Compact boxes hide the rail and stepper above, so their reserves
+   collapse too and the value takes the whole box. */
+.lex-source-control-internal.lex-compact-box {
+  --lex-internal-reference-width:0px;
+  --lex-stepper-width:0px;
 }
 .lex-source-control-internal > .lex-unit-field > .lex-unit {
   /* Resolve the reference rail in the same font size as its container.
@@ -4386,7 +4389,7 @@ body:has(.lex-data-map-table) #main {
 /* The title takes a share of the card, so it grows with the card. It used to
    stop at 90px, which is a quarter of a small card but under a fifth of a large
    one: on a wide window the label read small beside its own graph. */
-.lex-curve-plot::before { content:attr(data-curve-title); position:absolute; inset:20px; z-index:2; display:grid; place-items:center; color:var(--lex-text); opacity:.13; text-shadow:none; font:800 clamp(24px,22cqw,220px)/1 var(--lex-heading-font); pointer-events:none; }
+.lex-curve-plot::before { content:attr(data-curve-title); position:absolute; inset:20px; z-index:2; display:grid; place-items:center; color:var(--lex-text); opacity:.13; text-shadow:none; font:800 clamp(20px,calc(110cqw/var(--lex-curve-title-chars,6)),220px)/1 var(--lex-heading-font); pointer-events:none; }
 /* Leave graph space below a wrapped variable drawer, including fallback fonts. */
 .lex-curve-svg { display:block; position:relative; width:100%; height:auto; min-height:8em; aspect-ratio:2; overflow:visible; background:transparent; }
 .lex-curve-svg :is(path,line,polyline) { vector-effect:non-scaling-stroke; }
@@ -4442,17 +4445,35 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }
 .lex-curve-variable-c { color:#f1d34f; fill:#f1d34f; }
 .lex-curve-variable-d { color:#7fd777; fill:#7fd777; }
-/* Family keys after FF8: thresholds orange, values violet, shapes
-   teal, and cost fields a quiet gray (they never enter the curve). */
-.lex-curve-variable-t { color:#ff9e5e; fill:#ff9e5e; }
-.lex-curve-variable-v { color:#c792ea; fill:#c792ea; }
-.lex-curve-variable-s { color:#5fd7d7; fill:#5fd7d7; }
-.lex-curve-variable-cost { color:#9aa4b2; fill:#9aa4b2; }
-.lex-curve-variable-highlight { text-decoration:underline; }
+/* One color per variable, spread golden-angle wide so neighbours never
+   clash: T1 is not T2, and the equation names the same colors. */
+.lex-curve-variable-t1 { color:hsl(0,72%,66%); fill:hsl(0,72%,66%); }
+.lex-curve-variable-t2 { color:hsl(138,72%,66%); fill:hsl(138,72%,66%); }
+.lex-curve-variable-t3 { color:hsl(275,72%,66%); fill:hsl(275,72%,66%); }
+.lex-curve-variable-t4 { color:hsl(53,72%,66%); fill:hsl(53,72%,66%); }
+.lex-curve-variable-t5 { color:hsl(190,72%,66%); fill:hsl(190,72%,66%); }
+.lex-curve-variable-v1 { color:hsl(328,72%,66%); fill:hsl(328,72%,66%); }
+.lex-curve-variable-v2 { color:hsl(105,72%,66%); fill:hsl(105,72%,66%); }
+.lex-curve-variable-v3 { color:hsl(243,72%,66%); fill:hsl(243,72%,66%); }
+.lex-curve-variable-v4 { color:hsl(20,72%,66%); fill:hsl(20,72%,66%); }
+.lex-curve-variable-v5 { color:hsl(158,72%,66%); fill:hsl(158,72%,66%); }
+.lex-curve-variable-s1 { color:hsl(295,72%,66%); fill:hsl(295,72%,66%); }
+.lex-curve-variable-s2 { color:hsl(73,72%,66%); fill:hsl(73,72%,66%); }
+.lex-curve-variable-s3 { color:hsl(210,72%,66%); fill:hsl(210,72%,66%); }
+.lex-curve-variable-s4 { color:hsl(348,72%,66%); fill:hsl(348,72%,66%); }
+.lex-curve-variable-s5 { color:hsl(125,72%,66%); fill:hsl(125,72%,66%); }
+.lex-curve-variable-c1 { color:hsl(263,72%,66%); fill:hsl(263,72%,66%); }
+.lex-curve-variable-c2 { color:hsl(40,72%,66%); fill:hsl(40,72%,66%); }
+.lex-curve-variable-c3 { color:hsl(178,72%,66%); fill:hsl(178,72%,66%); }
+.lex-curve-variable-c4 { color:hsl(315,72%,66%); fill:hsl(315,72%,66%); }
+/* A hovered variable glows in its own color, in the drawer and on the
+   line alike, instead of taking an outline. */
+.lex-curve-variable-highlight { text-decoration:underline; text-shadow:0 0 6px currentColor; }
 .lex-curve-path-formula:has([data-curve-variable]) { pointer-events:auto; }
 .lex-curve-path-formula [data-curve-variable] { pointer-events:bounding-box; }
 .lex-curve-math-atom [data-curve-variable] { pointer-events:auto; }
-.lex-curve-variable-active { outline:1px solid var(--lex-highlight); }
+.lex-curve-variable-active { outline:none; }
+.lex-curve-variable-active > .lex-curve-variable-name { text-shadow:0 0 8px currentColor; }
 .lex-curve-tooltip { position:absolute; z-index:8; transform:translate(-50%,-100%); padding:4px 8px; color:var(--lex-text); background:var(--lex-panel); border:1px solid var(--lex-border); font:14px/1.3 var(--lex-font); white-space:nowrap; pointer-events:none; }
 .lex-curve-tooltip:empty { display:none; }
 .lex-curve-status { color:var(--lex-accent); font-size:.8em; }
@@ -5792,7 +5813,17 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    Barrels/Columns gizmos must receive hover: the gizmos reveal on
    divider:hover, and with no hover they could never be summoned by mouse. */
 .lex-panel-layout-divider:has(> .lex-barrel-control) { pointer-events:auto; }
-.lex-panel-layout-divider > .lex-barrel-control { z-index:30; pointer-events:auto; }
+/* The gizmo takes the pointer only while revealed (see the reveal
+   rule above): an invisible always-on box would summon from
+   wherever it sat, such as over the header thumbnail. */
+.lex-panel-layout-divider > .lex-barrel-control { z-index:30; }
+/* Headings sit above a parked divider gizmo: hovering the detail header's
+   thumbnail, title or buttons - or the master list's column headers - must
+   reach the header, never the gizmo parked behind it, so the gizmo answers
+   divider hovers only. Drawers stop at the heading and popups fly far
+   above, so neither is disturbed. */
+.lex-detail-panel-heading,
+.lex-barrelled-master .lex-column-list-header { position:relative; z-index:31; }
 .lex-barrel-control button {
 
   position: relative;
@@ -5804,8 +5835,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   padding: 0;
   place-items: center;
   text-shadow: none;
-
- pointer-events:auto;
 }
 
 /* Boolean references deliberately sit below their checkbox.  Keep that small
@@ -7467,7 +7496,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 /* Pagination avoids scrolling when cards fit. A failed fit must still leave
    every setting reachable; clipping is not a substitute for fitting. */
-.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+/* The paginate fit writes inline overflow-y hidden when a tab's content fits, and
+   nothing re-fits on content-only growth: the stale inline style then clips late
+   content with a dead wheel. The !important keeps the scroller alive; fitting
+   content renders identically under auto. */
+.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-y:auto !important; }
 .lex-master-detail .lex-tweaks-scroll { overflow-x:clip; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest

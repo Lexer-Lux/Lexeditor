@@ -92,13 +92,39 @@ def test_chr_dummies_and_geometry_from_binder(tmp_path):
     (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
     info = viewport.chr_dummies(game, None, 'c1200')
     assert (info['meshes'], info['bones']) == (1, 1)
-    assert info['dummies'] == [{'id': 100, 'pos': [1.0, 2.0, 3.0], 'bone': 0}]
+    assert info['dummies'] == [{'id': 100, 'pos': [1.0, 2.0, 3.0], 'bone': 0, 'bone_name': 'root'}]
     encoded = viewport.chr_geometry(game, None, 'c1200')
     assert len(encoded['meshes']) == 1
     positions = base64.b64decode(encoded['meshes'][0]['positions'])
     assert len(positions) == 4 * 3 * 4
     indices = struct.unpack('<6I', base64.b64decode(encoded['meshes'][0]['indices']))
     assert indices == (0, 1, 2, 0, 2, 3)
+
+
+def test_chr_dummies_name_bones_and_forgive_dangling_attach(tmp_path):
+    game = tmp_path / 'game'
+    (game / 'chr').mkdir(parents=True)
+    bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0)),
+             ('arm_L', 0, (1.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
+    (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver(
+        bones=bones, dummies=[(100, (1.0, 2.0, 3.0), 1), (200, (4.0, 5.0, 6.0), -1),
+                              (300, (7.0, 8.0, 9.0), 9)])))
+    dummies = viewport.chr_dummies(game, None, 'c1200')['dummies']
+    assert [(point['id'], point['bone'], point['bone_name']) for point in dummies] == [
+        (100, 1, 'arm_L'), (200, -1, None), (300, 9, None)]
+
+
+def test_impact_variants_carry_viewer_placement():
+    document = ItemDocument(make_archive())
+    variants = {entry['id']: entry for entry in
+                document.read_row('AtkParam_Npc', 101)['impact']['variants']}
+    assert [(variants[120000]['tab'], variants[120000]['sub'])] == [('enemies', 'monsters')]
+    assert [(variants[251000]['tab'], variants[251000]['sub'])] == [('npcs', 'npcs')]
+    stray = ItemDocument(make_archive(
+        field_values={'NpcParam': {999999: {'behaviorVariationId': 12000}}}))
+    orphans = [entry for entry in stray.read_row('AtkParam_Npc', 101)['impact']['variants']
+               if entry['id'] == 999999]
+    assert [(entry['tab'], entry['sub']) for entry in orphans] == [(None, None)]
 
 
 def test_chr_missing_and_bad_id(tmp_path):

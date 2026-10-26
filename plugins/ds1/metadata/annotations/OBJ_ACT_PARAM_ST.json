@@ -7,82 +7,82 @@
     {
       "Field": "actionEnableMsgId",
       "Name": "Enabled: Message ID",
-      "Description": "The text ID to use for the prompt message if this interaction is enabled."
+      "Description": "Prompt shown when the player can use this, such as Open. -1 shows no prompt."
     },
     {
       "Field": "actionFailedMsgId",
       "Name": "Failed: Message ID",
-      "Description": "The text ID to use for the prompt message if this interaction fails."
+      "Description": "Prompt shown when the player tries this without meeting the requirement. -1 shows no prompt."
     },
     {
       "Field": "spQualifiedPassEventFlag",
       "Name": "Bypass Qualification Check: Event Flag ID",
-      "Description": "The event flag ID that causes the qualification checks to be ignored for this interaction."
+      "Description": "Event flag that skips this interaction's requirements. While it is on, anyone can use this. -1 means no flag skips them."
     },
     {
       "Field": "validDist",
       "Name": "Use Distance",
-      "Description": "The maximum distance at which this interaction can be triggered. In metres."
+      "Description": "How close the player must stand to use this, in centimetres. 150 is roughly two paces. Larger values allow use from further away."
     },
     {
       "Field": "playerAnimId",
       "Name": "Use Action: Player Animation ID",
-      "Description": "The player animation to use when this interaction is used by a player."
+      "Description": "Animation the player acts out while using this, such as pushing a door. It must be an animation the player model has."
     },
     {
       "Field": "chrAnimId",
       "Name": "Use Action: Character Animation ID",
-      "Description": "The player animation to use when this interaction is used by a non-player character."
+      "Description": "Animation a non-player character acts out while using this. It must be an animation that character's model has."
     },
     {
       "Field": "spQualifiedId",
       "Name": "Qualification ID: 1",
-      "Description": "The requirements to use this interaction, can either be a EquipParamGoods or SpEffectParam row.\nspQualifiedType determines which type to reference."
+      "Description": "Item or effect the player must have to use this. The requirement type beside it says which list to read. Leave it 0 for no requirement."
     },
     {
       "Field": "spQualifiedId2",
       "Name": "Qualification ID: 2",
-      "Description": "The requirements to use this interaction, can either be a EquipParamGoods or SpEffectParam row.\nspQualifiedType2 determines which type to reference."
+      "Description": "Second item or effect the player must have. Works like the first requirement. Leave it 0 to use only one."
     },
     {
       "Field": "objDummyId",
       "Name": "Use: Dummy Polygon ID",
-      "Description": "The dummy polygon belonging to the attached object for this interaction that determines the 'action' position."
+      "Description": "Anchor point on the object where the prompt appears. It must be a point the object's model has."
     },
     {
       "Field": "objAnimId",
       "Name": "Use: Object Animation ID",
-      "Description": "The object animation to use when this interaction is used."
+      "Description": "Animation the object plays when used, such as a lid swinging open. It must be an animation the object's model has."
     },
     {
       "Field": "validPlayerAngle",
       "Name": "Valid Player Angle (degrees)",
-      "Description": "The usage cone where a player can trigger this interaction (on the player's side). Effective angular difference between the player's orientation vector and the object's orientation vector. In degrees."
+      "Description": "How far off-centre the object can be before the prompt hides, in degrees. 30 needs rough facing. 180 allows any direction."
     },
     {
       "Field": "spQualifiedType",
       "Name": "Qualification Type: 1",
-      "Description": "The requirement type to use for spQualifiedID."
+      "Description": "What the first requirement ID means. 0 needs nothing, 1 reads it as an item, 2 as an effect."
     },
     {
       "Field": "spQualifiedType2",
       "Name": "Qualification Type: 2",
-      "Description": "The requirement type to use for spQualifiedID2."
+      "Description": "What the second requirement ID means. 0 needs nothing, 1 reads it as an item, 2 as an effect."
     },
     {
       "Field": "validObjAngle",
       "Name": "Valid Object Angle (degrees)",
-      "Description": "The usage cone where a player can trigger this interaction (on the object's side). Effective angular difference between the player's orientation vector and the object's orientation vector. In degrees."
+      "Description": "How far around the object the player can stand and still use it, in degrees. 30 needs the marked side. 180 allows every side."
     },
     {
       "Field": "chrSorbType",
       "Name": "Character Attraction Type",
-      "Description": "How the user character is attracted into the object during usage."
+      "Description": "How the player slides into place when starting to use this. What each value does is not established."
     },
     {
       "Field": "eventKickTiming",
       "Name": "Interaction Activation Timing",
-      "Description": "The timing for the interaction activation."
+      "Description": "When the linked event starts during the use animation. What each value does is not established."
     },
     {
       "Field": "pad1",

@@ -179,6 +179,7 @@ class NativeRules:
         if tab == "levelup":
             return [{"id": levelup_gains.ROW_IDS[key], "table": "NativeRules",
                      "name": label, "values": dict(self.value["levelupGains"][key]),
+                     "labelKind": levelup_gains.ROW_ICONS[key],
                      "modified": self.row_modified(levelup_gains.ROW_IDS[key])}
                     for key, label in levelup_gains.OUTPUTS]
         if tab == "encumbrance":

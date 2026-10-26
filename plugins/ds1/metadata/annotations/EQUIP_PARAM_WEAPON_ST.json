@@ -7,22 +7,22 @@
     {
       "Field": "behaviorVariationId",
       "Name": "Behavior Variation ID",
-      "Description": "Used to determine the action parameters to use for this weapon's attacks."
+      "Description": "Chooses the attack moves this weapon performs. It selects a Behavior ID variant on top of the weapon's animation set. Change it only to a tested variant, or attacks may break."
     },
     {
       "Field": "sortId",
       "Name": "Sort ID",
-      "Description": "The ordering ID used to sort this part in the menu."
+      "Description": "Sets where this weapon sits in menus and lists. Lower numbers come first."
     },
     {
       "Field": "wanderingEquipId",
       "Name": "Wandering Equip ID",
-      "Description": "Replacement equipment ID for wandering ghosts."
+      "Description": "The weapon other players see on your wandering ghost instead of this one. This probably hides models their game cannot load."
     },
     {
       "Field": "weight",
       "Name": "Weight (kg)",
-      "Description": "Weight [kg]."
+      "Description": "How heavy the weapon is, in kilograms. Heavier gear raises Equip Load and slows your rolls."
     },
     {
       "Field": "weaponWeightRate",
@@ -32,422 +32,422 @@
     {
       "Field": "fixPrice",
       "Name": "Repair Value",
-      "Description": "The price required to repair this part. Repair cost is calculated using this and durabilityMax"
+      "Description": "Souls a blacksmith charges to fully repair this weapon. A partly worn weapon costs less."
     },
     {
       "Field": "basicPrice",
       "Name": "Reinforcement Value",
-      "Description": "The reinforcement price for this part."
+      "Description": "Souls each upgrade step costs. It never sets a shop price."
     },
     {
       "Field": "sellValue",
       "Name": "Sell Value",
-      "Description": "The sell value for this part."
+      "Description": "Souls Kingseeker Frampt pays for this weapon. That may be its only use, but it is unproven."
     },
     {
       "Field": "correctStrength",
       "Name": "Correction: STR",
-      "Description": "The multiplier to the damage corrected by this specified stat."
+      "Description": "How much Strength raises this weapon's damage. Higher values mean stronger scaling, shown as a letter grade."
     },
     {
       "Field": "correctAgility",
       "Name": "Correction: DEX",
-      "Description": "The multiplier to the damage corrected by this specified stat."
+      "Description": "How much Dexterity raises this weapon's damage. Higher values mean stronger scaling, shown as a letter grade."
     },
     {
       "Field": "correctMagic",
       "Name": "Correction: INT",
-      "Description": "The multiplier to the damage corrected by this specified stat."
+      "Description": "How much Intelligence raises this weapon's damage. Higher values mean stronger scaling, shown as a letter grade."
     },
     {
       "Field": "correctFaith",
       "Name": "Correction: FTH",
-      "Description": "The multiplier to the damage corrected by this specified stat."
+      "Description": "How much Faith raises this weapon's damage. Higher values mean stronger scaling, shown as a letter grade."
     },
     {
       "Field": "physGuardCutRate",
       "Name": "Guard Absorption: Physical (%)",
-      "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
+      "Description": "How much physical damage a block stops. 100 stops it all."
     },
     {
       "Field": "magGuardCutRate",
       "Name": "Guard Absorption: Magic (%)",
-      "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
+      "Description": "How much magic damage a block stops. 100 stops it all."
     },
     {
       "Field": "fireGuardCutRate",
       "Name": "Guard Absorption: Fire (%)",
-      "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
+      "Description": "How much fire damage a block stops. 100 stops it all."
     },
     {
       "Field": "thunGuardCutRate",
       "Name": "Guard Absorption: Lightning (%)",
-      "Description": "The absorption to apply to damage of the specified type when this weapon is guarding."
+      "Description": "How much lightning damage a block stops. 100 stops it all."
     },
     {
       "Field": "spEffectBehaviorId0",
       "Name": "SpEffect on Hit: 1",
-      "Description": "A SpEffect to apply to the victim when this weapon hits."
+      "Description": "Extra effect this weapon inflicts on enemies it hits, such as bleed or poison. None means a plain hit. Upgrades can replace it."
     },
     {
       "Field": "spEffectBehaviorId1",
       "Name": "SpEffect on Hit: 2",
-      "Description": "A SpEffect to apply to the victim when this weapon hits."
+      "Description": "Extra effect this weapon inflicts on enemies it hits, such as bleed or poison. None means a plain hit. Upgrades can replace it."
     },
     {
       "Field": "spEffectBehaviorId2",
       "Name": "SpEffect on Hit: 3",
-      "Description": "A SpEffect to apply to the victim when this weapon hits."
+      "Description": "Extra effect this weapon inflicts on enemies it hits, such as bleed or poison. None means a plain hit. Upgrades can replace it."
     },
     {
       "Field": "residentSpEffectId",
       "Name": "Resident SpEffect: 1",
-      "Description": "A SpEffect to apply to the wielder of this weapon."
+      "Description": "Bonus this weapon grants you while equipped. None means no bonus."
     },
     {
       "Field": "residentSpEffectId1",
       "Name": "Resident SpEffect: 2",
-      "Description": "A SpEffect to apply to the wielder of this weapon."
+      "Description": "Bonus this weapon grants you while equipped. None means no bonus."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect: 3",
-      "Description": "A SpEffect to apply to the wielder of this weapon."
+      "Description": "Bonus this weapon grants you while equipped. None means no bonus."
     },
     {
       "Field": "materialSetId",
       "Name": "Upgrade Material ID",
-      "Description": "The material requirements for improving this equipment."
+      "Description": "Which titanite each upgrade step needs. Pick the set that matches the upgrade path you want."
     },
     {
       "Field": "originEquipWep",
       "Name": "Source ID: +0",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +0. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep1",
       "Name": "Source ID: +1",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +1. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep2",
       "Name": "Source ID: +2",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +2. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep3",
       "Name": "Source ID: +3",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +3. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep4",
       "Name": "Source ID: +4",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +4. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep5",
       "Name": "Source ID: +5",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +5. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep6",
       "Name": "Source ID: +6",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +6. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep7",
       "Name": "Source ID: +7",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +7. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep8",
       "Name": "Source ID: +8",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +8. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep9",
       "Name": "Source ID: +9",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +9. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep10",
       "Name": "Source ID: +10",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +10. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep11",
       "Name": "Source ID: +11",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +11. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep12",
       "Name": "Source ID: +12",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +12. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep13",
       "Name": "Source ID: +13",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +13. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep14",
       "Name": "Source ID: +14",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +14. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "originEquipWep15",
       "Name": "Source ID: +15",
-      "Description": "The source ID when this equipment is reinforced to this level."
+      "Description": "Links this weapon to the one it ascends from at +15. The blacksmith also uses it when reverting, but the details are unproven."
     },
     {
       "Field": "antiDemonDamageRate",
       "Name": "Damage Adjustment: Demon (x)",
-      "Description": "Damage multiplier applied to targets that are classified with isDemon."
+      "Description": "Extra damage against demons. 1.1 adds 10%, and 1 means no bonus."
     },
     {
       "Field": "antSaintDamageRate",
       "Name": "Damage Adjustment: Divine (x)",
-      "Description": "Damage multiplier applied to targets that are classified with isWeakSaint."
+      "Description": "Extra damage against divine-weak enemies. Divine weapons also stop skeletons reviving. 1 means no bonus."
     },
     {
       "Field": "antWeakA_DamageRate",
       "Name": "Damage Adjustment: Occult (x)",
-      "Description": "Damage multiplier applied to targets that are classified with isWeakA"
+      "Description": "Extra damage against occult-weak enemies. 1.1 adds 10%, and 1 means no bonus."
     },
     {
       "Field": "antWeakB_DamageRate",
       "Name": "Damage Adjustment: Darkwraith (x)",
-      "Description": "Damage multiplier applied to targets that are classified with isWeakB"
+      "Description": "Extra damage against abyssal enemies like Darkwraiths. 1.1 adds 10%, and 1 means no bonus."
     },
     {
       "Field": "vagrantItemLotId",
       "Name": "Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the Vagrant this weapon may become. -1 spawns none, and 0 grants nothing."
     },
     {
       "Field": "vagrantBonusEneDropItemLotId",
       "Name": "Good Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the extra creature a Good Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "vagrantItemEneDropItemLotId",
       "Name": "Evil Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the creature an Evil Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "equipModelId",
       "Name": "Model ID",
-      "Description": "The model ID to use for this equipment."
+      "Description": "Which 3D model the weapon uses. Match it to the weapon's type or it looks wrong."
     },
     {
       "Field": "iconId",
       "Name": "Icon ID ",
-      "Description": "The icon ID to use for this equipment."
+      "Description": "Which inventory icon this weapon shows."
     },
     {
       "Field": "durability",
       "Name": "Durability",
-      "Description": "The initial durability of this equipment."
+      "Description": "The durability a found weapon starts with. Fighting lowers it, and at zero the weapon breaks."
     },
     {
       "Field": "durabilityMax",
       "Name": "Max Durability",
-      "Description": "The maximum durability of this equipment."
+      "Description": "The highest durability a repair can restore."
     },
     {
       "Field": "attackThrowEscape",
       "Name": "Damage: Throw Attack",
-      "Description": "The base damage for throw attack power"
+      "Description": "Probably helps you break free from enemy grabs. The effect is unproven, so copy a similar weapon."
     },
     {
       "Field": "parryDamageLife",
       "Name": "Parry Damage Duration (frames)",
-      "Description": "The duration of parry damage. It is capped by the duration set in the TAE. In frames."
+      "Description": "How long a parry attempt stays active, in frames. The animation can only shorten it, never stretch it."
     },
     {
       "Field": "attackBasePhysics",
       "Name": "Damage: Physical",
-      "Description": "The base Physical attack power."
+      "Description": "Physical damage before stat scaling and upgrades add more."
     },
     {
       "Field": "attackBaseMagic",
       "Name": "Damage: Magic",
-      "Description": "The base Magic attack power."
+      "Description": "Magic damage before stat scaling and upgrades add more."
     },
     {
       "Field": "attackBaseFire",
       "Name": "Damage: Fire",
-      "Description": "The base Fire attack power."
+      "Description": "Fire damage before stat scaling and upgrades add more."
     },
     {
       "Field": "attackBaseThunder",
       "Name": "Damage: Lightning",
-      "Description": "The base Lightning attack power."
+      "Description": "Lightning damage before stat scaling and upgrades add more."
     },
     {
       "Field": "attackBaseStamina",
       "Name": "Damage: Stamina",
-      "Description": "The base stamina attack power."
+      "Description": "Stamina damage this weapon deals to a blocking target. Higher values drain more stamina through the guard and break it sooner. It does nothing when the target is not blocking."
     },
     {
       "Field": "saWeaponDamage",
       "Name": "Damage: Poise",
-      "Description": "The base poise attack power."
+      "Description": "Poise damage each hit deals. Higher values stagger foes sooner."
     },
     {
       "Field": "saDurability",
       "Name": "Poise",
-      "Description": "The additional poise to apply when using this weapon during attack animations."
+      "Description": "May grant Poise during your own attacks. It looks unused, so changing it may do nothing."
     },
     {
       "Field": "guardAngle",
       "Name": "Horizontal Guard Angle (degrees)",
-      "Description": "Defense generation range angle when guarding with a weapon (horizontal direction). In degrees."
+      "Description": "May set how wide a block catches attacks, in degrees. It looks unused, so changing it may do nothing."
     },
     {
       "Field": "staminaGuardDef",
       "Name": "Guard Stability (%)",
-      "Description": "Defense power against stamina drain from enemy attacks when guarding correctly."
+      "Description": "How much blocking drains your stamina. Higher values drain less, so you block longer."
     },
     {
       "Field": "reinforceTypeId",
       "Name": "Reinforcement Type ID",
-      "Description": "The reinforcement progression to use for this equipment."
+      "Description": "Which upgrade table this weapon follows to +5 or +15. It sets the stat gains per level."
     },
     {
       "Field": "trophySGradeId",
       "Name": "Achievement ID",
-      "Description": "The achievement ID this equipment is associated with, if any."
+      "Description": "Unknown. It may link this weapon to an achievement. Leave it unless you test it."
     },
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "The sequential achievement ID this equipment is associated with, if any."
+      "Description": "Unknown. It may order this weapon in an achievement checklist. Leave it unless you test it."
     },
     {
       "Field": "throwAtkRate",
       "Name": "Critical Hit %",
-      "Description": "The multiplier to apply to critical hits."
+      "Description": "Probably sets backstab and riposte damage. The exact math is unproven, so copy a similar weapon."
     },
     {
       "Field": "bowDistRate",
       "Name": "Ammunition Distance %",
-      "Description": "Increase the attentuation range of ammunition by the specified multiplier."
+      "Description": "Extra range this weapon gives arrows and bolts, in percent. 0 means no change."
     },
     {
       "Field": "equipModelCategory",
       "Name": "Model Category",
-      "Description": "The equipment model category used by this equipment."
+      "Description": "Unknown. It tags the model type this weapon uses. Match a similar weapon."
     },
     {
       "Field": "equipModelGender",
       "Name": "Model Gender Category",
-      "Description": "The equipment gender category used by this equipment."
+      "Description": "Unknown. It tags the model gender this weapon uses. Match a similar weapon."
     },
     {
       "Field": "weaponCategory",
       "Name": "Weapon Category",
-      "Description": "The weapon category of this equipment."
+      "Description": "Partly sets what kind of weapon this is. Ranged weapons use it to pick arrows or bolts. Copy a similar weapon."
     },
     {
       "Field": "wepmotionCategory",
       "Name": "Weapon Animation Set",
-      "Description": "The weapon animation category. Determines the base animation set the weapon uses."
+      "Description": "Which set of attack animations this weapon uses. Pick a tested set or attacks break."
     },
     {
       "Field": "guardmotionCategory",
       "Name": "Guard Animation Set",
-      "Description": "The weapon animation category used when guarding. Determines the animation set to overlap when guarding."
+      "Description": "Which block animation this weapon uses. Copy a similar weapon."
     },
     {
       "Field": "atkMaterial",
       "Name": "Attack Presentation: Material",
-      "Description": "Specify the particles and sounds to apply to the victim at the time of attack."
+      "Description": "Hit sparks and sounds this weapon makes. Pick one that fits the weapon."
     },
     {
       "Field": "defMaterial",
       "Name": "Defense Presentation: Material",
-      "Description": "Specify the particles and sounds to apply when guarding against an attack."
+      "Description": "Clash sounds and sparks when this weapon blocks. Pick one that fits the weapon."
     },
     {
       "Field": "defSfxMaterial",
       "Name": "Defence Presentation: Particles",
-      "Description": "The particles to apply when guarding against an attack."
+      "Description": "Sparks shown when this weapon blocks. Pick one that fits the weapon."
     },
     {
       "Field": "correctType",
       "Name": "Damage Correction Graph",
-      "Description": "Which scaling graph this weapon uses. It stays read-only because the graph choices are not documented."
+      "Description": "Which scaling graph turns stats into bonus damage. 0 fits Strength and Dexterity weapons, 1 fits Intelligence and Faith ones."
     },
     {
       "Field": "spAttribute",
       "Name": "Special Attribute",
-      "Description": "Special attributes to set for attacks"
+      "Description": "May set the hit effects and death animations this weapon causes. Fire burns foes, and lightning zaps them."
     },
     {
       "Field": "spAtkcategory",
       "Name": "Weapon Override Animation Set",
-      "Description": "The weapon override animation category. Determines the override animation set the weapon uses."
+      "Description": "Extra animations that replace parts of the base set. Some weapon types use it for their whole moveset."
     },
     {
       "Field": "wepmotionOneHandId",
       "Name": "Weapon Idle Animation Set: 1H",
-      "Description": "The weapon idle animation category. Determines the idle animations used when held one-handed."
+      "Description": "Base motions used when held one-handed. Copy a similar weapon."
     },
     {
       "Field": "wepmotionBothHandId",
       "Name": "Weapon Idle Animation Set: 2H",
-      "Description": "The weapon idle animation category. Determines the idle animations used when held two-handed."
+      "Description": "Base motions used when held two-handed. Copy a similar weapon."
     },
     {
       "Field": "properStrength",
       "Name": "Requirement: STR",
-      "Description": "The required level of the specified stat to properly wield this weapon."
+      "Description": "Strength needed to wield this weapon well. Less means weak swings. Two hands count as 50% more Strength."
     },
     {
       "Field": "properAgility",
       "Name": "Requirement: DEX",
-      "Description": "The required level of the specified stat to properly wield this weapon."
+      "Description": "Dexterity needed to wield this weapon well. Less means weak swings."
     },
     {
       "Field": "properMagic",
       "Name": "Requirement: INT",
-      "Description": "The required level of the specified stat to properly wield this weapon."
+      "Description": "Intelligence needed to wield this weapon well. Less means weak swings."
     },
     {
       "Field": "properFaith",
       "Name": "Requirement: FTH",
-      "Description": "The required level of the specified stat to properly wield this weapon."
+      "Description": "Faith needed to wield this weapon well. Less means weak swings."
     },
     {
       "Field": "overStrength",
       "Name": "STR over Start Value",
-      "Description": "Strength over start value"
+      "Description": "Unknown. It may mark where extra Strength stops helping. Copy a similar weapon."
     },
     {
       "Field": "attackBaseParry",
       "Name": "Parry Attack",
-      "Description": "The base parry attack damage value. Applied to the enemy parry defense value."
+      "Description": "How well attacks beat enemy parries. Higher breaks through more often."
     },
     {
       "Field": "defenseBaseParry",
       "Name": "Parry Defense",
-      "Description": "The base parry defense value. Compared against enemy parry attack value."
+      "Description": "How likely your parry beats an attack instead of blocking it. Higher values parry more often."
     },
     {
       "Field": "guardBaseRepel",
       "Name": "Base Repel: Defense",
-      "Description": "The base repel value when guarding. If a blocked attack has a repel attack value less than the repel defense value, the attack will bounce."
+      "Description": "How well blocks bounce enemy attacks back. Weak hits bounce off instead of hurting you."
     },
     {
       "Field": "attackBaseRepel",
       "Name": "Base Repel: Attack",
-      "Description": "The base repel value when attacking. If the victim has a repel defense value greater than the repel attack value, the attack will bounce."
+      "Description": "How well attacks punch through blocks without bouncing. Weak swings bounce off strong blocks."
     },
     {
       "Field": "guardCutCancelRate",
       "Name": "Guard Absorption Invalidation (%)",
-      "Description": "Guard cut rate invalidation ratio (-100 to 100)  Normal at 0 / Completely invalidated at -100 / Doubles the defense effect of the opponent at 100  -50, 100% cut shield becomes 50% cut Become "
+      "Description": "How much attacks ignore enemy blocks. -100 cuts through fully, and 0 is normal."
     },
     {
       "Field": "guardLevel",
@@ -457,182 +457,182 @@
     {
       "Field": "slashGuardCutRate",
       "Name": "Guard Absorption: Slash (%)",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much slash damage a block stops. 100 stops it all."
     },
     {
       "Field": "blowGuardCutRate",
       "Name": "Guard Absorption: Strike (%)",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much strike damage a block stops. 100 stops it all."
     },
     {
       "Field": "thrustGuardCutRate",
       "Name": "Guard Absorption: Thrust (%)",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much thrust damage a block stops. 100 stops it all."
     },
     {
       "Field": "poisonGuardResist",
       "Name": "Guard Absorption %: Poison",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much poison buildup a block stops. 100 stops it all."
     },
     {
       "Field": "diseaseGuardResist",
       "Name": "Guard Absorption %: Toxic",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much toxic buildup a block stops. 100 stops it all."
     },
     {
       "Field": "bloodGuardResist",
       "Name": "Guard Absorption %: Bleed",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much bleed buildup a block stops. 100 stops it all."
     },
     {
       "Field": "curseGuardResist",
       "Name": "Guard Absorption %: Curse",
-      "Description": "The absorption to apply to damage of the specified type when guarding."
+      "Description": "How much curse buildup a block stops. 100 stops it all."
     },
     {
       "Field": "isDurabilityDivergence",
       "Name": "Is Animation Changed by Durability",
-      "Description": "Changes the weapon's animations based on its remaining durability."
+      "Description": "Switches animations as durability falls. Spell tools use this as casts run out."
     },
     {
       "Field": "rightHandEquipable",
       "Name": "Equipped in Right Weapon Slot",
-      "Description": "If ON, this equipment can be equipped in the right weapon slot."
+      "Description": ""
     },
     {
       "Field": "leftHandEquipable",
       "Name": "Equipped in Left Weapon Slot",
-      "Description": "If ON, this equipment can be equipped in the left weapon slot."
+      "Description": ""
     },
     {
       "Field": "bothHandEquipable",
       "Name": "Equipped in either Weapon Slot",
-      "Description": "If ON, this equipment can be equipped in either weapon slot."
+      "Description": "Lets you wield this weapon two-handed. Off locks it to one hand."
     },
     {
       "Field": "arrowSlotEquipable",
       "Name": "Equipped in Arrow Slot",
-      "Description": "If ON, this equipment can be equipped in arrow ammunition slot."
+      "Description": ""
     },
     {
       "Field": "boltSlotEquipable",
       "Name": "Equipped in Bolt Slot",
-      "Description": "If ON, this equipment can be equipped in bolt ammunition slot."
+      "Description": ""
     },
     {
       "Field": "enableGuard",
       "Name": "Enables Guard",
-      "Description": "If ON, this weapon will guard with L1 when equipped with left hand."
+      "Description": "Lets this weapon block when held in the left hand."
     },
     {
       "Field": "enableParry",
       "Name": "Enables Parry",
-      "Description": "If ON, this weapon will arry with L2 when equipped with left hand."
+      "Description": "Lets this weapon parry when held in the left hand."
     },
     {
       "Field": "enableMagic",
       "Name": "Enables Magic",
-      "Description": "If ON, this weapon will cast magic when attacking."
+      "Description": "Casts the readied sorcery when you attack. Turn it on for catalysts."
     },
     {
       "Field": "enableSorcery",
       "Name": "Enables Sorcery",
-      "Description": "If ON, this weapon will cast sorcery when attacking."
+      "Description": "Casts the readied pyromancy when you attack. Turn it on for flames."
     },
     {
       "Field": "enableMiracle",
       "Name": "Enables Miracles",
-      "Description": "If ON, this weapon will cast miracles when attacking."
+      "Description": "Casts the readied miracle when you attack. Turn it on for talismans."
     },
     {
       "Field": "enableVowMagic",
       "Name": "Enables Vow Magic",
-      "Description": "If ON, this weapon will cast vow magic when attacking."
+      "Description": "Unknown. No weapon in the game uses covenant magic. Leave it off unless you test it."
     },
     {
       "Field": "isNormalAttackType",
       "Name": "Menu Display: Normal",
-      "Description": "The attack type for menu display."
+      "Description": "Shows Normal on the weapon's menu card. It changes nothing about damage."
     },
     {
       "Field": "isBlowAttackType",
       "Name": "Menu Display: Strike",
-      "Description": "The attack type for menu display."
+      "Description": "Shows Strike on the weapon's menu card. It changes nothing about damage."
     },
     {
       "Field": "isSlashAttackType",
       "Name": "Menu Display: Slash",
-      "Description": "The attack type for menu display."
+      "Description": "Shows Slash on the weapon's menu card. It changes nothing about damage."
     },
     {
       "Field": "isThrustAttackType",
       "Name": "Menu Display: Thrust",
-      "Description": "The attack type for menu display."
+      "Description": "Shows Thrust on the weapon's menu card. It changes nothing about damage."
     },
     {
       "Field": "isEnhance",
       "Name": "Is Buffable",
-      "Description": "If ON, this weapon be buffed via a tool or spell."
+      "Description": "Lets resins and weapon spells buff this weapon. Elemental paths usually forbid it."
     },
     {
       "Field": "isLuckCorrect",
       "Name": "Apply Humanity Correction",
-      "Description": "If ON, applies attack correction based on humanity."
+      "Description": "Adds bonus damage from held humanity, up to 10. Chaos weapons use this."
     },
     {
       "Field": "isCustom",
       "Name": "Is Reinforcable",
-      "Description": "If ON, this weapon can be reinforced via the reinforcement mechanic."
+      "Description": ""
     },
     {
       "Field": "disableBaseChangeReset",
       "Name": "Disable Weapon Job Change",
-      "Description": "If ON, prevents the weapon from being changed fundamentally via the ascension mechanic or infusion mechanic."
+      "Description": "Stops this weapon reverting to its base form. Ascended weapons stay ascended."
     },
     {
       "Field": "disableRepair",
       "Name": "Disable Repair",
-      "Description": "If ON, this weapon cannot be repaired."
+      "Description": ""
     },
     {
       "Field": "isDarkHand",
       "Name": "Is Dark Hand",
-      "Description": "If ON, this weapon is considered a 'Dark Hand'."
+      "Description": "Unknown. It marks this as a Dark Hand. Copy the Dark Hand's value."
     },
     {
       "Field": "simpleModelForDlc",
       "Name": "Is Simple Model for DLC",
-      "Description": "If ON, this weapon uses a simple model for the DLC."
+      "Description": ""
     },
     {
       "Field": "lanternWep",
       "Name": "Is Light Source",
-      "Description": "If ON, this weapon is considered a light source."
+      "Description": ""
     },
     {
       "Field": "isVersusGhostWep",
       "Name": "Is Anti-Ghost Weapon",
-      "Description": "If ON, this weapon can hit 'Ghost' characters."
+      "Description": "Lets this weapon strike ghosts with no curse needed."
     },
     {
       "Field": "baseChangeCategory",
       "Name": "Job Category",
-      "Description": "Which ascension or infusion family this weapon belongs to. The game shows the matching attribute icon."
+      "Description": "Which ascension family this weapon belongs to. The blacksmith offers upgrades from that family."
     },
     {
       "Field": "isDragonSlayer",
       "Name": "Is Dragon-Hunter Weapon",
-      "Description": "If ON, is considered a 'dragon-hunter' weapon."
+      "Description": "Unknown. It marks this as a dragonslayer weapon. Copy a similar weapon."
     },
     {
       "Field": "isDeposit",
       "Name": "Can Deposit",
-      "Description": "If ON, this item can be deposited into the repository."
+      "Description": "Lets you store this weapon in the Bottomless Box at bonfires."
     },
     {
       "Field": "disableMultiDropShare",
       "Name": "Is Drop Disabled in Multiplayer",
-      "Description": "If ON, this item cannot be dropped in a multiplayer session."
+      "Description": "Stops other players picking this weapon up if dropped online."
     },
     {
       "Field": "pad_0",
@@ -642,12 +642,12 @@
     {
       "Field": "oldSortId",
       "Name": "Sort ID (Obsolete)",
-      "Description": "The ordering ID used to sort this part in the menu."
+      "Description": "Unknown. An old ordering number the game probably ignores."
     },
     {
       "Field": "levelSyncCorrectID",
       "Name": "Level Sync Correction ID",
-      "Description": "Determines the level sync calculation correction parameters to apply for this weapon in multiplayer."
+      "Description": "Used when password co-op syncs a strong guest down to the host. The exact values are unproven, so copy a similar weapon."
     },
     {
       "Field": "pad_1",

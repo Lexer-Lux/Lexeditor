@@ -99,6 +99,21 @@ def main():
                     page.reload(); page.wait_for_selector('body[data-ds1-ready="true"]')
                     reopened=ItemDocument((mod/RELATIVE).read_bytes())
                     for key,value in changes.items(): assert reopened.value('AtkParam_Npc',first_attack,key)==value
+                    page.locator('[data-tab="attacks"]').click()
+                    page.wait_for_function('state.tab==="attacks"')
+                    box=page.get_by_role('searchbox',name='Search attacks')
+                    box.click(); box.press('ControlOrMeta+a'); box.press('Backspace'); box.fill(str(first_attack))
+                    page.wait_for_function('(id)=>state.row?.id===id',arg=first_attack)
+                    page.get_by_role('button',name='Open viewer').first.click()
+                    page.wait_for_function('state.tab==="enemies" && state.selected==="NpcParam:120000"')
+                    page.wait_for_selector('.lex-model-preview-open .lex-chr-viewer')
+                    viewer=page.locator('.lex-chr-viewer-fields')
+                    viewer.locator('[data-field-key="hit0_Radius"]').wait_for()
+                    assert viewer.locator('[data-field-key="hit0_Radius"]').input_value()=='2.5'
+                    assert viewer.locator('input[data-hit-slot-status="0"]').input_value()==(
+                        'Live: sphere, radius 2.5 m on anchor 0.')
+                    assert viewer.locator('input[data-hit-slot-status="1"]').input_value()==(
+                        'Idle: radius 0 strikes nothing.')
                     open_monster(ranged['id'])
                     ranged_attack = next(r['id'] for r in refs.list(ranged['id'])['rows'] if 'projectile' in r['route'].lower())
                     follow(page.locator(f'.lex-hoverable[data-hover-target-type="ds1-attack"][data-hover-target-id="{ranged_attack}"]').first)
@@ -189,7 +204,7 @@ def main():
         finally: session.stop()
         assert hashlib.sha256((game/RELATIVE).read_bytes()).hexdigest()==digest
     if source: assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
-    print(json.dumps({'attackFieldsSavedReloaded':len(edited),'hoverPreview':True,'projectileLinks':True,'sharedImpact':True,'allRecords':len(refs.attack_ids),'unresolvedOwnership':True,'playerAttacks':True,'projectiles':True,'vanillaCreateModPrompt':True,'originalUnchanged':True,'browserErrors':errors}))
+    print(json.dumps({'attackFieldsSavedReloaded':len(edited),'hoverPreview':True,'projectileLinks':True,'sharedImpact':True,'viewerLink':True,'allRecords':len(refs.attack_ids),'unresolvedOwnership':True,'playerAttacks':True,'projectiles':True,'vanillaCreateModPrompt':True,'originalUnchanged':True,'browserErrors':errors}))
 
 
 if __name__=='__main__':main()

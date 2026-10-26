@@ -1,7 +1,9 @@
 """Drops detail reads slot by slot: eight Drop sections plus Lot.
 
-Each slot's item, category, rate, amount and flags sit under its own
-header; the four lot-level settings sit under Lot. No more flat wall.
+Each slot's item/count pair, category, rate, amount and flags sit under
+its own header; the four lot-level settings sit under Lot. No more flat
+wall. The pair's item lane keeps the row while the count lane compacts
+to a 1-2 digit box with no reference rail or stepper.
 """
 import sys
 import tempfile
@@ -46,7 +48,24 @@ def main():
                     assert [title for title, _ in sections] == (
                         [f'Drop {slot}' for slot in range(1, 9)] + ['Lot']), sections
                     for title, count in sections:
-                        assert count == (4 if title == 'Lot' else 8), (title, count)
+                        assert count == (4 if title == 'Lot' else 7), (title, count)
+                    lanes = page.evaluate("""() => [...document.querySelectorAll(
+                      '.ds1-item-count-pair')].slice(0, 3).map(pair => {
+                      const item = pair.children[0].getBoundingClientRect().width;
+                      const count = pair.children[1].getBoundingClientRect().width;
+                      const host = pair.children[1].querySelector(
+                        '.lex-source-control-internal');
+                      const input = pair.children[1].querySelector('input[type=number]');
+                      return {item: Math.round(item), count: Math.round(count),
+                        compact: host ? host.classList.contains('lex-compact-box') : null,
+                        padRight: input ? getComputedStyle(input).paddingRight : null};
+                    })""")
+                    assert lanes, 'expected item/count pair rows'
+                    for lane in lanes:
+                        assert lane['compact'], lane
+                        assert lane['count'] <= 60, lane
+                        assert lane['item'] > lane['count'] * 2, lane
+                        assert float(lane['padRight'].replace('px', '')) <= 20, lane
                 finally:
                     browser.close()
         finally:

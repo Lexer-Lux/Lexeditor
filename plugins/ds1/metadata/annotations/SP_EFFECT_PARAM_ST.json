@@ -7,112 +7,112 @@
     {
       "Field": "iconId",
       "Name": "Icon ID",
-      "Description": "The icon id to display in the interface whilst the effect is active."
+      "Description": "The Icon ID shown while this effect stays active."
     },
     {
       "Field": "conditionHp",
       "Name": "Trigger at HP Below %",
-      "Description": "The maximum percentage of HP required for effect to activate.\n-1 = no requirement, 40 = less than 40% HP, 80 = less than 80% HP"
+      "Description": "Activates when remaining HP is below this percentage. -1 removes the HP condition."
     },
     {
       "Field": "effectEndurance",
       "Name": "Duration",
-      "Description": "The duration of effect. In seconds."
+      "Description": "How long the effect lasts. -1 means permanent. 0 applies it once."
     },
     {
       "Field": "motionInterval",
       "Name": "Trigger Interval",
-      "Description": "The interval for the contents of this effect to be reapplied. 0 = once per frame. In seconds."
+      "Description": "Time between repeated applications. 0 applies the effect every frame."
     },
     {
       "Field": "maxHpRate",
       "Name": "Maximum HP %",
-      "Description": "Multiplies maximum HP. See bCurrHPIndependeMaxHP to determine how current HP behaves.\n1 = default, .5 = -50%, 2 = +100%"
+      "Description": "Multiplies maximum HP. 1 is unchanged. Current HP follows the new maximum unless Ignore Current HP on Max HP Change is set."
     },
     {
       "Field": "maxMpRate",
       "Name": "Maximum MP %",
-      "Description": "Multiplies maximum MP."
+      "Description": "Probably does nothing. The game has no magic point pool."
     },
     {
       "Field": "maxStaminaRate",
       "Name": "Maximum Stamina %",
-      "Description": "Multiplies maximum stamina."
+      "Description": "Multiplies maximum stamina. 1 is unchanged. 0.5 halves it."
     },
     {
       "Field": "slashDamageCutRate",
       "Name": "Absorption %: Slash",
-      "Description": "Multiplies slash physical damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies slash damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "blowDamageCutRate",
       "Name": "Absorption %: Strike",
-      "Description": "Multiplies strike physical damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies strike damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "thrustDamageCutRate",
       "Name": "Absorption %: Thrust",
-      "Description": "Multiplies thrust physical damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies thrust damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "neutralDamageCutRate",
       "Name": "Absorption %: Physical",
-      "Description": "Multiplies neutral physical damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies physical damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "magicDamageCutRate",
       "Name": "Absorption %: Magic",
-      "Description": "Multiplies magic damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies magic damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "fireDamageCutRate",
       "Name": "Absorption %: Fire",
-      "Description": "Multiplies fire damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies fire damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "thunderDamageCutRate",
       "Name": "Absorption %: Lightning",
-      "Description": "Multiplies lightning damage taken. Values below 1 mean damage is reduced, values above 1 mean damage is increased."
+      "Description": "Multiplies lightning damage the owner takes. Below 1 means less damage. Above 1 means more damage."
     },
     {
       "Field": "physicsAttackRate",
       "Name": "Post-Defense Attack %: Physical",
-      "Description": "Multiplies physical damage dealt (post-defense, bypasses attack rating)"
+      "Description": "Multiplies physical damage dealt. It applies after enemy defense instead of changing the attack rating."
     },
     {
       "Field": "magicAttackRate",
       "Name": "Post-Defense Attack %: Magic",
-      "Description": "Multiplies magic damage dealt (post-defense, bypasses attack rating)"
+      "Description": "Multiplies magic damage dealt. It applies after enemy defense instead of changing the attack rating."
     },
     {
       "Field": "fireAttackRate",
       "Name": "Post-Defense Attack %: Fire",
-      "Description": "Multiplies fire damage dealt (post-defense, bypasses attack rating)"
+      "Description": "Multiplies fire damage dealt. It applies after enemy defense instead of changing the attack rating."
     },
     {
       "Field": "thunderAttackRate",
       "Name": "Post-Defense Attack %: Lightning",
-      "Description": "Multiplies lightning damage dealt (post-defense, bypasses attack rating)"
+      "Description": "Multiplies lightning damage dealt. It applies after enemy defense instead of changing the attack rating."
     },
     {
       "Field": "physicsAttackPowerRate",
       "Name": "Attack %: Physical",
-      "Description": "Multiplies physical damage dealt."
+      "Description": "Multiplies physical damage dealt. 1 is unchanged."
     },
     {
       "Field": "magicAttackPowerRate",
       "Name": "Attack %: Magic",
-      "Description": "Multiplies magic damage dealt."
+      "Description": "Multiplies magic damage dealt. 1 is unchanged."
     },
     {
       "Field": "fireAttackPowerRate",
       "Name": "Attack %: Fire",
-      "Description": "Multiplies fire damage dealt."
+      "Description": "Multiplies fire damage dealt. 1 is unchanged."
     },
     {
       "Field": "thunderAttackPowerRate",
       "Name": "Attack %: Lightning",
-      "Description": "Multiplies lightning damage dealt."
+      "Description": "Multiplies lightning damage dealt. 1 is unchanged."
     },
     {
       "Field": "physicsAttackPower",
@@ -137,22 +137,22 @@
     {
       "Field": "physicsDiffenceRate",
       "Name": "Defense %: Physical",
-      "Description": "Multiplies physical defense."
+      "Description": "Multiplies physical defense. 1 is unchanged."
     },
     {
       "Field": "magicDiffenceRate",
       "Name": "Defense %: Magic",
-      "Description": "Multiplies magic defense."
+      "Description": "Multiplies magic defense. 1 is unchanged."
     },
     {
       "Field": "fireDiffenceRate",
       "Name": "Defense %: Fire",
-      "Description": "Multiplies fire defense."
+      "Description": "Multiplies fire defense. 1 is unchanged."
     },
     {
       "Field": "thunderDiffenceRate",
       "Name": "Defense %: Lightning",
-      "Description": "Multiplies lightning defense."
+      "Description": "Multiplies lightning defense. 1 is unchanged."
     },
     {
       "Field": "physicsDiffence",
@@ -177,217 +177,217 @@
     {
       "Field": "NoGuardDamageRate",
       "Name": "Damage on Hit %: Unguarded",
-      "Description": "Multiplier to the damage suffered by the target if it is not guarding when hit."
+      "Description": "Unknown. It may multiply damage against enemies that are not blocking. Leave it at 1 until tests prove more."
     },
     {
       "Field": "vitalSpotChangeRate",
       "Name": "Damage on Hit %: Weak Point",
-      "Description": "Multiplier to the damage suffered by the target if it is hit in a part designated as a 'weak point'."
+      "Description": "Unknown. It may multiply damage on weak-point hits. Leave it alone until tests prove more."
     },
     {
       "Field": "normalSpotChangeRate",
       "Name": "Damage on Hit %: Standard",
-      "Description": "Multiplier to the damage suffered by the target if it is hit normally."
+      "Description": "Unknown. It may multiply damage on normal hits. Leave it alone until tests prove more."
     },
     {
       "Field": "maxHpChangeRate",
       "Name": "Maximum HP Source Multiplier",
-      "Description": "Multiplier to the maxHpRate values present on the character this effect belongs to."
+      "Description": "Unused. Maximum HP % does this job instead."
     },
     {
       "Field": "behaviorId",
       "Name": "Behavior ID",
-      "Description": "The ID of BehaviorParam or BehaviorParam_PC to apply to the effect's owner.\nRequires stateInfo 142 to function for non-player characters.\nRequires stateInfo 171 to function for player characters."
+      "Description": "The Behavior ID granted to the owner. It needs the Action ID designation behaviour for enemy attacks. Karmic Justice uses 171, but its limits are unproven."
     },
     {
       "Field": "changeHpRate",
       "Name": "Damage HP by Percentage",
-      "Description": "Causes HP loss to the character this effect belongs to by the set value. Negative values will restore. The value is a percentage of the maximum HP of the character."
+      "Description": "Removes this percentage of maximum HP each application. Negative values heal. 100 removes all HP."
     },
     {
       "Field": "changeHpPoint",
       "Name": "Damage HP by Point",
-      "Description": "Causes HP loss to the character this effect belongs to by the set value. Negative values will restore. The value is a flat value."
+      "Description": "Removes this much HP each application. Negative values heal."
     },
     {
       "Field": "changeMpRate",
       "Name": "Damage MP by Percentage",
-      "Description": "Causes MP loss to the character this effect belongs to by the set value. Negative values will restore. The value is a percentage of the maximum MP of the character."
+      "Description": "Probably does nothing. The game has no magic point pool."
     },
     {
       "Field": "changeMpPoint",
       "Name": "Damage MP by Point",
-      "Description": "Causes MP loss to the character this effect belongs to by the set value. Negative values will restore. The value is a flat value."
+      "Description": "Probably does nothing. The game has no magic point pool."
     },
     {
       "Field": "mpRecoverChangeSpeed",
       "Name": "MP Recovery Speed",
-      "Description": "The amount of MP recovered per second."
+      "Description": "Probably does nothing. The game has no magic point pool."
     },
     {
       "Field": "changeStaminaRate",
       "Name": "Damage Stamina by Percentage",
-      "Description": "Causes Stamina loss to the character this effect belongs to by the set value. Negative values will restore. The value is a percentage of the maximum MP of the character."
+      "Description": "Does nothing. Use Stamina Recovery Speed instead."
     },
     {
       "Field": "changeStaminaPoint",
       "Name": "Damage Stamina by Point",
-      "Description": "Causes Stamina loss to the character this effect belongs to by the set value. Negative values will restore. The value is a flat value."
+      "Description": "Does nothing. Use Stamina Recovery Speed instead."
     },
     {
       "Field": "staminaRecoverChangeSpeed",
       "Name": "Stamina Recovery Speed",
-      "Description": "The amount of stamina recovered per second."
+      "Description": "Adds to stamina recovery while this effect is active. Negative values slow recovery. This is a modifier, not the final recovery rate or a percentage."
     },
     {
       "Field": "magicEffectTimeChange",
       "Name": "Magic Effect Duration Change",
-      "Description": "For only spells whose effect duration is set to 0.1 seconds or more, add or subtract the time set to the effect duration.\n\nLingering Dragoncrest Ring uses stateinfo 193 which checks for isExtendSpEffectLife."
+      "Description": "Does nothing. Longer spell durations come from the Lifespan extension behaviour instead."
     },
     {
       "Field": "insideDurability",
       "Name": "Damage Durability by Point",
-      "Description": "Causes Durability loss to the used equipment of the character this effect belongs to by the set value. Negative values will restore. The value is a flat value."
+      "Description": "Damages equipped weapons and armour. Negative values repair them."
     },
     {
       "Field": "maxDurability",
       "Name": "Hits per Durability Loss",
-      "Description": "Affects hits required before durability is consumed. 5 = +5 hits before durability consumed, -5 = -5 hits before durability consumed"
+      "Description": "Adds this many hits before equipment loses durability."
     },
     {
       "Field": "staminaAttackRate",
       "Name": "Attack %: Stamina",
-      "Description": "Multiplies stamina damage dealt."
+      "Description": "Multiplies stamina damage dealt. 1 is unchanged."
     },
     {
       "Field": "poizonAttackPower",
       "Name": "Inflict: Poison",
-      "Description": "Adds to the amount of poison status effect inflicted."
+      "Description": "Adds poison buildup to the owner's attacks."
     },
     {
       "Field": "registIllness",
       "Name": "Inflict: Toxic",
-      "Description": "Adds to the amount of toxic status effect inflicted."
+      "Description": "Adds toxic buildup to the owner's attacks."
     },
     {
       "Field": "registBlood",
       "Name": "Inflict: Bleed",
-      "Description": "Adds to the amount of bleed status effect inflicted."
+      "Description": "Adds bleed buildup to the owner's attacks."
     },
     {
       "Field": "registCurse",
       "Name": "Inflict: Curse",
-      "Description": "Adds to the amount of curse status effect inflicted."
+      "Description": "Adds curse buildup to the owner's attacks."
     },
     {
       "Field": "fallDamageRate",
       "Name": "Fall Damage %",
-      "Description": "Does nothing. Fall control effects use stateInfo 47"
+      "Description": "Does nothing. Falls use the Cat landing behaviour instead."
     },
     {
       "Field": "soulRate",
       "Name": "Soul Absorption %",
-      "Description": "Multiplies souls received from enemies."
+      "Description": "Multiplies souls received from enemies. 1 is unchanged."
     },
     {
       "Field": "equipWeightChangeRate",
       "Name": "Equipment Weight %",
-      "Description": "Multiplies maximum equip weight."
+      "Description": "Multiplies maximum Equip Load. 2 doubles it."
     },
     {
       "Field": "allItemWeightChangeRate",
       "Name": "Item Weight %",
-      "Description": "Multiplies maximum item weight. Does nothing. Probable DeS remnant."
+      "Description": "Does nothing. It is a leftover from Demon's Souls."
     },
     {
       "Field": "soul",
       "Name": "Souls",
-      "Description": "Flat increase/decrease to souls."
+      "Description": "Adds or removes a flat amount of souls."
     },
     {
       "Field": "animIdOffset",
       "Name": "Animation ID Offset",
-      "Description": "Offsets animation IDs. Frequently used to make enemies swap movesets."
+      "Description": "Shifts animation numbers. It can give an enemy a new moveset."
     },
     {
       "Field": "haveSoulRate",
       "Name": "Soul Possession %",
-      "Description": "Multiplies the amount of souls granted after death. Requires base value in character's NpcParam row."
+      "Description": "Multiplies souls the owner drops on death. It may only work from an enemy's own record."
     },
     {
       "Field": "targetPriority",
       "Name": "Target Priority Addition",
-      "Description": "Chance for an enemy to switch aggro targets to/away the effect's owner. Values range from -1 to 1. +1 = 100% chance to target owner instead of current target, -1 = 100% chance to target somebody else instead of current target (effect owner)."
+      "Description": "Positive values encourage enemies to target the owner. Negative values encourage another target."
     },
     {
       "Field": "sightSearchEnemyCut",
       "Name": "Visual Search Reduction %",
-      "Description": "The value to reduce the distance at which enemies see the effect's owner.\n0 = default, 50 = -50% sight distance, 100 = -100% sight distance"
+      "Description": "Shrinks how far enemies see the owner. 50 halves that distance."
     },
     {
       "Field": "hearingSearchEnemyCut",
       "Name": "Auditory Search Reduction %",
-      "Description": "The value to reduce the distance at which enemies hear the effect's owner.\n0 = default, 50 = -50% hearing distance, 100 = -100% hearing distance"
+      "Description": "Shrinks how far enemies hear the owner. 50 halves that distance."
     },
     {
       "Field": "grabityRate",
       "Name": "Animation Playback Speed",
-      "Description": "Multiplies animation speeds. 1 = default, 0.5 = -50% speed, 2 = +100% speed"
+      "Description": "Multiplies animation speed. 1 is unchanged. 0.5 halves it."
     },
     {
       "Field": "registPoizonChangeRate",
       "Name": "Resistance %: Poison",
-      "Description": "Multiplies stat based poison resistance."
+      "Description": "Multiplies poison resistance from stats. 2 doubles it."
     },
     {
       "Field": "registIllnessChangeRate",
       "Name": "Resistance %: Toxic",
-      "Description": "Multiplies stat based toxic resistance."
+      "Description": "Multiplies toxic resistance from stats. 2 doubles it."
     },
     {
       "Field": "registBloodChangeRate",
       "Name": "Resistance %: Bleed",
-      "Description": "Multiplies stat based bleed resistance."
+      "Description": "Multiplies bleed resistance from stats. 2 doubles it."
     },
     {
       "Field": "registCurseChangeRate",
       "Name": "Resistance %: Curse",
-      "Description": "Multiplies stat based curse resistance."
+      "Description": "Multiplies curse resistance from stats. 2 doubles it."
     },
     {
       "Field": "soulStealRate",
       "Name": "Soul Steal %",
-      "Description": "The defense power against HP loss when soul steal move is used."
+      "Description": "Unknown. It may guard HP against Soul Steal. No test has proven it."
     },
     {
       "Field": "lifeReductionRate",
       "Name": "Effect Duration Change %",
-      "Description": "Multiplies the duration of the status effect with the stateInfo specified by lifeReductionType."
+      "Description": "Multiplies the duration of another status. Effect Duration Change Type picks which one."
     },
     {
       "Field": "hpRecoverRate",
       "Name": "HP Recovery %",
-      "Description": "Multiplies healing received."
+      "Description": "Multiplies healing received. 1 is unchanged."
     },
     {
       "Field": "replaceSpEffectId",
       "Name": "Expire SpEffect ID",
-      "Description": "The ID of spEffectParam to add once this effect ends."
+      "Description": "Adds the selected effect when this effect ends."
     },
     {
       "Field": "cycleOccurrenceSpEffectId",
       "Name": "Cycle SpEffect ID",
-      "Description": "The ID of spEffectParam to add once every motionInterval."
+      "Description": "Adds the selected effect at each trigger interval."
     },
     {
       "Field": "atkOccurrenceSpEffectId",
       "Name": "Attack SpEffect ID",
-      "Description": "ID of spEffectParam to add to victim when the owner hits an enemy.\nRequires stateInfo 152 or 153 (and likely other values used for weapon buffs) to work (VFX present)"
+      "Description": "Adds the selected effect to a victim on a hit. It needs a weapon-buff behaviour such as Enhanced Flame or Stun enhancement."
     },
     {
       "Field": "guardDefFlickPowerRate",
       "Name": "Guard Defense Repulsion %",
-      "Description": "The multiplier to apply to guard defense (for deflection)."
+      "Description": "Unknown. It may change weapon bounce off blocks. No test has proven it."
     },
     {
       "Field": "guardStaminaCutRate",
@@ -397,387 +397,387 @@
     {
       "Field": "rayCastPassedTime",
       "Name": "Raycast Passed Time",
-      "Description": "Activation time for passing the line of sight (used for the Evil Eye). In milliseconds."
+      "Description": "Unknown. It belongs to the unused Evil Eye. No test has proven it."
     },
     {
       "Field": "changeSuperArmorPoint",
       "Name": "Poise",
-      "Description": "Flat increase/decrease to poise. Requires stateInfo 155 to work."
+      "Description": "Adds or removes Poise. It needs the Enhanced SA behaviour to work."
     },
     {
       "Field": "bowDistRate",
       "Name": "Ammunition Distance %",
-      "Description": "Addition to the bowDistRate field of the held weapon for the effect's owner."
+      "Description": "Changes the reach of bows and ranged weapons. 0 keeps it normal. Exact values need testing."
     },
     {
       "Field": "spCategory",
       "Name": "SpEffect Category",
-      "Description": "Determines special effect stacking behavior; how effects will react when another effect in the same category is added."
+      "Description": "Groups effects for stacking rules. Each group decides whether a new effect joins, replaces, or restarts the old one. Overwrite restarts the old effect, including its timer."
     },
     {
       "Field": "categoryPriority",
       "Name": "Category Priority",
-      "Description": "Used with specific spCategory values to determine stacking behavior. The higher the value, the lower the priority."
+      "Description": "Resolves priority within compatible stacking categories. Lower values have higher priority."
     },
     {
       "Field": "saveCategory",
       "Name": "Save Category",
-      "Description": "Used to save effects so that they remain after quitting and loading the game. Only one effect per saveCategory is saved."
+      "Description": "Keeps the effect through quit and reload. Only one effect per group survives. This needs testing."
     },
     {
       "Field": "changeMagicSlot",
       "Name": "Attunement Slots (Magic)",
-      "Description": "Increases attunement slots."
+      "Description": ""
     },
     {
       "Field": "changeMiracleSlot",
       "Name": "Attunement Slots (Miracle)",
-      "Description": "Increases attunement slots."
+      "Description": "Probably does nothing. Attunement Slots (Magic) adds slots instead."
     },
     {
       "Field": "heroPointDamage",
       "Name": "Damage: Humanity",
-      "Description": "Flat increase/decrease to humanity stat. -1 = add 1 humanity, 1 = remove 1 humanity"
+      "Description": "Adds or removes humanity. -1 adds 1 and 1 removes 1."
     },
     {
       "Field": "defFlickPower",
       "Name": "Repulsion Defense",
-      "Description": "Modifies the repulsion defense for the effect owner's current weapon."
+      "Description": "Unknown. It may change weapon bounce off the owner's weapon. No test has proven it."
     },
     {
       "Field": "flickDamageCutRate",
       "Name": "Repulsion Damage Absorption %",
-      "Description": "The absorption rate to use when calculating the repulsion damage for the effect owner's current weapon."
+      "Description": "Unknown. It may absorb damage from weapon bounce. No test has proven it."
     },
     {
       "Field": "bloodDamageRate",
       "Name": "Bleed Damage Incurred %",
-      "Description": "Multiplier to the damage portion of the Bleed status effect when it is triggered on the effect's owner."
+      "Description": "Unknown. It may change bleed damage. No test has proven it."
     },
     {
       "Field": "dmgLv_None",
       "Name": "Damage Level: No Impact",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for no-impact hits. No test has proven it."
     },
     {
       "Field": "dmgLv_S",
       "Name": "Damage Level: Small Impact",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for small hits. No test has proven it."
     },
     {
       "Field": "dmgLv_M",
       "Name": "Damage Level: Medium Impact",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for medium hits. No test has proven it."
     },
     {
       "Field": "dmgLv_L",
       "Name": "Damage Level: Large Impact",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for large hits. No test has proven it."
     },
     {
       "Field": "dmgLv_BlowM",
       "Name": "Damage Level: Medium Blow",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for medium blows. No test has proven it."
     },
     {
       "Field": "dmgLv_Push",
       "Name": "Damage Level: Push",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for pushes. No test has proven it."
     },
     {
       "Field": "dmgLv_Strike",
       "Name": "Damage Level: Strike",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for strikes. No test has proven it."
     },
     {
       "Field": "dmgLv_BlowS",
       "Name": "Damage Level: Small Blow",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for small blows. No test has proven it."
     },
     {
       "Field": "dmgLv_Min",
       "Name": "Damage Level: Minimal",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for minimal hits. No test has proven it."
     },
     {
       "Field": "dmgLv_Uppercut",
       "Name": "Damage Level: Uppercut",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for uppercuts. No test has proven it."
     },
     {
       "Field": "dmgLv_BlowLL",
       "Name": "Damage Level: Blow Backwards",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for blowback hits. No test has proven it."
     },
     {
       "Field": "dmgLv_Breath",
       "Name": "Damage Level: Breath",
-      "Description": "The damage animation to use for this damage level if it is applied to the effect's owner."
+      "Description": "Unknown. It may set the stun reaction for breath hits. No test has proven it."
     },
     {
       "Field": "atkAttribute",
       "Name": "Attack Attribute",
-      "Description": "Attack attribute to use when applying attack against the victim for attacks from this effect's owner."
+      "Description": "Sets the physical damage type of the owner's attacks."
     },
     {
       "Field": "spAttribute",
       "Name": "Special Attribute",
-      "Description": "Special attributes to use when applying attack against the victim for attacks from this effect's owner."
+      "Description": "Sets the special damage type of the owner's attacks. It changes hit effects and death animations."
     },
     {
       "Field": "stateInfo",
       "Name": "State Info",
-      "Description": "ID of hardcoded system to use for unique effects. Causes effects itself and is necessary for certain fields to work.\nAlso used for visual effects by referring to the ID of a SpEffectVfxParam to use if useSpEffectEffect is true."
+      "Description": "Selects the built-in system that grants unique effects. Many fields need the right value here to work. It also picks particle effects when Trigger Particles via SpEffect is on."
     },
     {
       "Field": "wepParamChange",
       "Name": "Weapon Influence Type",
-      "Description": "Determines how specific fields, such as damage modifiers, behave with certain attack categories"
+      "Description": "Limits the damage fields to one hand or all attacks. Ignore and Kick need testing."
     },
     {
       "Field": "moveType",
       "Name": "Movement Type",
-      "Description": "Offsets character movement animations."
+      "Description": "Swaps the movement animation set. Chameleon and Iron Flesh use this."
     },
     {
       "Field": "lifeReductionType",
       "Name": "Effect Duration Change Type",
-      "Description": "Determines the type of status effect to modify the duration of. SpEffects with the specified stateInfo will be affected."
+      "Description": "Picks the status whose duration Effect Duration Change % scales. The wiki says 2 means poison and 5 means toxic. The select names disagree, so this needs testing."
     },
     {
       "Field": "throwCondition",
       "Name": "Throw Condition",
-      "Description": "Affects the throwing masks."
+      "Description": "Changes grab rules like backstabs and ripostes. None keeps them normal. Most values need testing."
     },
     {
       "Field": "addBehaviorJudgeId_condition",
       "Name": "Behavior ID: Condition",
-      "Description": "A condition value for the BehaviorJudgeId value used by the current owner."
+      "Description": "May block certain attacks. No test links values to attacks."
     },
     {
       "Field": "addBehaviorJudgeId_add",
       "Name": "Behavior ID: Add",
-      "Description": "A value for the BehaviorJudgeId value used by the current owner."
+      "Description": "Unknown. It may shift attack behavior numbers. Tests have failed so far."
     },
     {
       "Field": "effectTargetSelf",
       "Name": "Apply to Self",
-      "Description": "Will affect the effect's owner."
+      "Description": ""
     },
     {
       "Field": "effectTargetFriend",
       "Name": "Apply to Friend",
-      "Description": "Will affect the effect's owner's allies."
+      "Description": ""
     },
     {
       "Field": "effectTargetEnemy",
       "Name": "Apply to Enemy",
-      "Description": "Will affect the effect's owner's enemies."
+      "Description": ""
     },
     {
       "Field": "effectTargetPlayer",
       "Name": "Apply to Player",
-      "Description": "Will affect the player."
+      "Description": ""
     },
     {
       "Field": "effectTargetAI",
       "Name": "Apply to Non-Player",
-      "Description": "Will affect non-player characters."
+      "Description": ""
     },
     {
       "Field": "effectTargetLive",
       "Name": "Apply to Host",
-      "Description": "Will affect host player in multiplayer sessions."
+      "Description": "Lets the effect touch human characters. Hollows are excluded."
     },
     {
       "Field": "effectTargetGhost",
       "Name": "Apply to Phantom",
-      "Description": "Will affect all types of client players in multiplayer sessions."
+      "Description": "Lets the effect touch hollow characters."
     },
     {
       "Field": "effectTargetWhiteGhost",
       "Name": "Apply to Friendly Phantom",
-      "Description": "Will affect friendly client players in multiplayer sessions."
+      "Description": "Lets the effect touch white phantoms."
     },
     {
       "Field": "effectTargetBlackGhost",
       "Name": "Apply to Hostile Phantom",
-      "Description": "Will affect hostile client players in multiplayer sessions."
+      "Description": "Lets the effect touch red phantoms."
     },
     {
       "Field": "effectTargetAttacker",
       "Name": "Apply to Attacker",
-      "Description": "When effect is added via equipParamWeapon spEffectBehavior field, this field determines if the effect will be applied to attacked enemies instead of the effect owner.\ntrue = affects victim, false = affects owner"
+      "Description": "Sends the effect back to the attacker. The victim must catch it from a bullet, attack, or weapon. Healing and damage fields then hit the attacker instead."
     },
     {
       "Field": "dispIconNonactive",
       "Name": "Display Icon when Inactive",
-      "Description": "If ON, the interface icon for the effect will still disabled even if the effect is inactive due to a failed conditional check."
+      "Description": "Unknown. It may show the icon before the effect starts. It is never used."
     },
     {
       "Field": "useSpEffectEffect",
       "Name": "Trigger Particles via SpEffect",
-      "Description": "If ON, visual effects via SpEffectVfxParam will be used. See stateInfo for the ID of SpEffectVfxParam to be used."
+      "Description": "Shows the State Info particle effect while active."
     },
     {
       "Field": "bAdjustMagicAblity",
       "Name": "Apply Intelligence Correction",
-      "Description": "If ON, the intelligence stat will be used to correct various fields, such as damage."
+      "Description": "Lets a catalyst's magic adjustment scale some fields. Exact conditions need testing."
     },
     {
       "Field": "bAdjustFaithAblity",
       "Name": "Apply Faith Correction",
-      "Description": "If ON, the faith stat will be used to correct various fields, such as damage."
+      "Description": "Lets a talisman's magic adjustment scale some fields. Exact conditions need testing."
     },
     {
       "Field": "bGameClearBonus",
       "Name": "Apply Modifiers only after Game Clear",
-      "Description": "If ON, this effect will only be active in NG+ or higher."
+      "Description": "Limits the effect to NG+ and beyond."
     },
     {
       "Field": "magParamChange",
       "Name": "Apply Modifiers to Sorcery",
-      "Description": "If ON, damage and scaling fields will apply to sorcery and pyromancies."
+      "Description": "Extends damage fields to sorceries and pyromancies."
     },
     {
       "Field": "miracleParamChange",
       "Name": "Apply Modifiers to Miracles",
-      "Description": "If ON, damage and scaling fields will apply to miracles."
+      "Description": "Extends damage fields to miracles."
     },
     {
       "Field": "clearSoul",
       "Name": "Clear Held Souls",
-      "Description": "Sets soul counter to 0."
+      "Description": ""
     },
     {
       "Field": "requestSOS",
       "Name": "Request: Friendly Phantom",
-      "Description": "Used only by White Sign Soapstone. Probably used for network matchmaking."
+      "Description": "Used only by the White Sign Soapstone. It probably drives matchmaking."
     },
     {
       "Field": "requestBlackSOS",
       "Name": "Request: Hostile Phantom",
-      "Description": "Used only by Red Sign Soapstone. Probably used for network matchmaking."
+      "Description": "Used only by the Red Sign Soapstone. It probably drives matchmaking."
     },
     {
       "Field": "requestForceJoinBlackSOS",
       "Name": "Request: Invader",
-      "Description": "Used only by (Cracked) Red Eye Orb. Probably used for network matchmaking."
+      "Description": "Used only by the Cracked Red Eye Orb. It probably drives matchmaking."
     },
     {
       "Field": "requestKickSession",
       "Name": "Request: Kick Phantom",
-      "Description": "Possibly kicks all clients out of your world."
+      "Description": "Possibly removes all guests from the world."
     },
     {
       "Field": "requestLeaveSession",
       "Name": "Request: Leave",
-      "Description": "Used only by Black Separation Crystal. Probably used to leave network sessions."
+      "Description": "Used only by the Black Separation Crystal. It probably leaves the session."
     },
     {
       "Field": "requestNpcInveda",
       "Name": "Request: Character Invader",
-      "Description": "Used only by Black Eye Orb (Lautrec quest and cut Shiva quest)."
+      "Description": "Used only by the Black Eye Orb. It starts a scripted invasion."
     },
     {
       "Field": "noDead",
       "Name": "Is Owner Undying",
-      "Description": "If ON, character cannot become a corpse (and thus die)."
+      "Description": "Stops the owner from dying. It may only work in Remastered."
     },
     {
       "Field": "bCurrHPIndependeMaxHP",
       "Name": "Ignore Current HP on Max HP Change",
-      "Description": "Determines how current HP behaves when maximum HP is modified. true = current HP will not change, false = current HP will change with max HP"
+      "Description": "Keeps current HP fixed when Maximum HP % changes it. Off means current HP scales along."
     },
     {
       "Field": "corrosionIgnore",
       "Name": "Disable Durability",
-      "Description": "If ON, disables durability damage to the effect owner's weapons and armor."
+      "Description": "May protect the owner's gear from durability damage. This needs testing."
     },
     {
       "Field": "sightSearchCutIgnore",
       "Name": "Ignore Visual Search Adjustments",
-      "Description": "If ON, visual search adjustments from sightSearchEnemyCut are ignored by the effect owner."
+      "Description": "May let the owner ignore Visual Search Reduction %. This needs testing."
     },
     {
       "Field": "hearingSearchCutIgnore",
       "Name": "Ignore Auditory Search Adjustments",
-      "Description": "If ON, auditory search adjustments from hearingSearchEnemyCut are ignored by the effect owner."
+      "Description": "May let the owner ignore Auditory Search Reduction %. This needs testing."
     },
     {
       "Field": "antiMagicIgnore",
       "Name": "Ignore Magic Block",
-      "Description": "If ON, magic blocking effects are ignored by the effect owner (Vow of Silence)."
+      "Description": "May let the owner ignore Vow of Silence. This needs testing."
     },
     {
       "Field": "fakeTargetIgnore",
       "Name": "Ignore Decoy Target",
-      "Description": "If ON, the effect owner will ignore fake targets (Aural Decoy projectiles)."
+      "Description": "May let the owner ignore Aural Decoy. This needs testing."
     },
     {
       "Field": "fakeTargetIgnoreUndead",
       "Name": "Ignore Decoy Target (Undead)",
-      "Description": "If ON, the effect owner will ignore fake undead targets (Alluring Skull projectiles)."
+      "Description": "May let the owner ignore Alluring Skulls. This needs testing."
     },
     {
       "Field": "fakeTargetIgnoreAnimal",
       "Name": "Ignore Decoy Target (Animal)",
-      "Description": "If ON, the effect owner will ignore fake animal targets."
+      "Description": "Unknown. It is never used."
     },
     {
       "Field": "grabityIgnore",
       "Name": "Ignore Animation Playback Speed Changes",
-      "Description": "If ON, the effect owner ignores grabityRate changes."
+      "Description": "Makes the owner ignore Animation Playback Speed."
     },
     {
       "Field": "disablePoison",
       "Name": "Is Immune to Poison",
-      "Description": "If ON, effect owner becomes immune to poison."
+      "Description": ""
     },
     {
       "Field": "disableDisease",
       "Name": "Is Immune to Toxic",
-      "Description": "If ON, effect owner becomes immune to toxic."
+      "Description": ""
     },
     {
       "Field": "disableBlood",
       "Name": "Is Immune to Bleed",
-      "Description": "If ON, effect owner becomes immune to bleed."
+      "Description": ""
     },
     {
       "Field": "disableCurse",
       "Name": "Is Immune to Curse",
-      "Description": "If ON, effect owner becomes immune to curse."
+      "Description": ""
     },
     {
       "Field": "enableCharm",
       "Name": "Is Vulnerable to Charm",
-      "Description": "If ON, effect owner is vulnerable to charm effects (Undead Rapport)."
+      "Description": "May let Undead Rapport charm the owner. This needs testing."
     },
     {
       "Field": "enableLifeTime",
       "Name": "Enable Duration via TimeAct Event",
-      "Description": "If ON, the effect duration can be extended by a TimeAct event.."
+      "Description": "Unknown. It may end the effect when the owner dies. This needs testing."
     },
     {
       "Field": "hasTarget",
       "Name": "Enable Target Activation",
-      "Description": "If ON, enable the activation conditions for the Evil Eye."
+      "Description": "Unknown. It belongs to the unused Evil Eye."
     },
     {
       "Field": "isFireDamageCancel",
       "Name": "Cancel Effect on Fire Damage",
-      "Description": "If ON, this effect will be cancelled early if fire damage is applied to the effect owner."
+      "Description": "Unknown. It is never used. It grants no fire immunity."
     },
     {
       "Field": "isExtendSpEffectLife",
       "Name": "Is Affected by Spell Duration Extension",
-      "Description": "Determines if effectEndurance will be affected by stateInfo 193 which is used by the Lingering Dragoncrest Ring."
+      "Description": "Lets the Lingering Dragoncrest Ring stretch this effect. The ring uses the Lifespan extension behaviour."
     },
     {
       "Field": "requestLeaveColiseumSession",
       "Name": "Request: Leave Undead Match",
-      "Description": "Used only by Purple Coward's Crystal."
+      "Description": "Used only by the Purple Coward's Crystal. It leaves the match."
     },
     {
       "Field": "pad_2",
@@ -787,82 +787,82 @@
     {
       "Field": "vowType0",
       "Name": "Trigger: None",
-      "Description": "Effect usable while in no covenant."
+      "Description": "The effect only works with no covenant."
     },
     {
       "Field": "vowType1",
       "Name": "Trigger: Way of White",
-      "Description": "Effect usable while in Way of White covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType2",
       "Name": "Trigger: Princess Guard",
-      "Description": "Effect usable while in Princess Guard covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType3",
       "Name": "Trigger: Warrior of Sunlight",
-      "Description": "Effect usable while in Warrior of Sunlight covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType4",
       "Name": "Trigger: Darkwaith",
-      "Description": "Effect usable while in Darkwraith covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType5",
       "Name": "Trigger: Path of the Dragon",
-      "Description": "Effect usable while in Path of the Dragon covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType6",
       "Name": "Trigger: Gravelord Servant",
-      "Description": "Effect usable while in Gravelord Servant covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType7",
       "Name": "Trigger: Forest Hunter",
-      "Description": "Effect usable while in Forest Hunter covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType8",
       "Name": "Trigger: Blade of the Dark Moon",
-      "Description": "Effect usable while in Blade of the Dark Moon covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType9",
       "Name": "Trigger: Chaos Servant",
-      "Description": "Effect usable while in Chaos Servant covenant."
+      "Description": "The effect only works in this covenant."
     },
     {
       "Field": "vowType10",
       "Name": "Trigger: 10",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "vowType11",
       "Name": "Trigger: 11",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "vowType12",
       "Name": "Trigger: 12",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "vowType13",
       "Name": "Trigger: 13",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "vowType14",
       "Name": "Trigger: 14",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "vowType15",
       "Name": "Trigger: 15",
-      "Description": "Effect usable while in ? covenant."
+      "Description": "Never used. Leave it off."
     },
     {
       "Field": "pad1",

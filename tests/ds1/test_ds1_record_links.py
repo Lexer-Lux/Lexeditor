@@ -301,7 +301,7 @@ def test_projectile_hit_id_links_to_child_projectiles():
         document.edit('Bullet', 100, 'HitBulletID', 999999)
 
 
-def test_effect_behavior_links_npc_behaviors_but_not_pc_ones():
+def test_effect_behavior_links_npc_and_pc_behaviors():
     document = ItemDocument(make_effects_archive())
     poke(document, 'SpEffectParam', 6890, 'stateInfo', 142)
     poke(document, 'SpEffectParam', 6890, 'behaviorId', 101)
@@ -315,7 +315,9 @@ def test_effect_behavior_links_npc_behaviors_but_not_pc_ones():
     with pytest.raises(FormatError):
         document.edit('SpEffectParam', 6890, 'behaviorId', 999999)
     poke(document, 'SpEffectParam', 6890, 'stateInfo', 171)
-    assert 'behaviorId' not in links(document, 'SpEffectParam', 6890)
+    found = links(document, 'SpEffectParam', 6890)
+    assert (found['behaviorId']['kind'], found['behaviorId']['table']) == ('behavior', 'BehaviorParam_PC')
+    assert found['behaviorId']['id'] == 101 and found['behaviorId']['resolved']
 
 
 def test_magic_replace_id_links_to_spells():
@@ -398,6 +400,28 @@ def test_source_id_help_names_derivation():
                            for item in document.schemas[table]['fields'] if item['spec'].key == key)
         assert 'blacksmith' in description
         assert 'not separate records' in description
+
+
+def test_reinforce_effect_offsets_stay_numbers():
+    # Stats upgrade Effect #1-3 are NOT effect IDs: From's own PARAMDEF
+    # calls them additive correction values, added to the gear's base
+    # effect at that level. A stored 40 means base+40, never effect 40,
+    # so no record link is emitted (linking would name the wrong effect
+    # and the finder could not write a real ID into a u8 anyway).
+    document = ItemDocument(make_effects_archive(table_ids={
+        'ReinforceParamWeapon': [100], 'ReinforceParamProtector': [200]}))
+    cases = (('ReinforceParamWeapon', 100, 'spEffectId1'),
+             ('ReinforceParamWeapon', 100, 'spEffectId2'),
+             ('ReinforceParamWeapon', 100, 'spEffectId3'),
+             ('ReinforceParamWeapon', 100, 'residentSpEffectId1'),
+             ('ReinforceParamProtector', 200, 'residentSpEffectId2'))
+    for table, row_id, key in cases:
+        poke(document, table, row_id, key, 40)
+        assert key not in links(document, table, row_id)
+        field = next(item for item in document.read_row(table, row_id)['fields']
+                     if item['key'] == key)
+        assert field['type'] == 'number'
+        assert 'Offset' in field['label']
 
 
 def test_a_link_pointing_at_none_is_emitted_unresolved():

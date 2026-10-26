@@ -387,3 +387,24 @@ def test_menu_labels_list_read_and_edit_as_records():
     with pytest.raises(FormatError):
         document.edit("MenuText", 102204, "label", "x")
 
+def test_records_compare_preserved_vanilla_not_deployed_live(tmp_path):
+    # The Records tab compares a mod against vanilla as shipped, not the
+    # live files: once another mod is applied, the live archive holds
+    # its rows, and comparing against those would report its edits as
+    # this mod's (the 1000-phantom-entries failure).
+    from plugins.ds1 import deployment
+    game, decoy, subject = tmp_path / "game", tmp_path / "decoy", tmp_path / "subject"
+    (game / RELATIVE).parent.mkdir(parents=True)
+    (game / RELATIVE).write_bytes(VANILLA)
+    for folder in (decoy, subject):
+        (folder / RELATIVE).parent.mkdir(parents=True)
+        (folder / MARKER).touch()
+    (decoy / RELATIVE).write_bytes(edited(("EquipParamGoods", 100, "sellValue", 42)))
+    deployment.apply(game, decoy)
+    assert value((game / RELATIVE).read_bytes(), "EquipParamGoods", 100, "sellValue") == 42
+    (subject / RELATIVE).write_bytes(edited(("EquipParamGoods", 101, "maxNum", 7)))
+    reported = mod_loader.describe_changes(subject, game)
+    assert [(entry["table"], entry["id"]) for entry in reported["changes"]] == [
+        ("EquipParamGoods", 101)]
+    assert reported["total"] == 1 and not reported["truncated"]
+    assert reported["note"] == ""

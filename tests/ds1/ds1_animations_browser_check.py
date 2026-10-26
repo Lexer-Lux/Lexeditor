@@ -150,6 +150,10 @@ def main():
                     page.locator("[data-anim-list] .lex-list-row", has_text="a87_3300.HKX").click()
                     page.locator('[data-anim-left] [data-tabstrip-id="events"]').click()
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===4 && state.row")
+                    style = page.locator("[data-tae-action]").evaluate_all(
+                        "nodes=>nodes.map(n=>({action:n.dataset.taeAction,icon:n.classList.contains('lex-header-icon'),label:n.getAttribute('aria-label')}))")
+                    assert style == [{"action": "add", "icon": True, "label": "Add event"},
+                                     {"action": "remove", "icon": True, "label": "Remove event"}], style
                     page.locator('[data-tae-action="add"]').click()
                     page.wait_for_selector('[data-tae-input="type"]')
                     assert page.locator('[data-tae-input="type"] option').count() > 40

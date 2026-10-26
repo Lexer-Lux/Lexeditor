@@ -1,11 +1,12 @@
 """DS1 textures tab: individual textures list, true blanks, scrolling preview.
 
 A multi-texture TPF expands into one row per texture (each naming its
-container file); single-texture files, split archives and unreadable
-files keep their file rows. Blank detection reads every pixel: a white
-texture with one red pixel shows its picture, while a truly flat one
-keeps the blank note with no image. The magnifier drawer scrolls, so a
-tall texture does not clip.
+container file), and so does a .chrtpfbdt character archive, one row
+per member texture. Single-texture files, split header/data pairs and
+unreadable files keep their file rows. Blank detection reads every
+pixel: a white texture with one red pixel shows its picture, while a
+truly flat one keeps the blank note with no image. The magnifier drawer
+scrolls, so a tall texture does not clip.
 """
 import struct
 import sys
@@ -15,7 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bhf_fixture import make_bhf
+from bhf_fixture import make_bhf, make_edge
+from bdf_fixture import make_bdf
 from ds1_fixture import make_archive, make_text_archive
 from plugins.ds1 import texts
 from plugins.ds1.store import MARKER, RELATIVE
@@ -27,6 +29,7 @@ SOLO = 'chr/c0000/solo.tpf'
 DDS = 'chr/c0000/face.dds'
 BHD = 'map/m10/m10.tpfbhd'
 BDT = 'map/m10/m10.tpfbdt'
+CHR = 'chr/c9999/c9999.chrtpfbdt'
 
 
 def make_dds(width, height, pixels):
@@ -94,6 +97,10 @@ def main():
         ('tall', make_dds(32, 512, checker_pixels(32, 512))),
     ])
     solo = make_tpf([('lone', make_dds(16, 16, checker_pixels(16, 16)))])
+    char = make_bdf([
+        make_tpf([('mail_diffuse', make_dds(16, 16, checker_pixels(16, 16)))]),
+        make_tpf([('mail_normal', make_dds(16, 16, checker_pixels(16, 16)))]),
+    ])
     with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-tex-tab-') as folder:
         temp = Path(folder)
         game, mod = temp / 'game', temp / 'mod'
@@ -105,9 +112,14 @@ def main():
         (game / MULTI).write_bytes(multi)
         (game / SOLO).write_bytes(solo)
         (game / DDS).write_bytes(make_dds(16, 16, checker_pixels(16, 16)))
+        (game / 'chr' / 'c9999').mkdir(parents=True)
+        (game / CHR).write_bytes(char)
         (game / 'map' / 'm10').mkdir(parents=True)
-        (game / 'map' / 'm10' / 'm10.tpfbhd').write_bytes(make_bhf([('/tex0', 0, 8)]))
-        (game / 'map' / 'm10' / 'm10.tpfbdt').write_bytes(b'12345678')
+        edge0 = make_edge(make_tpf([('pair_a', make_dds(16, 16, checker_pixels(16, 16)))]))
+        edge1 = make_edge(make_tpf([('pair_b', make_dds(16, 16, checker_pixels(16, 16)))]))
+        (game / 'map' / 'm10' / 'm10.tpfbhd').write_bytes(
+            make_bhf([('\\tex0', 0, len(edge0)), ('\\tex1', len(edge0), len(edge1))]))
+        (game / 'map' / 'm10' / 'm10.tpfbdt').write_bytes(edge0 + edge1)
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
@@ -125,25 +137,30 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
                     page.locator('[data-tab="textures"]').click()
                     page.wait_for_function(
-                        "state.tab==='textures'&&state.rows&&state.rows.length===8")
+                        "state.tab==='textures'&&state.rows&&state.rows.length===11")
                     page.wait_for_selector('#main .lex-list-row')
                     kinds = page.evaluate('state.rows.map(r=>`${r.table}:${r.name}`)')
                     for name in ('checker', 'solid', 'almost', 'tall'):
                         assert f'AssetTexture:{name}' in kinds, kinds
+                    for name in ('mail_diffuse', 'mail_normal'):
+                        assert f'AssetTexture:{name}' in kinds, kinds
+                    assert all('.chrtpfbdt' not in name for name in kinds), kinds
+                    for name in ('pair_a', 'pair_b'):
+                        assert f'AssetTexture:{name}' in kinds, kinds
+                    assert f'Asset:{BHD}' not in kinds, kinds
                     assert f'Asset:{SOLO}' in kinds, kinds
                     assert f'Asset:{DDS}' in kinds, kinds
-                    assert f'Asset:{BHD}' in kinds, kinds
                     assert f'Asset:{BDT}' in kinds, kinds
                     # Each texture row names its container in the File column.
                     files = page.evaluate(
                         'state.rows.filter(r=>r.table==="AssetTexture").map(r=>r.file)')
-                    assert files == [MULTI] * 4, files
+                    assert files == [MULTI] * 4 + [CHR] * 2 + [BHD] * 2, files
                     row = page.locator('#main .lex-list-row', has_text='almost')
                     assert row.count() == 1
                     assert MULTI in row.inner_text()
                     # Searching the container finds its textures.
                     page.get_by_role('searchbox', name='Search files').fill('multi.tpf')
-                    page.wait_for_function('state.rows.length===8')
+                    page.wait_for_function('state.rows.length===11')
                     page.wait_for_timeout(300)
                     assert page.locator('#main .lex-list-row', has_text='multi.tpf').count() == 4
                     page.get_by_role('searchbox', name='Search files').fill('')
@@ -161,6 +178,24 @@ def main():
                     file_value = page.locator(
                         '.lex-detail-field', has_text='FILE').first.locator('input').input_value()
                     assert file_value == MULTI, file_value
+                    # The header Add wears the shared header-button look: the
+                    # same 28px boxed icon button as every other detail
+                    # header, not the inline new-button style.
+                    add = page.locator(
+                        '.lex-detail-panel-actions button[data-asset-action="add"]')
+                    assert add.count() == 1, add.count()
+                    assert 'lex-header-icon' in (add.get_attribute('class') or '')
+                    assert add.locator('svg').count() == 1
+                    box = add.bounding_box()
+                    assert (box['width'], box['height']) == (28, 28), box
+                    assert page.locator(
+                        '.lex-detail-panel-actions .lex-new-button').count() == 0
+                    # A character-archive texture previews like any other.
+                    page.locator('#main .lex-list-row', has_text='mail_diffuse').click()
+                    page.wait_for_selector('.ds1-texture-tile img')
+                    page.wait_for_function(
+                        "document.querySelector('.ds1-texture-tile img')"
+                        "?.naturalWidth>0")
                     # A truly flat texture keeps the blank note, no picture.
                     page.locator('#main .lex-list-row', has_text='solid').click()
                     page.wait_for_function(
@@ -187,8 +222,8 @@ def main():
                     page.wait_for_function(
                         'String(state.selected).startsWith("AssetTexture:")')
                     assert page.evaluate('state.row.file') == MULTI
-                    # Split archives still list as whole files, unpreviewed.
-                    archive = page.locator('#main .lex-list-row', has_text=BHD)
+                    # Split data halves still list as whole files, unpreviewed.
+                    archive = page.locator('#main .lex-list-row', has_text=BDT)
                     assert archive.count() == 1
                     assert 'Split archive' in archive.inner_text()
                     assert not errors, f'page errors: {errors[:3]}'

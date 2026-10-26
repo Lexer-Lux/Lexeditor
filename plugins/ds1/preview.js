@@ -199,8 +199,22 @@ window.Ds1Preview = (() => {
     image.alt = `${options.label} model`;
     image.className = "ds1-model-thumbnail lex-image-pending";
     const key = options.url;
-    requestAnimationFrame(async () => {
+    requestAnimationFrame(() => {
       if (!image.isConnected) return;
+      // The snapshot queue is serial, so visible thumbnails render first:
+      // images in hidden rows (filtered out, paged away) wait until they
+      // actually show instead of hogging turns. Pending images keep their
+      // layout box, so only truly hidden rows wait.
+      const seen = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        seen.disconnect();
+        image._lexVisibility = null;
+        begin();
+      });
+      image._lexVisibility = seen;
+      seen.observe(image);
+    });
+    const begin = async () => {
       try {
         let source = thumbCache.get(key);
         if (source) { thumbCache.delete(key); thumbCache.set(key, source); }
@@ -229,7 +243,7 @@ window.Ds1Preview = (() => {
       } catch (_error) {
         if (image.isConnected) image.replaceWith(window.LexeditorUI.noThumbnail("ds1"));
       }
-    });
+    };
     return image;
   }
   return {mount, stop, thumbnail};

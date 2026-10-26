@@ -1,6 +1,7 @@
 """Render the Stats tab's lists and edit/save/reload, never game files."""
 import hashlib
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -85,6 +86,14 @@ def main():
             (Path(real_root) / texts.MENU_RELATIVE).read_bytes() if real_root else make_menu_archive(
                 extra={texts.CLASS_DESCRIPTION_FILE: {
                     132320: 'Warrior test.', 132355: 'Gift test.', 132357: 'Gift test.'}}))
+        if real_root:
+            # Label art reads the installed menu archives, so the
+            # acceptance run carries them (~32MB); fixtures have none.
+            (game / 'menu').mkdir(parents=True)
+            for name in ('menu.drb', 'menu_0.tpf.dcx', 'menu_1.tpf.dcx',
+                         'menu_2.tpf.dcx', 'menu_3.tpf.dcx',
+                         'menu_4.tpf.dcx', 'menu_5.tpf.dcx'):
+                shutil.copy(Path(real_root) / 'menu' / name, game / 'menu' / name)
         mod.mkdir()
         (mod / MARKER).touch()
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
@@ -135,12 +144,26 @@ def main():
                             formula = page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-follow')
                             assert formula.count() == 1
                             assert formula.get_attribute('aria-label') == \
-                                'V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S'
+                                'V(x) = V1 + (V2 - V1) * ((x - T1)/(T2 - T1))^S1'
                             assert page.locator('.lex-curve-editor[data-curve-row] .lex-curve-math-atom').count() > 0
                         elif tab == 'starting-gifts':
                             assert set(keys) == set(GIFT_FIELDS), keys
                         elif tab == 'levelup':
                             assert set(keys) == {name for name, _, _ in levelup_gains.INPUTS}, keys
+                            # Nine stat icons on the weights, four defense
+                            # icons on the rows, through the shared label art.
+                            assert page.locator('.lex-detail-panel [data-lex-icon]').count() == 9
+                            assert page.evaluate('state.rows.map(r=>r.labelKind)') == [
+                                levelup_gains.ROW_ICONS[key] for key, _ in levelup_gains.OUTPUTS]
+                            if real_root:
+                                page.wait_for_function(
+                                    "() => [...document.querySelectorAll("
+                                    "'.lex-detail-panel [data-lex-icon] img.lex-ds1-label-art')]"
+                                    ".filter(img => img.naturalWidth > 0).length === 9")
+                                page.evaluate('state.pagedView.pinOwner.toggle("icon","Icon")')
+                                page.wait_for_function(
+                                    "() => document.querySelectorAll("
+                                    "'.lex-list-row img[src*=\"/api/label\"]').length === 4")
                         else:
                             assert set(keys) == set(STATS_FIELDS[table]), keys
                         if tab == 'starting-classes':
@@ -232,16 +255,17 @@ def main():
                             changes.append((identity['table'], identity['id'], field, value))
                         if output:
                             page.screenshot(path=str(output / f'stats-{tab}.png'))
-                    # The level-up cost row has no stages to plot: it keeps
-                    # the plain field list instead of a graph.
+                    # The level-up cost row plots its graph like every other curve;
+                    # its values stay editable in the variables drawer.
                     page.locator('[data-subtab="curves"]').click()
                     page.wait_for_function('state.sub==="curves" && state.rows.length>0 && !state.error')
                     page.locator('.lex-list-row[data-key="CalcCorrectGraph:200"]').click()
                     page.wait_for_function('state.row && state.row.id===200 && !state.error')
-                    assert page.locator('.lex-curve-editor[data-curve-row]').count() == 0
+                    assert page.locator('.lex-curve-editor[data-curve-row]').count() == 1
                     assert {field.get_attribute('data-field-key') for field in
-                            page.locator('input[data-field-key]').all()} == set(
-                        STATS_FIELDS['CalcCorrectGraph'])
+                            page.locator('input[data-field-key]').all()} == {
+                        'init_inclination_soul', 'adjustment_value',
+                        'boundry_inclination_soul', 'boundry_value'}
                     page.locator('#global-save').click()
                     page.wait_for_function('state.dirty===0 && state.pending===0')
                     page.reload()

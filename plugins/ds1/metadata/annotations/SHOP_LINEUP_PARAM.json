@@ -7,42 +7,42 @@
     {
       "Field": "equipId",
       "Name": "Item ID",
-      "Description": "The item ID that is sold."
+      "Description": "The item this shop row sells. Equipment Type sets its list."
     },
     {
       "Field": "value",
       "Name": "Sale Price",
-      "Description": "The cost of item sold. Overrides the sellValue in item's row."
+      "Description": "How many souls this item costs in a shop. The attunement menu ignores it."
     },
     {
       "Field": "mtrlId",
       "Name": "Material ID",
-      "Description": "The material cost when purchasing an item, or equipping a spell."
+      "Description": "Extra items this purchase also costs. None means the buyer pays souls only."
     },
     {
       "Field": "eventFlag",
       "Name": "Stock Flag ID",
-      "Description": "The ID of an 8-bit event value that stores sold item quantity. Used for any items that are not sold infinitely."
+      "Description": "Where the game saves how many of this item sold. The game needs it only when Quantity limits stock."
     },
     {
       "Field": "qwcId",
       "Name": "World Tendency ID",
-      "Description": "Demon's Souls leftover. Probably doesn't work."
+      "Description": "Unused in this game. A Demon's Souls leftover."
     },
     {
       "Field": "sellQuantity",
       "Name": "Quantity",
-      "Description": "The maximum amount of items that can be sold. -1 for infinite. Requires an eventFlag for quantity sold to be saved."
+      "Description": "How many of this item the shop can sell. -1 means unlimited. Limited stock needs a Stock Flag ID to save what sold."
     },
     {
       "Field": "shopType",
       "Name": "Shop Type",
-      "Description": "The type of shop this row belongs to."
+      "Description": "Which shop menu shows this row. A row never appears in another menu."
     },
     {
       "Field": "equipType",
       "Name": "Equipment Type",
-      "Description": "The type of equipment the sold item is."
+      "Description": "Which item list holds the Item ID. Must match the item above."
     },
     {
       "Field": "pad_0",

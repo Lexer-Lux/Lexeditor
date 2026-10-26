@@ -7,142 +7,142 @@
     {
       "Field": "logicId",
       "Name": "Logic Script ID",
-      "Description": "The logic script to use for this character."
+      "Description": "The AI script that drives this enemy."
     },
     {
       "Field": "battleGoalID",
       "Name": "Battle Goal ID",
-      "Description": "The battle script to use for this character."
+      "Description": "The combat script this enemy runs in battle."
     },
     {
       "Field": "nearDist",
       "Name": "Battle Distance: Short (metres)",
-      "Description": "The distance between this character and the target that is treated as 'short' for combat distance calculations."
+      "Description": "Targets closer than this count as near. The enemy picks close-range attacks."
     },
     {
       "Field": "midDist",
       "Name": "Battle Distance: Medium (metres)",
-      "Description": "The distance between this character and the target that is treated as 'medium' for combat distance calculations."
+      "Description": "Targets closer than this count as mid-range. The enemy picks mid-range attacks."
     },
     {
       "Field": "farDist",
       "Name": "Battle Distance: Long (metres)",
-      "Description": "The distance between this character and the target that is treated as 'long' for combat distance calculations."
+      "Description": "Targets closer than this count as far. The enemy picks ranged attacks."
     },
     {
       "Field": "outDist",
       "Name": "Battle Distance: End (metres)",
-      "Description": "The distance between this character and the target that ends combat aggression. A character outside of this range will no longer attempt combat actions."
+      "Description": "Targets past this are out of range. The enemy stops trying combat moves."
     },
     {
       "Field": "BackHomeLife_OnHitEneWal",
       "Name": "Goal Duration on Wall Collision (seconds)",
-      "Description": "The duration of the BackToHome goal when this character hits an enemy wall collision (which blocks movement). In seconds."
+      "Description": "How long this enemy keeps walking home after hitting a barrier. In seconds."
     },
     {
       "Field": "goalID_ToCaution",
       "Name": "Caution State: Goal ID",
-      "Description": "The goal ID to use when this character enters the 'Caution' alert state."
+      "Description": "What this enemy does when it grows wary."
     },
     {
       "Field": "idAttackCannotMove",
       "Name": "Action ID on Blocked Movement",
-      "Description": "The EzState ID to use for the action to perform when this character's movement is stopped by a destructible object."
+      "Description": "The attack this enemy uses when rubble blocks its path."
     },
     {
       "Field": "goalID_ToFind",
       "Name": "Search State: Goal ID",
-      "Description": "The goal ID to use when this character enters the 'Search' alert state."
+      "Description": "What this enemy does when it spots a target."
     },
     {
       "Field": "callHelp_ActionAnimId",
       "Name": "Call for Help: Animation ID (Respond)",
-      "Description": "The action animation ID (EzStateAnimID) to use when responding to a call for help."
+      "Description": "The gesture this enemy plays when answering a call for help."
     },
     {
       "Field": "callHelp_CallActionId",
       "Name": "Call for Help: Animation ID (Call)",
-      "Description": "The action animation ID (EzStateAnimID) to use when calling for help."
+      "Description": "The gesture this enemy plays when calling for help."
     },
     {
       "Field": "eye_dist",
       "Name": "Visual Search Distance (metres)",
-      "Description": "The maximum extent to check for when searching visually (sight) for this character. In metres."
+      "Description": "How far this enemy sees. In metres."
     },
     {
       "Field": "ear_dist",
       "Name": "Auditory Search Distance (metres)",
-      "Description": "The maximum extent to check for when searching aurally (sound) for this character. In metres."
+      "Description": "How far this enemy hears. Set in centimetres."
     },
     {
       "Field": "ear_soundcut_dist",
       "Name": "Auditory Dampening Distance (metres)",
-      "Description": "The distance at which the size of a sound source will be reduced. Sounds below this distance will no longer be heard. In metres."
+      "Description": "Past this distance, sounds fade and may go unheard. In metres."
     },
     {
       "Field": "nose_dist",
       "Name": "Olfactory Search Distance (metres)",
-      "Description": "The maximum extent to check for when searching olfactorily (smell) for this character. This method of searching is never blocked by any obstacle. In metres."
+      "Description": "How far this enemy smells the player. In metres."
     },
     {
       "Field": "maxBackhomeDist",
       "Name": "Battle Act: Return Home Distance (metres)",
-      "Description": "The distance after which this character will always return home. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
+      "Description": "Past this distance from home, this enemy always turns back. In metres."
     },
     {
       "Field": "backhomeDist",
       "Name": "Battle Act: Return Home Distance (Combat) (metres)",
-      "Description": "The distance after which this character will return home if in combat with a target. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
+      "Description": "Past this distance from home, this enemy fights while falling back. In metres."
     },
     {
       "Field": "backhomeBattleDist",
       "Name": "Battle Act: Return Home Abort Distance (metres)",
-      "Description": "The distance whilst in combat, after which an attempt to return home will be aborted. In metres.\nA parameter for the COMMON_SetBattleActLogic script. "
+      "Description": "Past this distance, this enemy gives up going home and keeps fighting. In metres."
     },
     {
       "Field": "nonBattleActLife",
       "Name": "Battle Act: Non-Combat Act Duration (seconds)",
-      "Description": "The duration for non-combat acts whilst this character is aware of a target. In seconds.\nA parameter for the COMMON_SetBattleActLogic script. "
+      "Description": "How long this enemy waits before acting on a sensed target. In seconds."
     },
     {
       "Field": "BackHome_LookTargetTime",
       "Name": "Return Home: Target Look-At Duration (seconds)",
-      "Description": "When this character is returning home, this is the duration they keep looking at their current target for. In seconds."
+      "Description": "How long this enemy watches its target while walking home. In seconds."
     },
     {
       "Field": "BackHome_LookTargetDist",
       "Name": "Return Home: Target Look-At Distance (metres)",
-      "Description": "When this character is returning home, this is the distance at which they keep looking at their current target for. In metres."
+      "Description": "How far this enemy watches its target while walking home. In metres."
     },
     {
       "Field": "SightTargetForgetTime",
       "Name": "Visual Target Forget Duration (frames)",
-      "Description": "The duration after a visual target has been acquired in which it will be forgotten. In frames."
+      "Description": "How long this enemy remembers a seen target. In frames."
     },
     {
       "Field": "SoundTargetForgetTime",
       "Name": "Auditory Target Forget Duration (frames)",
-      "Description": "The duration after a aural target has been acquired in which it will be forgotten. In frames."
+      "Description": "How long this enemy remembers a heard target. In frames."
     },
     {
       "Field": "BattleStartDist",
       "Name": "Battle Start Distance (metres)",
-      "Description": "The distance at which this character will start combat after acquiring a target. In metres."
+      "Description": "How close a spotted target must be before this enemy attacks. In metres."
     },
     {
       "Field": "callHelp_MyPeerId",
       "Name": "Call for Help: Respond Friend Group ID",
-      "Description": "The friend group ID this character belongs to, and thus which other characters it will respond to."
+      "Description": "This enemy's friend group. It answers calls from this group."
     },
     {
       "Field": "callHelp_CallPeerId",
       "Name": "Call for Help: Call Friend Group ID",
-      "Description": "The friend group ID this character belongs to, and thus which other characters it can call to."
+      "Description": "The friend group this enemy calls to. Only that group answers."
     },
     {
       "Field": "targetSys_DmgEffectRate",
       "Name": "Damage Effect Rate",
-      "Description": "The damage effect rate for this character, used in the target system evaluation."
+      "Description": "How strongly pain draws this enemy's focus. The exact effect is not established."
     },
     {
       "Field": "TeamAttackEffectivity",
@@ -152,107 +152,107 @@
     {
       "Field": "eye_angX",
       "Name": "Visual Search: Horizontal Angle (degrees)",
-      "Description": "The horizontal cone within which the visual search is performed. In degrees."
+      "Description": "How tall the sight cone is. In degrees."
     },
     {
       "Field": "eye_angY",
       "Name": "Visual Search: Vertical Angle (degrees)",
-      "Description": "The vertical cone within which the visual search is performed. In degrees."
+      "Description": "How wide the sight cone is. In degrees."
     },
     {
       "Field": "ear_angX",
       "Name": "Auditory Search: Horizontal Angle (degrees)",
-      "Description": "The horizontal cone within which the aural search is performed. In degrees."
+      "Description": "How tall the hearing cone is. In degrees."
     },
     {
       "Field": "ear_angY",
       "Name": "Auditory Search: Vertical Angle (degrees)",
-      "Description": "The vertical cone within which the aural search is performed. In degrees."
+      "Description": "How wide the hearing cone is. In degrees."
     },
     {
       "Field": "callHelp_CallValidMinDistTarget",
       "Name": "Call for Help: Minimum Distance to Target (metres)",
-      "Description": "If a character is closer than this distance to their target, they cannot call for friends. In metres."
+      "Description": "This enemy cannot call for help closer to its target than this. In metres."
     },
     {
       "Field": "callHelp_CallValidRange",
       "Name": "Call for Help: Maximum Distance to Friend (metres)",
-      "Description": "If a character is further than this distance to a friend, they cannot call the friend. In metres."
+      "Description": "Friends past this cannot hear the call. In metres."
     },
     {
       "Field": "callHelp_ForgetTimeByArrival",
       "Name": "Call for Help: Respond Duration (seconds)",
-      "Description": "When a friend is called, this is the duration it takes to answer and then forget the call. In seconds."
+      "Description": "How long a called friend stays alert after answering. In seconds."
     },
     {
       "Field": "callHelp_MinWaitTime",
       "Name": "Call for Help: Minimum Delay (ms)",
-      "Description": "The minimum duration after a call that any friend responses can occur. In milliseconds."
+      "Description": "Shortest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
     },
     {
       "Field": "callHelp_MaxWaitTime",
       "Name": "Call for Help: Maximum Delay (ms)",
-      "Description": "The maximum duration after a call that any friend responses can occur. In milliseconds."
+      "Description": "Longest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
     },
     {
       "Field": "goalAction_ToCaution",
       "Name": "Caution State: Goal Action",
-      "Description": "The goal action when this character becomes alert."
+      "Description": "What this enemy does the moment it grows wary."
     },
     {
       "Field": "goalAction_ToFind",
       "Name": "Search State: Goal Action",
-      "Description": "The goal action when this character acquires a target."
+      "Description": "What this enemy does the moment it spots a target."
     },
     {
       "Field": "callHelp_ReplyBehaviorType",
       "Name": "Call for Help: Post-Response Action Type",
-      "Description": "The action type for reaching the friend's position after responding to a call."
+      "Description": "How a called friend moves to the caller."
     },
     {
       "Field": "disablePathMove",
       "Name": "Disable Path Movement",
-      "Description": "If ON, then path movement using the navigation mesh is ignored, and direct movement occurs in a straight line (obstacles are not accounted for)."
+      "Description": "If ON, this enemy walks straight at its goal. It ignores paths and may hit walls."
     },
     {
       "Field": "skipArrivalVisibleCheck",
       "Name": "Skip Arrival Line of Sight Check",
-      "Description": "If ON, arrival is achieved even if there is no line of sight."
+      "Description": "If ON, this enemy counts itself arrived without seeing its goal."
     },
     {
       "Field": "thinkAttr_doAdmirer",
       "Name": "Is Entourage",
-      "Description": "If ON, this character plays the role of an entourage. This is a think attribute."
+      "Description": "If ON, this enemy plays a follower role."
     },
     {
       "Field": "enableNaviFlg_Edge",
       "Name": "Can Navigate: Cliff",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'cliff' navigation flag."
+      "Description": "If ON, this enemy can cross cliff paths."
     },
     {
       "Field": "enableNaviFlg_LargeSpace",
       "Name": "Can Navigate: Wide",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'wide' navigation flag."
+      "Description": "If ON, this enemy can cross wide paths."
     },
     {
       "Field": "enableNaviFlg_Ladder",
       "Name": "Can Navigate: Ladder",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'ladder' navigation flag."
+      "Description": "If ON, this enemy can climb ladders."
     },
     {
       "Field": "enableNaviFlg_Hole",
       "Name": "Can Navigate: Hole",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'hole' navigation flag."
+      "Description": "If ON, this enemy can drop through holes."
     },
     {
       "Field": "enableNaviFlg_Door",
       "Name": "Can Navigate: Door",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'door' navigation flag."
+      "Description": "If ON, this enemy can pass through doors."
     },
     {
       "Field": "enableNaviFlg_InSideWall",
       "Name": "Can Navigate: In the Wall",
-      "Description": "If ON, this character can navigate on graph edges marked with the 'in the wall' navigation flag."
+      "Description": "If ON, this enemy can move inside walls."
     },
     {
       "Field": "enableNaviFlg_reserve0",

@@ -7,142 +7,142 @@
     {
       "Field": "physicsAtkRate",
       "Name": "Physical Damage (x)",
-      "Description": "The multiplier to apply to base physical damage for this tier of reinforcement."
+      "Description": "Physical damage at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, 2 means double."
     },
     {
       "Field": "magicAtkRate",
       "Name": "Magic Damage (x)",
-      "Description": "The multiplier to apply to base magic damage for this tier of reinforcement."
+      "Description": "Magic damage at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, 2 means double."
     },
     {
       "Field": "fireAtkRate",
       "Name": "Fire Damage (x)",
-      "Description": "The multiplier to apply to base fire damage for this tier of reinforcement."
+      "Description": "Fire damage at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, 2 means double."
     },
     {
       "Field": "thunderAtkRate",
       "Name": "Lightning Damage (x)",
-      "Description": "The multiplier to apply to base lightning damage for this tier of reinforcement."
+      "Description": "Lightning damage at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, 2 means double."
     },
     {
       "Field": "staminaAtkRate",
       "Name": "Stamina Damage (x)",
-      "Description": "The multiplier to apply to base stamina damage for this tier of reinforcement."
+      "Description": "How much stamina the weapon drains on a hit at this upgrade level. 1 means unchanged, 2 means double."
     },
     {
       "Field": "saWeaponAtkRate",
       "Name": "Poise Damage (x)",
-      "Description": "The multiplier to apply to base poise damage for this tier of reinforcement."
+      "Description": "Poise damage dealt at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, 2 means double."
     },
     {
       "Field": "saDurabilityRate",
       "Name": "Poise (x)",
-      "Description": "The multiplier to apply to base poise for this tier of reinforcement."
+      "Description": "Poise protection at this upgrade level, compared with the unupgraded weapon. 1 means unchanged."
     },
     {
       "Field": "correctStrengthRate",
       "Name": "Correction: STR (x)",
-      "Description": "The multiplier to apply to base STR correction for this tier of reinforcement."
+      "Description": "How strongly Strength raises damage at this upgrade level. 1 means unchanged, higher means stronger scaling."
     },
     {
       "Field": "correctAgilityRate",
       "Name": "Correction: DEX (x)",
-      "Description": "The multiplier to apply to base DEX correction for this tier of reinforcement."
+      "Description": "How strongly Dexterity raises damage at this upgrade level. 1 means unchanged, higher means stronger scaling."
     },
     {
       "Field": "correctMagicRate",
       "Name": "Correction: INT (x)",
-      "Description": "The multiplier to apply to base INT correction for this tier of reinforcement."
+      "Description": "How strongly Intelligence raises damage at this upgrade level. 1 means unchanged, higher means stronger scaling."
     },
     {
       "Field": "correctFaithRate",
       "Name": "Correction: FTH (x)",
-      "Description": "The multiplier to apply to base FTH correction for this tier of reinforcement."
+      "Description": "How strongly Faith raises damage at this upgrade level. 1 means unchanged, higher means stronger scaling."
     },
     {
       "Field": "physicsGuardCutRate",
       "Name": "Guard Absorption: Physical (x)",
-      "Description": "The multiplier to apply to base physical guard absorption for this tier of reinforcement."
+      "Description": "How much physical damage the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "magicGuardCutRate",
       "Name": "Guard Absorption: Magic (x)",
-      "Description": "The multiplier to apply to base magic guard absorption for this tier of reinforcement."
+      "Description": "How much magic damage the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "fireGuardCutRate",
       "Name": "Guard Absorption: Fire (x)",
-      "Description": "The multiplier to apply to base fire guard absorption for this tier of reinforcement."
+      "Description": "How much fire damage the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "thunderGuardCutRate",
       "Name": "Guard Absorption: Lightning (x)",
-      "Description": "The multiplier to apply to base lightning guard absorption for this tier of reinforcement."
+      "Description": "How much lightning damage the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "poisonGuardResistRate",
       "Name": "Guard Absorption: Poison (x)",
-      "Description": "The multiplier to apply to base poison guard absorption for this tier of reinforcement."
+      "Description": "How much poison buildup the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "diseaseGuardResistRate",
       "Name": "Guard Absorption: Toxic (x)",
-      "Description": "The multiplier to apply to base toxic guard absorption for this tier of reinforcement."
+      "Description": "How much toxic buildup the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "bloodGuardResistRate",
       "Name": "Guard Absorption: Bleed (x)",
-      "Description": "The multiplier to apply to base bleed guard absorption for this tier of reinforcement."
+      "Description": "How much bleed buildup the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "curseGuardResistRate",
       "Name": "Guard Absorption: Curse (x)",
-      "Description": "The multiplier to apply to base curse guard absorption for this tier of reinforcement."
+      "Description": "How much curse buildup the weapon blocks at this upgrade level. 1 means unchanged, higher blocks more."
     },
     {
       "Field": "staminaGuardDefRate",
       "Name": "Guard Stability (x)",
-      "Description": "The multiplier to apply to base guard stability for this tier of reinforcement."
+      "Description": "Stability at this upgrade level, compared with the unupgraded weapon. 1 means unchanged, higher drains less stamina when blocking."
     },
     {
       "Field": "spEffectId1",
       "Name": "Hit SpEffect Offset: 1",
-      "Description": "Added to the weapon's first hit effect at this reinforcement level."
+      "Description": "Moves the weapon's first hit effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "spEffectId2",
       "Name": "Hit SpEffect Offset: 2",
-      "Description": "Added to the weapon's second hit effect at this reinforcement level."
+      "Description": "Moves the weapon's second hit effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "spEffectId3",
       "Name": "Hit SpEffect Offset: 3",
-      "Description": "Added to the weapon's third hit effect at this reinforcement level."
+      "Description": "Moves the weapon's third hit effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "residentSpEffectId1",
       "Name": "Resident SpEffect Offset: 1",
-      "Description": "Added to the weapon's first resident effect at this reinforcement level."
+      "Description": "Moves the weapon's first wielder effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect Offset: 2",
-      "Description": "Added to the weapon's second resident effect at this reinforcement level."
+      "Description": "Moves the weapon's second wielder effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "residentSpEffectId3",
       "Name": "Resident SpEffect Offset: 3",
-      "Description": "Added to the weapon's third resident effect at this reinforcement level."
+      "Description": "Moves the weapon's third wielder effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "materialSetId",
       "Name": "Material Set Offset",
-      "Description": "Added to the weapon's material set at this reinforcement level."
+      "Description": "Which upgrade stones this level needs, as a step up from the weapon's base list. 0 keeps the base list."
     },
     {
       "Field": "reinforcementLevel",
       "Name": "Reinforcement Level",
-      "Description": "The reinforcement level this tier is counted as."
+      "Description": "The upgrade level this row counts as, such as 10 for +10."
     }
   ]
 }

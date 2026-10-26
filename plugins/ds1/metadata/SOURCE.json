@@ -392,6 +392,17 @@
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Row Names/English/BehaviorParam.json",
       "sha256": "1de0623181ab9c2cdeb8cfd302fafc2bce4b070f534c281ae227c72523a34248"
     },
+    "defs/BehaviorParam_PC.xml": {
+      "derived": "defs/BehaviorParam.xml",
+      "note": "Player behaviors share the BEHAVIOR_PARAM_ST layout; identical to the pinned enemy behavior definition."
+    },
+    "meta/BehaviorParam_PC.xml": {
+      "derived": "meta/BehaviorParam.xml",
+      "note": "Copied from the pinned enemy behavior meta, except refId calls the player attack table (AtkParam_Pc), never the enemy one."
+    },
+    "row_names/BehaviorParam_PC.json": {
+      "note": "Lexeditor-authored: no upstream row names. Rows show the parameter's own names."
+    },
     "annotations/BULLET_PARAM_ST.json": {
       "path": "Smithbox.Release/Output/Assets/PARAM/DS1R/Param Annotations/English/BULLET_PARAM_ST.json",
       "sha256": "b5dd7a4551d59d4232b0b4d9ee9a13cf6b0a6de62ed04dfde56ccf3cd89d3631"

@@ -93,11 +93,12 @@
   text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .ds1-find-reference{flex:0 0 auto;}
 /* An item/count pair gives the item lane the row and the count lane a
-   fixed box that still shows three digits beside the vanilla reference and
-   the stepper, which share the box: at 4.5em a changed 30 read as 3. */
-.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 6.5em;}
+   1-2 digit box. Under 120px the shared compact rule hides the count's
+   reference rail and stepper (right-click still restores vanilla), so the
+   digits keep the whole lane instead of sharing it. */
+.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 3em;}
 .lex-detail-parts.ds1-item-count-pair>.lex-detail-part{margin-right:0;}
-/* On a narrow property row even a 4.5em count leaves the item no room
+/* On a narrow property row even a 3em count leaves the item no room
    beside a side label, so the pair's label moves above its boxes the way
    a switch row's does, and the item keeps the full width. Em units also
    account for a larger editor font. */

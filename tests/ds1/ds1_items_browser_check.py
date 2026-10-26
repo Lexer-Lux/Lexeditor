@@ -68,10 +68,11 @@ def main():
                     for tab, _, _ in SUBTABS:
                         page.locator(strip + f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && state.row && !state.error', arg=tab)
-                        page.wait_for_timeout(200)
+                        # The first render of a big list lags its rows,
+                        # so the wait names DOM rows, not a fixed pause.
+                        page.wait_for_function("() => document.querySelectorAll('.lex-column-list .lex-list-row').length > 0")
                         counts[tab] = page.evaluate('state.rows.length')
                         assert counts[tab] > 0
-                        assert page.locator('.lex-column-list .lex-list-row').count() > 0
                         cells = page.locator('.lex-column-list .lex-list-row').first.evaluate(
                             'row=>row.children.length')
                         # No fixed icon column: thumbnails arrive through the
@@ -96,6 +97,25 @@ def main():
                                 tab_id = panel_tabs.nth(index).get_attribute('data-subtab')
                                 panel_tabs.nth(index).click()
                                 page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
+                        panel_ids = page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all(
+                            'nodes=>nodes.map(n=>n.dataset.subtab)')
+                        assert 'linked-records' not in panel_ids, (tab, panel_ids)
+                        if tab == 'weapons':
+                            # The protected scaling-curve link names its curve
+                            # where the field is, with no finder to change it.
+                            for _ in panel_ids:
+                                if page.locator('[data-field-key="correctType"]').count():
+                                    break
+                                page.locator('.lex-tabbed-panel [data-subtab]').nth(
+                                    panel_ids.index(page.evaluate('state.itemTab')) + 1
+                                    if page.evaluate('state.itemTab') in panel_ids else 0).click()
+                                page.wait_for_timeout(200)
+                            face = page.locator('.ds1-reference-face[data-field-key="correctType"]')
+                            assert face.count() == 1
+                            if real_root:
+                                assert face.locator('.lex-hoverable').count() == 1
+                            assert page.locator(
+                                '[data-lex-property="correctType"] .ds1-find-reference').count() == 0
                         control = reveal(page,page.locator('input[data-field-key][type="number"]').first)
                         field = control.get_attribute('data-field-key')
                         old = float(control.input_value().replace(',', ''))
@@ -113,7 +133,9 @@ def main():
                         if output: page.screenshot(path=str(output / f'{tab}.png'))
                     # Mod contents only leaves the one edited armor out of three; unticking restores the list.
                     page.locator(strip + '[data-subtab="armor"]').click()
-                    page.wait_for_function('state.sub==="armor" && state.row && !state.pending')
+                    # The sub flips before the new rows arrive, so the
+                    # wait names the armor rows; stale rows would pass it.
+                    page.wait_for_function('state.sub==="armor" && state.rows.length>0 && state.rows[0].table==="EquipParamProtector" && state.row?.table==="EquipParamProtector" && !state.pending')
                     real = '.lex-column-list .lex-list-row:not(.lex-filler-row)'
                     toggle = page.locator('.lex-pager-toggle input[aria-label="Mod contents only"]')
                     assert toggle.count() == 1
@@ -148,13 +170,16 @@ def main():
                         if output: page.screenshot(path=str(output / f'{tab}-upgrades.png'))
                     # Consumables have no upgrade path, so section tabs but no Upgrades tab.
                     page.locator(strip + '[data-subtab="consumables"]').click()
-                    page.wait_for_function('state.sub==="consumables" && state.row?.table==="EquipParamGoods"')
+                    page.wait_for_function('state.sub==="consumables" && state.rows.length>0 && state.rows[0].table==="EquipParamGoods" && state.row?.table==="EquipParamGoods" && !state.pending')
+                    page.wait_for_function("() => document.querySelectorAll('.lex-tabbed-panel').length > 0")
                     assert page.locator('.lex-tabbed-panel').count() == 1
                     assert page.locator('.lex-tabbed-panel [data-subtab="upgrades"]').count() == 0
                     # Menu labels is the last subtab and holds one text field;
                     # the enum and checkbox controls live on the param rows.
                     page.locator(strip + '[data-subtab="rings"]').click()
-                    page.wait_for_function('state.sub==="rings" && state.row && !state.pending')
+                    # The sub flips before the new rows arrive, so the
+                    # wait names the rings rows; stale rows would pass it.
+                    page.wait_for_function('state.sub==="rings" && state.rows.length>0 && state.rows[0].table==="EquipParamAccessory" && state.row?.table==="EquipParamAccessory" && !state.pending')
                     rings_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
                     seen = set()
                     for index in range(rings_tabs.count()):
@@ -214,7 +239,7 @@ def main():
                     page.locator(strip + '[data-subtab="weapons"]').click()
                     page.wait_for_timeout(500)
                     assert page.locator('#main > .lex-stack .lex-column-list').first.is_visible()
-                    expected = set(page.evaluate('state.row.fields.filter(f=>f.editable).map(f=>f.key)'))
+                    expected = set(page.evaluate('state.row.fields.filter(f=>f.editable||(state.row.recordLinks||[]).some(l=>l.field===f.key&&l.kind!=="npc")).map(f=>f.key)'))
                     seen = set()
                     panel_tabs = page.locator('.lex-tabbed-panel [data-subtab]')
                     assert panel_tabs.count() > 1

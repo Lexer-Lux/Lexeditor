@@ -7,22 +7,22 @@
     {
       "Field": "yesNoDialogMessageId",
       "Name": "Dialog Message ID",
-      "Description": "The text ID of to use for the 'Yes / No' dialog issued when this spell is used."
+      "Description": "The message shown in the Yes/No dialog when this spell is used."
     },
     {
       "Field": "limitCancelSpEffectId",
       "Name": "Ignore Usage Restriction SpEffect ID",
-      "Description": "If the specified SpEffect is active on the player, then usage restrictions for this spell are ignored."
+      "Description": "An effect that lifts this spell's usage limits while active. No vanilla spell uses this."
     },
     {
       "Field": "sortId",
       "Name": "Sort ID",
-      "Description": "The numeric ID used for ordering each spell in menus."
+      "Description": "The order of this spell in menus."
     },
     {
       "Field": "refId",
       "Name": "Call ID",
-      "Description": "The call ID to used to specific the Attack, Bullet or SpEffect this spell uses when triggered."
+      "Description": "The Bullet or SpEffect row this spell fires when cast."
     },
     {
       "Field": "mp",
@@ -32,37 +32,37 @@
     {
       "Field": "stamina",
       "Name": "Stamina Consumption",
-      "Description": "The stamina consumption of this spell when triggered."
+      "Description": "Stamina spent each time this spell is cast. 0 means no cost."
     },
     {
       "Field": "iconId",
       "Name": "Icon ID",
-      "Description": "The numeric ID used for specifying which icon is used to display this spell in menus."
+      "Description": "Which icon shows for this spell in menus."
     },
     {
       "Field": "behaviorId",
       "Name": "Behavior ID",
-      "Description": "The behavior parameter to use when this spell is triggered."
+      "Description": "The Behavior ID this spell triggers. Unused in the unmodded game."
     },
     {
       "Field": "mtrlItemId",
       "Name": "Item Requirement for Purchase",
-      "Description": "The item (or items) that the spell costs in a shop that must be present before it can be purchased."
+      "Description": "The item the buyer must hold to buy this spell. Unused in the unmodded game."
     },
     {
       "Field": "replaceMagicId",
       "Name": "State Info Switch: Magic ID",
-      "Description": "The new magic row ID to use when the specified state info is invoked."
+      "Description": "The spell this becomes when State Info Switch: Value matches. -1 turns the swap off. Unused in the unmodded game."
     },
     {
       "Field": "maxQuantity",
       "Name": "Usage Count",
-      "Description": "The number of uses this spell allows when equipped before requiring a bonfire reset. The Mana tweak derives this spell's default mana cost from it."
+      "Description": "Casts allowed before a bonfire rest restores them. -1 means unlimited. The Mana tweak derives this spell's default mana cost from it."
     },
     {
       "Field": "heroPoint",
       "Name": "Humanity Consumption",
-      "Description": "The amount of humanity this spell consumes when triggered."
+      "Description": "Humanity spent each time this spell is cast. Casting fails without enough."
     },
     {
       "Field": "overDexterity",
@@ -77,42 +77,42 @@
     {
       "Field": "slotLength",
       "Name": "Slot Usage",
-      "Description": "The number of spell equipment slots this spell occupies."
+      "Description": "How many attunement slots this spell takes."
     },
     {
       "Field": "requirementIntellect",
       "Name": "Requirement: INT",
-      "Description": "The minimum amount of intelligence (INT) this spell requires for a valid cast."
+      "Description": "The lowest Intelligence that can cast this spell."
     },
     {
       "Field": "requirementFaith",
       "Name": "Requirement: FTH",
-      "Description": "The minimum amount of faith (FTH) this spell requires for a valid cast."
+      "Description": "The lowest Faith that can cast this spell."
     },
     {
       "Field": "analogDexiterityMin",
       "Name": "Casting Speed Range: Start",
-      "Description": "The minimum value of dexterity (DEX) to start scaling the cast animation with (via the TimeAct event)."
+      "Description": "Dexterity where faster casting starts. Below this, Dexterity does not change cast speed. The exact effect is not established."
     },
     {
       "Field": "analogDexiterityMax",
       "Name": "Casting Speed Range: End",
-      "Description": "The maximum value of dexterity (DEX) to stop scaling the cast animation with (via the TimeAct event)."
+      "Description": "Dexterity where faster casting stops improving. Above this, more Dexterity does not shorten the cast. The exact effect is not established."
     },
     {
       "Field": "ezStateBehaviorType",
       "Name": "Magic School Type",
-      "Description": "The magic school this spell belongs to."
+      "Description": "The school of this spell. It decides which tool can cast it."
     },
     {
       "Field": "refCategory",
       "Name": "Call ID Type",
-      "Description": "The parameter type to use for the call ID."
+      "Description": "Whether the Call ID is a Bullet or a SpEffect."
     },
     {
       "Field": "spEffectCategory",
       "Name": "SpEffect Category",
-      "Description": "The SpEffect category this spell belongs to"
+      "Description": "Which power-boosting effects can raise this spell. The exact effect is not established."
     },
     {
       "Field": "refType",
@@ -127,107 +127,107 @@
     {
       "Field": "hasSpEffectType",
       "Name": "State Info Switch: Value",
-      "Description": "The state info value that triggers the state info switch for this spell, changing the magic row ID it uses."
+      "Description": "The State Info value that swaps this spell for another. Unused in the unmodded game."
     },
     {
       "Field": "replaceCategory",
       "Name": "State Info Switch: Replacement Category",
-      "Description": "Additional conditions when switching the spell due to a state info switch occuring."
+      "Description": "Which bonus shifts this spell to a stronger row. Higher resonance or covenant rank fires a later row. The exact mapping is not established."
     },
     {
       "Field": "useLimitCategory",
       "Name": "Usage Limit: SpEffect Category",
-      "Description": "The usage categories that this spell will be blocked by if SpEffect with the same category are present."
+      "Description": "Effects that block this spell while active. Casting fails while a clashing effect runs."
     },
     {
       "Field": "vowType0",
       "Name": "Vow Type: None",
-      "Description": "If ON, this spell can be used while in no covenant."
+      "Description": "If ON, this spell works with no covenant."
     },
     {
       "Field": "vowType1",
       "Name": "Vow Type: Way of White",
-      "Description": "If ON, this spell can be used while in Way of White covenant."
+      "Description": "If ON, this spell works in the Way of White covenant."
     },
     {
       "Field": "vowType2",
       "Name": "Vow Type: Princess Guard",
-      "Description": "If ON, this spell can be used while in Princess Guard covenant."
+      "Description": "If ON, this spell works in the Princess Guard covenant."
     },
     {
       "Field": "vowType3",
       "Name": "Vow Type: Warrior of Sunlight",
-      "Description": "If ON, this spell can be used while in Warrior of Sunlight covenant."
+      "Description": "If ON, this spell works in the Warrior of Sunlight covenant."
     },
     {
       "Field": "vowType4",
       "Name": "Vow Type: Darkwraith",
-      "Description": "If ON, this spell can be used while in Darkwraith covenant."
+      "Description": "If ON, this spell works in the Darkwraith covenant."
     },
     {
       "Field": "vowType5",
       "Name": "Vow Type: Path of the Dragon",
-      "Description": "If ON, this spell can be used while in Path of the Dragon covenant."
+      "Description": "If ON, this spell works in the Path of the Dragon covenant."
     },
     {
       "Field": "vowType6",
       "Name": "Vow Type: Gravelord Servant",
-      "Description": "If ON, this spell can be used while in Gravelord Servant covenant."
+      "Description": "If ON, this spell works in the Gravelord Servant covenant."
     },
     {
       "Field": "vowType7",
       "Name": "Vow Type: Forest Hunter",
-      "Description": "If ON, this spell can be used while in Forest Hunter covenant."
+      "Description": "If ON, this spell works in the Forest Hunter covenant."
     },
     {
       "Field": "enable_multi",
       "Name": "Usable in Multiplayer",
-      "Description": "If ON, then the spell can be used in multiplayer sessions."
+      "Description": "If ON, this spell works in multiplayer."
     },
     {
       "Field": "enable_multi_only",
       "Name": "Usable in Multiplayer Only",
-      "Description": "If ON, then the spell can be used in multiplayer sessions, but not in offline sessions."
+      "Description": "If ON, this spell only works in multiplayer."
     },
     {
       "Field": "isEnchant",
       "Name": "Is Weapon Enchantment",
-      "Description": "If ON, this spell is considered a weapon enhancement spell."
+      "Description": "If ON, the game treats this as a weapon enchant. What difference that makes is not established."
     },
     {
       "Field": "isShieldEnchant",
       "Name": "Is Shield Enchantment",
-      "Description": "If ON, this spell is considered a shield enhancement spell."
+      "Description": "If ON, the game treats this as a shield enchant. What difference that makes is not established."
     },
     {
       "Field": "enable_live",
       "Name": "Enable in Multiplayer: Host",
-      "Description": "If ON, this spell can be used in a sessions where the player is the host."
+      "Description": "If ON, this spell works in human form. The exact effect is not established."
     },
     {
       "Field": "enable_gray",
       "Name": "Enable in Multiplayer: Gray Phantom",
-      "Description": "If ON, this spell can be used in a sessions where the player is a gray phantom."
+      "Description": "If ON, this spell works while hollow. The exact effect is not established."
     },
     {
       "Field": "enable_white",
       "Name": "Enable in Multiplayer: White Phantom",
-      "Description": "If ON, this spell can be used in a sessions where the player is a white phantom."
+      "Description": "If ON, white phantoms can cast this. The exact effect is not established."
     },
     {
       "Field": "enable_black",
       "Name": "Enable in Multiplayer: Black Phantom",
-      "Description": "If ON, this spell can be used in a sessions where the player is a black phantom."
+      "Description": "If ON, black phantoms can cast this. The exact effect is not established."
     },
     {
       "Field": "disableOffline",
       "Name": "Disable when Offline",
-      "Description": "If ON, this spell is disabled if the player is not in a multiplayer session."
+      "Description": "If ON, this spell only works online."
     },
     {
       "Field": "castResonanceMagic",
       "Name": "Trigger Resonance",
-      "Description": "If ON, this spell will broadcast resonance across multiplayer sessions (i.e. white rings) that empower the spell."
+      "Description": "If ON, casting this sends white rings to other players. Standing near rings boosts matching spells."
     },
     {
       "Field": "pad_1",
@@ -237,42 +237,42 @@
     {
       "Field": "vowType8",
       "Name": "Vow Type: Blade of the Dark Moon",
-      "Description": "If ON, this spell can be used while in Blade of the Dark Moon covenant."
+      "Description": "If ON, this spell works in the Blade of the Dark Moon covenant."
     },
     {
       "Field": "vowType9",
       "Name": "Vow Type: Chaos Servant",
-      "Description": "If ON, this spell can be used while in Chaos Servant covenant."
+      "Description": "If ON, this spell works in the Chaos Servant covenant."
     },
     {
       "Field": "vowType10",
       "Name": "Vow Type: 10",
-      "Description": "If ON, this spell is associated with the covenant in slot 10."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "vowType11",
       "Name": "Vow Type: 11",
-      "Description": "If ON, this spell is associated with the covenant in slot 11."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "vowType12",
       "Name": "Vow Type: 12",
-      "Description": "If ON, this spell is associated with the covenant in slot 12."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "vowType13",
       "Name": "Vow Type: 13",
-      "Description": "If ON, this spell is associated with the covenant in slot 13."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "vowType14",
       "Name": "Vow Type: 14",
-      "Description": "If ON, this spell is associated with the covenant in slot 14."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "vowType15",
       "Name": "Vow Type: 15",
-      "Description": "If ON, this spell is associated with the covenant in slot 15."
+      "Description": "Unused. No covenant in the game uses this slot."
     },
     {
       "Field": "pad",

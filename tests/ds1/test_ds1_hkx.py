@@ -150,3 +150,46 @@ def test_peek_animation_agrees_with_full_read():
 def test_peek_animation_refuses_garbage():
     with pytest.raises(HkxError):
         peek_animation(b'not a havok file')
+
+
+def _retarget_blob_count(blob, delta=None, count=None):
+    """Rewrite the padded spline blob's ITEM entry count: it dwarfs
+    every other entry, so the largest count names it."""
+    from plugins.ds1.hkx import _section
+    root, _ = _section(bytes(blob), 0)
+    index = next(sub for sub in root['subs'] if sub['sig'] == 'INDX')
+    item = next(part for part in index['subs'] if part['sig'] == 'ITEM')
+    blob = bytearray(blob)
+    best, best_at = -1, None
+    for at in range(item['pos'], item['pos'] + item['length'], 12):
+        _at, _pos, have = struct.unpack_from('<iIi', blob, at)
+        if have > best:
+            best, best_at = have, at
+    assert best_at is not None
+    struct.pack_into('<i', blob, best_at + 8, count if count is not None else best + delta)
+    return bytes(blob)
+
+
+def test_item_blob_past_object_count_ceiling():
+    """A 70 KiB spline blob peeks and reads like any other item.
+
+    Long motions pack their whole curve set into one hkUint8 blob past
+    the 64 Ki object count, so the item gate checks the byte extent
+    against the DATA section instead.
+    """
+    blob = build_tag0(extra_data=70000)
+    assert peek_animation(blob) == {'duration': pytest.approx(0.1), 'frames': 4}
+    doc = HkxDocument(blob)
+    assert len(doc.animations) == 2
+
+
+def test_item_blob_past_data_refused():
+    blob = build_tag0(extra_data=70000)
+    with pytest.raises(HkxError, match='past its data'):
+        HkxDocument(_retarget_blob_count(blob, delta=5000))
+    with pytest.raises(HkxError, match='past its data'):
+        peek_animation(_retarget_blob_count(blob, delta=5000))
+    with pytest.raises(HkxError, match='past its data'):
+        HkxDocument(_retarget_blob_count(blob, count=2 ** 30))
+    with pytest.raises(HkxError, match='out of range'):
+        HkxDocument(_retarget_blob_count(blob, count=-5))

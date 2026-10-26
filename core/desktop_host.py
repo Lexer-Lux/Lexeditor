@@ -1830,7 +1830,7 @@ class HostApi:
         from core import mods_service
         folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
         result = mods_service.mod_files(folder)
-        result.update({'changes': [], 'changesTruncated': False, 'canDescribe': False, 'note': ''})
+        result.update({'changes': [], 'changesTruncated': False, 'totalChanges': 0, 'canDescribe': False, 'note': ''})
         adapter = self._mod_adapter(plugin_id)
         describe = getattr(adapter, 'describe_changes', None)
         if adapter is None or describe is None:
@@ -1845,6 +1845,7 @@ class HostApi:
             return result
         result['changes'] = reported.get('changes', [])
         result['changesTruncated'] = bool(reported.get('truncated', False))
+        result['totalChanges'] = int(reported.get('total', len(result['changes'])))
         if reported.get('note'):
             result['note'] = reported['note']
         loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}

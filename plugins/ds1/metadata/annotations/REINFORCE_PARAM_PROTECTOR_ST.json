@@ -7,77 +7,77 @@
     {
       "Field": "physicsDefRate",
       "Name": "Physical Defense (x)",
-      "Description": "The multiplier to apply to base physical defense for this tier of reinforcement."
+      "Description": "Physical defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "magicDefRate",
       "Name": "Magic Defense (x)",
-      "Description": "The multiplier to apply to base magic defense for this tier of reinforcement."
+      "Description": "Magic defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "fireDefRate",
       "Name": "Fire Defense (x)",
-      "Description": "The multiplier to apply to base fire defense for this tier of reinforcement."
+      "Description": "Fire defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "thunderDefRate",
       "Name": "Lightning Defense (x)",
-      "Description": "The multiplier to apply to base lightning defense for this tier of reinforcement."
+      "Description": "Lightning defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "slashDefRate",
       "Name": "Slash Defense (x)",
-      "Description": "The multiplier to apply to base slash defense for this tier of reinforcement."
+      "Description": "Slash defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "blowDefRate",
       "Name": "Strike Defense (x)",
-      "Description": "The multiplier to apply to base strike defense for this tier of reinforcement."
+      "Description": "Strike defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "thrustDefRate",
       "Name": "Thrust Defense (x)",
-      "Description": "The multiplier to apply to base thrust defense for this tier of reinforcement."
+      "Description": "Thrust defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
     },
     {
       "Field": "resistPoisonRate",
       "Name": "Poison Resistance (x)",
-      "Description": "The multiplier to apply to base poison resistance for this tier of reinforcement."
+      "Description": "Poison resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
     },
     {
       "Field": "resistDiseaseRate",
       "Name": "Toxic Resistance (x)",
-      "Description": "The multiplier to apply to base toxic resistance for this tier of reinforcement."
+      "Description": "Toxic resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
     },
     {
       "Field": "resistBloodRate",
       "Name": "Bleed Resistance (x)",
-      "Description": "The multiplier to apply to base bleed resistance for this tier of reinforcement."
+      "Description": "Bleed resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
     },
     {
       "Field": "resistCurseRate",
       "Name": "Curse Resistance (x)",
-      "Description": "The multiplier to apply to base curse resistance for this tier of reinforcement."
+      "Description": "Curse resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
     },
     {
       "Field": "residentSpEffectId1",
       "Name": "Resident SpEffect Offset: 1",
-      "Description": "Added to the armor's first resident effect at this reinforcement level."
+      "Description": "Moves the armor's first wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect Offset: 2",
-      "Description": "Added to the armor's second resident effect at this reinforcement level."
+      "Description": "Moves the armor's second wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "residentSpEffectId3",
       "Name": "Resident SpEffect Offset: 3",
-      "Description": "Added to the armor's third resident effect at this reinforcement level."
+      "Description": "Moves the armor's third wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
     },
     {
       "Field": "materialSetId",
       "Name": "Material Set Offset",
-      "Description": "Added to the armor's material set at this reinforcement level."
+      "Description": "Which upgrade stones this level needs, as a step up from the armor's base list. 0 keeps the base list."
     }
   ]
 }

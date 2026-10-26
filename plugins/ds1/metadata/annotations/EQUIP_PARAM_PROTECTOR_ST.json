@@ -7,647 +7,647 @@
     {
       "Field": "sortId",
       "Name": "Sort ID",
-      "Description": "The ordering ID used to sort this part in the menu."
+      "Description": "Where this piece sits in inventory and shop lists. Lower comes first."
     },
     {
       "Field": "wanderingEquipId",
       "Name": "Wandering Equip ID",
-      "Description": "Replacement equipment ID for wandering ghosts."
+      "Description": "The piece other players see on your wandering ghost instead of this one. This probably hides models their game cannot load."
     },
     {
       "Field": "vagrantItemLotId",
       "Name": "Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the Vagrant this piece may become. -1 spawns none, and 0 grants nothing."
     },
     {
       "Field": "vagrantBonusEneDropItemLotId",
       "Name": "Good Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the extra creature a Good Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "vagrantItemEneDropItemLotId",
       "Name": "Evil Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the creature an Evil Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "fixPrice",
       "Name": "Repair Price",
-      "Description": "Soul cost for repairing this item."
+      "Description": "The souls a full repair costs. The smith scales the price by missing durability."
     },
     {
       "Field": "basicPrice",
       "Name": "Reinforcement Price",
-      "Description": "Soul cost of reinforcement. See ShopLineupParam for shop prices."
+      "Description": "The souls each upgrade costs. Shop sale prices are set elsewhere."
     },
     {
       "Field": "sellValue",
       "Name": "Sell Value",
-      "Description": "The price when this item is sold. Determines the souls received when feeding this weapon to Frampt"
+      "Description": "The souls Kingseeker Frampt probably gives for this piece."
     },
     {
       "Field": "weight",
       "Name": "Weight (kg)",
-      "Description": "Weight [kg]."
+      "Description": "How much this piece adds to your Equip Load. Heavy loads slow your roll."
     },
     {
       "Field": "residentSpEffectId",
       "Name": "Resident SpEffect ID: 1",
-      "Description": "A SpEffect applied when this part is equipped."
+      "Description": "A hidden bonus this piece grants while worn, such as healing or resistance. -1 means None."
     },
     {
       "Field": "residentSpEffectId2",
       "Name": "Resident SpEffect ID: 2",
-      "Description": "A SpEffect applied when this part is equipped."
+      "Description": "A hidden bonus this piece grants while worn, such as healing or resistance. -1 means None."
     },
     {
       "Field": "residentSpEffectId3",
       "Name": "Resident SpEffect ID: 3",
-      "Description": "A SpEffect applied when this part is equipped."
+      "Description": "A hidden bonus this piece grants while worn, such as healing or resistance. -1 means None."
     },
     {
       "Field": "materialSetId",
       "Name": "Upgrade Material ID",
-      "Description": "The material requirements for improving this part."
+      "Description": "The materials each upgrade costs. -1 probably means it cannot be upgraded."
     },
     {
       "Field": "partsDamageRate",
       "Name": "Part Damage (x)",
-      "Description": "The damage correction to apply to this part when hit."
+      "Description": "May change damage this piece takes when hit. This is unproven."
     },
     {
       "Field": "corectSARecover",
       "Name": "Poise Recovery Correction",
-      "Description": "The poise recovery correction value."
+      "Description": "May raise Poise recovery speed. This is unproven."
     },
     {
       "Field": "originEquipPro",
       "Name": "Source ID: +0",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +0. -1 means None."
     },
     {
       "Field": "originEquipPro1",
       "Name": "Source ID: +1",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +1. -1 means None."
     },
     {
       "Field": "originEquipPro2",
       "Name": "Source ID: +2",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +2. -1 means None."
     },
     {
       "Field": "originEquipPro3",
       "Name": "Source ID: +3",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +3. -1 means None."
     },
     {
       "Field": "originEquipPro4",
       "Name": "Source ID: +4",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +4. -1 means None."
     },
     {
       "Field": "originEquipPro5",
       "Name": "Source ID: +5",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +5. -1 means None."
     },
     {
       "Field": "originEquipPro6",
       "Name": "Source ID: +6",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +6. -1 means None."
     },
     {
       "Field": "originEquipPro7",
       "Name": "Source ID: +7",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +7. -1 means None."
     },
     {
       "Field": "originEquipPro8",
       "Name": "Source ID: +8",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +8. -1 means None."
     },
     {
       "Field": "originEquipPro9",
       "Name": "Source ID: +9",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +9. -1 means None."
     },
     {
       "Field": "originEquipPro10",
       "Name": "Source ID: +10",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +10. -1 means None."
     },
     {
       "Field": "originEquipPro11",
       "Name": "Source ID: +11",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +11. -1 means None."
     },
     {
       "Field": "originEquipPro12",
       "Name": "Source ID: +12",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +12. -1 means None."
     },
     {
       "Field": "originEquipPro13",
       "Name": "Source ID: +13",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +13. -1 means None."
     },
     {
       "Field": "originEquipPro14",
       "Name": "Source ID: +14",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +14. -1 means None."
     },
     {
       "Field": "originEquipPro15",
       "Name": "Source ID: +15",
-      "Description": "The source ID when this part is reinforced to this level."
+      "Description": "The piece this upgrades from at +15. -1 means None."
     },
     {
       "Field": "faceScaleM_ScaleX",
       "Name": "Male Face Scale: X",
-      "Description": "The male face scaling factor for the X-axis."
+      "Description": "How much this helm widens a male face to fit. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleM_ScaleZ",
       "Name": "Male Face Scale: Z",
-      "Description": "The male face scaling factor for the Z-axis."
+      "Description": "How much this helm lengthens a male face to fit. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleM_MaxX",
       "Name": "Male Face Max Scale: X",
-      "Description": "The maximum male face scaling factor for the X-axis."
+      "Description": "The most this helm may widen a male face. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleM_MaxZ",
       "Name": "Male Face Max Scale: Z",
-      "Description": "The maximum male face scaling factor for the Z-axis."
+      "Description": "The most this helm may lengthen a male face. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleF_ScaleX",
       "Name": "Female Face Scale: X",
-      "Description": "The female face scaling factor for the X-axis."
+      "Description": "How much this helm widens a female face to fit. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleF_ScaleZ",
       "Name": "Female Face Scale: Z",
-      "Description": "The female face scaling factor for the Z-axis."
+      "Description": "How much this helm lengthens a female face to fit. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleF_MaxX",
       "Name": "Female Face Max Scale: X",
-      "Description": "The maximum female face scaling factor for the X-axis."
+      "Description": "The most this helm may widen a female face. 1 leaves it unchanged."
     },
     {
       "Field": "faceScaleF_MaxZ",
       "Name": "Female Face Max Scale: Z",
-      "Description": "The maximum female face scaling factor for the Z-axis."
+      "Description": "The most this helm may lengthen a female face. 1 leaves it unchanged."
     },
     {
       "Field": "qwcId",
       "Name": "World Tendency ID",
-      "Description": "The ID this item uses for world tendency."
+      "Description": "Unknown. It may link this piece to story progress."
     },
     {
       "Field": "equipModelId",
       "Name": "Model ID",
-      "Description": "The model ID to use for this equipment."
+      "Description": "Which 3D model the game draws for this piece."
     },
     {
       "Field": "iconIdM",
       "Name": "Male: Icon ID ",
-      "Description": "The icon ID to use for the male gender version."
+      "Description": "The inventory picture for male wearers."
     },
     {
       "Field": "iconIdF",
       "Name": "Female: Icon ID ",
-      "Description": "The icon ID to use for the male gender version."
+      "Description": "The inventory picture for female wearers."
     },
     {
       "Field": "knockBack",
       "Name": "Knockback",
-      "Description": "The knockback reduction value for this equipment."
+      "Description": "Lowers how far hits push you. Higher is steadier."
     },
     {
       "Field": "knockbackBounceRate",
       "Name": "Knockback Repulsion %",
-      "Description": "The knockback repulsion value for this equipment."
+      "Description": "May set how strongly hits bounce off you. This is unproven."
     },
     {
       "Field": "durability",
       "Name": "Durability",
-      "Description": "The initial durability for this equipment."
+      "Description": "The durability a found piece starts with."
     },
     {
       "Field": "durabilityMax",
       "Name": "Max Durability",
-      "Description": "The maximum durability for this equipment."
+      "Description": "The highest durability a repair can restore."
     },
     {
       "Field": "saDurability",
       "Name": "Poise",
-      "Description": "The poise durability for this equipment."
+      "Description": "Lets you take heavier hits without flinching. Heavier armor usually gives more."
     },
     {
       "Field": "defFlickPower",
       "Name": "Repulsion Defense",
-      "Description": "The weapon repulsion defense for this equipment."
+      "Description": "Helps bounce enemy attacks off this piece. The exact check is unproven."
     },
     {
       "Field": "defensePhysics",
       "Name": "Defense: Physical",
-      "Description": "The flat defense value for this equipment for the specified type."
+      "Description": "How much physical damage this piece blocks. Slash, strike and thrust adjust this value."
     },
     {
       "Field": "defenseMagic",
       "Name": "Defense: Magic",
-      "Description": "The flat defense value for this equipment for the specified type."
+      "Description": "How much magic damage this piece blocks."
     },
     {
       "Field": "defenseFire",
       "Name": "Defense: Fire",
-      "Description": "The flat defense value for this equipment for the specified type."
+      "Description": "How much fire damage this piece blocks."
     },
     {
       "Field": "defenseThunder",
       "Name": "Defense: Lightning",
-      "Description": "The flat defense value for this equipment for the specified type."
+      "Description": "How much lightning damage this piece blocks."
     },
     {
       "Field": "defenseSlash",
       "Name": "Defense Correction: Slash",
-      "Description": "Percentage modifier to apply to physical defense when struck with slash damage. Example: -50 = -50%, 50 = +50%"
+      "Description": "Adjusts physical defense against slash attacks. -50 halves it, 50 raises it by half."
     },
     {
       "Field": "defenseBlow",
       "Name": "Defense Correction: Strike",
-      "Description": "Percentage modifier to apply to physical defense when struck with strike damage. Example: -50 = -50%, 50 = +50%"
+      "Description": "Adjusts physical defense against strike attacks. -50 halves it, 50 raises it by half."
     },
     {
       "Field": "defenseThrust",
       "Name": "Defense Correction: Thrust",
-      "Description": "Percentage modifier to apply to physical defense when struck with thrust damage. Example: -50 = -50%, 50 = +50%"
+      "Description": "Adjusts physical defense against thrust attacks. -50 halves it, 50 raises it by half."
     },
     {
       "Field": "resistPoison",
       "Name": "Status Resist: Poison",
-      "Description": "The flat defense value for this equipment for the specified resistance type."
+      "Description": "How much poison buildup this piece soaks. Higher delays poisoning."
     },
     {
       "Field": "resistDisease",
       "Name": "Status Resist: Toxic",
-      "Description": "The flat defense value for this equipment for the specified resistance type."
+      "Description": "How much toxic buildup this piece soaks. Higher delays toxic."
     },
     {
       "Field": "resistBlood",
       "Name": "Status Resist: Bleed",
-      "Description": "The flat defense value for this equipment for the specified resistance type."
+      "Description": "How much bleed buildup this piece soaks. Higher delays bleeding."
     },
     {
       "Field": "resistCurse",
       "Name": "Status Resist: Curse",
-      "Description": "The flat defense value for this equipment for the specified resistance type."
+      "Description": "How much curse buildup this piece soaks. Higher delays curse."
     },
     {
       "Field": "reinforceTypeId",
       "Name": "Reinforcement Type ID",
-      "Description": "The reinforcement progression to use for this equipment."
+      "Description": "The upgrade table this piece uses. It sets how much defense each level adds."
     },
     {
       "Field": "trophySGradeId",
       "Name": "Achievement ID",
-      "Description": "The achievement ID this part is associated with, if any."
+      "Description": "The achievement tied to this piece, if any. -1 means None."
     },
     {
       "Field": "shopLv",
       "Name": "Shop Level",
-      "Description": "Level that can be sold at the store"
+      "Description": "Unknown. How shops use levels is not established."
     },
     {
       "Field": "knockbackParamId",
       "Name": "Knockback Parameter ID",
-      "Description": "The knockback parameters to use for this part."
+      "Description": "Unknown. The knockback table it points to is unidentified."
     },
     {
       "Field": "flickDamageCutRate",
       "Name": "Repulsion Damage Absorption (%)",
-      "Description": "The absorption rate to use when calculating the repulsion damage this part incurs."
+      "Description": "The percent of damage stopped when this piece deflects a hit."
     },
     {
       "Field": "equipModelCategory",
       "Name": "Model Category",
-      "Description": "The equipment model category used by this part."
+      "Description": "The model family this piece belongs to."
     },
     {
       "Field": "equipModelGender",
       "Name": "Model Gender",
-      "Description": "Gender of equipment model"
+      "Description": "The sex whose body this model fits."
     },
     {
       "Field": "protectorCategory",
       "Name": "Equipment Category",
-      "Description": "The equipment category for this part."
+      "Description": "The armor group this piece belongs to."
     },
     {
       "Field": "defenseMaterial",
       "Name": "Defense Presentation: Sound",
-      "Description": "The sound used when guarding."
+      "Description": "The clash sound hits on this piece make."
     },
     {
       "Field": "defenseMaterialSfx",
       "Name": "Defense Presentation: Particle",
-      "Description": "The particles used when guarding."
+      "Description": "The sparks hits on this piece make."
     },
     {
       "Field": "partsDmgType",
       "Name": "Parts Damage Type",
-      "Description": "The type of attack that applies parts damage."
+      "Description": "Which attacks trigger the parts-damage check."
     },
     {
       "Field": "defenseMaterial_Weak",
       "Name": "Defense Presentation: Sound (on Weak Point Damage)",
-      "Description": "The sound used when weak point is damaged."
+      "Description": "The sound when hits land on a weak point."
     },
     {
       "Field": "defenseMaterialSfx_Weak",
       "Name": "Defense Presentation: Particle (on Weak Point Damage)",
-      "Description": "The particles used when weak point is damaged."
+      "Description": "The sparks when hits land on a weak point."
     },
     {
       "Field": "isDeposit",
       "Name": "Can Deposit",
-      "Description": "If ON, this item can be deposited into the repository."
+      "Description": "Whether this piece can go into storage."
     },
     {
       "Field": "headEquip",
       "Name": "Is Helm Equipment",
-      "Description": "If ON, is considered Helm equipment."
+      "Description": "Whether this fills the head slot."
     },
     {
       "Field": "bodyEquip",
       "Name": "Is Chest Equipment",
-      "Description": "If ON, is considered Chest equipment."
+      "Description": "Whether this fills the chest slot."
     },
     {
       "Field": "armEquip",
       "Name": "Is Gauntlet Equipment",
-      "Description": "If ON, is considered Gauntlet equipment."
+      "Description": "Whether this fills the gauntlet slot."
     },
     {
       "Field": "legEquip",
       "Name": "Is Legs Equipment",
-      "Description": "If ON, is considered Legs equipment."
+      "Description": "Whether this fills the leg slot."
     },
     {
       "Field": "useFaceScale",
       "Name": "Use Facescale",
-      "Description": "If ON, this part applies face scaling."
+      "Description": "Lets this piece resize the face to fit inside it."
     },
     {
       "Field": "invisibleFlag00",
       "Name": "Model Mask 0",
-      "Description": ""
+      "Description": "Hides the tips of the bangs while worn."
     },
     {
       "Field": "invisibleFlag01",
       "Name": "Model Mask 1",
-      "Description": ""
+      "Description": "Hides the roots of the bangs while worn."
     },
     {
       "Field": "invisibleFlag02",
       "Name": "Model Mask 2",
-      "Description": ""
+      "Description": "Hides the sideburns while worn."
     },
     {
       "Field": "invisibleFlag03",
       "Name": "Model Mask 3",
-      "Description": ""
+      "Description": "Hides the crown of the head while worn."
     },
     {
       "Field": "invisibleFlag04",
       "Name": "Model Mask 4",
-      "Description": ""
+      "Description": "Hides the crown of the head while worn."
     },
     {
       "Field": "invisibleFlag05",
       "Name": "Model Mask 5",
-      "Description": ""
+      "Description": "Hides the back hair while worn."
     },
     {
       "Field": "invisibleFlag06",
       "Name": "Model Mask 6",
-      "Description": ""
+      "Description": "Hides the tips of the back hair while worn."
     },
     {
       "Field": "invisibleFlag07",
       "Name": "Model Mask 7",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag08",
       "Name": "Model Mask 8",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag09",
       "Name": "Model Mask 9",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag10",
       "Name": "Model Mask 10",
-      "Description": ""
+      "Description": "Hides the collar while worn."
     },
     {
       "Field": "invisibleFlag11",
       "Name": "Model Mask 11",
-      "Description": ""
+      "Description": "Hides the neckline while worn."
     },
     {
       "Field": "invisibleFlag12",
       "Name": "Model Mask 12",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag13",
       "Name": "Model Mask 13",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag14",
       "Name": "Model Mask 14",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag15",
       "Name": "Model Mask 15",
-      "Description": ""
+      "Description": "Hides the hem of the hood while worn."
     },
     {
       "Field": "invisibleFlag16",
       "Name": "Model Mask 16",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag17",
       "Name": "Model Mask 17",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag18",
       "Name": "Model Mask 18",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag19",
       "Name": "Model Mask 19",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag20",
       "Name": "Model Mask 20",
-      "Description": ""
+      "Description": "Hides sleeve part A while worn."
     },
     {
       "Field": "invisibleFlag21",
       "Name": "Model Mask 21",
-      "Description": ""
+      "Description": "Hides sleeve part B while worn."
     },
     {
       "Field": "invisibleFlag22",
       "Name": "Model Mask 22",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag23",
       "Name": "Model Mask 23",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag24",
       "Name": "Model Mask 24",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag25",
       "Name": "Model Mask 25",
-      "Description": ""
+      "Description": "Hides the arms while worn."
     },
     {
       "Field": "invisibleFlag26",
       "Name": "Model Mask 26",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag27",
       "Name": "Model Mask 27",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag28",
       "Name": "Model Mask 28",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag29",
       "Name": "Model Mask 29",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag30",
       "Name": "Model Mask 30",
-      "Description": ""
+      "Description": "Hides the belt while worn."
     },
     {
       "Field": "invisibleFlag31",
       "Name": "Model Mask 31",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag32",
       "Name": "Model Mask 32",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag33",
       "Name": "Model Mask 33",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag34",
       "Name": "Model Mask 34",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag35",
       "Name": "Model Mask 35",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag36",
       "Name": "Model Mask 36",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag37",
       "Name": "Model Mask 37",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag38",
       "Name": "Model Mask 38",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag39",
       "Name": "Model Mask 39",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag40",
       "Name": "Model Mask 40",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag41",
       "Name": "Model Mask 41",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag42",
       "Name": "Model Mask 42",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag43",
       "Name": "Model Mask 43",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag44",
       "Name": "Model Mask 44",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag45",
       "Name": "Model Mask 45",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag46",
       "Name": "Model Mask 46",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "invisibleFlag47",
       "Name": "Model Mask 47",
-      "Description": ""
+      "Description": "Unknown. It probably hides part of the body while worn."
     },
     {
       "Field": "disableMultiDropShare",
       "Name": "Is Drop Disabled in Multiplayer",
-      "Description": "If ON, this item cannot be dropped in a multiplayer session."
+      "Description": "Blocks dropping this piece during online play."
     },
     {
       "Field": "simpleModelForDlc",
       "Name": "Simple Model for DLC",
-      "Description": "If ON, there is a simple model for DLC."
+      "Description": "Whether a fallback model exists for players without the DLC."
     },
     {
       "Field": "pad_0",
@@ -657,7 +657,7 @@
     {
       "Field": "oldSortId",
       "Name": "Sort ID (Obsolete)",
-      "Description": "The ordering ID used to sort this part in the menu."
+      "Description": "Unknown. An old ordering number the game probably ignores."
     },
     {
       "Field": "pad_1",

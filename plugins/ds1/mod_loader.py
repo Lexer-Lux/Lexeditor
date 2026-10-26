@@ -55,7 +55,8 @@ TABLE_NAMES = {"EquipParamGoods": "Items", "EquipParamWeapon": "Weapons",
                "ReinforceParamWeapon": "Weapon upgrades", "ReinforceParamProtector": "Armor upgrades",
                "EquipMtrlSetParam": "Upgrade materials", "CharaInitParam": "Starting classes",
                "ItemLotParam": "Drops", "ShopLineupParam": "Shops", "ObjActParam": "Treasure",
-               "BehaviorParam": "Behaviors", "NpcThinkParam": "AI",
+               "BehaviorParam": "Behaviors", "BehaviorParam_PC": "Player behaviors",
+               "NpcThinkParam": "AI",
                "SpEffectParam": "Effects", "Bullet": "Projectiles"}
 
 
@@ -944,15 +945,35 @@ def _labeled(mod_params: bytes | None, vanilla_params: bytes, texts_doc):
             lambda table, row_id: label(vanilla_doc, table, row_id))
 
 
+def _vanilla_bytes(game_root: Path, relative: Path, notes: list, what: str):
+    """One game file as vanilla shipped it: the preserved original once
+    Lexeditor has applied, else the installed file. None (with a note)
+    when the original cannot be verified or nothing is installed."""
+    from . import deployment
+    try:
+        source = deployment.vanilla_source(Path(game_root), relative)
+    except RuntimeError as error:
+        notes.append(f"{what} cannot be compared: {error}")
+        return None
+    if not source.is_file():
+        notes.append(f"The game has no {what} to compare this mod against.")
+        return None
+    return source.read_bytes()
+
+
 def describe_changes(folder: Path, game_root: Path | None):
     """Every record one mod changes against vanilla: params, then texts.
 
-    Returns {'changes': [...], 'truncated': bool, 'note': str}. Each change
-    carries its table, id, display label, changed field labels (parameters)
-    or before/after text (texts), and added/removed flags. Map, character
-    and asset files are file-level changes; they show under the mod's
-    files, not here. Without the game installed there is no vanilla to
-    compare, so the list stays empty and the note says so.
+    Returns {'changes': [...], 'truncated': bool, 'total': int, 'note': str}.
+    Each change carries its table, id, display label, changed field
+    labels (parameters) or before/after text (texts), and added/removed
+    flags. Vanilla means the preserved originals once Lexeditor has
+    applied: the live files may hold a deployed mod instead, and
+    comparing against those would report that mod's rows as this
+    one's. Map, character and asset files are file-level changes;
+    they show under the mod's files, not here. Without the game
+    installed there is no vanilla to compare, so the list stays
+    empty and the note says so.
     """
     folder = Path(folder)
     changes, notes = [], []
@@ -961,9 +982,10 @@ def describe_changes(folder: Path, game_root: Path | None):
         return {'changes': changes, 'truncated': False, 'note': ' '.join(notes)}
     game_root = Path(game_root)
     mod_params = folder / RELATIVE
-    vanilla_params = game_root / RELATIVE
-    params = (mod_params.read_bytes() if mod_params.is_file() else None,
-              vanilla_params.read_bytes() if vanilla_params.is_file() else None)
+    params = (mod_params.read_bytes() if mod_params.is_file() else None, None)
+    if params[0] is not None:
+        params = (params[0], _vanilla_bytes(game_root, RELATIVE, notes,
+                                          "parameter archive"))
     texts_doc = None
     for candidate in (folder / texts.RELATIVE, game_root / texts.RELATIVE):
         if not candidate.is_file():
@@ -984,19 +1006,25 @@ def describe_changes(folder: Path, game_root: Path | None):
                                       _labeled(params[0], params[1], texts_doc), notes)
     for relative, document in ((texts.RELATIVE, texts.TextDocument),
                                (texts.MENU_RELATIVE, texts.MenuDocument)):
-        mod_file, vanilla_file = folder / relative, game_root / relative
-        if not mod_file.is_file() or not vanilla_file.is_file():
+        mod_file = folder / relative
+        if not mod_file.is_file():
+            continue
+        what = "menu text" if document is texts.MenuDocument else "item text"
+        base_bytes = _vanilla_bytes(game_root, relative, notes, what)
+        if base_bytes is None:
             continue
         try:
-            mine, base = document(mod_file.read_bytes()), document(vanilla_file.read_bytes())
+            mine, base = document(mod_file.read_bytes()), document(base_bytes)
         except FormatError as error:
             notes.append(f'{relative.name} cannot be read ({error})')
             continue
         if mine.plain == base.plain:
             continue
         changes += _text_changes(mine, base, menu=document is texts.MenuDocument)
-    truncated = len(changes) > CHANGE_LIMIT
-    return {'changes': changes[:CHANGE_LIMIT], 'truncated': truncated, 'note': ' '.join(notes)}
+    total = len(changes)
+    truncated = total > CHANGE_LIMIT
+    return {'changes': changes[:CHANGE_LIMIT], 'truncated': truncated,
+            'total': total, 'note': ' '.join(notes)}
 
 
 def loaded_files(folder: Path):

@@ -39,11 +39,20 @@ def drag(page, name, target, bottom=False):
     page.wait_for_timeout(100)
 
 
+def inside(page, section):
+    """A drop target inside a section: the title is the escape hatch to
+    the bare panel beside the section, not the way in."""
+    fields = page.locator(f'[data-lex-layout-section="{section}"] .lex-detail-field')
+    if fields.count():
+        return fields.last
+    return page.locator(f'[data-lex-layout-section="{section}"] .lex-detail-section-content')
+
+
 def test_reorder_move_redraw_and_undo(page, tmp_path):
     mount_properties(page)
     drag(page,'Accuracy',page.locator('[data-lex-layout-field="power"]'))
     assert order(page,'ATTACK')==['accuracy','power']
-    drag(page,'Power',page.locator('[data-lex-layout-section="DEFENCE"] h3'))
+    drag(page,'Power',inside(page,'DEFENCE'),bottom=True)
     assert order(page,'ATTACK')==['accuracy']
     assert order(page,'DEFENCE')==['armour','power']
     page.get_by_role('spinbutton',name='Power',exact=True).fill('42')
@@ -62,13 +71,22 @@ def test_reorder_move_redraw_and_undo(page, tmp_path):
     page.keyboard.press('Control+Shift+z')
     page.wait_for_timeout(150)
     assert order(page,'DEFENCE')==['armour','power']
+    # An empty section takes a title drop inside: its content has no box.
     drag(page,'Power',page.locator('[data-lex-layout-section="EXTRA"] h3'))
     assert order(page,'EXTRA')==['power']
+    # A title drop on a lived-in section escapes beside it instead.
+    drag(page,'Power',page.locator('[data-lex-layout-section="EXTRA"] h3'),bottom=True)
+    assert order(page,'EXTRA')==[]
+    bare = page.evaluate("""() => {
+      const field = document.querySelector('[data-lex-layout-field="power"]');
+      return field && !field.closest('[data-lex-layout-section]') ? 'bare' : 'sectioned';
+    }""")
+    assert bare == 'bare', bare
 
 
 def test_readers_use_saved_layout_but_cannot_drag(page):
     mount_properties(page)
-    drag(page,'Power',page.locator('[data-lex-layout-section="DEFENCE"] h3'))
+    drag(page,'Power',inside(page,'DEFENCE'),bottom=True)
     page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:false}})); drawProperties('Reader')")
     page.wait_for_timeout(150)
     assert order(page,'DEFENCE')==['armour','power']

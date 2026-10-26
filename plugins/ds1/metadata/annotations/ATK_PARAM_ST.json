@@ -7,352 +7,352 @@
     {
       "Field": "hit0_Radius",
       "Name": "Hit 0: Radius",
-      "Description": "Determines the radius of the hitbox (sphere/capsule)."
+      "Description": "Size of this hit's striking zone around its anchor point. Raise it to catch targets standing further off. Set it to 0 to disable this hit."
     },
     {
       "Field": "hit1_Radius",
       "Name": "Hit 1: Radius",
-      "Description": "Determines the radius of the hitbox (sphere/capsule)."
+      "Description": "Size of this hit's striking zone around its anchor point. Raise it to catch targets standing further off. Set it to 0 to disable this hit."
     },
     {
       "Field": "hit2_Radius",
       "Name": "Hit 2: Radius",
-      "Description": "Determines the radius of the hitbox (sphere/capsule)."
+      "Description": "Size of this hit's striking zone around its anchor point. Raise it to catch targets standing further off. Set it to 0 to disable this hit."
     },
     {
       "Field": "hit3_Radius",
       "Name": "Hit 3: Radius",
-      "Description": "Determines the radius of the hitbox (sphere/capsule)."
+      "Description": "Size of this hit's striking zone around its anchor point. Raise it to catch targets standing further off. Set it to 0 to disable this hit."
     },
     {
       "Field": "knockbackDist",
       "Name": "Knockback Distance",
-      "Description": "Determines the distance the victim is knocked back by. In metres per second."
+      "Description": "How far the victim slides when this attack staggers them, in metres. It may move the attacker instead when the victim holds firm, but this is not established."
     },
     {
       "Field": "hitStopTime",
       "Name": "Hit Stop Time",
-      "Description": "The duration that the victim's animations are paused for when hit. In seconds."
+      "Description": "How long the impact freezes motion when this hit lands, in seconds. Higher values make hits feel heavier. 0 removes the pause."
     },
     {
       "Field": "spEffectId0",
       "Name": "SpEffect ID: 0",
-      "Description": "SpEffect ID applied to victim by this attack."
+      "Description": "Extra effect this attack puts on the victim, such as poison or a stat change. Attacks fired as bullets ignore this and use the bullet's own effect slots instead."
     },
     {
       "Field": "spEffectId1",
       "Name": "SpEffect ID: 1",
-      "Description": "SpEffect ID applied to victim by this attack."
+      "Description": "Extra effect this attack puts on the victim, such as poison or a stat change. Attacks fired as bullets ignore this and use the bullet's own effect slots instead."
     },
     {
       "Field": "spEffectId2",
       "Name": "SpEffect ID: 2",
-      "Description": "SpEffect ID applied to victim by this attack."
+      "Description": "Extra effect this attack puts on the victim, such as poison or a stat change. Attacks fired as bullets ignore this and use the bullet's own effect slots instead."
     },
     {
       "Field": "spEffectId3",
       "Name": "SpEffect ID: 3",
-      "Description": "SpEffect ID applied to victim by this attack."
+      "Description": "Extra effect this attack puts on the victim, such as poison or a stat change. Attacks fired as bullets ignore this and use the bullet's own effect slots instead."
     },
     {
       "Field": "spEffectId4",
       "Name": "SpEffect ID: 4",
-      "Description": "SpEffect ID applied to victim by this attack."
+      "Description": "Extra effect this attack puts on the victim, such as poison or a stat change. Attacks fired as bullets ignore this and use the bullet's own effect slots instead."
     },
     {
       "Field": "hit0_DmyPoly1",
       "Name": "Hit 0: Initial Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tip of the capsule hitbox, for this hit."
+      "Description": "Anchor point on the attacker where this hit sits. For a capsule hit, this marks one end. -1 probably leaves this hit with no anchor, so it never lands."
     },
     {
       "Field": "hit1_DmyPoly1",
       "Name": "Hit 1: Initial Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tip of the capsule hitbox, for this hit."
+      "Description": "Anchor point on the attacker where this hit sits. For a capsule hit, this marks one end. -1 probably leaves this hit with no anchor, so it never lands."
     },
     {
       "Field": "hit2_DmyPoly1",
       "Name": "Hit 2: Initial Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tip of the capsule hitbox, for this hit."
+      "Description": "Anchor point on the attacker where this hit sits. For a capsule hit, this marks one end. -1 probably leaves this hit with no anchor, so it never lands."
     },
     {
       "Field": "hit3_DmyPoly1",
       "Name": "Hit 3: Initial Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tip of the capsule hitbox, for this hit."
+      "Description": "Anchor point on the attacker where this hit sits. For a capsule hit, this marks one end. -1 probably leaves this hit with no anchor, so it never lands."
     },
     {
       "Field": "hit0_DmyPoly2",
       "Name": "Hit 0: Secondary Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tail of the capsule hitbox, for this hit."
+      "Description": "Second anchor point, which stretches this hit into a capsule between the two points. Set -1 to keep it a sphere on the first point only."
     },
     {
       "Field": "hit1_DmyPoly2",
       "Name": "Hit 1: Secondary Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tail of the capsule hitbox, for this hit."
+      "Description": "Second anchor point, which stretches this hit into a capsule between the two points. Set -1 to keep it a sphere on the first point only."
     },
     {
       "Field": "hit2_DmyPoly2",
       "Name": "Hit 2: Secondary Dummy Polygon ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tail of the capsule hitbox, for this hit."
+      "Description": "Second anchor point, which stretches this hit into a capsule between the two points. Set -1 to keep it a sphere on the first point only."
     },
     {
       "Field": "hit3_DmyPoly2",
       "Name": "Hit 3: Secondary Dummy Poly ID",
-      "Description": "The dummy polygon ID to place the sphere hitbox, or the tail of the capsule hitbox, for this hit."
+      "Description": "Second anchor point, which stretches this hit into a capsule between the two points. Set -1 to keep it a sphere on the first point only."
     },
     {
       "Field": "blowingCorrection",
       "Name": "Attack Correction: Blow-off",
-      "Description": "The multiplier to apply to the base blow-off value."
+      "Description": "Unknown. It may scale how far this attack launches the victim, but this is not established."
     },
     {
       "Field": "atkPhysCorrection",
       "Name": "Attack Correction: Physical",
-      "Description": "The multiplier to apply to the base Physical attack value."
+      "Description": "Multiplies the attacker's physical damage for this hit, for player attacks. 100 keeps the weapon's full damage."
     },
     {
       "Field": "atkMagCorrection",
       "Name": "Attack Correction: Magic",
-      "Description": "The multiplier to apply to the base Magic attack value."
+      "Description": "Multiplies the attacker's magic damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkFireCorrection",
       "Name": "Attack Correction: Fire",
-      "Description": "The multiplier to apply to the base Fire attack value."
+      "Description": "Multiplies the attacker's fire damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkThunCorrection",
       "Name": "Attack Correction: Lightning",
-      "Description": "The multiplier to apply to the base Lightning attack value."
+      "Description": "Multiplies the attacker's lightning damage for this hit, for player attacks. 100 keeps the weapon's full damage. For bows, it scales the fired arrow instead."
     },
     {
       "Field": "atkStamCorrection",
       "Name": "Attack Correction: Stamina",
-      "Description": "The multiplier to apply to the base stamina attack value."
+      "Description": "Multiplies the stamina damage this hit deals to a blocking victim. Player attacks only. 100 keeps the weapon's full stamina damage."
     },
     {
       "Field": "guardAtkRateCorrection",
       "Name": "Attack Correction: Guard Attack",
-      "Description": "The multiplier to apply to the base guard attack value. Compared against the deflection defense value to determine if the attack will bounce."
+      "Description": "Multiplies the weapon's deflection attack for this hit. Player attacks only. The game compares it with the target's deflection defense to decide whether this attack rebounds."
     },
     {
       "Field": "guardBreakCorrection",
       "Name": "Attack Correction: Guard Defense",
-      "Description": "Player only. The multiplier to the base guard defense value. Compared against the deflection attack value to determine if the attack will bounce."
+      "Description": "Multiplies the weapon's deflection defense for this hit. Player attacks only. Higher values probably stop this attack rebounding off blocks and walls."
     },
     {
       "Field": "atkThrowEscapeCorrection",
       "Name": "Attack Correction: Throw Attack",
-      "Description": "The multiplier to apply to the base throw attack value."
+      "Description": "Scales weapon damage on grab attacks the victim can break out of. The exact effect is not established."
     },
     {
       "Field": "atkSuperArmorCorrection",
       "Name": "Attack Correction: Poise",
-      "Description": "Player only. The multiplier to apply to the base poise attack value."
+      "Description": "Multiplies the weapon's poise damage for this hit. Player attacks only. Higher values stagger victims through their armor more often."
     },
     {
       "Field": "atkPhys",
       "Name": "Damage: Physical",
-      "Description": "The base Physical attack value. Used primarily for NPC attacks."
+      "Description": "Flat physical damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
     },
     {
       "Field": "atkMag",
       "Name": "Damage: Magic",
-      "Description": "The base Magic attack value. Used primarily for NPC attacks."
+      "Description": "Flat magic damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
     },
     {
       "Field": "atkFire",
       "Name": "Damage: Fire",
-      "Description": "The base Fire attack value. Used primarily for NPC attacks."
+      "Description": "Flat fire damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
     },
     {
       "Field": "atkThun",
       "Name": "Damage: Lightning",
-      "Description": "The base Lightning attack value. Used primarily for NPC attacks."
+      "Description": "Flat lightning damage of this hit. Enemy attacks only. Player attacks use the weapon's damage instead."
     },
     {
       "Field": "atkStam",
       "Name": "Damage: Stamina",
-      "Description": "The base stamina attack value."
+      "Description": "Stamina damage this hit deals to a blocking victim. Enemy attacks only. Higher values break blocks faster."
     },
     {
       "Field": "guardAtkRate",
       "Name": "Damage: Guard Attack",
-      "Description": "The base guard attack value. Compared against the guard defense value to determine if the attack will bounce."
+      "Description": "Flat deflection attack of this hit. Enemy attacks only. The game compares it with the target's deflection defense to decide whether this attack rebounds."
     },
     {
       "Field": "guardBreakRate",
       "Name": "Damage: Guard Defense",
-      "Description": "The base guard defense value. Compared against the guard attack value to determine if the attack will bounce."
+      "Description": "Flat deflection defense of this hit. Enemy attacks only. Higher values stop this attack rebounding off blocks and walls."
     },
     {
       "Field": "atkSuperArmor",
       "Name": "Damage: Poise",
-      "Description": "The base poise attack value."
+      "Description": "Poise damage of this hit. Enemy attacks only. Higher values stagger victims through their armor more often."
     },
     {
       "Field": "atkThrowEscape",
       "Name": "Damage: Throw Attack",
-      "Description": "The base throw attack value."
+      "Description": "Flat damage for grab attacks the victim can break out of. The exact effect is not established."
     },
     {
       "Field": "atkObj",
       "Name": "Damage: Object Destruction",
-      "Description": "The base object destruction value. Applied to the object's HP."
+      "Description": "Damage this hit deals to breakable objects. Objects with less HP than this break. High values smash barriers in one hit."
     },
     {
       "Field": "guardStaminaCutRate",
       "Name": "Guard Absorption Correction: Stamina",
-      "Description": "The multiplier to apply to the reduction of stamina damage when guarding. Positive values increase guard stability, negative values decrease it."
+      "Description": "Shifts the victim's block stability against this hit. 0 keeps their stability, -50 halves it. Positive values make blocking this hit cheaper."
     },
     {
       "Field": "guardRate",
       "Name": "Guard Absorption",
-      "Description": "The multiplier to apply to the guard absorption value from the weapon. 0, 1x / 100, 2x / -100, guard multiplier = (guard multiplier / 100) to increase / decrease the parameter to 0. + 1)"
+      "Description": "Shifts how much damage blocking stops against this hit. 0 keeps the shield's block rate, -100 removes it. Positive values make the block stronger."
     },
     {
       "Field": "throwTypeId",
       "Name": "Throw Type ID",
-      "Description": "The throw type ID to use with this attack against the victim."
+      "Description": "Names the grab linked to this attack. Which table it points to is not established."
     },
     {
       "Field": "hit0_hitType",
       "Name": "Hit 0: Hit Type",
-      "Description": "The hit collision type for this hit slot."
+      "Description": "Special behavior of this hit. 0 is a normal hit. 2 rebounds off walls and objects."
     },
     {
       "Field": "hit1_hitType",
       "Name": "Hit 1: Hit Type",
-      "Description": "The hit collision type for this hit slot."
+      "Description": "Special behavior of this hit. 0 is a normal hit. 2 rebounds off walls and objects."
     },
     {
       "Field": "hit2_hitType",
       "Name": "Hit 2: Hit Type",
-      "Description": "The hit collision type for this hit slot."
+      "Description": "Special behavior of this hit. 0 is a normal hit. 2 rebounds off walls and objects."
     },
     {
       "Field": "hit3_hitType",
       "Name": "Hit 3: Hit Type",
-      "Description": "The hit collision type for this hit slot."
+      "Description": "Special behavior of this hit. 0 is a normal hit. 2 rebounds off walls and objects."
     },
     {
       "Field": "hti0_Priority",
       "Name": "Hit 0: Priority",
-      "Description": "The priority for this hit slot. If there are two or more hits at the same time, the one with the higher priority will be adopted."
+      "Description": "Which hit wins when two of this attack's hits land at once. Higher values win. It does nothing when only one hit lands."
     },
     {
       "Field": "hti1_Priority",
       "Name": "Hit 1: Priority",
-      "Description": "The priority for this hit slot. If there are two or more hits at the same time, the one with the higher priority will be adopted."
+      "Description": "Which hit wins when two of this attack's hits land at once. Higher values win. It does nothing when only one hit lands."
     },
     {
       "Field": "hti2_Priority",
       "Name": "Hit 2: Priority",
-      "Description": "The priority for this hit slot. If there are two or more hits at the same time, the one with the higher priority will be adopted."
+      "Description": "Which hit wins when two of this attack's hits land at once. Higher values win. It does nothing when only one hit lands."
     },
     {
       "Field": "hti3_Priority",
       "Name": "Hit 3: Priority",
-      "Description": "The priority for this hit slot. If there are two or more hits at the same time, the one with the higher priority will be adopted."
+      "Description": "Which hit wins when two of this attack's hits land at once. Higher values win. It does nothing when only one hit lands."
     },
     {
       "Field": "dmgLevel",
       "Name": "Damage Level: Hostile",
-      "Description": "The damage animation to apply to the victim of this attack."
+      "Description": "How hard the victim staggers. No Stagger plays no reaction, while Small Stagger, Large Stagger, and Blown Away play bigger ones."
     },
     {
       "Field": "mapHitType",
       "Name": "Map Hit Type",
-      "Description": "Which map do you see around the attack? The set"
+      "Description": "Which walls and floors this attack tests against. The meaning of each value is not established."
     },
     {
       "Field": "guardCutCancelRate",
       "Name": "Guard Absorption Invalidation",
-      "Description": "Guard cut rate invalidation ratio (-100 to 100)  Normal at 0 / Completely invalidated at -100 / Doubles the defense effect of the opponent at 100  -50, 100% cut shield becomes 50% cut Become "
+      "Description": "How much of the victim's block this attack ignores. 0 keeps the block, -100 removes it. Positive values strengthen the block instead."
     },
     {
       "Field": "atkAttribute",
       "Name": "Attack Attribute",
-      "Description": "Attack attribute to use when applying attack against the victim."
+      "Description": "The physical damage type, such as slash or thrust. Some enemies resist certain types. Pick the one that matches the weapon's motion."
     },
     {
       "Field": "spAttribute",
       "Name": "Special Attribute",
-      "Description": "Special attributes to use when applying attack against the victim."
+      "Description": "The visual and sound theme of this hit, such as fire or lightning. It also picks the victim's death animation."
     },
     {
       "Field": "atkType",
       "Name": "Attack Presentation Type",
-      "Description": "Specify the particles and sounds at the time of attack (1 set by attribute, material, size)."
+      "Description": "The look and sound theme of this hit. It joins the material and size as one set. Match it to the attack's damage type."
     },
     {
       "Field": "atkMaterial",
       "Name": "Attack Presentation: Material",
-      "Description": "Specify the particles and sounds at the time of attack (1 set by attribute, material, size)."
+      "Description": "The material flash and sound of this hit, such as fire or lightning. It joins the attack theme and size as one set."
     },
     {
       "Field": "atkSize",
       "Name": "Attack Presentation: Size",
-      "Description": "Specify particles and sounds at the time of attack (Although it is reserved, it is used, so be sure to set it blank or small)."
+      "Description": "The scale of this hit's look and sound. Always leave it blank or small. The spare sizes still take effect, so avoid them."
     },
     {
       "Field": "defMaterial",
       "Name": "Defense Presentation: Material",
-      "Description": "Specify the particles and sounds when guarding against this attack. (1 set by attribute, material, size)."
+      "Description": "The clang this attack makes when blocked. Match it to the attacker's weapon material."
     },
     {
       "Field": "defSfxMaterial",
       "Name": "Defense Presentation: Particles",
-      "Description": "The particles used when guarding against this attack."
+      "Description": "The sparks this attack shows when blocked. Match it to the attacker's weapon material."
     },
     {
       "Field": "hitSourceType",
       "Name": "Hit Source Type",
-      "Description": "The source of the dummy Polygon ID to use for this attack."
+      "Description": "Which model carries this attack's anchor points. Weapon reads them from the weapon, Body from the attacker. Parts suit multi-part enemies."
     },
     {
       "Field": "throwFlag",
       "Name": "Throw Type",
-      "Description": "The flag used to determine the throwing parameters for this attack."
+      "Description": "Marks how this attack behaves as a grab. The meaning of each value is not established."
     },
     {
       "Field": "disableGuard",
       "Name": "Ignore Guard",
-      "Description": "If ON, then this attack ignores the victim's guard and applies the damage animation automatically."
+      "Description": "Makes this attack go through blocks. The victim staggers as if unguarded. Use it for unblockable moves."
     },
     {
       "Field": "disableStaminaAttack",
       "Name": "Disable Guard Drain",
-      "Description": "If ON, then this attack will not reduce the victim's stamina as a result of them guarding the attack."
+      "Description": "Stops this attack draining a blocking victim's stamina. The guard-break check still runs as normal."
     },
     {
       "Field": "disableHitSpEffect",
       "Name": "Disable Hit SpEffect",
-      "Description": "If ON, then this attack will not apply on-hit SpEffects to the victim."
+      "Description": "Stops this attack applying its extra effect slots to the victim. The slots stay set but do nothing while this is on."
     },
     {
       "Field": "IgnoreNotifyMissSwingForAI",
       "Name": "Disable Missed Attack Notification",
-      "Description": "If ON, then the enemy AI is not given notification of a missed attack."
+      "Description": "Hides this attack's misses from enemy AI. Enemies will not react to a whiffed swing. Leave it off so enemies notice dodged attacks."
     },
     {
       "Field": "repeatHitSfx",
       "Name": "Repeat Hit Particles",
-      "Description": "If ON, does the on-hit SFX for this attack repeat forever upon collision."
+      "Description": "Repeats the wall-impact effect while this attack touches a wall. Enemy attacks only."
     },
     {
       "Field": "isArrowAtk",
       "Name": "Enable Part Destruction",
-      "Description": "If ON, then this attack will count as damage to a destructable enemy part."
+      "Description": "Lets this attack damage severable enemy parts such as tails. Turn it on for arrows and other projectiles. Its exact scope is not established."
     },
     {
       "Field": "isGhostAtk",
       "Name": "Enable Ghost Destruction",
-      "Description": "If ON, then this attack will count as damage to a ghost enemy."
+      "Description": "Lets this attack harm ghosts. Without it, ghost enemies take no damage."
     },
     {
       "Field": "isDisableNoDamage",
       "Name": "Ignore Invulnerability Frames",
-      "Description": "If ON, then invulnerability frames (such as roll frames) are ignored by this attack. Complete invulnerability is NOT ignored however."
+      "Description": "Makes this attack hit through dodge rolls. Fully scripted invincibility still blocks it."
     },
     {
       "Field": "pad",

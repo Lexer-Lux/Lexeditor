@@ -98,9 +98,12 @@ def _spline_data():
     return bytes(out)
 
 
-def build_tag0():
+def build_tag0(extra_data=0):
     """One skeleton (root/child), one static-plus-curve spline anim and
-    one two-frame interleaved anim, each with a binding, in two variants."""
+    one two-frame interleaved anim, each with a binding, in two variants.
+
+    extra_data pads the spline curve blob, the way a long motion's whole
+    curve set packs into one hkUint8 item past any object count."""
     pool = list(dict.fromkeys('hkArray' if tag == 'array' else name
                               for tag, name, *_ in TYPES))
     tnam = _pack(len(TYPES))
@@ -136,7 +139,7 @@ def build_tag0():
             tbod += _pack(TIDS[name]) + _pack(0) + _pack(11) + _pack(0x8)
             tbod += _pack(TIDS[entry[2]]) + _pack(16) + _pack(4)
 
-    spline = _spline_data()
+    spline = _spline_data() + bytes(extra_data)
     pose0 = _qstransform((0.0, 1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), (2.0, 2.0, 2.0, 1.0))
     pose1 = _qstransform((0.0, 0.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0), (1.0, 1.0, 1.0, 1.0))
     step0 = _qstransform((0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), (1.0, 1.0, 1.0, 1.0))

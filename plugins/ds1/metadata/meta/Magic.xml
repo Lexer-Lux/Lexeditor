@@ -9,7 +9,7 @@
     <mp />
     <stamina />
     <iconId />
-    <behaviorId />
+    <behaviorId Refs="BehaviorParam_PC" />
     <mtrlItemId Refs="EquipMtrlSetParam" />
     <replaceMagicId Refs="Magic" />
     <maxQuantity />

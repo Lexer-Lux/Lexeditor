@@ -181,6 +181,24 @@ def test_rows_use_bounded_number_controls():
     assert min(identities) < 1001
 
 
+def test_rows_and_weights_carry_label_art(rules):
+    # The nine weights read as the stats they cost and the four list
+    # rows as the defenses they grow, through the shared /api/label
+    # art every other tab uses.
+    from plugins.ds1.icons import ICON_LABELS, LABELS
+    served = set(LABELS) | set(ICON_LABELS)
+    config = {"levelupGains": deepcopy(DEFAULTS["levelupGains"])}
+    for key, _label in levelup_gains.OUTPUTS:
+        row = levelup_gains.row(key, config)
+        assert {field["icon"] for field in row["fields"]} <= served
+        assert [field["icon"] for field in row["fields"]] == [
+            levelup_gains.FIELD_ICONS[name] for name, _, _ in levelup_gains.INPUTS]
+    listed = rules.list_rows("levelup")
+    assert [row["labelKind"] for row in listed] == [
+        levelup_gains.ROW_ICONS[key] for key, _label in levelup_gains.OUTPUTS]
+    assert {row["labelKind"] for row in listed} <= served
+
+
 def test_vanilla_values_build_no_hooks():
     spec = levelup_gains.spec_for_values(deepcopy(DEFAULTS["levelupGains"]))
     assert spec == {"version": 1, "islands": [], "hooks": []}

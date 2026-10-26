@@ -44,7 +44,11 @@ def build(page):
 
 
 def set_columns(page, count):
-    page.locator(".lex-list-detail-divider .lex-detail-column-control").hover()
+    # Summon like a reader: hover the divider strip, not the parked gizmo.
+    # Parked it is invisible, click-through, and rotated, with its center
+    # deep in pane territory where pane content covers it; the strip is
+    # the reveal zone, and the gizmo opens under the cursor at mid-height.
+    page.locator(".lex-list-detail-divider").hover()
     control = page.locator(".lex-list-detail-divider .lex-detail-column-control")
     for _ in range(8):
         current = int(control.locator(".lex-barrel-count").text_content())

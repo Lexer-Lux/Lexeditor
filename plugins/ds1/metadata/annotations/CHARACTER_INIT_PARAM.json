@@ -7,17 +7,17 @@
     {
       "Field": "baseRec_mp",
       "Name": "MP recovery (seconds)",
-      "Description": "Seconds to recover 1 MP. Classes store 0."
+      "Description": "Seconds to recover 1 MP. The game has no MP pool, so this does nothing. Classes store 0."
     },
     {
       "Field": "baseRec_sp",
       "Name": "Stamina recovery (seconds)",
-      "Description": "Seconds to recover 1 stamina. Classes store 0."
+      "Description": "Seconds to recover 1 stamina. The game may ignore it. Classes store 0."
     },
     {
       "Field": "red_Falldam",
       "Name": "Fall damage cut (%)",
-      "Description": "Fall damage reduction in percent. Classes store 0."
+      "Description": "May cut damage when another character lands on this one. Set in percent. Classes store 0."
     },
     {
       "Field": "soul",
@@ -112,17 +112,17 @@
     {
       "Field": "equip_Skill_01",
       "Name": "Skill 1",
-      "Description": "Unused. Classes store none."
+      "Description": "Unused. Classes store None."
     },
     {
       "Field": "equip_Skill_02",
       "Name": "Skill 2",
-      "Description": "Unused. Classes store none."
+      "Description": "Unused. Classes store None."
     },
     {
       "Field": "equip_Skill_03",
       "Name": "Skill 3",
-      "Description": "Unused. Classes store none."
+      "Description": "Unused. Classes store None."
     },
     {
       "Field": "equip_Spell_01",
@@ -212,12 +212,12 @@
     {
       "Field": "npcPlayerFaceGenId",
       "Name": "Face preset",
-      "Description": "Face shape for rows the game draws as bodies. Classes store 0; creation decides the player's face."
+      "Description": "Face shape for rows the game draws as bodies. Classes store 0. Character creation decides the player's face."
     },
     {
       "Field": "npcPlayerThinkId",
       "Name": "AI",
-      "Description": "The NPC behavior this row uses. Classes store 0."
+      "Description": "The NPC behavior this row uses. The game ignores it for the player."
     },
     {
       "Field": "baseHp",
@@ -227,7 +227,7 @@
     {
       "Field": "baseMp",
       "Name": "Mana",
-      "Description": "Maximum mana. Classes store 0 and the game computes it from Attunement."
+      "Description": "Maximum mana. The game has no mana pool, so this does nothing. Classes store 0."
     },
     {
       "Field": "baseSp",
@@ -257,17 +257,17 @@
     {
       "Field": "QWC_sb",
       "Name": "World state 1",
-      "Description": "A world-state value the game checks. Always 0 in the game's file."
+      "Description": "Unknown. A Demon's Souls leftover, 0 on every row. Its effect here is not documented."
     },
     {
       "Field": "QWC_mw",
       "Name": "World state 2",
-      "Description": "A world-state value the game checks. Always 0 in the game's file."
+      "Description": "Unknown. A Demon's Souls leftover, 0 on every row. Its effect here is not documented."
     },
     {
       "Field": "QWC_cd",
       "Name": "World state 3",
-      "Description": "A world-state value the game checks. Always 0 in the game's file."
+      "Description": "Unknown. A Demon's Souls leftover, 0 on every row. Its effect here is not documented."
     },
     {
       "Field": "soulLv",
@@ -312,12 +312,12 @@
     {
       "Field": "baseLuc",
       "Name": "Unknown value 1",
-      "Description": "Unknown. Every starting class stores 10 here; its effect is not documented."
+      "Description": "Unknown. Every starting class stores 10 here. Its effect is not documented."
     },
     {
       "Field": "baseHeroPoint",
       "Name": "Unknown value 2",
-      "Description": "Unknown. Every starting class stores 0 here; its effect is not documented."
+      "Description": "Unknown. Every starting class stores 0 here. Its effect is not documented."
     },
     {
       "Field": "baseDurability",
@@ -437,17 +437,17 @@
     {
       "Field": "npcPlayerType",
       "Name": "Player type",
-      "Description": "What kind of character this row builds. Classes store 0."
+      "Description": "Which NPC type this row uses. The game ignores it for the player."
     },
     {
       "Field": "npcPlayerDrawType",
       "Name": "Draw type",
-      "Description": "How the game tints this body. Classes store None."
+      "Description": "How the game draws this body, such as a phantom. Classes store None."
     },
     {
       "Field": "npcPlayerSex",
       "Name": "Sex",
-      "Description": "The sex this row builds."
+      "Description": "The sex this row builds. Character creation decides the player's sex."
     },
     {
       "Field": "vowType",

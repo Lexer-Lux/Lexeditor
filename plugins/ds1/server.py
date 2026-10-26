@@ -59,19 +59,69 @@ NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
 UPLOAD_BODY_LIMIT = 2100000
 
 
-def _asset_bytes(relative, side):
-    """The bytes the game would load: the mod's override, else the installed file."""
+def _asset_target(relative, side):
+    """The file the game would load: the mod's override, else the installed file."""
     relative = assets.check_relative(relative)
     if STORE.project is not None and (side or "mod") != "game":
         own = Path(STORE.project) / relative
         if own.is_file():
-            return own.read_bytes(), "mod", relative.as_posix()
+            return own, "mod", relative.as_posix()
     if STORE.game_root is None:
         raise ValueError("Select the installed game before browsing its files")
     live = Path(STORE.game_root) / relative
     if not live.is_file():
         raise ValueError("The installed game has no such file")
-    return live.read_bytes(), "game", relative.as_posix()
+    return live, "game", relative.as_posix()
+
+
+def _asset_bytes(relative, side):
+    """The bytes the game would load: the mod's override, else the installed file."""
+    live, source, name = _asset_target(relative, side)
+    return live.read_bytes(), source, name
+
+
+def _textures_detail(filename, side):
+    """A scope=textures payload for one file. Pure reads for textures-kind
+    files (no shared mutable state but the stamp caches, which tolerate
+    concurrent computes); models-kind files additionally resolve their
+    model strip through the viewport caches, so those stay under LOCK."""
+    live, source, name = _asset_target(filename, side)
+    size = live.stat().st_size
+    model = assets.model_info(live.read_bytes(), name) \
+        if assets.kind_of(name) == 'models' else None
+    if assets.is_split_archive(name):
+        textures, reason = [], 'split-archive'
+    else:
+        try:
+            textures, reason = assets.list_textures_from_path(live, name), None
+        except assets.AssetError:
+            textures, reason = [], 'unreadable'
+    if model is not None and model.get('previewable') and model.get('maps'):
+        found, meta = viewport.model_strip_pngs(
+            STORE.game_root, STORE.project, name, side,
+            model.get('member'), model['maps'])
+        have = {tile['name'].lower() for tile in textures}
+        for stem in model['maps']:
+            if stem in found and meta[stem]['name'].lower() not in have:
+                tile = meta[stem]
+                textures.append({
+                    'name': tile['name'], 'width': tile['width'],
+                    'height': tile['height'], 'format': tile['format'],
+                    'png': 'data:image/png;base64,' + base64.b64encode(
+                        found[stem]).decode('ascii')})
+    return {'file': name, 'source': source, 'size': size,
+            'textures': textures, 'reason': reason,
+            'model': model}
+
+
+def _preview_png(filename, side, member, index):
+    """One texture's PNG preview. Pure reads; lock-free safe."""
+    live, _source, name = _asset_target(filename, side)
+    try:
+        number = int(index)
+    except ValueError:
+        raise ValueError('A texture preview needs a numeric texture') from None
+    return assets.texture_png_from_path(live, name, member, number)
 
 
 def _sound_bank_path(relative):
@@ -161,6 +211,27 @@ class Handler(PluginRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+        # Pure-read texture routes run outside LOCK so the Textures tab's
+        # bounded-parallel expansion (and a preview strip's images) decode
+        # side by side instead of serializing behind one global mutex.
+        if path == '/api/assets/preview':
+            try:
+                self.send_bytes(_preview_png(query.get('file', [''])[0],
+                                             query.get('side', ['mod'])[0],
+                                             query.get('member', [''])[0],
+                                             query.get('index', ['0'])[0]),
+                                'image/png')
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/assets' and query.get('scope', ['overrides'])[0] == 'textures' \
+                and assets.kind_of(query.get('file', [''])[0]) != 'models':
+            try:
+                self.send_json(_textures_detail(query.get('file', [''])[0],
+                                                query.get('side', ['mod'])[0]))
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/map/geometries',
@@ -182,33 +253,10 @@ class Handler(PluginRequestHandler):
                                       'hasProject': STORE.project is not None,
                                       'readOnly': STORE.read_only}
                         elif scope == 'textures':
-                            side = query.get('side', ['mod'])[0]
-                            data, source, name = _asset_bytes(query.get('file', [''])[0], side)
-                            model = assets.model_info(data, name) \
-                                if assets.kind_of(name) == 'models' else None
-                            if assets.is_split_archive(name):
-                                textures, reason = [], 'split-archive'
-                            else:
-                                try:
-                                    textures, reason = assets.list_textures(data, name), None
-                                except assets.AssetError:
-                                    textures, reason = [], 'unreadable'
-                            if model is not None and model.get('previewable') and model.get('maps'):
-                                found, meta = viewport.model_strip_pngs(
-                                    STORE.game_root, STORE.project, name, side,
-                                    model.get('member'), model['maps'])
-                                have = {tile['name'].lower() for tile in textures}
-                                for stem in model['maps']:
-                                    if stem in found and meta[stem]['name'].lower() not in have:
-                                        tile = meta[stem]
-                                        textures.append({
-                                            'name': tile['name'], 'width': tile['width'],
-                                            'height': tile['height'], 'format': tile['format'],
-                                            'png': 'data:image/png;base64,' + base64.b64encode(
-                                                found[stem]).decode('ascii')})
-                            result = {'file': name, 'source': source, 'size': len(data),
-                                      'textures': textures, 'reason': reason,
-                                      'model': model}
+                            # Textures-kind files are served lock-free above;
+                            # only models-kind files (model strip) arrive here.
+                            result = _textures_detail(query.get('file', [''])[0],
+                                                      query.get('side', ['mod'])[0])
                         else:
                             result = {'files': assets.scan_project(STORE.project, strict=False,
                                                                     game_root=STORE.game_root)
@@ -441,6 +489,11 @@ class Handler(PluginRequestHandler):
                                     row['values']['maps'] = links.get(row['id'], [])
                                     row['values'].update(MAPSTORE.describe_drop(
                                         row['name'], links.get(row['id'], []), displays))
+                            elif tab in ('bosses', 'monsters', 'npcs'):
+                                links = MAPSTORE.npc_models()
+                                for row in result['rows']:
+                                    models = sorted(links.get(row['id'], ()))
+                                    row['values']['chr'] = models[0] if models else None
                             elif tab == 'treasure':
                                 stems = MAPSTORE.stem_display_names()
                                 for row in result['rows']:
@@ -526,20 +579,6 @@ class Handler(PluginRequestHandler):
                     KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
-        if path == '/api/assets/preview':
-            try:
-                with LOCK:
-                    data, _source, name = _asset_bytes(query.get('file', [''])[0],
-                                                       query.get('side', ['mod'])[0])
-                    try:
-                        index = int(query.get('index', ['0'])[0])
-                    except ValueError:
-                        raise ValueError('A texture preview needs a numeric texture') from None
-                    self.send_bytes(assets.texture_png(data, name, query.get('member', [''])[0], index),
-                                    'image/png')
-            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
-                self.send_json({'error': str(error)}, 400)
-            return
         if path == '/api/assets/geometry':
             try:
                 with LOCK:
@@ -554,43 +593,45 @@ class Handler(PluginRequestHandler):
                 self.send_json({'error': str(error)}, 400)
             return
         if path == '/api/sounds':
+            # Lock-free: the scan reads immutable game and mod files and
+            # publishes its cache in one assignment, so a slow writer
+            # elsewhere can never wedge the sound tab open.
             try:
-                with LOCK:
-                    kind = query.get('kind', ['sfx'])[0]
-                    if kind not in ('sfx', 'music'):
-                        raise ValueError("Sounds list 'sfx' or 'music'")
-                    streams = assets.list_streams(STORE.game_root, STORE.project)
-                    rows = [{"table": "SoundStream", "id": f"{entry['bank']}::{entry['name']}",
-                             "name": entry["name"], "bank": entry["bank"],
-                             "duration": entry["duration"], "size": entry["size"],
-                             "overridden": entry["overridden"]}
-                            for entry in (streams["music"] if kind == "music" else streams["sound"])]
-                    self.send_json({"rows": rows, "unreadable": streams["unreadable"]})
+                kind = query.get('kind', ['sfx'])[0]
+                if kind not in ('sfx', 'music'):
+                    raise ValueError("Sounds list 'sfx' or 'music'")
+                streams = assets.list_streams(STORE.game_root, STORE.project)
+                rows = [{"table": "SoundStream", "id": f"{entry['bank']}::{entry['name']}",
+                         "name": entry["name"], "bank": entry["bank"],
+                         "duration": entry["duration"], "size": entry["size"],
+                         "overridden": entry["overridden"]}
+                        for entry in (streams["music"] if kind == "music" else streams["sound"])]
+                self.send_json({"rows": rows, "unreadable": streams["unreadable"]})
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
         if path == '/api/sound/bank':
+            # Lock-free: pure bank reads, like the sounds list.
             try:
-                with LOCK:
-                    bank, source = _sound_bank_path(query.get('file', [''])[0])
-                    self.send_json({'file': bank.name, 'source': source,
-                                      'streams': [{"name": entry["name"],
-                                                   "duration": entry["duration"],
-                                                   "size": entry["size"]}
-                                                  for entry in fsb.parse_table(bank)]})
+                bank, source = _sound_bank_path(query.get('file', [''])[0])
+                self.send_json({'file': bank.name, 'source': source,
+                                  'streams': [{"name": entry["name"],
+                                               "duration": entry["duration"],
+                                               "size": entry["size"]}
+                                              for entry in fsb.parse_table(bank)]})
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
         if path == '/api/sound/stream':
+            # Lock-free: pure bank reads, like the sounds list.
             try:
-                with LOCK:
-                    bank, _source = _sound_bank_path(query.get('file', [''])[0])
-                    wanted = query.get('stream', [''])[0]
-                    table = fsb.parse_table(bank)
-                    entry = next((item for item in table if item["name"] == wanted), None)
-                    if entry is None:
-                        raise ValueError("Unknown sound stream")
-                    self.send_bytes(fsb.extract_mp3(bank, entry), "audio/mpeg")
+                bank, _source = _sound_bank_path(query.get('file', [''])[0])
+                wanted = query.get('stream', [''])[0]
+                table = fsb.parse_table(bank)
+                entry = next((item for item in table if item["name"] == wanted), None)
+                if entry is None:
+                    raise ValueError("Unknown sound stream")
+                self.send_bytes(fsb.extract_mp3(bank, entry), "audio/mpeg")
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return

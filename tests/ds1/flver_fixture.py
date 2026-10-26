@@ -58,7 +58,8 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     `uv_scale` multiplies the first UV set, so fixtures can tile their
     diffuse the way real map pieces do; the second set is untouched.
     `dummies` is [(ref_id, (x, y, z))] (default the one point 100 at
-    (1.0, 2.0, 3.0)).
+    (1.0, 2.0, 3.0)). Each entry takes an optional attach bone index
+    as a third item; without it the point hangs off bone 0.
     """
     if bones is None:
         bones = [('root', -1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]
@@ -80,13 +81,15 @@ def build_flver(strip=False, qloc=False, bones=None, skin=None,
     out = bytearray()
     out.extend(b'\0' * 128)  # header
 
-    for ref_id, (dx, dy, dz) in dummies:  # dummies
+    for entry in dummies:  # dummies
+        ref_id, (dx, dy, dz) = entry[0], entry[1]
+        attach = entry[2] if len(entry) > 2 else 0
         out.extend(struct.pack('<3f', dx, dy, dz))
         out.extend(bytes((255, 128, 64, 32)))
         out.extend(struct.pack('<3f', 0.0, 0.0, 1.0))
         out.extend(struct.pack('<2h', ref_id, 0))
         out.extend(struct.pack('<3f', 0.0, 1.0, 0.0))
-        out.extend(struct.pack('<h2B', 0, 1, 1))
+        out.extend(struct.pack('<h2B', attach, 1, 1))
         out.extend(struct.pack('<2I', 0, 0) + bytes(8))
 
     mat_at = len(out)  # material

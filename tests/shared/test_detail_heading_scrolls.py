@@ -47,3 +47,58 @@ def test_heading_scrolls_away_and_gutters_match(page):
         body: getComputedStyle(panel.querySelector(':scope > .lex-detail-panel-body')).overflowY};
     }''')
     assert tabbed == {'panelScrolls': False, 'body': 'auto'}, tabbed
+
+def test_unpaged_tab_scroller_survives_late_content_growth(page):
+    """An unpaged tab keeps scrolling after its content grows past the fit.
+
+    The paginate fit writes inline overflow-y hidden when a tab fits, and
+    nothing re-fits when content grows in place afterwards. The stale
+    inline style used to clip the late fields with no scrollbar and a dead
+    wheel; the shared scroller rule now keeps overflow-y auto.
+    """
+    framework(page)
+    page.evaluate('''() => {
+      const U = LexeditorUI, main = document.querySelector('main');
+      main.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;height:500px';
+      const fields = (n, prefix) => Array.from({length: n}, (_, i) => U.detailField({label: prefix + i,
+        control: U.el('input', {type: 'number', value: i})}));
+      window.extraFields = () => fields(40, 'Late ');
+      main.append(U.detailPanel({title: 'Tabbed record', attrs: {id: 'tabbed'},
+        body: [U.tabbedPanel({tabs: [{id: 'a', label: 'A'}], active: 'a',
+          paginate: {unpaged: true}, content: () => fields(4, 'Field ')})]}));
+    }''')
+    page.wait_for_timeout(400)
+    state = page.evaluate('''() => {
+      const scroller = document.querySelector('#tabbed .lex-tweaks-scroll');
+      return {found: !!scroller,
+        overflows: scroller ? scroller.scrollHeight > scroller.clientHeight + 1 : None};
+    }''')
+    assert state == {'found': True, 'overflows': False}, state
+    page.evaluate('''() => {
+      const scroller = document.querySelector('#tabbed .lex-tweaks-scroll');
+      const host = scroller.querySelector('.lex-detail-field').parentElement;
+      host.append(...window.extraFields());
+    }''')
+    page.wait_for_timeout(300)
+    grown = page.evaluate('''() => {
+      const scroller = document.querySelector('#tabbed .lex-tweaks-scroll');
+      return {computed: getComputedStyle(scroller).overflowY,
+        overflows: scroller.scrollHeight > scroller.clientHeight + 1};
+    }''')
+    assert grown['overflows'], grown
+    assert grown['computed'] == 'auto', grown
+    box = page.locator('#tabbed .lex-tweaks-scroll').bounding_box()
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    page.mouse.wheel(0, 400)
+    page.wait_for_timeout(300)
+    top = page.evaluate("() => document.querySelector('#tabbed .lex-tweaks-scroll').scrollTop")
+    assert top > 0, top
+    page.evaluate("() => { const s = document.querySelector('#tabbed .lex-tweaks-scroll'); s.scrollTop = s.scrollHeight; }")
+    page.wait_for_timeout(200)
+    visible = page.evaluate('''() => {
+      const s = document.querySelector('#tabbed .lex-tweaks-scroll');
+      const fields = [...s.querySelectorAll('.lex-detail-field')];
+      const last = fields[fields.length - 1].getBoundingClientRect();
+      return {lastBottom: last.bottom, boxBottom: s.getBoundingClientRect().bottom};
+    }''')
+    assert visible['lastBottom'] <= visible['boxBottom'] + 1, visible

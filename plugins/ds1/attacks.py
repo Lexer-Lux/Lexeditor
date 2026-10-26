@@ -56,7 +56,7 @@ ATTACK_FIELDS['hitStopTime'] = (
     "How long the victim's animation pauses when hit, in seconds.")
 # The status effects this attack applies to its victim, and their master
 # switch. Hidden by the allowlist until now: record links only cover shown
-# fields, so the effects were invisible everywhere, including Linked records.
+# fields, so the effects were invisible everywhere in detail.
 for _slot in range(5):
     ATTACK_FIELDS[f'spEffectId{_slot}'] = (
         f'Effect on hit {_slot + 1}', 'Effects',
@@ -251,11 +251,28 @@ class AttackReferences:
             return {'kind': 'missing', 'detail': f'Effect {target} is not in the parameters'}
         return {'kind': 'unsupported', 'detail': f'Unsupported reference type {kind}'}
 
+    def _placement(self, npc):
+        """Where an owner opens: (tab, subtab), or (None, None) when no
+        list admits it. Bosses first: Gwyndolin keeps the friendly type
+        into his boss fight but lists under Bosses."""
+        if self.doc.is_boss(npc):
+            return ('enemies', 'bosses')
+        if self.doc.is_monster(npc):
+            return ('enemies', 'monsters')
+        if self.doc.is_friend(npc) or self.doc.is_merchant(npc):
+            return ('npcs', 'npcs')
+        return (None, None)
+
     def impact(self, attack):
         paths = self.paths[attack]
         owners = sorted({npc for p in paths for npc in self.variants[p['variation']]})
-        return {'variants': [{'id': npc, 'name': self.doc.schemas['NpcParam']['names'].get(npc) or f'NPC {npc}'}
-                             for npc in owners],
+        variants = []
+        for npc in owners:
+            tab, sub = self._placement(npc)
+            variants.append({'id': npc,
+                             'name': self.doc.schemas['NpcParam']['names'].get(npc) or f'NPC {npc}',
+                             'tab': tab, 'sub': sub})
+        return {'variants': variants,
                 'behaviors': sorted({p['behavior'] for p in paths}),
                 'bulletReferences': sorted(b for b, (a, _) in self.bullets.items() if a == attack),
                 'paths': [p['path'] for p in paths]}

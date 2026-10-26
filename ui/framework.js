@@ -477,6 +477,27 @@
     return svg;
   };
 
+  // The add mark on header buttons that add something new: a bare plus,
+  // drawn in the same stroke as the copy and remove icons and cropped
+  // to the drawing.
+  const addIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "3 3 18 18");
+    svg.setAttribute("aria-hidden", "true");
+    for (const d of ["M12 5v14M5 12h14"]) {
+      const path = document.createElementNS(namespace, "path");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("d", d);
+      svg.append(path);
+    }
+    return svg;
+  };
+
   // The section mark on the dev-mode Add-section header button: a panel
   // block with a header divider, drawn in the same stroke as the copy
   // and remove icons. A bare plus here read as the record add button
@@ -1143,6 +1164,13 @@
   // collide however long the number gets. When the value is long enough to
   // reach that lane the unit parks against it, which is the old behaviour and
   // the correct one at that width.
+  // A box under this width cannot fit its value, its unit, its vanilla
+  // reference and its stepper at a readable size: it compacts instead.
+  const COMPACT_BOX_WIDTH = 120;
+  const placeCompactBox = (host, box) => {
+    if (host && box && box.clientWidth > 0)
+      host.classList.toggle("lex-compact-box", box.clientWidth < COMPACT_BOX_WIDTH);
+  };
   const followUnit = (field, control) => {
     const unitNode = field.querySelector(":scope > .lex-unit");
     if (!unitNode || !(control instanceof HTMLElement)) return;
@@ -1164,10 +1192,7 @@
       const left = Math.min(border + start + measured + gap, limit);
       const next = `${Math.round(left)}px`;
       if (unitNode.style.left !== next) unitNode.style.left = next;
-      // A box too narrow to read a reference beside its value keeps the
-      // value: the rail and stepper hide until the box has room again.
-      const host = field.closest?.(".lex-source-control-internal");
-      if (host && field.clientWidth > 0) host.classList.toggle("lex-compact-box", field.clientWidth < 120);
+      placeCompactBox(field.closest?.(".lex-source-control-internal"), field);
     };
     control.addEventListener("input", place);
     control.addEventListener("change", place);
@@ -3114,7 +3139,11 @@
         // unlit material shows its own map at full brightness.
         if ("lightMap" in saved) mat.lightMap = bright ? null : saved.lightMap;
         if ("aoMap" in saved) mat.aoMap = bright ? null : saved.aoMap;
-        if ("vertexColors" in saved) mat.vertexColors = bright ? false : saved.vertexColors;
+        // Lines and points keep their vertex colors: on a helper line the
+        // vertex colors are the colors, not a darkening tint, and the lines
+        // are unlit already, so Fullbright gains nothing by stripping them.
+        if ("vertexColors" in saved && !mat.isLineBasicMaterial && !mat.isLineDashedMaterial && !mat.isPointsMaterial)
+          mat.vertexColors = bright ? false : saved.vertexColors;
         if (mat.emissive && typeof mat.emissive.setHex === "function") {
           // The material glows in its own colors, textured or flat,
           // and with the lamps out that glow is the whole picture.
@@ -4007,6 +4036,10 @@
         };
         const move = moved => queuePointer(moved);
         let stopped = false;
+        // A drag that ends off-window never sees its pointerup: the
+        // window losing focus ends it instead, or the slider keeps
+        // following the pointer and swallowing its hover events.
+        const blurStop = () => stop();
         const stop = () => {
           if (stopped) return;
           stopped = true;
@@ -4014,6 +4047,7 @@
           handle.removeEventListener("pointermove", move);
           handle.removeEventListener("pointerup", stop);
           handle.removeEventListener("pointercancel", stop);
+          window.removeEventListener("blur", blurStop);
           node.classList.remove("lex-value-dragging");
           input.lexValueSliderDragging = false;
           input.dispatchEvent(new Event("change", {bubbles: true}));
@@ -4021,6 +4055,7 @@
         handle.addEventListener("pointermove", move);
         handle.addEventListener("pointerup", stop);
         handle.addEventListener("pointercancel", stop);
+        window.addEventListener("blur", blurStop);
       });
       node.classList.add("lex-has-value-fill");
       // The fill is drawn behind the value box, so it has to be positioned
@@ -4741,27 +4776,27 @@
     formulaText.setAttribute("dy", "-7");
     const mathematical = options.formula?.classList?.contains("lex-math-formula");
     const mathOverlay = mathematical ? options.formula.cloneNode(true) : null;
-    const mathSource = mathOverlay?.querySelector(":scope > math");
+    let mathSource = mathOverlay?.querySelector(":scope > math");
     const mathAtoms = [];
+    const addAtom = source => {
+      if (source.localName === "mrow") {
+        [...source.children].forEach(addAtom);
+        return;
+      }
+      // Fractions and powers stay whole; splitting their descendants would
+      // lose the mathematical grouping. Ordinary terms turn independently.
+      const math = document.createElementNS(mathSource.namespaceURI, "math");
+      math.append(source.cloneNode(true));
+      const visual = element("span", {class:"lex-curve-math-atom", "aria-hidden":"true"}, math);
+      mathOverlay.append(visual);
+      mathAtoms.push({source, visual});
+    };
     if (mathSource) {
       mathOverlay.classList.add("lex-curve-math-follow");
       mathOverlay.setAttribute("role", "img");
       mathOverlay.setAttribute("aria-label", options.formula.title || mathSource.getAttribute("aria-label") || mathSource.textContent);
       mathSource.classList.add("lex-curve-math-source");
       mathSource.setAttribute("aria-hidden", "true");
-      const addAtom = source => {
-        if (source.localName === "mrow") {
-          [...source.children].forEach(addAtom);
-          return;
-        }
-        // Fractions and powers stay whole; splitting their descendants would
-        // lose the mathematical grouping. Ordinary terms turn independently.
-        const math = document.createElementNS(mathSource.namespaceURI, "math");
-        math.append(source.cloneNode(true));
-        const visual = element("span", {class:"lex-curve-math-atom", "aria-hidden":"true"}, math);
-        mathOverlay.append(visual);
-        mathAtoms.push({source, visual});
-      };
       [...mathSource.children].forEach(addAtom);
     }
     if (mathematical) formulaText.style.display = "none";
@@ -4896,6 +4931,7 @@
       options.overlayExtrema ? hoverExtrema : null,
       ...(curveVariableKeys.length ? [] : [modeToggle]),
       tooltip);
+    const formulaBlock = element("div", {class: "lex-curve-formula"}, formulaContent(options.formula));
     const title = element("h4", {},
       element("span", {class: "lex-curve-heading-title"}, String(options.title || "CURVE").toLocaleUpperCase()));
     if (options.extremaInTitle) title.append(
@@ -4915,19 +4951,26 @@
           element("span", {}, "MAX ", maximum))),
       curveVariableKeys.length ? variables : null,
       plot,
-      element("div", {class: "lex-curve-formula"}, formulaContent(options.formula)),
+      formulaBlock,
       status);
 
     const variableKeys = curveVariableSet;
-    const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class], .lex-curve-math-atom [class]")];
-    formulaTokens.forEach(token => {
-      const match = [...token.classList].find(name => {
-        if (!name.startsWith("lex-curve-variable-")) return false;
-        const key = name.slice("lex-curve-variable-".length);
-        return variableKeys.has(key);
+    const linkFormulaTokens = () => {
+      root.querySelectorAll("[data-curve-variable]").forEach(node => {
+        if (node.classList.contains("lex-curve-variable")) return;
+        delete node.dataset.curveVariable;
       });
-      if (match) token.dataset.curveVariable = match.slice("lex-curve-variable-".length);
-    });
+      const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class], .lex-curve-math-atom [class]")];
+      formulaTokens.forEach(token => {
+        const match = [...token.classList].find(name => {
+          if (!name.startsWith("lex-curve-variable-")) return false;
+          const key = name.slice("lex-curve-variable-".length);
+          return variableKeys.has(key);
+        });
+        if (match) token.dataset.curveVariable = match.slice("lex-curve-variable-".length);
+      });
+    };
+    linkFormulaTokens();
     const highlightVariable = key => {
       for (const entry of root.querySelectorAll(".lex-curve-variable")) {
         entry.classList.toggle("lex-curve-variable-active",
@@ -4979,6 +5022,7 @@
       guide.setAttribute("y2", graphY.toFixed(2));
       marker.setAttribute("d", `M${(graphX - 4).toFixed(2)} ${(graphY - 4).toFixed(2)}L${(graphX + 4).toFixed(2)} ${(graphY + 4).toFixed(2)}M${(graphX + 4).toFixed(2)} ${(graphY - 4).toFixed(2)}L${(graphX - 4).toFixed(2)} ${(graphY + 4).toFixed(2)}`);
       tooltip.textContent = `(${formatNumber(x)}, ${formatNumber(y, options.valueFormat || {})})`;
+      options.onProbe?.(x);
       const plotBounds = plot.getBoundingClientRect();
       const tooltipBounds = tooltip.getBoundingClientRect();
       const inset = 4;
@@ -5530,6 +5574,26 @@
     if(typeof ResizeObserver!=="undefined")new ResizeObserver(scheduleDraw).observe(svg);
     draw();
     root.refreshCurve = draw;
+    root.refreshFormula = source => {
+      formulaPath.replaceChildren();
+      appendFormulaTokens(formulaPath, formulaContent(source));
+      if (mathOverlay && source?.classList?.contains("lex-math-formula")) {
+        const fresh = source.cloneNode(true);
+        const math = fresh.querySelector(":scope > math");
+        mathOverlay.replaceChildren();
+        mathAtoms.length = 0;
+        if (math) {
+          math.classList.add("lex-curve-math-source");
+          math.setAttribute("aria-hidden", "true");
+          mathOverlay.append(math);
+          mathSource = math;
+          [...math.children].forEach(addAtom);
+        } else mathSource = null;
+      }
+      formulaBlock.replaceChildren(formulaContent(source));
+      linkFormulaTokens();
+      draw();
+    };
     return root;
   };
 
@@ -9078,6 +9142,9 @@ ${contents.path}`});
   // Keep layout separate from record data. IDs describe the original shared
   // field/section structure, never the selected record's name or number.
   const propertyLayouts = new WeakMap();
+  // The live-root lookup beside it: a WeakMap cannot list its keys, so
+  // the set carries the roots and drops them as they disconnect.
+  const propertyLayoutRoots = new Set();
   const propertyRoot = field => field.closest(".lex-detail-panel") || field.closest(".lex-detail-section");
   // A body box mid-render has no panel ancestor yet: its fields and
   // sections answer to the box itself until it joins its panel. Nested
@@ -9331,6 +9398,7 @@ ${contents.path}`});
         [...previous.groups.keys()].every(node => node.isConnected)) return previous;
     const state = buildPropertyState(root, fields);
     propertyLayouts.set(root, state);
+    propertyLayoutRoots.add(root);
     try { applyPropertyLayout(state, readStoredLayout(state)); } catch (_error) {}
     return state;
   };
@@ -9986,7 +10054,10 @@ ${contents.path}`});
   // When the panel rebuilt since, the live root with the same key takes it.
   const reapplyStoredLayout = state => {
     const live = state.root.isConnected ? state.root
-      : [...propertyLayouts.keys()].find(root => root.isConnected && propertyLayouts.get(root)?.key === state.key);
+      : [...propertyLayoutRoots].find(root => {
+          if (!root.isConnected) { propertyLayoutRoots.delete(root); return false; }
+          return propertyLayouts.get(root)?.key === state.key;
+        });
     if (!live) return;
     propertyLayouts.delete(live);
     preparePropertyLayout(live);
@@ -10059,14 +10130,22 @@ ${contents.path}`});
     } else {
       const section = event.target.closest?.(".lex-detail-section");
       const title = event.target.closest?.(".lex-detail-section-title");
+      const sectionNode = section?.querySelector(":scope > .lex-detail-section-content");
       // A title drop lands beside the section instead of inside it,
       // above or below by pointer half. That is how a property leaves
-      // every section for the bare panel.
-      if (title && section && section.parentElement && !title.closest(".lex-detail-field")) {
+      // every section for the bare panel. The section must belong to
+      // the dragged field's own panel, like the content drop below:
+      // without the membership check a title drop stole the property
+      // into another panel instead of refusing it. An empty section has
+      // nothing to leave, so its title takes the drop inside: without
+      // that an empty section could never be filled by dragging, since
+      // its content has no box to aim at.
+      if (title && section && section.parentElement && !title.closest(".lex-detail-field")
+          && state.groups.has(sectionNode)
+          && sectionNode.querySelector(".lex-detail-field")) {
         const after = event.clientY >= section.getBoundingClientRect().top + section.offsetHeight / 2;
         propertyDrop = {node: section.parentElement, before: after ? section.nextSibling : section, marker: section, after};
       } else {
-        const sectionNode = section?.querySelector(":scope > .lex-detail-section-content");
         if (state.groups.has(sectionNode)) {
           propertyDrop = {node: sectionNode, before: null, marker: section, after: true};
         } else {
@@ -13246,6 +13325,7 @@ ${contents.path}`});
   // told apart from the page a stale selection would pull it back to.
   const lastRenderedPage = new Map();
   let openBarrelControlKey = "";
+  let pendingBarrelSettle = null;
   const fitBarrelTableColumns = node => {
     const template = node?.style?.getPropertyValue("--lex-column-list-template");
     if (!template) return node;
@@ -13302,7 +13382,7 @@ ${contents.path}`});
     lists.forEach((node, listIndex) => {
       node.querySelectorAll(":scope > .lex-column-list-header:not(.lex-matrix-column-axis)"
         + " > .lex-column-list-head-cell").forEach((head, index) => {
-        if (contentSized(templates[listIndex][index])) {
+        if (contentSized(templates[listIndex][index]) || /fr\b/.test(templates[listIndex][index])) {
           minContentHeads.push([head, head.style.width]);
           head.style.width = "min-content";
         }
@@ -13334,6 +13414,10 @@ ${contents.path}`});
           if (head) need = Math.max(need, head.getBoundingClientRect().width);
           continue;
         }
+        // This track is flexible: the heading fit floors it at the header's
+        // longest word, so the want includes the header (read at min-content
+        // above) alongside the body text scanned below.
+        if (head) need = Math.max(need, head.getBoundingClientRect().width);
         // Filler rows draw the grid below a short barrel; they hold no
         // values, only a zero-width space outside any text span, so the
         // fallback below would read their stretched box - the track width
@@ -13867,6 +13951,34 @@ ${contents.path}`});
     }, element("span", {class: "lex-barrel-label"}, "BARRELS"),
     element("span", {class: "lex-barrel-buttons"}, decrease,
       element("output", {class: "lex-barrel-count", "aria-live": "polite"}, String(barrels)), increase));
+    if (pendingBarrelSettle) {
+      document.removeEventListener("pointermove", pendingBarrelSettle.move);
+      document.removeEventListener("pointerdown", pendingBarrelSettle.down);
+      pendingBarrelSettle = null;
+    }
+    // A re-rendered control appears under a stationary cursor the browser
+    // never tracked as hovered, so its own mouseleave may never fire and
+    // the sticky open state would survive mouse-away. The next pointer
+    // movement or press anywhere settles it: still over a gizmo means
+    // hover tracking works from here, otherwise the stickiness clears.
+    if (openBarrelControlKey === preferenceKey) {
+      const settle = event => {
+        if (event.target.closest?.(".lex-barrel-control")
+          || openBarrelControlKey !== preferenceKey) return;
+        openBarrelControlKey = "";
+        barrelControl.classList.remove("open");
+      };
+      const done = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerdown", down);
+        if (pendingBarrelSettle?.move === move) pendingBarrelSettle = null;
+      };
+      const move = event => { settle(event); done(); };
+      const down = event => { settle(event); done(); };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerdown", down);
+      pendingBarrelSettle = {move, down};
+    }
     // COLUMNS mirrors BARRELS on the other side of the same divider: how many
     // columns the selected record's details flow into. Right-click: fit again.
     // Without an explicit columnsKey each panel tab keeps its own column
@@ -14617,6 +14729,17 @@ ${contents.path}`});
     options.control?.addEventListener?.("input", refresh);
     options.control?.addEventListener?.("change", refresh);
     refresh();
+    // A box too narrow to read a reference beside its value keeps the
+    // value: the rail and stepper hide until the box has room again.
+    // Unit boxes already compact through followUnit; every other
+    // internal box compacts here, by the same width.
+    if (internal && !unitHost && options.control instanceof Element
+        && typeof ResizeObserver !== "undefined") {
+      const box = options.control;
+      const place = () => placeCompactBox(root, box);
+      new ResizeObserver(place).observe(box);
+      requestAnimationFrame(place);
+    }
     root.refreshReference = refresh;
     return root;
   };
@@ -15841,7 +15964,9 @@ ${contents.path}`});
         const changes = result.changes || [];
         if (result.note && !changes.length) return element("div", {class: "lex-mod-contents"}, detailNote(result.note));
         const notes = [];
-        if (result.changesTruncated) notes.push(`Showing the first ${changes.length} changes.`);
+        if (result.changesTruncated) notes.push(result.totalChanges > changes.length
+          ? `Showing the first ${changes.length} of ${result.totalChanges} changes.`
+          : `Showing the first ${changes.length} changes.`);
         if (result.note) notes.push(result.note);
         return modContentsTable("records", changes, [
           {key: "label", label: "Record", grow: 1},
@@ -16177,7 +16302,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, addIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 window.LexeditorUI.attachPreviewPin = attachPreviewPin;
 // The pad path is on for every page that mounts the shared UI, so a plugin
@@ -16459,8 +16584,25 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     }
   };
   const hoverKey = node => node?.dataset?.lexProperty || node?.dataset?.columnKey || '';
+  // One hovered key at a time: a new hover drops the last key's
+  // glow outright, so nothing sticks when its pointerout goes
+  // missing (a drag swallowing boundary events, a node replaced
+  // mid-hover). Blur, gesture cancel and native drags clear
+  // everything: no pointerout follows any of them.
+  let glowKey = '';
+  const clearGlow = () => {
+    glowKey = '';
+    document.querySelectorAll('.lex-self-hover').forEach(node => node.classList.remove('lex-self-hover'));
+    document.querySelectorAll('.lex-column-lit').forEach(node => node.classList.remove('lex-column-lit'));
+  };
+  window.addEventListener('blur', clearGlow);
+  document.addEventListener('pointercancel', clearGlow, true);
+  document.addEventListener('dragstart', clearGlow, true);
   document.addEventListener('pointerover', event => {
     const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
+    const overKey = node ? hoverKey(node) : '';
+    if (overKey !== glowKey) clearGlow();
+    glowKey = overKey;
     if (!node) return;
     node.classList.add('lex-self-hover');
     // A column lights from its HEADER, not from anywhere inside it. Lighting
@@ -16484,6 +16626,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     node.classList.remove('lex-self-hover');
     const key = hoverKey(node);
     if (!key) return;
+    if (key === glowKey) glowKey = '';
     document.querySelectorAll(glowSelector(key))
       .forEach(peer => peer.classList.remove('lex-column-lit'));
     litHolderTabs(key, node.closest?.('.lex-paged-list-detail') || document, false);
@@ -16779,6 +16922,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         size = Math.max(LABEL_MIN_PX, size - .5);
         labels.forEach(label => { label.style.fontSize = `${size}px`; });
       }
+      // Full size leaves no inline style, like the all-fit path above:
+      // a stamped "13px" read as shrunk-with-room and churned.
+      if (size === start) labels.forEach(label => { label.style.fontSize = ""; });
     }
     for (const label of labels) {
       if (label.scrollWidth > label.clientWidth) {

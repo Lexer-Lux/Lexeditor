@@ -7,92 +7,92 @@
     {
       "Field": "refId",
       "Name": "Call ID",
-      "Description": "Reference ID to use for this accessory."
+      "Description": "The attack, projectile or effect this ring calls. Call ID Type picks which list it comes from."
     },
     {
       "Field": "sfxVariationId",
       "Name": "Particle Variation ID",
-      "Description": "Specify SFX variation (used to identify SFX in combination with TimeActEditor ID)"
+      "Description": "Which visual effect plays for this ring. None keeps the default look."
     },
     {
       "Field": "weight",
       "Name": "Weight (kg)",
-      "Description": "Weight [kg]"
+      "Description": "How much this ring adds to your Equip Load."
     },
     {
       "Field": "behaviorId",
       "Name": "Behavior ID",
-      "Description": "Action ID (= Skill)"
+      "Description": "The Behavior ID linked to this ring. Its effect while equipped is not established."
     },
     {
       "Field": "basicPrice",
       "Name": "Reinforcement Price",
-      "Description": "Soul cost of reinforcement. See ShopLineupParam for shop prices."
+      "Description": "Probably does nothing. Only weapons and armor can be reinforced."
     },
     {
       "Field": "sellValue",
       "Name": "Sell Value",
-      "Description": "The price when this item is sold. Determines the souls received when feeding this weapon to Frampt"
+      "Description": "How many souls feeding this ring to Kingseeker Frampt grants."
     },
     {
       "Field": "sortId",
       "Name": "Sort ID",
-      "Description": "The ordering within the menu."
+      "Description": "Where this ring sits in menu lists. Lower values sort first."
     },
     {
       "Field": "qwcId",
       "Name": "World Tendency ID",
-      "Description": "The ID this item uses for world tendency."
+      "Description": "Probably unused in Dark Souls. It drove World Tendency in Demon's Souls."
     },
     {
       "Field": "equipModelId",
       "Name": "Model ID",
-      "Description": "Equipment model number"
+      "Description": "The model number for this ring. Its visible effect is not established."
     },
     {
       "Field": "iconId",
       "Name": "Icon ID",
-      "Description": "Menu icon ID"
+      "Description": "Which menu icon this ring shows."
     },
     {
       "Field": "shopLv",
       "Name": "Shop Level",
-      "Description": "Level that can be sold at the store"
+      "Description": "Unknown. How shops use levels is not established."
     },
     {
       "Field": "trophySGradeId",
       "Name": "Achievement ID",
-      "Description": "The achievement ID this part is associated with, if any."
+      "Description": "The achievement tied to this ring. The exact list is not established."
     },
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "The sequential achievement ID this part is associated with, if any."
+      "Description": "The sequential achievement tied to this ring. The exact list is not established."
     },
     {
       "Field": "equipModelCategory",
       "Name": "Model Category",
-      "Description": "Equipment model type"
+      "Description": "Which model group this ring uses. Its visible effect is not established."
     },
     {
       "Field": "equipModelGender",
       "Name": "Model Gender",
-      "Description": "Gender of equipment model"
+      "Description": "Whether this ring's model is male or female. Its visible effect is not established."
     },
     {
       "Field": "accessoryCategory",
       "Name": "Accessory Type",
-      "Description": "Armor category"
+      "Description": ""
     },
     {
       "Field": "refCategory",
       "Name": "Call ID Type",
-      "Description": "The ID category to use for the refId field."
+      "Description": "Which list the call ID comes from: attacks, projectiles or effects."
     },
     {
       "Field": "spEffectCategory",
       "Name": "SpEffect Category",
-      "Description": "The SpEffect category this spell belongs to"
+      "Description": "Which attacks this ring counts as, for buffs that raise one kind. Set None when no buff needs it."
     },
     {
       "Field": "pad",
@@ -102,32 +102,32 @@
     {
       "Field": "vagrantItemLotId",
       "Name": "Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the Vagrant this ring may become. -1 spawns none, and 0 grants nothing."
     },
     {
       "Field": "vagrantBonusEneDropItemLotId",
       "Name": "Good Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the extra creature a Good Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "vagrantItemEneDropItemLotId",
       "Name": "Evil Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the creature an Evil Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "isDeposit",
       "Name": "Is Depositable",
-      "Description": "Can be deposited in the repository."
+      "Description": "Whether the player can move this ring into storage."
     },
     {
       "Field": "isEquipOutBrake",
       "Name": "Destroy on Unequip",
-      "Description": "Is destroyed when unequipped."
+      "Description": "Whether taking this ring off destroys it."
     },
     {
       "Field": "disableMultiDropShare",
       "Name": "Block Drop in Multiplayer",
-      "Description": "Block the ability to drop in multiplayer sessions."
+      "Description": "Whether drops of this ring stay out of other players' worlds."
     },
     {
       "Field": "pad1",

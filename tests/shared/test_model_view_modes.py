@@ -31,11 +31,13 @@ def fake_scene(page):
       window.fakeMats = [0, 1].map(index => ({wireframe: false,
         emissive: color(0x111111 * (index + 1)), emissiveMap: null,
         emissiveIntensity: 1, map: null, color: color(0x9aa3ad),
-        needsUpdate: false}));
+        vertexColors: true, needsUpdate: false}));
+      // A skeleton-helper line: its vertex colors are the colors.
+      window.fakeLineMat = {isLineBasicMaterial: true, vertexColors: true};
       // One textured face: Fullbright must light it through its own map.
       window.fakeMats[1].map = {isTexture: true};
       const scene = {traverse(fn) {
-        window.fakeMats.forEach(mat => fn({material: mat})); }};
+        [...window.fakeMats, window.fakeLineMat].forEach(mat => fn({material: mat})); }};
       document.querySelector("#stage").lexBindScene(scene);
     }""")
     return page.evaluate("""() => window.fakeMats.map(mat => ({
@@ -101,6 +103,23 @@ def test_modes_retint_a_bound_scene_and_regular_restores(page):
     assert [mat["emissive"] for mat in after] == [0x111111, 0x222222], after
     assert [mat["emissiveMap"] for mat in after] == [None, None], after
     assert [mat["emissiveIntensity"] for mat in after] == [1, 1], after
+
+
+def test_fullbright_keeps_helper_line_vertex_colors(page):
+    """Fullbright strips darkening vertex colors from meshes, not lines.
+
+    A mesh's vertex colors darken its surface, so Fullbright lifts them;
+    a SkeletonHelper line's vertex colors are its green/blue joints, and
+    the line is unlit already, so they survive Fullbright untouched.
+    """
+    mount(page)
+    fake_scene(page)
+    page.locator("#stage .lex-model-view-modes button").nth(1).click()
+    lit = page.evaluate("() => [...window.fakeMats.map(mat => mat.vertexColors), window.fakeLineMat.vertexColors]")
+    assert lit == [False, False, True], lit
+    page.locator("#stage .lex-model-view-modes button").nth(0).click()
+    after = page.evaluate("() => [...window.fakeMats.map(mat => mat.vertexColors), window.fakeLineMat.vertexColors]")
+    assert after == [True, True, True], after
 
 
 def test_attach_to_a_plain_host_is_idempotent(page):

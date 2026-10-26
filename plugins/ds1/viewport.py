@@ -959,17 +959,27 @@ def chr_geometry(game_root, project, chr_id, skin=False):
 
 
 def chr_dummies(game_root, project, chr_id):
-    """Dummy points and mesh inventory for one character model."""
+    """Dummy points and mesh inventory for one character model.
+
+    Each point names its bone index and that bone's name, so the
+    viewer can say where an anchor sits. Unattached points (bone
+    -1, as vanilla models carry) and out-of-range indices name no
+    bone instead of failing the model.
+    """
     resolved = resolve_chr(game_root, project, chr_id)
     if resolved[0] == 'skip':
         raise FlverError(resolved[1])
     raw = _read_member(Path(resolved[1]), resolved[2])
     doc = FlverDocument(raw)
-    return {'meshes': len(doc.meshes), 'bones': len(doc.bones),
-            'dummies': [{'id': dummy['ref_id'],
-                         'pos': [float(axis) for axis in dummy['pos']],
-                         'bone': dummy['attach_bone']}
-                        for dummy in doc.dummies]}
+    names = [bone['name'] for bone in doc.bones]
+    dummies = []
+    for dummy in doc.dummies:
+        attach = dummy['attach_bone']
+        dummies.append({'id': dummy['ref_id'],
+                        'pos': [float(axis) for axis in dummy['pos']],
+                        'bone': attach,
+                        'bone_name': names[attach] if 0 <= attach < len(names) else None})
+    return {'meshes': len(doc.meshes), 'bones': len(doc.bones), 'dummies': dummies}
 
 
 PART_PREFIXES = {1: 'AM', 2: 'BD', 5: 'HD', 6: 'LG'}

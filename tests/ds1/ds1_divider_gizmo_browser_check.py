@@ -2,7 +2,11 @@
 
 Hovering the list/detail divider at several heights puts the visible
 Barrels/Columns gizmo under the cursor (clamped to the strip) at full
-opacity, on a plain and on a multi-barrel master alike.
+opacity, on a plain and on a multi-barrel master alike. The gizmo's
+barrel +/- buttons click through a full roundtrip, dismiss on mouse-away
+after a click, and parking the mouse on the detail header's preview
+thumbnail never summons the gizmo: it only appears over the divider strip
+itself.
 """
 import sys
 import tempfile
@@ -42,6 +46,63 @@ def check(page, rows):
             f"gizmo at {info['cy']:.0f}, cursor at {info['want']:.0f}")
 
 
+def click_roundtrip(page):
+    strip = page.locator(
+        '.lex-panel-layout-divider:has(> .lex-barrel-control)').first
+    box = strip.bounding_box()
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    time.sleep(0.35)
+    control = page.locator(
+        '.lex-panel-layout-divider > .lex-barrel-control').first
+    value = control.locator('.lex-barrel-count').first
+    assert value.text_content().strip() == '1', 'barrels start at 1'
+    control.locator('.lex-barrel-increase').first.click()
+    page.wait_for_function(
+        """() => [...document.querySelectorAll(
+        '.lex-panel-layout-divider > .lex-barrel-control .lex-barrel-count'
+        )].some(el => el.textContent.trim() === '2')""")
+    assert value.text_content().strip() == '2', 'barrel + reaches 2'
+    box = strip.bounding_box()
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    time.sleep(0.35)
+    control.locator('.lex-barrel-decrease').first.click()
+    page.wait_for_function(
+        """() => [...document.querySelectorAll(
+        '.lex-panel-layout-divider > .lex-barrel-control .lex-barrel-count'
+        )].some(el => el.textContent.trim() === '1')""")
+    assert value.text_content().strip() == '1', 'barrel - returns to 1'
+    page.mouse.move(box['x'] + 400, box['y'] + box['height'] / 2)
+    time.sleep(0.35)
+    shown = page.evaluate("""() => [...document.querySelectorAll(
+        '.lex-panel-layout-divider > .lex-barrel-control')].filter(
+        g => parseFloat(getComputedStyle(g).opacity) > 0).length""")
+    assert shown == 0, 'gizmo dismisses after +/- click and mouse-away'
+
+
+def phantom_probe(page):
+    strip = page.locator(
+        '.lex-panel-layout-divider:has(> .lex-barrel-control)').first
+    box = strip.bounding_box()
+    thumb = page.locator('.lex-detail-header .lex-detail-panel-icon, '
+                         '.lex-detail-panel-icon').first.bounding_box()
+    assert thumb is not None, 'header thumbnail present'
+    cy = min(max(thumb['y'] + thumb['height'] / 2, box['y'] + 8),
+             box['y'] + box['height'] - 8)
+    page.mouse.move(box['x'] + box['width'] / 2, cy)
+    time.sleep(0.35)
+    shown = page.evaluate("""() => [...document.querySelectorAll(
+        '.lex-panel-layout-divider > .lex-barrel-control')].filter(
+        g => parseFloat(getComputedStyle(g).opacity) > 0).length""")
+    assert shown > 0, 'gizmo summons over the divider strip'
+    page.mouse.move(thumb['x'] + thumb['width'] / 2,
+                    thumb['y'] + thumb['height'] / 2)
+    time.sleep(0.35)
+    shown = page.evaluate("""() => [...document.querySelectorAll(
+        '.lex-panel-layout-divider > .lex-barrel-control')].filter(
+        g => parseFloat(getComputedStyle(g).opacity) > 0).length""")
+    assert shown == 0, 'header thumbnail hover summons no gizmo'
+
+
 def main():
     errors = []
     for count in (4, 60):
@@ -76,6 +137,9 @@ def main():
                         page.wait_for_function(
                             '`${state.row.table}:${state.row.id}` === "EquipParamGoods:100"')
                         check(page, count)
+                        if count == 60:
+                            click_roundtrip(page)
+                            phantom_probe(page)
                     finally:
                         browser.close()
             finally:

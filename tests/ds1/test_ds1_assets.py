@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive
-from bhf_fixture import make_bhf
+from bhf_fixture import make_bhf, make_edge
+from bdf_fixture import make_bdf
 from flver_fixture import build_flver, make_chrbnd
 from plugins.ds1 import assets, deployment
 from plugins.ds1.assets import AssetError
@@ -147,13 +148,15 @@ def test_a_tweak_mods_script_folder_is_not_an_asset(tmp_path):
     (mod / "script" / "m10_00_00_00.luabnd.dcx").write_bytes(b"a game script override")
     # A data mod's script/ holds game files and deploys.
     assert [row["relative"] for row in assets.scan_project(mod)] == ["script/m10_00_00_00.luabnd.dcx"]
-    # A tweak mod's script/ is its build script, sources and caches.
+    # A tweak mod's script/ is its build script, sources and caches,
+    # except game archives (.dcx): those stay shippable game files.
     (mod / "mod.json").write_text(json.dumps({"name": "Tweak", "script": {"version": 1}}), encoding="utf-8")
     (mod / "script" / "tweak.py").write_text("def build(values, root): return {}\n", encoding="utf-8")
     (mod / "script" / "island.S").write_text("ret\n", encoding="utf-8")
     (mod / "script" / "__pycache__" / "tweak.cpython-312.pyc").write_bytes(b"cache")
     assets.store_bytes(mod, TPF.as_posix(), b"pixels")
-    assert [row["relative"] for row in assets.scan_project(mod)] == [TPF.as_posix()]
+    assert [row["relative"] for row in assets.scan_project(mod)] == [
+        TPF.as_posix(), "script/m10_00_00_00.luabnd.dcx"]
 
 
 def test_scan_game_lists_assets_not_owned(tmp_path):
@@ -216,12 +219,94 @@ def test_tpf_listing_and_png_preview():
         assets.texture_png(blob, "c0000.tpf", "", 9)
 
 
+def test_chrtpfbdt_lists_members_and_previews():
+    blob = make_bdf([
+        make_tpf([("mail_diffuse.dds", make_uncompressed_dds(8, 4))]),
+        make_tpf([("mail_normal.dds", make_uncompressed_dds(4, 8))]),
+    ])
+    found = assets.list_textures(blob, "chr/c9999/c9999.chrtpfbdt")
+    assert [(row["member"], row["name"], row["width"], row["height"]) for row in found] == [
+        ("0", "mail_diffuse.dds", 8, 4), ("1", "mail_normal.dds", 4, 8)]
+    assert assets.texture_png(blob, "chr/c9999/c9999.chrtpfbdt", "1", 0)[:8] == b"\x89PNG\r\n\x1a\n"
+    with pytest.raises(AssetError):
+        assets.list_textures(b"BDF3" + bytes(200), "chr/c9999/c9999.chrtpfbdt")
+    with pytest.raises(AssetError):
+        assets.texture_png(blob, "chr/c9999/c9999.chrtpfbdt", "7", 0)
+    with pytest.raises(AssetError):
+        assets.texture_png(blob, "chr/c9999/c9999.chrtpfbdt", "0", 3)
+
+
+def test_from_path_seeks_match_full_reads_and_cache(tmp_path):
+    tpf = make_tpf([("a_diffuse.dds", make_uncompressed_dds(8, 4)),
+                    ("b_normal.dds", make_uncompressed_dds(4, 8))])
+    dds = make_uncompressed_dds(6, 2)
+    bdf = make_bdf([make_tpf([("mail_diffuse.dds", make_uncompressed_dds(8, 4))])])
+    (tmp_path / "a.tpf").write_bytes(tpf)
+    (tmp_path / "loose.dds").write_bytes(dds)
+    (tmp_path / "c9999.chrtpfbdt").write_bytes(bdf)
+    assert assets.list_textures_from_path(tmp_path / "a.tpf", "a.tpf") == assets.list_textures(tpf, "a.tpf")
+    assert assets.list_textures_from_path(tmp_path / "loose.dds", "loose.dds") == assets.list_textures(dds, "loose.dds")
+    assert assets.list_textures_from_path(
+        tmp_path / "c9999.chrtpfbdt", "c9999.chrtpfbdt") == assets.list_textures(bdf, "c9999.chrtpfbdt")
+    assert assets.texture_png_from_path(tmp_path / "a.tpf", "a.tpf", "", 1) == assets.texture_png(tpf, "a.tpf", "", 1)
+    assert assets.texture_png_from_path(
+        tmp_path / "c9999.chrtpfbdt", "c9999.chrtpfbdt", "0", 0) == assets.texture_png(bdf, "c9999.chrtpfbdt", "0", 0)
+    # Cache hits return copies: appending to one list must not pollute later ones.
+    first = assets.list_textures_from_path(tmp_path / "a.tpf", "a.tpf")
+    first.append({"member": "", "index": 9, "name": "bogus"})
+    assert [row["name"] for row in assets.list_textures_from_path(tmp_path / "a.tpf", "a.tpf")] == [
+        "a_diffuse.dds", "b_normal.dds"]
+
+
+def test_service_assets_textures_detail_lists_chrtpfbdt(tmp_path):
+    game, mod = service_project(tmp_path)
+    (game / "chr" / "c9999").mkdir(parents=True)
+    (game / "chr" / "c9999" / "c9999.chrtpfbdt").write_bytes(make_bdf([
+        make_tpf([("mail_diffuse.dds", make_uncompressed_dds(8, 4))]),
+        make_tpf([("mail_normal.dds", make_uncompressed_dds(4, 8))]),
+    ]))
+    session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
+                          "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
+    try:
+        session.start()
+        rows = {row["relative"]: row for row in request_json(session, "/api/assets?scope=game")["files"]}
+        assert rows["chr/c9999/c9999.chrtpfbdt"]["archive"] is False
+        detail = request_json(session, "/api/assets?scope=textures&file=chr/c9999/c9999.chrtpfbdt")
+        assert detail["reason"] is None
+        assert [(row["member"], row["name"]) for row in detail["textures"]] == [
+            ("0", "mail_diffuse.dds"), ("1", "mail_normal.dds")]
+        content_type, png = request_json(
+            session, "/api/assets/preview?file=chr/c9999/c9999.chrtpfbdt&member=1&index=0", raw=True)
+        assert content_type == "image/png"
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    finally:
+        session.stop()
+
+
+def test_tpfbhd_pair_lists_members_and_previews(tmp_path):
+    edge0 = make_edge(make_tpf([("wall_diffuse.dds", make_uncompressed_dds(8, 4))]))
+    edge1 = make_edge(make_tpf([("wall_normal.dds", make_uncompressed_dds(4, 8))]))
+    head = make_bhf([("\\tex0", 0, len(edge0)), ("\\tex1", len(edge0), len(edge1))])
+    (tmp_path / "m10.tpfbhd").write_bytes(head)
+    (tmp_path / "m10.tpfbdt").write_bytes(edge0 + edge1)
+    found = assets.list_textures_from_path(tmp_path / "m10.tpfbhd", "map/m10/m10.tpfbhd")
+    assert [(row["member"], row["name"], row["width"], row["height"]) for row in found] == [
+        ("tex0", "wall_diffuse.dds", 8, 4), ("tex1", "wall_normal.dds", 4, 8)]
+    assert assets.texture_png_from_path(
+        tmp_path / "m10.tpfbhd", "map/m10/m10.tpfbhd", "tex1", 0)[:8] == b"\x89PNG\r\n\x1a\n"
+    with pytest.raises(AssetError):
+        assets.list_textures(head, "map/m10/m10.tpfbhd")
+    (tmp_path / "m10.tpfbdt").unlink()
+    with pytest.raises(AssetError):
+        assets.list_textures_from_path(tmp_path / "m10.tpfbhd", "map/m10/m10.tpfbhd")
+
+
 def test_split_archives_replace_whole_but_never_preview(tmp_path):
     _, mod = project(tmp_path)
     with pytest.raises(AssetError, match="replace as whole files"):
-        assets.list_textures(b"BHF3" + bytes(200), "x.tpfbhd")
-    assets.store_bytes(mod, "chr/c0000/x.tpfbhd", b"BHF3" + bytes(200))
-    assert assets.scan_project(mod)[0]["relative"] == "chr/c0000/x.tpfbhd"
+        assets.list_textures(b"BHF3" + bytes(200), "x.tpfbdt")
+    assets.store_bytes(mod, "chr/c0000/x.tpfbdt", b"BHF3" + bytes(200))
+    assert assets.scan_project(mod)[0]["relative"] == "chr/c0000/x.tpfbdt"
 
 
 def test_deployment_asset_apply_disable_roundtrip(tmp_path):
@@ -313,7 +398,9 @@ def test_service_assets_list_upload_preview_remove(tmp_path):
 def test_service_assets_textures_detail_explains_split_archives(tmp_path):
     game, mod = service_project(tmp_path)
     (game / "map" / "m10").mkdir(parents=True)
-    (game / "map" / "m10" / "m10.tpfbhd").write_bytes(make_bhf([("/tex0", 0, 8)]))
+    edge = make_edge(make_tpf([("wall_diffuse.dds", make_uncompressed_dds())]))
+    (game / "map" / "m10" / "m10.tpfbhd").write_bytes(make_bhf([("\\tex0", 0, len(edge))]))
+    (game / "map" / "m10" / "m10.tpfbdt").write_bytes(edge)
     (game / "chr" / "c9999").mkdir(parents=True)
     (game / "chr" / "c9999" / "junk.tpf").write_bytes(b"not a texture container")
     session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
@@ -321,10 +408,14 @@ def test_service_assets_textures_detail_explains_split_archives(tmp_path):
     try:
         session.start()
         rows = {row["relative"]: row for row in request_json(session, "/api/assets?scope=game")["files"]}
-        assert rows["map/m10/m10.tpfbhd"]["archive"] is True
+        assert rows["map/m10/m10.tpfbhd"]["archive"] is False
+        assert rows["map/m10/m10.tpfbdt"]["archive"] is True
         assert rows["chr/c0000/c0000.tpf"]["archive"] is False
         detail = request_json(session, "/api/assets?scope=textures&file=map/m10/m10.tpfbhd")
-        assert detail["textures"] == [] and detail["reason"] == "split-archive"
+        assert [row["name"] for row in detail["textures"]] == ["wall_diffuse.dds"]
+        assert detail["reason"] is None
+        data = request_json(session, "/api/assets?scope=textures&file=map/m10/m10.tpfbdt")
+        assert data["textures"] == [] and data["reason"] == "split-archive"
         broken = request_json(session, "/api/assets?scope=textures&file=chr/c9999/junk.tpf")
         assert broken["textures"] == [] and broken["reason"] == "unreadable"
     finally:
@@ -351,11 +442,13 @@ def test_service_assets_vanilla_is_read_only(tmp_path):
 
 
 def test_is_split_archive_names_header_and_data_pairs():
-    assert assets.is_split_archive("map/m10/m10.tpfbhd")
+    # Headers list their pair's textures; only data halves stay whole-file.
+    assert not assets.is_split_archive("map/m10/m10.tpfbhd")
     assert assets.is_split_archive("map/m10/m10.tpfbdt")
     assert assets.is_split_archive("map/m10/m10.tpfbdt.dcx")
-    assert assets.is_split_archive("chr/c0000/c0000.chrtpfbdt")
-    assert assets.is_split_archive("MAP\\M10\\M10.TPFBHD")
+    # .chrtpfbdt decodes as BDF3 character archives, not whole-file splits.
+    assert not assets.is_split_archive("chr/c0000/c0000.chrtpfbdt")
+    assert assets.is_split_archive("MAP\\M10\\M10.TPFBDT")
     assert not assets.is_split_archive("chr/c0000/c0000.tpf")
     assert not assets.is_split_archive("chr/c0000/c0000.tpf.dcx")
     assert not assets.is_split_archive("other/picture.png")

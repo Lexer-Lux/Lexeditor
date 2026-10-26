@@ -1,8 +1,8 @@
 """Curve formulas color their own variables and glow both ways.
 
 A curve's variables decide which formula identifiers take a color:
-FF8's A-D keep their letters, DS1's families share one key across
-several labels (T1-T5 all light T_lo). Hovering a drawer variable
+FF8's A-D keep their letters, DS1's stages each own one key
+(T1 never lights T2). Hovering a drawer variable
 highlights its formula atoms over the plot and hovering an atom
 lights the drawer. A formula without variables stays uncolored.
 """
@@ -31,15 +31,15 @@ MOUNT = """() => {
     formula: LexeditorUI.mathFormula('Y = A + 2 * B', {variables: ff8}),
   }));
   const ds1 = [
-    {label: 'T1', key: 't', tokens: ['T_lo', 'T_hi'], control: input()},
-    {label: 'T2', key: 't', tokens: ['T_lo', 'T_hi'], control: input()},
-    {label: 'V1', key: 'v', tokens: ['V', 'V_lo'], control: input()},
+    {label: 'T1', key: 't1', control: input()},
+    {label: 'T2', key: 't2', control: input()},
+    {label: 'V1', key: 'v1', control: input()},
   ];
   main.append(LexeditorUI.curveEditor({
     title: 'DS1', domain: {min: 1, max: 9}, range: {min: 0, max: 9},
     evaluate: x => x,
     variables: ds1,
-    formula: LexeditorUI.mathFormula('T_lo + V_lo = V', {variables: ds1}),
+    formula: LexeditorUI.mathFormula('T1 + V1 = T2', {variables: ds1}),
   }));
   main.append(LexeditorUI.mathFormula('A + B'));
 }"""
@@ -94,32 +94,41 @@ def test_explicit_letters_color_formula_and_drawer():
             browser.close()
 
 
-def test_family_keys_share_one_color_and_glow():
+def test_each_stage_owns_its_color_and_glow():
     with sync_playwright() as play:
         browser, page, errors = open_page(play)
         try:
             second = page.locator(".lex-curve-editor").nth(1)
             token = second.locator(
-                ".lex-curve-math-atom .lex-curve-variable-t")
+                ".lex-curve-math-atom .lex-curve-variable-t1")
             assert token.count() == 1
-            assert token.first.text_content() == "T_lo"
-            assert second.locator(
-                ".lex-curve-math-atom .lex-curve-variable-v").count() == 2
-            color = page.evaluate(
-                "() => getComputedStyle(document.querySelectorAll("
-                "'.lex-curve-editor')[1].querySelector("
-                "'.lex-curve-variable-name.lex-curve-variable-t')).color")
-            assert color == "rgb(255, 158, 94)", color
-            # One T lights the token and the whole T family.
+            assert token.first.text_content() == "T1"
+            colors = page.evaluate(
+                "() => [...document.querySelectorAll("
+                "'.lex-curve-editor')[1].querySelectorAll("
+                "'.lex-curve-variable-name')].map(node => "
+                "getComputedStyle(node).color)")
+            assert len(set(colors)) == 3, colors
+            # T1 lights its own token and drawer entry only: T2 and V1
+            # stay dark.
             second.hover()
             second.locator(
-                ".lex-curve-variable[data-curve-variable='t']").nth(0).hover()
+                ".lex-curve-variable[data-curve-variable='t1']").hover()
             assert second.locator(
-                ".lex-curve-math-atom .lex-curve-variable-t"
+                ".lex-curve-math-atom .lex-curve-variable-t1"
                 ".lex-curve-variable-highlight").count() == 1
             assert second.locator(
-                ".lex-curve-variable[data-curve-variable='t']"
-                ".lex-curve-variable-active").count() == 2
+                ".lex-curve-variable[data-curve-variable='t1']"
+                ".lex-curve-variable-active").count() == 1
+            assert second.locator(
+                ".lex-curve-variable[data-curve-variable='t2']"
+                ".lex-curve-variable-active").count() == 0
+            # The reverse direction: a V1 atom lights the V1 drawer entry.
+            second.locator(
+                ".lex-curve-math-atom .lex-curve-variable-v1").hover(force=True)
+            assert second.locator(
+                ".lex-curve-variable[data-curve-variable='v1']"
+                ".lex-curve-variable-active").count() == 1
             assert not errors, errors
         finally:
             browser.close()

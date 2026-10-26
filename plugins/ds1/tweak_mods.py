@@ -189,6 +189,7 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
             mod_requires.check_changes(root or mods_root(), planned)
         except ValueError as error:
             raise TweakError(str(error)) from error
+    ensure_loader_mod(root)
     touched = [Path(rows[mod_id]["path"]) / name for mod_id in changes
                for name in ("mod.json", script_mods.VALUES_FILE)]
     before = {path: path.read_bytes() if path.is_file() else None for path in touched}
@@ -209,6 +210,101 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
                 atomic_write(path, content)
         raise
     return tweak_rows(root)
+
+
+#: The loader as its own library mod: switching it on installs Lexeditor's
+#: loader (dinput8.dll), which applies executable patches in memory, switches
+#: the game's anti-tamper protection off and keeps the game offline.
+#: Executable-patch mods need it on.
+LOADER_ID = "lexeditor-loader"
+LOADER_FOLDER = "Lexeditor Loader"
+LOADER_NAME = "Lexeditor Loader"
+LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable patches in memory "
+                      "when the game starts. The loader switches the game's anti-tamper protection "
+                      "off and keeps the game offline. Switch it on to use executable-patch mods.")
+
+
+def _loader_folder(root: Path) -> Path | None:
+    """The folder claiming the loader id, or None when no mod does."""
+    try:
+        entries = sorted(Path(root).iterdir(), key=lambda item: item.name.casefold())
+    except OSError:
+        return None
+    for candidate in entries:
+        if not candidate.is_dir() or candidate.name.startswith("."):
+            continue
+        try:
+            stored = json.loads((candidate / "mod.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(stored, dict) and str(stored.get("id") or candidate.name) == LOADER_ID:
+            return candidate
+    return None
+
+
+def ensure_loader_mod(root: Path | None = None) -> Path:
+    """The loader mod's folder, created on first use.
+
+    The loader is an ordinary mod in the reader's library (a mod.json with
+    no script and no settings), so the Mods tab switches it and other mods
+    can require it. A library whose removed debug flag was on migrates
+    switched on; the flag file is then deleted.
+    """
+    folder = checked(Path(root or mods_root()))
+    folder.mkdir(parents=True, exist_ok=True)
+    found = _loader_folder(folder)
+    if found is not None:
+        _drop_debug_flag(folder)
+        return found
+    enabled = False
+    try:
+        enabled = json.loads((folder / DEBUG_FILE).read_text(encoding="utf-8")).get("debugMode") is True
+    except (OSError, ValueError, AttributeError):
+        enabled = False
+    target = checked(folder / LOADER_FOLDER)
+    target.mkdir(parents=True, exist_ok=True)
+    atomic_write(target / "mod.json", (json.dumps(
+        {"id": LOADER_ID, "name": LOADER_NAME, "description": LOADER_DESCRIPTION,
+         "enabled": enabled, "order": 0}, indent=2) + "\n").encode("utf-8"))
+    _drop_debug_flag(folder)
+    return target
+
+
+def _drop_debug_flag(folder: Path) -> None:
+    try:
+        (Path(folder) / DEBUG_FILE).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def loader_mod_state(root: Path | None = None) -> tuple[bool, bool]:
+    """(installed, enabled) for the loader mod. Missing or unreadable is neither."""
+    folder = _loader_folder(root or mods_root())
+    if folder is None:
+        return False, False
+    try:
+        stored = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False, False
+    return True, isinstance(stored, dict) and stored.get("enabled") is True
+
+
+def _needs_loader(spec: dict) -> bool:
+    """Whether one built native description patches the executable."""
+    return bool(spec.get("islands") or spec.get("hooks") or spec.get("sectionVirtualSize"))
+
+
+def _refuse_without_loader(owners: list[str], root: Path | None) -> None:
+    """Refuse executable patches while the loader mod is off, naming who needs it."""
+    if not owners:
+        return
+    installed, enabled = loader_mod_state(root)
+    if enabled:
+        return
+    state = "switched off" if installed else "not installed"
+    if len(owners) == 1:
+        raise TweakError(f"{owners[0]} requires {LOADER_NAME}, which is {state}.")
+    raise TweakError(f"{' and '.join(owners)} require {LOADER_NAME}, which is {state}.")
 
 
 class BuildContext:
@@ -252,6 +348,9 @@ class BuildContext:
 def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
     """Build every enabled tweak mod and read back its executable patches.
 
+    Mods whose build patches the executable need the loader mod switched
+    on; anything else builds without it.
+
     The same build writes any layout/<id>.json or esd/<id>.json; layout_specs and esd_specs read those.
     """
     try:
@@ -259,9 +358,12 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
     except ValueError as error:
         raise TweakError(str(error)) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
+    ensure_loader_mod(root)
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root)
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError)
-    return _built(rows, "native", exe_patches.validate)
+    specs = _built(rows, "native", exe_patches.validate)
+    _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)], root)
+    return specs
 
 
 def layout_specs(root: Path | None = None) -> list[dict]:
@@ -663,16 +765,16 @@ def loader_bytes(debug: bool = False) -> bytes:
 # standalone loader (#954) is to do the same.
 PROTECTED_LOADER = True
 
-# Debug mode is the reader's choice, kept beside the DS1 mod library so Play
-# and Apply both follow it. With PROTECTED_LOADER it only decides whether the
-# loader goes in when no tweak is enabled.
+# Removed flag, read once to migrate: a debug install becomes an enabled loader mod.
+
+
 DEBUG_FILE = ".lexeditor-ds1.json"
 
 
-def debug_mode(root: Path | None = None) -> bool:
-    path = Path(root or mods_root()) / DEBUG_FILE
+
+
     try:
-        return json.loads(path.read_text(encoding="utf-8")).get("debugMode") is True
+
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -721,8 +823,8 @@ def _runtime_status(game_root: Path) -> dict:
     state = _runtime(game_root)
     result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
               "project": state["record"].get("project") if state["active"] else None,
-              "problem": "", "loaderMessage": "",
-              "debug": bool(state["active"] and state["record"].get("debug") is True)}
+              "problem": "", "loaderMessage": ""}
+
     if state["foreignDll"] and (state["record"] or state["patch"] is not None):
         result["problem"] = (f"Another mod's {RUNTIME_DLL} replaced Lexeditor's loader, so the tweaks are not loaded. "
                              "Remove it, then Apply again.")
@@ -740,7 +842,7 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     and Play). Never raises for a damaged record or an unreadable library;
     that is status()'s problem to report, not staleness.
     """
-    result: dict = {"needed": False, "stale": [], "debug": False, "set": False}
+    result: dict = {"needed": False, "stale": [], "set": False}
     try:
         runtime = _runtime(checked(Path(game_root)))
     except (ValueError, OSError):
@@ -766,8 +868,8 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
             stale.append(row["id"])
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}
-    result["debug"] = debug_mode(root) != (record.get("debug") is True)
-    result["needed"] = bool(stale) or result["set"] or result["debug"]
+
+    result["needed"] = bool(stale) or result["set"]
     return result
 
 
@@ -775,7 +877,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
                    built: dict | None = None) -> None:
     """Install, replace or remove the loader and its patch description.
 
-    In debug mode the debug loader goes in even with no tweak to apply."""
+    With the loader mod on, the loader goes in even with no tweak to apply."""
     game_root = checked(Path(game_root))
     state = _runtime(game_root)
     if patch is None and debug:
@@ -794,7 +896,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
                          "remove or rename the other file, then Apply again. Nothing was changed.")
     loader = loader_bytes(debug or PROTECTED_LOADER)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
-              "patchSha256": _sha(patch), "dllSha256": _sha(loader), "debug": bool(debug),
+              "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {})}
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
@@ -831,17 +933,22 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
     chosen = _project(chosen)
+    if chosen is not None and _needs_loader(chosen["spec"]):
+        _refuse_without_loader(["Project native rules"], root)
     native = build_specs(root, game_root)
     # Fingerprinted after the build, so the fingerprint covers the built files too.
     built = {row["id"]: build_fingerprint(Path(row["path"]))
              for row in tweak_rows(root) if row["enabled"]}
     layout = layout_specs(root)
     scripts = esd_specs(root)
+    loader = loader_mod_state(root)[1]
     specs = native + ([exe_patches.validate(chosen["spec"], "Project native rules")] if chosen else [])
     try:
         patch = exe_patches.runtime_patch(original, specs)
     except exe_patches.PatchError as error:
         raise TweakError(str(error)) from error
+    if patch is None and loader:
+        patch = b""
     files = []
     if not is_vanilla(current) or manifest:
         # Put an executable patched by an earlier Lexeditor back, once.
@@ -870,7 +977,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})
-    if patch is None and not debug_mode(root) and any(
+    if patch is None and not loader and any(
             item.get("managed") in (LAYOUT, *ESD) and not item["managed"].vanilla(item["after"])
             for item in files):
         # No native patches, but a menu file stays managed: keep an empty
@@ -879,7 +986,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     return {"files": files, "executableSha256": _sha(current),
             "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
                         "project": chosen if patch else None, "previous": previous,
-                        "debug": debug_mode(root), "built": built}}
+                        "built": built}}
 
 
 def _undo(game_root: Path, done: list[dict]) -> None:
@@ -911,7 +1018,7 @@ def commit(game_root: Path, plan: dict) -> None:
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
-        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("debug", False),
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], False,
                        runtime.get("built"))
     except Exception:
         try:
@@ -978,7 +1085,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
     """What is installed now, without building or changing anything."""
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
               "pendingRecovery": False, "project": None, "loaderMessage": "",
-              "builtIntoExecutable": False, "debugMode": debug_mode(root), "debugInstalled": False,
+              "builtIntoExecutable": False,
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root())),
               "needsRebuild": False, "staleMods": []}
     try:
@@ -1004,7 +1111,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         result["project"] = runtime["project"] or executable["project"]
         result["pendingRecovery"] = any(item["pendingRecovery"] for item in files)
         result["loaderMessage"] = runtime["loaderMessage"]
-        result["debugInstalled"] = runtime["debug"]
+
         result["problem"] = runtime["problem"] or next((item["problem"] for item in files if item["problem"]), "")
         rebuild = needs_rebuild(game_root, root)
         names = {row["id"]: row.get("name") or row["id"] for row in result["tweaks"]}

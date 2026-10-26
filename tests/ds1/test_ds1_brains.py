@@ -50,7 +50,8 @@ def test_brains_metadata_matches_vanilla_shape():
 def test_brains_subtabs_list_their_rows():
     assert [entry[0] for entry in ENEMY_SUBTABS] == ['monsters', 'bosses']
     assert [(entry[0], entry[1], entry[2]) for entry in AI_SUBTABS] == [
-        ('ai', 'AI tables', 'NpcThinkParam'), ('behaviors', 'Behaviors', 'BehaviorParam')]
+        ('ai', 'AI tables', 'NpcThinkParam'), ('behaviors', 'Behaviors', 'BehaviorParam'),
+        ('player-behaviors', 'Player behaviors', 'BehaviorParam_PC')]
     assert [entry[0] for entry in ATTACK_SUBTABS] == ['attacks', 'player-attacks', 'projectiles']
     document = ItemDocument(make_archive())
     behaviors = document.list_rows('behaviors')

@@ -3,7 +3,9 @@
 The enemy drawer builds its hitbox fields from the tab's shared
 controls (data-field-key inputs with units), the body's hurtbox
 (radius, height, offset) edits beside them, and dragging a model-point
-chip onto a slot's point field re-anchors (moves) that hitbox.
+chip onto a slot's point field re-anchors (moves) that hitbox. Each
+slot carries a live-or-idle status line, and each chip names its
+anchor's bone and bind-pose position.
 """
 import sys
 import tempfile
@@ -103,8 +105,14 @@ def main():
                     # Model-point chips: dragging one moves the hitbox there.
                     chips = fields.locator('.ds1-dummy-chip')
                     assert chips.count() == 2
-                    assert chips.nth(0).get_attribute('aria-label') == 'Model point 100'
+                    assert chips.nth(0).get_attribute('aria-label') == 'Model point 100 on root at (1, 2, 3)'
+                    assert chips.nth(0).get_attribute('data-lex-title') == (
+                        "Anchor 100 on root at (1, 2, 3). Drag onto a slot's point field to move the hitbox there")
                     assert '0 live hitboxes' in status.inner_text()
+                    slot = fields.locator('input[data-hit-slot-status]')
+                    assert slot.count() == 4
+                    assert slot.nth(0).input_value() == 'Idle: no anchor set.'
+                    assert slot.nth(1).input_value() == 'Idle: radius 0 strikes nothing.'
                     seq = page.evaluate(
                         'document.querySelector(".lex-chr-viewer-fields").dataset.fieldsSeq')
                     chips.nth(0).drag_to(fields.locator('[data-point-field="hit0_DmyPoly1"]'))
@@ -113,6 +121,8 @@ def main():
                         '.dataset.fieldsSeq!==before', arg=seq)
                     assert '1 live hitbox' in status.inner_text()
                     assert fields.locator('[data-point-field="hit0_DmyPoly1"] input').input_value() == '100'
+                    assert fields.locator('input[data-hit-slot-status="0"]').input_value() == (
+                        'Live: sphere, radius 0.5 m on anchor 100.')
                     moved = page.evaluate(
                         "fetch('/api/row?table=AtkParam_Npc&id=100&sub=attacks').then(r=>r.json())"
                         ".then(v=>v.row.fields.find(f=>f.key==='hit0_DmyPoly1').value)")
@@ -125,7 +135,7 @@ def main():
         finally:
             session.stop()
             assert session.wait_closed()
-        print('DS1 hitbox viewer: shared controls, hurtbox, drag-to-move passed.')
+        print('DS1 hitbox viewer: shared controls, hurtbox, drag-to-move, statuses, chip labels passed.')
 
 
 if __name__ == '__main__':

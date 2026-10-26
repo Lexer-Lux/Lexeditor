@@ -16,9 +16,13 @@ import struct
 
 from .formats import FormatError
 
-# Ceilings no real game file reaches; corrupt counts stop here.
+# Object-count ceilings no real game file reaches; corrupt counts stop here.
 MAX_FILE = 64 * 1024 * 1024
 MAX_COUNT = 65536
+# One item's byte extent is a different quantity: a long motion packs its
+# whole spline curve set into a single hkUint8 blob, and the game ships
+# blobs near 500 KiB, so the flat object count cannot gate them.
+MAX_ITEM_BYTES = 1024 * 1024
 # The sampler only blends curves up to this degree.
 MAX_SPLINE_DEGREE = 4
 SDK_VERSIONS = frozenset({'20150100', '20160100', '20160200', '20180100', '20190100'})
@@ -426,7 +430,7 @@ class _TagReader:
         raise HkxError('A Havok value has an unknown shape')
 
 
-def _items(data, section, data_off, types):
+def _items(data, section, data_off, data_end, types):
     found = []
     off, end = section['pos'], section['pos'] + section['length']
     while off < end:
@@ -434,14 +438,18 @@ def _items(data, section, data_off, types):
         at &= 0xFFFFFF
         pos, off = _u32(data, off)
         count, off = _i32(data, off)
-        if not 0 <= count <= MAX_COUNT:
+        if count < 0:
             raise HkxError('A Havok item count is out of range')
         if at == 0:
             found.append({'type': None, 'pos': 0, 'count': 0, 'array': False})
         else:
             if not 1 <= at <= len(types):
                 raise HkxError('A Havok item names no type')
-            found.append({'type': types[at - 1], 'pos': pos + data_off,
+            kind = types[at - 1]
+            extent = count * kind.resolve_size()
+            if extent > MAX_ITEM_BYTES or pos + extent > data_end - data_off:
+                raise HkxError('A Havok item runs past its data')
+            found.append({'type': kind, 'pos': pos + data_off,
                           'count': count, 'array': False})
     return found
 
@@ -470,6 +478,7 @@ def _peek_tables(data):
                 raise HkxError(f'A Havok file needs SDK {version}')
         elif sub['sig'] == 'DATA':
             data_off = sub['pos']
+            data_end = sub['pos'] + sub['length']
         elif sub['sig'] == 'TYPE':
             types = _read_types(data, sub)
         elif sub['sig'] == 'INDX':
@@ -484,7 +493,7 @@ def _peek_tables(data):
             raise HkxError(f'A Havok file holds {sub["sig"]}')
     if data_off is None or types is None or items is None:
         raise HkxError('A Havok file is missing its data, types or items')
-    entries = _items(data, items[0], data_off, items[1])
+    entries = _items(data, items[0], data_off, data_end, items[1])
     if len(entries) < 2:
         raise HkxError('A Havok file names no root object')
     return entries
@@ -771,6 +780,7 @@ class HkxDocument:
                     raise HkxError(f'A Havok file needs SDK {version}')
             elif sub['sig'] == 'DATA':
                 data_off = sub['pos']
+                data_end = sub['pos'] + sub['length']
             elif sub['sig'] == 'TYPE':
                 types = _read_types(data, sub)
             elif sub['sig'] == 'INDX':
@@ -785,7 +795,7 @@ class HkxDocument:
                 raise HkxError(f'A Havok file holds {sub["sig"]}')
         if data_off is None or types is None or items is None:
             raise HkxError('A Havok file is missing its data, types or items')
-        entries = _items(data, items[0], data_off, items[1])
+        entries = _items(data, items[0], data_off, data_end, items[1])
         if len(entries) < 2:
             raise HkxError('A Havok file names no root object')
         reader = _TagReader(data, data_off, types, entries)

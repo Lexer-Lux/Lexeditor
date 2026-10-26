@@ -61,6 +61,10 @@ def payload(store, native_rules=None, theme=None):
             row.update(coverage='structured',status='partial',openable=True,
                 target='ai',sub='behaviors',controls='AI: behavior costs and call targets',
                 notes='Edit what behaviors cost and which attack, projectile or effect they call.')
+        elif table == 'BehaviorParam_PC':
+            row.update(coverage='structured',status='partial',openable=True,
+                target='ai',sub='player-behaviors',controls='AI: player behavior costs and call targets',
+                notes='Edit what player behaviors cost and which player attack, projectile or effect they call.')
         elif table == 'Bullet':
             row.update(coverage='structured',status='partial',openable=True,
                 target='attacks',sub='projectiles',controls='Attacks: projectile flight and damage',

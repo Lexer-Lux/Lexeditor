@@ -150,7 +150,10 @@ window.Ds1Viewport = (() => {
       if (!lightCache.has(key)) {
         try {
           const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
-          image.colorSpace = THREE.SRGBColorSpace;
+          // Baked irradiance, not display color: the bytes are linear,
+          // and tagging them sRGB crushed the Depths to near-black
+          // (a median wall texel decoded to under 2% brightness).
+          image.colorSpace = THREE.NoColorSpace;
           // Same DirectX bytes as the diffuse, but an atlas-ranged UV
           // set on channel 1: clamp, never tile.
           image.flipY = false;

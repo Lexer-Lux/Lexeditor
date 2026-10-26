@@ -7,332 +7,332 @@
     {
       "Field": "refId",
       "Name": "Call ID",
-      "Description": "ID used for the item."
+      "Description": "The attack, projectile or effect this item calls. Call ID Type picks which list it comes from."
     },
     {
       "Field": "sfxVariationId",
       "Name": "Particle Variation ID",
-      "Description": "Specify SFX variation (used to identify SFX in combination with TimeActEditor ID)"
+      "Description": "Which visual effect plays when the player uses this item. None keeps the default look."
     },
     {
       "Field": "weight",
       "Name": "Weight (kg)",
-      "Description": "Weight. In kilograms."
+      "Description": "How much this item adds to your Equip Load."
     },
     {
       "Field": "basicPrice",
       "Name": "Reinforcement Price",
-      "Description": "Soul cost of reinforcement. See ShopLineupParam for shop prices."
+      "Description": "Probably does nothing. Only weapons and armor can be reinforced."
     },
     {
       "Field": "sellValue",
       "Name": "Sell Value",
-      "Description": "The price when this item is sold. Determines the souls received when feeding this weapon to Frampt"
+      "Description": "How many souls feeding this item to Kingseeker Frampt grants."
     },
     {
       "Field": "behaviorId",
       "Name": "Behavior ID",
-      "Description": "Behavior action ID applied when item is used."
+      "Description": "The Behavior ID that runs when the player uses this item."
     },
     {
       "Field": "replaceItemId",
       "Name": "Replacement Item ID",
-      "Description": "Item ID to add when item is consumed."
+      "Description": "The item the player gets when this one runs out. None gives nothing."
     },
     {
       "Field": "sortId",
       "Name": "Sort ID",
-      "Description": "Determines ordering in menu."
+      "Description": "Where this item sits in menu lists. Lower values sort first."
     },
     {
       "Field": "qwcId",
       "Name": "World Tendency ID",
-      "Description": "The ID this item uses for world tendency."
+      "Description": "Probably unused in Dark Souls. It drove World Tendency in Demon's Souls."
     },
     {
       "Field": "yesNoDialogMessageId",
       "Name": "Message Text ID",
-      "Description": "Message ID used when displaying the YesNo dialog."
+      "Description": "The Yes/No question shown when the player uses this item. None asks nothing."
     },
     {
       "Field": "magicId",
       "Name": "Magic ID",
-      "Description": "Magic ID to use when item is consumed."
+      "Description": "The spell tied to this item. Whether any item uses this is not established."
     },
     {
       "Field": "iconId",
       "Name": "Icon ID",
-      "Description": "Icon ID used for this item."
+      "Description": "Which menu icon this item shows."
     },
     {
       "Field": "modelId",
       "Name": "Model ID",
-      "Description": "Model ID used for this item."
+      "Description": "Which 3D model the game draws for this item."
     },
     {
       "Field": "shopLv",
       "Name": "Shop Level",
-      "Description": "Level that can be sold at the store"
+      "Description": "Unknown. How shops use levels is not established."
     },
     {
       "Field": "compTrophySedId",
       "Name": "Achievement ID",
-      "Description": "The achievement ID this part is associated with, if any."
+      "Description": "The completion achievement this item counts toward. The exact list is not established."
     },
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "The sequential achievement ID this part is associated with, if any."
+      "Description": "The achievement tied to this item. The exact list is not established."
     },
     {
       "Field": "maxNum",
       "Name": "Max Held Count",
-      "Description": "The maximum number of this item held."
+      "Description": ""
     },
     {
       "Field": "consumeHeroPoint",
       "Name": "Humanity Consumption",
-      "Description": "The amount of humanity consumption on use."
+      "Description": "How much Humanity using this item spends."
     },
     {
       "Field": "overDexterity",
       "Name": "Dexterity over Start Value",
-      "Description": "Unknown. Its effect is not documented."
+      "Description": "Unknown. Its effect is not established."
     },
     {
       "Field": "goodsType",
       "Name": "Goods Type",
-      "Description": "The type of item."
+      "Description": ""
     },
     {
       "Field": "refCategory",
       "Name": "Call ID Type",
-      "Description": "The ID category to use for the refId field."
+      "Description": "Which list the call ID comes from: attacks, projectiles or effects."
     },
     {
       "Field": "spEffectCategory",
       "Name": "SpEffect Category",
-      "Description": "The SpEffect category this spell belongs to"
+      "Description": "Which attacks this item counts as, for buffs that raise one kind. Set None when no buff needs it."
     },
     {
       "Field": "goodsCategory",
       "Name": "Item Category",
-      "Description": "Category for this item."
+      "Description": ""
     },
     {
       "Field": "goodsUseAnim",
       "Name": "Item Use Animation",
-      "Description": "Set the animation to play when using the item."
+      "Description": "The animation that plays when the player uses this item."
     },
     {
       "Field": "opmeMenuType",
       "Name": "Interaction Menu Type",
-      "Description": "Menu type that opens when using an item."
+      "Description": "Which menu opens when the player uses this item."
     },
     {
       "Field": "useLimitCategory",
       "Name": "Use Limit Category",
-      "Description": "Limit usage based on applied SpEffect."
+      "Description": "Which active effects can block this item. It stays usable while none match."
     },
     {
       "Field": "replaceCategory",
       "Name": "Replace Category",
-      "Description": "Condition category to add to call ID"
+      "Description": "Extra rule for picking the call target. Its exact effect is not established."
     },
     {
       "Field": "vowType0",
       "Name": "Pledge Type: 0",
-      "Description": ""
+      "Description": "Whether characters with no covenant can use this item."
     },
     {
       "Field": "vowType1",
       "Name": "Pledge Type: 1",
-      "Description": ""
+      "Description": "Whether Way of White members can use this item."
     },
     {
       "Field": "vowType2",
       "Name": "Pledge Type: 2",
-      "Description": ""
+      "Description": "Whether Princess Guard members can use this item."
     },
     {
       "Field": "vowType3",
       "Name": "Pledge Type: 3",
-      "Description": ""
+      "Description": "Whether Warrior of Sunlight members can use this item."
     },
     {
       "Field": "vowType4",
       "Name": "Pledge Type: 4",
-      "Description": ""
+      "Description": "Whether Darkwraith members can use this item."
     },
     {
       "Field": "vowType5",
       "Name": "Pledge Type: 5",
-      "Description": ""
+      "Description": "Whether Path of the Dragon members can use this item."
     },
     {
       "Field": "vowType6",
       "Name": "Pledge Type: 6",
-      "Description": ""
+      "Description": "Whether Gravelord Servant members can use this item."
     },
     {
       "Field": "vowType7",
       "Name": "Pledge Type: 7",
-      "Description": ""
+      "Description": "Whether Forest Hunter members can use this item."
     },
     {
       "Field": "vowType8",
       "Name": "Pledge Type: 8",
-      "Description": ""
+      "Description": "Whether Blade of the Dark Moon members can use this item."
     },
     {
       "Field": "vowType9",
       "Name": "Pledge Type: 9",
-      "Description": ""
+      "Description": "Whether Chaos Servant members can use this item."
     },
     {
       "Field": "vowType10",
       "Name": "Pledge Type: 10",
-      "Description": ""
+      "Description": "Whether members of covenant 10 can use this item. No covenant uses this number."
     },
     {
       "Field": "vowType11",
       "Name": "Pledge Type: 11",
-      "Description": ""
+      "Description": "Whether members of covenant 11 can use this item. No covenant uses this number."
     },
     {
       "Field": "vowType12",
       "Name": "Pledge Type: 12",
-      "Description": ""
+      "Description": "Whether members of covenant 12 can use this item. No covenant uses this number."
     },
     {
       "Field": "vowType13",
       "Name": "Pledge Type: 13",
-      "Description": ""
+      "Description": "Whether members of covenant 13 can use this item. No covenant uses this number."
     },
     {
       "Field": "vowType14",
       "Name": "Pledge Type: 14",
-      "Description": ""
+      "Description": "Whether members of covenant 14 can use this item. No covenant uses this number."
     },
     {
       "Field": "vowType15",
       "Name": "Pledge Type: 15",
-      "Description": ""
+      "Description": "Whether members of covenant 15 can use this item. No covenant uses this number."
     },
     {
       "Field": "enable_live",
       "Name": "Enable as Host Player",
-      "Description": "If ON, this item is usable if the user is a host player."
+      "Description": "Whether the host can use this item."
     },
     {
       "Field": "enable_gray",
       "Name": "Enable as Gray Phantom",
-      "Description": "If ON, this item is usable if the user is a gray phantom player."
+      "Description": "Whether gray phantoms can use this item. Which phantoms count as gray is not established."
     },
     {
       "Field": "enable_white",
       "Name": "Enable as White Phantom",
-      "Description": "If ON, this item is usable if the user is a white phantom player."
+      "Description": "Whether summoned white phantoms can use this item."
     },
     {
       "Field": "enable_black",
       "Name": "Enable as Black Phantom",
-      "Description": "If ON, this item is usable if the user is a black phantom player."
+      "Description": "Whether invading black phantoms can use this item."
     },
     {
       "Field": "enable_multi",
       "Name": "Enable in Multiplayer",
-      "Description": "If ON, this item is usable in a multiplayer session."
+      "Description": "Whether this item works during online multiplayer."
     },
     {
       "Field": "enable_pvp",
       "Name": "Enable only in Multiplayer",
-      "Description": "If ON, this item is only usable if in a multiplayer session."
+      "Description": "Whether this item works in competitive multiplayer. Its difference from Enable in Multiplayer is not established."
     },
     {
       "Field": "disable_offline",
       "Name": "Disable Offline",
-      "Description": ""
+      "Description": "Whether being offline blocks this item. Turn it on for items that need other players."
     },
     {
       "Field": "isEquip",
       "Name": "Is Equippable",
-      "Description": "If ON, this item can be equipped."
+      "Description": "Whether this item can sit in an equipment slot. If not, the player uses it from the menu."
     },
     {
       "Field": "isConsume",
       "Name": "Is Consumed",
-      "Description": "If ON, this item can be consumed. This will remove one instance of the item upon consumption."
+      "Description": "Whether using this item spends one from the stack."
     },
     {
       "Field": "isAutoEquip",
       "Name": "Is Automatically Equipped",
-      "Description": "If ON, this item is automaticlly equipped when picked up."
+      "Description": "Whether picking this item up equips it at once."
     },
     {
       "Field": "isEstablishment",
       "Name": "Is Guidance Item",
-      "Description": "If ON, this item is a stationary item."
+      "Description": "Whether this item is a placed item. Its exact effect is not established."
     },
     {
       "Field": "isOnlyOne",
       "Name": "Is Unique Item",
-      "Description": "If ON, this item is an unique item."
+      "Description": "Whether the player can hold only one of this item."
     },
     {
       "Field": "isDrop",
       "Name": "Can Drop",
-      "Description": "If ON, this item can be dropped."
+      "Description": "Whether the player can leave this item on the ground."
     },
     {
       "Field": "isDeposit",
       "Name": "Can Deposit",
-      "Description": "If ON, this item can be deposited into the repository."
+      "Description": "Whether the player can move this item into storage."
     },
     {
       "Field": "isDisableHand",
       "Name": "Disable if Right Hand is Empty",
-      "Description": "If ON, this item cannot be used when the right-handed weapon is empty."
+      "Description": "Whether this item needs a weapon in the right hand. Without one the game blocks its use."
     },
     {
       "Field": "IsTravelItem",
       "Name": "Is Travel Item",
-      "Description": "If ON, this item is considered a 'travel' item."
+      "Description": "Whether this item can drift to another player's world. Left behind online, it may grow into a Good Vagrant."
     },
     {
       "Field": "isSuppleItem",
       "Name": "Is Replenishable Item",
-      "Description": "If ON, this item is automatically replenished."
+      "Description": "Whether resting at a bonfire refills this item. Turn it on for the Estus Flask."
     },
     {
       "Field": "isFullSuppleItem",
       "Name": "Is Restocked Item",
-      "Description": "If ON, this item is automatically restocked."
+      "Description": "Unknown. It probably touches bonfire refills, but its difference from Is Replenishable Item is not established."
     },
     {
       "Field": "isEnhance",
       "Name": "Is Enhancement Source",
-      "Description": "If ON, this item is used to apply an 'enhancement' to equipment or self."
+      "Description": "Whether using this item buffs the equipped weapon."
     },
     {
       "Field": "isFixItem",
       "Name": "Is Repairable Item",
-      "Description": "IF ON, this item can be repaired."
+      "Description": "Whether using this item repairs equipment."
     },
     {
       "Field": "disableMultiDropShare",
       "Name": "Is Drop Disabled in Multiplayer",
-      "Description": "If ON, this item cannot be dropped in a multiplayer session."
+      "Description": "Whether drops of this item stay out of other players' worlds."
     },
     {
       "Field": "disableUseAtColiseum",
       "Name": "Is Disabled in PvP Arena",
-      "Description": "If ON, this item cannot be used when in the PvP arena."
+      "Description": "Blocks this item inside the PvP arena."
     },
     {
       "Field": "disableUseAtOutOfColiseum",
       "Name": "Is Enabled only in PvP Arena",
-      "Description": "If ON, this item can only be used in the PvP arena."
+      "Description": "Whether this item works only inside the PvP arena."
     },
     {
       "Field": "pad",
@@ -342,17 +342,17 @@
     {
       "Field": "vagrantItemLotId",
       "Name": "Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the Vagrant this item may become. -1 spawns none, and 0 grants nothing."
     },
     {
       "Field": "vagrantBonusEneDropItemLotId",
       "Name": "Good Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the extra creature a Good Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     },
     {
       "Field": "vagrantItemEneDropItemLotId",
       "Name": "Evil Vagrant: Item Lot ID",
-      "Description": "The item lot to use when this item is dropped and generates a vagrant."
+      "Description": "The reward roll for the creature an Evil Vagrant may bring. -1 drops nothing, and 0 grants nothing."
     }
   ]
 }

@@ -7,10 +7,12 @@ their files (parameters, item text, .msb maps, .anibnd.dcx animations); every
 other file under the game's data roots is an asset and merges whole, or
 member-by-member for binders.
 
-Texture previews decode TPF containers (binder members, standalone .tpf and
-.dds files) and render each DDS through Pillow, which already reads every
-compressed format the game ships, BC7 included. Split .bhd/.bdt archives
-replace as whole files; their member table is not decoded yet.
+Texture previews decode TPF containers (binder members, standalone .tpf,
+BDF3 .chrtpfbdt character archives and .dds files) and render each DDS
+through Pillow, which already reads every compressed format the game
+ships, BC7 included. Split .tpfbhd/.tpfbdt pairs list their member
+textures under the header file; the .tpfbdt data half replaces as a
+whole file.
 """
 import hashlib
 import io
@@ -49,7 +51,7 @@ MODEL_KINDS = {'.flver': 'piece', '.chrbnd': 'character', '.objbnd': 'object',
                '.partsbnd': 'part', '.fgbnd': 'face', '.remobnd': 'cutscene'}
 COLLISION_EXTENSIONS = frozenset({'.hkx', '.hkxbhd', '.hkxbdt'})
 TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
-SPLIT_ARCHIVE_EXTENSIONS = frozenset({'.tpfbhd', '.tpfbdt', '.chrtpfbdt'})
+SPLIT_ARCHIVE_EXTENSIONS = frozenset({'.tpfbdt'})
 SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
 # FMOD bank name tags that mark music: area themes (m), streamed themes
 # (sm) and the mix setup. Every other bank is sound effects.
@@ -75,7 +77,8 @@ def kind_of(relative):
 
 
 def is_split_archive(relative):
-    """Split texture archives (header/data pairs) replace as whole files."""
+    """Split texture data halves (.tpfbdt) replace as whole files; their
+    .tpfbhd headers list the pair's member textures."""
     lowered = str(relative).replace(chr(92), '/').lower()
     inner = lowered[:-4] if lowered.endswith('.dcx') else lowered
     leaf = inner.rsplit('/', 1)[-1]
@@ -389,6 +392,65 @@ def parse_tpf(data):
     return textures
 
 
+BDF_MAGIC = b'BDF307D7R6\x00\x00\x00\x00\x00\x00'
+BDF_HEADER_SIZE = 16
+BDF_ALIGN = 16
+BDF_MAX_MEMBERS = 10000
+
+
+def parse_bdf(data):
+    """A .chrtpfbdt character archive's DCX members: (offset, size) slots.
+
+    BDF3 is a 16-byte magic header followed by standard DCX blobs, each
+    holding one TPF, packed back to back on 16-byte boundaries with zero
+    padding. Sizes include the 76-byte DCX header.
+    """
+    raw = bytes(data)
+    if len(raw) < BDF_HEADER_SIZE or raw[:BDF_HEADER_SIZE] != BDF_MAGIC:
+        raise AssetError('That is not a Dark Souls character texture archive')
+    slots = []
+    at = BDF_HEADER_SIZE
+    while True:
+        if at >= len(raw):
+            break
+        end = (at + BDF_ALIGN - 1) // BDF_ALIGN * BDF_ALIGN
+        if raw[at:end] != b'\x00' * (end - at):
+            raise AssetError('That character texture archive has dirt between members')
+        at = end
+        if at >= len(raw):
+            break
+        if len(slots) >= BDF_MAX_MEMBERS:
+            raise AssetError('That character texture archive names too many members')
+        blob = raw[at:]
+        if len(blob) < 76 or blob[:4] != b'DCX\0':
+            raise AssetError('That character texture archive holds a non-DCX member')
+        _length, compressed = struct.unpack_from('>II', blob, 28)
+        size = 76 + compressed
+        if not 76 < size <= MAX_ARCHIVE or at + size > len(raw):
+            raise AssetError('That character texture archive ends inside a member')
+        slots.append((at, size))
+        at += size
+    if not slots:
+        raise AssetError('That character texture archive holds no members')
+    return slots
+
+
+def _bdf_textures(payload):
+    """Every texture in a BDF3 character archive, with member slots."""
+    found = []
+    for slot, (offset, size) in enumerate(parse_bdf(payload)):
+        try:
+            tpf = bytes(inflate(payload[offset:offset + size]))
+        except FormatError as error:
+            raise AssetError(f'Character texture member {slot} does not open: {error}') from error
+        for texture in parse_tpf(tpf):
+            blob = tpf[texture["offset"]:texture["offset"] + texture["size"]]
+            info = dds_info(blob)
+            found.append({"member": str(slot), "index": texture["index"], "name": texture["name"],
+                          "width": info["width"], "height": info["height"], "format": info["format"]})
+    return found
+
+
 def dds_info(blob):
     """A DDS blob's dimensions and compression label."""
     if len(blob) < 128 or blob[:4] != b"DDS " or struct.unpack_from("<I", blob, 4)[0] != 124:
@@ -497,10 +559,15 @@ def list_textures(file_bytes, filename):
             info = dds_info(payload[texture["offset"]:texture["offset"] + texture["size"]])
             found.append({"member": "", "index": texture["index"], "name": texture["name"],
                           "width": info["width"], "height": info["height"], "format": info["format"]})
-    elif lowered.endswith(".tpfbhd") or lowered.endswith(".tpfbdt"):
-        # Split texture archives (BHF3/BDT): their members decode for the
-        # map viewport (bhf.py), but the asset browser still replaces them
-        # as whole files.
+    elif lowered.endswith(".chrtpfbdt"):
+        found.extend(_bdf_textures(payload))
+    elif lowered.endswith(".tpfbhd"):
+        # Pair headers list through their data sibling, which bare bytes
+        # cannot see; the path reader below resolves it.
+        raise AssetError("That split header lists through its data file")
+    elif lowered.endswith(".tpfbdt"):
+        # The data half of a split pair replaces as a whole file; its
+        # textures list under the .tpfbhd header file.
         raise AssetError("Split texture archives replace as whole files")
     elif lowered.endswith(".dds"):
         info = dds_info(payload)
@@ -529,9 +596,25 @@ def texture_png(file_bytes, filename, member="", index=0):
         # Without this the menu icon sheets (menu_1.tpf.dcx and kin) list
         # no textures and their records show no thumbnail or preview.
         lowered = lowered[:-len(".dcx")]
-    if lowered.endswith(".tpf"):
+    if lowered.endswith(".chrtpfbdt"):
+        slots = parse_bdf(payload)
+        try:
+            slot = int(member)
+        except (TypeError, ValueError):
+            raise AssetError("That character texture archive has no such member") from None
+        if not 0 <= slot < len(slots):
+            raise AssetError("That character texture archive has no such member")
+        offset, size = slots[slot]
+        try:
+            payload = bytes(inflate(payload[offset:offset + size]))
+        except FormatError as error:
+            raise AssetError(f"Character texture member {slot} does not open: {error}") from error
         textures = parse_tpf(payload)
-    elif lowered.endswith(".tpfbhd") or lowered.endswith(".tpfbdt"):
+    elif lowered.endswith(".tpf"):
+        textures = parse_tpf(payload)
+    elif lowered.endswith(".tpfbhd"):
+        raise AssetError("That split header previews through its data file")
+    elif lowered.endswith(".tpfbdt"):
         raise AssetError("Split texture archives replace as whole files")
     elif lowered.endswith(".dds"):
         return render_png(payload)
@@ -541,6 +624,267 @@ def texture_png(file_bytes, filename, member="", index=0):
     if match is None:
         raise AssetError("That file has no such texture")
     return render_png(payload[match["offset"]:match["offset"] + match["size"]])
+
+
+# Texture lists and previews by disk seeks, not full reads: the Textures
+# tab expands hundreds of containers on open, and every selection and
+# preview strip re-reads its file. Plain .tpf, .dds and BDF3 members
+# read only their headers; DCX-wrapped and binder files still inflate
+# whole, because their bytes are a stream. Caches key by path, size and
+# mtime, so an upload or removal (new bytes, new stamp) never reads
+# stale. List hits return copies: the model strip appends companion
+# tiles to the list it gets, which must not pollute the cache.
+_TEXTURE_LIST_CACHE = {}
+_TEXTURE_LIST_CACHE_SIZE = 256
+_TEXTURE_PNG_CACHE = {}
+_TEXTURE_PNG_CACHE_SIZE = 64
+
+
+def _cache_store(cache, cap, key, value):
+    # Lock-free reads share these caches across request threads: concurrent
+    # computes of one key are benign (last write wins), and a lost eviction
+    # race just retries instead of raising.
+    cache.pop(key, None)
+    while len(cache) >= cap:
+        try:
+            cache.pop(next(iter(cache)))
+        except (KeyError, StopIteration):
+            break
+    cache[key] = value
+    return value
+
+
+def _read_at(handle, offset, size, total, what):
+    if not 0 <= offset <= total - size:
+        raise AssetError(f"That texture container ends inside its {what}")
+    handle.seek(offset)
+    blob = handle.read(size)
+    if len(blob) != size:
+        raise AssetError(f"That texture container ends inside its {what}")
+    return blob
+
+
+def _tpf_entries_from_file(handle, total):
+    """A plain .tpf file's table via seeks: parse_tpf without the read."""
+    head = _read_at(handle, 0, 16, total, "header")
+    if head[:4] != b"TPF\x00":
+        raise AssetError("That is not a Dark Souls texture container")
+    count = struct.unpack_from("<I", head, 8)[0]
+    if count > 10000:
+        raise AssetError("That texture container names too many textures")
+    table = _read_at(handle, 16, count * 20, total, "table") if count else b""
+    entries = []
+    for index in range(count):
+        offset, size, _unknown, name_off, _other = struct.unpack_from("<5I", table, index * 20)
+        if offset + size > total:
+            raise AssetError("That texture container points outside its pixels")
+        if not 0 <= name_off < total:
+            raise AssetError("That texture container has a nameless texture")
+        raw_name = _read_at(handle, name_off, min(128, total - name_off), total, "names")
+        end = raw_name.find(b"\x00")
+        if end <= 0:
+            raise AssetError("That texture container has a nameless texture")
+        entries.append({"index": index, "name": raw_name[:end].decode("shift_jis", "replace"),
+                        "offset": offset, "size": size})
+    return entries
+
+
+def _bdf_slots_from_file(handle, total):
+    """BDF3 DCX slots via header seeks: parse_bdf without the read."""
+    if _read_at(handle, 0, BDF_HEADER_SIZE, total, "header") != BDF_MAGIC:
+        raise AssetError("That is not a Dark Souls character texture archive")
+    slots, at = [], BDF_HEADER_SIZE
+    while True:
+        if at >= total:
+            break
+        end = (at + BDF_ALIGN - 1) // BDF_ALIGN * BDF_ALIGN
+        if _read_at(handle, at, end - at, total, "padding") != b"\x00" * (end - at):
+            raise AssetError("That character texture archive has dirt between members")
+        at = end
+        if at >= total:
+            break
+        if len(slots) >= BDF_MAX_MEMBERS:
+            raise AssetError("That character texture archive names too many members")
+        head = _read_at(handle, at, 76, total, "member")
+        if head[:4] != b"DCX\0":
+            raise AssetError("That character texture archive holds a non-DCX member")
+        _length, compressed = struct.unpack_from(">II", head, 28)
+        size = 76 + compressed
+        if not 76 < size <= MAX_ARCHIVE or at + size > total:
+            raise AssetError("That character texture archive ends inside a member")
+        slots.append((at, size))
+        at += size
+    if not slots:
+        raise AssetError("That character texture archive holds no members")
+    return slots
+
+
+def _bdf_textures_from_file(handle, total):
+    """Every texture in a BDF3 file, inflating one member at a time."""
+    found = []
+    for slot, (offset, size) in enumerate(_bdf_slots_from_file(handle, total)):
+        handle.seek(offset)
+        blob = handle.read(size)
+        if len(blob) != size:
+            raise AssetError("That character texture archive ends inside a member")
+        try:
+            tpf = bytes(inflate(blob))
+        except FormatError as error:
+            raise AssetError(f"Character texture member {slot} does not open: {error}") from error
+        for texture in parse_tpf(tpf):
+            info = dds_info(tpf[texture["offset"]:texture["offset"] + texture["size"]])
+            found.append({"member": str(slot), "index": texture["index"], "name": texture["name"],
+                          "width": info["width"], "height": info["height"], "format": info["format"]})
+    return found
+
+
+def _texture_file_key(path):
+    try:
+        stat = Path(path).stat()
+    except OSError as error:
+        raise AssetError(f"Cannot read {Path(path).name}") from error
+    return (str(path), stat.st_size, stat.st_mtime_ns)
+
+
+def _pair_data_path(path):
+    """A .tpfbhd header path's .tpfbdt data sibling, wrapped or plain."""
+    plain = str(path)[:-len(".dcx")] if str(path).lower().endswith(".dcx") else str(path)
+    sibling = str(Path(plain).with_suffix(".tpfbdt"))
+    if str(path).lower().endswith(".dcx"):
+        sibling += ".dcx"
+    return Path(sibling)
+
+
+def _pair_textures(header_bytes, data_path):
+    """Every texture in a split pair: header slots seek-read from data."""
+    from . import bhf
+    try:
+        table = bhf.parse_bhf(header_bytes)
+    except FormatError as error:
+        raise AssetError(str(error)) from error
+    found = []
+    for stem in sorted(table):
+        offset, size = table[stem]
+        try:
+            tpf = bytes(bhf.inflate_member(data_path, offset, size))
+        except FormatError as error:
+            raise AssetError(str(error)) from error
+        for texture in parse_tpf(tpf):
+            info = dds_info(tpf[texture["offset"]:texture["offset"] + texture["size"]])
+            found.append({"member": stem, "index": texture["index"], "name": texture["name"],
+                          "width": info["width"], "height": info["height"], "format": info["format"]})
+    return found
+
+
+def list_textures_from_path(path, filename):
+    """list_textures by disk seeks for plain containers; cached by stamp."""
+    lowered = str(filename).lower()
+    inner = lowered[:-4] if lowered.endswith(".dcx") else lowered
+    key = _texture_file_key(path)
+    if inner.endswith(".tpfbhd"):
+        # The list also depends on the data sibling's bytes: a replaced
+        # data half must invalidate the header's cached list.
+        key = key + _texture_file_key(_pair_data_path(path))[1:]
+    total = key[1]
+    hit = _TEXTURE_LIST_CACHE.get(key)
+    if hit is not None:
+        return [dict(entry) for entry in hit]
+    found = None
+    if inner.endswith(".tpfbhd") and not lowered.endswith(".dcx"):
+        if total > 8 * 1024 * 1024:
+            raise AssetError("That split header is too large to list")
+        with open(path, "rb") as handle:
+            found = _pair_textures(handle.read(), _pair_data_path(path))
+    if found is None and not lowered.endswith(".dcx"):
+        with open(path, "rb") as handle:
+            magic = handle.read(BDF_HEADER_SIZE)
+            if inner.endswith(".tpf") and magic[:4] == b"TPF\x00":
+                found = []
+                for entry in _tpf_entries_from_file(handle, total):
+                    head = _read_at(handle, entry["offset"], min(entry["size"], 132), total, "pixels")
+                    info = dds_info(head)
+                    found.append({"member": "", "index": entry["index"], "name": entry["name"],
+                                  "width": info["width"], "height": info["height"], "format": info["format"]})
+            elif inner.endswith(".chrtpfbdt") and magic == BDF_MAGIC:
+                found = _bdf_textures_from_file(handle, total)
+            elif inner.endswith(".dds") and magic[:4] == b"DDS ":
+                info = dds_info(_read_at(handle, 0, min(132, total), total, "pixels"))
+                found = [{"member": "", "index": 0, "name": str(filename).rsplit("/", 1)[-1],
+                          "width": info["width"], "height": info["height"], "format": info["format"]}]
+    if found is None:
+        with open(path, "rb") as handle:
+            found = list_textures(handle.read(), filename)
+    _cache_store(_TEXTURE_LIST_CACHE, _TEXTURE_LIST_CACHE_SIZE, key, [dict(entry) for entry in found])
+    return [dict(entry) for entry in found]
+
+
+def texture_png_from_path(path, filename, member="", index=0):
+    """texture_png by disk seeks for plain containers; cached by stamp."""
+    lowered = str(filename).lower()
+    inner = lowered[:-4] if lowered.endswith(".dcx") else lowered
+    key = _texture_file_key(path)
+    if inner.endswith(".tpfbhd"):
+        key = key + _texture_file_key(_pair_data_path(path))[1:]
+    key = key + (member, index)
+    hit = _TEXTURE_PNG_CACHE.get(key)
+    if hit is not None:
+        return hit
+    total = _texture_file_key(path)[1]
+    png = None
+    if inner.endswith(".tpfbhd") and not lowered.endswith(".dcx"):
+        from . import bhf
+        if total > 8 * 1024 * 1024:
+            raise AssetError("That split header is too large to preview")
+        try:
+            with open(path, "rb") as handle:
+                table = bhf.parse_bhf(handle.read())
+        except FormatError as error:
+            raise AssetError(str(error)) from error
+        slot = table.get((member or "").lower())
+        if slot is None:
+            raise AssetError("That split archive has no such member")
+        try:
+            tpf = bytes(bhf.inflate_member(_pair_data_path(path), slot[0], slot[1]))
+        except FormatError as error:
+            raise AssetError(str(error)) from error
+        match = next((item for item in parse_tpf(tpf) if item["index"] == index), None)
+        if match is None:
+            raise AssetError("That file has no such texture")
+        png = render_png(tpf[match["offset"]:match["offset"] + match["size"]])
+    if not lowered.endswith(".dcx"):
+        with open(path, "rb") as handle:
+            magic = handle.read(BDF_HEADER_SIZE)
+            if inner.endswith(".tpf") and magic[:4] == b"TPF\x00":
+                match = next((entry for entry in _tpf_entries_from_file(handle, total)
+                              if entry["index"] == index), None)
+                if match is None:
+                    raise AssetError("That file has no such texture")
+                png = render_png(_read_at(handle, match["offset"], match["size"], total, "pixels"))
+            elif inner.endswith(".chrtpfbdt") and magic == BDF_MAGIC:
+                slots = _bdf_slots_from_file(handle, total)
+                try:
+                    slot = int(member)
+                except (TypeError, ValueError):
+                    raise AssetError("That character texture archive has no such member") from None
+                if not 0 <= slot < len(slots):
+                    raise AssetError("That character texture archive has no such member")
+                offset, size = slots[slot]
+                handle.seek(offset)
+                blob = handle.read(size)
+                if len(blob) != size:
+                    raise AssetError("That character texture archive ends inside a member")
+                try:
+                    tpf = bytes(inflate(blob))
+                except FormatError as error:
+                    raise AssetError(f"Character texture member {slot} does not open: {error}") from error
+                match = next((item for item in parse_tpf(tpf) if item["index"] == index), None)
+                if match is None:
+                    raise AssetError("That file has no such texture")
+                png = render_png(tpf[match["offset"]:match["offset"] + match["size"]])
+    if png is None:
+        with open(path, "rb") as handle:
+            png = texture_png(handle.read(), filename, member, index)
+    return _cache_store(_TEXTURE_PNG_CACHE, _TEXTURE_PNG_CACHE_SIZE, key, png)
 
 
 # Model inventories by content hash: selecting two copies of one file, or

@@ -34,7 +34,7 @@ const assetRows=files=>(files||[]).filter(file=>state.tab==="sound"?file.kind===
 const textureListCache=new Map();
 const textureCacheKey=row=>`${row.id}|${row.values?.size}|${row.created?"new":row.modified?"modified":""}`;
 const textureExpandable=row=>row.table==="Asset"&&row.values?.kind!=="archive"
-  &&String(row.id||"").toLowerCase().replace(/\.dcx$/,"").endsWith(".tpf");
+  &&[".tpf",".chrtpfbdt",".tpfbhd"].some(suffix=>String(row.id||"").toLowerCase().replace(/\.dcx$/,"").endsWith(suffix));
 function textureRow(fileRow,texture){
   return {table:"AssetTexture",id:`${fileRow.id}#${texture.index}`,name:texture.name,
     file:fileRow.id,member:texture.member||"",index:texture.index,
@@ -364,6 +364,10 @@ async function loadDeployment(){
   state.deployment=await api("/api/deployment");
 }
 async function navigate(tab,sub=state.sub,selected=null){
+  // An attack's viewer link survives its own navigation and no other:
+  // anything else the reader opens drops the pending drawer.
+  if(!keepViewerPending)pendingViewer=null;
+  keepViewerPending=false;
   // Subtabs bypass the shell, so the switch announces itself here too:
   // old content out, throbber in, before the first await.
   document.querySelector("#main")?.replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${sub}`}));
@@ -422,7 +426,8 @@ async function textLabelPreview(id){
   return LexeditorUI.stack({fill:false,compact:true},el("strong",{},row.name),el("span",{},label||"(empty)"));
 }
 const openAttack=(id,table="AtkParam_Npc")=>navigate("attacks",table==="AtkParam_Pc"?"player-attacks":"attacks",`${table}:${id}`);
-const openBehavior=id=>navigate("ai","behaviors",`BehaviorParam:${id}`);
+const BEHAVIOR_SUBS={BehaviorParam:"behaviors",BehaviorParam_PC:"player-behaviors"};
+const openBehavior=(id,table="BehaviorParam")=>navigate("ai",BEHAVIOR_SUBS[table]||"behaviors",`${table}:${id}`);
 const LINK_TAB_LABELS={effect:"Effects",attack:"Attacks",bullet:"Attacks",goods:"Items",catalog:"Items",ai:"AI",drop:"Drops",stat:"Stats",behavior:"AI"};
 const ATTACK_SUBS={AtkParam_Npc:"attacks",AtkParam_Pc:"player-attacks"};
 const STAT_SUBS={EquipMtrlSetParam:"upgrade-materials",ReinforceParamWeapon:"weapon-upgrades",ReinforceParamProtector:"armor-upgrades",CalcCorrectGraph:"curves"};
@@ -460,7 +465,7 @@ function openRecord(link){
   if(link.kind==="npc")return navigate(link.tab||"enemies",link.sub||"monsters",`${link.table}:${link.id}`);
   if(link.kind==="drop")return navigate("drops","drops",`${link.table}:${link.id}`);
   if(link.kind==="stat")return navigate("stats",STAT_SUBS[link.table],`${link.table}:${link.id}`);
-  if(link.kind==="behavior")return openBehavior(link.id);
+  if(link.kind==="behavior")return openBehavior(link.id,link.table);
   if(link.kind==="asset")return openAsset(link);
   return openCatalog(link.table,link.id);
 }
@@ -485,7 +490,7 @@ async function finderTarget(link,value){
   if(link.kind==="npc")return [link.tab||"enemies",link.sub||"monsters"];
   if(link.kind==="drop")return ["drops","drops"];
   if(link.kind==="stat")return ["stats",STAT_SUBS[link.table]];
-  if(link.kind==="behavior")return ["ai","behaviors"];
+  if(link.kind==="behavior")return ["ai",BEHAVIOR_SUBS[link.table]||"behaviors"];
   try{return ["items",catalogSub(link.table,await recordRow(link.table,value))];}
   catch(error){return ["items",CATALOG_SUBS[link.table]||"consumables"];}
 }
@@ -655,6 +660,7 @@ function commit(row,field,value,control,beforeOverride){
       const changed=result.row.fields.find(item=>item.key===field.key);
       if(changed){if(control?.isConnected){if(field.type==="bool")control.checked=!!changed.value;else control.value=String(changed.value);}
       syncDetailControl(field.key,changed.value,control);}
+      if((row.table==="AtkParam_Npc"||row.table==="AtkParam_Pc")&&hitSlotOf(field.key)!==null)syncHitSlotStatus(result.row);
       // A link appearing or disappearing swaps the control itself (a
       // picker becomes a record face, or back), so the panel rebuilds
       // the way it does when an edit changes another control's shape.
@@ -1038,7 +1044,14 @@ const DS1_TEXT_TAG_GROUPS=[
   {label:"itemNameBeforeForge",insert:"<?itemNameBeforeForge?>",title:"The gear's name before reinforcing."},
   {label:"itemNameAfterForge",insert:"<?itemNameAfterForge?>",title:"The gear's name after reinforcing."}]}];
 function plainControlFor(row,field){
-  if(!field.editable)return readonlyField(field.value,{"aria-label":field.label});
+  if(!field.editable){
+    // A protected link still names its record where the field is: the
+    // face previews and opens it, with no finder to change it. Nothing
+    // is left for a Linked-records ghetto, so the tab is gone.
+    const stuck=(row.recordLinks||[]).find(entry=>entry.field===field.key);
+    if(stuck&&stuck.kind!=="npc")return referenceFace(row,field);
+    return readonlyField(field.value,{"aria-label":field.label});
+  }
   const attrs={"aria-label":field.label,"data-field-key":field.key,disabled:state.readOnly||field.disabled};
   // The shared shell still catches an edit attempt here and offers Create a
   // mod; disabling the control too matches the greyed-out, cursor:default
@@ -1143,7 +1156,6 @@ function fieldSections(row){
   // writes the binder's number back; an icon pick comes from the gallery.
   const links=new Map((row.recordLinks||[]).filter(entry=>entry.kind!=="asset").map(entry=>[entry.field,entry]));
   const dialogs=new Map((row.dialogLinks||[]).map(entry=>[entry.field,entry]));
-  const shownLinks=new Set();
   // Placement coordinates ride one row per vector: Position, then
   // Rotation in degrees, then Scale. Detection is by field, not by
   // tab, so any record carrying a coordinate triple renders the same way.
@@ -1198,7 +1210,6 @@ function fieldSections(row){
       let pairControl=controlFor(row,field);
       const pairLink=field.editable&&links.get(field.key);
       if(pairLink){
-        shownLinks.add(field.key);
         const face=pairControl.matches?.(".ds1-reference-face")?pairControl
           :pairControl.querySelector?.(".ds1-reference-face")??pairControl;
         pairControl=el("span",{class:"ds1-reference-field"},pairControl,referencePicker(row,field,face));
@@ -1218,7 +1229,6 @@ function fieldSections(row){
     const fieldAssetLink=(row.recordLinks||[]).find(entry=>entry.kind==="asset"&&entry.field===field.key)||null;
     let control=controlFor(row,field);
     if(link){
-      shownLinks.add(field.key);
       const face=control.matches?.(".ds1-reference-face")?control
         :control.querySelector?.(".ds1-reference-face")??control;
       control=el("span",{class:"ds1-reference-field"},control,referencePicker(row,field,face));
@@ -1250,15 +1260,6 @@ function fieldSections(row){
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
       help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})}));
-  }
-  const unlisted=(row.recordLinks||[]).filter(entry=>!shownLinks.has(entry.field)&&entry.kind!=="asset");
-  if(unlisted.length){
-    groups.set("Linked records",unlisted.map(entry=>detailField({
-      label:row.fields.find(field=>field.key===entry.field)?.label||entry.field,
-      control:entry.resolved?hoverable({content:entry.name,targetType:`ds1-${entry.kind}`,
-        targetId:entry.id,targetLabel:`${entry.name} in ${LINK_TAB_LABELS[entry.kind]||"Items"}`,
-        preview:()=>recordPreview(entry),activate:()=>openRecord(entry)}):readonlyField(entry.name,{format:false}),
-      help:infoHelp("Open this record's linked record. Changing a shared record changes every use of it.")})));
   }
   if(row.effectUsage){
     const usage=row.effectUsage;
@@ -1337,7 +1338,20 @@ function shopIconCell(line){
 // Humanity rows show the wisp, weapons their blades. Rows without a
 // picture leave the cell empty; without game files every cell is empty.
 function recordIconCell(row){
-  if(!row||!ds1IconTables.has(row.table))return "";
+  if(!row)return "";
+  if(row.table==="NpcParam"){
+    const chr=row.values?.chr;
+    if(!chr)return "";
+    return window.Ds1Preview.thumbnail({url:`/api/chr/geometry?chr=${encodeURIComponent(chr)}`,label:`${row.name} model`});
+  }
+  if(row.table==="NativeRules"&&ds1LabelKinds.has(row.labelKind)){
+    const art=el("img",{class:"lex-ds1-shop-icon",loading:"lazy",
+      src:`/api/label?name=${encodeURIComponent(row.labelKind)}`,
+      alt:"",draggable:"false","data-lex-no-image":"off"});
+    art.addEventListener("error",()=>{if(art.isConnected)art.remove();},{once:true});
+    return art;
+  }
+  if(!ds1IconTables.has(row.table))return "";
   const id=Number(row.id);
   if(!Number.isInteger(id))return "";
   const picture=el("img",{class:"lex-ds1-shop-icon",loading:"lazy",
@@ -1834,9 +1848,15 @@ function assetTexturePanel(row,info,body,previewUrl,textureHelp){
   }
   // The archive kind is file metadata, not a preview: it sits loose in
   // the panel instead of under PREVIEW, pinnable through the row's kind.
-  if(info.reason==="split-archive")body.push(
-    detailField({label:"ARCHIVE",property:"kind",control:readonlyField("Split archive"),
-      help:infoHelp("Many textures packed into one whole-file archive. It replaces as a whole file and has no per-texture preview; single .tpf and .dds files do.")}));
+  if(info.reason==="split-archive"){
+    const file=String(row.file||row.id||"");
+    const header=file.replace(/\.tpfbdt(\.dcx)?$/i,".tpfbhd$1");
+    const splitHelp=header!==file
+      ?`The data half of ${header}. Its textures list under that header file; this half replaces as a whole file.`
+      :"Many textures packed into one whole-file archive. It replaces as a whole file and has no per-texture preview; single .tpf and .dds files do.";
+    body.push(detailField({label:"ARCHIVE",property:"kind",control:readonlyField("Split archive"),
+      help:infoHelp(splitHelp)}));
+  }
   else if(info.reason==="unreadable")body.push(detailSection({title:"PREVIEW",body:[
     detailField({label:"TEXTURES",control:readonlyField("No preview"),
       help:infoHelp("This file does not open as textures. It still replaces as a whole file.")})]}));
@@ -1903,7 +1923,8 @@ function assetAddUpload(){
 function assetUploadButton(){
   const locked=state.readOnly||state.assetBusy;
   const title=state.readOnly?"This is the game's own data, shown read-only. Create a mod to add files to it.":state.assetBusy?"An upload is already running.":"Add file to mod";
-  return LexeditorUI.newButton({title,"aria-label":title,disabled:locked,onclick:()=>assetAddUpload()});
+  return el("button",{type:"button",class:"lex-header-icon","data-asset-action":"add",title,"aria-label":title,disabled:locked,
+    onclick:()=>assetAddUpload()},LexeditorUI.addIcon());
 }
 function targetIcon(){
   const namespace="http://www.w3.org/2000/svg";
@@ -2087,17 +2108,10 @@ function curveDetail(actions,groups){
   const row=state.row;
   const at=key=>Number(row.fields.find(item=>item.key===key)?.value??0);
   const stages=[0,1,2,3,4].map(i=>at(`stageMaxVal${i}`));
-  if(stages.every(value=>value===0)){
-    // The level-up cost row has no stages to plot, and its soul price
-    // comes from the four cost fields by an undocumented formula, so it
-    // keeps the plain field list.
-    return detailPanel({title:row.name,help:row.help,actions,paginate:{unpaged:true},
-      body:[...groups].map(([title,body])=>detailSection({title,body}))});
-  }
-  const host=el("div",{class:"ds1-curve-host"});
+  if(stages.every(value=>value===0))return costDetail(actions,row,groups);
   let graph=null;
   const live=key=>{
-    const input=host.querySelector(`input[data-field-key="${key}"]`);
+    const input=graph?.querySelector(`input[data-field-key="${key}"]`);
     const value=input?Number(input.value):NaN;
     return Number.isFinite(value)?value:at(key);
   };
@@ -2115,31 +2129,87 @@ function curveDetail(actions,groups){
   };
   const variables=row.fields.map(field=>{
     const digit=Number(field.key.slice(-1));
-    const family=field.key.startsWith("stageMaxVal")?{short:`T${digit+1}`,key:"t",tokens:["T_lo","T_hi"]}
-      :field.key.startsWith("stageMaxGrowVal")?{short:`V${digit+1}`,key:"v",tokens:["V","V_lo","V_hi"]}
-      :field.key.startsWith("adjPt_maxGrowVal")?{short:`S${digit+1}`,key:"s",tokens:["S"]}
-      :{short:field.key==="init_inclination_soul"?"C1":field.key==="adjustment_value"?"C2"
-        :field.key==="boundry_inclination_soul"?"C3":"C4",key:"cost",tokens:[]};
+    const short=field.key.startsWith("stageMaxVal")?`T${digit+1}`
+      :field.key.startsWith("stageMaxGrowVal")?`V${digit+1}`
+      :field.key.startsWith("adjPt_maxGrowVal")?`S${digit+1}`
+      :field.key==="init_inclination_soul"?"C1":field.key==="adjustment_value"?"C2"
+      :field.key==="boundry_inclination_soul"?"C3":"C4";
     const control=plainControlFor(row,field);
     if(control instanceof Element&&field.label)control.title=field.label;
     control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
-    return {label:family.short,key:family.key,tokens:family.tokens,control};
+    return {label:short,key:short.toLowerCase(),control};
   });
+  // The equation names the hovered segment's own variables, never
+  // lo/hi abstractions: T3 and T4 are its threshold levels, V3 and
+  // V4 their values, S3 its shape (the left stage's, like the game).
+  let segment=0;
+  const segmentFor=x=>{
+    const cuts=[0,1,2,3,4].map(i=>live(`stageMaxVal${i}`));
+    let found=0;
+    for(let i=0;i<4;i++)if(x>=cuts[i])found=i;
+    return Math.max(0,Math.min(3,found));
+  };
+  const segmentFormula=i=>LexeditorUI.mathFormula(
+    `V(x) = V${i+1} + (V${i+2} - V${i+1}) * ((x - T${i+1})/(T${i+2} - T${i+1}))^S${i+1}`,{variables});
   const ends=[0,1,2,3,4].map(i=>at(`stageMaxGrowVal${i}`));
   const floor=Math.min(0,...ends),ceil=Math.max(...ends);
   graph=curveEditor({title:row.name,overlayExtrema:true,variables,
     domain:{min:stages[0],max:stages[4]>stages[0]?stages[4]:stages[0]+1},
     range:{min:floor,max:ceil>floor?ceil:floor+1},
     graphLabel:`${row.name} from ${stages[0]} to ${stages[4]}`,evaluate,
-    formula:LexeditorUI.mathFormula("V(x) = V_lo + (V_hi - V_lo) * ((x - T_lo)/(T_hi - T_lo))^S",{variables})});
+    formula:segmentFormula(0),
+    onProbe:x=>{const next=segmentFor(x);if(next!==segment){segment=next;graph.refreshFormula(segmentFormula(next));}}});
+  // Hovering a drawer variable pulls a segment that names it into the
+  // equation, so the glow always lands in both places: T3 shows the
+  // T3-T4 segment, and cost fields (which no segment names) glow alone.
+  graph.querySelector(".lex-curve-variables")?.addEventListener("pointerover",event=>{
+    const entry=event.target.closest?.(".lex-curve-variable");
+    const key=entry?.dataset.curveVariable||"";
+    if(key[0]==="c")return;
+    const digit=Number(key.slice(-1));
+    if(!Number.isFinite(digit))return;
+    const next=Math.max(0,Math.min(3,digit-1));
+    if(next!==segment){segment=next;graph.refreshFormula(segmentFormula(next));}
+  });
   graph.dataset.curveRow=String(row.id);
   graph.curveEvaluate=evaluate;
-  host.append(graph);
-  // A lone graph fills its tab: no section header around the only content.
-  // Its guidance joins the panel help bubble instead.
-  const graphHelp="The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. On the line, T_lo and V_lo belong to the left stage, T_hi and V_hi to the right one. Edit every value from the variables drawer over the graph.";
+  // A lone graph fills its tab: no wrapper and no section header around
+  // the only content. Its guidance joins the panel help bubble instead.
+  const graphHelp="The line passes through every stage point and bends between them with the left stage's shape. A shape of 1 draws straight, a higher shape starts slow, and a negative shape starts fast. T1-T5 are the stage thresholds, V1-V5 their values, S1-S5 the shapes, C1-C4 the level-up cost fields. The equation names the hovered segment's own variables, each in its variable's color; hovering a variable in the drawer or the equation lights it in both. Edit every value from the variables drawer over the graph.";
   const panelHelp=typeof row.help==="string"&&row.help?`${row.help}\n\n${graphHelp}`:(row.help||graphHelp);
-  return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[host]});
+  return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[graph]});
+}
+function costDetail(actions,row,groups){
+  void groups;
+  const at=key=>Number(row.fields.find(item=>item.key===key)?.value??0);
+  let graph=null;
+  const live=key=>{
+    const input=graph?.querySelector(`input[data-field-key="${key}"]`);
+    const value=input?Number(input.value):NaN;
+    return Number.isFinite(value)?value:at(key);
+  };
+  // The community cubic, accurate level 12 and up. Only its cubic
+  // term is wired to the record: boundry_inclination_soul is 0.02 on
+  // the vanilla row, exactly the published cubic coefficient, while
+  // the other coefficients' sources are undocumented.
+  const price=level=>Math.round(live("boundry_inclination_soul")*Math.pow(level,3)+3.06*Math.pow(level,2)+105.6*level-895);
+  const names={init_inclination_soul:"C1",adjustment_value:"C2",boundry_inclination_soul:"C3",boundry_value:"C4"};
+  const variables=row.fields.filter(field=>names[field.key]).map(field=>{
+    const control=plainControlFor(row,field);
+    if(control instanceof Element&&field.label)control.title=field.label;
+    control.addEventListener?.("change",()=>{edits.then(()=>{graph?.refreshCurve?.();});});
+    return {label:names[field.key],key:names[field.key].toLowerCase(),control};
+  });
+  const floor=Math.floor(price(12)),ceil=Math.ceil(price(99));
+  graph=curveEditor({title:row.name,overlayExtrema:true,variables,
+    domain:{min:12,max:99},range:{min:floor,max:ceil>floor?ceil:floor+1},
+    graphLabel:`${row.name} from level 12 to 99`,evaluate:price,
+    formula:LexeditorUI.mathFormula("Souls(L) = C3*L^3 + 3.06*L^2 + 105.6*L - 895",{variables})});
+  graph.dataset.curveRow=String(row.id);
+  graph.curveEvaluate=price;
+  const graphHelp="Souls per level from the community cubic, accurate level 12 and up. Only the cubic term reads the record (C3); the other coefficients are fitted, because their sources are undocumented, so C1, C2 and C4 do not move the line. Edit every value from the variables drawer over the graph.";
+  const panelHelp=typeof row.help==="string"&&row.help?`${row.help}\n\n${graphHelp}`:(row.help||graphHelp);
+  return detailPanel({title:row.name,help:panelHelp,actions,paginate:{unpaged:true},body:[graph]});
 }
 function renderScriptDetail(){
   const info=state.scriptDetail;
@@ -2183,6 +2253,10 @@ function detail(){
   const msbRowEarly=tableEarly.endsWith(".msb");
   const meta=state.tab==="maps"&&state.row&&msbRowEarly?(state.row.kind==="Light"?`look ${state.row.preset}`:state.row.kind==="Message"?`message ${state.row.textId}`:`model ${state.row.model}`):state.tab==="animations"&&state.row?`${state.row.binder} · ${state.row.tae} · ${state.row.animName}`:"";
   const groups=fieldSections(state.row);
+  // Hit fields read slot by slot with a status line each, like the
+  // viewer, instead of the stored field-by-field order.
+  if((state.row.table==="AtkParam_Npc"||state.row.table==="AtkParam_Pc")&&groups.has("Hitbox"))
+    groups.set("Hitbox",hitboxGroupWithStatus(state.row,groups.get("Hitbox"),null));
   const eventRowEarly=state.tab==="animations"&&state.animScope.level==="events"&&String(state.row.id||"").startsWith("ev:");
   const paramRowEarly=!msbRowEarly&&!tableEarly.endsWith(".anibnd.dcx")&&state.row.table!=="NativeRules"&&state.row.table!=="Asset"&&state.row.table!=="MenuText";
   const rowActionsEarly=state.row.band?bandActions():eventRowEarly?taeActions():msbRowEarly?rowActionButtons(state.row.kind==="Light"?"light":state.row.kind==="Message"?"message":"placement"):paramRowEarly?rowActionButtons("record"):[];
@@ -2195,6 +2269,11 @@ function detail(){
       (examples?` Examples: ${examples}.`:" Ownership is unresolved.")+
       ` ${impact.bulletReferences.length} projectile records reference this attack ID; player and enemy contexts may differ.`+
       " Animation, script and effect calls are not fully traced, so this is a minimum impact estimate.";
+    // Each owner opens in the enemy viewer with this attack showing.
+    // Owners no list admits keep their names in the help bubble only.
+    const viewable=(impact.variants||[]).filter(entry=>entry.tab&&entry.sub);
+    if(viewable.length)groups.set("View on model",viewable.map(entry=>detailField({label:entry.name,
+      control:el("button",{type:"button",onclick:()=>openAttackViewer(entry,state.row.id).catch(notify)},"Open viewer")})));
     groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
       help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
@@ -2216,6 +2295,9 @@ const ds1PreviewAvailability=new Map();
 // The open enemy viewer's refresh, when one is open: undo and redo
 // repaint it instead of re-rendering the page out from under it.
 let chrDrawerRefresh=null,chrFieldsSeq=0;
+// An attack tab's viewer link: the enemy to open and the attack to
+// show once its detail lands. Consumed by the preview settle below.
+let pendingViewer=null,keepViewerPending=false;
 // Label kinds with equipment-screen art (icons.py); anything else keeps the
 // shared fallback glyph.
 const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
@@ -2319,7 +2401,7 @@ function ds1PreviewReason(panel,table,id,reason){
   heading.prepend(el("div",{class:"lex-detail-panel-icon",role:"img","aria-label":reason,title:reason,
     "data-lex-preview-state":"unavailable"},LexeditorUI.iconSlot({content:art})));
   heading.classList.remove("no-icon");
-  if(state.tab==="items"&&state.pagedView?.pinOwner){
+  if(state.pagedView?.pinOwner){
     const previewBox=heading.querySelector('.lex-detail-panel-icon');
     if(previewBox)LexeditorUI.attachPreviewPin(previewBox,state.pagedView.pinOwner,"icon","Icon");
   }
@@ -2341,7 +2423,12 @@ function ds1PreviewContent(target){
       if(stage.isConnected)message.replaceChildren(error.message||String(error));
     });
   };
-  if(target.kind==="chr")return chrDrawerContent(target);
+  if(target.kind==="chr"){
+    // A viewer link preselects its attack; the request is one-shot.
+    const attack=target.attackId;
+    delete target.attackId;
+    return chrDrawerContent(target,attack);
+  }
   if(!target.variants){show(target.url);return stage;}
   let picked=target.variants[0];
   // Dual-gender armor fits exactly two bodies, so the switch is one
@@ -2372,7 +2459,7 @@ function ds1PreviewContent(target){
 // preview open it here, and the Model tab stays only where no preview
 // opens. Hitbox timing is not shown: parameter links do not prove an
 // animation uses the attack, so no timeline can say when a slot strikes.
-async function chrDrawerContent(target){
+async function chrDrawerContent(target,initialAttack=null){
   const view=await api(`/api/chr/view?npc=${target.npc}`);
   const listHost=el("div",{class:"lex-chr-viewer-list"});
   const stageHost=el("div",{class:"lex-chr-viewer-stage"});
@@ -2380,7 +2467,7 @@ async function chrDrawerContent(target){
   const fieldsHost=el("div",{class:"lex-chr-viewer-fields"});
   const wrap=el("div",{class:"lex-chr-viewer"},listHost,
     el("div",{class:"lex-chr-viewer-main"},stageHost,status,fieldsHost));
-  let attackId=(view.attacks||[])[0]?.id??null;
+  let attackId=(view.attacks||[]).some(entry=>entry.id===initialAttack)?initialAttack:(view.attacks||[])[0]?.id??null;
   const renderList=()=>{listHost.replaceChildren(chrAttackList(view.attacks||[],attackId,pick));};
   // The drawer appends this content after the factory resolves, and the
   // stage refuses a detached host, so the first mount waits a frame.
@@ -2449,6 +2536,78 @@ function chrDummies(view){
 }
 // A slot's point field doubles as a drop target: a dropped model
 // point re-anchors the hitbox, and the viewer repaints on landing.
+// One hit slot's status line, shared by the Attacks tab and the enemy
+// viewer: live or idle, sphere or capsule, and which anchors it hangs
+// from. dummyIds names the viewed model's anchors when one is in view;
+// without it a slot can only say live or idle, never where it sits.
+function hitSlotText(slot,values,dummyIds){
+  const radius=Number(values.get(`hit${slot}_Radius`)??0);
+  const first=Number(values.get(`hit${slot}_DmyPoly1`)??-1);
+  const second=Number(values.get(`hit${slot}_DmyPoly2`)??-1);
+  const size=+Number(radius).toFixed(3);
+  if(!(radius>0))return `Idle: radius 0 strikes nothing.`;
+  if(!(first>=0))return `Idle: no anchor set.`;
+  const missing=anchor=>dummyIds&&!dummyIds.has(anchor);
+  if(missing(first))return `Live: sphere, radius ${size} m on anchor ${first}. That anchor is not on this body model.`;
+  if(second>=0&&second!==first){
+    if(missing(second))return `Live: sphere, radius ${size} m on anchor ${first}. Anchor ${second} is not on this body model.`;
+    return `Live: capsule, radius ${size} m from anchor ${first} to anchor ${second}.`;
+  }
+  return `Live: sphere, radius ${size} m on anchor ${first}.`;
+}
+function hitSlotOf(key){
+  const hit=/^hit(\d)_(Radius|DmyPoly1|DmyPoly2)$/.exec(key||"");
+  if(hit)return Number(hit[1]);
+  const priority=/^hti(\d)_Priority$/.exec(key||"");
+  return priority?Number(priority[1]):null;
+}
+// One slot's status row: the text plus the hooks an edit uses to
+// refresh it in place.
+function hitSlotStatusRow(slot,values,dummyIds){
+  const control=readonlyField(hitSlotText(slot,values,dummyIds),{format:false});
+  control.dataset.hitSlotStatus=String(slot);
+  if(dummyIds&&dummyIds.size)control.dataset.hitSlotDummies=[...dummyIds].join(",");
+  return detailField({label:`Hit ${slot}`,control});
+}
+// The Attacks tab stores hit fields field by field (every Size, then
+// every First point), while the viewer lays them slot by slot. One
+// ordering wins: each slot's status line, then that slot's own fields,
+// with the shared source select last.
+function hitboxGroupWithStatus(row,kids,dummyIds){
+  const values=new Map((row.fields||[]).map(field=>[field.key,field.value]));
+  const keyOf=kid=>kid.querySelector?.("[data-field-key]")?.dataset.fieldKey;
+  const buckets=[[],[],[],[]],rest=[];
+  for(const kid of kids){
+    const slot=hitSlotOf(keyOf(kid));
+    if(slot===null||slot<0||slot>3)rest.push(kid);
+    else buckets[slot].push(kid);
+  }
+  const out=[];
+  for(let slot=0;slot<4;slot++){
+    out.push(hitSlotStatusRow(slot,values,dummyIds));
+    out.push(...buckets[slot]);
+  }
+  out.push(...rest);
+  return out;
+}
+// A hit-slot edit moves that slot's status line in place, on the tab
+// and in the viewer, without rebuilding the panel out from under it.
+function syncHitSlotStatus(row){
+  const values=new Map((row.fields||[]).map(field=>[field.key,field.value]));
+  for(const node of document.querySelectorAll("[data-hit-slot-status]")){
+    const ids=node.dataset.hitSlotDummies;
+    node.value=hitSlotText(Number(node.dataset.hitSlotStatus),values,
+      ids?new Set(ids.split(",").map(Number)):null);
+  }
+}
+// An attack row's owners open in the enemy viewer with that attack
+// showing, instead of landing on the enemy and leaving the reader to
+// find the magnifier and then the attack in its list.
+async function openAttackViewer(variant,attackId){
+  pendingViewer={npc:variant.id,attack:attackId};
+  keepViewerPending=true;
+  await navigate(variant.tab,variant.sub,`NpcParam:${variant.id}`);
+}
 function hitboxPointDrop(shared,def){
   return el("span",{class:"ds1-hitbox-drop","data-point-field":def.key},shared);
 }
@@ -2489,8 +2648,11 @@ function dummyChipDrag(chip,attackRow,defs,afterEdit,dummyId){
 }
 function chrHitboxFields(attackRow,dummies,afterEdit){
   const defs=new Map((attackRow.fields||[]).map(field=>[field.key,field]));
+  const values=new Map((attackRow.fields||[]).map(field=>[field.key,field.value]));
+  const dummyIds=(dummies||[]).length?new Set(dummies.map(dummy=>dummy.id)):null;
   const body=[];
   for(let slot=0;slot<4;slot++){
+    body.push(hitSlotStatusRow(slot,values,dummyIds));
     for(const key of [`hit${slot}_Radius`,`hit${slot}_DmyPoly1`,`hit${slot}_DmyPoly2`]){
       const def=defs.get(key);
       if(!def)continue;
@@ -2513,9 +2675,14 @@ function chrHitboxFields(attackRow,dummies,afterEdit){
   if(dummies.length){
     const strip=el("div",{class:"ds1-dummy-strip",role:"list"});
     for(const dummy of dummies){
+      // The chip names where its anchor sits: bone and bind-pose
+      // position join the number, so a bare ID becomes a place.
+      const spot=(dummy.pos||[]).map(axis=>+Number(axis).toFixed(2)).join(", ");
+      const where=dummy.bone_name?` on ${dummy.bone_name}`:"";
+      const at=spot?` at (${spot})`:"";
       const chip=el("button",{type:"button",class:"ds1-dummy-chip",disabled:state.readOnly,
-        "data-dummy":String(dummy.id),"aria-label":`Model point ${dummy.id}`,
-        title:"Drag onto a slot's point field to move the hitbox there"},`#${dummy.id}`);
+        "data-dummy":String(dummy.id),"aria-label":`Model point ${dummy.id}${where}${at}`,
+        title:`Anchor ${dummy.id}${where}${at}. Drag onto a slot's point field to move the hitbox there`},`#${dummy.id}`);
       dummyChipDrag(chip,attackRow,defs,afterEdit,dummy.id);
       strip.append(chip);
     }
@@ -2554,7 +2721,11 @@ function armDs1Preview(panel,table,id){
   }
   const settle=target=>{
     if(!panel.isConnected||!target)return;
-    if(target.reason){ds1PreviewReason(panel,table,id,target.reason);return;}
+    // An attack's viewer link asked for this enemy: its drawer opens
+    // with that attack showing. Anything else drops the request.
+    const want=pendingViewer&&table==="NpcParam"&&Number(id)===pendingViewer.npc?pendingViewer:null;
+    if(want)pendingViewer=null;
+    if(target.reason){if(want)notify(target.reason);ds1PreviewReason(panel,table,id,target.reason);return;}
     const heading=panel.querySelector(':scope > .lex-detail-panel-heading');
     const existing=heading&&heading.querySelector('.lex-detail-panel-icon');
     let art=null;
@@ -2571,8 +2742,9 @@ function armDs1Preview(panel,table,id){
       openLabel:`View ${target.name}`,closeLabel:`Close ${target.name}`,
       content:()=>ds1PreviewContent(target),
       onClose:drawer=>{chrDrawerRefresh=null;window.Ds1Preview.stop(drawer);drawer.replaceChildren();delete window.__lexPreview;}});
+    if(want){target.attackId=want.attack;panel.lexModelPreview?.open();}
     const previewBox=heading&&heading.querySelector('.lex-detail-panel-icon');
-    if(previewBox&&state.tab==="items"&&state.pagedView?.pinOwner)
+    if(previewBox&&state.pagedView?.pinOwner)
       LexeditorUI.attachPreviewPin(previewBox,state.pagedView.pinOwner,"icon","Icon");
   };
   // Detail panels mount after detail() returns, so a cached answer settles
@@ -2583,9 +2755,14 @@ function armDs1Preview(panel,table,id){
 }
 function taeActions(){
   const disabled=state.readOnly||state.taeBusy||state.pending>0;
+  // The shared header-button style: boxed icon buttons with hover
+  // titles, like the bands header below. The accessible names stay
+  // put, so the add form and remove confirm open as before.
+  const addTitle=state.readOnly?"Open a mod project to add events":"Add an event to this motion";
+  const removeTitle=state.readOnly?"Open a mod project to remove events":"Remove the selected event";
   return [
-    el("button",{type:"button",disabled,"data-tae-action":"add",onclick:()=>beginTaeForm().catch(notify)},"Add event"),
-    el("button",{type:"button",disabled,"data-tae-action":"remove",onclick:()=>removeTaeEvent().catch(notify)},"Remove event")
+    el("button",{type:"button",class:"lex-header-icon","data-tae-action":"add",disabled,title:addTitle,"aria-label":"Add event",onclick:()=>beginTaeForm().catch(notify)},LexeditorUI.copyIcon()),
+    el("button",{type:"button",class:"lex-header-icon","data-tae-action":"remove",disabled,title:removeTitle,"aria-label":"Remove event",onclick:()=>removeTaeEvent().catch(notify)},LexeditorUI.removeIcon())
   ];
 }
 let taeEventTypes=null;
@@ -2760,7 +2937,7 @@ function renderItems(){
   if(state.tab==="maps")return renderMaps();
   if(state.tab==="animations")return renderAnimPanels();
   const misc=state.tab==="misc";
-  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="scripts"?"states":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="sound"?"sounds":ASSET_TABS.has(state.tab)?"files":"items";
+  const noun=misc?(state.sub==="encumbrance"?"bands":state.sub==="encumbrance-overrides"?"overrides":"stamina"):state.tab==="effects"?"effects":state.tab==="attacks"?(state.sub==="projectiles"?"projectiles":"attacks"):state.tab==="npcs"?(state.sub==="unowned-shops"?"shop lines":"NPCs"):state.tab==="drops"?"drops":state.tab==="ai"?(state.sub==="behaviors"?"behaviors":state.sub==="player-behaviors"?"player behaviors":"AI records"):state.tab==="enemies"?(state.sub==="bosses"?"bosses":"monsters"):state.tab==="text"?"labels":state.tab==="scripts"?"states":state.tab==="stats"?(state.sub==="levelup"?"gains":state.sub==="curves"?"curves":state.sub==="upgrade-materials"?"material sets":state.sub==="starting-classes"?"classes":state.sub==="starting-gifts"?"gifts":"upgrades"):state.tab==="sound"?"sounds":ASSET_TABS.has(state.tab)?"files":"items";
   const label=misc?"Misc.":state.tab==="effects"?"Effects":state.tab==="attacks"?"Attacks":state.tab==="animations"?"Animations":state.tab==="npcs"?"NPCs":state.tab==="drops"?"Drops":state.tab==="ai"?"AI":state.tab==="enemies"?"Enemies":state.tab==="text"?"Text":state.tab==="scripts"?"Scripts":state.tab==="stats"?"Stats":ASSET_TABS.has(state.tab)?ASSET_LABELS[state.tab]:"Items";
   // sortedRows owns this list's order (filter, name sort, meaningful-order tabs); the framework yields.
   const view=pagedListDetail({className:"ds1-records",rows:sortedRows(),key,selected:state.selected,slots:false,order:"given",noun,modOnly:modOnlySpec(),

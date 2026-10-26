@@ -712,6 +712,21 @@ def test_mods_detail_lists_changed_records(page):
     assert detail.locator(".lex-mod-contents .lex-pager").count() == 1
 
 
+def test_mods_detail_truncated_records_name_their_total(page):
+    mount(page)
+    page.evaluate("""() => { window.__modContents = {changes: [
+        {table: 'EquipParamGoods', id: 100, label: 'Fixture Stone', fields: ['Basic price'],
+         added: false, removed: false, before: null, after: null},
+        {table: 'EquipParamGoods', id: 101, label: 'Fixture Key', fields: ['Basic price'],
+         added: false, removed: false, before: null, after: null},
+      ], files: [], truncated: false, changesTruncated: true, totalChanges: 4752,
+      canDescribe: true, note: ''}; }""")
+    detail = _detail_tabs(page)
+    detail.locator(STRIP, has_text="Records").click()
+    detail.locator(".lex-mod-contents .lex-column-list").wait_for()
+    assert "Showing the first 2 of 4752 changes." in detail.locator(".lex-mod-contents").inner_text()
+
+
 def test_mods_detail_lists_files_with_loader_marks(page):
     mount(page)
     detail = _detail_tabs(page)
