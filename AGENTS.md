@@ -119,6 +119,13 @@ work, even if your tool does not load skills on its own.
 - No visible test windows during routine checks; headless is the default.
   Native window fixtures need Lexer's approval.
 
+## Done
+
+- Done means the user's literal ask is true and observed, not that tests
+  pass. Quote their words in the todo, verify against those words (a
+  screenshot viewed for anything visual), and never substitute a nearby
+  technical task for the ask.
+
 ## Disk and temporary files
 
 - The checkout holds source only. No `_scratch/`, `.pytest_cache`, `artifacts/`,
