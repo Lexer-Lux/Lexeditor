@@ -38,6 +38,13 @@ SPECS = {
 }
 
 
+def enable_loader(library, on=True):
+    """Switch the loader mod on or off, creating it on first use."""
+    folder = tweak_mods.ensure_loader_mod(Path(library))
+    data = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+    (folder / "mod.json").write_text(json.dumps({**data, "enabled": on}), encoding="utf-8")
+
+
 class LoaderTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="lexeditor-ds1-tweaks-")
@@ -63,6 +70,7 @@ class LoaderTests(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+        enable_loader(self.library)
 
     def enable(self, **switches):
         tweak_mods.save({mod_id: {"enabled": on} for mod_id, on in switches.items()}, self.library)
@@ -113,6 +121,7 @@ class LoaderTests(unittest.TestCase):
         # Reading the catalogue or saving switches does not install anything.
         tweak_mods.status(self.game, self.library)
         self.enable(alpha=False, beta=False)
+        enable_loader(self.library, False)
         self.assertEqual(self.files(), [exe_patches.EXECUTABLE])
         result = tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
@@ -122,31 +131,57 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual((self.game / tweak_mods.LOCK_FILE).read_bytes(), b"0")
         self.assertEqual((result["state"], result["applied"]), ("vanilla", []))
 
-    def test_debug_mode_installs_the_loader_even_with_no_tweak(self):
-        # Debug mode: Arxan off and no network, so a debugger can attach (#742).
-        # Apply installs that protected loader in every mode (PROTECTED_LOADER).
-        self.assertFalse(tweak_mods.status(self.game, self.library)["debugMode"])
-        tweak_mods.set_debug_mode(True, self.library)
-        status = tweak_mods.status(self.game, self.library)
-        self.assertEqual((status["debugMode"], status["debugInstalled"]), (True, False))
-        # With no tweak enabled the debug loader still goes in, with nothing to patch.
+    def test_the_loader_mod_installs_the_loader_even_with_no_tweak(self):
+        # The loader is an ordinary library mod (mod.json only): switching it
+        # on installs the protected loader (Arxan off, no network) even with
+        # no tweak enabled.
+        self.assertEqual(tweak_mods.loader_mod_state(self.library), (True, True))
         result = tweak_mods.apply(self.game, self.library)
         self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
         self.assertEqual(self.runtime(), b"")
-        self.assertTrue(result["debugInstalled"])
+        self.assertEqual(result["applied"], [])
         self.assertEqual(self.live.read_bytes(), VANILLA)
         # Tweaks ride along.
         self.enable(alpha=True)
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.runtime(), self.expected("alpha"))
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
-        # Off, then Apply: still the protected loader while a tweak is enabled.
-        tweak_mods.set_debug_mode(False, self.library)
+        # Off, with the last tweak: the loader goes away too.
+        self.enable(alpha=False)
+        enable_loader(self.library, False)
         result = tweak_mods.apply(self.game, self.library)
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
-        self.assertEqual((result["debugMode"], result["debugInstalled"]), (False, False))
-        with self.assertRaises(tweak_mods.TweakError):
-            tweak_mods.set_debug_mode("yes", self.library)
+        self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE]))
+        self.assertEqual(result["state"], "vanilla")
+
+    def test_a_removed_debug_flag_migrates_to_an_enabled_loader_mod(self):
+        fresh = self.temp / "fresh-library"
+        fresh.mkdir()
+        (fresh / tweak_mods.DEBUG_FILE).write_text(json.dumps({"debugMode": True}), encoding="utf-8")
+        folder = tweak_mods.ensure_loader_mod(fresh)
+        stored = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+        self.assertEqual((stored["id"], stored["enabled"], stored["order"]), ("lexeditor-loader", True, 0))
+        self.assertNotIn("script", stored)
+        self.assertFalse((fresh / tweak_mods.DEBUG_FILE).exists())
+
+    def test_build_specs_refuses_executable_patches_while_the_loader_is_off(self):
+        self.enable(alpha=True, beta=True)
+        enable_loader(self.library, False)
+        with self.assertRaisesRegex(tweak_mods.TweakError,
+                                    "Alpha and Beta require Lexeditor Loader, which is switched off"):
+            tweak_mods.build_specs(self.library)
+        stored = json.loads((self.library / "Alpha" / "mod.json").read_text(encoding="utf-8"))
+        self.assertNotIn("requires", stored)
+        enable_loader(self.library)
+        self.assertEqual(len(tweak_mods.build_specs(self.library)), 2)
+
+    def test_prepare_refuses_project_native_rules_while_the_loader_is_off(self):
+        enable_loader(self.library, False)
+        project = {"path": "mods/Native", "settingsHash": "ab" * 32, "spec": SPECS["alpha"]}
+        with self.assertRaisesRegex(tweak_mods.TweakError,
+                                    "Project native rules requires Lexeditor Loader, which is switched off"):
+            tweak_mods.prepare(self.game, self.library, project=project)
+        enable_loader(self.library)
+        plan = tweak_mods.prepare(self.game, self.library, project=project)
+        self.assertIsNotNone(plan["runtime"]["patch"])
 
     def test_enabled_tweak_builds_with_no_trust_step(self):
         self.enable(alpha=True)
@@ -179,10 +214,11 @@ class LoaderTests(unittest.TestCase):
                          "Apply and Restore retain the same lock inode")
         self.assertTrue(all(row["enabled"] for row in tweak_mods.tweak_rows(self.library)), "restore keeps the switches")
 
-    def test_turning_every_tweak_off_and_applying_removes_the_loader(self):
+    def test_turning_everything_off_and_applying_removes_the_loader(self):
         self.enable(alpha=True)
         tweak_mods.apply(self.game, self.library)
         self.enable(alpha=False)
+        enable_loader(self.library, False)
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE]))
@@ -316,6 +352,7 @@ class LayoutLoaderTests(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+        enable_loader(self.library)
 
     def enable(self, on=True):
         tweak_mods.save({"details": {"enabled": on}}, self.library)
@@ -444,6 +481,7 @@ class EsdLoaderTests(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+        enable_loader(self.library)
 
     def enable(self, on=True):
         tweak_mods.save({"scripts": {"enabled": on}}, self.library)

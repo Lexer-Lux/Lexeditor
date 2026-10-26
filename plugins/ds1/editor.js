@@ -4209,17 +4209,6 @@ function renderTweaks(){
   const installed=detailPanel({title:"INSTALLED GAME",
     help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. The loader switches the game's anti-tamper protection off and keeps the game offline, so a modded game never meets other players. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
-      // Debug mode: the game runs offline with Arxan off, so a debugger
-      // (Cheat Engine's "find what writes", x64dbg) can attach (#742).
-      detailField({label:"DEBUG MODE",dataType:"BOOL",
-        help:infoHelp("Installs Lexeditor's loader even when no tweak is on, for finding things in the running game with a debugger. The loader always switches the game's anti-debug protection (Arxan) off, so Cheat Engine or x64dbg can attach. While it is installed the game has no network access and cannot go online."),
-        control:el("input",{type:"checkbox",checked:!!status.debugMode,disabled:busy,"aria-label":"Debug mode",
-          onchange:event=>tweakRequest("/api/tweaks/debug",{on:event.target.checked},"Could not switch debug mode")})}),
-      !!status.debugMode!==!!status.debugInstalled?LexeditorUI.detailNote(state.readOnly
-        ?(status.debugMode?"Debug mode is on. Close the game, then press Play to install it.":"Debug mode is off. Close the game, then press Play to put the normal loader back.")
-        :(status.needsRebuild
-          ?(status.debugMode?"Debug mode is on. Save to install it.":"Debug mode is off. Save to put the normal loader back.")
-          :(status.debugMode?"Debug mode is on. It installs when you press Play.":"Debug mode is off. The normal loader returns when you press Play."))):null,
       (status.staleMods||[]).length?LexeditorUI.detailNote(state.readOnly
         ?"The enabled tweaks changed since the last build. Close the game, then press Play to rebuild them."
         :"The enabled tweaks changed since the last build. Save to rebuild them."):null,

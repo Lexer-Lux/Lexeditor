@@ -227,10 +227,15 @@ class Ds1ModAdapter:
     #: What the Mods tab and the mod selector show on a tweak mod that changed
     #: since the tweaks were last built. One line; the mark lists every flag.
     ALERT_CHANGED = "This mod changed since the last build."
+    #: What they show on an executable-patch mod while the loader mod is off:
+    #: its last-built native patches cannot install until the loader is on.
+    ALERT_NEEDS_LOADER = "Requires Lexeditor Loader, which is switched off."
+    ALERT_LOADER_MISSING = "Requires Lexeditor Loader, which is not installed."
 
     def alerts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
-        """Each given mod that changed since the last build, or whose
-        required mods are not installed and on, by folder, on or off."""
+        """Each given mod that changed since the last build, that patches the
+        executable while the loader is off, or whose required mods are not
+        installed and on, by folder, on or off."""
         wanted = {Path(path).resolve() for path in mods}
         try:
             stale = set(tweak_mods.needs_rebuild(Path(game_root), self._library()).get("stale", []))
@@ -246,6 +251,18 @@ class Ds1ModAdapter:
         for folder, need_lines in pending.items():
             if Path(folder) in wanted:
                 lines.setdefault(folder, []).extend(need_lines)
+        installed, enabled = tweak_mods.loader_mod_state(self._library())
+        if not enabled:
+            try:
+                rows = tweak_mods.tweak_rows(self._library())
+            except (ValueError, OSError, RuntimeError):
+                rows = []
+            line = self.ALERT_LOADER_MISSING if not installed else self.ALERT_NEEDS_LOADER
+            for row in rows:
+                folder = Path(row["path"])
+                if folder.resolve() in wanted and any(
+                        tweak_mods.native_spans(folder, row["name"]).values()):
+                    lines.setdefault(str(folder.resolve()), []).append(line)
         return lines
     def describe_changes(self, folder, game_root):
         """One mod's changed records and loaded files, for its detail panel.

@@ -672,7 +672,7 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/restore', '/api/tweaks/debug'):
+                            '/api/tweaks/save', '/api/tweaks/restore'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -828,12 +828,6 @@ class Handler(PluginRequestHandler):
                     result = tweak_mods.status(STORE.game_root)
                 elif path == '/api/tweaks/restore':
                     result = tweak_mods.restore(STORE.game_root)
-                elif path == '/api/tweaks/debug':
-                    # Takes effect at the next Save or Play.
-                    tweak_mods.set_debug_mode(payload.get('on'))
-                    if STORE.read_only:
-                        _deploy_tweaks_now()
-                    result = tweak_mods.status(STORE.game_root)
                 elif path == '/api/deployment/apply':
                     result = RULES.apply(STORE)
                 else:

@@ -57,6 +57,9 @@ def main():
         mod.mkdir()
         (mod / MARKER).touch()
         make_mod(library)
+        loader = tweak_mods.ensure_loader_mod(library)
+        data = json.loads((loader / "mod.json").read_text(encoding="utf-8"))
+        (loader / "mod.json").write_text(json.dumps({**data, "enabled": True}), encoding="utf-8")
         size, digest, closed = (exe_patches.VANILLA_SIZE, exe_patches.VANILLA_SHA256,
                                 tweak_mods.ensure_game_closed)
         exe_patches.VANILLA_SIZE = len(VANILLA)

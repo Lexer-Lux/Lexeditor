@@ -57,6 +57,13 @@ def record_of(game):
     return json.loads((Path(game) / tweak_mods.RUNTIME_RECORD).read_text(encoding="utf-8"))
 
 
+def enable_loader(library, on=True):
+    """Switch the loader mod on or off, creating it on first use."""
+    folder = tweak_mods.ensure_loader_mod(Path(library))
+    data = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+    (folder / "mod.json").write_text(json.dumps({**data, "enabled": on}), encoding="utf-8")
+
+
 @pytest.fixture
 def game(tmp_path, monkeypatch):
     root = tmp_path / "game"
@@ -73,6 +80,7 @@ def library(tmp_path):
     root = tmp_path / "library"
     make_mod(root, "alpha", "Alpha", SPECS["alpha"], enabled=True, order=10, values={"step": 1})
     make_mod(root, "beta", "Beta", SPECS["beta"], enabled=True, order=20, values={"step": 1})
+    enable_loader(root)
     return root
 
 
@@ -114,7 +122,7 @@ def api(game, library, monkeypatch, tmp_path):
 
 def test_a_fresh_apply_needs_no_rebuild_and_records_fingerprints(game, library):
     tweak_mods.apply(game, library)
-    assert tweak_mods.needs_rebuild(game, library) == {"needed": False, "stale": [], "debug": False, "set": False}
+    assert tweak_mods.needs_rebuild(game, library) == {"needed": False, "stale": [], "set": False}
     assert sorted(record_of(game)["built"]) == ["alpha", "beta"]
 
 
@@ -143,14 +151,6 @@ def test_restore_needs_no_rebuild_and_keeps_the_switches(game, library):
     tweak_mods.restore(game, library)
     assert tweak_mods.needs_rebuild(game, library)["needed"] is False
     assert sorted(row["id"] for row in tweak_mods.tweak_rows(library) if row["enabled"]) == ["alpha", "beta"]
-
-
-def test_a_debug_toggle_with_a_record_needs_a_rebuild_without_stale_mods(game, library):
-    tweak_mods.apply(game, library)
-    tweak_mods.set_debug_mode(True, library)
-    assert tweak_mods.needs_rebuild(game, library) == {"needed": True, "stale": [], "debug": True, "set": False}
-    tweak_mods.apply(game, library)
-    assert tweak_mods.needs_rebuild(game, library)["needed"] is False
 
 
 def test_a_record_from_before_fingerprints_needs_one_rebuild(game, library):
@@ -190,6 +190,29 @@ def test_the_adapter_flags_only_the_changed_mod(game, library):
     tweak_mods.save({"alpha": {"values": {"step": 2}}}, library)
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
         str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_CHANGED]}
+
+
+def test_the_adapter_flags_executable_mods_while_the_loader_is_off(game, library):
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    tweak_mods.apply(game, library)
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {}
+    enable_loader(library, False)
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
+        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER],
+        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER]}
+
+
+def test_the_adapter_flags_executable_mods_while_the_loader_is_missing(game, library):
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    tweak_mods.apply(game, library)
+    loader = tweak_mods.ensure_loader_mod(library)
+    (loader / "mod.json").unlink()
+    loader.rmdir()
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
+        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING],
+        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING]}
 
 
 def _require(library, folder, *needs):
