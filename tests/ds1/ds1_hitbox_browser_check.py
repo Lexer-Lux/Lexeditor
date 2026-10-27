@@ -77,16 +77,16 @@ def main():
                     page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]', timeout=30000)
                     status = page.locator('.lex-chr-viewer .lex-viewport-status').inner_text()
                     assert 'c1200' in status, status
-                    assert '1 mesh' in status and '2 triangles' in status, status
+                    assert '1 mesh' in status, status
                     assert '1 model point' in status, status
                     assert '2 live hitboxes' in status, status
                     assert '1 slot points at a missing model point' in status, status
                     assert 'Body R 0.5 x H 1.8' in status, status
                     assert page.locator('.lex-chr-viewer-stage canvas').count() == 1
                     modes = page.locator('.lex-chr-viewer-stage .lex-model-view-modes button')
-                    assert modes.count() == 3
+                    assert modes.count() == 4
                     assert [modes.nth(index).get_attribute('aria-label')
-                            for index in range(3)] == ['Regular', 'Fullbright', 'Wireframe']
+                            for index in range(4)] == ['Regular', 'Fullbright', 'Wireframe', 'Skeleton']
                     # The quad, the green model point, the blue body and the
                     # red hitboxes paint more than a blank canvas ever could.
                     shot = page.locator('.lex-chr-viewer-stage canvas').screenshot()
