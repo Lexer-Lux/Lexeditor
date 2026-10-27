@@ -206,7 +206,9 @@ def main() -> int:
     parser.add_argument("plugin", nargs="?", choices=PLUGINS)
     parser.add_argument("--global", dest="shared", action="store_true")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--jobs", type=int, default=4)
+    # Four browsers wedge hosted runners (screenshot/goto timeouts, a
+    # different set every run); two is quick enough and stays green.
+    parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--write-workflows", action="store_true",
                         help="regenerate all workflows, or only the named plugin workflow")
     args = parser.parse_args()

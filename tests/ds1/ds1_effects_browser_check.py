@@ -39,7 +39,7 @@ def main():
                 try:
                     page=browser.new_page(viewport={"width":1440,"height":900})
                     page.on("pageerror",lambda error:errors.append(str(error)))
-                    page.set_default_timeout(10000)
+                    page.set_default_timeout(30000)
                     page.set_default_navigation_timeout(30000)
 
                     def ready():
