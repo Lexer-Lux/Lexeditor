@@ -28,7 +28,7 @@ def game(tmp_path, monkeypatch):
     spec = exe_patches.validate({"version": 1, "hooks": [
         {"rva": HOOK_A, "original": "e800000000", "bytes": "9090909090"},
     ]}, "Synthetic fixture")
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda _root=None: [spec])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda _root=None, _game_root=None: [spec])
     # What an earlier Lexeditor left: the tweak built into the executable.
     built = exe_patches.compose(VANILLA, [spec])
     (root / exe_patches.EXECUTABLE).write_bytes(built)
