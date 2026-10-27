@@ -69,7 +69,13 @@ window.Ds1Viewport = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const canvas = renderer.domElement;
     canvas.dataset.viewport = "true";
-    const viewModes = LexeditorUI.modelViewModes(host);
+    // The stage renders on demand, not every frame: a continuous
+    // render loop burned a CPU core per open map (two concurrent
+    // SwiftShader viewports browned CI out), so every camera, data,
+    // mode, selection and size change below marks the frame dirty.
+    let dirty = true;
+    const requestRender = () => { dirty = true; };
+    const viewModes = LexeditorUI.modelViewModes(host, {onChange: requestRender});
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 10000);
     camera.position.set(0, 30, 60);
@@ -246,6 +252,7 @@ window.Ds1Viewport = (() => {
     let mapDiag = 0, skyDiag = 0;
     let canvasOn = false, fullyLoaded = false, userMoved = false, progress = null;
     controls.addEventListener("start", () => { userMoved = true; });
+    controls.addEventListener("change", requestRender);
     const MOVABLE = new Set([1, 2, 4, 9, 10]);
     const place = (group, part) => {
       group.position.set(part.pos[0], part.pos[1], part.pos[2]);
@@ -255,6 +262,7 @@ window.Ds1Viewport = (() => {
         movable: MOVABLE.has(Number(String(part.key).split(":")[0]))};
     };
     const frameCamera = () => {
+      requestRender();
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
@@ -277,6 +285,7 @@ window.Ds1Viewport = (() => {
       camera.updateProjectionMatrix();
     };
     const resize = () => {
+      requestRender();
       const width = host.clientWidth || 800, height = host.clientHeight || 520;
       renderer.setSize(width, height);
       camera.aspect = width / height;
@@ -314,6 +323,7 @@ window.Ds1Viewport = (() => {
         highlight.visible = true;
       } else highlight.visible = false;
       if (hooks.onSelect) hooks.onSelect(selected, group ? {...group.userData.part} : null);
+      requestRender();
     };
     let startPos = null, startRot = null, gizmoMode = "translate", spinStart = false;
     gizmo.addEventListener("dragging-changed", event => { controls.enabled = !event.value; });
@@ -328,11 +338,13 @@ window.Ds1Viewport = (() => {
       if (!selected) return;
       const group = groups.get(selected);
       highlight.setFromObject(group);
+      requestRender();
     });
     const snapBack = (group, back, backRot) => {
       group.position.copy(back);
       if (backRot) group.rotation.copy(backRot);
       highlight.setFromObject(group);
+      requestRender();
     };
     gizmo.addEventListener("mouseUp", () => {
       if (!selected || !startPos) return;
@@ -406,6 +418,7 @@ window.Ds1Viewport = (() => {
         offset.normalize().multiplyScalar(Math.min(Math.max(span * 2, 8), 24));
         controls.target.copy(target);
         camera.position.copy(target).add(offset);
+        requestRender();
         return true;
       },
       moveTo(key, pos) {
@@ -413,22 +426,26 @@ window.Ds1Viewport = (() => {
         if (!group || !group.userData.part.movable) return;
         group.position.set(pos[0], pos[1], pos[2]);
         if (key === selected) highlight.setFromObject(group);
+        requestRender();
       },
       turnTo(key, rot) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
         if (key === selected) highlight.setFromObject(group);
+        requestRender();
       },
       scaleTo(key, scale) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.scale.set(scale[0], scale[1], scale[2]);
         if (key === selected) highlight.setFromObject(group);
+        requestRender();
       },
       setGizmoMode(mode) {
         gizmoMode = mode === "rotate" ? "rotate" : "translate";
         gizmo.setMode(gizmoMode);
+        requestRender();
       },
       aim() { return [controls.target.x, controls.target.y, controls.target.z]; },
       dispose() { stop(host); }
@@ -460,6 +477,10 @@ window.Ds1Viewport = (() => {
     const loop = () => {
       if (!live || mine !== session || !host.isConnected) { stop(host); return; }
       controls.update();
+      // The ready gate needs two settled post-load frames; force them.
+      if (fullyLoaded && frames < 2) dirty = true;
+      if (!dirty) { requestAnimationFrame(loop); return; }
+      dirty = false;
       fitDepth();
       for (const mesh of skyMeshes) mesh.visible = mesh.userData.worldBox.containsPoint(camera.position);
       renderer.render(scene, camera);
@@ -555,6 +576,7 @@ window.Ds1Viewport = (() => {
       // Keep the growing scene framed unless the reader already took
       // the camera; the final frame still matches a full load exactly.
       if (!userMoved) frameCamera();
+      requestRender();
       return true;
     };
     // One request per batch of models instead of one per model; each

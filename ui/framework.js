@@ -3118,7 +3118,7 @@
       }
     });
   };
-  const modelViewModes = host => {
+  const modelViewModes = (host, options = {}) => {
     // Remounting clears the host (animationViewer.stop replaces its
     // children), which detaches the bar while the cached controller
     // survives. Re-attach it so the buttons - and the mode - persist.
@@ -3141,6 +3141,7 @@
       mode = next;
       paint();
       if (scene) applyModelViewMode(scene, mode);
+      if (typeof options.onChange === "function") options.onChange(mode);
     };
     const bar = element("div", {class: "lex-model-view-modes", role: "group", "aria-label": "View mode"},
       ...MODEL_VIEW_MODES.map(entry => {
@@ -3158,7 +3159,11 @@
       bar,
       mode: () => mode,
       setMode,
-      bindScene: next => { scene = next || null; if (scene) applyModelViewMode(scene, mode); },
+      bindScene: next => {
+        scene = next || null;
+        if (scene) applyModelViewMode(scene, mode);
+        if (scene && typeof options.onChange === "function") options.onChange(mode);
+      },
     };
     host.lexViewModes = controller;
     host.lexSetViewMode = setMode;
