@@ -16821,6 +16821,12 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const box=label.getBoundingClientRect(),css=getComputedStyle(label);
     const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
     if(labelTextOutside(label))return false;
+    // The two-line clamp lives inside the name box: the label can contain
+    // the box while the box cuts its third line ("Poise-break stagger" came
+    // out "Poise- / brea…"). A clamped name does not fit, so the sweep
+    // shrinks it or grows its lane instead of stopping early.
+    const nameText=label.querySelector(':scope > .lex-detail-field-label-text');
+    if(nameText&&(nameText.scrollHeight>nameText.clientHeight+1||nameText.scrollWidth>nameText.clientWidth))return false;
     const outsidePadding=[...label.children].some(child=>{
       const bounds=child.getBoundingClientRect();
       return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
@@ -16873,14 +16879,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // upward one the floor cap fixes.
     const shrunkWithRoom = (label, pane, cap) => label.style.fontSize
       && (parseFloat(pane?.style.getPropertyValue('--lex-detail-label-floor')) || 0) < cap - 1;
-    if (hint instanceof HTMLElement && fieldLabelScope(hint) === scope &&
-        !hint.parentElement?.classList.contains('lex-detail-field-stacked')) {
-      const base = fieldLabelBase(hint);
-      const hintPane = hint.closest('.lex-tweak-card-grid') || hint.parentElement?.parentElement;
-      const hintCap = (hint.parentElement?.clientWidth || 0) / 2;
-      if (!floorOver(hintPane, hintCap) && !shrunkWithRoom(hint, hintPane, hintCap)
-        && fitted.get(hint) === scopedFieldKey(hint, base) && labelFits(hint)) return;
-    }
+    // No hint-only shortcut: after a resize the first name can fit while a
+    // later one stays cut, and the hint alone let it stick. The scope-wide
+    // check below reads every label from the same layout, so judging them
+    // all costs nothing over judging one.
     // Narrow columns stack their fields by container query, without the
     // stacked class: the label spans the field instead of sharing the lane.
     // Those labels take no part in the lane fit - an inline label never
@@ -17005,10 +17007,19 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         const range = document.createRange(); range.selectNodeContents(nameText);
         const lines = [...range.getClientRects()].filter(box => box.width && box.height);
         const scale = nameText.getBoundingClientRect().width / (nameText.offsetWidth || 1) || 1;
-        if (lines.length > 1) hugs.push([nameText, Math.ceil(Math.max(...lines.map(box => box.width)) / scale) + 1]);
+        // Only two-line names hug: narrowing a name already on three
+        // lines freezes the narrow width and the clamp keeps the cut.
+        if (lines.length === 2) hugs.push([nameText, Math.ceil(Math.max(...lines.map(box => box.width)) / scale) + 1]);
       }
     }
     for (const [node, width] of hugs) node.style.width = `${width}px`;
+    // A hug that rewraps its name past the two-line clamp cuts it: the
+    // clamp lives inside the name box, which the label fit above cannot
+    // see ("Poise-break stagger" came out "Poise- / brea…"). Unhug those
+    // names; their help mark keeps the lane edge instead.
+    for (const [node] of hugs) {
+      if (node.scrollHeight > node.clientHeight + 1) node.style.width = "";
+    }
     for (const label of labels) {
       placeBooleanHelp(label);
       fitted.set(label, scopedFieldKey(label, base));

@@ -35,3 +35,37 @@ def test_wrapped_names_widen_the_lane_and_keep_full_size(page):
     assert all(label['size'] == 13 for label in labels), 'wrapping comes before shrinking'
     assert len({round(label['left']) for label in labels}) == 1, labels
     assert all(label['floor'] > 0 for label in labels), 'the lane widened for the wrapped names'
+
+
+def test_a_hugged_name_is_never_cut_by_the_clamp(page):
+    """A narrowed help-hug must not rewrap its name past two lines.
+
+    The hug narrowed "Poise-break stagger" to its longest line, which
+    rewrapped it to three lines the clamp cut ("Poise- / brea…"), and the
+    fit could not see it: the label contained the cut box just fine. The
+    narrow viewport forces the pile-up; widening must refit every name
+    whole, not just the first.
+    """
+    page.set_viewport_size({"width": 440, "height": 900})
+    framework(page)
+    page.evaluate("""() => {
+      const U = LexeditorUI, main = document.querySelector('main');
+      const field = label => U.detailField({label, showType: true, help: U.infoHelp('Help for ' + label),
+        control: U.el('input', {type: 'number', value: 3, min: 0, max: 10})});
+      const card = names => U.detailSection({title: 'BASICS', body: names.map(field)});
+      const grid = U.el('div', {class: 'lex-tweak-card-grid',
+        style: 'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;'});
+      grid.append(card(['HP', 'Effective HP', 'MP']),
+        card(['Stamina', 'Stamina recovery', 'Poise']),
+        card(['Poise recovery', 'Poise-break stagger', 'No bonfire reset']));
+      main.append(U.detailPanel({title: 'Stray Demon', body: [grid]}));
+    }""")
+    page.wait_for_timeout(800)
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.wait_for_timeout(1200)
+    state = page.evaluate("""() => [...document.querySelectorAll('.lex-detail-field-label-text')].map(text => ({
+      name: text.textContent,
+      cut: text.scrollHeight > text.clientHeight + 1 || text.scrollWidth > text.clientWidth,
+    }))""")
+    assert len(state) == 9, state
+    assert all(not row['cut'] for row in state), state
