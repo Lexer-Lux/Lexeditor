@@ -2,8 +2,8 @@
 
 Per the help-text skill: a field bubble runs three sentences at most, never
 repeats its label, and exists only where the label and control leave the
-reader guessing. Guard stats, model masks, phantom targeting and curve
-coefficients need one; ally checkboxes and the offline toggle do not.
+reader guessing. Guard stats, model masks, phantom targeting, the offline
+toggle and curve coefficients need one; ally checkboxes do not.
 """
 import re
 import sys
@@ -63,10 +63,16 @@ def test_guard_stats_explain_their_percentage():
 def test_model_masks_say_what_they_hide():
     fields = {entry["spec"].key: entry["spec"]
               for entry in schema("EquipParamProtector")["fields"]}
+    # Flags whose hidden body part is researched name it; the rest say so.
+    known = {0, 1, 2, 3, 4, 5, 6, 10, 11, 15, 20, 21, 25, 30}
     for index in range(48):
         description = fields["invisibleFlag%02d" % index].description
-        assert "Hides part of the worn body model" in description, index
-        assert "not documented" in description, index
+        if index in known:
+            assert description.startswith("Hides "), index
+            assert description.endswith(" while worn."), index
+        else:
+            assert description.startswith("Unknown. "), index
+            assert "hides part of the body" in description, index
 
 
 def test_effect_targets_need_no_bubble():
@@ -87,11 +93,13 @@ def test_phantom_targets_explain_who_they_touch():
     assert "red phantoms" in fields["effectTargetBlackGhost"].description
 
 
-def test_offline_toggle_has_a_label_not_a_bubble():
+def test_offline_toggle_explains_when_to_use_it():
     fields = {entry["spec"].key: entry["spec"]
               for entry in schema("EquipParamGoods")["fields"]}
     assert fields["disable_offline"].label == "Disable Offline"
-    assert fields["disable_offline"].description.strip() == ""
+    description = fields["disable_offline"].description
+    assert "offline blocks this item" in description
+    assert "need other players" in description
 
 
 def test_guard_stability_keeps_its_facts_short():
