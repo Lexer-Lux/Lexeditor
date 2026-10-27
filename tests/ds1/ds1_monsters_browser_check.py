@@ -381,7 +381,7 @@ def main():
                                            arg=think_id)
                     page.locator('[data-tab="items"]').click()
                     page.wait_for_function('state.tab==="items" && state.row?.table==="EquipParamGoods"')
-                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 8
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').count() == 9
                     monsters()
                     page.set_viewport_size({'width': 1000, 'height': 700})
                     search = page.get_by_role('searchbox', name='Search monsters')

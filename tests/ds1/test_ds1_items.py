@@ -49,6 +49,13 @@ def test_all_categories_noop_and_changed_roundtrip():
     assert document.dirty_count == len(set(changed))
 
 
+def test_shields_split_from_weapons_by_category():
+    document = ItemDocument(make_archive())
+    assert [row['id'] for row in document.list_rows('weapons')] == [100]
+    assert [row['id'] for row in document.list_rows('shields')] == [103]
+    assert [row['id'] for row in document.list_rows('ammo')] == [101, 102]
+
+
 def test_validation_and_bit_preservation():
     document = ItemDocument(make_archive())
     table = 'EquipParamGoods'

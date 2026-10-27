@@ -32,7 +32,7 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     for tab in ('spells', 'rings', 'upgrades', 'consumables', 'keys',
-                                    'weapons', 'armor', 'ammo'):
+                                    'weapons', 'shields', 'armor', 'ammo'):
                         page.locator(f'[data-subtab="{tab}"]').click()
                         page.wait_for_function('(tab)=>state.sub===tab && state.row && !state.error', arg=tab)
                         page.wait_for_timeout(200)

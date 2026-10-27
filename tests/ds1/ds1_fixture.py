@@ -16,7 +16,7 @@ def make_archive(table_ids=None, field_values=None):
         if table in OPTIONAL_TABLES and table not in table_ids:
             continue
         definition = schema(table)
-        ids = table_ids.get(table, [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102])
+        ids = table_ids.get(table, [120000, 120100, 251000, 223000, 321001, 502, 999999] if table == 'NpcParam' else [100, 101, 102, 103] if table == 'EquipParamWeapon' else [100, 101, 102])
         rows_start = 48 + len(ids) * 12
         data = bytearray(rows_start + len(ids) * size)
         struct.pack_into('<IHhhH', data, 0, len(data), rows_start, 0, version, len(ids))
@@ -29,7 +29,7 @@ def make_archive(table_ids=None, field_values=None):
             category = 'goodsType' if table == 'EquipParamGoods' else 'weaponCategory' if table == 'EquipParamWeapon' else None
             if category:
                 field = next(f['spec'] for f in definition['fields'] if f['spec'].key == category)
-                value = index if table == 'EquipParamGoods' else [0, 13, 14][index]
+                value = index if table == 'EquipParamGoods' else [0, 13, 14, 12][index]
                 row = write_field(row, field, value, '<')
             if table == 'NpcParam' and row_id in (251000, 321001):
                 field = next(f['spec'] for f in definition['fields'] if f['spec'].key == 'npcType')

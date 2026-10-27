@@ -46,8 +46,9 @@ SUBTABS = (
     ('consumables', 'Consumables', 'EquipParamGoods'),
     ('upgrades', 'Upgrade Items', 'EquipParamGoods'),
     ('keys', 'Key Items', 'EquipParamGoods'), ('spells', 'Spells', 'Magic'),
-    ('weapons', 'Weapons', 'EquipParamWeapon'), ('ammo', 'Ammo', 'EquipParamWeapon'),
-    ('armor', 'Armor', 'EquipParamProtector'), ('rings', 'Rings', 'EquipParamAccessory'),
+    ('weapons', 'Weapons', 'EquipParamWeapon'), ('shields', 'Shields', 'EquipParamWeapon'),
+    ('ammo', 'Ammo', 'EquipParamWeapon'), ('armor', 'Armor', 'EquipParamProtector'),
+    ('rings', 'Rings', 'EquipParamAccessory'),
 )
 FMG_SUBTABS = (
     ('fmg-conversation', 'Conversation', 'Conversation_.fmg'),
@@ -1380,8 +1381,9 @@ class ItemDocument:
                 # Spell records are edited through Magic, not duplicate inventory goods.
                 if category in (5, 6, 7): continue
             if table == 'EquipParamWeapon':
-                ammo = self.value(table, row.row_id, 'weaponCategory') in (13, 14)
-                if (tab == 'ammo') != ammo: continue
+                category = self.value(table, row.row_id, 'weaponCategory')
+                want = 'ammo' if category in (13, 14) else 'shields' if category == 12 else 'weapons'
+                if tab != want: continue
             if tab == 'unowned-shops' and _shops.has_owner(self, row.row_id):
                 continue
             values, display = self.row_values(table, row.row_id)

@@ -1,9 +1,9 @@
-"""Ammo's Defense panel tab groups its guard block under headers.
+"""Ammo's and shields' Defense panel tabs group their guard blocks.
 
-Weapons and ammo share the parameter table, but only ammo's Defense tab
-subdivides: the guard's own settings under Properties, the absorption
-under Defenses, the status guards under Resistances. Weapons keep the
-one flat list.
+Weapons, ammo and shields share the parameter table, but only the guard
+items' Defense tabs subdivide: the guard's own settings under Properties,
+the absorption under Defenses, the status guards under Resistances.
+Other weapons keep the one flat list.
 """
 import sys
 import tempfile
@@ -56,12 +56,16 @@ def main():
                     assert headers(page) == ['Properties', 'Defenses', 'Resistances'], headers(page)
                     fields = page.locator('.lex-tabbed-panel-content .lex-detail-field')
                     assert fields.count() == 19, fields.count()
+                    open_defense(page, 'shields')
+                    assert headers(page) == ['Properties', 'Defenses', 'Resistances'], headers(page)
+                    fields = page.locator('.lex-tabbed-panel-content .lex-detail-field')
+                    assert fields.count() == 19, fields.count()
                 finally:
                     browser.close()
         finally:
             session.stop()
         assert errors == [], errors
-        print('PASS: ammo Defense headers group the guard block; weapons stay flat')
+        print('PASS: ammo and shields Defense headers group the guard block; weapons stay flat')
 
 
 if __name__ == '__main__':

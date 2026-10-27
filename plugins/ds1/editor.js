@@ -450,7 +450,7 @@ function catalogSub(table,row){
     const category=value("goodsType");
     return category===1?"keys":category===2?"upgrades":[5,6,7].includes(category)?"spells":"consumables";
   }
-  if(table==="EquipParamWeapon")return [13,14].includes(value("weaponCategory"))?"ammo":"weapons";
+  if(table==="EquipParamWeapon"){const category=value("weaponCategory");return category===12?"shields":[13,14].includes(category)?"ammo":"weapons";}
   if(table==="EquipParamProtector")return "armor";
   if(table==="EquipParamAccessory")return "rings";
   if(table==="Magic")return "spells";
@@ -1628,18 +1628,19 @@ function monsterDetail(groups){
   return tabbedPanel({label:"Monster details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.monsterTab=id;render();},content});
 }
-// Ammo's Defense tab reads its guard block under three headers: the guard's
-// own settings, the damage it absorbs, the statuses it resists. Weapons
-// share the table but keep the one flat list. A field the table gains
-// later lands in Properties with the other settings.
-const AMMO_DEFENSE_HEADERS=[
+// Guard items read their Defense tab's guard block under three headers:
+// the guard's own settings, the damage it absorbs, the statuses it
+// resists. Ammo and shields share the weapon table; other weapons keep
+// the one flat list. A field the table gains later lands in Properties
+// with the other settings.
+const GUARD_DEFENSE_HEADERS=[
   ["Properties",["guardAngle","staminaGuardDef","guardmotionCategory","defenseBaseParry","guardBaseRepel","guardCutCancelRate","guardLevel","enableGuard"]],
   ["Defenses",["physGuardCutRate","magGuardCutRate","fireGuardCutRate","thunGuardCutRate","slashGuardCutRate","blowGuardCutRate","thrustGuardCutRate"]],
   ["Resistances",["poisonGuardResist","diseaseGuardResist","bloodGuardResist","curseGuardResist"]]];
-function ammoDefenseSections(fields){
-  const buckets=AMMO_DEFENSE_HEADERS.map(([title])=>[title,[]]);
+function guardDefenseSections(fields){
+  const buckets=GUARD_DEFENSE_HEADERS.map(([title])=>[title,[]]);
   for(const field of fields){
-    const at=AMMO_DEFENSE_HEADERS.findIndex(([,keys])=>keys.includes(field.dataset?.lexLayoutField));
+    const at=GUARD_DEFENSE_HEADERS.findIndex(([,keys])=>keys.includes(field.dataset?.lexLayoutField));
     buckets[at<0?0:at][1].push(field);
   }
   return buckets.filter(([,body])=>body.length).map(([title,body])=>detailSection({title,body}));
@@ -1662,8 +1663,8 @@ function itemDetail(groups){
   // overrides may have drained the remembered tab (or the record under it
   // changed), and the panel falls back to the first live tab.
   const content=(resolved,selected)=>{const body=groups.get(selected?.label);
-    return selected?.label==="Defense"&&state.row&&catalogSub(state.row.table,state.row)==="ammo"
-      ?ammoDefenseSections(body):body;};
+    return selected?.label==="Defense"&&state.row&&["ammo","shields"].includes(catalogSub(state.row.table,state.row))
+      ?guardDefenseSections(body):body;};
   return tabbedPanel({label:"Item details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.itemTab=id;render();},content});
 }

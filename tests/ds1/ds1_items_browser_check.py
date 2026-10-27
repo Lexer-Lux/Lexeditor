@@ -1,4 +1,4 @@
-"""Render all eight item lists and edit/save/reload copies, never game files."""
+"""Render all nine item lists and edit/save/reload copies, never game files."""
 import hashlib
 import json
 import os
@@ -154,9 +154,9 @@ def main():
                         '".lex-column-list .lex-list-row:not(.lex-filler-row)").length===full')
                     page.wait_for_function(restored, arg=full)
                     # Weapons and armor carry their upgrade paths on an Upgrades panel tab.
-                    for tab, owned in (('weapons', True), ('armor', False)):
+                    for tab, owned in (('weapons', True), ('shields', True), ('armor', False)):
                         page.locator(strip + f'[data-subtab="{tab}"]').click()
-                        page.wait_for_function('(tab)=>state.sub===tab && ((tab==="weapons" && state.row?.table==="EquipParamWeapon") || (tab==="armor" && state.row?.table==="EquipParamProtector"))', arg=tab)
+                        page.wait_for_function('(tab)=>state.sub===tab && (((tab==="weapons"||tab==="shields") && state.row?.table==="EquipParamWeapon") || (tab==="armor" && state.row?.table==="EquipParamProtector"))', arg=tab)
                         page.locator('.lex-tabbed-panel [data-subtab="upgrades"]').click()
                         page.wait_for_function('state.itemTab==="upgrades"')
                         keys = page.locator('.lex-tabbed-panel [data-field-key]').evaluate_all(
