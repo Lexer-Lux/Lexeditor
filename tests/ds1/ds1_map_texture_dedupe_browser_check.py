@@ -1,8 +1,8 @@
-"""Map viewport fetches each shared texture blob once per map.
+"""Map viewport fetches each shared texture blob once per batch.
 
-Nine fixture pieces wear the same diffuse bytes. Geometry loads
-in batches, each batch sending the content ids it already holds
-as known; responses omit those blobs but keep the id mapping,
+Nine fixture pieces wear the same diffuse bytes. The batch
+endpoint builds the known set across its own items, so repeats
+are omitted within the one request while keeping the id mapping,
 and the viewport rebuilds per-model dicts from the shared store
 so every model still renders textured. The urllib half pins the
 server contract, the browser half watches the wire.
@@ -57,13 +57,18 @@ def main():
         errors = []
         try:
             session.start()
-            base = session.url + '/api/map/geometry?map=m10_00_00_00.msb&model='
-            first = fetch(base + names[0])
+            base = session.url + '/api/map/geometries?map=m10_00_00_00.msb&models='
+            batch = fetch(base + ','.join(names[:2]))
+            first = batch['items'][names[0]]
             assert set(first['textures']) == {'tex0'}, sorted(first['textures'])
             assert set(first['texture_ids']) == {'tex0'}, first.get('texture_ids')
-            again = fetch(base + names[1] + '&known=' + first['texture_ids']['tex0'])
-            assert again['textures'] == {}, sorted(again['textures'])
-            assert again['texture_ids'] == first['texture_ids'], again.get('texture_ids')
+            second = batch['items'][names[1]]
+            assert second['textures'] == {}, sorted(second['textures'])
+            assert second['texture_ids'] == first['texture_ids'], second.get('texture_ids')
+            known = fetch(base + names[2] + '&known=' + first['texture_ids']['tex0'])
+            third = known['items'][names[2]]
+            assert third['textures'] == {}, sorted(third['textures'])
+            assert third['texture_ids'] == first['texture_ids'], third.get('texture_ids')
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True)
                 try:
@@ -72,7 +77,7 @@ def main():
                     wire = []
 
                     def on_response(response):
-                        if '/api/map/geometry' not in response.url:
+                        if '/api/map/geometries' not in response.url:
                             return
                         try:
                             wire.append((response.url, response.json()))
@@ -87,10 +92,13 @@ def main():
                                            timeout=120000)
                     page.wait_for_selector('[data-viewport-host][data-ready="true"]',
                                            timeout=120000)
-                    assert len(wire) == PIECES, len(wire)
-                    assert any('known=' in url for url, _ in wire), 'client sends no known ids'
-                    assert any(data['textures'] == {} and data['texture_ids']
-                               for _, data in wire), 'no response omitted a known blob'
+                    assert len(wire) == 1, len(wire)
+                    _, data = wire[0]
+                    items = data['items']
+                    assert set(items) == set(names), sorted(items)
+                    assert set(items[names[0]]['textures']) == {'tex0'}
+                    assert all(items[name]['textures'] == {} and items[name]['texture_ids']
+                               for name in names[1:]), 'no item omitted the repeated blob'
                     seam = page.evaluate(
                         "!!document.querySelector('[data-viewport-host]')._viewportScene")
                     assert seam, 'no viewport scene seam'
