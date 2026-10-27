@@ -158,6 +158,17 @@ placement `compose` does not offer (it moves nodes vertically only).
   0x88 = 1 unless `0x681EA0` says otherwise) and is what the item-use
   menu switch calls for the orange soapstone (`0x35A672`). It needs no
   item.
+- Item icons: the game copies an item icon onto a sprite (0x6B43E9 on):
+  `EDDFE0(handle, L"DIALOG_アイコンダイアログ")` finds the icon catalog the
+  menu scripts create (`1:1 ..., "Icon", ...`), `ED6020(catalog,
+  "EquIcon_%04d")` the icon's sprite, and on the two controls' shapes
+  (`0xEDBA60`, control +0x20) target vtable +0x30 takes source +0x68
+  (texture), +0x38 takes +0x70 (UV rectangle), +0x48 takes +0x78.
+  `0x52BC30(out {-1, row}, id)` gives a goods param row; iconId is +0x2C.
+- The inventory list: input at 0x6AD3D4 polls A (0x96) into `0x6AD5F0`
+  (decide) and B into `0x6ADA10` (back), both switching on `[+0x294]`. In
+  state 5 decide reads the row's inventory index (`+0x264` row, through the
+  vectors at `+0x270` and `+0x268`) and opens the item submenu (`0x6AEED0`).
 - `0x749310(inventory, index, delta, 1, 0, 1)` is the count change the
   inventory Use calls (`0x6AEA25`); an entry that reaches 0 leaves the
   inventory and its quick slot.
