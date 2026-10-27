@@ -60,6 +60,31 @@ def test_skeleton_maps_flver_bones_by_name(tmp_path):
     assert skel['map'] == [0]
 
 
+def game_with_model_only(tmp_path):
+    game = tmp_path / 'game'
+    (game / 'chr').mkdir(parents=True)
+    (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
+    return game
+
+
+def test_skeleton_without_binders_holds_bind_pose(tmp_path):
+    skel = anim.skeleton(game_with_model_only(tmp_path), None, 'c1200')
+    assert skel['hka'] == {'bones': [], 'parents': [], 'pose': []}
+    assert [bone['name'] for bone in skel['flver']] == ['root']
+    assert skel['map'] == [-1]
+
+
+def test_skeleton_without_model_is_empty(tmp_path):
+    skel = anim.skeleton(game_with_model_only(tmp_path), None, 'c9999')
+    assert skel == {'hka': {'bones': [], 'parents': [], 'pose': []},
+                    'flver': [], 'map': []}
+
+
+def test_list_anims_without_binders_is_an_error(tmp_path):
+    with pytest.raises(HkxError):
+        anim.list_anims(game_with_model_only(tmp_path), None, 'c1200')
+
+
 def test_anim_frames_sample_and_cue_events(tmp_path):
     game = game_with_chr(tmp_path)
     payload = anim.anim_frames(game, None, 'c1200', 'c1200.anibnd.dcx', 'a87_3300.hkx',

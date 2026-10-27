@@ -2632,36 +2632,266 @@ function ds1PreviewContent(target){
   return stage;
 }
 // The enemy viewer: the Model tab's contents merged into the magnifier
-// drawer - an attack list on the left, the stage, and the viewed
-// attack's hitbox fields under it. One viewer, not two: enemies with a
-// preview open it here, and the Model tab stays only where no preview
-// opens. Hitbox timing is not shown: parameter links do not prove an
-// animation uses the attack, so no timeline can say when a slot strikes.
+// drawer - an attack list on the left, the animated stage with its motion
+// picker and playback timeline in the middle, and the viewed attack's
+// hitbox fields in a panel on the right. One viewer, not two: enemies
+// with a preview open it here, and the Model tab stays only where no
+// preview opens. Hitbox timing is not shown: parameter links do not prove
+// an animation uses the attack, so no timeline can say when a slot strikes.
+// The enemy viewer's picked motion per enemy, kept while the page
+// lives: reopening the drawer replays the last motion, not the first.
+const chrAnimPick=new Map();
+// The enemy viewer shares three.js with the animation mount: one
+// import for every drawer, so overlay math never reloads the module.
+let chrThree=null;
+const chrThreeLib=async()=>chrThree||(chrThree=await import("three"));
+// The viewed body: the first working model, like the anchor chips.
+function chrViewed(view){
+  return (view?.chrs||[]).find(entry=>entry.available)||(view?.chrs||[])[0]||null;
+}
+function dist3(a,b){
+  return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+}
+// Dropping the overlay group: a remount drops it first, and the
+// animation mount drops it on dispose, so no GL buffers strand.
+function chrDropOverlays(stageHost){
+  const overlay=stageHost._chrOverlay;
+  stageHost._chrOverlay=null;
+  if(!overlay)return;
+  if(overlay.group.parent)overlay.group.parent.remove(overlay.group);
+  for(const item of overlay.trash)item.dispose?.();
+}
+// Re-seating the overlays on the live bones after every pose: anchored
+// points follow their bone, unattached ones sit at rest, and the body
+// capsule follows the root sideways while staying vertical.
+function chrPositionOverlays(stageHost,bones){
+  const overlay=stageHost._chrOverlay;
+  if(!overlay)return;
+  if(bones&&bones.length&&overlay.bonesRef!==bones){
+    overlay.bonesRef=bones;
+    overlay.byName=new Map(bones.map(bone=>[bone.name,bone]));
+  }
+  const place=(mesh,dummy)=>{
+    const bone=dummy.bone_name?overlay.byName.get(dummy.bone_name):null;
+    if(bone)bone.getWorldPosition(mesh.position);
+    else mesh.position.set(dummy.pos[0],dummy.pos[1],dummy.pos[2]);
+  };
+  for(const item of overlay.items){
+    if(!item.capsule){place(item.mesh,item.dummy);continue;}
+    const boneA=item.a.bone_name?overlay.byName.get(item.a.bone_name):null;
+    const boneB=item.b.bone_name?overlay.byName.get(item.b.bone_name):null;
+    if(boneA)boneA.getWorldPosition(item.tmpA);else item.tmpA.set(item.a.pos[0],item.a.pos[1],item.a.pos[2]);
+    if(boneB)boneB.getWorldPosition(item.tmpB);else item.tmpB.set(item.b.pos[0],item.b.pos[1],item.b.pos[2]);
+    item.mesh.position.set((item.tmpA.x+item.tmpB.x)/2,(item.tmpA.y+item.tmpB.y)/2,(item.tmpA.z+item.tmpB.z)/2);
+    item.tmpD.copy(item.tmpB).sub(item.tmpA);
+    if(item.tmpD.lengthSq()>1e-12)item.mesh.quaternion.setFromUnitVectors(overlay.up,item.tmpD.normalize());
+  }
+  if(overlay.bodyMesh){
+    const root=overlay.bonesRef?overlay.bonesRef[0]:null;
+    if(root){
+      root.getWorldPosition(overlay.scratch);
+      overlay.bodyMesh.position.set(overlay.scratch.x,
+        overlay.scratch.y+(overlay.body.offset||0)+overlay.body.height/2,overlay.scratch.z);
+    }else overlay.bodyMesh.position.set(0,(overlay.body.offset||0)+overlay.body.height/2,0);
+  }
+}
+// Hitbox overlays on the animated stage: green dots on the viewed
+// attack's anchors, red spheres and capsules on its live slots, and
+// the body's blue capsule. Only the dummies the viewed attack's slots
+// name light up; a slot that names a point the model lacks is
+// reported, not drawn. Rest seating is static; the first pose re-seats
+// everything live.
+async function chrBuildOverlays(stageHost,view,attackId){
+  const scene=stageHost._animScene?stageHost._animScene():null;
+  if(!scene)return null;
+  const THREE=await chrThreeLib();
+  chrDropOverlays(stageHost);
+  const chr=chrViewed(view);
+  const byId=new Map((chr?.dummies||[]).map(dummy=>[dummy.id,dummy]));
+  const attack=(view.attacks||[]).find(entry=>entry.id===attackId);
+  const wanted=new Set();
+  for(const slot of attack?.slots||[]){
+    if(typeof slot.first==="number")wanted.add(slot.first);
+    if(slot.shape==="capsule"&&typeof slot.second==="number")wanted.add(slot.second);
+  }
+  const shown=[...byId].filter(([id])=>wanted.has(id));
+  const body=view.body||{};
+  const group=new THREE.Group();
+  const items=[];
+  const trash=[];
+  const dotGeo=new THREE.SphereGeometry(body.height>0?Math.max(body.height*0.004,0.005):0.01,8,8);
+  const dotMat=new THREE.MeshBasicMaterial({color:0x44dd66});
+  const hitMat=new THREE.MeshBasicMaterial({color:0xff5533,transparent:true,opacity:0.4,depthWrite:false});
+  trash.push(dotGeo,dotMat,hitMat);
+  for(const [,dummy] of shown){
+    const dot=new THREE.Mesh(dotGeo,dotMat);
+    group.add(dot);
+    items.push({mesh:dot,dummy});
+  }
+  let live=0,missing=0;
+  for(const slot of attack?.slots||[]){
+    if(!slot.active)continue;
+    const a=byId.get(slot.first);
+    if(!a){missing++;continue;}
+    const b=slot.shape==="capsule"?byId.get(slot.second):null;
+    if(slot.shape==="capsule"&&b&&dist3(a.pos,b.pos)>1e-6){
+      const geo=new THREE.CapsuleGeometry(slot.radius,dist3(a.pos,b.pos),8,16);
+      trash.push(geo);
+      const mesh=new THREE.Mesh(geo,hitMat);
+      group.add(mesh);
+      items.push({mesh,capsule:true,a,b,tmpA:new THREE.Vector3(),tmpB:new THREE.Vector3(),tmpD:new THREE.Vector3()});
+    }else{
+      if(slot.shape==="capsule")missing++;
+      const geo=new THREE.SphereGeometry(slot.radius,16,12);
+      trash.push(geo);
+      const mesh=new THREE.Mesh(geo,hitMat);
+      group.add(mesh);
+      items.push({mesh,dummy:a});
+    }
+    live++;
+  }
+  let bodyMesh=null;
+  if(body.radius>0&&body.height>0){
+    const geo=new THREE.CapsuleGeometry(body.radius,Math.max(body.height-body.radius*2,0),8,16);
+    const mat=new THREE.MeshBasicMaterial({color:0x3388ff,transparent:true,opacity:0.3,depthWrite:false});
+    trash.push(geo,mat);
+    bodyMesh=new THREE.Mesh(geo,mat);
+    group.add(bodyMesh);
+  }
+  scene.add(group);
+  const liveNames=new Set(stageHost._animBones?stageHost._animBones().map(bone=>bone.name):[]);
+  const used=new Set();
+  for(const slot of attack?.slots||[]){
+    if(!slot.active)continue;
+    if(typeof slot.first==="number")used.add(slot.first);
+    if(slot.shape==="capsule"&&typeof slot.second==="number")used.add(slot.second);
+  }
+  let staticCount=0;
+  for(const id of used){
+    const dummy=byId.get(id);
+    if(dummy&&!(dummy.bone_name&&liveNames.has(dummy.bone_name)))staticCount++;
+  }
+  stageHost._chrOverlay={group,items,bodyMesh,body,trash,
+    bonesRef:null,byName:new Map(),scratch:new THREE.Vector3(),up:new THREE.Vector3(0,1,0)};
+  stageHost.dataset.dots=String(shown.length);
+  chrPositionOverlays(stageHost,null);
+  return {live,missing,static:staticCount};
+}
+// The stage's status line: what model shows, what the viewed attack
+// strikes with, and the body's size. The mount's own problem rides
+// along, so an unreadable motion still explains itself.
+function chrWriteSummary(status,view,attackId,counts,mountProblem){
+  const chr=chrViewed(view);
+  if(!chr)return;
+  const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
+  const short=n=>+Number(n).toFixed(3);
+  const attack=(view.attacks||[]).find(entry=>entry.id===attackId);
+  const body=view.body||{};
+  let text=`${chr.id}: ${plural(chr.meshes??0,"mesh","meshes")}, ${plural(chr.dummies?.length??0,"model point","model points")}. `;
+  text+=attack?`Attack "${attack.name}": ${plural(counts.live,"live hitbox","live hitboxes")}`:"No linked attack";
+  if(counts.missing)text+=`, ${plural(counts.missing,"slot points","slots point")} at a missing model point`;
+  if(counts.static)text+=`, ${plural(counts.static,"anchor sits","anchors sit")} at rest`;
+  text+=body.radius>0&&body.height>0?` Body R ${short(body.radius)} x H ${short(body.height)}.`:".";
+  if((view.chrs||[]).length>1)text+=` Also wears ${(view.chrs||[]).filter(entry=>entry.id!==chr.id).map(entry=>entry.id).join(", ")}.`;
+  status.textContent=text+(mountProblem?` ${mountProblem}`:"");
+}
 async function chrDrawerContent(target,initialAttack=null){
   const view=await api(`/api/chr/view?npc=${target.npc}`);
   const listHost=el("div",{class:"lex-chr-viewer-list"});
+  const pickerRow=el("div",{class:"lex-chr-viewer-picker"});
   const stageHost=el("div",{class:"lex-chr-viewer-stage"});
+  const timelineHost=el("div",{class:"lex-chr-viewer-timeline"});
   const status=el("div",{class:"lex-viewport-status"});
   const fieldsHost=el("div",{class:"lex-chr-viewer-fields"});
   const wrap=el("div",{class:"lex-chr-viewer"},listHost,
-    el("div",{class:"lex-chr-viewer-main"},stageHost,status,fieldsHost));
+    el("div",{class:"lex-chr-viewer-main"},pickerRow,stageHost,timelineHost,status),fieldsHost);
   let attackId=(view.attacks||[]).some(entry=>entry.id===initialAttack)?initialAttack:(view.attacks||[])[0]?.id??null;
   const renderList=()=>{listHost.replaceChildren(chrAttackList(view.attacks||[],attackId,pick));};
   // The drawer appends this content after the factory resolves, and the
   // stage refuses a detached host, so the first mount waits a frame.
   // Nothing mounted means nothing to stand on: the stage hides instead
-  // of leaving a black hole, and the attack list and hitboxes below
-  // stay. The generation pins the decision to the latest mount, so a
-  // slow mount cannot hide its replacement's canvas.
+  // of leaving a black hole, and the attack list and hitbox panel stay.
+  // The generation pins every decision to the latest mount, so a slow
+  // mount cannot hide its replacement's canvas or seat stale overlays.
   let stageGen=0;
+  let anims=null,animsFor=null,animsError="";
+  let mountProblem="";
+  let mountedFile=null;
+  const motionOf=()=>{
+    const select=pickerRow.querySelector("select");
+    const file=select?select.value:chrAnimPick.get(target.npc);
+    const entries=anims||[];
+    return entries.find(entry=>entry.file&&entry.file===file)
+      ||entries.find(entry=>entry.file&&entry.available!==false)
+      ||entries.find(entry=>entry.file)||null;
+  };
+  const renderPicker=()=>{
+    const chr=chrViewed(view);
+    if(!chr||!chr.available){pickerRow.replaceChildren();return;}
+    if(anims===null){pickerRow.replaceChildren(LexeditorUI.loadingStatus("Reading animations"));return;}
+    if(!anims.length){pickerRow.replaceChildren(LexeditorUI.detailNote(
+      animsError?`No animations: ${animsError}.`:"No animations are installed for this model."));return;}
+    const select=el("select",{class:"lex-chr-viewer-motion","aria-label":"Animation"},
+      ...anims.map(entry=>el("option",{value:entry.file||""},
+        `${entry.file||"(no file)"}${entry.frames?` — ${entry.frames} frames`:""}${entry.available===false?" (unavailable)":""}`)));
+    const current=motionOf()?.file;
+    if(current)select.value=current;
+    // A picked motion remounts once: input and change both fire for one
+    // pick where both arrive, and input alone arrives in vanilla, where
+    // change events on selects never reach their listeners. A value the
+    // stage already plays is a no-op, so the second event lands silent.
+    const repick=()=>{
+      if(select.value===(mountedFile??false)&&stageHost.querySelector("canvas"))return;
+      chrAnimPick.set(target.npc,select.value);
+      renderStage();
+    };
+    select.addEventListener("input",repick);
+    select.addEventListener("change",repick);
+    pickerRow.replaceChildren(el("span",{class:"lex-chr-viewer-motion-label"},"Animation"),
+      infoHelp("Motions from this model's animation binder. Pick one to pose the model; hitbox timing is not shown, because parameters do not prove an animation uses the attack."),
+      select);
+  };
+  const renderOverlays=async ()=>{
+    try{
+      const counts=await chrBuildOverlays(stageHost,view,attackId);
+      if(!wrap.isConnected)return;
+      if(counts)chrWriteSummary(status,view,attackId,counts,mountProblem);
+    }catch(error){if(wrap.isConnected)notify(error);}
+  };
   const renderStage=async ()=>{
     const gen=++stageGen;
     stageHost.hidden=false;
+    timelineHost.replaceChildren();
+    const chr=chrViewed(view);
+    if(!chr||!chr.available){
+      pickerRow.replaceChildren();
+      mountProblem="";
+      status.textContent=!chr?`${view.name}: no placed character model.`
+        :`${view.name}: ${chr.id} — ${chr.reason||"model unavailable"}.`;
+      stageHost.hidden=true;
+      return;
+    }
+    if(animsFor!==chr.id){
+      anims=null;animsFor=chr.id;animsError="";
+      renderPicker();
+      try{anims=(await api(`/api/anim/list?chr=${encodeURIComponent(chr.id)}`)).anims||[];}
+      catch(error){anims=[];animsError=error.message||String(error);}
+      if(gen!==stageGen||!wrap.isConnected)return;
+      renderPicker();
+    }
     await new Promise(request=>requestAnimationFrame(request));
-    if(!stageHost.isConnected)return;
-    await Ds1Viewport.mountChr(stageHost,view,attackId,status)
-      .catch(error=>{status.textContent=error.message||String(error);});
-    if(gen===stageGen&&!stageHost.querySelector("canvas"))stageHost.hidden=true;
+    if(gen!==stageGen||!stageHost.isConnected)return;
+    chrDropOverlays(stageHost);
+    mountedFile=null;
+    const motion=motionOf();
+    await Ds1Anim.mount(stageHost,chr.id,motion,timelineHost,status,null,
+        {afterPose:posed=>chrPositionOverlays(stageHost,posed),onDispose:()=>chrDropOverlays(stageHost)})
+      .catch(error=>{if(gen===stageGen)status.textContent=error.message||String(error);});
+    if(gen!==stageGen||!stageHost.isConnected)return;
+    if(!stageHost.querySelector("canvas")){stageHost.hidden=true;return;}
+    mountedFile=motion?.file??null;
+    mountProblem=status.textContent.trim();
+    await renderOverlays();
   };
   const renderFields=async ()=>{
     if(attackId==null){fieldsHost.replaceChildren();return;}
@@ -2684,14 +2914,18 @@ async function chrDrawerContent(target,initialAttack=null){
   };
   const refresh=async ()=>{
     if(!wrap.isConnected){chrDrawerRefresh=null;return false;}
+    const before=chrViewed(view)?.id;
     const fresh=await api(`/api/chr/view?npc=${target.npc}`);
     Object.assign(view,fresh);
     if(!(view.attacks||[]).some(entry=>entry.id===attackId))attackId=(view.attacks||[])[0]?.id??null;
-    renderList();await renderStage();await renderFields();
+    renderList();
+    if(chrViewed(view)?.id!==before){animsFor=null;await renderStage();}
+    else await renderOverlays();
+    await renderFields();
     return true;
   };
   const refreshSoon=()=>{edits.then(refresh).catch(()=>{});};
-  const pick=id=>{if(id===attackId)return;attackId=id;renderList();renderStage();renderFields();};
+  const pick=id=>{if(id===attackId)return;attackId=id;renderList();renderOverlays();renderFields();};
   chrDrawerRefresh=refresh;
   renderList();renderStage();renderFields();
   return wrap;
@@ -2709,8 +2943,7 @@ function chrAttackList(attacks,selectedId,onPick){
 }
 // The viewed model's anchor points: hitbox drop targets read them.
 function chrDummies(view){
-  const chrs=view?.chrs||[];
-  return (chrs.find(entry=>entry.available)||chrs[0])?.dummies||[];
+  return chrViewed(view)?.dummies||[];
 }
 // A slot's point field doubles as a drop target: a dropped model
 // point re-anchors the hitbox, and the viewer repaints on landing.

@@ -21,7 +21,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tests' / 'ds1'))
 from ds1_fixture import make_archive  # noqa: E402
 from flver_fixture import build_flver, make_chrbnd  # noqa: E402
+from hkx_fixture import build_tag0  # noqa: E402
 from msb_fixture import build_msb  # noqa: E402
+from tae_fixture import build_anibnd  # noqa: E402
 from plugins.ds1.msb import MAP_DIR  # noqa: E402
 from plugins.ds1.store import MARKER, RELATIVE  # noqa: E402
 from plugins.ds1.plugin import DS1Session  # noqa: E402
@@ -103,6 +105,9 @@ def drawer_session(temp, field_values=None):
     (game / 'chr' / 'c1200.chrbnd.dcx').write_bytes(make_chrbnd(build_flver()))
     (game / 'chr' / 'c0000.chrbnd.dcx').write_bytes(
         make_chrbnd(build_flver(mesh_count=0), stem='c0000'))
+    (game / 'chr' / 'c1200.anibnd.dcx').write_bytes(build_anibnd({
+        'Skeleton.hkx': build_tag0(), 'a00_1000.hkx': build_tag0(),
+        'a00_1001.hkx': build_tag0()}))
     mod.mkdir()
     (mod / MARKER).touch()
     return DS1Session({'LEXEDITOR_DS1_ROOT': str(game),
@@ -137,7 +142,7 @@ def test_drawer_lists_attacks_and_edits_hitboxes():
                     page.wait_for_selector('.lex-chr-viewer')
                     rows = page.locator('.lex-chr-viewer-list .lex-list-row')
                     assert rows.count() >= 1, rows.count()
-                    field = page.locator('.lex-chr-viewer-fields input').first
+                    field = page.locator('.lex-chr-viewer-fields [data-field-key="hit0_Radius"]')
                     field.wait_for()
                     assert attack_radius(page) == 0
                     field.fill('2.5')
@@ -149,7 +154,7 @@ def test_drawer_lists_attacks_and_edits_hitboxes():
                     page.wait_for_function(
                         'fieldHistory.undoStack.length === 0 && fieldHistory.redoStack.length === 1')
                     page.wait_for_function(
-                        "document.querySelector('.lex-chr-viewer-fields input').value === '0'")
+                        "document.querySelector('.lex-chr-viewer-fields [data-field-key=\"hit0_Radius\"]').value === '0'")
                     assert attack_radius(page) == 0
                     assert page.locator('.lex-chr-viewer').count() == 1
                     assert not errors, errors
@@ -196,12 +201,83 @@ def test_armor_assembled_npc_with_attacks_opens_attack_drawer():
                     names = page.locator('.lex-chr-viewer-list .lex-list-row').all_inner_texts()
                     assert len(names) == 1, names
                     assert 'NPC_test2' in names[0], names
-                    field = page.locator('.lex-chr-viewer-fields input').first
+                    field = page.locator('.lex-chr-viewer-fields [data-field-key="hit0_Radius"]')
                     assert field.input_value() == '0.5'
                     shot = page.locator('.lex-chr-viewer-stage canvas').screenshot()
                     colors = Image.open(io.BytesIO(shot)).convert('RGB').getcolors(maxcolors=1 << 20)
                     count = 'many' if colors is None else len(colors)
                     assert colors is None or len(colors) > 8, f'hitbox canvas blank ({count} colors)'
+                    assert not errors, errors
+                finally:
+                    browser.close()
+        finally:
+            session.stop()
+
+
+def test_drawer_motion_picker_drives_shared_transport():
+    errors = []
+    with tempfile.TemporaryDirectory(prefix='lexeditor-ds1-npc-transport-') as folder:
+        session = drawer_session(folder)
+        session.start()
+        try:
+            with sync_playwright() as play:
+                browser = play.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+                    page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.goto(session.url)
+                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
+                    page.evaluate("navigate('npcs','npcs')")
+                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    select(page, 'NpcParam', 251000)
+                    page.wait_for_selector('.lex-model-preview-trigger')
+                    page.locator('.lex-model-preview-trigger').click()
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]',
+                                           timeout=30000)
+                    boxes = page.evaluate("""() => {
+                        const box = sel => {
+                            const r = document.querySelector(sel).getBoundingClientRect();
+                            return {x: r.x, y: r.y, w: r.width, h: r.height};
+                        };
+                        return {list: box('.lex-chr-viewer-list'),
+                                main: box('.lex-chr-viewer-main'),
+                                fields: box('.lex-chr-viewer-fields')};
+                    }""")
+                    assert boxes['list']['x'] < boxes['main']['x'] < boxes['fields']['x']
+                    assert abs(boxes['list']['y'] - boxes['main']['y']) <= 1
+                    assert abs(boxes['main']['y'] - boxes['fields']['y']) <= 1
+                    assert abs(boxes['list']['h'] - boxes['main']['h']) <= 1
+                    motion = page.locator('.lex-chr-viewer-motion')
+                    assert motion.locator('option').count() == 2
+                    labels = page.evaluate(
+                        '[...document.querySelectorAll(".lex-chr-viewer-timeline button")]'
+                        '.map(button => button.getAttribute("aria-label"))')
+                    for name in ('Go to animation start', 'Back one frame',
+                                 'Play or pause', 'Forward one frame',
+                                 'Go to animation end'):
+                        assert name in labels, labels
+                    timeline = page.locator('.lex-chr-viewer-timeline')
+                    assert '/' in timeline.inner_text()
+                    timeline.get_by_role('button', name='Play or pause').click()
+                    page.wait_for_timeout(300)
+                    slider = timeline.locator('input[type="range"]')
+                    maximum = int(slider.get_attribute('max'))
+                    assert maximum >= 2
+                    slider.fill(str(maximum))
+                    page.wait_for_timeout(500)
+                    first = timeline.inner_text()
+                    slider.fill('0')
+                    page.wait_for_timeout(500)
+                    assert timeline.inner_text() != first
+                    target = motion.locator('option').nth(1).get_attribute('value')
+                    motion.select_option(index=1)
+                    page.wait_for_function(
+                        '(name) => (document.querySelector(".lex-chr-viewer-stage")'
+                        '._animMotion || "").endsWith("|" + name)',
+                        arg=target, timeout=30000)
+                    page.wait_for_selector('.lex-chr-viewer-stage[data-ready="true"]',
+                                           timeout=30000)
+                    assert motion.input_value() == target
                     assert not errors, errors
                 finally:
                     browser.close()

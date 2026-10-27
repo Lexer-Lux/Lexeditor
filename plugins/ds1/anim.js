@@ -14,6 +14,7 @@ window.Ds1Anim = (() => {
       delete host.dataset.ready;
     }
     delete host._animBones;
+    delete host._animScene;
     delete host._animSkeletonShown;
     delete host._animMotion;
   }
@@ -48,7 +49,7 @@ window.Ds1Anim = (() => {
   // Read-only skeletal playback: the model's bind pose comes from its
   // bones, each frame poses them from the sampled motion, and the
   // timeline scrubs frames with the motion's TAE event cues as markers.
-  async function mount(host, chrId, motion, timeline, status, onEvent) {
+  async function mount(host, chrId, motion, timeline, status, onEvent, hooks) {
     stop(host);
     timeline.replaceChildren();
     const mine = ++session;
@@ -150,6 +151,9 @@ window.Ds1Anim = (() => {
     const viewModes = LexeditorUI.modelViewModes(host);
     overlay.remove();
     const scene = new THREE.Scene();
+    // Overlay seam: the enemy viewer hangs hitbox spheres on this
+    // scene and re-seats them on the live bones after every pose.
+    host._animScene = () => scene;
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 10000);
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
@@ -310,7 +314,9 @@ window.Ds1Anim = (() => {
     else window.addEventListener("resize", resize);
 
     const dispose = () => {
+      if (hooks && hooks.onDispose) hooks.onDispose();
       delete host._animBones;
+      delete host._animScene;
       delete host._animSkeletonShown;
       host._animViewer = null;
       if (resizer) resizer.disconnect();
@@ -395,6 +401,7 @@ window.Ds1Anim = (() => {
       follow: {label: "Root motion"},
       render: (shown, playback) => {
         pose(shown, playback.follow);
+        if (hooks && hooks.afterPose) hooks.afterPose(bones);
         controls.update();
         renderer.render(scene, camera);
       },

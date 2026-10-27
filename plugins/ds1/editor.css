@@ -171,6 +171,10 @@
 .lex-chr-viewer-main{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;}
 .lex-chr-viewer-stage{flex:1 1 auto;min-height:220px;position:relative;}
 .lex-chr-viewer-fields{flex:0 1 38%;min-height:0;overflow:auto;}
+.lex-chr-viewer-picker{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.lex-chr-viewer-motion-label{font-weight:600;}
+.lex-chr-viewer-motion{flex:1 1 auto;min-width:0;}
+.lex-chr-viewer-timeline{flex:0 0 auto;}
 .ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
 .ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
 .ds1-texture-help{flex:0 0 auto;display:flex;}

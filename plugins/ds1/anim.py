@@ -309,33 +309,41 @@ def _listed_anims(chr_id, stamps, paths):
     return {'chr': chr_id, 'skeleton': skeleton, 'anims': anims}
 
 
+def _flver_bones(game_root, project, chr_id):
+    """The model binder's own bone list, or [] when no model is installed."""
+    from .flver import FlverDocument
+    resolved = resolve_chr(game_root, project, chr_id)
+    if resolved[0] != 'member':
+        return []
+    plain, names = _open(resolved[1])
+    flvers = sorted(name for name in names if name.endswith('.flver'))
+    picked = f'{chr_id}.flver' if f'{chr_id}.flver' in flvers else (flvers[:1] or [None])[0]
+    if picked is None:
+        return []
+    doc = FlverDocument(_entry(plain, names, resolved[1], picked))
+    return [{'name': bone['name'], 'parent': bone['parent'],
+             'pos': list(bone['pos']), 'rot': list(bone['rot']),
+             'scale': list(bone['scale'])} for bone in doc.bones]
+
+
 def skeleton(game_root, project, chr_id):
     """The Havok skeleton (names, parents, reference pose) with the
     FLVER bone list it drives. FLVER bones carry extras the animation
     never moves (SFX and dummy anchors); they keep the bind pose. The
     skeleton resolves through the shared source, so an empty anibnd
-    skeleton falls back to the model binder's own rig."""
-    from .flver import FlverDocument
+    skeleton falls back to the model binder's own rig. Without
+    animation binders at all, the model's own bones hold the bind pose
+    with an empty Havok side and nothing mapped, so the viewer shows
+    the model at rest instead of an error."""
     binders = _binders(game_root, project, chr_id)
+    flver_bones = _flver_bones(game_root, project, chr_id)
     if not binders:
-        raise HkxError('No animation binder is installed')
+        return {'hka': {'bones': [], 'parents': [], 'pose': []},
+                'flver': flver_bones,
+                'map': [-1] * len(flver_bones)}
     skel_path, skel_member = _skeleton_source(game_root, project, chr_id, binders)
     docs, _broken = _parsed_binder(skel_path, _stamp(skel_path))
     hka = docs[skel_member].skeletons[0]
-    flver_bones = []
-    resolved = resolve_chr(game_root, project, chr_id)
-    if resolved[0] == 'member':
-        plain, names = _open(resolved[1])
-        # The same mesh the geometry endpoint skins: skin indices are
-        # positions in this file's bone list, so a binder holding
-        # several models must not lend another file's bones.
-        flvers = sorted(name for name in names if name.endswith('.flver'))
-        picked = f'{chr_id}.flver' if f'{chr_id}.flver' in flvers else (flvers[:1] or [None])[0]
-        if picked is not None:
-            doc = FlverDocument(_entry(plain, names, resolved[1], picked))
-            flver_bones = [{'name': bone['name'], 'parent': bone['parent'],
-                            'pos': list(bone['pos']), 'rot': list(bone['rot']),
-                            'scale': list(bone['scale'])} for bone in doc.bones]
     order = {bone['name']: index for index, bone in enumerate(hka['bones'])}
     return {'hka': {'bones': [bone['name'] for bone in hka['bones']],
                     'parents': list(hka['parents']),
