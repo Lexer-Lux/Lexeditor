@@ -65,7 +65,8 @@ def build(zig: str, output: Path) -> None:
         subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-shared", "-O2", "-s",
                         "-fno-ident",
                         "-o", str(work / "dinput8.dll"), str(work / SOURCES[0])],
-                       check=True, cwd=work)
+                       check=True, cwd=work,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         shutil.copy2(work / "dinput8.dll", output)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -75,7 +76,8 @@ def find_vcvars() -> Path:
     where = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
     if where.is_file():
         found = subprocess.run([str(where), "-latest", "-products", "*", "-property", "installationPath"],
-                               capture_output=True, text=True).stdout.strip()
+                               capture_output=True, text=True,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.strip()
         vcvars = Path(found) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat" if found else None
         if vcvars and vcvars.is_file():
             return vcvars
@@ -99,7 +101,8 @@ def build_debug(dearxan: Path, output: Path) -> None:
                    f'dbghelp.lib kernel32.lib advapi32.lib bcrypt.lib synchronization.lib')
         # A batch file: cmd's quoting does not survive being passed as one argument.
         (work / "build.bat").write_text("@echo off\n" + command + "\n", encoding="utf-8")
-        subprocess.run(["cmd", "/c", str(work / "build.bat")], check=True, cwd=work)
+        subprocess.run(["cmd", "/c", str(work / "build.bat")], check=True, cwd=work,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         shutil.copy2(work / "dinput8.dll", output)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -130,7 +133,8 @@ def main() -> int:
         print(json.dumps(manifest, indent=2))
         return 0
     zig = find_zig(args.zig)
-    version = subprocess.run([zig, "version"], capture_output=True, text=True, check=True).stdout.strip()
+    version = subprocess.run([zig, "version"], capture_output=True, text=True, check=True,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.strip()
     if args.check:
         with tempfile.TemporaryDirectory() as folder:
             build(zig, Path(folder) / "dinput8.dll")
