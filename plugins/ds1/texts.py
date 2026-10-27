@@ -67,7 +67,12 @@ MAX_LONG_DESCRIPTION = 2000
 #: 2401+i reads 132351+i, as the game ships them.
 CLASS_DESCRIPTION_FILE = 'Menu_others_.fmg'
 CLASS_DESCRIPTION_ROWS = {'CharaInitParam': ((3000, 3009, 132320), (2401, 2408, 132351))}
-MAX_FMG_TEXT = 4000
+# One FMG entry holds this many characters. The format sets no per-entry
+# limit (null-terminated UTF-16 with u32 offsets), and the game ships
+# entries up to 9,886 characters (System_message_win32_), so the old
+# 4,000 cap blocked vanilla-length text. 65,535 keeps absurd pastes out
+# while allowing six times the longest shipped entry.
+MAX_FMG_TEXT = 65535
 HEADER = 0x1C
 
 
@@ -477,7 +482,8 @@ class MenuDocument(TextDocument):
         if not text.strip():
             raise FormatError('Menu text cannot be blank; the game shows nothing for it.')
         if len(text) > MAX_FMG_TEXT:
-            raise FormatError(f'Menu text is up to {MAX_FMG_TEXT} characters.')
+            raise FormatError(f'Menu text holds up to {MAX_FMG_TEXT} characters; '
+                              f'this text is {len(text)}.')
         for position in self._copies_of(filename):
             self.tables[position][1][text_id] = text
         self._dirty_cache = {}
