@@ -25,10 +25,10 @@ def test_parts_row_names_the_items_model_previews(tmp_path):
     parts = next(row for row in rows if row['id'] == 'assets:parts')
     assert parts['coverage'] == 'structured' and parts['status'] == 'partial'
     assert parts['openable']
-    assert (parts['target'], parts['sub']) == ('assets', 'game')
-    assert parts['targets'] == [{'id': 'assets', 'label': 'Assets'}]
-    assert 'models preview in Items' in parts['controls']
-    assert 'weapon and armor models preview in their Items detail drawers' in parts['notes']
+    assert (parts['target'], parts['sub']) == ('models', 'files')
+    assert parts['targets'] == [{'id': 'models', 'label': 'Models'}]
+    assert parts['controls'] == 'Assets: whole-file replacement with previews'
+    assert 'also preview in their Items detail' in parts['notes']
 
 
 def test_other_asset_rows_keep_the_generic_wording(tmp_path):
@@ -36,8 +36,8 @@ def test_other_asset_rows_keep_the_generic_wording(tmp_path):
     others = [row for row in rows if row['id'].startswith('assets:') and row['id'] != 'assets:parts']
     assert len(others) == 2
     for row in others:
-        assert row['controls'] == 'Assets: whole-file replacement with texture previews'
-        assert 'models replace without one' in row['notes']
+        assert row['controls'] == 'Assets: whole-file replacement with previews'
+        assert 'Sounds replace without a preview' in row['notes']
 
 
 def test_parts_row_absent_without_the_folder(tmp_path):
