@@ -122,13 +122,14 @@ def test_fmg_read_edit_and_dirty_roundtrip():
     rebuilt = texts.MenuDocument(document.menu_texts.export())
     assert rebuilt.text('Dialogue_.fmg', 11) == 'No.\nNever.'
     assert rebuilt.label('magicDefense') == 'MagDEF'
-    for bad in ('   ', 'x' * 4001):
+    for bad in ('   ', 'x' * (texts.MAX_FMG_TEXT + 1)):
         try:
             document.edit('Dialogue_.fmg', 11, 'text', bad)
         except FormatError:
             pass
         else:
             raise AssertionError(f'accepted {bad[:8]!r}')
+    document.edit('Dialogue_.fmg', 11, 'text', 'x' * texts.MAX_FMG_TEXT)
     try:
         document.edit('Dialogue_.fmg', 999, 'text', 'New.')
     except FormatError:
