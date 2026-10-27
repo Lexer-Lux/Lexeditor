@@ -9766,9 +9766,15 @@ ${contents.path}`});
     // runs before the group passes and marks its fields used, so the
     // passes below never file them under a swapped column index or drag
     // them back into their template section.
+    const looseProps = new Set(layout.loose && typeof layout.loose === "object"
+      ? Object.keys(layout.loose).map(propertyOf) : []);
     for (const [key, lane] of Object.entries(layout.lanes || {})) {
       if (!key.startsWith("field:")) continue;
       const prop = key.slice("field:".length);
+      // A loose field rejoins through its anchor section below, which
+      // knows whether it sat above or below it; appending it to its
+      // lane here would land it last and mark it used first.
+      if (looseProps.has(prop)) continue;
       const found = [...state.fields].find(([candidate]) =>
         candidate.dataset.lexLayoutField === prop);
       const pinned = found?.[0];

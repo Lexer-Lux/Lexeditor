@@ -20,7 +20,7 @@ from playwright.sync_api import sync_playwright
 
 HEADS = ("[...document.querySelectorAll('.lex-barrelled-master "
          ".lex-column-list-head-cell')].map(c=>c.dataset.columnKey)")
-ARCHIVE = "Asset:chr/c0000/c0000.tpfbhd"
+ARCHIVE = "Asset:chr/c0000/c0000.tpfbdt"
 GARBAGE = "Asset:chr/c0000/garbage.dds"
 LOOSE = """() => {
     const field = document.querySelector('.lex-detail-field[data-lex-layout-field="TEXTURES"]');
@@ -42,7 +42,7 @@ def main():
         (game / RELATIVE).parent.mkdir(parents=True)
         (game / RELATIVE).write_bytes(make_archive())
         (game / 'chr' / 'c0000').mkdir(parents=True)
-        (game / 'chr' / 'c0000' / 'c0000.tpfbhd').write_bytes(b'split archive bytes')
+        (game / 'chr' / 'c0000' / 'c0000.tpfbdt').write_bytes(b'split archive bytes')
         (game / 'chr' / 'c0000' / 'garbage.dds').write_bytes(b'not a dds file')
         mod.mkdir()
         (mod / MARKER).touch()
