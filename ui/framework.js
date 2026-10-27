@@ -11550,11 +11550,15 @@ ${contents.path}`});
     const shipped = described?.label ?? entry.shipped ?? entry.label ?? entry.key;
     const labelKey = fieldLabelKey(shipped);
     const shown = () => savedLabel(labelKey, shipped);
+    // A unit rides the header separately from the renamable name: the
+    // rename resolves under the bare label the detail field shows, then
+    // the suffix re-attaches, so the two never diverge.
+    const suffix = described?.unit ?? "";
     return {
       key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey,
         // The kind rides along so a game can swap the generic glyph for
         // its own art, the way DS1 label art replaces field glyphs.
-        "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown()) : shipped, sortable: described?.sortable !== false,
+        "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown() + suffix) : shown() + suffix, sortable: described?.sortable !== false,
       ...(described?.width ? {width: described.width} : {}), pinnedProperty: entry.key,
       sortValue: row => pinnedValue(row, entry.key) ?? "",
       numeric: described?.numeric === true,

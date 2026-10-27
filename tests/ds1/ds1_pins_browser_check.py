@@ -91,6 +91,39 @@ def main():
                     expect(page.locator(".lex-column-list .lex-list-row[data-key]")).to_have_count(1, timeout=10000)
                     box.fill("")
                     expect(page.locator(".lex-column-list .lex-list-row[data-key]")).to_have_count(3, timeout=10000)
+                    # A pinned header follows the detail field's rename: the
+                    # rename resolves under the bare label both show, then the
+                    # unit suffix re-attaches, so the two never diverge.
+                    page.evaluate("navigate('items','weapons')")
+                    page.wait_for_function("state.sub==='weapons' && state.row")
+                    page.locator(".lex-tabbed-panel [role=tab]",
+                                 has_text="Defense").first.click()
+                    page.wait_for_function("state.itemTab==='defense'")
+                    label = page.locator(
+                        '//*[@data-field-key="poisonGuardResist"]'
+                        '/ancestor::*[contains(concat(" ", @class, " "), " lex-detail-field ")][1]'
+                        '//*[contains(@class,"lex-detail-field-label-text")]')
+                    expect(label).to_have_text("Poison guard")
+                    pin = page.locator(
+                        "[data-lex-auto-pin][data-lex-pin-column='poisonGuardResist']")
+                    pin.click()
+                    heads = page.locator(".lex-column-list-head-cell")
+                    match = heads.filter(has_text="Poison guard (%)")
+                    assert match.count() >= 1
+                    assert "Poison guard (%)" in match.first.inner_text()
+                    page.evaluate("""() => {
+                      const tab = document.querySelector(
+                        ".lex-shell-header nav button.active")?.dataset.tab;
+                      const key = `${document.body.dataset.lexPlugin}-${tab}`
+                        + ".field.Poison guard.label";
+                      localStorage.setItem(key, "Venom");
+                      render();
+                    }""")
+                    page.wait_for_function("state.sub==='weapons' && state.row")
+                    expect(label).to_have_text("Venom")
+                    match = heads.filter(has_text="Venom (%)")
+                    assert match.count() >= 1, heads.all_inner_texts()
+                    assert "Venom (%)" in match.first.inner_text()
                     assert not errors, errors
                 finally:
                     browser.close()

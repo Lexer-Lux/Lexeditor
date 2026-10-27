@@ -750,7 +750,7 @@ function describePinnedCell(propertyKey){
   const field=(state.row?.fields||[]).find(item=>item.key===propertyKey);
   if(!field||!field.editable||field.type==="longtext")return null;
   const entries=field.type==="enum"?Object.entries(field.enum||{}):null;
-  return {editable:true,type:field.type,numeric:field.type==="number",label:field.label,
+  return {editable:true,type:field.type,numeric:field.type==="number",label:shownLabel(field),unit:labelSuffix(field),
     minimum:field.minimum,maximum:field.maximum,
     step:field.step??(/^(f|angle)/.test(field.dtype||"")?"any":1),
     choices:entries&&entries.length?entries:field.type==="bool"?[[1,"Yes"],[0,"No"]]:null};
@@ -778,6 +778,9 @@ const SOULS=/\s*\(souls\)$/;
 const PCT_PER_SEC=/\s*\(%\/s\)$/;
 const PER_LEVEL=/\s*\(per level\)$/;
 const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"").replace(PER_LEVEL,"").replace(CM,"").replace(SOULS,"");
+// The unit suffix the shown label dropped, derived from it so the two
+// cannot drift: pinned headers resolve the same rename, then re-attach it.
+const labelSuffix=field=>field.label.slice(shownLabel(field).length);
 // Think distances carry their unit suffixes in their labels, like every
 // other unit below (fourteen in metres, plus the ear search distance in
 // centimetres, the same family).
