@@ -85,7 +85,7 @@ def main():
                     width = page.evaluate(
                         "() => document.querySelector('[data-maps-side]')"
                         ".getBoundingClientRect().width")
-                    assert round(width) == 360, width
+                    assert round(width) == 300, width
                     counts = page.evaluate('(name) => state.mapList.find(r=>r.id===name).values', arg=map_name)
                     assert set(counts) == {'npcs', 'drops', 'enemies'}, counts
                     if not root:
