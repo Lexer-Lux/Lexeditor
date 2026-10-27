@@ -1,8 +1,8 @@
 """DS1 maps directory mounts the compact pagination bar, never game files.
 
-The 360px Directory panel shows a separate search row up top, the list,
+The 300px Directory panel shows a separate search row up top, the list,
 then pager controls plus filters centered on one shared bottom row, with
-no X-Y/Z position count and the Local toggle label reading bottom-to-top.
+no X-Y/Z position count and the Local toggle label reading left to right.
 Paging and search keep working through the new bar.
 """
 import sys
@@ -67,6 +67,7 @@ def main():
                     page.locator('button[data-tab="maps"]').click()
                     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error',
                                            timeout=60000)
+                    page.wait_for_selector('[data-maps-side]', timeout=60000)
                     page.evaluate("window.__dirCalmWait = " + CALM)
                     page.locator('[data-tabstrip-id="placements"]').click()
                     page.wait_for_function('state.mapTab==="placements"', timeout=30000)
@@ -90,9 +91,9 @@ def main():
                     assert search["y"] + search["height"] <= rows["y"] + 1, (search, rows)
                     label = page.locator("[data-maps-dir] .lex-compact-pager .lex-pager-toggle > span")
                     assert label.count() == 1
-                    assert label.evaluate("node => getComputedStyle(node).writingMode") == "vertical-rl"
+                    assert label.evaluate("node => getComputedStyle(node).writingMode") == "horizontal-tb"
                     box = label.bounding_box()
-                    assert box["width"] < box["height"], box
+                    assert box["width"] > box["height"], box
                     # Two rows per page forces the page controls out; the one
                     # bottom row still holds them beside the toggle.
                     page.evaluate("state.pageSize=2")
