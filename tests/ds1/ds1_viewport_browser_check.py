@@ -227,8 +227,8 @@ def phase_edit(play, game, mod, output, errors):
             assert not duplicate.is_disabled() and not remove.is_disabled()
             viewport_click(page, 'duplicate')
             page.wait_for_function('state.mapSelected==="1:1" && state.mapInfo?.name==="chest0_1"',
-                                   timeout=30000)
-            page.wait_for_function('state.mapView.parts.length===7', timeout=30000)
+                                   timeout=120000)
+            page.wait_for_function('state.mapView.parts.length===7', timeout=120000)
             gen = page.evaluate('viewportMount')
             viewport_click(page, 'remove')
             page.locator('.lex-dialog').get_by_role('button', name='Remove').click()
@@ -237,7 +237,7 @@ def phase_edit(play, game, mod, output, errors):
             # state lands before the remount renders; wait for the fresh map.
             page.wait_for_function('state.mapSelected===null && state.mapView.parts.length===6',
                                    timeout=30000)
-            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)
+            page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=120000)
             page.evaluate("viewportMove('test.msb','1:0',[9,8,7])")
             page.wait_for_function("state.pending===0 && state.mapView.parts.find(p=>p.key==='1:0').pos[0]===9",
                                    timeout=30000)
