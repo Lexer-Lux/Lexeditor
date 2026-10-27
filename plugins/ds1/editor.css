@@ -36,10 +36,6 @@
   /* The record's own picture stays with its name on the header's left,
      whether or not a model preview is attached. */
   --lex-preview-icon-side:left;}
-/* Detail lanes fit three across a 950px panel: measured spill-free
-   with zero new clips against the 400px default. Tweaks and settings
-   keep the shared width. */
-.lex-detail-panel .lex-tweak-card-grid{--lex-tweak-card-width:300px;}
 /* The selection details are narrow, and their longest name-plus-help
    ("Enemy" plus its mark) would otherwise shrink to the font floor. The
    floor is the framework's own lane minimum: wide enough that the names

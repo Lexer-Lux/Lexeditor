@@ -2627,7 +2627,7 @@ function ds1PreviewContent(target){
       picker.setAttribute("aria-label",action());picker.title=action();
       show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
     }},sign(picked));
-  stage.querySelector(":scope > .lex-model-view-modes")?.append(picker);
+  stage.lexViewModes?.bar?.append(picker);
   show(`/api/parts/geometry?table=${encodeURIComponent(target.table)}&id=${target.id}&variant=${encodeURIComponent(picked.variant)}`);
   return stage;
 }

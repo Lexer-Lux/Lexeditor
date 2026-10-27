@@ -28,8 +28,8 @@ window.Ds1Anim = (() => {
 
   // The skeleton switch sits with the view-mode buttons, styled like the
   // root-motion one; unlike it, the choice is global, kept across mounts.
-  function skeletonToggle(host, apply) {
-    const bar = host.querySelector(":scope > .lex-model-view-modes");
+  function skeletonToggle(modes, apply) {
+    const bar = modes ? modes.bar : null;
     if (!bar) return;
     // Remounts re-attach the cached bar with its stale toggle, like the
     // follow switch: the old one goes before the fresh one lands.
@@ -326,7 +326,7 @@ window.Ds1Anim = (() => {
       for (const item of trash) item.dispose();
     };
     viewModes.bindScene(scene);
-    skeletonToggle(host, shown => { helper.visible = shown; });
+    skeletonToggle(viewModes, shown => { helper.visible = shown; });
     // The motion this viewer plays: event seeks land only while it
     // matches the events scope, never onto an older motion's cues.
     host._animMotion = `${chrId}|${motion?.binder || ""}|${motion?.file || ""}`;
