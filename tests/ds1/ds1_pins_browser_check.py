@@ -49,14 +49,14 @@ def main():
                     page.wait_for_function("state.sub==='armor' && state.row")
                     page.wait_for_timeout(300)
                     fields = page.locator(".lex-detail-panel .lex-detail-field").count()
-                    pins = page.locator(".lex-detail-panel [data-lex-auto-pin]").count()
+                    pins = page.locator(".lex-detail-panel .lex-detail-field [data-lex-auto-pin]").count()
                     assert fields > 0 and pins == fields, (fields, pins)
                     page.locator(".lex-tabbed-panel [role=tab]",
                                  has_text="Defense").first.click()
                     page.wait_for_function("state.itemTab==='defense'")
                     page.wait_for_timeout(300)
                     fields = page.locator(".lex-detail-panel .lex-detail-field").count()
-                    pins = page.locator(".lex-detail-panel [data-lex-auto-pin]").count()
+                    pins = page.locator(".lex-detail-panel .lex-detail-field [data-lex-auto-pin]").count()
                     assert fields > 0 and pins == fields, (fields, pins)
                     pin = page.locator("[data-lex-auto-pin][data-lex-pin-column='defensePhysics']")
                     assert pin.count() == 1
