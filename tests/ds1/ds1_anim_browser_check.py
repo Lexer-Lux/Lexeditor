@@ -60,8 +60,10 @@ def main():
                     assert chars == ['c1200'], chars
                     assert page.locator('[data-anim-chars] .lex-column-list.lex-list-fill').count() == 1
                     page.locator('[data-anim-left] [data-tabstrip-id="anims"]').click()
-                    motions = page.locator('[data-anim-list] .lex-list-row').evaluate_all(ROWS)
+                    motions = page.locator('[data-anim-list] .lex-list-row .lex-column-list-cell[data-column-key="name"]').evaluate_all(ROWS)
                     assert motions == ['a87_3300.hkx', 'animation 3301'], motions
+                    lengths = page.locator('[data-anim-list] .lex-list-row .lex-column-list-cell[data-column-key="length"]').evaluate_all(ROWS)
+                    assert lengths == ['0.10s', '\u2014'], lengths
                     assert page.locator('[data-anim-list] .lex-column-list.lex-list-fill').count() == 1
                     # The mount may finish before the tab navigation lands:
                     # readiness, not the transient throbber, is the signal.
@@ -95,8 +97,10 @@ def main():
                     frozen = page.locator('[data-anim-readout]').inner_text()
                     time.sleep(0.5)
                     assert page.locator('[data-anim-readout]').inner_text() == frozen
-                    page.locator('[data-anim-timeline] input[type="range"]').fill('2')
-                    page.wait_for_function('document.querySelector("[data-anim-readout]")?.textContent?.startsWith("2.0")', timeout=10000)
+                    slider = page.locator('[data-anim-timeline] input[type="range"]')
+                    last = slider.get_attribute('max')
+                    slider.fill(last)
+                    page.wait_for_function('(want)=>document.querySelector("[data-anim-readout]")?.textContent?.startsWith(want)', arg=f'{last} /', timeout=10000)
                     # Switching motions is viewing, not editing: nothing dirties.
                     page.locator('[data-anim-list] .lex-list-row', has_text='animation 3301').click()
                     page.wait_for_function(
