@@ -33,7 +33,8 @@ NAMES = {
 def values_for(rows):
     return {(row_id, key): value
             for row_id in rows
-            for key, value in (('value', row_id), ('sellQuantity', -1))}
+            for key, value in (('value', row_id), ('sellQuantity', -1),
+                               ('equipType', 3), ('equipId', 1000))}
 
 
 def test_prefix_stock_in_shop_order():
