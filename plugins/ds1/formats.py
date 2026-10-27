@@ -1053,7 +1053,7 @@ class ItemDocument:
             from .texts import MENU_LABELS, MENU_LABEL_IDS
             if row_id in MENU_LABEL_IDS:
                 key = MENU_LABEL_IDS[row_id]
-                return (self.menu_texts.label(key) if self.menu_texts else None) or MENU_LABELS[key][0]
+                return MENU_LABELS[key][0]
             return f'Menu label {row_id}'
         if table in FMG_TABLES:
             text = self.menu_texts.text(table, row_id) if self.menu_texts else None
@@ -1488,11 +1488,11 @@ class ItemDocument:
                 'renamable': False, 'fields': fields, 'recordLinks': [], 'dialogLinks': []}
 
     def _menu_label_rows(self):
-        """The equipment defense labels as records: named by their text."""
+        """The equipment defense labels as records: named by their slot, so an edited label keeps its record name."""
         if self.menu_texts is None:
             return []
         from .texts import MENU_LABELS
-        return [{'id': text_id, 'table': 'MenuText', 'name': self.menu_texts.label(key) or display,
+        return [{'id': text_id, 'table': 'MenuText', 'name': display,
                  'values': {'label': self.menu_texts.label(key) or ''}, 'display': {},
                  'modified': key in self.menu_texts.dirty}
                 for key, (display, text_id) in MENU_LABELS.items()]
@@ -1739,8 +1739,8 @@ class ItemDocument:
                            'type': 'text', 'minimum': None, 'maximum': None, 'maxLength': 200,
                            'required': True, 'enum': {}, 'protectedReason': '',
                            'editable': True, 'vanilla': self.menu_texts.original_label(key) or ''})
-        text = next(field['value'] for field in fields if field['key'] == 'label') if fields else ''
-        return {'id': row_id, 'table': 'MenuText', 'name': text or MENU_LABELS[key][0],
+
+        return {'id': row_id, 'table': 'MenuText', 'name': MENU_LABELS[key][0],
                 'renamable': False, 'fields': fields, 'recordLinks': [], 'dialogLinks': []}
 
     def _absorption_levels(self, row_id, table='EquipParamProtector'):

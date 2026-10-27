@@ -277,7 +277,7 @@ def test_player_attacks_merge_by_field_and_conflict_by_name():
     assert merged.value("AtkParam_Pc", 100, "atkMag") == 222
     c = mod("C", edited(("AtkParam_Pc", 100, "atkPhys", 333)))
     result = mod_loader.compose(GAME, [a, c])
-    assert [(c.part, c.mods) for c in result.conflicts] == [("Player attacks 100, Physical", ["A", "C"])]
+    assert [(c.part, c.mods) for c in result.conflicts] == [("Player attacks 100, Physical (%)", ["A", "C"])]
     assert ItemDocument(result.files[RELATIVE]).value("AtkParam_Pc", 100, "atkPhys") == 333
 
 def test_reinforce_rows_merge_by_field_and_conflict_by_name():

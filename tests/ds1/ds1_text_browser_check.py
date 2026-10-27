@@ -59,7 +59,7 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
-                    # The Text tab opens on the three labels under their text.
+                    # The Text tab opens on the three labels under their slot names.
                     page.locator('button[data-tab="text"]').click()
                     page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
                     subs = page.locator('[data-subtab]').evaluate_all(
@@ -67,7 +67,8 @@ def main():
                     assert subs == ['fmg-dialogue', 'menu-labels', 'fmg-menu-text'], subs
                     names = page.locator('.lex-column-list .lex-list-row').evaluate_all(
                         'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
-                    assert names == ['FireDEF', 'LitngDEF', 'MagDEF'], names
+                    assert names == ['Fire defense label', 'Lightning defense label',
+                                      'Magic defense label'], names
                     # Every FMG lists its filled entries named by first line.
                     page.locator('[data-subtab="fmg-dialogue"]').click()
                     page.wait_for_function('state.sub === "fmg-dialogue" && state.rows.length === 2')
@@ -116,14 +117,14 @@ def main():
                     # Labels edit, save and reload like any other record.
                     page.locator('[data-subtab="menu-labels"]').click()
                     page.wait_for_function('state.sub === "menu-labels" && state.rows.length === 3')
-                    page.locator('.lex-column-list .lex-list-row', has_text='MagDEF').click()
+                    page.locator('.lex-column-list .lex-list-row', has_text='Magic defense label').click()
                     pinned(page, 'MenuText', 102204)
                     control = page.locator('input[data-field-key="label"][type="text"]')
                     control.fill('MagAbsorb')
                     control.press('Tab')
                     page.wait_for_function('state.pending === 0 && state.dirty > 0')
                     row = request_json(session.url + 'api/row?table=MenuText&id=102204')['row']
-                    assert row['name'] == 'MagAbsorb'
+                    assert row['name'] == 'Magic defense label'
                     assert next(f['value'] for f in row['fields'] if f['key'] == 'label') == 'MagAbsorb'
                     if output:
                         page.screenshot(path=str(output / 'text.png'))

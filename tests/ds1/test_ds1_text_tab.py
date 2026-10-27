@@ -1,8 +1,8 @@
-"""Menu labels live in the Text tab, named by their text.
+"""Menu labels live in the Text tab, named by their slot.
 
 The equipment defense labels (MagDEF, FireDEF, LitngDEF) are menu text,
-not items; the Text tab lists them under their in-game text, and armor
-defense fields link to them.
+not items; the Text tab lists them under their slot names, so an edited
+label keeps its record name, and armor defense fields link to them.
 """
 import json
 from pathlib import Path
@@ -32,13 +32,14 @@ def test_menu_label_ids_match_the_three_defense_kinds():
                                  'lightningDefense': ('Lightning defense label', 102206)}
 
 
-def test_menu_label_rows_take_their_names_from_the_text():
+def test_menu_label_rows_keep_their_slot_names():
     document = ItemDocument(make_archive())
     document.menu_texts = texts.MenuDocument(make_menu_archive())
     rows = {row['id']: row['name'] for row in document.list_rows('menu-labels')}
-    assert rows == {102204: 'MagDEF', 102205: 'FireDEF', 102206: 'LitngDEF'}
-    assert document.read_row('MenuText', 102205)['name'] == 'FireDEF'
-    assert document.display_name('MenuText', 102206) == 'LitngDEF'
+    assert rows == {102204: 'Magic defense label', 102205: 'Fire defense label',
+                    102206: 'Lightning defense label'}
+    assert document.read_row('MenuText', 102205)['name'] == 'Fire defense label'
+    assert document.display_name('MenuText', 102206) == 'Lightning defense label'
     assert document.display_name('MenuText', 999999) == 'Menu label 999999'
 
 
@@ -70,7 +71,7 @@ def test_text_tab_state_and_label_roundtrip(tmp_path):
         edited = request('/api/edit', {'table': 'MenuText', 'id': 102204, 'field': 'label', 'value': 'MagAbsorb'})
         assert edited['values'] == {'label': 'MagAbsorb'}
         row = request('/api/row?table=MenuText&id=102204')['row']
-        assert row['name'] == 'MagAbsorb'
+        assert row['name'] == 'Magic defense label'
         assert next(f['value'] for f in row['fields'] if f['key'] == 'label') == 'MagAbsorb'
     finally:
         session.stop()
