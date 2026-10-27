@@ -173,6 +173,9 @@ def test_rows_use_bounded_number_controls():
             assert (field["minimum"], field["maximum"]) == (0.0, 10.0)
             assert field["editable"] and not field["disabled"]
             assert field["description"] and field["description"] != field["label"]
+            stat = next(title for short, title, _ in levelup_gains.INPUTS
+                        if short == field["key"])
+            assert field["label"] == f"{stat} gain (per level)", field["label"]
         locked = levelup_gains.row(key, config, read_only=True)
         assert all(field["disabled"] for field in locked["fields"])
     assert seen == {name for name, _, _ in levelup_gains.INPUTS}

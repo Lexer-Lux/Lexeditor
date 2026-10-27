@@ -182,8 +182,10 @@ def row(output: str, config, *, read_only=False) -> dict:
     from . import encumbrance
     label = next(title for key, title in OUTPUTS if key == output)
     rules = validate(config["levelupGains"])
+    # The weights are gains, not the stats themselves: each level put
+    # into the stat adds this much defense, hence the /level unit.
     fields = [encumbrance.number(
-        name, stat, rules[output][name], MIN_FACTOR, MAX_FACTOR,
+        name, f'{stat} gain (per level)', rules[output][name], MIN_FACTOR, MAX_FACTOR,
         FIELD_HELP.format(stat=stat, label=label.lower(),
                           vanilla=vanilla_of(ROW_IDS[output] - 101, position)),
         group="Gains")

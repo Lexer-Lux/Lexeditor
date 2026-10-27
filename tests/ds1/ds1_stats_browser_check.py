@@ -171,6 +171,14 @@ def main():
                             assert page.locator('.lex-detail-panel [data-lex-icon]').count() == 9
                             assert page.evaluate('state.rows.map(r=>r.labelKind)') == [
                                 levelup_gains.ROW_ICONS[key] for key, _ in levelup_gains.OUTPUTS]
+                            # The weights are gains, not the stats: each
+                            # reads '{stat} gain' with a /level unit.
+                            for name, stat, _ in levelup_gains.INPUTS:
+                                cell = page.locator(
+                                    f'[data-lex-layout-field="{name}"]')
+                                assert cell.locator(
+                                    '.lex-detail-field-label-text').inner_text() == f'{stat} gain'
+                                assert cell.locator('.lex-unit').inner_text() == '/level'
                             if real_root:
                                 page.wait_for_function(
                                     "() => [...document.querySelectorAll("

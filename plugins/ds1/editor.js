@@ -776,7 +776,8 @@ const KG=/\s*\(kg\)$/;
 const CM=/\s*\(cm\)$/;
 const SOULS=/\s*\(souls\)$/;
 const PCT_PER_SEC=/\s*\(%\/s\)$/;
-const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"").replace(CM,"").replace(SOULS,"");
+const PER_LEVEL=/\s*\(per level\)$/;
+const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"").replace(PER_LEVEL,"").replace(CM,"").replace(SOULS,"");
 // Think distances carry their metre suffix in their labels, like every
 // other unit below (fifteen fields: eleven annotated plus the four
 // battle distances, the same family).
@@ -793,7 +794,8 @@ function controlFor(row,field){
     // Degrees per second keeps its degree; the generic rate below would not.
     :DEGREES_PER_SEC.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"\u00b0/s")
     // The quantity names the row already; the unit only says per second.
-    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"/sec")
+    :RATE.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"/sec")    // Level-up gains: defense added per level spent on the stat.
+    :PER_LEVEL.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"/level")
     :SECONDS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"s")
     :MS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"ms")
     :POINTS.test(field.label)&&field.type==="number"?LexeditorUI.unitField(plain,"pts")
