@@ -53,7 +53,7 @@ DLG_SIZE = 64
 TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
 TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
-FONT_AT = 20  # a text node's font size step
+FONT_AT = 20  # a text node's text style id (face, size and colour)
 MIN_FONT, MAX_FONT = 1, 15
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
@@ -349,11 +349,13 @@ class Drb:
         struct.pack_into("<4h", self.sections["SHPR"][0], start, left, top, right, bottom)
 
     def set_font(self, dialog: str, name: str, size: int) -> None:
-        """Set a text node's font size step (shape byte 20) in place.
+        """Set a text node's text style id (shape byte 20) in place.
 
-        Vanilla uses steps 4-11 (7 for most rows, 9 for titles); the glyphs
-        are drawn at this size whatever the rectangle, so a narrowed panel
-        needs a smaller step, not a smaller box.
+        The id picks an entry of the game's text style table: face, size and
+        colour together, not a size alone (style 5 draws orange at full
+        size). Vanilla mostly uses 7 for rows, 9-11 for titles and names, 4
+        and 0 for some small text. Glyphs are drawn at the style's size
+        whatever the rectangle, so smaller text means another style.
         """
         if type(size) is not int or not MIN_FONT <= size <= MAX_FONT:
             raise LayoutError(f"{dialog}/{name}: font is a size step from {MIN_FONT} to {MAX_FONT}")
