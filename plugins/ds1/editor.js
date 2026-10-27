@@ -3,7 +3,7 @@ const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,logView,p
   actionRow,confirmAction,modLoaderSection,tabbedPanel,applyFieldTabOverrides,hoverable,curveEditor,soundPreview}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attackTabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
   readOnly:true,query:"",modOnly:false,page:0,pageSize:20,sorts:{},error:"",deployment:null,deployBusy:false,
-  monsterTab:"basics",itemTab:"",effectTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
+  monsterTab:"basics",itemTab:"",effectTab:"",attackTab:"",monsterAttacks:null,thinkRow:null,monsterBehaviors:null,behaviorQuery:"",behaviorPage:0,tweaks:null,tweakBusy:false,tweaksNeedRebuild:false,
   effectTabs:[],statsTabs:[],animTabs:[],worldTabs:[],textTabs:[],npcTabs:[],miscTabs:[],animScope:{level:"anims"},animLeftTab:"chars",nativeRules:null,bandForm:null,bandBusy:false,taeForm:null,taeBusy:false,rowBusy:false,
   animChars:[],animCharId:null,animCharQuery:"",animCharPage:0,animQuery:"",animPage:0,animCharFit:null,animFit:null,animEventFit:null,animListError:null,animEventError:null,
   assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
@@ -1681,6 +1681,62 @@ function effectDetail(groups){
   return tabbedPanel({label:"Effect details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:Object.fromEntries([...groups].map(([title,fields])=>[tabId(title),(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean)]))},
     change:id=>{state.effectTab=id;render();},content:(resolved,selected)=>groups.get(selected?.label)});
 }
+function attackDetail(groups,impact){
+  // The parameter sections share one Properties tab; Usages lists every
+  // owner, behavior and projectile that reaches the attack. Groups are
+  // sections, never tabs, so section dragging keeps working inside.
+  const tabs=[{id:"properties",label:"Properties"},{id:"usages",label:"Usages",bespoke:true,
+    help:`${impact.variants.length} owners across ${impact.behaviors.length} behaviors`+
+      (impact.bulletReferences.length?` and ${impact.bulletReferences.length} projectiles`:"")+
+      `. Parameter links do not prove an animation invokes the attack.`}];
+  const active=tabs.some(tab=>tab.id===state.attackTab)?state.attackTab:tabs[0].id;
+  const accept=["properties"];
+  const shape=applyFieldTabOverrides(groups,tabs,{accept,callerShape:`${state.row.table}:${state.sub}`});
+  const content=resolved=>resolved==="usages"?attackUsagesSection(impact)
+    :[...groups].map(([title,body])=>detailSection({title,body}));
+  return tabbedPanel({label:"Attack details",active,tabs,paginate:{unpaged:true},fieldTabs:{shape,accept,members:{properties:[...groups].flatMap(([,fields])=>(Array.isArray(fields)?fields:[]).map(field=>field?.dataset?.lexLayoutField).filter(Boolean))}},
+    change:id=>{state.attackTab=id;render();},content});
+}
+function attackUsagesSection(impact){
+  const sections=[];
+  const owners=impact.variants||[];
+  if(owners.length){
+    const rows=owners.map(entry=>{
+      const admitted=entry.tab&&entry.sub;
+      const name=admitted?hoverable({content:entry.name,targetType:"ds1-npc",targetId:entry.id,
+        targetLabel:`${entry.name} in ${NPC_TAB_LABELS[entry.tab]||"Enemies"}`,
+        preview:()=>recordPreview({kind:"npc",table:"NpcParam",id:entry.id}),
+        activate:()=>openRecord({kind:"npc",tab:entry.tab,sub:entry.sub,table:"NpcParam",id:entry.id})}):entry.name;
+      return {key:`NpcParam:${entry.id}`,
+        owner:admitted?el("span",{style:"display:flex;gap:8px;align-items:center;justify-content:space-between;"},name,
+          el("button",{type:"button",onclick:()=>openAttackViewer(entry,state.row.id).catch(notify)},"Open viewer")):name};
+    });
+    sections.push(detailSection({title:"Enemies & NPCs",body:[columnList({rows,key:row=>row.key,
+      columns:[{key:"owner",label:"Owner",grow:1}]})]}));
+  }
+  const behaviors=impact.behaviors||[];
+  if(behaviors.length){
+    const rows=behaviors.map(move=>({key:`BehaviorParam:${move.id}`,
+      behavior:hoverable({content:move.name,targetType:"ds1-behavior",targetId:move.id,
+        targetLabel:`${move.name} in AI`,preview:()=>recordPreview({kind:"behavior",table:"BehaviorParam",id:move.id}),
+        activate:()=>openRecord({kind:"behavior",table:"BehaviorParam",id:move.id})})}));
+    sections.push(detailSection({title:"Behaviors",body:[columnList({rows,key:row=>row.key,
+      columns:[{key:"behavior",label:"Behavior",grow:1}]})]}));
+  }
+  const bullets=impact.bulletReferences||[];
+  if(bullets.length){
+    const rows=bullets.map(proj=>({key:`Bullet:${proj.id}`,
+      projectile:hoverable({content:proj.name,targetType:"ds1-bullet",targetId:proj.id,
+        targetLabel:`${proj.name} in Attacks`,preview:()=>recordPreview({kind:"bullet",table:"Bullet",id:proj.id}),
+        activate:()=>openRecord({kind:"bullet",table:"Bullet",id:proj.id})})}));
+    sections.push(detailSection({title:"Projectiles",body:[columnList({rows,key:row=>row.key,
+      columns:[{key:"projectile",label:"Projectile",grow:1}]})]}));
+  }
+  if((impact.paths||[]).length)
+    sections.push(detailSection({title:"Reference paths",body:[logView(impact.paths.join("\n"))]}));
+  if(!sections.length)return LexeditorUI.detailNote("No enemy, NPC, behavior or projectile links reach this attack.");
+  return sections;
+}
 function lightDetail(row,groups){
   // Coordinates first like placements; the Light section below names
   // what shines there, then the look it wears.
@@ -2394,13 +2450,6 @@ function detail(){
       (examples?` Examples: ${examples}.`:" Ownership is unresolved.")+
       ` ${impact.bulletReferences.length} projectile records reference this attack ID; player and enemy contexts may differ.`+
       " Animation, script and effect calls are not fully traced, so this is a minimum impact estimate.";
-    // Each owner opens in the enemy viewer with this attack showing.
-    // Owners no list admits keep their names in the help bubble only.
-    const viewable=(impact.variants||[]).filter(entry=>entry.tab&&entry.sub);
-    if(viewable.length)groups.set("View on model",viewable.map(entry=>detailField({label:entry.name,
-      control:el("button",{type:"button",onclick:()=>openAttackViewer(entry,state.row.id).catch(notify)},"Open viewer")})));
-    groups.set("Reference paths",(impact.paths.length?impact.paths:["No behavior link found"]).map((path,index)=>detailField({label:`Path ${index+1}`,control:readonlyField(path),
-      help:infoHelp("This parameter link reaches the attack. Projectile paths include child projectiles. It does not prove an animation invokes it.")})));
   }
   // The selection heading names the enemy only; the map it stands
   // in stays on the row and in the lists, never in the heading.
@@ -2412,7 +2461,11 @@ function detail(){
   // Effects render through the same panel tabs: one tab per SpEffect
   // section, with its own remembered tab.
   if(state.tab==="effects"&&state.row.table==="SpEffectParam")
-    return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[effectDetail(groups)]}),state.row.table,state.row.id);
+    return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[effectDetail(groups)]}),state.row.table,state.row.id);  // Attacks with traced usages split into Properties and Usages;
+  // player attacks and projectiles have no traced owners, so they
+  // keep the flat sections.
+  if(state.row.table==="AtkParam_Npc"&&impact)
+    return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,body:[attackDetail(groups,impact)]}),state.row.table,state.row.id);
   return armDs1Preview(detailPanel({title,meta,help,actions:rowActionsEarly,paginate:{unpaged:true},
     body:[...groups].map(([title,body])=>detailSection({title,body}))}),state.row.table,state.row.id);
 }

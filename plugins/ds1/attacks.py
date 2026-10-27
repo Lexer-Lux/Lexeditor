@@ -257,6 +257,9 @@ class AttackReferences:
                              'name': self.doc.schemas['NpcParam']['names'].get(npc) or f'NPC {npc}',
                              'tab': tab, 'sub': sub})
         return {'variants': variants,
-                'behaviors': sorted({p['behavior'] for p in paths}),
-                'bulletReferences': sorted(b for b, (a, _) in self.bullets.items() if a == attack),
+                'behaviors': [{'id': behavior, 'name': self.doc.display_name('BehaviorParam', behavior)}
+                              for behavior in sorted({p['behavior'] for p in paths})],
+                'bulletReferences': [{'id': bullet, 'name': self.doc.display_name('Bullet', bullet)}
+                                     for bullet in sorted(b for b, (a, _) in self.bullets.items()
+                                                         if a == attack)],
                 'paths': [p['path'] for p in paths]}

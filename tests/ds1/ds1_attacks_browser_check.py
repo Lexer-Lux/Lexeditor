@@ -104,6 +104,12 @@ def main():
                     box=page.get_by_role('searchbox',name='Search attacks')
                     box.click(); box.press('ControlOrMeta+a'); box.press('Backspace'); box.fill(str(first_attack))
                     page.wait_for_function('(id)=>state.row?.id===id',arg=first_attack)
+                    tabs=page.locator('.lex-tabbed-panel [data-subtab]')
+                    assert tabs.evaluate_all('n=>n.map(x=>x.dataset.subtab)')==['properties','usages']
+                    page.locator('.lex-tabbed-panel [data-subtab="usages"]').click()
+                    page.wait_for_function('state.attackTab==="usages"')
+                    assert page.locator('.lex-hoverable[data-hover-target-type="ds1-npc"]').count()>=1
+                    assert page.locator('.lex-hoverable[data-hover-target-type="ds1-behavior"]').count()>=1
                     page.get_by_role('button',name='Open viewer').first.click()
                     page.wait_for_function('state.tab==="enemies" && state.selected==="NpcParam:120000"')
                     page.wait_for_selector('.lex-model-preview-open .lex-chr-viewer')
@@ -123,6 +129,8 @@ def main():
                     attack=next(r['id'] for r in refs.list(shared['id'])['rows'] if len(refs.impact(r['id'])['variants'])>1)
                     follow(page.locator(f'.lex-hoverable[data-hover-target-type="ds1-attack"][data-hover-target-id="{attack}"]').first)
                     page.locator('.lex-detail-panel-title .lex-info-help').wait_for()
+                    page.locator('.lex-tabbed-panel [data-subtab="properties"]').click()
+                    page.wait_for_function('state.attackTab==="properties"')
                     assert page.locator('.lex-detail-panel-meta').count() == 0
                     assert 'changes every use' in (page.locator('.lex-detail-panel-title .lex-info-help').get_attribute('aria-label') or '')
                     page.set_viewport_size({'width':1000,'height':700}); page.wait_for_timeout(400)

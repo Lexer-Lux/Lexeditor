@@ -19,6 +19,8 @@ def test_direct_projectile_child_and_shared_npc_references():
     impact = doc.read_row('AtkParam_Npc',101)['impact']
     assert [v['id'] for v in impact['variants']] == [120000,251000]  # Includes excluded friendly NPC.
     assert impact['paths'] == ['Behavior 101 → Bullet 100 → Bullet 101 → Attack 101']
+    assert impact['behaviors'] == [{'id': 101, 'name': doc.display_name('BehaviorParam', 101)}]
+    assert impact['bulletReferences'] == [{'id': 101, 'name': doc.display_name('Bullet', 101)}]
     assert refs.list(120100)['rows'] == []
     assert refs.list(120100)['unresolved'] == ['Behavior 102 → Bullet 102 → Bullet 999999 (missing)']
     assert refs.list(120000,True)['rows'][-1]['route'] == 'Not linked'
