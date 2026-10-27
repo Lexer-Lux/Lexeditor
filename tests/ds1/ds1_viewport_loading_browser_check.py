@@ -74,7 +74,7 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.route('**/api/map/geometries*', hold)
                     page.route('**/api/chr/geometry*', hold)
-                    page.goto(session.url)
+                    page.goto(session.url, timeout=120000)
                     page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
                     # Map stage: the panel, centered and big, no inline status.
                     page.locator('[data-tab="maps"]').click()

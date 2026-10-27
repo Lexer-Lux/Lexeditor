@@ -105,6 +105,9 @@ SLOW = {
     # flevel.lgp, so the run needs well over the common timeout that every
     # other check gets. Reported as TIMEOUT, this said nothing about the code.
     "verify_plugins_open": 900,
+    # A full rendered sweep of every effect field (153 edits, save/reload,
+    # screenshots): ~85s unloaded, past 180s under parallel browsers.
+    "ds1_effects_browser_check": 600,
 }
 
 

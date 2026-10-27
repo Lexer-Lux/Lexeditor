@@ -3406,7 +3406,7 @@ function renderItems(){
     // the game stores no name to change.
     // names: behavior and AI rows take fixed reference names; the game stores no name to change.
     // names: script states have no stored names; the list names them by archive, script, group and state.
-    // names: a menu label is named by its text; editing the text renames it.
+    // names: a menu label keeps its slot name, so an edited label keeps its record.
     renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
     detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});

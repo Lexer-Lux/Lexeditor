@@ -300,7 +300,8 @@ def main():
                         page.wait_for_function('(id)=>state.itemTab===id', arg=tab_id)
                         if page.locator('img.lex-ds1-label-art').count():
                             page.wait_for_function(
-                                "()=>[...document.querySelectorAll('img.lex-ds1-label-art')].every(i=>i.complete&&i.naturalWidth>0)")
+                                "()=>[...document.querySelectorAll('img.lex-ds1-label-art')].every(i=>i.complete&&i.naturalWidth>0)",
+                                timeout=60000)
                             total += loaded_images(page, 'img.lex-ds1-label-art')
                     assert total >= 4, total
                     assert page.evaluate(

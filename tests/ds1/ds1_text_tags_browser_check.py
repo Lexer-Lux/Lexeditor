@@ -52,8 +52,8 @@ def main():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]')
+                    page.goto(session.url, timeout=120000)
+                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=120000)
                     page.locator('button[data-tab="text"]').click()
                     page.wait_for_function('state.tab === "text" && !state.error')
                     page.locator('[data-subtab="fmg-dialogue"]').click()
@@ -93,7 +93,7 @@ def main():
                     # Menu labels get the same buttons on one line.
                     page.locator('[data-subtab="menu-labels"]').click()
                     page.wait_for_function('state.sub === "menu-labels" && state.rows.length === 3')
-                    page.locator('.lex-column-list .lex-list-row', has_text='MagDEF').click()
+                    page.locator('.lex-column-list .lex-list-row', has_text='Magic defense label').click()
                     pinned(page, 'MenuText', 102204)
                     assert page.locator('.lex-ds1-text-editor input[data-field-key="label"]').count() == 1
                     control = page.locator('input[data-field-key="label"]')

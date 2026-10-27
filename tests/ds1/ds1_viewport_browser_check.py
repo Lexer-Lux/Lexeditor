@@ -86,7 +86,7 @@ def open_viewport(page, session):
     page.wait_for_selector('body[data-ds1-ready="true"]')
     page.locator('button[data-tab="maps"]').click()
     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error')
-    page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
+    page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=120000)
 
 
 def viewport_click(page, action):

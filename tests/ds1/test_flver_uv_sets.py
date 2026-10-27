@@ -47,16 +47,16 @@ def test_single_uv_mesh_has_empty_second_set():
     assert len(unpack(entry['uv'])) == 8
 
 
-def test_lightmapped_single_uv_mesh_reuses_diffuse_uvs():
+def test_lightmapped_single_uv_mesh_leaves_uv1_empty():
     # A lightmapped mesh with genuinely one UV set (a lone 0x15
-    # member) has no lightmap interpolants of its own, so the
-    # encoder repeats uv as uv1 instead of leaving the light path
-    # dead (fullbright map).
+    # member) has no lightmap interpolants of its own. The encoder
+    # leaves uv1 empty instead of copying uv: sampling a clamped
+    # atlas with tiling diffuse UVs smeared streaks across the mesh
+    # (test_ds1_lightmap_fallback pins the API and the rig-lit render).
     entry = _encode(FlverDocument(build_flver(light_tex='lit0')),
                     textured=True)['meshes'][0]
     assert entry['light'] == 'lit0'
-    assert base64.b64decode(entry['uv1']) != b''
-    assert unpack(entry['uv1']) == unpack(entry['uv'])
+    assert base64.b64decode(entry['uv1']) == b''
 
 
 def test_packed_uv_member_splits_into_both_sets():
