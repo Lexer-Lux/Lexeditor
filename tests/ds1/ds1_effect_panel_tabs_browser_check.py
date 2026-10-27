@@ -34,18 +34,19 @@ def main():
                     page.wait_for_function("state.tab==='effects' && state.row?.table==='SpEffectParam'")
                     tabs = page.locator('.lex-detail .lex-tabbed-panel [data-subtab]')
                     names = tabs.evaluate_all('nodes=>nodes.map(n=>n.dataset.subtab)')
-                    for want in ('activation-and-timing', 'hp-and-stamina', 'damage-dealt',
-                                 'immunities', 'usage'):
+                    for want in ('timing', 'vitals', 'offense', 'defense',
+                                 'immunity', 'move', 'links', 'gear',
+                                 'covenants', 'other', 'locked', 'usage'):
                         assert want in names, (want, names)
                     assert len(set(names)) == len(names), names
                     # One tab on screen: switching tabs swaps the fields, and the
                     # tab is the header, so no section title repeats it.
-                    page.locator('.lex-detail .lex-tabbed-panel [data-subtab="status-buildup"]').click()
-                    page.wait_for_function("state.effectTab==='status-buildup'")
+                    page.locator('.lex-detail .lex-tabbed-panel [data-subtab="offense"]').click()
+                    page.wait_for_function("state.effectTab==='offense'")
                     assert page.locator('[data-field-key="poizonAttackPower"]:visible').count() == 1
                     assert page.locator('[data-field-key="maxHpRate"]:visible').count() == 0
-                    page.locator('.lex-detail .lex-tabbed-panel [data-subtab="hp-and-stamina"]').click()
-                    page.wait_for_function("state.effectTab==='hp-and-stamina'")
+                    page.locator('.lex-detail .lex-tabbed-panel [data-subtab="vitals"]').click()
+                    page.wait_for_function("state.effectTab==='vitals'")
                     assert page.locator('[data-field-key="maxHpRate"]:visible').count() == 1
                     assert page.locator('[data-field-key="poizonAttackPower"]:visible').count() == 0
                     assert page.locator('.lex-detail .lex-tabbed-panel .lex-detail-section-title').count() == 0
