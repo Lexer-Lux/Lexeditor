@@ -1644,7 +1644,7 @@ class ItemDocument:
                                     'effects, as the game uses it. Read-only: change HP or the effects instead.'),
                     'group': hp['group'], 'dtype': hp['dtype'], 'value': self._effective_hp(row_id),
                     'type': 'number', 'minimum': 0, 'maximum': None, 'enum': {},
-                    'protectedReason': '', 'editable': False, 'vanilla': None})
+                    'protectedReason': '', 'editable': False, 'vanilla': None, 'computed': True})
         if table == 'AtkParam_Npc':
             order = {key: index for index, key in enumerate(ATTACK_FIELDS)}
             fields.sort(key=lambda field: order[field['key']])

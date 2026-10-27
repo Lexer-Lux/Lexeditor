@@ -85,4 +85,5 @@ def test_editor_mounts_no_other_files_tab():
     source = (ROOT / "plugins" / "ds1" / "editor.js").read_bytes()
     assert b'{id:"other",label:"Other files"' not in source
     assert b'"models","textures","sound","music","other"' not in source
-    assert b'new Set(["models","textures","sound","music"])' in source
+    assert b'new Set(["models","textures","sound"])' in source
+    assert b'{id:"music",label:"Music"}' in source

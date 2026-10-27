@@ -83,6 +83,11 @@ def test_every_shown_field_uses_its_schemas_control():
                     text_seen = True
                     checked += 1
                     continue
+                if field["key"] not in items:
+                    assert field.get("computed") is True, (table, field["key"])
+                    assert field["editable"] is False, (table, field["key"])
+                    checked += 1
+                    continue
                 item = items[field["key"]]
                 spec = item["spec"]
                 assert item["editable"] or not field["editable"], (table, field["key"])
