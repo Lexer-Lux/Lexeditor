@@ -427,12 +427,12 @@
     {
       "Field": "attackBaseParry",
       "Name": "Parry Attack",
-      "Description": "The base parry attack damage value. Applied to the enemy parry defense value."
+      "Description": "No weapon in the game sets this. It probably adjusts whether enemies can parry this weapon's attacks, but nobody has shown how. Leave it at 0."
     },
     {
       "Field": "defenseBaseParry",
       "Name": "Parry Defense",
-      "Description": "The base parry defense value. Compared against enemy parry attack value."
+      "Description": "No weapon in the game sets this. It probably adjusts what this weapon can parry, but nobody has shown how. Leave it at 0."
     },
     {
       "Field": "guardBaseRepel",

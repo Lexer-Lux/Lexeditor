@@ -92,13 +92,20 @@ def test_sweep_rewrites_weapons():
     assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "rightHandEquipable") == ""
     assert "two-handed" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable")
     assert "1 fits Intelligence" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "correctType")
-def test_lexer_parry_lines_stay_untouched():
-    # Hand-written by Lexer: parrying is deterministic (active frames vs a
-    # parryable attack), never chance-based. Do not reword; talk to him.
+def test_lexer_parry_lines():
+    # Rewritten at Lexer's request: the old lines said nothing ("the base
+    # parry defense value, compared against enemy parry attack value"), and
+    # he could not tell what the property does. Verified since: every
+    # vanilla weapon leaves both fields at 0, and no source documents
+    # their effect, so the bubbles say so and advise leaving them.
+    # Parrying itself stays deterministic (active frames vs a parryable
+    # attack), never chance-based; do not reword back toward RNG.
     assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "attackBaseParry") == \
-        "The base parry attack damage value. Applied to the enemy parry defense value."
+        "No weapon in the game sets this. It probably adjusts whether enemies can parry " \
+        "this weapon's attacks, but nobody has shown how. Leave it at 0."
     assert description("annotations/EQUIP_PARAM_WEAPON_ST.json", "defenseBaseParry") == \
-        "The base parry defense value. Compared against enemy parry attack value."
+        "No weapon in the game sets this. It probably adjusts what this weapon can parry, " \
+        "but nobody has shown how. Leave it at 0."
 def test_override_cleanup_labels_and_enum_wiring():
     assert name("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable") == "Two-Hand Wield"
     assert "two-handed" in description("annotations/EQUIP_PARAM_WEAPON_ST.json", "bothHandEquipable")
