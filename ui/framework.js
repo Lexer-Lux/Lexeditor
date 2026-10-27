@@ -7347,6 +7347,7 @@
     if (digit) return event.shiftKey ? "subtab" : "tab";
     const letter = shortcutLetter(event);
     if (letter === "z") return event.shiftKey ? "redo" : "undo";
+    if (letter === "y") return "redo";
     if (letter === "s") return "save";
     if (letter === "m") return "datamap";
     if (letter === "f") return "search";

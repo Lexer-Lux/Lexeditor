@@ -66,6 +66,9 @@ def test_one_undo_after_a_slider_drag_undoes_that_drag(tmp_path):
                 page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")')
                 page.wait_for_selector('.lex-plugin-loading-screen', state='detached')
                 page.wait_for_function('state.sub === "consumables" && state.row && state.row.id === 100')
+                # Goods render through panel tabs: weight sits on Properties.
+                page.locator('.lex-detail .lex-tabbed-panel [data-subtab="properties"]').click()
+                page.wait_for_function('state.itemTab === "properties"')
                 control = page.locator('input[data-field-key="weight"]')
                 assert float(control.input_value()) == pytest.approx(0.0)
                 assert page.evaluate(STACKS) == {'undo': 0, 'redo': 0}
