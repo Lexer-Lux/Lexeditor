@@ -120,8 +120,9 @@ def test_effect_options_validate_and_reflect_actual_consumers():
     # An unset reference still emits its entry, so the field keeps its
     # face and finder instead of a full-table dropdown.
     assert [(link["kind"], link["table"], link["resolved"]) for link in alone] == [
-        ("bullet", "Bullet", False), ("drop", "ItemLotParam", False),
-        ("drop", "ItemLotParam", False), ("drop", "ItemLotParam", False)]
+        ("bullet", "Bullet", False), ("behavior", "BehaviorParam_PC", False),
+        ("drop", "ItemLotParam", False), ("drop", "ItemLotParam", False),
+        ("drop", "ItemLotParam", False), ("asset", "Asset", False)]
     assert [link["id"] for link in alone if link["kind"] == "drop"] == [0, 0, 0]
     doc.edit("EquipParamWeapon",100,"residentSpEffectId",99001)
     assert next(link["id"] for link in doc.read_row("EquipParamWeapon",100)["recordLinks"]
@@ -274,11 +275,11 @@ def test_damage_and_defense_fields_carry_the_games_icons():
     for keys in (cuts, flats, rates):
         for key, kind in zip(keys, defs):
             assert items[key]['icon'] == kind, key
-    # Slash, strike and thrust keep the shared glyphs: the game draws
-    # them as text, so there is no menu cell to crop.
-    for key, kind in zip(('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'),
-                        ('slash', 'strike', 'thrust')):
-        assert items[key]['icon'] == kind, key
+    # Slash, strike and thrust reuse the physical shield: the game draws
+    # them as text, so there is no menu cell to crop, and every one of
+    # these fields scale physical defense.
+    for key in ('slashDamageCutRate', 'blowDamageCutRate', 'thrustDamageCutRate'):
+        assert items[key]['icon'] == 'physicalDef', key
     for key, kind in (('poizonAttackPower', 'poison'), ('registIllness', 'toxic'),
                         ('registBlood', 'bleed'), ('registCurse', 'curse'),
                         ('registPoizonChangeRate', 'poison'),

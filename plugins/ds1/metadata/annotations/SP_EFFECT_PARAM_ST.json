@@ -32,7 +32,7 @@
     {
       "Field": "maxMpRate",
       "Name": "Maximum MP %",
-      "Description": "Probably does nothing. The game has no magic point pool."
+      "Description": "Probably does nothing. The game has no magic point pool to multiply."
     },
     {
       "Field": "maxStaminaRate",
@@ -192,7 +192,7 @@
     {
       "Field": "maxHpChangeRate",
       "Name": "Maximum HP Source Multiplier",
-      "Description": "Unused. Maximum HP % does this job instead."
+      "Description": "Unused. Maximum HP % does this job instead, so this multiplier never applies."
     },
     {
       "Field": "behaviorId",
@@ -297,7 +297,7 @@
     {
       "Field": "allItemWeightChangeRate",
       "Name": "Item Weight %",
-      "Description": "Does nothing. It is a leftover from Demon's Souls."
+      "Description": "Does nothing. It is a leftover multiplier from Demon's Souls."
     },
     {
       "Field": "soul",
@@ -387,7 +387,7 @@
     {
       "Field": "guardDefFlickPowerRate",
       "Name": "Guard Defense Repulsion %",
-      "Description": "Unknown. It may change weapon bounce off blocks. No test has proven it."
+      "Description": "Unknown. It may multiply weapon bounce off blocks. No test has proven it."
     },
     {
       "Field": "guardStaminaCutRate",
@@ -452,7 +452,7 @@
     {
       "Field": "bloodDamageRate",
       "Name": "Bleed Damage Incurred %",
-      "Description": "Unknown. It may change bleed damage. No test has proven it."
+      "Description": "Unknown. It may multiply bleed damage. No test has proven it."
     },
     {
       "Field": "dmgLv_None",
