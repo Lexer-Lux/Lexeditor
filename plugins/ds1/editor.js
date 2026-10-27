@@ -778,9 +778,9 @@ const SOULS=/\s*\(souls\)$/;
 const PCT_PER_SEC=/\s*\(%\/s\)$/;
 const PER_LEVEL=/\s*\(per level\)$/;
 const shownLabel=field=>field.label.replace(PERCENT,"").replace(TIMES,"").replace(DEGREES_PER_SEC,"").replace(RATE,"").replace(SECONDS,"").replace(MS,"").replace(POINTS,"").replace(DEGREES,"").replace(METRES,"").replace(VEL,"").replace(ACCEL,"").replace(FRAMES,"").replace(KG,"").replace(PCT_PER_SEC,"").replace(PER_LEVEL,"").replace(CM,"").replace(SOULS,"");
-// Think distances carry their metre suffix in their labels, like every
-// other unit below (fifteen fields: eleven annotated plus the four
-// battle distances, the same family).
+// Think distances carry their unit suffixes in their labels, like every
+// other unit below (fourteen in metres, plus the ear search distance in
+// centimetres, the same family).
 
 // Placement coordinates keep their conflict-list labels, so their units
 // wire off field keys here instead of label suffixes.

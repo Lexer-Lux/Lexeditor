@@ -1,9 +1,9 @@
-"""Think distances carry their metre unit.
+"""Think distances carry their units: fourteen in metres, ears in centimetres.
 
-Eleven think fields say "In metres" in their help (plus the four battle
-distances, the same family), but none showed a unit: units wired off
-label suffixes and these labels have none. The fifteen distance fields
-now render unit fields in metres; neighboring non-distances stay plain.
+Fourteen think fields say "(metres)" in their names, including the four
+battle distances, and the ear search distance says "(cm)", which is what
+From's own definition uses. Units wire off label suffixes; neighboring
+non-distances stay plain.
 """
 import sys
 import tempfile
@@ -44,7 +44,11 @@ def test_think_distances_show_metres():
                         ' && !state.error', timeout=60000)
                     page.wait_for_timeout(400)
                     units = page.locator('.lex-detail-panel [data-lex-unit="m"]')
-                    assert units.count() >= 15, units.count()
+                    assert units.count() == 14, units.count()
+                    ears = page.locator(
+                        '.lex-detail-panel .lex-detail-field:has-text("Auditory Search Distance")'
+                        ' [data-lex-unit="cm"]')
+                    assert ears.count() == 1
                     assert page.locator(
                         '.lex-detail-panel .lex-detail-field:has-text("Team Attack Weight")'
                         ' [data-lex-unit]').count() == 0
