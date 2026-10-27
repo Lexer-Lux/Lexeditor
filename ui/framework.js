@@ -5215,30 +5215,72 @@
       const length = line.getTotalLength(), matrix = svg.getScreenCTM();
       if (!length || !matrix) return;
       const bounds = plot.getBoundingClientRect(), scale = bounds.width / plot.offsetWidth || 1;
-      for (const rider of mathRiders) positionMathRider(rider, length, matrix, bounds, scale);
+      // Long equations on adjacent spans cannot share two lanes: each
+      // packed rider takes the lowest lane whose atoms clear every
+      // placed rider, so packing degrades to stacking, never overlap.
+      // One rider keeps its lane exactly as before.
+      const packable = piecewise ? mathRiders.filter(rider => rider.mathSource) : [];
+      if (packable.length > 1) {
+        positionMathPacked(packable, length, matrix, scale);
+        for (const rider of mathRiders)
+          if (!rider.mathSource) positionMathRider(rider, length, matrix, bounds, scale);
+      } else {
+        for (const rider of mathRiders) positionMathRider(rider, length, matrix, bounds, scale);
+      }
     };
-    const positionMathRider = (rider, length, matrix, bounds, scale) => {
+    // The equation shrunk to the line it rides, never below a readable
+    // floor; answers the px-per-unit scale, or 0 when the plot has no
+    // measurable transform yet.
+    const shrinkMathRider = (rider, length, matrix, scale) => {
+      const mathOverlay = rider.overlay, mathSource = rider.mathSource;
+      const unit = Math.hypot(matrix.a, matrix.b) / scale;
+      if (!unit) return 0;
+      mathOverlay.style.removeProperty("font-size");
+      const available = length * unit * .8;
+      const naturalWidth = mathSource.getBoundingClientRect().width / scale;
+      if (naturalWidth > available) {
+        const size = parseFloat(getComputedStyle(mathOverlay).fontSize);
+        mathOverlay.style.fontSize = `${Math.max(7.5, size * available / naturalWidth)}px`;
+      }
+      return unit;
+    };
+    // One rider laid at the given perpendicular lift and slid rigidly
+    // into the plot; answers its atoms’ boxes for the packer.
+    const layMathRider = (rider, length, matrix, lift, scale, rigid) => {
       const mathOverlay = rider.overlay, mathSource = rider.mathSource, mathAtoms = rider.atoms;
       const middle = rider.center == null ? .5 : rider.center;
-      // Neighbouring spans ride two lanes above the line, so equations
-      // longer than their spans never share ink. A lone rider keeps 7.
-      const lift = 7 + (rider.index % 2) * 19;
-      if (mathSource) {
-        const overlayBounds = mathOverlay.getBoundingClientRect();
-        const unit = Math.hypot(matrix.a, matrix.b) / scale;
-        if (!unit) return;
-        mathOverlay.style.removeProperty("font-size");
-        const available = length * unit * .8;
-        const naturalWidth = mathSource.getBoundingClientRect().width / scale;
-        if (naturalWidth > available) {
-          const size = parseFloat(getComputedStyle(mathOverlay).fontSize);
-          mathOverlay.style.fontSize = `${size * available / naturalWidth}px`;
-        }
-        const sourceBounds = mathSource.getBoundingClientRect();
-        for (const {source, visual} of mathAtoms) {
-          const box = source.getBoundingClientRect();
-          const offset = (box.left + box.width / 2 - sourceBounds.left - sourceBounds.width / 2) / scale;
-          const distance = Math.max(0, Math.min(length, length * middle + offset / unit));
+      const overlayBounds = mathOverlay.getBoundingClientRect();
+      const unit = Math.hypot(matrix.a, matrix.b) / scale;
+      if (!unit) return [];
+      const sourceBounds = mathSource.getBoundingClientRect();
+      // An equation longer than the line from its center to an end
+      // would fold its atoms onto the endpoint they clamp to; shift
+      // the whole equation along the line so it fits instead.
+      const rawDistances = mathAtoms.map(({source}) => {
+        const box = source.getBoundingClientRect();
+        const offset = (box.left + box.width / 2 - sourceBounds.left - sourceBounds.width / 2) / scale;
+        return length * middle + offset / unit;
+      });
+      let pathShift = 0;
+      if (rawDistances.length) {
+        const low = Math.min(...rawDistances), high = Math.max(...rawDistances);
+        if (low < 0) pathShift = -low;
+        else if (high > length) pathShift = length - high;
+      }
+        // A packed equation keeps one lift direction and one tilt for
+        // the whole run, both read at its center: per-atom angles on a
+        // curving knee folded neighbouring atoms over each other.
+        const rigidDelta = Math.max(2, Math.min(8, length / 40));
+        const rigidSample = at => {
+          const point = line.getPointAtLength(Math.max(0, Math.min(length, at)));
+          return new DOMPoint(point.x, point.y).matrixTransform(matrix);
+        };
+        const rigidMiddle = length * middle;
+        const rigidBefore = rigidSample(rigidMiddle - rigidDelta);
+        const rigidAfter = rigidSample(rigidMiddle + rigidDelta);
+        const rigidAngle = Math.atan2(rigidAfter.y - rigidBefore.y, rigidAfter.x - rigidBefore.x);
+        for (const [atomIndex, {visual}] of mathAtoms.entries()) {
+          const distance = Math.max(0, Math.min(length, rawDistances[atomIndex] + pathShift));
           // The tilt is measured over a window of about two levels of the x
           // axis, not over the term's own width. A stat that grows in whole
           // points moves up one step about every level, and a narrow window
@@ -5252,7 +5294,7 @@
             return new DOMPoint(point.x, point.y).matrixTransform(matrix);
           };
           const center = sample(distance), before = sample(distance - delta), after = sample(distance + delta);
-          const angle = Math.atan2(after.y - before.y, after.x - before.x);
+          const angle = rigid ? rigidAngle : Math.atan2(after.y - before.y, after.x - before.x);
           visual.style.left = `${(center.x - overlayBounds.left) / scale + Math.sin(angle) * lift}px`;
           visual.style.top = `${(center.y - overlayBounds.top) / scale - Math.cos(angle) * lift}px`;
           // Bounded like the single-formula case: a curve that climbs and then
@@ -5289,6 +5331,36 @@
             }
           }
         }
+      return mathAtoms.map(({visual}) => visual.getBoundingClientRect());
+    };
+    const boxesOverlap = (boxes, placed) => boxes.some(box => placed.some(other =>
+      box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top));
+    const positionMathPacked = (packable, length, matrix, scale) => {
+      const ordered = [...packable].sort((left, right) => (left.center ?? .5) - (right.center ?? .5));
+      for (const rider of ordered) shrinkMathRider(rider, length, matrix, scale);
+      let step = 0;
+      for (const rider of ordered)
+        for (const box of layMathRider(rider, length, matrix, 7, scale, true))
+          step = Math.max(step, box.bottom - box.top);
+      step += 10;
+      const placed = [];
+      for (const rider of ordered) {
+        let boxes = [];
+        for (let lane = 0; lane < ordered.length; lane += 1) {
+          boxes = layMathRider(rider, length, matrix, 7 + lane * step, scale, true);
+          if (!boxesOverlap(boxes, placed)) break;
+        }
+        placed.push(...boxes);
+      }
+    };
+    const positionMathRider = (rider, length, matrix, bounds, scale) => {
+      const mathOverlay = rider.overlay, mathSource = rider.mathSource;
+      const middle = rider.center == null ? .5 : rider.center;
+      // A lone rider keeps 7; unpacked neighbours alternate two lanes.
+      const lift = 7 + (rider.index % 2) * 19;
+      if (mathSource) {
+        if (!shrinkMathRider(rider, length, matrix, scale)) return;
+        layMathRider(rider, length, matrix, lift, scale);
         return;
       }
       const point = ratio => {
@@ -5423,6 +5495,10 @@
         const first = points[0], last = points[points.length - 1];
         rangeLow.textContent = formatNumber(samples[0]?.value ?? range.min, {useGrouping: true});
         rangeHigh.textContent = formatNumber(samples[samples.length - 1]?.value ?? range.max, {useGrouping: true});
+        // A piecewise line wears an equation on every span, so the end
+        // values would sit on the first and last equations; the axis
+        // labels already carry the range.
+        rangeLow.style.display = rangeHigh.style.display = piecewise ? "none" : "";
         // The line's own height at a given x. A number beside the curve has to
         // be placed against the line where the number sits, not against the
         // endpoint it was measured from: the XP curve climbs steeply over its

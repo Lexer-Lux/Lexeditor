@@ -153,6 +153,45 @@ def main():
                                 f' * ((x - T{i + 1})/(T{i + 2} - T{i + 1}))^S{i + 1}'
                                 for i in range(4)]
                             assert card.locator('.lex-curve-math-atom').count() > 0
+                            # Packed spans share no ink: atoms stay in the
+                            # plot, and only sequential neighbours touch.
+                            # Rotated boxes dust small atoms, so only an
+                            # overlap past 30% of the smaller box fails.
+                            clear = card.evaluate("""element => {
+                              const plot = element.querySelector('.lex-curve-plot');
+                              const box = plot.getBoundingClientRect();
+                              const atoms = [...element.querySelectorAll(
+                                '.lex-curve-math-follow')].flatMap(follow =>
+                                [...follow.querySelectorAll('.lex-curve-math-atom')].map(atom => ({
+                                  seg: follow.getAttribute('data-segment'),
+                                  rect: atom.getBoundingClientRect()})));
+                              for (const atom of atoms) {
+                                const r = atom.rect;
+                                if (r.left < box.left + 7.5 || r.right > box.right - 7.5 ||
+                                    r.top < box.top + 3.5 || r.bottom > box.bottom - 3.5)
+                                  return 'outside: ' + atom.seg;
+                              }
+                              const overlap = (a, b) => {
+                                const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+                                const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+                                if (w <= 0 || h <= 0) return false;
+                                const smaller = Math.min((a.right - a.left) * (a.bottom - a.top),
+                                  (b.right - b.left) * (b.bottom - b.top));
+                                return smaller > 0 && (w * h) / smaller > 0.3;
+                              };
+                              for (let i = 0; i < atoms.length; i++)
+                                for (let j = i + 1; j < atoms.length; j++) {
+                                  if (atoms[i].seg === atoms[j].seg) {
+                                    const same = atoms.filter(a => a.seg === atoms[i].seg);
+                                    if (Math.abs(same.indexOf(atoms[i]) - same.indexOf(atoms[j])) < 2)
+                                      continue;
+                                  }
+                                  if (overlap(atoms[i].rect, atoms[j].rect))
+                                    return 'overlap: ' + atoms[i].seg + '/' + atoms[j].seg;
+                                }
+                              return '';
+                            }""")
+                            assert clear == '', clear
                             # Axes in player terms, with the shared unit.
                             assert card.locator(
                                 '.lex-curve-axis-name-x').inner_text() == 'Stat'
