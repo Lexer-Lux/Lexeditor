@@ -196,7 +196,7 @@ def main():
                     page.wait_for_function('state.tab==="models" && state.sub==="files"')
                     page.locator(".lex-detail-panel-heading").wait_for()
                     assert page.locator(
-                        '.lex-detail-panel-actions .lex-new-button[aria-label="Add file to mod"]').count() == 1
+                        '.lex-detail-panel-actions button[aria-label="Add file to mod"]').count() == 1
                     # A character model: meshes and bones, never objects.
                     page.locator('[data-tab="models"]').click()
                     page.wait_for_function('state.tab==="models" && state.rows.length===4')
@@ -326,10 +326,11 @@ def main():
                         " && state.assetDetail?.textures.length===0 && !state.error")
                     assert page.locator(".lex-model-preview-trigger").count() == 0
                     # Split archives name themselves instead of failing: no modal,
-                    # no stuck loader, and the Kind column tells them apart.
-                    page.locator(".lex-list-row", has_text=BHD).click()
+                    # no stuck loader, and the Kind column tells them apart. The
+                    # header half lists the pair's member textures instead.
+                    page.locator(".lex-list-row", has_text=BDT).click()
                     page.wait_for_function(
-                        'state.row?.id==="map/m10/m10.tpfbhd"'
+                        'state.row?.id==="map/m10/m10.tpfbdt"'
                         " && state.assetDetail?.reason==='split-archive' && !state.error")
                     assert page.locator(".lex-detail-field-label-text", has_text="ARCHIVE").count() == 1
                     note = page.locator(".lex-detail-field", has_text="ARCHIVE").first.locator("input").input_value()
@@ -337,8 +338,8 @@ def main():
                     assert page.locator(".lex-detail-section", has_text="PREVIEW").count() == 0
                     assert page.locator(".lex-model-preview-trigger").count() == 0
                     kinds = page.evaluate("state.rows.map(r=>r.display?.kind)")
-                    assert kinds.count("Split archive") == 2 and kinds.count("Textures") == 2, kinds
-                    assert page.locator("#main .lex-list-row", has_text="Split archive").count() == 2
+                    assert kinds.count("Split archive") == 1 and kinds.count("Textures") == 3, kinds
+                    assert page.locator("#main .lex-list-row", has_text="Split archive").count() == 1
                     # Sound streams name their banks; there is no Files list.
                     page.locator('[data-tab="sound"]').click()
                     page.locator('[data-subtab="sfx"]').click()
