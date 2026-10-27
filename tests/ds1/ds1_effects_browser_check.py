@@ -103,15 +103,16 @@ def main():
                     assert units["maxHpRate"] == ["\u00d7", True, "Maximum HP"], units
                     assert units["motionInterval"] == ["s", False, "Trigger interval"], units
                     assert units["changeMpRate"] == ["%", False, "MP damage"], units
-                    assert units["mpRecoverChangeSpeed"] == ["MP/second", False, "MP recovery adjustment"], units
+                    assert units["mpRecoverChangeSpeed"] == ["/sec", False, "MP recovery adjustment"], units
                     assert units["rayCastPassedTime"] == ["ms", False, "Raycast Passed Time"], units
                     assert units["poizonAttackPower"] == ["pts", False, "Inflict: Poison"], units
                     assert units["changeMpPoint"] == ["pts", False, "Flat MP damage"], units
                     art = control("physicsAttackPower").evaluate(
                         "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')")
                     assert art == "physical", art
-                    assert control("slashDamageCutRate").evaluate(
-                        "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')") is None
+                    art = control("slashDamageCutRate").evaluate(
+                        "node => node.closest('.lex-detail-field').getAttribute('data-lex-icon')")
+                    assert art == "physicalDef", art
                     changes={"effectEndurance":30,"maxHpRate":1.25,RECOVERY_KEY:4,
                              "disablePoison":True,"spCategory":20,"replaceSpEffectId":6920}
                     edit("effectEndurance",30)
@@ -122,7 +123,19 @@ def main():
                     assert control("disablePoison").get_attribute("type")=="checkbox"
                     edit("spCategory",20)
                     assert control("spCategory").evaluate("node=>node.tagName")=="SELECT"
-                    edit("replaceSpEffectId",6920)
+                    # Reference fields edit through the finder, not by typing.
+                    control("replaceSpEffectId")
+                    page.locator('.ds1-reference-field:has(.ds1-reference-face[data-field-key="replaceSpEffectId"]:visible) button.ds1-find-reference:visible').click()
+                    page.get_by_role("searchbox", name="Search effects").fill("")
+                    page.wait_for_function("document.querySelectorAll('.lex-search-candidate').length >= 2")
+                    pick = page.locator('.lex-search-candidate[data-key="SpEffectParam:6920"]')
+                    pick.scroll_into_view_if_needed()
+                    box = pick.bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function('document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
+                    page.wait_for_function("state.pending===0 && state.row?.fields?.find(f=>f.key==='replaceSpEffectId')?.value===6920")
                     face = page.locator('.ds1-reference-face[data-field-key="replaceSpEffectId"]:visible')
                     face.wait_for()
                     assert "Mask of the Child" in face.inner_text()
