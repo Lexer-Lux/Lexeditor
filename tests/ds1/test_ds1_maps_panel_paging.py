@@ -47,6 +47,20 @@ def panel_settled(page, panel, list_selector):
         '(pair) => { const state = (' + PANEL_STATE + ')(pair);'
         ' return state !== null && state.scrollable === false; }',
         arg=[panel, list_selector], timeout=15000)
+    # The fitted page size converges a beat after the rows render: a tab
+    # rebuilt with the previous height's size looks settled until the
+    # refit lands, so wait for the count to stop changing.
+    page.wait_for_function(
+        '(pair) => {'
+        ' const root = document.querySelector(pair[0]);'
+        ' const node = root ? root.querySelector(pair[1]) : null;'
+        ' if (!node) return false;'
+        ' const rows = node.querySelectorAll(".lex-list-row:not(.lex-filler-row)").length;'
+        ' const key = pair[0] + "|" + pair[1];'
+        ' const last = (window.__lex_paging_last_count || {})[key];'
+        ' (window.__lex_paging_last_count = window.__lex_paging_last_count || {})[key] = rows;'
+        ' return last === rows; }',
+        arg=[panel, list_selector], timeout=15000)
 
 
 def check_panel(page, panel, list_selector, label):
@@ -89,9 +103,18 @@ def test_maps_side_panels_fit_and_page_inside():
                         'state.tab==="maps" && state.mapView && state.rows.length>0'
                         ' && !state.error', timeout=60000)
                     sizes = {}
+                    side_tall = None
                     for height in (900, 600):
                         if height != 900:
                             page.set_viewport_size({'width': 1440, 'height': height})
+                            # The fitted page derives from the panel height,
+                            # which follows the viewport asynchronously:
+                            # measure only after the panel actually shrinks,
+                            # or the tall fit reads back stale.
+                            page.wait_for_function(
+                                'tall => document.querySelector("[data-maps-side]")'
+                                '.getBoundingClientRect().height < tall',
+                                arg=side_tall, timeout=15000)
                         page.locator('[data-tabstrip-id="placements"]').click()
                         page.wait_for_function('state.mapTab==="placements"',
                                                timeout=30000)
@@ -120,12 +143,20 @@ def test_maps_side_panels_fit_and_page_inside():
                             '#main .lex-pager:not(.lex-pager-inline)').count() == 0
                         page.wait_for_timeout(300)
                         page.screenshot(path=str(shots / f'maps-panel-paging-{height}.png'))
+                        if height == 900:
+                            side_tall = page.evaluate(
+                                'document.querySelector("[data-maps-side]")'
+                                '.getBoundingClientRect().height')
                     # Taller window, more rows per page: the page size is
                     # derived from the panel height, not fixed.
                     assert sizes[('placements', 900)] > sizes[('placements', 600)], sizes
                     assert sizes[('maps', 900)] > sizes[('maps', 600)], sizes
                     # Paging still works through the in-panel bar.
                     page.set_viewport_size({'width': 1440, 'height': 900})
+                    page.wait_for_function(
+                        'tall => document.querySelector("[data-maps-side]")'
+                        '.getBoundingClientRect().height >= tall - 1',
+                        arg=side_tall, timeout=15000)
                     page.locator('[data-tabstrip-id="placements"]').click()
                     page.wait_for_function('state.mapTab==="placements"', timeout=30000)
                     page.locator('[data-maps-dir] .lex-subtab-button', has_text='All').click()

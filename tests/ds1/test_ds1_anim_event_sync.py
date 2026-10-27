@@ -126,6 +126,12 @@ def test_sibling_bank_motion_drills_into_main_binder_events():
                         'state.animScope.level === "events" && state.rows.length === 4',
                         timeout=15000)
                     assert page.evaluate('state.animEventError') is None
+                    # State lands before the list re-renders, so wait for
+                    # the event rows themselves before reading one.
+                    page.wait_for_function(
+                        'document.querySelector("[data-anim-list] .lex-list-row")'
+                        '.textContent.includes("at 0.00s")',
+                        timeout=15000)
                     first = page.locator('[data-anim-list] .lex-list-row').first.text_content()
                     assert 'at 0.00s' in first, first
                 finally:
