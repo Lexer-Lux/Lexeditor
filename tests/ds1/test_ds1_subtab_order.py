@@ -63,8 +63,12 @@ def test_no_text_subtab_bar_opts_out_of_alphabetical_order():
 
 
 def test_ds1_editor_does_not_pass_given_order():
+    # Only subtab bars count: the records list owns its row order through
+    # pagedListDetail's own given-order option, which this rule never covered.
     source = (ROOT / "plugins" / "ds1" / "editor.js").read_text(encoding="utf-8")
-    assert not ORDER_GIVEN.search(source), "DS1 must sort its subtabs like everywhere else"
+    offenders = [call[:120] for call in subtab_bar_calls(source)
+                 if ORDER_GIVEN.search(call) and not IMAGES.search(call)]
+    assert offenders == [], offenders
 
 
 def test_ds1_subtab_labels_need_the_shared_sort():
