@@ -40,13 +40,26 @@ def main():
                     row.click()
                     page.wait_for_selector('[data-field-key="lotItemId01"]', timeout=60000)
                     field = page.locator('[data-field-key="lotItemId01"]:visible')
-                    assert field.count() == 1 and field.is_enabled()
-                    assert field.evaluate('n=>n.tagName') == 'SELECT'
+                    assert field.count() == 1
+                    assert field.evaluate('n=>n.tagName') == 'SPAN'
+                    assert field.evaluate('n=>n.classList.contains("ds1-reference-face")')
                     pair = page.locator('[data-lex-property="lotItemId01"]')
                     assert pair.count() == 1
                     assert pair.locator('input[data-field-key="lotItemNum01"]').count() == 1
-                    field.select_option('101')
-                    page.wait_for_function('state.pending===0 && state.dirty>0', timeout=60000)
+                    # The item edits through the finder, not a select.
+                    page.locator('[data-lex-property="lotItemId01"] button.ds1-find-reference:visible').click()
+                    page.wait_for_function("state.tab==='items' && state.sub==='weapons'")
+                    page.wait_for_function("document.querySelectorAll('.lex-search-candidate').length >= 1")
+                    pick = page.locator('.lex-search-candidate[data-key="EquipParamWeapon:100"]')
+                    pick.scroll_into_view_if_needed()
+                    box = pick.bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function('document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
+                    page.wait_for_function('state.pending===0 && state.dirty>0 && state.tab==="drops"'
+                                            ' && state.row?.fields?.find(f=>f.key==="lotItemId01")?.value===100',
+                                            timeout=60000)
                     page.evaluate("navigate('npcs','npcs')")
                     page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
                     merchant = page.locator('.lex-list-row[data-key="NpcParam:251000"]')
@@ -57,12 +70,20 @@ def main():
                     page.locator('.lex-detail .lex-tabbed-panel [data-subtab="value-rewards"]').click()
                     page.wait_for_selector('[data-field-key="itemLotId_1"]', timeout=60000)
                     lot = page.locator('[data-field-key="itemLotId_1"]:visible')
-                    assert lot.evaluate('n=>n.tagName') == 'SELECT'
-                    assert 'Drop 100' in lot.locator('option').all_text_contents()
-                    lot.select_option('100')
+                    assert lot.evaluate('n=>n.tagName') == 'SPAN'
+                    page.locator('.ds1-reference-field:has(.ds1-reference-face[data-field-key="itemLotId_1"]:visible) button.ds1-find-reference:visible').click()
+                    page.wait_for_function("state.tab==='drops'")
+                    page.wait_for_function("document.querySelectorAll('.lex-search-candidate').length >= 1")
+                    drop = page.locator('.lex-search-candidate[data-key="ItemLotParam:100"]')
+                    drop.scroll_into_view_if_needed()
+                    box = drop.bounding_box()
+                    page.mouse.move(box['x'] + 40, box['y'] + box['height'] / 2)
+                    page.mouse.down()
+                    page.wait_for_function('document.querySelector(".lex-searcher-bar") === null', timeout=10000)
+                    page.mouse.up()
                     page.wait_for_function(
-                        "state.pending===0 && state.row.fields.find("
-                        "f=>f.key==='itemLotId_1').value===100",
+                        "state.pending===0 && state.tab==='npcs' && state.row?.table==='NpcParam'"
+                        " && state.row?.fields?.find(f=>f.key==='itemLotId_1')?.value===100",
                         timeout=60000)
                     page.wait_for_selector(
                         '.lex-hoverable[data-hover-target-type="ds1-drop"]',
