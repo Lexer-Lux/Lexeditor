@@ -62,32 +62,32 @@
     {
       "Field": "itemLotId_1",
       "Name": "Item Lot ID: 1",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "The lot this enemy drops from when it dies. Pick a lot ID from the Drops list. -1 drops nothing."
     },
     {
       "Field": "itemLotId_2",
       "Name": "Item Lot ID: 2",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing."
     },
     {
       "Field": "itemLotId_3",
       "Name": "Item Lot ID: 3",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing."
     },
     {
       "Field": "itemLotId_4",
       "Name": "Item Lot ID: 4",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing."
     },
     {
       "Field": "itemLotId_5",
       "Name": "Item Lot ID: 5",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing."
     },
     {
       "Field": "itemLotId_6",
       "Name": "Item Lot ID: 6",
-      "Description": "One item lot this enemy rolls when it dies. -1 rolls nothing."
+      "Description": "A spare drop slot. Vanilla leaves it empty, so table 1 does all the work. -1 drops nothing."
     },
     {
       "Field": "humanityLotId",

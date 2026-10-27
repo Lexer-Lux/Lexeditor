@@ -6,29 +6,34 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ds1_fixture import make_archive
 from ds1_effects_fixture import make_effects_archive
-from plugins.ds1.formats import ItemDocument, FormatError, inflate, SIZES
+from plugins.ds1.effects import TABLE as EFFECT_TABLE
+from plugins.ds1.formats import ItemDocument, FormatError, inflate, SIZES, schema, field_link
 from plugins.ds1.monsters import NPC_FIELDS
 from plugins.ds1.store import ItemStore, RELATIVE, MARKER
 from plugins.ds3.formats import write_field
 
 
+def _npc_specs():
+    return {item['spec'].key: item['spec'] for item in schema('NpcParam')['fields']}
+
+
 def test_drop_tables_say_which_slot_is_live():
-    label, group, description = NPC_FIELDS['itemLotId_1']
-    assert label == 'Drop table 1'
-    assert group == 'Value & rewards'
-    assert '-1' in description
+    specs = _npc_specs()
+    assert specs['itemLotId_1'].label == 'Drop table 1'
+    assert specs['itemLotId_1'].group == 'Value & rewards'
+    assert '-1' in specs['itemLotId_1'].description
     for index in range(2, 7):
-        label, group, description = NPC_FIELDS[f'itemLotId_{index}']
-        assert label == f'Drop table {index}'
-        assert 'spare' in description.lower()
-        assert '-1' in description
+        spec = specs[f'itemLotId_{index}']
+        assert spec.label == f'Drop table {index}'
+        assert 'spare' in spec.description.lower()
+        assert '-1' in spec.description
 
 
 def test_boss_souls_help_names_the_event_script():
-    label, group, description = NPC_FIELDS['getSoul']
-    assert label == 'Souls'
-    assert group == 'Value & rewards'
-    assert 'event script' in description, description
+    specs = _npc_specs()
+    assert specs['getSoul'].label == 'Souls'
+    assert specs['getSoul'].group == 'Value & rewards'
+    assert 'event script' in specs['getSoul'].description, specs['getSoul'].description
 
 
 def test_only_reviewed_monsters_and_only_stat_fields_are_accessible():
@@ -73,6 +78,14 @@ def test_all_stats_roundtrip_only_their_cells_and_revert_exactly():
         start = doc._row('NpcParam', 120000)[1] + spec.offset
         allowed.update(range(start, start + SIZES[spec.dtype]))
         value = 1 if spec.is_bool else int(sorted(item['enum'], key=int)[-1]) if item['enum'] else 25.5 if spec.dtype == 'f32' else 25
+        link = field_link(doc, 'NpcParam', 120000, spec)
+        if link is not None and (link[0] != 'effect' or EFFECT_TABLE in doc.params):
+            current = doc.value('NpcParam', 120000, key)
+            alts = [int(choice) for choice in doc.link_choices(*link)
+                    if choice.lstrip('-').isdigit() and int(choice) != current
+                    and item['min'] <= int(choice) <= item['max']]
+            assert alts, (key, 'no alternate linked value in the fixture')
+            value = alts[0]
         doc.edit('NpcParam', 120000, key, value)
         written[key] = value
     reopened = ItemDocument(doc.export())
@@ -175,9 +188,10 @@ def test_defense_fields_carry_game_art_where_it_exists():
     # Damage and defense labels show the equipment screen's own icons. Slash,
     # strike and thrust have no glyph of their own, so they reuse the physical
     # shield: every one of these fields scales physical defense. Resistances
-    # show the shared status glyphs before their labels. Kinds with no icon
-    # and no parent stat (weaknesses, stamina guard) ship with none: game art
-    # or shared glyphs only, no invented glyphs.
+    # show the shared status glyphs before their labels. Divine and occult
+    # weaknesses take the sheet's white and black rings, and guard fields
+    # take the game's Stability icon: game art or shared glyphs only,
+    # no invented glyphs.
     fields = {field['key']: field.get('icon')
               for field in ItemDocument(make_archive()).read_row('NpcParam', 120000)['fields']}
     assert fields['def_fire'] == 'fireDef'
@@ -190,12 +204,13 @@ def test_defense_fields_carry_game_art_where_it_exists():
     assert fields['resist_desease'] == 'toxic'
     assert fields['resist_blood'] == 'bleed'
     assert fields['resist_curse'] == 'curse'
-    assert fields['isWeakSaint'] is None
-    assert fields['staminaGuardDef'] is None
-    assert fields['hp'] == 'vit'
-    assert fields['mp'] == 'att'
-    assert fields['stamina'] == 'end'
-    assert fields['staminaRecoverBaseVel'] == 'end'
+    assert fields['isWeakSaint'] == 'divine'
+    assert fields['isWeakA'] == 'occult'
+    assert fields['staminaGuardDef'] == 'stability'
+    assert fields['hp'] == 'hp'
+    assert fields['mp'] == 'mp'
+    assert fields['stamina'] == 'stamina'
+    assert fields['staminaRecoverBaseVel'] == 'stamina'
     assert fields['getSoul'] == 'souls'
     assert fields['humanityLotId'] == 'humanity'
     assert fields['superArmorDurability'] == 'poise'
