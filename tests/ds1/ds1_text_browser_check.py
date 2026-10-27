@@ -62,6 +62,10 @@ def main():
                     # The Text tab opens on the three labels under their slot names.
                     page.locator('button[data-tab="text"]').click()
                     page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
+                    # State lands before the rows render: wait for text.
+                    page.wait_for_function(
+                        'document.querySelector(".lex-column-list .lex-list-row")'
+                        '.textContent.replace(/\u200b/g, "").trim() !== ""')
                     subs = page.locator('[data-subtab]').evaluate_all(
                         'nodes => nodes.map(node => node.getAttribute("data-subtab"))')
                     assert subs == ['fmg-dialogue', 'menu-labels', 'fmg-menu-text'], subs
@@ -72,6 +76,9 @@ def main():
                     # Every FMG lists its filled entries named by first line.
                     page.locator('[data-subtab="fmg-dialogue"]').click()
                     page.wait_for_function('state.sub === "fmg-dialogue" && state.rows.length === 2')
+                    page.wait_for_function(
+                        'document.querySelector(".lex-column-list .lex-list-row")'
+                        '.textContent.replace(/\u200b/g, "").trim() !== ""')
                     spoken = page.locator('.lex-column-list .lex-list-row').evaluate_all(
                         'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
                     assert spoken == ['No.', 'Yes.'], spoken
