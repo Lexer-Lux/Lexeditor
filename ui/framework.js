@@ -10017,6 +10017,27 @@ ${contents.path}`});
     }
     return best;
   };
+  // A scrolled-out region has no hit box: hovering a section's clipped part
+  // lands on whatever is behind it (usually the page itself), so a
+  // contains() search finds no drop target and the browser silently refuses
+  // the drop. The box is still real - getBoundingClientRect ignores the
+  // clip, and the before/after split already uses it - so the fallback
+  // reads the pointer position instead. Innermost wins, like contains().
+  const sectionAtPoint = (sections, x, y) => {
+    const hits = sections.filter(node => {
+      if (!node?.isConnected || node.hidden) return false;
+      const box = node.getBoundingClientRect();
+      return box.width > 0 && box.height > 0
+        && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+    });
+    hits.sort((a, b) => {
+      if (a === b) return 0;
+      if (a.contains(b)) return 1;
+      if (b.contains(a)) return -1;
+      return 0;
+    });
+    return hits[0] || null;
+  };
   let sectionDrag = null;
   document.addEventListener("dragstart", event => {
     const heading = event.target.closest?.(".lex-detail-section-title");
@@ -10036,9 +10057,16 @@ ${contents.path}`});
     dragScrollNote(event);
     clearPropertyDrop();
     const {state, section} = sectionDrag;
-    const target = [...state.groups.values()].map(layoutSectionOf)
-      .find(node => node && node !== section && node.contains(event.target) && !node.contains(section) && !section.contains(node)
-        && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section));
+    const siblings = [...state.groups.values()].map(layoutSectionOf)
+      .filter(node => node && node !== section && !node.contains(section) && !section.contains(node));
+    const target = siblings.find(node => node.contains(event.target)
+        && ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner.contains(event.target) && inner !== section))
+      // Over a clipped region the pointer lands behind the section,
+      // never inside it: read the box instead, skipping a section
+      // the point only reaches through a nested one, as above.
+      || sectionAtPoint(siblings.filter(node =>
+        ![...node.querySelectorAll(".lex-detail-section")].some(inner => inner !== section
+          && sectionAtPoint([inner], event.clientX, event.clientY))), event.clientX, event.clientY);
     if (!target) {
       const pager = event.target.closest?.(".lex-tweaks-paged");
       if (!pager || pager.lexUnpaged !== true || pager !== section.closest(".lex-tweaks-paged")) return;

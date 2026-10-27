@@ -225,6 +225,62 @@ def test_a_table_only_heading_drags_its_section(page):
     assert titles() == ["Notes", "Referenced"]
 
 
+def test_a_heading_drops_onto_a_scrolled_out_section(page):
+    # Lexer: "I can't move around damage" - dropping onto a section's
+    # clipped part hit the page behind it, so the drop silently refused.
+    # The geometric fallback reads the pointer position instead.
+    mount(page)
+    titles = lambda: page.locator(".lex-detail-section-title-text").all_text_contents()
+    assert titles() == ["Combat", "Drops"]
+    page.evaluate("""() => {
+      const main = document.querySelector("main");
+      main.style.flex = "none";
+      main.style.height = "160px";
+      main.style.overflow = "hidden";
+      for (const section of document.querySelectorAll('.lex-detail-section')) {
+        section.style.minHeight = '220px';
+        section.style.width = '100%';
+      }
+      const scroller = document.querySelector('.lex-detail-panel-body');
+      scroller.style.flexDirection = "column";
+      scroller.style.alignItems = "stretch";
+      scroller.style.maxHeight = "100px";
+      scroller.style.overflow = "auto";
+      scroller.scrollTop = scroller.scrollHeight;
+    }""")
+    page.wait_for_timeout(200)
+    box = page.evaluate("""() => {
+      const combat = [...document.querySelectorAll(".lex-detail-section")]
+        .find(n => n.textContent.includes("Combat"));
+      const rect = combat.getBoundingClientRect();
+      return {top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width};
+    }""")
+    assert box["top"] < 0, f"Combat must be scrolled out above: {box}"
+    page.evaluate("""(box) => {
+      const drops = [...document.querySelectorAll(".lex-detail-section-title")]
+        .find(n => n.textContent.includes("Drops"));
+      drops.dispatchEvent(new DragEvent("dragstart",
+        {bubbles: true, cancelable: true, dataTransfer: new DataTransfer()}));
+      // A real browser aiming at the clipped part reports the page
+      // behind it as the target: the dispatch mimics that exactly.
+      document.body.dispatchEvent(new DragEvent("dragover", {bubbles: true,
+        cancelable: true, clientX: box.left + box.width / 2,
+        clientY: box.top + (box.bottom - box.top) / 4,
+        dataTransfer: new DataTransfer()}));
+    }""", box)
+    page.wait_for_timeout(200)
+    combat = page.locator(".lex-detail-section", has=page.locator(
+        ".lex-detail-section-title", has_text="Combat"))
+    assert "lex-property-drop-before" in (combat.get_attribute("class") or ""), \
+        "the clipped section takes the drop marker"
+    page.evaluate("""() => document.body.dispatchEvent(new DragEvent("drop",
+      {bubbles: true, cancelable: true, dataTransfer: new DataTransfer()}))""")
+    page.wait_for_timeout(200)
+    page.evaluate("document.dispatchEvent(new DragEvent(\"dragend\", {bubbles: true}))")
+    page.wait_for_timeout(200)
+    assert titles() == ["Drops", "Combat"]
+
+
 GRAPH_PANEL = """() => {
   const U = LexeditorUI;
   window.drawGraphPanel = () => document.querySelector('main').replaceChildren(
