@@ -69,18 +69,18 @@ def test_grouping_routes_upgrades_by_table():
 
 def test_weapons_and_armor_open_an_upgrades_panel_tab():
     assert "function itemDetail(groups){" in EDITOR
-    assert 'title==="Upgrades"' in EDITOR
+    # Every group is a tab, so the Upgrades group lands as a tab
+    # labeled Upgrades with no bespoke routing.
+    assert 'const tabs=[...groups].map(([title])=>({id:tabId(title),label:title}));' in EDITOR
+    assert 'tabbedPanel({label:"Item details"' in EDITOR
     assert EDITOR.count("state.itemTab") >= 3
-    assert ('const goodsSub=state.row.table==="EquipParamGoods"'
-            '?catalogSub(state.row.table,state.row):null;') in EDITOR
+    # Every items subtab renders through the same panel tabs:
+    # weapons, armor, rings, spells and every kind of goods.
     assert ('if(state.tab==="items"&&(state.row.table==="EquipParamWeapon"'
             '||state.row.table==="EquipParamProtector"'
             '||state.row.table==="EquipParamAccessory"'
             '||state.row.table==="Magic"'
-            '||goodsSub==="upgrades"||goodsSub==="spells"))') in EDITOR
-    # Consumables and keys keep the stacked detail: routing every goods
-    # row through the panel tabs hid the weight slider from undo tests.
-    assert '||state.row.table==="EquipParamGoods"))' not in EDITOR
+            '||state.row.table==="EquipParamGoods"))') in EDITOR
 
 
 def test_data_map_names_the_upgrades_tab(tmp_path):
