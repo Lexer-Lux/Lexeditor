@@ -139,15 +139,17 @@ def test_state_reports_world_tabs_and_no_shop_tabs(tmp_path):
     assert 'shopTabs' not in state
 
 
-def test_data_map_points_world_at_maps_and_shops_at_npcs(tmp_path):
+def test_data_map_points_drops_treasure_and_shops_at_their_tabs(tmp_path):
     game, mod = project(tmp_path)
     rows = data_map.payload(ItemStore(game, mod, False))['rows']
-    for filename, sub in (('ItemLotParam.param', 'drops'), ('ObjActParam.param', 'treasure')):
+    for filename, target, sub, label in (
+            ('ItemLotParam.param', 'drops', 'drops', 'Drops'),
+            ('ObjActParam.param', 'maps', 'treasure', 'Maps')):
         row = next(entry for entry in rows if entry['filename'] == filename)
-        assert row['coverage'] == 'structured' and row['status'] == 'partial'
-        assert row['openable'] and row['target'] == 'maps' and row['sub'] == sub
-        assert row['targets'] == [{'id': 'maps', 'label': 'Maps'}]
+        assert row['coverage'] == 'structured' and row['status'] == 'integrated'
+        assert row['openable'] and row['target'] == target and row['sub'] == sub
+        assert row['targets'] == [{'id': target, 'label': label}]
     row = next(entry for entry in rows if entry['filename'] == 'ShopLineupParam.param')
-    assert row['coverage'] == 'structured' and row['status'] == 'partial'
+    assert row['coverage'] == 'structured' and row['status'] == 'integrated'
     assert row['openable'] and row['target'] == 'npcs' and row['sub'] == 'npcs'
     assert row['targets'] == [{'id': 'npcs', 'label': 'NPCs'}]
