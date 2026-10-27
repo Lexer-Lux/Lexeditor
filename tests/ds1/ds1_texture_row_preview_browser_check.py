@@ -3,7 +3,7 @@
 Pinning the header preview adds the thumbnail column like any other
 pin: every texture file row then carries its first texture as a
 loaded icon. Split archives have no per-texture preview, so their
-rows keep the word Archive and no icon. A blank texture tile shows
+rows keep the words Split archive and no icon. A blank texture tile shows
 no picture at all, just the name with a blank note.
 """
 import struct
@@ -25,6 +25,7 @@ TPF = 'chr/c0000/c0000.tpf'
 DDS = 'chr/c0000/face.dds'
 BLANK = 'chr/c0000/blank.dds'
 BHD = 'map/m10/m10.tpfbhd'
+BDT = 'map/m10/m10.tpfbdt'
 
 
 def make_dds(width=32, height=32, solid=None):
@@ -107,7 +108,7 @@ def main():
                             "'#main .lex-list-row')].find(n => n.textContent.includes(relative));"
                             " const img = row && row.querySelector('img.lex-ds1-shop-icon');"
                             ' return img && img.naturalWidth > 0; }', arg=relative)
-                    archive = page.locator('#main .lex-list-row', has_text=BHD)
+                    archive = page.locator('#main .lex-list-row', has_text=BDT)
                     assert archive.count() == 1, 'split archive listed'
                     assert archive.locator('img.lex-ds1-shop-icon').count() == 0, \
                         'split archives have no per-texture preview'
