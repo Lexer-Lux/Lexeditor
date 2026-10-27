@@ -9267,6 +9267,7 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
   }
 }
 .ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.lex-compact-pager [data-dir-local].lex-pager-toggle>span{writing-mode:horizontal-tb;transform:none;}
 .ds1-sound-row{display:flex;align-items:center;gap:6px;}
 /* The number keeps a short digit lane while the stream's face takes the
    rest: an unconstrained input ate the whole narrow lane and crushed

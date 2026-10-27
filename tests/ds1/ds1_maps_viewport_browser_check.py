@@ -47,6 +47,11 @@ def main():
                     page.wait_for_function('state.tab==="maps" && !state.error', timeout=60000)
                     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=60000)
                     assert page.locator('[data-viewport-status]').count() == 0
+                    page.locator('[data-tabstrip-id="placements"]').click()
+                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+                    page.locator('[data-maps-dir] .lex-subtab-button', has_text='Drops').click()
+                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.wait_for_selector('[data-maps-dir] [data-dir-local]', timeout=30000)
                     toggle = page.locator('[data-dir-local]')
                     assert toggle.count() == 1
                     mode = page.evaluate("getComputedStyle(document.querySelector('[data-dir-local] > span')).writingMode")
