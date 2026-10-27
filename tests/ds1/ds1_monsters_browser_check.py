@@ -34,7 +34,7 @@ def main():
         game, mod = Path(temporary) / 'game', Path(temporary) / 'mod'
         (game / RELATIVE).parent.mkdir(parents=True)
         (game / RELATIVE).write_bytes(raw)
-        # A placed, loadable model so the Model tab renders its full list.
+        # A placed, loadable model for the preview drawer.
         (game / MAP_DIR).mkdir(parents=True)
         (game / MAP_DIR / 'm0.msb').write_bytes(build_msb(parts=(('enemy', 2, 0, 0, 120000),)))
         (game / 'chr').mkdir(parents=True)
@@ -59,8 +59,8 @@ def main():
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [t[0] for t in sorted(tabs, key=lambda entry: entry[1].lower())]
                     # Every section is a tab; Attacks joins them.
                     assert page.locator('.lex-tabbed-panel [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == [
-                        'ai', 'attacks', 'basics', 'behaviors', 'blocking', 'defense', 'effects-references',
-                        'model', 'value-rewards']
+                        'ai', 'attacks', 'basics', 'behaviors', 'blocking', 'body', 'defense', 'effects-references',
+                        'value-rewards']
                     assert page.evaluate('state.monsterTab') == 'basics'
                     page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
                     page.wait_for_function('state.monsterTab==="defense"')
@@ -93,6 +93,8 @@ def main():
                     expected = set(page.evaluate('state.row.fields.map(f=>f.key)'))
                     # The AI table rides row.fields for the Think panel without a grouping entry.
                     assert expected == set(NPC_FIELDS) | {'effectiveHp', 'aiThinkId'}
+                    page.locator('.lex-tabbed-panel [data-subtab="body"]').click()
+                    page.wait_for_function('state.monsterTab==="body"')
                     units = page.evaluate("""() => {
                         const out = {};
                         for (const key of ['weakPartsDamageRate', 'partsDamageRate1', 'partsDamageRate8']) {
@@ -166,6 +168,12 @@ def main():
                                     page.wait_for_function('(x)=>state.pending===0 && state.row.fields.find(f=>f.key===x.key).value===x.value',
                                                            arg={'key': key, 'value': changes[key]})
                                     edited.add(key)
+                            # Reference faces render their link, not an input; they still
+                            # count as reached, except the AI table the Think panel owns.
+                            faces = page.locator('span.ds1-reference-face[data-field-key]:visible')
+                            for key in faces.evaluate_all('nodes=>nodes.map(n=>n.dataset.fieldKey)'):
+                                if key != 'aiThinkId':
+                                    seen.add(key)
                             if output: page.screenshot(path=str(output / f'monsters-{tab_id}-{index}.png'))
                             following = page.locator('.lex-tweaks-pages').get_by_role('button', name='Next page', exact=True)
                             if not following.count() or not following.is_enabled(): break
@@ -199,11 +207,12 @@ def main():
                     page.mouse.down()
                     page.mouse.move(goal["x"] + goal["width"] / 2, goal["y"] + goal["height"] / 2, steps=8)
                     page.mouse.up()
-                    page.wait_for_function('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:pins:"))))[0].key==="mp"')
+                    page.wait_for_function('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:header-order:"))))'
+                                            '.slice(-2).join(",")==="pin:mp,pin:hp"')
                     order = page.locator('.lex-column-list-head-cell[data-column-key^="pin:"]').evaluate_all("cells=>cells.map(c=>c.dataset.columnKey)")
                     assert order == ["pin:mp", "pin:hp"], order
-                    stored = page.evaluate('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:pins:"))))')
-                    assert [entry["key"] for entry in stored] == ["mp", "hp"], stored
+                    stored = page.evaluate('JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith("lexeditor:header-order:"))))')
+                    assert stored[-2:] == ["pin:mp", "pin:hp"], stored
                     page.locator('.lex-column-list-row[data-key]').first.click()
                     page.wait_for_function('state.pending===0 && state.row && (state.row.table+":"+state.row.id)===state.selected')
                     page.evaluate('document.querySelector(".lex-detail-panel").dataset.pinProbe = "1"')
@@ -224,10 +233,10 @@ def main():
                     brains = []
                     page.locator('[data-tab="ai"]').click()
                     page.wait_for_function('state.tab==="ai" && state.sub==="ai" && state.row?.table==="NpcThinkParam" && !state.error')
-                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['ai', 'behaviors']
+                    assert page.locator('#main > .lex-stack > .lex-subtab-bar [data-subtab]').evaluate_all('n=>n.map(x=>x.dataset.subtab)') == ['ai', 'behaviors', 'player-behaviors']
                     assert page.locator('#main > .lex-stack > .lex-subtab-bar .lex-tab-label-text').evaluate_all(
-                        'n=>n.map(x=>x.textContent)') == ['AI tables', 'Behaviors']
-                    for sub, table, allowed in [('behaviors', 'BehaviorParam', BEHAVIOR_EDITABLE), ('ai', 'NpcThinkParam', THINK_EDITABLE)]:
+                        'n=>n.map(x=>x.textContent)') == ['AI tables', 'Behaviors', 'Player behaviors']
+                    for sub, table, allowed in [('behaviors', 'BehaviorParam', BEHAVIOR_EDITABLE), ('player-behaviors', 'BehaviorParam_PC', BEHAVIOR_EDITABLE), ('ai', 'NpcThinkParam', THINK_EDITABLE)]:
                         page.locator(f'#main > .lex-stack > .lex-subtab-bar [data-subtab="{sub}"]').click()
                         page.wait_for_function('(want)=>state.sub===want.sub && state.rows.length>0 && state.row && state.row.table===want.table && !state.error', arg={'sub': sub, 'table': table})
                         assert {field['key'] for field in page.evaluate('state.row.fields')} == set(allowed)
@@ -274,7 +283,7 @@ def main():
                         assert 'lists every attack record' in page.locator('.lex-tabbed-panel').inner_text()
                     panel('behaviors')
                     variation = page.evaluate('state.monsterBehaviors.variation')
-                    assert f'Behavior set {variation}' in page.locator('.lex-tabbed-panel').inner_text()
+                    assert page.locator('.lex-tabbed-panel input[aria-label="Behaviors ID"]').input_value() == str(variation)
                     moves = page.locator('.lex-tabbed-panel button.lex-hoverable[data-hover-target-type="ds1-behavior"]')
                     assert moves.count() == page.evaluate('state.monsterBehaviors.rows.length')
                     heads = page.locator('.lex-tabbed-panel .lex-column-list-head-cell').evaluate_all(
