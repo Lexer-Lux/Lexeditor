@@ -889,12 +889,6 @@ def _encode(doc, skin=False, textured=False):
             ok2 = bool(uvs2) and len(mesh['uvs2']) == len(mesh['positions'])
             packed2 = struct.pack('<%df' % len(uvs2), *uvs2) if ok2 else b''
             light = _lightmap_name(doc.meshes[index]['material'])
-            # A lightmapped mesh with genuinely one UV set samples its
-            # lightmap with the diffuse set, like the game, instead of
-            # rendering rig-lit. Packed members split in the parser, so
-            # this only reaches meshes with no second pair at all.
-            if light and not ok2 and ok:
-                packed2 = packed
             entry['uv1'] = base64.b64encode(packed2).decode('ascii')
             entry['map'] = _diffuse_name(doc.meshes[index]['material'])
             entry['light'] = light
