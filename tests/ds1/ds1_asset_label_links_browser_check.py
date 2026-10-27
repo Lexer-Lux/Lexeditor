@@ -1,10 +1,9 @@
-"""DS1 asset label links: Model ID hovers and opens its parts binder.
+"""DS1 asset links: Model ID hovers and opens its parts binder.
 
-Icon ID and Model ID link to their game files through the field label;
-the number input stays editable. Hoverables only: a picked file could
-never write back into a numeric ID, so no finder joins them. Model
-paths need no game files, so the Model ID link resolves offline; the
-Icon ID stays a dead number until the menu sheets are installed.
+Icon ID and Model ID show their game file through an asset face and
+edit through a picker that writes the numeric ID back. Model paths
+need no game files, so the Model ID face resolves offline; the Icon
+ID face shows None until the menu sheets are installed.
 """
 import sys
 import tempfile
@@ -47,11 +46,11 @@ def main():
                     page.locator('.lex-detail .lex-tabbed-panel [data-subtab="appearance"]').click()
                     page.wait_for_function("state.itemTab==='appearance'")
                     model = page.locator('.lex-detail-field[data-lex-property="equipModelId"]')
-                    assert model.locator('.lex-detail-field-label .lex-hoverable').count() == 1
-                    assert model.locator('.lex-thing-finder').count() == 0
-                    model.locator('.lex-detail-field-label .lex-hoverable').hover()
+                    assert model.locator('.ds1-asset-face .lex-hoverable').count() == 1
+                    assert model.locator('button.ds1-find-asset').count() == 1
+                    model.locator('.ds1-asset-face .lex-hoverable').hover()
                     page.locator('.lex-hover-preview').first.wait_for()
-                    model.locator('.lex-detail-field-label .lex-hoverable').click()
+                    model.locator('.ds1-asset-face .lex-hoverable').click()
                     page.wait_for_function("state.tab==='models'", timeout=15000)
                     page.locator('[data-tab="items"]').click()
                     page.locator('[data-subtab="weapons"]').click()
@@ -59,12 +58,13 @@ def main():
                     page.locator('.lex-detail .lex-tabbed-panel [data-subtab="appearance"]').click()
                     page.wait_for_function("state.itemTab==='appearance'")
                     icon = page.locator('.lex-detail-field[data-lex-property="iconId"]')
-                    assert icon.locator('.lex-detail-field-label .lex-hoverable').count() == 0
-                    assert icon.locator('.lex-thing-finder').count() == 0
+                    assert icon.locator('.ds1-asset-face .lex-hoverable').count() == 0
+                    assert icon.locator('.ds1-asset-face .ds1-unset-face').count() == 1
+                    assert icon.locator('button.ds1-icon-gallery').count() == 1
                 finally:
                     browser.close()
         finally:
             session.stop()
-        print('DS1 asset label links: Model ID hovers and opens, no finders passed.')
+        print('DS1 asset links: Model ID hovers and opens, pickers write back passed.')
 if __name__ == '__main__':
     main()
