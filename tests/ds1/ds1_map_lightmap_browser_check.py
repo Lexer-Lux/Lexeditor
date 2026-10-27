@@ -1,8 +1,10 @@
 """Map viewport bakes lightmaps: lightMap on channel 1 over uv1.
 
 A fixture map piece with a diffuse and a lightmap texture renders
-through MeshBasicMaterial with the light on the second UV set - map
-times light, no scene rig, the way the game shades terrain.
+through MeshStandardMaterial with the light on the second UV set -
+map times light plus the scene rig, the way the game shades
+terrain: the bake is ambient alone (the Depths medians 7%), so an
+unlit material rendered floors black.
 Synthetic fixtures only; read-only with no mod.
 """
 import base64
@@ -81,7 +83,7 @@ def main():
                             return lit; }""")
                     assert found, 'no lightmapped material in the scene'
                     for entry in found:
-                        assert entry['type'] == 'MeshBasicMaterial', entry
+                        assert entry['type'] == 'MeshStandardMaterial', entry
                         assert entry['channel'] == 1, entry
                         assert entry['uv1'], entry
                     if output:

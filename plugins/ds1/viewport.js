@@ -176,9 +176,12 @@ window.Ds1Viewport = (() => {
       const lit = !fx && litPng ? lightCache.get(texKey(mesh.light, litPng)) : null;
       const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}`;
       if (!matCache.has(key)) {
-        // Baked meshes skip the scene rig exactly like the game: map
-        // times light, nothing else. Basic divides the light by pi, so
-        // the intensity puts the baked values back to authored levels.
+        // Baked meshes keep the scene rig exactly like the game: map
+        // times light, plus the rig's direct light over it. The bake
+        // is ambient alone (the Depths medians 7% brightness), so
+        // Basic's map-times-light rendered floors black; Standard
+        // adds the hemisphere and sun back on top. The pi still
+        // cancels three's Lambert divide on the lightmap term.
         // Cutouts discard their empty texels instead of drawing them
         // black, and the offset lifts them off the surface beneath.
         // Effects already blend, so they cut nothing.
@@ -190,8 +193,9 @@ window.Ds1Viewport = (() => {
           ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
               side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false})
           : lit
-            ? new THREE.MeshBasicMaterial({map: image, lightMap: lit,
-                lightMapIntensity: Math.PI, ...cut})
+            ? new THREE.MeshStandardMaterial({map: image, lightMap: lit,
+                lightMapIntensity: Math.PI, roughness: 0.95, metalness: 0,
+                side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut})
             : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
                 side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut});
         matCache.set(key, textured);
